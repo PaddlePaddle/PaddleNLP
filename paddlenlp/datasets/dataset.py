@@ -48,14 +48,14 @@ DATASETS_MODULE_PATH = "paddlenlp.datasets."
 from datasets import load_dataset as origin_load_dataset
 
 
-def load_from_ppnlp(path, **kwargs):
+def load_from_ppnlp(path, *args, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
     new_path = os.path.split(path)[-1]
     new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
     if os.path.exists(new_path):
-        return origin_load_dataset(new_path, **kwargs)
+        return origin_load_dataset(new_path, *args, **kwargs)
     else:
-        return origin_load_dataset(path, **kwargs)
+        return origin_load_dataset(path, *args, **kwargs)
 
 
 datasets.load_dataset = load_from_ppnlp
@@ -64,7 +64,7 @@ datasets.load_dataset = load_from_ppnlp
 class DatasetTuple:
     def __init__(self, splits):
         self.tuple_cls = namedtuple('datasets', splits)
-        self.tuple = self.tuple_cls(*[None for _ in splits])
+        self.tuple = self.tuple_cls(* [None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):

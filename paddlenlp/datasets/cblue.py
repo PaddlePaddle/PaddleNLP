@@ -122,7 +122,14 @@ class CBLUE(DatasetBuilder):
                     '8ac74722e9448fdc76132206582b9a06', ['text']
                 ]
             },
-            'labels': '53_schemas.json'
+            'labels': [
+                '预防', '阶段', '就诊科室', '辅助治疗', '化疗', '放射治疗', '手术治疗', '实验室检查',
+                '影像学检查', '辅助检查', '组织学检查', '内窥镜检查', '筛查', '多发群体', '发病率', '发病年龄',
+                '多发地区', '发病性别倾向', '死亡率', '多发季节', '传播途径', '并发症', '病理分型',
+                '相关（导致）', '鉴别诊断', '相关（转化）', '相关（症状）', '临床表现', '治疗后症状',
+                '侵及周围组织转移的症状', '病因', '高危因素', '风险评估因素', '病史', '遗传因素', '发病机制',
+                '病理生理', '药物治疗', '发病部位', '转移部位', '外侵部位', '预后状况', '预后生存率', '同义词'
+            ]
         },
         'CHIP-CDN': {
             'url':
@@ -286,20 +293,22 @@ class CBLUE(DatasetBuilder):
             if tokens[idx:idx + ent_len] == entity_tokens:
                 if skip_idx is None:
                     return idx
-                elif idx < skip_idx or idx >= skip_idx + ent_len:
+                elif idx < skip_idx[0] or idx > skip_idx[1]:
                     return idx
         return None
 
     def _search_spo_index(self, tokens, subjects, objects):
-        tokens = tokens.lower()
-        subjects = subjects.lower()
-        objects = objects.lower()
+        tokens = [x.lower() for x in tokens]
+        subjects = [x.lower() for x in subjects]
+        objects = [x.lower() for x in objects]
         if len(subjects) > len(objects):
             sub_idx = self._search_entity_index(tokens, subjects)
-            obj_idx = self._search_entity_index(tokens, objects, sub_idx)
+            obj_idx = self._search_entity_index(
+                tokens, objects, (sub_idx, sub_idx + len(subjects) - 1))
         else:
             obj_idx = self._search_entity_index(tokens, objects)
-            sub_idx = self._search_entity_index(tokens, subjects, obj_idx)
+            sub_idx = self._search_entity_index(
+                tokens, subjects, (obj_idx, obj_idx + len(objects) - 1))
         return sub_idx, obj_idx
 
     def _read(self, filename, split):
@@ -319,24 +328,30 @@ class CBLUE(DatasetBuilder):
                         ent_list.append(sub)
                         ent_list.append(obj)
                         spo_list.append((sub, rel, obj))
+
                         sub_idx, obj_idx = self._search_spo_index(data['text'],
                                                                   sub, obj)
                         if sub_idx is not None and obj_idx is not None:
-                            ent_label.append((sub_idx, sub_idx + len(sub) - 1))
-                            ent_label.append((obj_idx, obj_idx + len(obj) - 1))
-                            spo_label.append((sub_idx, obj_idx, label_map[rel]))
+                            sub = tuple((sub_idx, sub_idx + len(sub) - 1))
+                            obj = tuple((obj_idx, obj_idx + len(obj) - 1))
+                            ent_label.append(sub)
+                            ent_label.append(obj)
+                            spo_label.append((sub, label_map[rel], obj))
 
-                        if sub_idx is None or obj_idx is None:
-                            print('Error: Can not find entities in tokens.')
-                            print('Tokens:', data['text'])
-                            print('Entities":', sub, obj)
+                        # The samples where subjects and objects have overlap
+                        # will be discarded during training.
+                        #
+                        #if sub_idx is None or obj_idx is None:
+                        #    print('Error: Can not find entities in tokens.')
+                        #    print('Tokens:', data['text'])
+                        #    print('Entities":', sub, obj)
 
-                        data['ent_list'] = ent_list
-                        data['spo_list'] = spo_list
-                        data['ent_label'] = ent_label
-                        data['spo_label'] = spo_label
+                    data['ent_list'] = ent_list
+                    data['spo_list'] = spo_list
+                    data['ent_label'] = ent_label
+                    data['spo_label'] = spo_label
 
-                        yield data
+                    yield data
             elif self.name == 'CMeEE':
                 data_list = json.load(f, encoding='utf-8')
                 for data in data_list:
@@ -344,11 +359,16 @@ class CBLUE(DatasetBuilder):
                     if data.get('entities', None):
                         labels = [['O' for _ in range(text_len)],
                                   ['O' for _ in range(text_len)]]
+                        idx_dict = [{}, {}]
                         for entity in data['entities']:
                             start_idx = entity['start_idx']
                             end_idx = entity['end_idx']
                             etype = entity['type']
                             ltype = int(etype == 'sym')
+                            if start_idx in idx_dict[ltype]:
+                                if idx_dict[ltype][start_idx] >= end_idx:
+                                    continue
+                            idx_dict[ltype][start_idx] = end_idx
                             if start_idx == end_idx:
                                 labels[ltype][start_idx] = 'S-' + etype
                             else:
@@ -396,11 +416,5 @@ class CBLUE(DatasetBuilder):
         elif self.name == 'CHIP-CTC':
             labels = pd.read_excel(os.path.join(label_dir, labels))
             return sorted(labels['Label Name'].values)
-        elif self.name == 'CMeIE':
-            label_list = set()
-            with open(os.path.join(label_dir, labels), 'r') as f:
-                for line in f.readlines():
-                    label_list.add(json.loads(line)['predicate'])
-            return sorted(list(label_list))
         else:
             return self.BUILDER_CONFIGS[self.name]['labels']

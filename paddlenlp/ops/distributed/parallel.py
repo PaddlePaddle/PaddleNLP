@@ -14,7 +14,6 @@
 
 import paddle
 import paddle.nn as nn
-from paddle.fluid.framework import in_dygraph_mode
 try:
     from paddle.distributed.fleet import fleet
 except Exception as e:
@@ -167,7 +166,7 @@ class ColumnParallelLiner(nn.Layer):
                  name=None):
         super().__init__()
 
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
@@ -267,7 +266,7 @@ class RowParallelLiner(nn.Layer):
                  name=None):
         super().__init__()
 
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:

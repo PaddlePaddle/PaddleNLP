@@ -1,9 +1,7 @@
-<div align="center">  
-  <h1> PaddleNLP 一键预测功能 </h1>
-</div>
+# PaddleNLP一键预测功能：Taskflow API
 
 
-<p align="center">
+<p align="left">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/pyversions/paddlenlp"></a>
@@ -12,7 +10,7 @@
 </p>
 
 
-<h4 align="center">
+<h4 align="left">
   <a href=#QuickStart> QuickStart </a> |
   <a href=#社区交流> 社区交流 </a> |
   <a href=#详细使用> 一键预测&定制训练 </a> |
@@ -40,7 +38,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")` | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
-| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            | ✅          | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
+| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 
 
 ## QuickStart
@@ -52,6 +50,9 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
+可进入 Jupyter Notebook 环境，在线体验 👉🏻  [进入在线运行环境](https://aistudio.baidu.com/aistudio/projectdetail/3696243)
+
+PaddleNLP Taskflow API 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
 ## 社区交流
 
@@ -62,10 +63,6 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 </div>
 
 ## 详细使用
-
-可进入 Jupyter Notebook 环境，在线体验 👉🏻  [进入在线运行环境](https://aistudio.baidu.com/aistudio/projectdetail/3494205)
-
-Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
 ## PART Ⅰ &emsp; 一键预测
 
@@ -112,8 +109,7 @@ from paddlenlp import Taskflow
 在默认模式和精确模式下，词典文件每一行由一个或多个自定义item组成。词典文件`user_dict.txt`示例：
 ```text
 平原上的火焰
-上
-映
+上 映
 ```
 
 在快速模式下，词典文件每一行为一个自定义item+"\t"+词频（词频可省略，词频省略则自动计算能保证分出该词的词频），暂时不支持黑名单词典（即通过设置”年“、”末“，以达到切分”年末“的目的）。词典文件`user_dict.txt`示例：
@@ -129,7 +125,7 @@ from paddlenlp import Taskflow
 >>> seg("平原上的火焰宣布延期上映")
 ['平原', '上', '的', '火焰', '宣布', '延期', '上映']
 >>> seg = Taskflow("word_segmentation", user_dict="user_dict.txt")
->>> seg("平原上的火焰计划于年末上映")
+>>> seg("平原上的火焰宣布延期上映")
 ['平原上的火焰', '宣布', '延期', '上', '映']
 ```
 #### 参数说明
@@ -680,6 +676,31 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
 ```
 </div></details>
 
+## 模型算法
+
+<details><summary>模型算法说明</summary><div>
+
+<table>
+  <tr><td>任务名称<td>模型<td>模型详情<td>训练集
+  <tr><td rowspan="3">中文分词<td>默认模式: BiGRU+CRF<td>  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含近2200万句子，覆盖多种场景
+  <tr><td>快速模式：Jieba<td> - <td> -
+  <tr><td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>词性标注<td>BiGRU+CRF<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
+  <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
+  <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
+  <tr><td>文本相似度<td>SimBERT<td> - <td> 收集百度知道2200万对相似句组
+  <tr><td rowspan="2">情感倾向分析<td> BiLSTM <td> - <td> 百度自建数据集
+  <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
+  <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
+  <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
+</table>
+
+</div></details>
 
 ## FAQ
 
@@ -701,6 +722,22 @@ ner = Taskflow("ner", home_path="/workspace")
 
 </div></details>
 
+<details><summary><b>Q：</b>Taskflow如何提升预测速度？</summary><div>
+
+**A:** 可以结合设备情况适当调整batch_size，采用批量输入的方式来提升平均速率。示例：
+```python
+from paddlenlp import Taskflow
+
+# 精确模式模型体积较大，可结合机器情况适当调整batch_size，采用批量样本输入的方式。
+seg_accurate = Taskflow("word_segmentation", mode="accurate", batch_size=32)
+
+# 批量样本输入，输入为多个句子组成的list，预测速度更快
+texts = ["热梅茶是一道以梅子为主要原料制作的茶饮", "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"]
+seg_accurate(texts)
+```
+通过上述方式进行分词可以大幅提升预测速度。
+
+</div></details>
 
 <details><summary><b>Q：</b>后续会增加更多任务支持吗？</summary><div>
 

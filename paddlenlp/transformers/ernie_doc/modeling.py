@@ -688,7 +688,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
             The dropout ratio of last output. Default to `0.1`.
     """
 
-    def __init__(self, ernie_doc, num_classes, dropout=0.1):
+    def __init__(self, ernie_doc, num_classes=2, dropout=0.1):
         super(ErnieDocForSequenceClassification, self).__init__()
         self.ernie_doc = ernie_doc
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
@@ -782,7 +782,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
             The dropout ratio of last output. Default to 0.1.
     """
 
-    def __init__(self, ernie_doc, num_classes, dropout=0.1):
+    def __init__(self, ernie_doc, num_classes=2, dropout=0.1):
         super(ErnieDocForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config

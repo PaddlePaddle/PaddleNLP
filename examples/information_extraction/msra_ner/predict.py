@@ -26,7 +26,7 @@ from paddle.io import DataLoader
 
 import paddlenlp as ppnlp
 from datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 
 parser = argparse.ArgumentParser()
@@ -75,6 +75,7 @@ def do_predict(args):
     # Create dataset, tokenizer and dataloader.
     train_examples, predict_examples = load_dataset(
         'msra_ner', split=('train', 'test'))
+    column_names = train_examples.column_names
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
     label_list = train_examples.features['ner_tags'].feature.names
@@ -104,17 +105,14 @@ def do_predict(args):
         return tokenized_inputs
 
     ignore_label = -100
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        'seq_len': Stack(),
-        'labels': Pad(axis=0, pad_val=ignore_label)  # label
-    }): fn(samples)
+    batchify_fn = DataCollatorForTokenClassification(tokenizer)
 
     id2label = dict(enumerate(label_list))
 
     predict_examples = predict_examples.select(range(len(predict_examples) - 1))
-    predict_ds = predict_examples.map(tokenize_and_align_labels, batched=True)
+    predict_ds = predict_examples.map(tokenize_and_align_labels,
+                                      batched=True,
+                                      remove_columns=column_names)
     predict_data_loader = DataLoader(
         dataset=predict_ds,
         collate_fn=batchify_fn,
@@ -133,11 +131,10 @@ def do_predict(args):
     pred_list = []
     len_list = []
     for step, batch in enumerate(predict_data_loader):
-        input_ids, token_type_ids, length, labels = batch
-        logits = model(input_ids, token_type_ids)
+        logits = model(batch['input_ids'], batch['token_type_ids'])
         pred = paddle.argmax(logits, axis=-1)
         pred_list.append(pred.numpy())
-        len_list.append(length.numpy())
+        len_list.append(batch['seq_len'].numpy())
 
     preds = parse_decodes(predict_examples, id2label, pred_list, len_list)
 

@@ -26,11 +26,10 @@ from paddle.metric import Accuracy
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer, LinearDecayWithWarmup
+from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
 from paddlenlp.metrics import MultiLabelsMetric, AccuracyAndF1
-from paddlenlp.ops.optimizer import ExponentialMovingAverage
 
-from utils import convert_example, create_dataloader
+from utils import convert_example, create_dataloader, LinearDecayWithWarmup
 
 METRIC_CLASSES = {
     'KUAKE-QIC': Accuracy,
@@ -48,6 +47,7 @@ parser.add_argument('--dataset', choices=['KUAKE-QIC', 'KUAKE-QQR', 'KUAKE-QTR',
 parser.add_argument('--seed', default=1000, type=int, help='Random seed for initialization.')
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default='gpu', help='Select which device to train model, default to gpu.')
 parser.add_argument('--epochs', default=3, type=int, help='Total number of training epochs.')
+parser.add_argument('--max_steps', default=-1, type=int, help='If > 0: set total number of training steps to perform. Override epochs.')
 parser.add_argument('--batch_size', default=32, type=int, help='Batch size per GPU/CPU for training.')
 parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning sequence classification task.')
 parser.add_argument('--weight_decay', default=0.01, type=float, help="Weight decay of optimizer if we apply some.")
@@ -58,7 +58,6 @@ parser.add_argument('--logging_steps', default=10, type=int, help='The interval 
 parser.add_argument('--save_dir', default='./checkpoint', type=str, help='The output directory where the model checkpoints will be written.')
 parser.add_argument('--save_steps', default=100, type=int, help='The interval steps to save checkpoints.')
 parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
-parser.add_argument('--use_ema', default=False, type=bool, help='Use exponential moving average for evaluation.')
 parser.add_argument('--use_amp', default=False, type=distutils.util.strtobool, help='Enable mixed precision training.')
 parser.add_argument('--scale_loss', default=128, type=float, help='The value of scale_loss for fp16.')
 
@@ -121,11 +120,10 @@ def do_train():
         'cblue', args.dataset, splits=['train', 'dev'])
 
     model = ElectraForSequenceClassification.from_pretrained(
-        'ehealth-chinese',
+        'ernie-health-chinese',
         num_classes=len(train_ds.label_list),
-        activation='tanh',
-        layer_norm_eps=1e-5)
-    tokenizer = ElectraTokenizer.from_pretrained('ehealth-chinese')
+        activation='tanh')
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
     trans_func = partial(
         convert_example,
@@ -155,7 +153,8 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = len(train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(
+        train_data_loader) * args.epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -186,9 +185,6 @@ def do_train():
         metric_name = 'micro f1'
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-    if args.use_ema and rank == 0:
-        ema = ExponentialMovingAverage(model)
-        ema.register()
     global_step = 0
     tic_train = time.time()
     total_train_time = 0
@@ -197,7 +193,9 @@ def do_train():
             input_ids, token_type_ids, position_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                    custom_white_list=[
+                        'layer_norm', 'softmax', 'gelu', 'tanh'
+                    ], ):
                 logits = model(input_ids, token_type_ids, position_ids)
                 loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
@@ -218,8 +216,6 @@ def do_train():
                 loss.backward()
                 optimizer.step()
             lr_scheduler.step()
-            if args.use_ema and rank == 0:
-                ema.update()
             optimizer.clear_grad()
 
             global_step += 1
@@ -230,16 +226,9 @@ def do_train():
                     'global step %d, epoch: %d, batch: %d, loss: %.5f, %s: %.5f, speed: %.2f step/s'
                     % (global_step, epoch, step, loss, metric_name, result,
                        args.logging_steps / time_diff))
-                tic_train = time.time()
 
             if global_step % args.valid_steps == 0 and rank == 0:
-                if args.use_ema:
-                    ema.apply_shadow()
-                    evaluate(model, criterion, metric, dev_data_loader)
-                    ema.restore()
-                else:
-                    evaluate(model, criterion, metric, dev_data_loader)
-                tic_train = time.time()
+                evaluate(model, criterion, metric, dev_data_loader)
 
             if global_step % args.save_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, 'model_%d' % global_step)
@@ -250,8 +239,12 @@ def do_train():
                 else:
                     model.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
-                tic_train = time.time()
-    if rank == 0:
+
+            if args.max_steps > 0 and global_step >= args.max_steps:
+                return
+            tic_train = time.time()
+
+    if rank == 0 and total_train_time > 0:
         print('Speed: %.2f steps/s' % (global_step / total_train_time))
 
 
