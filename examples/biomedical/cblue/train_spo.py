@@ -128,9 +128,8 @@ def do_train():
         }): fn(samples)
         ent_label = [x['ent_label'] for x in data]
         spo_label = [x['spo_label'] for x in data]
-        # data = input_ids, token_type_ids, position_ids, attention_mask
-        data = _batchify_fn(data)
-        batch_size, batch_len = data[0].shape
+        input_ids, token_type_ids, position_ids, masks = _batchify_fn(data)
+        batch_size, batch_len = input_ids.shape
         num_classes = len(train_ds.label_list)
         # Create one-hot labels.
         #
@@ -176,7 +175,7 @@ def do_train():
         # xxx_label are used for metric computation.
         ent_label = [one_hot_ent_label, ent_label]
         spo_label = [one_hot_spo_label, spo_label]
-        return (*data), ent_label, spo_label
+        return input_ids, token_type_ids, position_ids, masks, ent_label, spo_label
 
     train_data_loader = create_dataloader(
         train_ds,

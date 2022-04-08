@@ -9,29 +9,31 @@
 使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
 
 
-| Model                 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | C<sup>3</sup> |
-| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ------------- |
-| RoBERTa-wwm-ext-large | 76.20 | 59.50 | 62.10   | 84.02 | 79.15 | 90.79       | 82.03 | 75.79         |
+| Model                 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | CHID  | C<sup>3</sup> |
+| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----- | ------------- |
+| RoBERTa-wwm-ext-large | 75.32 | 59.33 | 61.91   | 83.87 | 78.81 | 91.78       | 81.80 | 70.67/90.61 | 85.83 | 74.90         |
 
 
-AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。
-其中前 7 项属于分类任务，后面 1 项属于阅读理解任务，这两种任务的训练过程在下面将会分开介绍。
+AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM/F1。
+其中前 7 项属于分类任务，后面 3 项属于阅读理解任务，这两种任务的训练过程在下面将会分开介绍。
 
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优。分类任务训练每间隔 100 steps 评估验证集效果，阅读理解任务每隔一个 epoch 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
 
 2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，对CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
 
-3. 阅读理解任务 Grid Search 超参范围：batch_size: 24, 32; learning rates: 1e-5, 2e-5, 3e-5。
+3. 阅读理解任务 Grid Search 超参范围：batch_size: 24, 32; learning rates: 1e-5, 2e-5, 3e-5。阅读理解任务均使用多卡训练，其中 Grid Search 中的 batch_size 是指多张卡上的 batch_size 总和。
 
-4. 以上任务的 epoch、max_seq_length、warmup proportion 如下表所示：
+4. 以上每个任务的固定超参配置如下表所示：
 
 | TASK              | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL  | CMRC2018 | CHID | C<sup>3</sup> |
 | ----------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ---- | -------- | ---- | ------------- |
 | epoch             | 3     | 3     | 3       | 2     | 5     | 50          | 5    | 2        | 3    | 8             |
 | max_seq_length    | 128   | 128   | 128     | 128   | 128   | 128         | 128  | 512      | 64   | 512           |
-| warmup_proportion | 0.1   | 0.1   | 0.1     | 0.1   | 0.1   | 0.1         | 0.1  | 0.1      | 0.06 | 0.05          |
-
+| warmup_proportion | 0.1   | 0.1   | 0.1     | 0.1   | 0.1   | 0.1         | 0.1  | 0.1      | 0.06 | 0.1           |
+| num_cards         | 1     | 1     | 1       | 1     | 1     | 1           | 1    | 2        | 4    | 4             |
+| learning_rate     | 1e-5  | 3e-5  | 3e-5    | 1e-5  | 1e-5  | 1e-5        | 2e-5 | 32       | 24   | 24            |
+| batch_size        | 32    | 32    | 32      | 16    | 16    | 16          | 16   | 3e-5     | 1e-5 | 2e-5          |
 
 
 ## 一键复现模型效果
@@ -100,7 +102,7 @@ eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
 
 ### 启动 CLUE 阅读理解任务
-以 CLUE 的 C<sup>3</sup> 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
+以 CLUE 的 C<sup>3</sup> 任务为例，多卡启动 CLUE 任务进行 Fine-tuning 的方式如下：
 
 ```shell
 
@@ -108,18 +110,21 @@ cd mrc
 
 mkdir roberta-wwm-ext-large
 MODEL_PATH=roberta-wwm-ext-large
-BATCH_SIZE=24
+BATCH_SIZE=6
 LR=2e-5
 
-python -u run_c3.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
     --learning_rate ${LR} \
     --max_seq_length 512 \
     --num_train_epochs 8 \
-    --warmup_proportion 0.05 \
+    --do_train \
+    --warmup_proportion 0.1 \
+    --gradient_accumulation_steps 3 \
 
 ```
+需要注意的是，如果显存无法容纳所传入的 `batch_size`，可以通过传入 `gradient_accumulation_steps` 参数来模拟该 `batch_size`。
 
 ## 参加 CLUE 竞赛
 
