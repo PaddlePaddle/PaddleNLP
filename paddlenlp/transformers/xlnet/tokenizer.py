@@ -18,6 +18,7 @@ import os
 import unicodedata
 from shutil import copyfile
 from typing import List, Optional
+# from paddlenlp.transformers.tokenizer_utils import is_chinese_char as ischnch
 
 from paddle.utils import try_import
 from .. import PretrainedTokenizer
@@ -152,6 +153,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
+        self.basic_tokenizer = self
 
     @property
     def vocab_size(self):
@@ -175,7 +177,9 @@ class XLNetTokenizer(PretrainedTokenizer):
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.vocab_file)
 
+
     def preprocess_text(self, inputs):
+        inputs = self.sp_model.decode_pieces(self.sp_model.encode_as_pieces(inputs))
         if self.remove_space:
             outputs = " ".join(inputs.strip().split())
         else:
@@ -188,17 +192,21 @@ class XLNetTokenizer(PretrainedTokenizer):
                 [c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
-
+        outputs = self.sp_model.decode_pieces(self.sp_model.encode_as_pieces(outputs))
         return outputs
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
+        # print('nizer')
+        
         text = self.preprocess_text(text)
-
+        # print('tokenize_text:',text)
         if not sample:
             pieces = self.sp_model.EncodeAsPieces(text)
         else:
             pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
+        # print(pieces)
+        # print(pieces)
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
@@ -212,6 +220,8 @@ class XLNetTokenizer(PretrainedTokenizer):
                         cur_pieces[0] = cur_pieces[0][1:]
                 cur_pieces.append(piece[-1])
                 new_pieces.extend(cur_pieces)
+            # elif len(piece) > 0 and self.is_chinese_char(ord(piece[0])):
+            #     new_pieces.append(SENTENCEPIECE_UNDERLINE+piece)
             else:
                 new_pieces.append(piece)
 
@@ -394,3 +404,61 @@ class XLNetTokenizer(PretrainedTokenizer):
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):
                 copyfile(self.vocab_file, save_path)
+
+    def get_offset_mapping(self, text):
+        text = self.preprocess_text(text)
+        # text = text.replace("``", '"').replace("''", '"')
+        # print('TEXT:    ',text)
+        normalized_text, char_mapping = '', []
+        for i, ch in enumerate(text):
+            # if not self.keep_accents:
+            #     ch = unicodedata.normalize("NFKD", ch)
+            #     if not unicodedata.combining(ch):
+            #         normalized_text += ch
+            #         char_mapping.extend([i] * len(ch))
+            # else:
+            normalized_text += ch
+            char_mapping.extend([i] * len(ch))
+
+        if self.do_lower_case:
+            normalized_text = normalized_text.lower()
+
+        text, token_mapping, offset = normalized_text, [], 0
+        split_tokens = self.tokenize(text)
+        if split_tokens[0] == SENTENCEPIECE_UNDERLINE:
+            split_tokens = split_tokens[1:]
+            token_mapping.append((0,0))
+
+        for token in split_tokens:
+            if token[0] == SENTENCEPIECE_UNDERLINE:
+                token=token[1:]
+
+            if len(token) == 0:
+                length = 1
+            else:
+                length = len(token)
+            if text[offset:].find(token) == -1:
+                print ('    text:   ',text,'\n  text[offset]:   ',text[offset:],'\n token   ',token,'\n split_tokens:',split_tokens)
+            start = text[offset:].index(token) + offset
+            end = start + length
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))            
+            offset = end
+
+        return token_mapping
+    # def get_offset_mapping(self, text):
+    #     text = self.preprocess_text(text)
+    #     # print('mapping_text:',text)
+    #     from sentencepiece import sentencepiece_pb2
+    #     spt = sentencepiece_pb2.SentencePieceText()
+    #     spt.ParseFromString(self.sp_model.encode_as_serialized_proto(text))
+    #     token_mapping = []
+    #     print(spt.pieces)
+    #     for piece in spt.pieces:
+    #         blanklen = 0
+    #         if len(piece.surface.strip())!=0:
+    #             blanklen = (len(piece.surface)-len(piece.surface.lstrip()))
+    #         # print(blanklen)
+    #         token_mapping.append((piece.begin+blanklen, piece.end))
+    #     return token_mapping
