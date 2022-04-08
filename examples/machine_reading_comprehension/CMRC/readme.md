@@ -24,7 +24,7 @@ CMRC
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" run_squad.py \
+python -m paddle.distributed.launch --gpus "0" run_cmrc.py \
     --model_type xlnet \
     --model_name_or_path chinese-xlnet-mid \
     --max_seq_length 1024 \
@@ -51,16 +51,16 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 ```text
 {
-  "exact": 81.18259224219489,
-  "f1": 88.68817481234801,
-  "total": 10570,
-  "HasAns_exact": 81.18259224219489,
-  "HasAns_f1": 88.68817481234801,
-  "HasAns_total": 10570
+  "exact": 61.26126126126126,
+  "f1": 84.18154653513831,
+  "total": 3219,
+  "HasAns_exact": 61.26126126126126,
+  "HasAns_f1": 84.18154653513831,
+  "HasAns_total": 3219
 }
 ```
 
-**NOTE:** 如需恢复模型训练，则model_name_or_path只需指定到文件夹名即可。如`--model_name_or_path=./tmp/cmrc/model_19000/`，程序会自动加载模型参数`/model_state.pdparams`，也会自动加载词表，模型config和tokenizer的config。
+**NOTE:** 如需恢复模型训练，则model_name_or_path只需指定到文件夹名即可。如`--model_name_or_path=./tmp/cmrc/model_3000/`，程序会自动加载模型参数`/model_state.pdparams`，也会自动加载词表，模型config和tokenizer的config。
 
 ### 预测
 
@@ -95,11 +95,11 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
   }
 ```
 
-并参考[以内置数据集格式读取本地数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#id4)中的方法创建自己的数据集并修改`run_squad.py`中对应的数据集读取代码。再运行以下脚本：
+并参考[以内置数据集格式读取本地数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#id4)中的方法创建自己的数据集并修改`run_cmrc.py`中对应的数据集读取代码。再运行以下脚本：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" run_squad.py \
+python -m paddle.distributed.launch --gpus "0" run_cmrc.py \
     --model_type xlnet \
     --model_name_or_path chinese-xlnet-mid \
     --max_seq_length 1024 \
