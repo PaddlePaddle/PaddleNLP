@@ -110,7 +110,7 @@ class RembertPretrainedModel(PretrainedModel):
                     self.rembert.config["initializer_range"],
                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = self.layer_norm_eps
+            layer._epsilon = 1e-12
 
 
 class RemBertEmbeddings(nn.Layer):
@@ -470,7 +470,8 @@ class RemBertModel(RembertPretrainedModel):
             attention_probs_dropout_prob=attention_probs_dropout_prob,
             hidden_dropout_prob=hidden_dropout_prob,
             intermediate_size=intermediate_size,
-            hidden_act=hidden_act)
+            hidden_act=hidden_act,
+            layer_norm_eps=layer_norm_eps)
 
         self.pooler = RemBertPooler(hidden_size)
 
