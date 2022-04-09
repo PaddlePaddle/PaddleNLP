@@ -18,6 +18,17 @@ CMRC
 ### 数据准备
 
 为了方便开发者进行测试，我们使用了HuggingFace的数据集，需要安装HuggingFace的datasets包加载数据集
+
+### 安装依赖
+
+除了要安装paddlenlp及其依赖外，本示例还应安装sentencepeice，具体命令如下
+```shell
+pip install sentencepiece
+```
+另外nltk需要下载punkt资源，具体方法为：
+
+![图片](https://user-images.githubusercontent.com/50627048/162560106-e3e1469b-5e68-4d8d-a1d7-e977e1ca242f.png)
+
 ### Fine-tune
 
 对于 CMRC任务,按如下方式启动 Fine-tuning:
