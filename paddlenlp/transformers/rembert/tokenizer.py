@@ -59,8 +59,8 @@ class RemBertTokenizer(PretrainedTokenizer):
     Examples:
         .. code-block::
 
-            from paddlenlp.transformers import ChineseBertTokenizer
-            tokenizer = ChineseBertTokenizer.from_pretrained('ChineseBERT-base')
+            from paddlenlp.transformers import RemBertTokenizer
+            tokenizer = ChineseBertTokenizer.from_pretrained('rembert')
 
             inputs = tokenizer('欢迎使用飞桨！')
             print(inputs)
