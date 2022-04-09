@@ -4,3 +4,6 @@ colorlog
 colorama
 seqeval
 multiprocess
+datasets
+tqdm
+paddlefsl

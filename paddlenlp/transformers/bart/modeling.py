@@ -777,6 +777,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             raise AttributeError(
                 "'repetition_penalty != 1' is not supported yet in the faster version"
             )
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         if kwargs['forced_bos_token_id'] is not None:
             # not support for min_length yet in the faster version
             raise AttributeError(
@@ -851,6 +855,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             return lm_logits, cache
         else:
             return lm_logits
+
+    def prepare_decoder_input_ids_from_labels(self, labels):
+        return shift_tokens_right(labels,
+                                  self.bart.config['decoder_start_token_id'])
 
     def prepare_inputs_for_generation(self,
                                       decoder_input_ids,

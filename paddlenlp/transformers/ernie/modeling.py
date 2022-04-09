@@ -31,15 +31,17 @@ class ErnieEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            hidden_dropout_prob=0.1,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            pad_token_id=0,
-            weight_attr=None, ):
+    def __init__(self,
+                 vocab_size,
+                 hidden_size=768,
+                 hidden_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=2,
+                 pad_token_id=0,
+                 weight_attr=None,
+                 task_type_vocab_size=3,
+                 task_id=0,
+                 use_task_id=False):
         super(ErnieEmbeddings, self).__init__()
 
         self.word_embeddings = nn.Embedding(
@@ -51,10 +53,19 @@ class ErnieEmbeddings(nn.Layer):
             max_position_embeddings, hidden_size, weight_attr=weight_attr)
         self.token_type_embeddings = nn.Embedding(
             type_vocab_size, hidden_size, weight_attr=weight_attr)
+        self.use_task_id = use_task_id
+        self.task_id = task_id
+        if self.use_task_id:
+            self.task_type_embeddings = nn.Embedding(
+                task_type_vocab_size, hidden_size, weight_attr=weight_attr)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                task_type_ids=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             #seq_length = input_ids.shape[1]
@@ -69,6 +80,12 @@ class ErnieEmbeddings(nn.Layer):
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
+        if self.use_task_id:
+            if task_type_ids is None:
+                task_type_ids = paddle.ones_like(
+                    input_ids, dtype="int64") * self.task_id
+            task_type_embeddings = self.task_type_embeddings(task_type_ids)
+            embeddings = embeddings + task_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -169,6 +186,84 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "rocketqa-zh-dureader-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-zh-dureader-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
+        "rocketqa-zh-dureader-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 513,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
+        "rocketqa-v1-marco-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -183,6 +278,18 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
+            "rocketqa-zh-dureader-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_query_encoder.pdparams",
+            "rocketqa-zh-dureader-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_para_encoder.pdparams",
+            "rocketqa-v1-marco-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_query_encoder.pdparams",
+            "rocketqa-v1-marco-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_para_encoder.pdparams",
+            "rocketqa-zh-dureader-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_cross_encoder.pdparams",
+            "rocketqa-v1-marco-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_cross_encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
@@ -274,7 +381,10 @@ class ErnieModel(ErniePretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=2,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 task_type_vocab_size=3,
+                 task_id=0,
+                 use_task_id=False):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -283,7 +393,8 @@ class ErnieModel(ErniePretrainedModel):
                 mean=0.0, std=self.initializer_range))
         self.embeddings = ErnieEmbeddings(
             vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr)
+            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr,
+            task_type_vocab_size, task_id, use_task_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -302,7 +413,8 @@ class ErnieModel(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                task_type_ids=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -381,7 +493,8 @@ class ErnieModel(ErniePretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
-            token_type_ids=token_type_ids)
+            token_type_ids=token_type_ids,
+            task_type_ids=task_type_ids)
 
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
@@ -739,12 +852,16 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
 
     """
 
-    def __init__(self):
+    def __init__(self, with_nsp_loss=True):
         super(ErniePretrainingCriterion, self).__init__()
+        self.with_nsp_loss = with_nsp_loss
         #self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
 
-    def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels):
+    def forward(self,
+                prediction_scores,
+                seq_relationship_score,
+                masked_lm_labels,
+                next_sentence_labels=None):
         """
         Args:
             prediction_scores(Tensor):
@@ -775,6 +892,10 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 masked_lm_labels,
                 ignore_index=-1,
                 reduction='none')
+
+            if not self.with_nsp_loss:
+                return paddle.mean(masked_lm_loss)
+
             next_sentence_loss = F.cross_entropy(
                 seq_relationship_score, next_sentence_labels, reduction='none')
             return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)

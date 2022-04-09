@@ -53,4 +53,35 @@ void topK_update_kernelLauncher(
     DecodingBeamsearchArguments args,
     cudaStream_t stream);
 
+template <typename T>
+void topK_sampling_kernel_kernelLauncher_v3(
+    void* workspace,
+    size_t& workspace_size,
+    T* log_probs,
+    int* ids,
+    int* sequence_length,
+    float* scores,
+    bool* finished_buf,
+    curandState_t* curandstate,
+    DecodingSamplingArguments args,
+    cudaStream_t stream,
+    const int batch_size);
+
+template <typename T>
+void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            const T* log_probs,
+                                            const int* id_vals,
+                                            int* offset_buf,
+                                            int* begin_offset_buf,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments& args,
+                                            int* output_ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            const int n,
+                                            cudaStream_t stream,
+                                            const int batch_size);
+
 }  // namespace fastertransformer

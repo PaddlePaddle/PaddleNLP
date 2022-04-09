@@ -1,3 +1,5 @@
+
+
 English | [简体中文](./README.md)
 
 <p align="center">
@@ -30,6 +32,25 @@ English | [简体中文](./README.md)
 * **High Performance Distributed Training**
   -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
 
+## Community
+
+### Special Interest Group (SIG)
+
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+
+### Slack
+
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+
+### WeChat
+
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
+</div>
+
+
 ## Installation
 
 ### Prerequisites
@@ -51,34 +72,7 @@ pip install --upgrade paddlenlp
 
 Taskflow aims to provide **off-the-shelf** NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
 
-```python
-from paddlenlp import Taskflow
-
-# Chinese Word Segmentation
-seg = Taskflow("word_segmentation")
-seg("第十四届全运会在西安举办")
->>> ['第十四届', '全运会', '在', '西安', '举办']
-
-# POS Tagging
-tag = Taskflow("pos_tagging")
-tag("第十四届全运会在西安举办")
->>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
-
-# Named Entity Recognition
-ner = Taskflow("ner")
-ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
->>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
-
-# Dependency Parsing
-ddp = Taskflow("dependency_parsing")
-ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
->>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
-
-# Sentiment Analysis
-senta = Taskflow("sentiment_analysis")
-senta("这个产品用起来真的很流畅，我非常喜欢")
->>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
-```
+![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
 
@@ -201,23 +195,6 @@ Please refer to our official AI Studio account for more interactive tutorials: [
 * [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
 
 * [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-## Community
-
-### Special Interest Group (SIG)
-
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
-
-### Slack
-To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
-
-### WeChat
-Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
-
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/153517320-2e1f35b5-ae5a-42db-971c-ae96c6480778.jpg" width="210" height="200" />
-</div>
-
 
 ## ChangeLog
 
