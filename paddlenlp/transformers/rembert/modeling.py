@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 from paddlenlp.transformers import PretrainedModel, register_base_model
+
 import paddle
 import paddle.nn as nn
-import math
 import paddle.nn.functional as F
 
 __all__ = [
@@ -65,8 +67,6 @@ ACT2FN = {
     "swish": swish,
 }
 
-layer_norm_eps = 1e-12
-
 
 class RembertPretrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
@@ -84,7 +84,8 @@ class RembertPretrainedModel(PretrainedModel):
             "num_hidden_layers": 32,
             "pad_token_id": 0,
             "type_vocab_size": 2,
-            "vocab_size": 250300
+            "vocab_size": 250300,
+            "layer_norm_eps": 1e-12
         }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -109,7 +110,7 @@ class RembertPretrainedModel(PretrainedModel):
                     self.rembert.config["initializer_range"],
                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = layer_norm_eps
+            layer._epsilon = self.layer_norm_eps
 
 
 class RemBertEmbeddings(nn.Layer):
@@ -121,7 +122,8 @@ class RemBertEmbeddings(nn.Layer):
                  input_embedding_size=256,
                  max_position_embeddings=512,
                  type_vocab_size=2,
-                 hidden_dropout_prob=0):
+                 hidden_dropout_prob=0,
+                 layer_norm_eps=1e-12):
         super(RemBertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size, input_embedding_size, padding_idx=pad_token_id)
@@ -220,7 +222,7 @@ class RemBertSelfAttention(nn.Layer):
             attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
-        attention_probs = nn.Softmax(axis=-1)(attention_scores)
+        attention_probs = F.softmax(attention_scores, axis=-1)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -239,7 +241,7 @@ class RemBertSelfAttention(nn.Layer):
 
 
 class RemBertSelfOutput(nn.Layer):
-    def __init__(self, hidden_size, hidden_dropout_prob):
+    def __init__(self, hidden_size, hidden_dropout_prob, layer_norm_eps=1e-12):
         super(RemBertSelfOutput, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -254,14 +256,17 @@ class RemBertSelfOutput(nn.Layer):
 
 class RemBertAttention(nn.Layer):
     def __init__(self, hidden_size, num_attention_heads,
-                 attention_probs_dropout_prob, hidden_dropout_prob):
+                 attention_probs_dropout_prob, hidden_dropout_prob,
+                 layer_norm_eps):
         super(RemBertAttention, self).__init__()
         self.self = RemBertSelfAttention(
             hidden_size=hidden_size,
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob)
         self.output = RemBertSelfOutput(
-            hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob)
+            hidden_size=hidden_size,
+            hidden_dropout_prob=hidden_dropout_prob,
+            layer_norm_eps=layer_norm_eps)
 
     def forward(
             self,
@@ -285,7 +290,11 @@ class RemBertIntermediate(nn.Layer):
 
 
 class RemBertOutput(nn.Layer):
-    def __init__(self, hidden_size, hidden_dropout_prob, intermediate_size):
+    def __init__(self,
+                 hidden_size,
+                 hidden_dropout_prob,
+                 intermediate_size,
+                 layer_norm_eps=1e-12):
         super(RemBertOutput, self).__init__()
         self.dense = nn.Linear(intermediate_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -301,13 +310,14 @@ class RemBertOutput(nn.Layer):
 class RemBertLayer(nn.Layer):
     def __init__(self, hidden_size, num_attention_heads,
                  attention_probs_dropout_prob, hidden_dropout_prob, hidden_act,
-                 intermediate_size):
+                 intermediate_size, layer_norm_eps):
         super(RemBertLayer, self).__init__()
         self.attention = RemBertAttention(
             hidden_size=hidden_size,
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob,
-            hidden_dropout_prob=hidden_dropout_prob, )
+            hidden_dropout_prob=hidden_dropout_prob,
+            layer_norm_eps=layer_norm_eps)
 
         self.intermediate = RemBertIntermediate(
             hidden_size=hidden_size,
@@ -316,7 +326,8 @@ class RemBertLayer(nn.Layer):
         self.output = RemBertOutput(
             hidden_size=hidden_size,
             hidden_dropout_prob=hidden_dropout_prob,
-            intermediate_size=intermediate_size, )
+            intermediate_size=intermediate_size,
+            layer_norm_eps=layer_norm_eps)
 
     def forward(self, hidden_states, attention_mask=None):
         self_attention_outputs = self.attention(
@@ -334,16 +345,10 @@ class RemBertLayer(nn.Layer):
 
 
 class RemBertEncoder(nn.Layer):
-    def __init__(
-            self,
-            input_embedding_size,
-            hidden_size,
-            hidden_act,
-            num_hidden_layers,
-            num_attention_heads,
-            attention_probs_dropout_prob,
-            hidden_dropout_prob,
-            intermediate_size, ):
+    def __init__(self, input_embedding_size, hidden_size, hidden_act,
+                 num_hidden_layers, num_attention_heads,
+                 attention_probs_dropout_prob, hidden_dropout_prob,
+                 intermediate_size, layer_norm_eps):
         super(RemBertEncoder, self).__init__()
         self.embedding_hidden_mapping_in = nn.Linear(input_embedding_size,
                                                      hidden_size)
@@ -354,6 +359,7 @@ class RemBertEncoder(nn.Layer):
                 attention_probs_dropout_prob=attention_probs_dropout_prob,
                 hidden_dropout_prob=hidden_dropout_prob,
                 intermediate_size=intermediate_size,
+                layer_norm_eps=layer_norm_eps,
                 hidden_act=hidden_act) for _ in range(num_hidden_layers)
         ])
 
@@ -441,13 +447,16 @@ class RemBertModel(RembertPretrainedModel):
                  max_position_embeddings=512,
                  type_vocab_size=2,
                  initializer_range=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 layer_norm_eps=1e-12):
         super(RemBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.num_hidden_layers = num_hidden_layers
         self.initializer_range = initializer_range
+        self.layer_norm_eps = layer_norm_eps
         self.embeddings = RemBertEmbeddings(
             vocab_size=vocab_size,
+            layer_norm_eps=layer_norm_eps,
             pad_token_id=pad_token_id,
             input_embedding_size=input_embedding_size,
             max_position_embeddings=max_position_embeddings,
@@ -580,7 +589,6 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
         super(RemBertForSequenceClassification, self).__init__()
         self.rembert = rembert
         self.dense = nn.Linear(self.rembert.config['hidden_size'], num_classes)
-        self.loss_fn = nn.CrossEntropyLoss()
         self.dropout = nn.Dropout(self.rembert.config['hidden_dropout_prob'])
         self.apply(self.init_weights)
 

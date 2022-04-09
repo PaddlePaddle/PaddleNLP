@@ -98,11 +98,6 @@ class RemBertTokenizer(PretrainedTokenizer):
         self.vocab_file = vocab_file
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
-        self.cls_token = cls_token
-        self.unk_token = unk_token
-        self.sep_token = sep_token
-        self.pad_token = pad_token
-        self.mask_token = mask_token
 
     @property
     def vocab_size(self):
