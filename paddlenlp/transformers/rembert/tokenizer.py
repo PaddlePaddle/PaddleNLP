@@ -60,7 +60,7 @@ class RemBertTokenizer(PretrainedTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import RemBertTokenizer
-            tokenizer = ChineseBertTokenizer.from_pretrained('rembert')
+            tokenizer = RemBertTokenizer.from_pretrained('rembert')
 
             inputs = tokenizer('欢迎使用飞桨！')
             print(inputs)
