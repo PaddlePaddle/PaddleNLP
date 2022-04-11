@@ -131,9 +131,9 @@ python -u ./run_clue_classifier_trainer.py \
     --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/ \
     --device gpu  \
     --do_train \
-	--do_eval \
+    --do_eval \
     --metric_for_best_model "eval_accuracy" \
-	--load_best_model_at_end \
+    --load_best_model_at_end \
     --save_total_limit 3 \
 ```
 大部分参数含义如上文所述，这里简要介绍一些新参数:
