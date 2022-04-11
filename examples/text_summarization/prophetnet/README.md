@@ -71,7 +71,7 @@ python train_prophetnet.py \
     --epochs=4 \
     --lr=0.0001 \
     --warmup_init_lr=1e-07 \
-    --warmup_updates=1000 \
+    --warmup_steps=1000 \
     --clip_norm=0.1 \
     --num_workers=4 \
     --output_dir=./ckpt/cnndm
@@ -87,7 +87,7 @@ python train_prophetnet.py \
     --epochs=6 \
     --lr=0.0001 \
     --warmup_init_lr=1e-07 \
-    --warmup_updates=1000 \
+    --warmup_steps=1000 \
     --clip_norm=0.1 \
     --num_workers=8 \
     --output_dir=./ckpt/gigaword
@@ -97,7 +97,7 @@ python train_prophetnet.py \
 
 - `dataset` 指定数据集，可选cnndm和gigaword
 
-- `model_name_or_path` 本地预训练模型初始化权重文件路径，例如: ./model_state.pdparams。
+- `model_name_or_path` 预训练模型名称或本地预训练模型初始化权重文件路径。
 
 - `batch_size` 表示训练样本批大小。
 
@@ -107,7 +107,7 @@ python train_prophetnet.py \
 
 - `warmup_init_lr` 表示预热学习率
 
-- `warmup_updates` 表示预热学习步数
+- `warmup_steps` 表示预热学习步数
 
 - `clip_norm` 表示梯度裁剪
 

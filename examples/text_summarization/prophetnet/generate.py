@@ -260,10 +260,6 @@ def generate(args):
     model = ProphetNetForConditionalGeneration.from_pretrained(
         args.model_name_or_path)
 
-    ckpt = paddle.load("./ckpt/" + args.dataset + "/model_best.pdparams")
-
-    model.load_dict(ckpt['model'])
-
     test_data_src = 'data/' + args.dataset + '_data/uncased_tok_data/test.src'
     test_data_tgt = 'data/' + args.dataset + '_data/uncased_tok_data/test.tgt'
 

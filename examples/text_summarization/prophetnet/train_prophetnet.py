@@ -168,16 +168,6 @@ optimizer = paddle.optimizer.Adam(
     weight_decay=weight_decay,
     grad_clip=paddle.nn.ClipGradByNorm(clip_norm))
 
-if os.path.exists(output_dir) and len(os.listdir(output_dir)) > 1:
-    ckpt_file_last = os.listdir(output_dir)[-2]
-    ckpt_load = paddle.load(os.path.join(output_dir, ckpt_file_last))
-    best_valid_loss = ckpt_load["best_valid_loss"]
-    start_epoch = ckpt_load["epoch"] + 1
-    optimizer.set_state_dict(ckpt_load["optimizer"])
-    model.load_dict(ckpt_load["model"])
-else:
-    model.load_dict(paddle.load(args.pretrained_model_path))
-
 accumulate_batchs_num = int(32 * 16 / batch_size)
 
 scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
@@ -287,37 +277,17 @@ def train():
         best_ckpt_path = os.path.join(output_dir, "model_best.pdparams")
         if best_valid_loss is None:
             best_valid_loss = valid_loss
-            save(best_ckpt_path, {
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "epoch": epoch,
-                "best_valid_loss": best_valid_loss
-            })
+            model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
         else:
             if valid_loss < best_valid_loss:
                 best_valid_loss = valid_loss
-                save(best_ckpt_path, {
-                    "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "epoch": epoch,
-                    "best_valid_loss": best_valid_loss
-                })
+                model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
         print("valid loss: %f, best valid loss: %f" %
               (valid_loss, best_valid_loss))
-        ckpt_path = os.path.join(output_dir, "model_%d.pdparams" % epoch)
-        save(ckpt_path, {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "epoch": epoch,
-            "best_valid_loss": best_valid_loss
-        })
-
-
-def save(path, obj):
-    if not os.path.exists(
-            os.path.abspath(os.path.dirname(path) + os.path.sep + ".")):
-        os.makedirs(os.path.abspath(os.path.dirname(path) + os.path.sep + "."))
-    paddle.save(obj, path)
+        model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
