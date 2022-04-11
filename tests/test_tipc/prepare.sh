@@ -34,18 +34,16 @@ if [ ${MODE} = "lite_train_lite_infer" ];then
 
         # The whole procedure of lite_train_infer should be less than 15min.
         # Hence, set maximum output length is 16. 
-        sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.base.yaml
-        sed -i "s/^batch_size.*/batch_size: 3072/g" configs/transformer.base.yaml
-        sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.big.yaml
-        sed -i "s/^batch_size.*/batch_size: 3072/g" configs/transformer.big.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.base.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 16/g" configs/transformer.big.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.base.yaml
+        # sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.base.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
+        # sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
 
         # Data set prepared. 
         if [ ! -f WMT14.en-de.partial.tar.gz ]; then
@@ -96,18 +94,16 @@ elif [ ${MODE} = "whole_train_whole_infer" ];then
 
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
-        sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
-        sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
 
         # Whole data set prepared. 
         if [ ! -f WMT14.en-de.tar.gz ]; then
@@ -158,18 +154,16 @@ elif [ ${MODE} = "lite_train_whole_infer" ];then
 
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
-        sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
-        sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
 
         # Trained transformer base model checkpoint. 
         # For infer. 
@@ -236,18 +230,16 @@ elif [ ${MODE} = "whole_infer" ];then
 
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
-        sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.base.yaml
-        sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
-        sed -i "s/^batch_size.*/batch_size: 4096/g" configs/transformer.big.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
+        # sed -i "s/^max_out_len.*/max_out_len: 1024/g" configs/transformer.big.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.base.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.base.yaml
 
-        sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
-        sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
+        # sed -i "s/^random_seed:.*/random_seed: None/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle_batch:.*/shuffle_batch: True/g" configs/transformer.big.yaml
+        # sed -i "s/^shuffle:.*/shuffle: True/g" configs/transformer.big.yaml
 
         # Trained transformer base model checkpoint. 
         if [ ! -f transformer-base-wmt_ende_bpe.tar.gz ]; then

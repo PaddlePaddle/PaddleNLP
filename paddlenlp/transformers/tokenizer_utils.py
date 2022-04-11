@@ -905,7 +905,7 @@ class PretrainedTokenizer(object):
     def convert_tokens_to_ids(self, tokens):
         if tokens is None:
             return None
-        if isinstance(tokens, str):
+        if isinstance(tokens, (str, AddedToken)):
             if tokens in self.added_tokens_encoder:
                 return self.added_tokens_encoder[tokens]
             else:
@@ -1065,6 +1065,20 @@ class PretrainedTokenizer(object):
         # Update with newly provided args and kwargs
         init_args = init_args if not args else args
         init_kwargs.update(kwargs)
+
+        def convert_added_tokens(obj):
+            if isinstance(
+                    obj,
+                    dict) and "__type" in obj and obj["__type"] == "AddedToken":
+                obj.pop("__type")
+                return AddedToken(**obj)
+            elif isinstance(obj, (list, tuple)):
+                return list(convert_added_tokens(o) for o in obj)
+            elif isinstance(obj, dict):
+                return {k: convert_added_tokens(v) for k, v in obj.items()}
+            return obj
+
+        init_kwargs = convert_added_tokens(init_kwargs)
 
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
