@@ -17,9 +17,10 @@ import sys
 if 'datasets' in sys.modules.keys():
     from paddlenlp.utils.log import logger
     logger.warning(
-        "datasets module loaded before paddlenlp. "
+        "Detected that datasets module was imported before paddlenlp. "
         "This may cause PaddleNLP datasets to be unavalible in intranet"
-        "or download speed to be low in some area")
+        "Please import paddlenlp before datasets module to avoid download issues"
+    )
 from . import data
 from . import datasets
 from . import embeddings
