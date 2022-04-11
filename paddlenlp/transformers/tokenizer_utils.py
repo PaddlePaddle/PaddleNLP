@@ -254,6 +254,9 @@ class AddedToken:
     def __getstate__(self):
         return self.__dict__
 
+    def __str__(self):
+        return self.content
+
 
 class Trie:
     """
@@ -1216,7 +1219,7 @@ class PretrainedTokenizer(object):
 
     def __getattr__(self, name):
         if name.endswith('_token'):
-            return self.special_tokens_map[name]
+            return str(self.special_tokens_map[name])
         elif name.endswith('_token_id'):
             return self._convert_token_to_id(self.special_tokens_map[name[:-3]])
         raise AttributeError("'{}' object has no attribute '{}'".format(
