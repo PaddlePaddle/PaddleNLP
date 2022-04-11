@@ -27,9 +27,6 @@ from paddlenlp.utils.log import logger
 from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.trainer_utils import PredictionOutput
 
-sys.path.insert(0, os.path.abspath("."))
-from utils import Dict
-
 
 class QuestionAnsweringTrainer(Trainer):
     def __init__(self,
@@ -123,17 +120,6 @@ class QuestionAnsweringTrainer(Trainer):
             metrics=metrics)
 
 
-def qa_collator(tokenizer, args):
-    train_batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        "start_positions": Stack(dtype="int64"),
-        "end_positions": Stack(dtype="int64")
-    }): fn(samples)
-
-    return train_batchify_fn
-
-
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
@@ -155,8 +141,7 @@ def prepare_train_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
-    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function.
     contexts = examples['context']
     questions = examples['question']
 
@@ -233,7 +218,7 @@ def prepare_validation_features(examples, tokenizer, args):
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
     #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
-    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    # that HuggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     contexts = examples['context']
     questions = examples['question']
 
@@ -263,8 +248,10 @@ def prepare_validation_features(examples, tokenizer, args):
 
         # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
         # position is part of the context or not.
+
         tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index else None)
+            (o if sequence_ids[k] == context_index and
+             k != len(sequence_ids) - 1 else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 
