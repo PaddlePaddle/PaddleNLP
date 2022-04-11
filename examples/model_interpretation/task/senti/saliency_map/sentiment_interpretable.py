@@ -42,7 +42,7 @@ from ernie.tokenizing_ernie import ErnieTokenizer
 
 from roberta.modeling import RobertaForSequenceClassification
 sys.path.append('../../..')
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ class Senti_data(DatasetBuilder):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
                 line_split = json.loads(line)
-                yield {'id': line_split['id'], 'context': line_split['context']}
+                yield {'id': line_split['id'], 'context': line_split['context'], 'sent_token': line_split['sent_token']}
 
 
 def create_dataloader(dataset,
@@ -161,10 +161,15 @@ def create_dataloader(dataset,
     return dataloader
 
 
-def map_fn_senti(examples, tokenizer):
+def map_fn_senti(examples, tokenizer, args):
     log.debug('load data %d' % len(examples))
-    contexts = [example['context'] for example in examples]
+    if args.language == 'en':
+        contexts = [example['context'].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
+    else:
+        contexts = [example['context'] for example in examples]
     tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
+    for i in range(len(tokenized_examples)):
+        tokenized_examples[i]['offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(contexts[i])[:args.max_seq_len-2]+[(0,0)]
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -172,20 +177,9 @@ def map_fn_senti(examples, tokenizer):
 
 
 def init_lstm_var(args):
-    # Different language has different tokenizer
-    if args.language == "ch":
-        tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
-        padding_idx = tokenizer.vocab.get('[PAD]')
-        tokenizer.inverse_vocab = [
-            item[0]
-            for item in sorted(
-                tokenizer.vocab.items(), key=lambda x: x[1])
-        ]
-    else:
-        vocab = Vocab.load_vocabulary(
-            args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-        tokenizer = CharTokenizer(vocab)
-        padding_idx = vocab.token_to_idx.get('[PAD]', 0)
+    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
+    padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
     trans_fn = partial(
         convert_example,
@@ -235,7 +229,7 @@ def init_roberta_var(args):
         name='',
         return_inter_score=True)
 
-    map_fn = partial(map_fn_senti, tokenizer=tokenizer)
+    map_fn = partial(map_fn_senti, tokenizer=tokenizer, args=args)
 
     dev_ds = Senti_data().read(args.data_dir)
     dev_ds.map(map_fn, batched=True)
@@ -243,7 +237,8 @@ def init_roberta_var(args):
         dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id)
     }): fn(samples)
 
     dataloader = paddle.io.DataLoader(
@@ -256,7 +251,7 @@ def init_roberta_var(args):
 
 
 def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
-                             result, out_handle):
+                             result, offset, out_handle):
     if args.base_model.startswith('roberta'):
         inter_score = atts[-1][:, :, 0, :].mean(1)  # (bsz, seq)
         inter_score = inter_score[0][1:-1]  # remove CLS and SEP
@@ -271,39 +266,41 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
 
     char_attribution_dict = {}
     # Collect scores in different situation
-    if args.language == 'ch':
-        idx = 0
-        for token, score in zip(tokens, inter_score.numpy().tolist()):
-            char_attribution_dict[idx] = (token, score)
-            idx += 1
+    if args.base_model.startswith('roberta'):
+        assert len(inter_score) == len(offset), str(len(inter_score))+"not equal to"+str(len(offset))
+        sorted_token = []
+        for i in range(len(inter_score)):
+            sorted_token.append([i, offset[i], inter_score[i]])
+
+        char_attribution_dict = match(result['context'], result['sent_token'], sorted_token)
+        
+        result['char_attri'] = collections.OrderedDict()
+        for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('sent_token')
     else:
-        if args.base_model.startswith('roberta'):
-            sub_word_count = 0
-            for i in range(len(sub_word_id_dict)):
-                sub_word_len = sub_word_id_dict[i][1]
-                cur_token_score = 0
-                for j in range(sub_word_len):
-                    cur_token_score += inter_score.tolist()[sub_word_count]
-                    sub_word_count += 1
-                char_attribution_dict[i] = (sub_word_id_dict[i][0],
-                                            cur_token_score)
-        elif args.base_model == 'lstm':
+        if args.language == 'ch':
+            idx = 0
+            for token, score in zip(tokens, inter_score.numpy().tolist()):
+                char_attribution_dict[idx] = (token, score)
+                idx += 1
+        else:
             idx = 0
             for word, sub_word_score in zip(tokens, inter_score.tolist()):
                 char_attribution_dict[idx] = (word, sub_word_score)
                 idx += 1
 
-    result['char_attri'] = collections.OrderedDict()
-    for token_id, token_info in sorted(
-            char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
-        result['char_attri'][token_id] = token_info
+        result['char_attri'] = collections.OrderedDict()
+        for token_id, token_info in sorted(
+                char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+            result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
 
 def extract_integrated_gradient_scores(
         args, atts, input_ids, tokens, sub_word_id_dict, fwd_args, fwd_kwargs,
-        model, result, pred_label, err_total, out_handle):
+        model, result, pred_label, err_total, offset, out_handle):
     embedded_grads_list = []
     for i in range(args.n_samples):
         probs, _, embedded = model.forward_interpet(
@@ -357,21 +354,15 @@ def extract_integrated_gradient_scores(
     char_attribution_dict = {}
     if args.base_model.startswith('roberta'):
         inter_score = inter_score[0][1:-1]
-        if args.language == 'en':
-            sub_word_count = 0
-            for i in range(len(sub_word_id_dict)):
-                sub_word_len = sub_word_id_dict[i][1]
-                cur_token_score = 0
-                for j in range(sub_word_len):
-                    cur_token_score += inter_score.tolist()[sub_word_count]
-                    sub_word_count += 1
-                char_attribution_dict[i] = (sub_word_id_dict[i][0],
-                                            cur_token_score)
-        else:
-            idx = 0
-            for token, score in zip(tokens, inter_score.numpy().tolist()):
-                char_attribution_dict[idx] = (token, score)
-                idx += 1
+        sorted_token = []
+        for i in range(len(inter_score)):
+            sorted_token.append([i, offset[i], inter_score[i]])
+        char_attribution_dict = match(result['context'], result['sent_token'], sorted_token)
+        
+        result['char_attri'] = collections.OrderedDict()
+        for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('sent_token')
 
     elif args.base_model == 'lstm':
         inter_score = inter_score[0]
@@ -380,10 +371,10 @@ def extract_integrated_gradient_scores(
             char_attribution_dict[idx] = (word, sub_word_score)
             idx += 1
 
-    result['char_attri'] = collections.OrderedDict()
-    for token_id, token_info in sorted(
-            char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
-        result['char_attri'][token_id] = token_info
+        result['char_attri'] = collections.OrderedDict()
+        for token_id, token_info in sorted(
+                char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+            result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
     return err_total
@@ -398,11 +389,7 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
     if_lstm = (args.base_model == 'lstm')
     explain_res = None
 
-    text_instance = ''
-    if args.language == 'ch':
-        text_instance = ''.join(tokens)
-    else:
-        text_instance = result['context']
+    text_instance = result['context']
 
     explain_res = explainer.explain_instance(
         text_instance=text_instance,
@@ -431,12 +418,16 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
     for kind, local_exp in local_exps.items():  #only have one iteration here
         char_attribution_dict = []
 
-        for idx in range(len(tokens)):
-            t = tokens[idx].replace('Ġ', '')
+        for idx in range(len(result['sent_token'])):
+            t = result['sent_token'][idx] #.replace('Ġ', '')
+            got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string.inverse_vocab[word_id] == t:
                     char_attribution_dict.append((idx, t, attribution))
+                    got_score = True
                     break
+            if not got_score:
+                char_attribution_dict.append((idx, t, 0))
         char_attribution_dict = sorted(
             char_attribution_dict, key=lambda x: x[2], reverse=True)
 
@@ -473,30 +464,23 @@ if __name__ == "__main__":
                 continue
             # Initialize input_ids, fwd_args, tokens
             result = {}
+            offset = None
             if args.base_model.startswith('roberta'):
-                input_ids, token_type_ids = d
+                input_ids, token_type_ids, offset_map = d
                 fwd_args = [input_ids, token_type_ids]
                 fwd_kwargs = {}
                 tokens = tokenizer.convert_ids_to_tokens(
                     input_ids[0, 1:-1].tolist())  # list
+                offset = offset_map[0, 1:-1]
 
             elif args.base_model == 'lstm':
-                if args.language == 'ch':
-                    input_ids, seq_lens = d
-                    fwd_args = [input_ids, seq_lens]
-                    fwd_kwargs = {}
-                    tokens = [
-                        tokenizer.inverse_vocab[input_id]
-                        for input_id in input_ids.tolist()[0]
-                    ]
-                else:
-                    input_ids, seq_lens = d
-                    fwd_args = [input_ids, seq_lens]
-                    fwd_kwargs = {}
-                    tokens = [
-                        tokenizer.vocab.idx_to_token[input_id]
-                        for input_id in input_ids.tolist()[0]
-                    ]
+                input_ids, seq_lens = d
+                fwd_args = [input_ids, seq_lens]
+                fwd_kwargs = {}
+                tokens = [
+                    tokenizer.vocab.idx_to_token[input_id]
+                    for input_id in input_ids.tolist()[0]
+                ]
 
             result['id'] = dataloader.dataset.data[step]['id']
 
@@ -512,33 +496,21 @@ if __name__ == "__main__":
             err_total = []
             lime_err_total, lime_score_total, lime_relative_err_total = [], [], []
 
-            if args.language == 'ch':
-                result['context'] = ''.join(tokens)
-            else:
-                result['context'] = tokenizer.convert_tokens_to_string(tokens)
-                # If for English model, we prepare a sub_word_id_dict which allows us to serach the original word by sub-word ids
-                if args.base_model.startswith('roberta'):
-                    context_list = result['context'].split()
-                    context_list = context_list[
-                        0:1] + [' %s' % word for word in context_list[1:]]
-                    sub_word_id_dict = []
-                    for context_word in context_list:
-                        sub_word_id = get_sub_word_ids(context_word)
-                        sub_word_id_dict.append(
-                            (context_word, len(list(sub_word_id))))
+            result['context'] = dataloader.dataset.data[step]['context']
+            result['sent_token'] = dataloader.dataset.data[step]['sent_token']
 
             # Attention
             if args.inter_mode == "attention":
                 #extract attention scores and write resutls to file
                 extract_attention_scores(args, atts, input_ids, tokens,
-                                         sub_word_id_dict, result, out_handle)
+                                         sub_word_id_dict, result, offset, out_handle)
 
             # Integrated_gradient
             elif args.inter_mode == 'integrated_gradient':
                 err_total = extract_integrated_gradient_scores(
                     args, atts, input_ids, tokens, sub_word_id_dict, fwd_args,
                     fwd_kwargs, model, result, pred_label, err_total,
-                    out_handle)
+                    offset, out_handle)
 
             # LIME
             elif args.inter_mode == 'lime':

@@ -6,7 +6,7 @@ unset CUDA_VISIBLE_DEVICES
 LANGUAGE=en
 
 if [[ $LANGUAGE == 'ch' ]]; then
-    VOCAB_PATH='./'
+    VOCAB_PATH='./vocab.txt'
 else
     VOCAB_PATH='vocab.sst2_train'
 fi

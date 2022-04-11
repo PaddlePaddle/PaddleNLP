@@ -33,7 +33,7 @@ from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBP
 
 from roberta.modeling import RobertaForQuestionAnswering
 sys.path.append('../../..')
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -137,12 +137,18 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    questions = [examples[i]['question'] for i in range(len(examples))]
-    contexts = [
-        examples[i]['context'] + examples[i]['title']
-        for i in range(len(examples))
-    ]
-
+    if args.language == 'en':
+        questions = [examples[i]['question'].encode('ascii', errors='replace').decode('UTF-8') for i in range(len(examples))]
+        contexts = [
+            examples[i]['context'].encode('ascii', errors='replace').decode('UTF-8')
+            for i in range(len(examples))
+        ]
+    else:
+        questions = [examples[i]['question'] for i in range(len(examples))]
+        contexts = [
+            examples[i]['context']
+            for i in range(len(examples))
+        ]
     tokenized_examples = tokenizer(
         questions,
         contexts,
@@ -162,28 +168,9 @@ def map_fn_DuCheckList(examples, args, tokenizer):
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = tokenized_example['overflow_to_sample']
         tokenized_examples[i]["example_id"] = examples[sample_index]['id']
-
-        # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
-        # position is part of the context or not.
-        if args.language == 'ch':
-            tokenized_examples[i]["offset_mapping"] = [
-                (o if sequence_ids[k] == 1 else None)
-                for k, o in enumerate(tokenized_example["offset_mapping"])
-            ]
-        else:
-            n = tokenized_example['offset_mapping'].index(
-                (0, 0), 1) + 2  # context start position
-            m = len(tokenized_example[
-                'offset_mapping']) - 1  # context end position + 1
-            tokenized_examples[i]["offset_mapping"] = [
-                (o if n <= k < m else None)
-                for k, o in enumerate(tokenized_example["offset_mapping"])
-            ]
-
         tokenized_examples[i]['question'] = examples[sample_index]['question']
         tokenized_examples[i]['context'] = examples[sample_index]['context']
-        #tokenized_examples[i]['answer'] = examples[sample_index]['answers'][0]
-        #tokenized_examples[i]['is_impossible'] = examples[sample_index]['is_impossible']
+        tokenized_examples[i]['sent_token'] = examples[sample_index]['sent_token']
 
     return tokenized_examples
 
@@ -205,6 +192,7 @@ def init_roberta_var(args):
     batchify_fn = lambda samples, fn=Dict({
         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
         "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id),
         "overflow_to_sample": Stack(dtype='int32'), }): fn(samples)
 
     dev_dataloader = paddle.io.DataLoader(
@@ -217,19 +205,15 @@ def init_roberta_var(args):
 
 
 def ch_per_example(args, scores_in_one_example, prev_context_tokens, dev_ds,
-                   prev_example_idx, ans_dic, ans_idx_dic, out_handle):
-    total_score = []
-    for idx, score in enumerate(scores_in_one_example):
-        if idx == len(scores_in_one_example) - 1:
-            total_score.extend(score)
-        else:
-            total_score.extend(score[:args.doc_stride])
+                   prev_example_idx, ans_dic, ans_idx_dic, offset, out_handle):
+    total_score = scores_in_one_example[-1]
     assert len(prev_context_tokens) == len(total_score)
-    token_score_dict = {}
-    for idx, token in enumerate(prev_context_tokens):
-        token_score_dict[idx] = (token, total_score[idx])
+    token_score_dict = []
+    for idx in range(len(total_score)):
+        token_score_dict.append([idx, offset[idx], total_score[idx]])
 
     prev_example = dev_ds.data[prev_example_idx]
+    char_attribution_dict = match(prev_example['context'], prev_example['sent_token'], token_score_dict)
     result['id'] = prev_example['id']
     result['question'] = prev_example['question']
     result['title'] = prev_example['title']
@@ -238,31 +222,25 @@ def ch_per_example(args, scores_in_one_example, prev_context_tokens, dev_ds,
     result['pred_feature'] = ans_idx_dic[str(result['id'])]
 
     result['char_attri'] = collections.OrderedDict()
-    for token, score in sorted(
-            token_score_dict.items(), key=lambda x: x[1][1], reverse=True):
-        result['char_attri'][token] = score
+    for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
+        result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
 
-def en_per_example(sub_word_id_dict, inter_score, result, ans_dic, ans_idx_dic,
+def en_per_example(inter_score, result, ans_dic, ans_idx_dic, offset,
                    out_handle):
-    char_attribution_dict = {}
-    sub_word_count = 0
-    for i in range(len(sub_word_id_dict)):
-        sub_word_len = sub_word_id_dict[i][1]
-        cur_token_score = 0
-        for j in range(sub_word_len):
-            cur_token_score += inter_score.tolist()[sub_word_count]
-            sub_word_count += 1
-        char_attribution_dict[i] = (sub_word_id_dict[i][0], cur_token_score)
+    sorted_token = []
+    for i in range(len(inter_score)):
+        sorted_token.append([i, offset[i], inter_score[i]])
+    char_attribution_dict = match(result['context'], result['sent_token'], sorted_token)
 
     result['pred_label'] = ans_dic[str(result['id'])]
     result['pred_feature'] = ans_idx_dic[str(result['id'])]
     result['char_attri'] = collections.OrderedDict()
-    for token_id, token_info in sorted(
-            char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
-        result['char_attri'][token_id] = token_info
+    for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
+        result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+    result.pop('sent_token')
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
@@ -280,7 +258,7 @@ def load_pred_data(ans_path, ans_idx_path):
 def extract_attention_scores(
         args, model, result, fwd_args, fwd_kwargs, prev_example_idx,
         example_idx, prev_context_tokens, scores_in_one_example, dev_ds,
-        ans_dic, ans_idx_dic, sub_word_id_dict, context_tokens, out_handle):
+        ans_dic, ans_idx_dic, context_tokens, offset, prev_offset, out_handle):
     with paddle.no_grad():
         # start_logits: (bsz, seq); end_logits: (bsz, seq); cls_logits: (bsz, 2)
         # attention: list((bsz, head, seq, seq) * 12); embedded: (bsz, seq, emb)
@@ -300,21 +278,22 @@ def extract_attention_scores(
         else:
             ch_per_example(args, scores_in_one_example, prev_context_tokens,
                            dev_ds, prev_example_idx, ans_dic, ans_idx_dic,
-                           out_handle)
+                           prev_offset, out_handle)
             scores_in_one_example = [context_norm_score.numpy().tolist()]
         prev_example_idx = example_idx
         prev_context_tokens = context_tokens
+        prev_offset = offset
     else:
-        en_per_example(sub_word_id_dict, context_norm_score, result, ans_dic,
-                       ans_idx_dic, out_handle)
-    return prev_example_idx, prev_context_tokens, scores_in_one_example
+        en_per_example(context_norm_score, result, ans_dic,
+                       ans_idx_dic, offset, out_handle)
+    return prev_example_idx, prev_context_tokens, scores_in_one_example, prev_offset
 
 
 def extract_integrated_gradient_scores(
         args, dev_ds, model, result, fwd_args, fwd_kwargs, SEP_idx, add_idx,
         prev_example_idx, example_idx, scores_in_one_example,
-        prev_context_tokens, ans_dic, ans_idx_dic, context_tokens,
-        sub_word_id_dict, out_handle):
+        prev_context_tokens, ans_dic, ans_idx_dic, context_tokens, offset, prev_offset,
+        out_handle):
     embedded_grads_list = []  # [Tensor(1, seq_len, embed_size)]
     with open(os.path.join(args.output_dir, 'predict_feature_index'),
               'r') as f_feature_index:
@@ -382,14 +361,15 @@ def extract_integrated_gradient_scores(
         else:
             ch_per_example(args, scores_in_one_example, prev_context_tokens,
                            dev_ds, prev_example_idx, ans_dic, ans_idx_dic,
-                           out_handle)
+                           prev_offset, out_handle)
             scores_in_one_example = [context_norm_score.numpy().tolist()]
         prev_example_idx = example_idx
         prev_context_tokens = context_tokens
+        prev_offset = offset
     else:
-        en_per_example(sub_word_id_dict, context_norm_score, result, ans_dic,
-                       ans_idx_dic, out_handle)
-    return prev_example_idx, prev_context_tokens, scores_in_one_example
+        en_per_example(context_norm_score, result, ans_dic,
+                       ans_idx_dic, offset, out_handle)
+    return prev_example_idx, prev_context_tokens, scores_in_one_example, prev_offset
 
 
 if __name__ == "__main__":
@@ -421,6 +401,7 @@ if __name__ == "__main__":
         scores_in_one_example = []
         prev_example_idx = None
         prev_context_tokens = None
+        prev_offset = None
 
         get_subword_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
         for step, d in tqdm(enumerate(dataloader)):
@@ -430,14 +411,14 @@ if __name__ == "__main__":
             model.train()
 
             result = {}
-            input_ids, segment_ids, example_idx = d
+            input_ids, segment_ids, offset_map, example_idx = d
             fwd_args = [input_ids, segment_ids]
             fwd_kwargs = {}
-            sub_word_id_dict = []
 
             SEP_idx = input_ids.numpy()[0].tolist().index(
                 tokenizer.sep_token_id)
             context_ids = input_ids[0, SEP_idx + add_idx:-1]
+            offset = offset_map[0, SEP_idx + add_idx : -1]
             context_tokens = tokenizer.convert_ids_to_tokens(context_ids.numpy()
                                                              .tolist())
 
@@ -447,28 +428,20 @@ if __name__ == "__main__":
                 result['question'] = example['question']
                 result['title'] = example['title']
                 result['context'] = example['context']
-
-                context_list = result['context'].split()
-                context_list = context_list[
-                    0:1] + [' %s' % word for word in context_list[1:]]
-                for context_word in context_list:
-                    sub_word_id = get_subword_ids(context_word)
-                    sub_word_id_dict.append(
-                        (context_word, len(list(sub_word_id))))
+                result['sent_token'] = example['sent_token']
 
             if args.inter_mode == "attention":
-                prev_example_idx, prev_context_tokens, scores_in_one_example = extract_attention_scores(
+                prev_example_idx, prev_context_tokens, scores_in_one_example, prev_offset = extract_attention_scores(
                     args, model, result, fwd_args, fwd_kwargs, prev_example_idx,
                     example_idx, prev_context_tokens, scores_in_one_example,
-                    dev_ds, ans_dic, ans_idx_dic, sub_word_id_dict,
-                    context_tokens, out_handle)
+                    dev_ds, ans_dic, ans_idx_dic, context_tokens, offset, prev_offset, out_handle)
 
             elif args.inter_mode == 'integrated_gradient':
-                prev_example_idx, prev_context_tokens, scores_in_one_example = extract_integrated_gradient_scores(
+                prev_example_idx, prev_context_tokens, scores_in_one_example, prev_offset = extract_integrated_gradient_scores(
                     args, dev_ds, model, result, fwd_args, fwd_kwargs, SEP_idx,
                     add_idx, prev_example_idx, example_idx,
                     scores_in_one_example, prev_context_tokens, ans_dic,
-                    ans_idx_dic, context_tokens, sub_word_id_dict, out_handle)
+                    ans_idx_dic, context_tokens, offset, prev_offset, out_handle)
             else:
                 raise KeyError(f"Unkonwn interpretable mode: {args.inter_mode}")
 
@@ -479,7 +452,8 @@ if __name__ == "__main__":
             input_ids = feature['input_ids']
             SEP_idx = input_ids.index(tokenizer.sep_token_id)
             context_ids = input_ids[SEP_idx + 1:-1]
+            offset = offset_map[SEP_idx + add_idx : -1]
             context_tokens = tokenizer.convert_ids_to_tokens(context_ids)
 
             ch_per_example(args, scores_in_one_example, context_tokens, dev_ds,
-                           -1, ans_dic, ans_idx_dic, out_handle)
+                           -1, ans_dic, ans_idx_dic, offset, out_handle)

@@ -39,7 +39,7 @@ from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet
 from LIME.lime_text import LimeTextExplainer
 sys.path.append('../../..')
-from model_interpretation.utils import convert_tokenizer_res_to_old_version
+from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -123,13 +123,17 @@ class Similarity_data(DatasetBuilder):
                     yield {
                         'id': line_split['id'],
                         'query': line_split['query'],
-                        'title': line_split['title']
+                        'title': line_split['title'],
+                        'text_q_seg': line_split['text_q_seg'],
+                        'text_t_seg': line_split['text_t_seg']
                     }
                 else:
                     yield {
                         'id': line_split['id'],
                         'sentence1': line_split['sentence1'],
-                        'sentence2': line_split['sentence2']
+                        'sentence2': line_split['sentence2'],
+                        'text_q_seg': line_split['text_q_seg'],
+                        'text_t_seg': line_split['text_t_seg']
                     }
 
 
@@ -138,15 +142,22 @@ def map_fn_senti(examples, tokenizer, language):
     if language == 'ch':
         q_name = "query"
         t_name = "title"
+        queries = [example[q_name] for example in examples]
+        titles = [example[t_name] for example in examples]
     else:
         q_name = "sentence1"
         t_name = "sentence2"
-    queries = [example[q_name] for example in examples]
-    titles = [example[t_name] for example in examples]
+        queries = [example[q_name].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
+        titles = [example[t_name].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
     tokenized_examples = tokenizer(
         queries, titles, max_seq_len=args.max_seq_len)
+
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
+
+    for i in range(len(tokenized_examples)):
+        tokenized_examples[i]['query_offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(queries[i])[:args.max_seq_len-2]+[(0,0)]
+        tokenized_examples[i]['title_offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(titles[i])[:args.max_seq_len-2]+[(0,0)]
 
     return tokenized_examples
 
@@ -174,7 +185,9 @@ def init_roberta_var(args):
         dev_ds, batch_size=args.batch_size, shuffle=False)
     batchify_fn = lambda samples, fn=Dict({
         "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        "query_offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+        "title_offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id)
     }): fn(samples)
 
     dataloader = paddle.io.DataLoader(
@@ -194,7 +207,7 @@ def init_lstm_var(args):
         vocab = Vocab.load_vocabulary(
             "simnet/vocab_QQP", unk_token='[UNK]', pad_token='[PAD]')
 
-    tokenizer = CharTokenizer(vocab, args.language)
+    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
     model = SimNet(network='lstm', vocab_size=len(vocab), num_classes=2)
 
     dev_ds = Similarity_data().read(args.data_dir)
@@ -230,7 +243,7 @@ def get_qt_tokens(base_model,
                   vocab=None):
     SEP_idx = 0
     if base_model == 'roberta':
-        input_ids, token_type_ids = d
+        input_ids, token_type_ids, query_offset_map, title_offset_map = d
         fwd_args = [input_ids, token_type_ids]
         fwd_kwargs = {}
 
@@ -239,6 +252,10 @@ def get_qt_tokens(base_model,
             input_ids[0, 1:SEP_idx].tolist())  # list
         t_tokens = tokenizer.convert_ids_to_tokens(
             input_ids[0, SEP_idx + add_idx:-1].tolist())  # list
+        q_offset = query_offset_map[0, 1:-1].tolist()
+        t_offset = title_offset_map[0, 1:-1].tolist()
+        return q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs, q_offset, t_offset
+
     if base_model == 'lstm':
         query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(d)
         query_ids = paddle.to_tensor(query_ids)
@@ -250,36 +267,12 @@ def get_qt_tokens(base_model,
         fwd_kwargs = {}
         q_tokens = [vocab._idx_to_token[idx] for idx in query_ids.tolist()[0]]
         t_tokens = [vocab._idx_to_token[idx] for idx in title_ids.tolist()[0]]
-    return q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs
+        return q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs
 
-
-def sub_word_length(result, part, get_sub_word_ids):
-    context_list = result[part].split()
-    context_list = context_list[
-        0:1] + [' %s' % word for word in context_list[1:]]
-    sub_word_id_dict = []
-    for context_word in context_list:
-        sub_word_id = get_sub_word_ids(context_word)
-        sub_word_id_dict.append((context_word, len(list(sub_word_id))))
-    return sub_word_id_dict
-
-
-def cal_whole_word_score(sub_word_id_dict, inter_score):
-    char_attribution_dict = {}
-    sub_word_count = 0
-    for i in range(len(sub_word_id_dict)):
-        sub_word_len = sub_word_id_dict[i][1]
-        cur_token_score = 0
-        for j in range(sub_word_len):
-            cur_token_score += inter_score[sub_word_count]
-            sub_word_count += 1
-        char_attribution_dict[i] = (sub_word_id_dict[i][0], cur_token_score)
-    return char_attribution_dict
 
 
 def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
-                             sub_word_id_dict_query, sub_word_id_dict_title,
-                             out_handle, SEP_idx, add_idx):
+                             out_handle, SEP_idx, q_offset, t_offset, add_idx):
     if args.base_model.startswith('roberta'):
         inter_score = atts[-1][:, :, 0, :].mean(1)  # (bsz, seq)
         q_inter_score = inter_score[0][1:SEP_idx]  # remove CLS and SEP
@@ -295,11 +288,27 @@ def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
     assert len(t_tokens) == t_length, f"{len(t_tokens)} != {t_length}"
 
     q_char_attribution_dict, t_char_attribution_dict = {}, {}
-    if args.language == 'en' and args.base_model.startswith('roberta'):
-        q_char_attribution_dict = cal_whole_word_score(sub_word_id_dict_query,
-                                                       q_inter_score.tolist())
-        t_char_attribution_dict = cal_whole_word_score(sub_word_id_dict_title,
-                                                       t_inter_score.tolist())
+    if args.base_model.startswith('roberta'):
+        # Query
+        sorted_token = []
+        for i in range(len(q_inter_score)):
+            sorted_token.append([i, q_offset[i], q_inter_score[i]])
+        q_char_attribution_dict = match(result['query'], result['text_q_seg'], sorted_token)
+        result['query_char_attri'] = collections.OrderedDict()
+        for token_info in sorted(q_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['query_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('text_q_seg')
+
+        #Title
+        sorted_token = []
+        for i in range(len(t_inter_score)):
+            sorted_token.append([i, t_offset[i], t_inter_score[i]])
+        t_char_attribution_dict = match(result['title'], result['text_t_seg'], sorted_token)
+        result['title_char_attri'] = collections.OrderedDict()
+        for token_info in sorted(t_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['title_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('text_t_seg')
+
     else:
         idx = 0
         for token, score in zip(q_tokens, q_inter_score.tolist()):
@@ -309,17 +318,17 @@ def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
             t_char_attribution_dict[idx] = (token, score)
             idx += 1
 
-    result['query_char_attri'], result[
-        'title_char_attri'] = collections.OrderedDict(
-        ), collections.OrderedDict()
-    for token, attri in sorted(
-            q_char_attribution_dict.items(), key=lambda x: x[1][1],
-            reverse=True):
-        result['query_char_attri'][token] = attri
-    for token, attri in sorted(
-            t_char_attribution_dict.items(), key=lambda x: x[1][1],
-            reverse=True):
-        result['title_char_attri'][token] = attri
+        result['query_char_attri'], result[
+            'title_char_attri'] = collections.OrderedDict(
+            ), collections.OrderedDict()
+        for token, attri in sorted(
+                q_char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
+            result['query_char_attri'][token] = attri
+        for token, attri in sorted(
+                t_char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
+            result['title_char_attri'][token] = attri
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
@@ -383,10 +392,9 @@ def IG_lstm_inter_score(q_embedded_grads_list, pred_embedded, baseline_embedded,
     return q_inter_score
 
 
-def extract_integrated_gradient_scores(args, result, sub_word_id_dict_query,
-                                       sub_word_id_dict_title, fwd_args,
+def extract_integrated_gradient_scores(args, result, fwd_args,
                                        fwd_kwargs, model, q_tokens, t_tokens,
-                                       out_handle, SEP_idx, add_idx, err_total):
+                                       out_handle, SEP_idx, add_idx, q_offset, t_offset, err_total):
     embedded_grads_list = []
     q_embedded_grads_list, t_embedded_grads_list = [], []
     for i in range(args.n_samples):
@@ -428,11 +436,26 @@ def extract_integrated_gradient_scores(args, result, sub_word_id_dict_query,
                                             pred_embedded, baseline_embedded, 1)
 
     q_char_attribution_dict, t_char_attribution_dict = {}, {}
-    if args.language == 'en' and args.base_model.startswith('roberta'):
-        q_char_attribution_dict = cal_whole_word_score(sub_word_id_dict_query,
-                                                       q_inter_score.tolist())
-        t_char_attribution_dict = cal_whole_word_score(sub_word_id_dict_title,
-                                                       t_inter_score.tolist())
+    if args.base_model.startswith('roberta'):
+        # Query
+        sorted_token = []
+        for i in range(len(q_inter_score)):
+            sorted_token.append([i, q_offset[i], q_inter_score[i]])
+        q_char_attribution_dict = match(result['query'], result['text_q_seg'], sorted_token)
+        result['query_char_attri'] = collections.OrderedDict()
+        for token_info in sorted(q_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['query_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('text_q_seg')
+
+        #Title
+        sorted_token = []
+        for i in range(len(t_inter_score)):
+            sorted_token.append([i, t_offset[i], t_inter_score[i]])
+        t_char_attribution_dict = match(result['title'], result['text_t_seg'], sorted_token)
+        result['title_char_attri'] = collections.OrderedDict()
+        for token_info in sorted(t_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['title_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        result.pop('text_t_seg')
     else:
         idx = 0
         for token, score in zip(q_tokens, q_inter_score.tolist()):
@@ -442,17 +465,17 @@ def extract_integrated_gradient_scores(args, result, sub_word_id_dict_query,
             t_char_attribution_dict[idx] = (token, score)
             idx += 1
 
-    result['query_char_attri'], result[
-        'title_char_attri'] = collections.OrderedDict(
-        ), collections.OrderedDict()
-    for token, attri in sorted(
-            q_char_attribution_dict.items(), key=lambda x: x[1][1],
-            reverse=True):
-        result['query_char_attri'][token] = attri
-    for token, attri in sorted(
-            t_char_attribution_dict.items(), key=lambda x: x[1][1],
-            reverse=True):
-        result['title_char_attri'][token] = attri
+        result['query_char_attri'], result[
+            'title_char_attri'] = collections.OrderedDict(
+            ), collections.OrderedDict()
+        for token, attri in sorted(
+                q_char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
+            result['query_char_attri'][token] = attri
+        for token, attri in sorted(
+                t_char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
+            result['title_char_attri'][token] = attri
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
@@ -490,12 +513,16 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
     # query
     char_attribution_dict = []
     for kind, local_exp in local_exps_q.items():
-        for idx in range(len(q_tokens)):
-            t = q_tokens[idx].replace('Ġ', '')
+        for idx in range(len(result['text_q_seg'])):
+            t = result['text_q_seg'][idx] #.replace('Ġ', '')
+            got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string_q.inverse_vocab[word_id] == t:
                     char_attribution_dict.append((idx, t, attribution))
+                    got_score = True
                     break
+                if not got_score:
+                    char_attribution_dict.append((idx, t, 0))
     char_attribution_dict = sorted(
         char_attribution_dict, key=lambda x: x[2], reverse=True)
     result['query_char_attri'] = collections.OrderedDict()
@@ -505,12 +532,16 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
     # title       
     char_attribution_dict = []
     for kind, local_exp in local_exps_t.items():
-        for idx in range(len(t_tokens)):
-            t = t_tokens[idx].replace('Ġ', '')
+        for idx in range(len(result['text_t_seg'])):
+            t = result['text_t_seg'][idx] #.replace('Ġ', '')
+            got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string_t.inverse_vocab[word_id] == t:
                     char_attribution_dict.append((idx, t, attribution))
+                    got_score = True
                     break
+                if not got_score:
+                    char_attribution_dict.append((idx, t, 0))
     char_attribution_dict = sorted(
         char_attribution_dict, key=lambda x: x[2], reverse=True)
     result['title_char_attri'] = collections.OrderedDict()
@@ -571,6 +602,8 @@ if __name__ == "__main__":
         # For Roberta
         sub_word_id_dict_query = []
         sub_word_id_dict_title = []
+        # For LSTM
+        q_offset, t_offset = None, None
 
         get_sub_word_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
         for step, d in tqdm(enumerate(dataloader)):
@@ -582,7 +615,7 @@ if __name__ == "__main__":
             add_idx = get_seq_token_num(args.language)
 
             if args.base_model.startswith('roberta'):
-                q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs = get_qt_tokens(
+                q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs, q_offset, t_offset = get_qt_tokens(
                     base_model='roberta',
                     d=d,
                     add_idx=add_idx,
@@ -595,6 +628,8 @@ if __name__ == "__main__":
                     vocab=vocab)
 
             result['id'] = dev_ds.data[step]['id']
+            result['text_q_seg'] = dev_ds.data[step]['text_q_seg']
+            result['text_t_seg'] = dev_ds.data[step]['text_t_seg']
 
             probs, atts, embedded = model.forward_interpret(*fwd_args,
                                                             **fwd_kwargs)
@@ -606,29 +641,21 @@ if __name__ == "__main__":
             ]
 
             if args.language == 'ch':
-                result['query'] = ''.join(q_tokens)
-                result['title'] = ''.join(t_tokens)
+                result['query'] = dev_ds.data[step]['query']
+                result['title'] = dev_ds.data[step]['title']
             else:
-                result['query'] = tokenizer.convert_tokens_to_string(q_tokens)
-                result['title'] = tokenizer.convert_tokens_to_string(t_tokens)
-                if args.base_model.startswith('roberta'):
-                    sub_word_id_dict_query = sub_word_length(result, 'query',
-                                                             get_sub_word_ids)
-                    sub_word_id_dict_title = sub_word_length(result, 'title',
-                                                             get_sub_word_ids)
+                result['query'] = dev_ds.data[step]['sentence1']
+                result['title'] = dev_ds.data[step]['sentence2']
 
             # Attention
             if args.inter_mode == "attention":
-                extract_attention_scores(args, result, atts, q_tokens, t_tokens,
-                                         sub_word_id_dict_query,
-                                         sub_word_id_dict_title, out_handle,
-                                         SEP_idx, add_idx)
+                extract_attention_scores(args, result, atts, q_tokens, t_tokens, out_handle,
+                                         SEP_idx, q_offset, t_offset, add_idx)
 
             elif args.inter_mode == 'integrated_gradient':
                 extract_integrated_gradient_scores(
-                    args, result, sub_word_id_dict_query,
-                    sub_word_id_dict_title, fwd_args, fwd_kwargs, model,
-                    q_tokens, t_tokens, out_handle, SEP_idx, add_idx, err_total)
+                    args, result, fwd_args, fwd_kwargs, model,
+                    q_tokens, t_tokens, out_handle, SEP_idx, add_idx, q_offset, t_offset, err_total)
 
             elif args.inter_mode == 'lime':
                 exp_q, exp_t, relative_err, err = extract_LIME_scores(

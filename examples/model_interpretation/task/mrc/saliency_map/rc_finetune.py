@@ -150,7 +150,16 @@ def map_fn_DuCheckList_finetune(examples):
             # Start/end character index of the answer in the text.
             start_char = answer_starts[0]
             end_char = start_char + len(answers[0])
-            if args.language == 'ch':
+            if args.language == 'en':
+                # Start token index of the current span in the text.
+                token_start_index = 0
+                while not (offsets[token_start_index] == (0, 0) and offsets[token_start_index + 1] == (0, 0)):
+                    token_start_index += 1
+                token_start_index += 2
+
+                # End token index of the current span in the text.
+                token_end_index = len(input_ids) - 2
+            else:
                 # Start token index of the current span in the text.
                 token_start_index = 0
                 while sequence_ids[token_start_index] != 1:
@@ -160,10 +169,6 @@ def map_fn_DuCheckList_finetune(examples):
                 token_end_index = len(input_ids) - 2
                 while sequence_ids[token_end_index] != 1:
                     token_end_index -= 1
-            else:
-
-                token_start_index = tokenized_example['context_start_id']
-                token_end_index = tokenized_example['context_end_id']
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
             if not (offsets[token_start_index][0] <= start_char and

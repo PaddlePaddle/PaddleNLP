@@ -88,38 +88,28 @@ if __name__ == "__main__":
     set_seed()
 
     if args.language == 'ch':
-        tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
-
-        # Loads dataset.
         train_ds, dev_ds = load_dataset(
             "chnsenticorp", splits=["train", "dev"]
-        )  # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
-
-        # Constructs the newtork.
-        vocab_size = len(tokenizer.vocab)
-        num_classes = len(train_ds.label_list)
-        pad_token_id = tokenizer.vocab.get('[PAD]')
-        pad_value = tokenizer.vocab.get('[PAD]', 0)
+        )
     else:
-        # Loads vocab.
-        if not os.path.exists(args.vocab_path):
-            raise RuntimeError('The vocab_path  can not be found in the path %s'
-                               % args.vocab_path)
-        vocab = Vocab.load_vocabulary(
-            args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-
-        tokenizer = CharTokenizer(vocab)
-
-        # Loads dataset.
         train_ds, dev_ds = load_dataset(
             "glue", "sst-2", splits=["train", "dev"]
-        )  # train_ds, dev_ds: <class 'paddlenlp.datasets.dataset.MapDataset'>
+        )
 
-        # Constructs the newtork.
-        vocab_size = len(vocab)
-        num_classes = len(train_ds.label_list)
-        pad_token_id = 0
-        pad_value = vocab.token_to_idx.get('[PAD]', 0)
+    # Loads vocab.
+    if not os.path.exists(args.vocab_path):
+        raise RuntimeError('The vocab_path  can not be found in the path %s'
+                            % args.vocab_path)
+    vocab = Vocab.load_vocabulary(
+        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+
+    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
+
+    # Constructs the newtork.
+    vocab_size = len(vocab)
+    num_classes = len(train_ds.label_list)
+    pad_token_id = 0
+    pad_value = vocab.token_to_idx.get('[PAD]', 0)
 
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)

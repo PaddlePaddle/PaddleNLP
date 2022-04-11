@@ -106,8 +106,12 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     # context that overlaps a bit the context of the previous feature.
     #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    contexts = [examples[i]['context'] for i in range(len(examples))]
-    questions = [examples[i]['question'] for i in range(len(examples))]
+    if args.language == 'en':
+        contexts = [examples[i]['context'].encode('ascii', errors='replace').decode('UTF-8') for i in range(len(examples))]
+        questions = [examples[i]['question'].encode('ascii', errors='replace').decode('UTF-8') for i in range(len(examples))]
+    else:
+        contexts = [examples[i]['context'] for i in range(len(examples))]
+        questions = [examples[i]['question'] for i in range(len(examples))]
 
     tokenized_examples = tokenizer(
         questions,
@@ -142,7 +146,6 @@ def map_fn_DuCheckList(examples, args, tokenizer):
                 (o if n <= k <= m else None)
                 for k, o in enumerate(tokenized_example["offset_mapping"])
             ]
-
     return tokenized_examples
 
 
