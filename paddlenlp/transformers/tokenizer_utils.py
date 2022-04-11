@@ -894,12 +894,10 @@ class PretrainedTokenizer(object):
                         tokens[i - 1] = left.rstrip()
         tokenized_text = []
         for token in tokens:
-
             if not token:
                 continue
             if token in no_split_token:
                 tokenized_text.append(token)
-
             else:
                 tokenized_text.extend(self._tokenize(token, **kwargs))
         return tokenized_text
