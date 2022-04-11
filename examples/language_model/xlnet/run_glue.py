@@ -153,20 +153,8 @@ def convert_example(example,
             'attention_mask']
 
 
-def do_train(args):
-    paddle.set_device(args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    set_seed(args)
-    global final_res
-
-    args.task_name = args.task_name.lower()
-    metric_class = METRIC_CLASSES[args.task_name]
-    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
-
+def create_data_loader(args, tokenizer):
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
@@ -225,6 +213,26 @@ def do_train(args):
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
+
+    return train_data_loader, dev_data_loader, train_ds, dev_ds
+
+
+def do_train(args):
+    paddle.set_device(args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
+
+    set_seed(args)
+    global final_res
+
+    args.task_name = args.task_name.lower()
+    metric_class = METRIC_CLASSES[args.task_name]
+    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
+
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(
+        args, tokenizer)
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = XLNetForSequenceClassification.from_pretrained(
