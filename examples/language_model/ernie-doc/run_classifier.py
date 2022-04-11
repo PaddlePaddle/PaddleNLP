@@ -165,7 +165,7 @@ def do_train(args):
         if eval_name == test_name:
             test_ds = eval_ds
         else:
-            test_ds = load_dataset(args.dataset, splits=["train", test_name])
+            test_ds = load_dataset(args.dataset, splits=[test_name])
 
     num_classes = len(train_ds.label_list)
 

@@ -230,7 +230,7 @@ class ColumnParallelLiner(nn.Layer):
         if self.gather_out is False:
             return output_parallel
 
-        return paddle.distributed.collective._concat(
+        return paddle.distributed.collective._c_concat(
             output_parallel, group=group)
 
 
