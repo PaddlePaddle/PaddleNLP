@@ -93,7 +93,6 @@ lines=(${dataline})
 model_name=$(func_parser_value "${lines[1]}")
 
 if [[ ${model_name} =~ gpt* ]]; then
-    export BENCHMARK_ROOT=/workspace
     run_env=$BENCHMARK_ROOT/run_env
     export PATH=$run_env:${PATH}
 fi
