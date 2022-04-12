@@ -88,18 +88,15 @@ if __name__ == "__main__":
     set_seed()
 
     if args.language == 'ch':
-        train_ds, dev_ds = load_dataset(
-            "chnsenticorp", splits=["train", "dev"]
-        )
+        train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     else:
         train_ds, dev_ds = load_dataset(
-            "glue", "sst-2", splits=["train", "dev"]
-        )
+            "glue", "sst-2", splits=["train", "dev"])
 
     # Loads vocab.
     if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s'
-                            % args.vocab_path)
+        raise RuntimeError('The vocab_path  can not be found in the path %s' %
+                           args.vocab_path)
     vocab = Vocab.load_vocabulary(
         args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
 

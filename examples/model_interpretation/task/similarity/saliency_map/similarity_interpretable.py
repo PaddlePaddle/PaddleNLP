@@ -147,8 +147,16 @@ def map_fn_senti(examples, tokenizer, language):
     else:
         q_name = "sentence1"
         t_name = "sentence2"
-        queries = [example[q_name].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
-        titles = [example[t_name].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
+        queries = [
+            example[q_name].encode(
+                'ascii', errors='replace').decode('UTF-8')
+            for example in examples
+        ]
+        titles = [
+            example[t_name].encode(
+                'ascii', errors='replace').decode('UTF-8')
+            for example in examples
+        ]
     tokenized_examples = tokenizer(
         queries, titles, max_seq_len=args.max_seq_len)
 
@@ -156,8 +164,16 @@ def map_fn_senti(examples, tokenizer, language):
         tokenized_examples)
 
     for i in range(len(tokenized_examples)):
-        tokenized_examples[i]['query_offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(queries[i])[:args.max_seq_len-2]+[(0,0)]
-        tokenized_examples[i]['title_offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(titles[i])[:args.max_seq_len-2]+[(0,0)]
+        tokenized_examples[i]['query_offset_mapping'] = [
+            (0, 0)
+        ] + tokenizer.get_offset_mapping(queries[i])[:args.max_seq_len - 2] + [
+            (0, 0)
+        ]
+        tokenized_examples[i]['title_offset_mapping'] = [
+            (0, 0)
+        ] + tokenizer.get_offset_mapping(titles[i])[:args.max_seq_len - 2] + [
+            (0, 0)
+        ]
 
     return tokenized_examples
 
@@ -270,9 +286,8 @@ def get_qt_tokens(base_model,
         return q_tokens, t_tokens, SEP_idx, fwd_args, fwd_kwargs
 
 
-
-def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
-                             out_handle, SEP_idx, q_offset, t_offset, add_idx):
+def extract_attention_scores(args, result, atts, q_tokens, t_tokens, out_handle,
+                             SEP_idx, q_offset, t_offset, add_idx):
     if args.base_model.startswith('roberta'):
         inter_score = atts[-1][:, :, 0, :].mean(1)  # (bsz, seq)
         q_inter_score = inter_score[0][1:SEP_idx]  # remove CLS and SEP
@@ -293,20 +308,26 @@ def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
         sorted_token = []
         for i in range(len(q_inter_score)):
             sorted_token.append([i, q_offset[i], q_inter_score[i]])
-        q_char_attribution_dict = match(result['query'], result['text_q_seg'], sorted_token)
+        q_char_attribution_dict = match(result['query'], result['text_q_seg'],
+                                        sorted_token)
         result['query_char_attri'] = collections.OrderedDict()
-        for token_info in sorted(q_char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['query_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                q_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['query_char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('text_q_seg')
 
         #Title
         sorted_token = []
         for i in range(len(t_inter_score)):
             sorted_token.append([i, t_offset[i], t_inter_score[i]])
-        t_char_attribution_dict = match(result['title'], result['text_t_seg'], sorted_token)
+        t_char_attribution_dict = match(result['title'], result['text_t_seg'],
+                                        sorted_token)
         result['title_char_attri'] = collections.OrderedDict()
-        for token_info in sorted(t_char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['title_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                t_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['title_char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('text_t_seg')
 
     else:
@@ -322,11 +343,13 @@ def extract_attention_scores(args, result, atts, q_tokens, t_tokens,
             'title_char_attri'] = collections.OrderedDict(
             ), collections.OrderedDict()
         for token, attri in sorted(
-                q_char_attribution_dict.items(), key=lambda x: x[1][1],
+                q_char_attribution_dict.items(),
+                key=lambda x: x[1][1],
                 reverse=True):
             result['query_char_attri'][token] = attri
         for token, attri in sorted(
-                t_char_attribution_dict.items(), key=lambda x: x[1][1],
+                t_char_attribution_dict.items(),
+                key=lambda x: x[1][1],
                 reverse=True):
             result['title_char_attri'][token] = attri
 
@@ -392,9 +415,9 @@ def IG_lstm_inter_score(q_embedded_grads_list, pred_embedded, baseline_embedded,
     return q_inter_score
 
 
-def extract_integrated_gradient_scores(args, result, fwd_args,
-                                       fwd_kwargs, model, q_tokens, t_tokens,
-                                       out_handle, SEP_idx, add_idx, q_offset, t_offset, err_total):
+def extract_integrated_gradient_scores(
+        args, result, fwd_args, fwd_kwargs, model, q_tokens, t_tokens,
+        out_handle, SEP_idx, add_idx, q_offset, t_offset, err_total):
     embedded_grads_list = []
     q_embedded_grads_list, t_embedded_grads_list = [], []
     for i in range(args.n_samples):
@@ -441,20 +464,26 @@ def extract_integrated_gradient_scores(args, result, fwd_args,
         sorted_token = []
         for i in range(len(q_inter_score)):
             sorted_token.append([i, q_offset[i], q_inter_score[i]])
-        q_char_attribution_dict = match(result['query'], result['text_q_seg'], sorted_token)
+        q_char_attribution_dict = match(result['query'], result['text_q_seg'],
+                                        sorted_token)
         result['query_char_attri'] = collections.OrderedDict()
-        for token_info in sorted(q_char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['query_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                q_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['query_char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('text_q_seg')
 
         #Title
         sorted_token = []
         for i in range(len(t_inter_score)):
             sorted_token.append([i, t_offset[i], t_inter_score[i]])
-        t_char_attribution_dict = match(result['title'], result['text_t_seg'], sorted_token)
+        t_char_attribution_dict = match(result['title'], result['text_t_seg'],
+                                        sorted_token)
         result['title_char_attri'] = collections.OrderedDict()
-        for token_info in sorted(t_char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['title_char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                t_char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['title_char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('text_t_seg')
     else:
         idx = 0
@@ -469,11 +498,13 @@ def extract_integrated_gradient_scores(args, result, fwd_args,
             'title_char_attri'] = collections.OrderedDict(
             ), collections.OrderedDict()
         for token, attri in sorted(
-                q_char_attribution_dict.items(), key=lambda x: x[1][1],
+                q_char_attribution_dict.items(),
+                key=lambda x: x[1][1],
                 reverse=True):
             result['query_char_attri'][token] = attri
         for token, attri in sorted(
-                t_char_attribution_dict.items(), key=lambda x: x[1][1],
+                t_char_attribution_dict.items(),
+                key=lambda x: x[1][1],
                 reverse=True):
             result['title_char_attri'][token] = attri
 
@@ -514,7 +545,7 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
     char_attribution_dict = []
     for kind, local_exp in local_exps_q.items():
         for idx in range(len(result['text_q_seg'])):
-            t = result['text_q_seg'][idx] #.replace('Ġ', '')
+            t = result['text_q_seg'][idx]  #.replace('Ġ', '')
             got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string_q.inverse_vocab[word_id] == t:
@@ -533,7 +564,7 @@ def extract_LIME_scores(args, q_tokens, t_tokens, result, tokenizer, pred_label,
     char_attribution_dict = []
     for kind, local_exp in local_exps_t.items():
         for idx in range(len(result['text_t_seg'])):
-            t = result['text_t_seg'][idx] #.replace('Ġ', '')
+            t = result['text_t_seg'][idx]  #.replace('Ġ', '')
             got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string_t.inverse_vocab[word_id] == t:
@@ -649,13 +680,15 @@ if __name__ == "__main__":
 
             # Attention
             if args.inter_mode == "attention":
-                extract_attention_scores(args, result, atts, q_tokens, t_tokens, out_handle,
-                                         SEP_idx, q_offset, t_offset, add_idx)
+                extract_attention_scores(args, result, atts, q_tokens, t_tokens,
+                                         out_handle, SEP_idx, q_offset,
+                                         t_offset, add_idx)
 
             elif args.inter_mode == 'integrated_gradient':
                 extract_integrated_gradient_scores(
-                    args, result, fwd_args, fwd_kwargs, model,
-                    q_tokens, t_tokens, out_handle, SEP_idx, add_idx, q_offset, t_offset, err_total)
+                    args, result, fwd_args, fwd_kwargs, model, q_tokens,
+                    t_tokens, out_handle, SEP_idx, add_idx, q_offset, t_offset,
+                    err_total)
 
             elif args.inter_mode == 'lime':
                 exp_q, exp_t, relative_err, err = extract_LIME_scores(

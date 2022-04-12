@@ -107,8 +107,16 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     if args.language == 'en':
-        contexts = [examples[i]['context'].encode('ascii', errors='replace').decode('UTF-8') for i in range(len(examples))]
-        questions = [examples[i]['question'].encode('ascii', errors='replace').decode('UTF-8') for i in range(len(examples))]
+        contexts = [
+            examples[i]['context'].encode(
+                'ascii', errors='replace').decode('UTF-8')
+            for i in range(len(examples))
+        ]
+        questions = [
+            examples[i]['question'].encode(
+                'ascii', errors='replace').decode('UTF-8')
+            for i in range(len(examples))
+        ]
     else:
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]

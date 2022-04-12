@@ -40,7 +40,7 @@ def cal_score(match_list, sorted_token):
     miss = 0
     for i in match_list:
         over_all.extend(i[0])
-    
+
     score_dic = {}
     for i in sorted_token:
         split_time = over_all.count(i[0])
@@ -64,8 +64,8 @@ def cal_score(match_list, sorted_token):
 
 def match(context, context_seg, sorted_token):
     result = []
-    pointer1 = 0 # point at the context
-    pointer2 = 0 # point at the sorted_token array
+    pointer1 = 0  # point at the context
+    pointer2 = 0  # point at the sorted_token array
     for i in range(len(context_seg)):
         seg_start_idx = context.find(context_seg[i], pointer1)
         if seg_start_idx < 0:
@@ -74,7 +74,8 @@ def match(context, context_seg, sorted_token):
 
         cur_set = []
         while pointer2 < len(sorted_token):
-            while pointer2<len(sorted_token) and sorted_token[pointer2][1][1] <= seg_start_idx:
+            while pointer2 < len(sorted_token) and sorted_token[pointer2][1][
+                    1] <= seg_start_idx:
                 pointer2 += 1
             if pointer2 >= len(sorted_token):
                 break

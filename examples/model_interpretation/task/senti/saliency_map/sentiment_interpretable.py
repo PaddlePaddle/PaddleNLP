@@ -123,7 +123,11 @@ class Senti_data(DatasetBuilder):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
                 line_split = json.loads(line)
-                yield {'id': line_split['id'], 'context': line_split['context'], 'sent_token': line_split['sent_token']}
+                yield {
+                    'id': line_split['id'],
+                    'context': line_split['context'],
+                    'sent_token': line_split['sent_token']
+                }
 
 
 def create_dataloader(dataset,
@@ -164,12 +168,19 @@ def create_dataloader(dataset,
 def map_fn_senti(examples, tokenizer, args):
     log.debug('load data %d' % len(examples))
     if args.language == 'en':
-        contexts = [example['context'].encode('ascii', errors='replace').decode('UTF-8') for example in examples]
+        contexts = [
+            example['context'].encode(
+                'ascii', errors='replace').decode('UTF-8')
+            for example in examples
+        ]
     else:
         contexts = [example['context'] for example in examples]
     tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
     for i in range(len(tokenized_examples)):
-        tokenized_examples[i]['offset_mapping'] = [(0,0)]+tokenizer.get_offset_mapping(contexts[i])[:args.max_seq_len-2]+[(0,0)]
+        tokenized_examples[i]['offset_mapping'] = [
+            (0, 0)
+        ] + tokenizer.get_offset_mapping(contexts[i])[:args.max_seq_len -
+                                                      2] + [(0, 0)]
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -177,7 +188,8 @@ def map_fn_senti(examples, tokenizer, args):
 
 
 def init_lstm_var(args):
-    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(
+        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     tokenizer = CharTokenizer(vocab, args.language, '../../punctuations')
     padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
@@ -267,16 +279,20 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
     char_attribution_dict = {}
     # Collect scores in different situation
     if args.base_model.startswith('roberta'):
-        assert len(inter_score) == len(offset), str(len(inter_score))+"not equal to"+str(len(offset))
+        assert len(inter_score) == len(offset), str(len(
+            inter_score)) + "not equal to" + str(len(offset))
         sorted_token = []
         for i in range(len(inter_score)):
             sorted_token.append([i, offset[i], inter_score[i]])
 
-        char_attribution_dict = match(result['context'], result['sent_token'], sorted_token)
-        
+        char_attribution_dict = match(result['context'], result['sent_token'],
+                                      sorted_token)
+
         result['char_attri'] = collections.OrderedDict()
-        for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('sent_token')
     else:
         if args.language == 'ch':
@@ -292,7 +308,8 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
 
         result['char_attri'] = collections.OrderedDict()
         for token_id, token_info in sorted(
-                char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+                char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
             result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
@@ -357,11 +374,14 @@ def extract_integrated_gradient_scores(
         sorted_token = []
         for i in range(len(inter_score)):
             sorted_token.append([i, offset[i], inter_score[i]])
-        char_attribution_dict = match(result['context'], result['sent_token'], sorted_token)
-        
+        char_attribution_dict = match(result['context'], result['sent_token'],
+                                      sorted_token)
+
         result['char_attri'] = collections.OrderedDict()
-        for token_info in sorted(char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['char_attri'][str(token_info[0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(
+                char_attribution_dict, key=lambda x: x[2], reverse=True):
+            result['char_attri'][str(token_info[
+                0])] = [str(token_info[1]), float(token_info[2])]
         result.pop('sent_token')
 
     elif args.base_model == 'lstm':
@@ -373,7 +393,8 @@ def extract_integrated_gradient_scores(
 
         result['char_attri'] = collections.OrderedDict()
         for token_id, token_info in sorted(
-                char_attribution_dict.items(), key=lambda x: x[1][1], reverse=True):
+                char_attribution_dict.items(), key=lambda x: x[1][1],
+                reverse=True):
             result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
@@ -419,7 +440,7 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
         char_attribution_dict = []
 
         for idx in range(len(result['sent_token'])):
-            t = result['sent_token'][idx] #.replace('Ġ', '')
+            t = result['sent_token'][idx]  #.replace('Ġ', '')
             got_score = False
             for word_id, attribution in local_exp:
                 if indexed_string.inverse_vocab[word_id] == t:
@@ -503,14 +524,15 @@ if __name__ == "__main__":
             if args.inter_mode == "attention":
                 #extract attention scores and write resutls to file
                 extract_attention_scores(args, atts, input_ids, tokens,
-                                         sub_word_id_dict, result, offset, out_handle)
+                                         sub_word_id_dict, result, offset,
+                                         out_handle)
 
             # Integrated_gradient
             elif args.inter_mode == 'integrated_gradient':
                 err_total = extract_integrated_gradient_scores(
                     args, atts, input_ids, tokens, sub_word_id_dict, fwd_args,
-                    fwd_kwargs, model, result, pred_label, err_total,
-                    offset, out_handle)
+                    fwd_kwargs, model, result, pred_label, err_total, offset,
+                    out_handle)
 
             # LIME
             elif args.inter_mode == 'lime':

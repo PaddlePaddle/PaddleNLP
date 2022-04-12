@@ -153,7 +153,8 @@ def map_fn_DuCheckList_finetune(examples):
             if args.language == 'en':
                 # Start token index of the current span in the text.
                 token_start_index = 0
-                while not (offsets[token_start_index] == (0, 0) and offsets[token_start_index + 1] == (0, 0)):
+                while not (offsets[token_start_index] ==
+                           (0, 0) and offsets[token_start_index + 1] == (0, 0)):
                     token_start_index += 1
                 token_start_index += 2
 

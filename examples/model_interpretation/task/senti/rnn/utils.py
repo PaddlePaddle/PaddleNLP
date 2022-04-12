@@ -13,6 +13,7 @@
 # limitations under the License.
 import numpy as np
 
+
 def convert_example(example, tokenizer, is_test=False, language='en'):
     """
     Builds model inputs from a sequence for sequence classification tasks. 
@@ -145,6 +146,7 @@ def tokenizer_punc(string, vocab_path):
             res.append('[MASK]')
     return res
 
+
 def punc_split(string, vocab_path):
     punc_set = set()
     with open(vocab_path, 'r') as f:
@@ -155,7 +157,7 @@ def punc_split(string, vocab_path):
             punc_set.add(chr(ascii_num))
         for ascii_num in range(48, 58):
             punc_set.add(chr(ascii_num))
-        
+
     res = []
     temp = ''
     for c in string:
