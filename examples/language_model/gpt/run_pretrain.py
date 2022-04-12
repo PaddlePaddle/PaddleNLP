@@ -78,8 +78,8 @@ def run_evaluate(data_loader,
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and
-            str(f).endswith("_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -91,8 +91,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and
-            str(f).endswith("_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
+            "_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
