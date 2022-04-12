@@ -122,8 +122,8 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and
+            str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -135,8 +135,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f)) and
+            str(f).endswith("_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
@@ -430,7 +430,7 @@ def do_train(args):
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips: %.0f tokens/s, ips_per_card: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, loss_return[0],
                            avg_reader_cost, 1. / speed, speed,
                            speed * args.global_batch_size * args.max_seq_len,
