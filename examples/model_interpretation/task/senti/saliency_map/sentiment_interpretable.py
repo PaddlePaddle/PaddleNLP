@@ -178,7 +178,7 @@ def map_fn_senti(examples, tokenizer, args):
 
 def init_lstm_var(args):
     vocab = Vocab.load_vocabulary(args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
+    tokenizer = CharTokenizer(vocab, args.language, '../../punctuations')
     padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
     trans_fn = partial(

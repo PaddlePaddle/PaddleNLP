@@ -207,7 +207,7 @@ def init_lstm_var(args):
         vocab = Vocab.load_vocabulary(
             "simnet/vocab_QQP", unk_token='[UNK]', pad_token='[PAD]')
 
-    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
+    tokenizer = CharTokenizer(vocab, args.language, '../../punctuations')
     model = SimNet(network='lstm', vocab_size=len(vocab), num_classes=2)
 
     dev_ds = Similarity_data().read(args.data_dir)

@@ -213,11 +213,11 @@ def ch_per_example(args, scores_in_one_example, prev_context_tokens, dev_ds,
         token_score_dict.append([idx, offset[idx], total_score[idx]])
 
     prev_example = dev_ds.data[prev_example_idx]
-    char_attribution_dict = match(prev_example['context'], prev_example['sent_token'], token_score_dict)
+    char_attribution_dict = match(prev_example['context']+ prev_example['title'], prev_example['sent_token'], token_score_dict)
     result['id'] = prev_example['id']
     result['question'] = prev_example['question']
     result['title'] = prev_example['title']
-    result['context'] = prev_example['context']
+    result['context'] = prev_example['context'] + prev_example['title']
     result['pred_label'] = ans_dic[str(result['id'])]
     result['pred_feature'] = ans_idx_dic[str(result['id'])]
 
@@ -427,7 +427,7 @@ if __name__ == "__main__":
                 result['id'] = example['id']
                 result['question'] = example['question']
                 result['title'] = example['title']
-                result['context'] = example['context']
+                result['context'] = example['context'] + example['title']
                 result['sent_token'] = example['sent_token']
 
             if args.inter_mode == "attention":
