@@ -19,12 +19,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument(
-        "--optimizer",
-        type=str,
-        default='adam',
-        help="optimizer to use, only supprt[sgd|adam]")
-
-    parser.add_argument(
         "--learning_rate",
         type=float,
         default=0.001,
@@ -55,7 +49,7 @@ def parse_args():
         help="max length for source and target sentence")
 
     parser.add_argument(
-        "--dropout", type=float, default=0.0, help="drop probability")
+        "--dropout", type=float, default=0.2, help="drop probability")
 
     parser.add_argument(
         "--init_scale",
