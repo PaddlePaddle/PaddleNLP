@@ -126,7 +126,7 @@ class RemBertEmbeddings(nn.Layer):
                  layer_norm_eps=1e-12):
         super(RemBertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
-            vocab_size, input_embedding_size, padding_idx=pad_token_id)
+            vocab_size, input_embedding_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 input_embedding_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
