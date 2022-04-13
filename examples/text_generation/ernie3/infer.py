@@ -104,10 +104,10 @@ def infer(args):
 
     output_ids, _ = model.generate(
         input_ids=input_ids,
-        topk=args.topk,
-        topp=args.topp,
+        top_k=args.topk,
+        top_p=args.topp,
         eos_token_id=tokenizer.end_token_id,
-        decoding_strategy=args.decoding_strategy,
+        decode_strategy=args.decoding_strategy,
         min_length=args.min_out_len,
         max_length=args.max_out_len,
         temperature=args.temperature,
