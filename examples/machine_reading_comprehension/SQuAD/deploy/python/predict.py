@@ -124,6 +124,7 @@ def main():
                               batched=True,
                               remove_columns=column_names,
                               num_proc=4)
+
     batchify_fn = lambda samples, fn=Dict(
         {
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
