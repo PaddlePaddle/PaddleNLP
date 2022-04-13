@@ -21,7 +21,6 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
@@ -582,7 +581,7 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
                                                 "cuda" in str(p.place).lower()):
         return p
     if restore_data:
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             param_data = p.numpy()
             # Creating parameters with Assign initializer is too slow. Maybe we
             # can cast to fp16 directly and get a tensor, while we do it more
@@ -813,8 +812,8 @@ def convert_params(faster_model,
                         attr += "_"
                     setattr(faster_model, attr, params["slf_q_bias"][-1])
                     for key in [
-                            f"slf_{m}_{n}" for m in ("k", "v")
-                            for n in ("weight", "bias")
+                            f"slf_{m}_{n}"
+                            for m in ("k", "v") for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))

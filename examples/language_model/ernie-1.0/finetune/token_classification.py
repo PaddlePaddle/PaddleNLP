@@ -50,16 +50,6 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
     return tokenized_input
 
 
-def ner_collator(tokenizer, args):
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'labels': Pad(axis=0, pad_val=args.ignore_label, dtype='int64')  # label
-    }): fn(samples)
-
-    return batchify_fn
-
-
 def ner_trans_fn(example, tokenizer, args):
     return tokenize_and_align_labels(
         example,

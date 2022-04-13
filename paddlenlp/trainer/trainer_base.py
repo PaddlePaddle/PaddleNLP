@@ -27,6 +27,7 @@ import warnings
 import types
 from collections.abc import Mapping
 from pathlib import Path
+from packaging import version
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from tqdm.auto import tqdm
@@ -39,12 +40,17 @@ from paddle.io import (
     Dataset,
     DataLoader,
     DistributedBatchSampler, )
+from paddlenlp.data import (
+    default_data_collator,
+    DataCollator,
+    DefaultDataCollator,
+    DataCollatorWithPadding, )
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
-from .trainer_args import (TrainingArguments, )
+from .trainer_args import TrainingArguments
 from .trainer_utils import (
     IntervalStrategy,
     EvaluationStrategy,
@@ -73,17 +79,6 @@ from .utils.helper import (
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 
-
-class DataCollator:
-    def __init__(self, *args, **kwargs):
-        pass
-
-
-class DataCollatorWithPadding:
-    def __init__(self, *args, **kwargs):
-        pass
-
-
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
@@ -94,6 +89,16 @@ SCALER_NAME = "scaler.pdparams"
 
 WEIGHTS_NAME = "model_state.pdparams"
 CONFIG_NAME = "model_config.json"
+
+import importlib
+
+
+def is_datasets_available():
+    return importlib.util.find_spec("datasets") is not None
+
+
+if is_datasets_available():
+    import datasets
 
 
 def set_seed(seed):
@@ -184,6 +189,9 @@ class Trainer:
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]]=None,
             optimizers: Tuple[paddle.optimizer.Optimizer,
                               paddle.optimizer.lr.LRScheduler]=(None, None), ):
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.init_parallel_env()
+
         if args is None:
             output_dir = "tmp_trainer"
             logger.info(
@@ -220,6 +228,7 @@ class Trainer:
 
         self.state = TrainerState()
         self.control = TrainerControl()
+        self._signature_columns = None
 
         callbacks = DEFAULT_CALLBACKS
         self.callback_handler = CallbackHandler(callbacks, self.model,
@@ -595,6 +604,10 @@ class Trainer:
             raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
+        if is_datasets_available() and isinstance(train_dataset,
+                                                  datasets.Dataset):
+            train_dataset = self._remove_unused_columns(
+                train_dataset, description="training")
 
         train_sampler = self._get_train_sampler()
 
@@ -636,6 +649,11 @@ class Trainer:
             raise ValueError("Trainer: evaluation requires an eval_dataset.")
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
 
+        if is_datasets_available() and isinstance(eval_dataset,
+                                                  datasets.Dataset):
+            eval_dataset = self._remove_unused_columns(
+                eval_dataset, description="evaluation")
+
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
         return DataLoader(
@@ -655,6 +673,10 @@ class Trainer:
                 The test dataset to use. If it is an `datasets.Dataset`, columns not accepted by the `model.forward()`
                 method are automatically removed. It must implement `__len__`.
         """
+        if is_datasets_available() and isinstance(test_dataset,
+                                                  datasets.Dataset):
+            test_dataset = self._remove_unused_columns(
+                test_dataset, description="test")
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -1519,6 +1541,44 @@ class Trainer:
             tuple(new_size), dtype=tensor.dtype) + pad_index
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
+
+    def _remove_unused_columns(self,
+                               dataset: "datasets.Dataset",
+                               description: Optional[str]=None):
+        if not self.args.remove_unused_columns:
+            return dataset
+        if self._signature_columns is None:
+            # Inspect model forward signature to keep only the arguments it accepts.
+            signature = inspect.signature(self.model.forward)
+            self._signature_columns = list(signature.parameters.keys())
+            # Labels may be named label or label_ids, the default data collator handles that.
+            self._signature_columns += [
+                "label", "label_ids", "labels", "start_positions",
+                "end_positions"
+            ]
+
+        ignored_columns = list(
+            set(dataset.column_names) - set(self._signature_columns))
+        if len(ignored_columns) > 0:
+            dset_description = "" if description is None else f"in the {description} set "
+            logger.info(
+                f"The following columns {dset_description} don't have a corresponding argument in "
+                f"`{self.model.__class__.__name__}.forward` and have been ignored: {', '.join(ignored_columns)}."
+                f" If {', '.join(ignored_columns)} are not expected by `{self.model.__class__.__name__}.forward`, "
+                f" you can safely ignore this message.")
+
+        columns = [
+            k for k in self._signature_columns if k in dataset.column_names
+        ]
+
+        if version.parse(datasets.__version__) < version.parse("1.4.0"):
+            dataset.set_format(
+                type=dataset.format["type"],
+                columns=columns,
+                format_kwargs=dataset.format["format_kwargs"])
+            return dataset
+        else:
+            return dataset.remove_columns(ignored_columns)
 
     def print_config(self, args=None, key=""):
         """

@@ -18,16 +18,14 @@ import ast
 import math
 import argparse
 import random
-from functools import partial
 
 import numpy as np
 import paddle
-from paddlenlp.data import Pad, Tuple, Stack
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.utils.log import logger
 import distutils.util
 
-from data import load_dataset, load_vocab, convert_example
+from data import create_data_loader
 from model import BiGruCrf
 
 # yapf: disable
@@ -81,52 +79,9 @@ def train(args):
     if trainer_num > 1:
         paddle.distributed.init_parallel_env()
     rank = paddle.distributed.get_rank()
-    # Create dataset.
-    train_ds, test_ds = load_dataset(datafiles=(os.path.join(
-        args.data_dir, 'train.tsv'), os.path.join(args.data_dir, 'test.tsv')))
 
-    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
-    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
-    # q2b.dic is used to replace DBC case to SBC case
-    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
-
-    trans_func = partial(
-        convert_example,
-        max_seq_len=args.max_seq_len,
-        word_vocab=word_vocab,
-        label_vocab=label_vocab,
-        normlize_vocab=normlize_vocab)
-    train_ds.map(trans_func)
-    test_ds.map(trans_func)
-
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get("[PAD]", 0), dtype='int64'),  # word_ids
-        Stack(dtype='int64'),  # length
-        Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype='int64'),  # label_ids
-    ): fn(samples)
-
-    # Create sampler for dataloader
-    train_sampler = paddle.io.DistributedBatchSampler(
-        dataset=train_ds,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True)
-    train_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
-
-    test_sampler = paddle.io.BatchSampler(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=False)
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_sampler=test_sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+    word_vocab, label_vocab, train_loader, test_loader = create_data_loader(
+        args)
 
     # Define the model netword and its loss
     model = BiGruCrf(

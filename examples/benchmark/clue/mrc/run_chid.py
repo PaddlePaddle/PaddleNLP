@@ -24,11 +24,9 @@ from functools import partial
 import numpy as np
 
 import paddle
-from paddle.metric import Accuracy
 import paddle.nn as nn
 
 from datasets import load_dataset
-
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -140,19 +138,64 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
+def calc_global_pred_results(logits):
+    logits = np.array(logits)
+    # [num_choices, tag_size]
+    logits = np.transpose(logits)
+    tmp = []
+    for i, row in enumerate(logits):
+        for j, col in enumerate(row):
+            tmp.append((i, j, col))
+    else:
+        choice = set(range(i + 1))
+        blanks = set(range(j + 1))
+    tmp = sorted(tmp, key=lambda x: x[2], reverse=True)
+    results = []
+    for i, j, v in tmp:
+        if (j in blanks) and (i in choice):
+            results.append((i, j))
+            blanks.remove(j)
+            choice.remove(i)
+    results = sorted(results, key=lambda x: x[1], reverse=False)
+    results = [i for i, j in results]
+    return results
+
+
 @paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader):
+def evaluate(model, data_loader, do_predict=False):
     model.eval()
-    metric.reset()
+    right_num, total_num = 0, 0
+    all_results = []
     for step, batch in enumerate(data_loader):
-        input_ids, segment_ids, labels = batch
+        if do_predict:
+            input_ids, segment_ids, example_ids = batch
+        else:
+            input_ids, segment_ids, labels, example_ids = batch
         logits = model(input_ids=input_ids, token_type_ids=segment_ids)
-        loss = loss_fct(logits, labels)
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-    res = metric.accumulate()
+        batch_num = example_ids.shape[0]
+        l = 0
+        r = batch_num - 1
+        batch_results = []
+        for i in range(batch_num - 1):
+            if example_ids[i] != example_ids[i + 1]:
+                r = i
+                batch_results.extend(
+                    calc_global_pred_results(logits[l:r + 1, :]))
+                l = i + 1
+        if l <= batch_num - 1:
+            batch_results.extend(
+                calc_global_pred_results(logits[l:batch_num, :]))
+        if do_predict:
+            all_results.extend(batch_results)
+        else:
+            right_num += np.sum(np.array(batch_results) == labels.numpy())
+            total_num += labels.shape[0]
     model.train()
-    return res
+    if not do_predict:
+        acc = right_num / total_num
+        print("acc", right_num, total_num, acc)
+        return acc
+    return all_results
 
 
 def run(args):
@@ -242,9 +285,14 @@ def run(args):
         num_tokens = max_tokens_for_doc - 5
         num_examples = len(examples.data["candidates"])
         if do_predict:
-            result = {"input_ids": [], "token_type_ids": []}
+            result = {"input_ids": [], "token_type_ids": [], "example_ids": []}
         else:
-            result = {"input_ids": [], "token_type_ids": [], "labels": []}
+            result = {
+                "input_ids": [],
+                "token_type_ids": [],
+                "labels": [],
+                "example_ids": []
+            }
         for idx in range(num_examples):
             candidate = 0
             options = examples.data['candidates'][idx]
@@ -316,6 +364,7 @@ def run(args):
                     # Final shape of input_ids: [batch_size, num_choices, seq_len]
                     result["input_ids"].append(new_data["input_ids"])
                     result["token_type_ids"].append(new_data["token_type_ids"])
+                    result["example_ids"].append(idx)
                     if not do_predict:
                         label = examples.data["answers"][idx]["candidate_id"][
                             candidate]
@@ -350,7 +399,8 @@ def run(args):
         batchify_fn = lambda samples, fn=Dict({
             'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
             'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
-            'labels': Stack(dtype="int64")  # label
+            'labels': Stack(dtype="int64"),  # label
+            'example_ids': Stack(dtype="int64"),  # example id
         }): fn(samples)
 
         train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -397,7 +447,6 @@ def run(args):
             grad_clip=grad_clip)
 
         loss_fct = nn.CrossEntropyLoss()
-        metric = Accuracy()
 
         model.train()
         global_step = 0
@@ -405,7 +454,7 @@ def run(args):
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_data_loader):
-                input_ids, segment_ids, labels = batch
+                input_ids, segment_ids, labels, example_ids = batch
                 logits = model(input_ids=input_ids, token_type_ids=segment_ids)
                 loss = loss_fct(logits, labels)
                 if args.gradient_accumulation_steps > 1:
@@ -424,7 +473,7 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
             tic_eval = time.time()
-            acc = evaluate(model, loss_fct, metric, dev_data_loader)
+            acc = evaluate(model, dev_data_loader)
             print("eval acc: %.5f, eval done total : %s s" %
                   (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
@@ -445,13 +494,13 @@ def run(args):
                               batch_size=len(test_ds),
                               remove_columns=column_names,
                               num_proc=1)
-
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=args.eval_batch_size, shuffle=False)
 
         batchify_fn = lambda samples, fn=Dict({
             'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
             'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
+            'example_ids': Stack(dtype="int64"),  # example id
         }): fn(samples)
 
         test_data_loader = paddle.io.DataLoader(
@@ -462,15 +511,10 @@ def run(args):
 
         result = {}
         idx = 623377
-        for step, batch in enumerate(test_data_loader):
-            input_ids, segment_ids = batch
-            with paddle.no_grad():
-                logits = model(input_ids, segment_ids)
-            preds = paddle.argmax(logits, axis=1).numpy().tolist()
-            for pred in preds:
-                result["#idiom" + str(idx)] = pred
-                idx += 1
-
+        preds = evaluate(model, test_data_loader, do_predict=True)
+        for pred in preds:
+            result["#idiom" + str(idx)] = pred
+            idx += 1
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
         with open(
