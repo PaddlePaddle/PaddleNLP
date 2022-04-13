@@ -12,6 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# Notice, most of this file is modified from 
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_callback.py
+# Thanks a lot.
 """
 Callbacks to use with the Trainer class and customize the training loop.
 """
