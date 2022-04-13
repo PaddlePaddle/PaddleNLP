@@ -38,6 +38,7 @@ option(WITH_PARALLEL    "Compile with model parallel for GPT"                   
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WITH_PARALLEL)
   # https://cmake.org/cmake/help/latest/module/FindMPI.html#variables-for-locating-mpi
+  # https://github.com/Kitware/CMake/blob/master/Modules/FindMPI.cmake
   find_package(MPI REQUIRED)
   find_package(NCCL REQUIRED)
   add_definitions(-DBUILD_GPT)
@@ -240,6 +241,12 @@ list(APPEND COMMON_HEADER_DIRS
 set(COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
 )
+
+if(WITH_PARALLEL)
+  list(APPEND COMMON_HEADER_DIRS
+    ${NCCL_INCLUDE_PATH}
+    ${MPI_INCLUDE_PATH})
+endif()
 
 set(THIRD_PATH "third-party")
 set(THIRD_PARTY_NAME "fastertransformer")
