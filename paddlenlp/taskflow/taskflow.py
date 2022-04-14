@@ -39,124 +39,6 @@ from .dialogue import DialogueTask
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
-    "knowledge_mining": {
-        "models": {
-            "wordtag": {
-                "task_class": WordTagTask,
-                "task_flag": 'knowledge_mining-wordtag',
-            },
-            "nptag": {
-                "task_class": NPTagTask,
-                "task_flag": 'knowledge_mining-nptag',
-            },
-        },
-        "default": {
-            "model": "wordtag"
-        }
-    },
-    "ner": {
-        "modes": {
-            "accurate": {
-                "task_class": NERWordTagTask,
-                "task_flag": "ner-wordtag",
-                "linking": False,
-            },
-            "fast": {
-                "task_class": NERLACTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": "ner-lac",
-            }
-        },
-        "default": {
-            "mode": "accurate"
-        }
-    },
-    "poetry_generation": {
-        "models": {
-            "gpt-cpm-large-cn": {
-                "task_class": PoetryGenerationTask,
-                "task_flag": 'poetry_generation-gpt-cpm-large-cn',
-            },
-        },
-        "default": {
-            "model": "gpt-cpm-large-cn",
-        }
-    },
-    "question_answering": {
-        "models": {
-            "gpt-cpm-large-cn": {
-                "task_class": QuestionAnsweringTask,
-                "task_flag": 'question_answering-gpt-cpm-large-cn',
-            },
-        },
-        "default": {
-            "model": "gpt-cpm-large-cn",
-        }
-    },
-    "lexical_analysis": {
-        "models": {
-            "lac": {
-                "task_class": LacTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": 'lexical_analysis-gru_crf',
-            }
-        },
-        "default": {
-            "model": "lac"
-        }
-    },
-    "word_segmentation": {
-        "modes": {
-            "fast": {
-                "task_class": SegJiebaTask,
-                "task_flag": "word_segmentation-jieba",
-            },
-            "base": {
-                "task_class": SegLACTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": "word_segmentation-gru_crf",
-            },
-            "accurate": {
-                "task_class": SegWordTagTask,
-                "task_flag": "word_segmentation-wordtag",
-                "linking": False,
-            },
-        },
-        "default": {
-            "mode": "base"
-        }
-    },
-    "pos_tagging": {
-        "models": {
-            "lac": {
-                "task_class": POSTaggingTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": 'pos_tagging-gru_crf',
-            }
-        },
-        "default": {
-            "model": "lac"
-        }
-    },
-    'sentiment_analysis': {
-        "models": {
-            "bilstm": {
-                "task_class": SentaTask,
-                "task_flag": 'sentiment_analysis-bilstm',
-            },
-            "skep_ernie_1.0_large_ch": {
-                "task_class": SkepTask,
-                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
-            }
-        },
-        "default": {
-            "model": "bilstm"
-        }
-    },
     'dependency_parsing': {
         "models": {
             "ddparser": {
@@ -173,7 +55,121 @@ TASKS = {
             },
         },
         "default": {
-            "model": "ddparser"
+            "model": "ddparser",
+        }
+    },
+    'dialogue': {
+        "models": {
+            "plato-mini": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-plato-mini"
+            },
+        },
+        "default": {
+            "model": "plato-mini",
+        }
+    },
+    "knowledge_mining": {
+        "models": {
+            "wordtag": {
+                "task_class": WordTagTask,
+                "task_flag": 'knowledge_mining-wordtag',
+                "task_priority_path": "wordtag",
+            },
+            "nptag": {
+                "task_class": NPTagTask,
+                "task_flag": 'knowledge_mining-nptag',
+            },
+        },
+        "default": {
+            "model": "wordtag",
+        }
+    },
+    "lexical_analysis": {
+        "models": {
+            "lac": {
+                "task_class": LacTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'lexical_analysis-gru_crf',
+                "task_priority_path": "lac",
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "ner": {
+        "modes": {
+            "accurate": {
+                "task_class": NERWordTagTask,
+                "task_flag": "ner-wordtag",
+                "task_priority_path": "wordtag",
+                "linking": False,
+            },
+            "fast": {
+                "task_class": NERLACTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": "ner-lac",
+                "task_priority_path": "lac",
+            }
+        },
+        "default": {
+            "mode": "accurate"
+        }
+    },
+    "poetry_generation": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": PoetryGenerationTask,
+                "task_flag": 'poetry_generation-gpt-cpm-large-cn',
+                "task_priority_path": "gpt-cpm-large-cn",
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    "pos_tagging": {
+        "models": {
+            "lac": {
+                "task_class": POSTaggingTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'pos_tagging-gru_crf',
+                "task_priority_path": "lac",
+            }
+        },
+        "default": {
+            "model": "lac"
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
+                "task_flag": 'question_answering-gpt-cpm-large-cn',
+                "task_priority_path": "gpt-cpm-large-cn",
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
+        }
+    },
+    'sentiment_analysis': {
+        "models": {
+            "bilstm": {
+                "task_class": SentaTask,
+                "task_flag": 'sentiment_analysis-bilstm',
+            },
+            "skep_ernie_1.0_large_ch": {
+                "task_class": SkepTask,
+                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
+            }
+        },
+        "default": {
+            "model": "bilstm"
         }
     },
     'text_correction': {
@@ -198,15 +194,28 @@ TASKS = {
             "model": "simbert-base-chinese"
         }
     },
-    'dialogue': {
-        "models": {
-            "plato-mini": {
-                "task_class": DialogueTask,
-                "task_flag": "dialogue-plato-mini"
+    "word_segmentation": {
+        "modes": {
+            "fast": {
+                "task_class": SegJiebaTask,
+                "task_flag": "word_segmentation-jieba",
+            },
+            "base": {
+                "task_class": SegLACTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": "word_segmentation-gru_crf",
+                "task_priority_path": "lac",
+            },
+            "accurate": {
+                "task_class": SegWordTagTask,
+                "task_flag": "word_segmentation-wordtag",
+                "task_priority_path": "wordtag",
+                "linking": False,
             },
         },
         "default": {
-            "model": "plato-mini"
+            "mode": "base"
         }
     },
 }
@@ -247,6 +256,13 @@ class Taskflow(object):
             )), "The {} name:{} is not in task:[{}]".format(tag, model, task)
         else:
             self.model = TASKS[task]['default'][ind_tag]
+
+        if "task_priority_path" in TASKS[self.task][tag][self.model]:
+            self.priority_path = TASKS[self.task][tag][self.model][
+                "task_priority_path"]
+        else:
+            self.priority_path = None
+
         # Set the device for the task
         device = get_env_device()
         if device == 'cpu' or device_id == -1:
@@ -261,7 +277,10 @@ class Taskflow(object):
         self.kwargs = kwargs
         task_class = TASKS[self.task][tag][self.model]['task_class']
         self.task_instance = task_class(
-            model=self.model, task=self.task, **self.kwargs)
+            model=self.model,
+            task=self.task,
+            priority_path=self.priority_path,
+            **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
 
