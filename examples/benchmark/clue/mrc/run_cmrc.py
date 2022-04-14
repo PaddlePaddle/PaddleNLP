@@ -130,7 +130,7 @@ def parse_args():
     parser.add_argument(
         "--max_query_length", type=int, default=64, help="Max query length.")
     parser.add_argument(
-        "--max_answer_length", type=int, default=30, help="Max answer length.")
+        "--max_answer_length", type=int, default=50, help="Max answer length.")
     parser.add_argument(
         "--do_lower_case",
         action='store_false',
@@ -184,12 +184,15 @@ def evaluate(model, raw_dataset, data_loader, args, do_eval=True):
         raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
         False, args.n_best_size, args.max_answer_length)
 
-    # Can also write all_nbest_json and scores_diff_json files if needed
-    if args.do_predict:
-        with open('cmrc2018_predict.json', "w", encoding='utf-8') as writer:
-            writer.write(
-                json.dumps(
-                    all_predictions, ensure_ascii=False, indent=4) + "\n")
+    mode = 'validation' if do_eval else 'test'
+    if do_eval:
+        filename = 'prediction_validation.json'
+    else:
+        filename = 'cmrc2018_predict.json'
+    with open(filename, "w", encoding='utf-8') as writer:
+        writer.write(
+            json.dumps(
+                all_predictions, ensure_ascii=False, indent=4) + "\n")
     if do_eval:
         squad_evaluate(
             examples=[raw_data for raw_data in raw_dataset],
@@ -354,7 +357,8 @@ def run(args):
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
             # position is part of the context or not.
             tokenized_examples["offset_mapping"][i] = [
-                (o if sequence_ids[k] == context_index else None)
+                (o if sequence_ids[k] == context_index and
+                 k != len(sequence_ids) - 1 else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
 
