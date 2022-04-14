@@ -269,7 +269,7 @@ class DataCollatorForSeq2Seq:
         if (labels is not None and self.model is not None and
                 hasattr(self.model, "prepare_decoder_input_ids_from_labels")):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(
-                labels=batch["labels"])
+                labels=paddle.to_tensor(batch["labels"]))
             if not return_tensors:
                 batch["decoder_input_ids"] = decoder_input_ids.numpy()
         if self.return_tensors:

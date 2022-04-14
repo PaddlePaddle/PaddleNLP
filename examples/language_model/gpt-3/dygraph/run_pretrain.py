@@ -394,7 +394,7 @@ def do_train(args):
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, ips_per_card: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, avg_reader_cost,
                            1. / speed, speed, speed * default_global_tokens_num,
                            speed * default_global_tokens_num / nranks,
