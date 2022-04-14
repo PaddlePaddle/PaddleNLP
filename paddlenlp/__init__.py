@@ -17,8 +17,10 @@ import sys
 if 'datasets' in sys.modules.keys():
     from paddlenlp.utils.log import logger
     logger.warning(
-        "datasets module loaded before paddlenlp. "
-        "This may cause PaddleNLP datasets to be unavalible in intranet.")
+        "Detected that datasets module was imported before paddlenlp. "
+        "This may cause PaddleNLP datasets to be unavalible in intranet"
+        "Please import paddlenlp before datasets module to avoid download issues"
+    )
 from . import data
 from . import datasets
 from . import embeddings
@@ -31,6 +33,7 @@ from . import utils
 from . import losses
 from . import experimental
 from .taskflow import Taskflow
+from . import trainer
 import paddle
 
 paddle.disable_signal_handler()

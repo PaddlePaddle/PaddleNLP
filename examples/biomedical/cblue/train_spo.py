@@ -35,6 +35,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=1000, type=int, help='Random seed for initialization.')
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default='gpu', help='Select which device to train model, default to gpu.')
 parser.add_argument('--epochs', default=100, type=int, help='Total number of training epochs.')
+parser.add_argument('--max_steps', default=-1, type=int, help='If > 0: set total number of training steps to perform. Override epochs.')
 parser.add_argument('--batch_size', default=12, type=int, help='Batch size per GPU/CPU for training.')
 parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning sequence classification task.')
 parser.add_argument('--weight_decay', default=0.01, type=float, help="Weight decay of optimizer if we apply some.")
@@ -127,9 +128,8 @@ def do_train():
         }): fn(samples)
         ent_label = [x['ent_label'] for x in data]
         spo_label = [x['spo_label'] for x in data]
-        # data = input_ids, token_type_ids, position_ids, attention_mask
-        data = _batchify_fn(data)
-        batch_size, batch_len = data[0].shape
+        input_ids, token_type_ids, position_ids, masks = _batchify_fn(data)
+        batch_size, batch_len = input_ids.shape
         num_classes = len(train_ds.label_list)
         # Create one-hot labels.
         #
@@ -175,7 +175,7 @@ def do_train():
         # xxx_label are used for metric computation.
         ent_label = [one_hot_ent_label, ent_label]
         spo_label = [one_hot_spo_label, spo_label]
-        return (*data), ent_label, spo_label
+        return input_ids, token_type_ids, position_ids, masks, ent_label, spo_label
 
     train_data_loader = create_dataloader(
         train_ds,
@@ -199,7 +199,8 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = len(train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(
+        train_data_loader) * args.epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -259,11 +260,9 @@ def do_train():
                       'ent_loss: %.5f, spo_loss: %.5f, speed: %.2f steps/s' %
                       (global_step, epoch, step, loss, ent_loss, spo_loss,
                        args.logging_steps / time_diff))
-                tic_train = time.time()
 
             if global_step % args.valid_steps == 0 and rank == 0:
                 evaluate(model, criterion, metric, dev_data_loader)
-                tic_train = time.time()
 
             if global_step % args.save_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, 'model_%d' % global_step)
@@ -274,9 +273,12 @@ def do_train():
                 else:
                     model.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
-                tic_train = time.time()
 
-    if rank == 0:
+            if args.max_steps > 0 and global_step >= args.max_steps:
+                return
+            tic_train = time.time()
+
+    if rank == 0 and total_train_time > 0:
         print('Speed: %.2f steps/s' % (global_step / total_train_time))
 
 

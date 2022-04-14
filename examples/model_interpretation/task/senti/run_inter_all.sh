@@ -45,7 +45,7 @@ do
                     CKPT=pretrained_models/saved_model_ch/roberta_large_20211014_192021/model_900/model_state.pdparams
                     #CKPT=pretrained_models/saved_model_ch/roberta_large_20211229_105019/model_900/model_state.pdparams
                 elif [[ $BASE_MODEL == "lstm" ]]; then
-                    VOCAB_PATH='rnn'
+                    VOCAB_PATH='rnn/vocab.txt'
                     CKPT=rnn/checkpoints_ch/final.pdparams
                     #CKPT=rnn/checkpoints_ch/final.pdparams
                 fi

@@ -254,6 +254,9 @@ class AddedToken:
     def __getstate__(self):
         return self.__dict__
 
+    def __str__(self):
+        return self.content
+
 
 class Trie:
     """
@@ -584,7 +587,9 @@ class PretrainedTokenizer(object):
                  return_length=False,
                  return_overflowing_tokens=False,
                  return_special_tokens_mask=False,
-                 return_dict=True):
+                 return_dict=True,
+                 return_offsets_mapping=False,
+                 add_special_tokens=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
@@ -664,6 +669,14 @@ class PretrainedTokenizer(object):
                          {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
 
                 Defaults to `True`.
+            return_offsets_mapping (bool, optional):
+                Whether to include the list of pair preserving the index of start 
+                and end char in original input for each token in the returned
+                dictionary. Would be automatically set to `True` when `stride` > 0. 
+                Defaults to `False`.
+            add_special_tokens (bool, optional):
+                Whether to add the special tokens associated with the corresponding model
+                to the encoded inputs. Defaults to `True`
                  
         Returns:
             dict or list[dict] (for batch input):
@@ -688,10 +701,10 @@ class PretrainedTokenizer(object):
                 - **special_tokens_mask** (list[int] or list[list[int]], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
-                - **offset_mapping** (list[int] or list[list[int]], optional): list of pair preserving the
+                - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
-                  For a special token, the index pair is `(0, 0)`. Included when
-                  `stride` works.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when 
+                  `return_overflowing_tokens` is True or `stride` > 0.
                 - **overflow_to_sample** (int or list[int], optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
@@ -712,6 +725,12 @@ class PretrainedTokenizer(object):
         )), (
             "text_pair input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
             "or `List[List[str]]` (batch of pretokenized examples).")
+
+        if return_token_type_ids and not add_special_tokens:
+            raise ValueError(
+                "Asking to return token_type_ids while setting add_special_tokens to False "
+                "results in an undefined behavior. Please set add_special_tokens to True or "
+                "set return_token_type_ids to False.")
 
         is_batched = bool(
             (not is_split_into_words and isinstance(text, (list, tuple))) or
@@ -734,7 +753,9 @@ class PretrainedTokenizer(object):
                 return_length=return_length,
                 return_overflowing_tokens=return_overflowing_tokens,
                 return_special_tokens_mask=return_special_tokens_mask,
-                return_dict=return_dict)
+                return_dict=return_dict,
+                return_offsets_mapping=return_offsets_mapping,
+                add_special_tokens=add_special_tokens)
         else:
             return self.encode(
                 text=text,
@@ -747,7 +768,9 @@ class PretrainedTokenizer(object):
                 return_attention_mask=return_attention_mask,
                 return_length=return_length,
                 return_overflowing_tokens=return_overflowing_tokens,
-                return_special_tokens_mask=return_special_tokens_mask)
+                return_special_tokens_mask=return_special_tokens_mask,
+                return_offsets_mapping=return_offsets_mapping,
+                add_special_tokens=add_special_tokens)
 
     @property
     def all_special_tokens(self):
@@ -885,7 +908,7 @@ class PretrainedTokenizer(object):
     def convert_tokens_to_ids(self, tokens):
         if tokens is None:
             return None
-        if isinstance(tokens, str):
+        if isinstance(tokens, (str, AddedToken)):
             if tokens in self.added_tokens_encoder:
                 return self.added_tokens_encoder[tokens]
             else:
@@ -1046,6 +1069,20 @@ class PretrainedTokenizer(object):
         init_args = init_args if not args else args
         init_kwargs.update(kwargs)
 
+        def convert_added_tokens(obj):
+            if isinstance(
+                    obj,
+                    dict) and "__type" in obj and obj["__type"] == "AddedToken":
+                obj.pop("__type")
+                return AddedToken(**obj)
+            elif isinstance(obj, (list, tuple)):
+                return list(convert_added_tokens(o) for o in obj)
+            elif isinstance(obj, dict):
+                return {k: convert_added_tokens(v) for k, v in obj.items()}
+            return obj
+
+        init_kwargs = convert_added_tokens(init_kwargs)
+
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
         for args_name, file_path in resolved_vocab_files.items():
@@ -1182,7 +1219,7 @@ class PretrainedTokenizer(object):
 
     def __getattr__(self, name):
         if name.endswith('_token'):
-            return self.special_tokens_map[name]
+            return str(self.special_tokens_map[name])
         elif name.endswith('_token_id'):
             return self._convert_token_to_id(self.special_tokens_map[name[:-3]])
         raise AttributeError("'{}' object has no attribute '{}'".format(
@@ -1365,7 +1402,9 @@ class PretrainedTokenizer(object):
                return_attention_mask=False,
                return_length=False,
                return_overflowing_tokens=False,
-               return_special_tokens_mask=False):
+               return_special_tokens_mask=False,
+               return_offsets_mapping=False,
+               add_special_tokens=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
@@ -1384,16 +1423,6 @@ class PretrainedTokenizer(object):
                 that it has a maximum length. If there are overflowing tokens,
                 those overflowing tokens will be added to the returned dictionary
                 when `return_overflowing_tokens` is `True`. Defaults to `None`.
-            stride (int, optional):
-                Only available for batch input of sequence pair and mainly for
-                question answering usage. When for QA, `text` represents questions
-                and `text_pair` represents contexts. If `stride` is set to a
-                positive number, the context will be split into multiple spans
-                where `stride` defines the number of (tokenized) tokens to skip
-                from the start of one span to get the next span, thus will produce
-                a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
-                and 'offset_mapping' preserving the original example and position
-                information will be added to the returned dictionary. Defaults to 0.
             pad_to_max_seq_len (bool, optional):
                 If set to `True`, the returned sequences would be padded up to
                 `max_seq_len` specified length according to padding side
@@ -1428,6 +1457,13 @@ class PretrainedTokenizer(object):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
+            return_offsets_mapping (bool, optional):
+                Whether to include the list of pair preserving the index of start 
+                and end char in original input for each token in the returned
+                dictionary. Defaults to `False`.
+            add_special_tokens (bool, optional):
+                Whether to add the special tokens associated with the corresponding model
+                to the encoded inputs. Defaults to `True`
 
         Returns:
             dict:
@@ -1452,6 +1488,10 @@ class PretrainedTokenizer(object):
                 - **special_tokens_mask** (list[int], optional): List of integers valued 0 or 1,
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
+                - **offset_mapping** (list[int], optional): list of pair preserving the
+                  index of start and end char in original input for each token.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when 
+                  `return_overflowing_tokens` is True.
         """
 
         def get_input_ids(text):
@@ -1479,10 +1519,9 @@ class PretrainedTokenizer(object):
         len_pair_ids = len(pair_ids) if pair else 0
 
         encoded_inputs = {}
-
         # Truncation: Handle max sequence length
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(
-            pair=pair))
+            pair=pair) if add_special_tokens else 0)
         if max_seq_len and total_len > max_seq_len:
 
             ids, pair_ids, overflowing_tokens = self.truncate_sequences(
@@ -1495,19 +1534,42 @@ class PretrainedTokenizer(object):
                 encoded_inputs["num_truncated_tokens"] = total_len - max_seq_len
 
         # Add special tokens
-
-        sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
-        token_type_ids = self.create_token_type_ids_from_sequences(ids,
-                                                                   pair_ids)
+        if add_special_tokens:
+            sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
+            token_type_ids = self.create_token_type_ids_from_sequences(ids,
+                                                                       pair_ids)
+        else:
+            sequence = ids + pair_ids if pair else ids
+            token_type_ids = [0] * len(ids) + ([0] * len(pair_ids)
+                                               if pair else [])
 
         # Build output dictionnary
         encoded_inputs["input_ids"] = sequence
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = token_type_ids
         if return_special_tokens_mask:
-            encoded_inputs[
-                "special_tokens_mask"] = self.get_special_tokens_mask(ids,
-                                                                      pair_ids)
+            if add_special_tokens:
+                encoded_inputs[
+                    "special_tokens_mask"] = self.get_special_tokens_mask(
+                        ids, pair_ids)
+            else:
+                encoded_inputs["special_tokens_mask"] = [0] * len(sequence)
+
+        if return_offsets_mapping:
+            token_offset_mapping = self.get_offset_mapping(text)
+            token_pair_offset_mapping = self.get_offset_mapping(text_pair)
+            if max_seq_len and total_len > max_seq_len:
+                token_offset_mapping, token_pair_offset_mapping, _ = self.truncate_sequences(
+                    token_offset_mapping,
+                    pair_ids=token_pair_offset_mapping,
+                    num_tokens_to_remove=total_len - max_seq_len,
+                    truncation_strategy=truncation_strategy, )
+            if add_special_tokens:
+                offset_mapping = self.build_offset_mapping_with_special_tokens(
+                    token_offset_mapping, token_pair_offset_mapping)
+            else:
+                offset_mapping = token_offset_mapping + token_pair_offset_mapping if token_pair_offset_mapping else token_offset_mapping
+            encoded_inputs['offset_mapping'] = offset_mapping
         if return_length:
             encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
 
@@ -1534,6 +1596,9 @@ class PretrainedTokenizer(object):
                         "special_tokens_mask"] + [1] * difference
                 encoded_inputs["input_ids"] = encoded_inputs[
                     "input_ids"] + [self.pad_token_id] * difference
+                if return_offsets_mapping:
+                    encoded_inputs["offset_mapping"] = encoded_inputs[
+                        "offset_mapping"] + [(0, 0)] * difference
             elif self.padding_side == 'left':
                 if return_attention_mask:
                     encoded_inputs["attention_mask"] = [0] * difference + [
@@ -1550,6 +1615,10 @@ class PretrainedTokenizer(object):
                 encoded_inputs["input_ids"] = [
                     self.pad_token_id
                 ] * difference + encoded_inputs["input_ids"]
+                if return_offsets_mapping:
+                    encoded_inputs["offset_mapping"] = [
+                        (0, 0)
+                    ] * difference + encoded_inputs["offset_mapping"]
         else:
             if return_attention_mask:
                 encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
@@ -1574,7 +1643,9 @@ class PretrainedTokenizer(object):
                      return_length=False,
                      return_overflowing_tokens=False,
                      return_special_tokens_mask=False,
-                     return_dict=True):
+                     return_dict=True,
+                     return_offsets_mapping=False,
+                     add_special_tokens=True):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
@@ -1635,6 +1706,27 @@ class PretrainedTokenizer(object):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
+            return_dict (bool, optional):
+                Decide the format for returned encoded batch inputs. Only works when
+                input is a batch of data.
+                ::
+                    - If True, encoded inputs would be a dictionary like: 
+                        {'input_ids': [[1, 4444, 4385, 1545, 6712],[1, 4444, 4385]],
+                        'token_type_ids': [[0, 0, 0, 0, 0], [0, 0, 0]]}
+                    - If False, encoded inputs would be a list like:
+                        [{'input_ids': [1, 4444, 4385, 1545, 6712],
+                          'token_type_ids': [0, 0, 0, 0, 0]},
+                         {'input_ids': [1, 4444, 4385], 'token_type_ids': [0, 0, 0]}]
+
+                Defaults to `True`.
+            return_offsets_mapping (bool, optional):
+                Whether to include the list of pair preserving the index of start 
+                and end char in original input for each token in the returned
+                dictionary. Would be automatically set to `True` when `stride` > 0. 
+                Defaults to `False`.
+            add_special_tokens (bool, optional):
+                Whether to add the special tokens associated with the corresponding model
+                to the encoded inputs. Defaults to `True`
 
         Returns:
             list[dict]:
@@ -1661,8 +1753,8 @@ class PretrainedTokenizer(object):
                   Included when `return_special_tokens_mask` is `True`.
                 - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
-                  For a sqecial token, the index pair is `(0, 0)`. Included when
-                  `stride` works.
+                  For a sqecial token, the index pair is `(0, 0)`. Included when 
+                  `return_overflowing_tokens` is True or `stride` > 0.
                 - **overflow_to_sample** (int, optional): Index of example from which this
                   feature is generated. Included when `stride` works.
         """
@@ -1702,8 +1794,9 @@ class PretrainedTokenizer(object):
 
             if stride > 0 and second_ids is not None:
 
-                max_len_for_pair = max_seq_len - len(
-                    first_ids) - self.num_special_tokens_to_add(pair=True)
+                max_len_for_pair = max_seq_len - len(first_ids) - (
+                    self.num_special_tokens_to_add(pair=True)
+                    if add_special_tokens else 0)
 
                 token_offset_mapping = self.get_offset_mapping(text)
                 token_pair_offset_mapping = self.get_offset_mapping(text_pair)
@@ -1717,26 +1810,35 @@ class PretrainedTokenizer(object):
 
                     ids = first_ids
                     pair_ids = second_ids[offset:offset + length]
-
                     mapping = token_offset_mapping
                     pair_mapping = token_pair_offset_mapping[offset:offset +
                                                              length]
-
-                    offset_mapping = self.build_offset_mapping_with_special_tokens(
-                        mapping, pair_mapping)
-                    sequence = self.build_inputs_with_special_tokens(ids,
-                                                                     pair_ids)
-                    token_type_ids = self.create_token_type_ids_from_sequences(
-                        ids, pair_ids)
+                    if add_special_tokens:
+                        offset_mapping = self.build_offset_mapping_with_special_tokens(
+                            mapping, pair_mapping)
+                        sequence = self.build_inputs_with_special_tokens(
+                            ids, pair_ids)
+                        token_type_ids = self.create_token_type_ids_from_sequences(
+                            ids, pair_ids)
+                    else:
+                        offset_mapping = mapping + pair_mapping
+                        sequence = ids + pair_ids if pair else ids
+                        token_type_ids = [0] * len(ids) + ([0] * len(pair_ids)
+                                                           if pair else [])
+                    encoded_inputs['offset_mapping'] = offset_mapping
 
                     # Build output dictionnary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids
                     if return_special_tokens_mask:
-                        encoded_inputs[
-                            "special_tokens_mask"] = self.get_special_tokens_mask(
-                                ids, pair_ids)
+                        if add_special_tokens:
+                            encoded_inputs[
+                                "special_tokens_mask"] = self.get_special_tokens_mask(
+                                    ids, pair_ids)
+                        else:
+                            encoded_inputs["special_tokens_mask"] = [0] * len(
+                                sequence)
                     if return_length:
                         encoded_inputs["seq_len"] = len(encoded_inputs[
                             "input_ids"])
@@ -1748,8 +1850,6 @@ class PretrainedTokenizer(object):
                     # Padding
                     needs_to_be_padded = pad_to_max_seq_len and \
                                         max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
-
-                    encoded_inputs['offset_mapping'] = offset_mapping
 
                     if needs_to_be_padded:
                         difference = max_seq_len - len(encoded_inputs[
@@ -1828,7 +1928,9 @@ class PretrainedTokenizer(object):
                     return_attention_mask=return_attention_mask,
                     return_length=return_length,
                     return_overflowing_tokens=return_overflowing_tokens,
-                    return_special_tokens_mask=return_special_tokens_mask)
+                    return_special_tokens_mask=return_special_tokens_mask,
+                    return_offsets_mapping=return_offsets_mapping,
+                    add_special_tokens=add_special_tokens)
 
                 if return_dict:
                     for key, value in encoded_inputs.items():
@@ -1853,6 +1955,8 @@ class PretrainedTokenizer(object):
             list: The offset map of input text.
             
         """
+        if text is None:
+            return None
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
