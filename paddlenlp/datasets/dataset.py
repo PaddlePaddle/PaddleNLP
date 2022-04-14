@@ -23,8 +23,15 @@ import inspect
 from collections import namedtuple
 from multiprocess import Pool, RLock
 import time
+import paddlenlp
+import datasets
 
-import paddle.distributed as dist
+try:
+    import paddle.distributed as dist
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
+
 from paddle.io import Dataset, IterableDataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url, _get_unique_endpoints
@@ -37,23 +44,45 @@ __all__ = ['MapDataset', 'DatasetBuilder', 'IterDataset', 'load_dataset']
 
 DATASETS_MODULE_PATH = "paddlenlp.datasets."
 
+# Patch for intranet
+from datasets import load_dataset as origin_load_dataset
+
+
+def load_from_ppnlp(path, *args, **kwargs):
+    ppnlp_path = paddlenlp.datasets.__path__[0]
+    new_path = os.path.split(path)[-1]
+    new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
+    if os.path.exists(new_path):
+        return origin_load_dataset(new_path, *args, **kwargs)
+    else:
+        return origin_load_dataset(path, *args, **kwargs)
+
+
+datasets.load_dataset = load_from_ppnlp
+
 
 class DatasetTuple:
     def __init__(self, splits):
-        self.tuple_cls = namedtuple('datasets', splits)
+        self.identifier_map, identifiers = self._gen_identifier_map(splits)
+        self.tuple_cls = namedtuple('datasets', identifiers)
         self.tuple = self.tuple_cls(* [None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
             return self.tuple[key]
         if isinstance(key, str):
-            return getattr(self.tuple, key)
-
-    def __repr__(self):
-        return self.tuple.__repr__()
+            return getattr(self.tuple, self.identifier_map[key])
 
     def __setitem__(self, key, value):
-        self.tuple = self.tuple._replace(**{key: value})
+        self.tuple = self.tuple._replace(**{self.identifier_map[key]: value})
+
+    def _gen_identifier_map(self, splits):
+        identifier_map = {}
+        identifiers = []
+        for i in range(len(splits)):
+            identifiers.append('splits_' + str(i))
+            identifier_map[splits[i]] = 'splits_' + str(i)
+        return identifier_map, identifiers
 
     def __len__(self):
         return len(self.tuple)
@@ -645,6 +674,29 @@ class DatasetBuilder:
         label_list = self.get_labels()
         vocab_info = self.get_vocab()
 
+        def _create_dict(labels):
+            # For multiple labels in the form of list.
+            if isinstance(labels[0], list) or isinstance(labels[0], tuple):
+                label_dict = []
+                for sub_labels in labels:
+                    sub_dict = {}
+                    for i, label in enumerate(sub_labels):
+                        sub_dict[label] = i
+                    label_dict.append(sub_dict)
+            else:
+                label_dict = {}
+                for i, label in enumerate(labels):
+                    label_dict[label] = i
+            return label_dict
+
+        def _convert_label_to_id(labels, label_dict):
+            if isinstance(labels, list) or isinstance(labels, tuple):
+                for label_idx in range(len(labels)):
+                    labels[label_idx] = label_dict[labels[label_idx]]
+            else:
+                labels = label_dict[labels]
+            return labels
+
         if self.lazy:
 
             def generate_examples():
@@ -664,16 +716,15 @@ class DatasetBuilder:
 
                     # Convert class label to label ids.
                     if label_list is not None and example.get(label_col, None):
-                        label_dict = {}
-                        for i, label in enumerate(label_list):
-                            label_dict[label] = i
-                        if isinstance(example[label_col], list) or isinstance(
-                                example[label_col], tuple):
-                            for label_idx in range(len(example[label_col])):
-                                example[label_col][label_idx] = label_dict[
-                                    example[label_col][label_idx]]
+                        label_dict = _create_dict(label_list)
+                        # For multiple labels in the form of list.
+                        if isinstance(label_dict, list):
+                            for idx, sub_dict in enumerate(label_dict):
+                                example[label_col][idx] = _convert_label_to_id(
+                                    example[label_col][idx], sub_dict)
                         else:
-                            example[label_col] = label_dict[example[label_col]]
+                            example[label_col] = _convert_label_to_id(
+                                example[label_col], label_dict)
 
                         yield example
                     else:
@@ -709,18 +760,16 @@ class DatasetBuilder:
 
             # Convert class label to label ids.
             if label_list is not None and examples[0].get(label_col, None):
-                label_dict = {}
-                for i, label in enumerate(label_list):
-                    label_dict[label] = i
+                label_dict = _create_dict(label_list)
                 for idx in range(len(examples)):
-                    if isinstance(examples[idx][label_col], list) or isinstance(
-                            examples[idx][label_col], tuple):
-                        for label_idx in range(len(examples[idx][label_col])):
-                            examples[idx][label_col][label_idx] = label_dict[
-                                examples[idx][label_col][label_idx]]
+                    # For multiple labels in the form of list.
+                    if isinstance(label_dict, list):
+                        for i, sub_dict in enumerate(label_dict):
+                            examples[idx][label_col][i] = _convert_label_to_id(
+                                examples[idx][label_col][i], sub_dict)
                     else:
-                        examples[idx][label_col] = label_dict[examples[idx][
-                            label_col]]
+                        examples[idx][label_col] = _convert_label_to_id(
+                            examples[idx][label_col], label_dict)
 
             return MapDataset(
                 examples, label_list=label_list, vocab_info=vocab_info)

@@ -1,0 +1,157 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.layoutlmv2.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling:1
+msgid "Modeling classes for LayoutLMv2 model."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForPretraining:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:1
+msgid "基类：:class:`paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:1
+msgid "The bare LayoutLMv2 Model outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForPretraining.forward
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction.forward
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification.forward
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:10
+msgid ""
+"Vocabulary size of the XLNet model. Defines the number of different "
+"tokens that can be represented by the `inputs_ids` passed when calling "
+"XLNetModel."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:13
+msgid ""
+"Dimensionality of the encoder layers and the pooler layer. Defaults to "
+"``768``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:15
+msgid "Number of hidden layers in the Transformer encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:17
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to ``12``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:20
+msgid ""
+"Dimensionality of the \"intermediate\" (often named feed-forward) layer "
+"in the Transformer encoder. Defaults to ``3072``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:23
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to ``\"gelu\"``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:27
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:30
+msgid ""
+"The dropout probability for all fully connected layers in the pooler. "
+"Defaults to ``0.1``."
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:33
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Defaults to ``0.02``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForPretraining.forward:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction.forward:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification.forward:1
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForPretraining.forward:4
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction.forward:4
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification.forward:4
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForPretraining.forward:6
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction.forward:6
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification.forward:6
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForRelationExtraction.init_weights:1
+msgid "Initialize the weights"
+msgstr ""
+
