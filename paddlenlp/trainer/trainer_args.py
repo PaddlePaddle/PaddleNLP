@@ -472,7 +472,7 @@ class TrainingArguments:
             "Drop the last incomplete batch if it is not divisible by the batch size."
         })
     eval_steps: int = field(
-        default=200, metadata={"help": "Run an evaluation every X steps."})
+        default=None, metadata={"help": "Run an evaluation every X steps."})
     dataloader_num_workers: int = field(
         default=0,
         metadata={
@@ -602,8 +602,8 @@ class TrainingArguments:
         self.save_strategy = IntervalStrategy(self.save_strategy)
 
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
-        if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
-            self.do_eval = True
+        # if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
+        #     self.do_eval = True
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (
