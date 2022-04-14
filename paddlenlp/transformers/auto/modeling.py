@@ -37,46 +37,68 @@ MAPPING_NAMES = OrderedDict([
     ("BigBird", "bigbird"),
     ("BlenderbotSmall", "blenderbot_small"),
     ("Blenderbot", "blenderbot"),
-    ("ConvBert", "convbert"),
-    ("MobileBert", "mobilebert"),
     ("ChineseBert", "chinesebert"),
+    ("ConvBert", "convbert"),
     ("CTRL", "ctrl"),
     ("DistilBert", "distilbert"),
     ("Electra", "electra"),
-    ("Skep", "skep"),
     ("ErnieCtm", "ernie_ctm"),
     ("ErnieDoc", "ernie_doc"),
-    ("ErnieGram", "ernie_gram"),
     ("ErnieGen", "ernie_gen"),
-    ("Ernie", "ernie"),
+    ("ErnieGram", "ernie_gram"),
     ("ErnieM", "ernie_m"),
-    ("GPT", "gpt"),
+    ("Ernie", "ernie"),
+    ("FNet", "fnet"),
+    ("Funnel", "funnel"),
     ("LayoutXLM", "layoutxlm"),
     ("LayoutLMv2", "layoutlmv2"),
     ("LayoutLM", "layoutlm"),
+    ("Luke", "luke"),
     ("MBart", "mbart"),
+    ("MegatronBert", "megatronbert"),
+    ("MobileBert", "mobilebert"),
     ("MPNet", "mpnet"),
     ("NeZha", "nezha"),
+    ("PPMiniLM", "ppminilm"),
+    ("ProphetNet", "prophetnet"),
+    ("Reformer", "reformer"),
     ("Roberta", "roberta"),
     ("RoFormer", "roformer"),
-    ("Reformer", "reformer"),
+    ("Skep", "skep"),
     ("SqueezeBert", "squeezebert"),
-    ("T5", "t5"),
     ("TinyBert", "tinybert"),
+    ("UnifiedTransformer", "unified_transformer"),
+    ("UNIMO", "unimo"),
+    ("XLNet", "xlnet"),
+    ("GPT", "gpt"),
+    ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
-    ("UNIMO", "unimo"),
-    ("UnifiedTransformer", "unified_transformer"),
-    ("XLNet", "xlnet"),
+])
+
+MAPPING_TASKS = OrderedDict([
+    ("Model", "AutoModel"),
+    ("ForPretraining", "AutoModelForPretraining"),
+    ("ForSequenceClassification", "AutoModelForSequenceClassification"),
+    ("ForTokenClassification", "AutoModelForTokenClassification"),
+    ("ForQuestionAnswering", "AutoModelForQuestionAnswering"),
+    ("ForMultipleChoice", "AutoModelForMultipleChoice"),
+    ("ForMaskedLM", "AutoModelForMaskedLM"),
+    ("ForCausalLM", "AutoModelForCausalLM"),
+    ("Encoder", "AutoEncoder"),
+    ("Decoder", "AutoDecoder"),
+    ("Generator", "AutoGenerator"),
+    ("Discriminator", "AutoDiscriminator"),
+    ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
 ])
 
 
 def get_name_mapping(task='Model'):
-    '''
+    """
     Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
     'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
     'Generator', 'Discriminator', 'ForConditionalGeneration'.
-    '''
+    """
     NAME_MAPPING = OrderedDict()
     for key, value in MAPPING_NAMES.items():
         import_class = key + task
@@ -85,6 +107,13 @@ def get_name_mapping(task='Model'):
         NAME_MAPPING[import_class] = value
 
     return NAME_MAPPING
+
+
+def get_task_name(model_class):
+    for key, value in MAPPING_TASKS.items():
+        if model_class.endswith(key):
+            return value
+    return None
 
 
 def get_init_configurations():
@@ -123,7 +152,7 @@ class _BaseAutoModelClass:
                          *model_args,
                          **kwargs):
         if task:
-            if cls._task_choice == True:
+            if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print('We only support task choice for AutoModel.')
@@ -146,7 +175,26 @@ class _BaseAutoModelClass:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
-                        model_class = getattr(import_class, init_class)
+                        try:
+                            model_class = getattr(import_class, init_class)
+                        except AttributeError as err:
+                            logger.error(err)
+                            all_model_classes = import_class.__all__
+                            all_tasks = {
+                                get_task_name(m)
+                                for m in all_model_classes
+                                if get_task_name(m) is not None
+                            }
+                            raise AttributeError(
+                                f"module '{import_class.__name__}' only supports the following classes: "
+                                + ", ".join(m for m in all_model_classes) + "\n"
+                                "Hint: you can use interface " + "or ".join(
+                                    task + ".from_pretrained"
+                                    for task in all_tasks) +
+                                f" to load '{pretrained_model_name_or_path}'\n")
+                        logger.info(
+                            "We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
                         return model_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args,
                             **kwargs)
@@ -174,9 +222,26 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_name = getattr(import_class, init_class)
-                return model_name.from_pretrained(pretrained_model_name_or_path,
-                                                  *model_args, **kwargs)
+                try:
+                    model_class = getattr(import_class, init_class)
+                except AttributeError as err:
+                    logger.error(err)
+                    all_model_classes = import_class.__all__
+                    all_tasks = {
+                        get_task_name(m)
+                        for m in all_model_classes
+                        if get_task_name(m) is not None
+                    }
+                    raise AttributeError(
+                        f"module '{import_class.__name__}' only supports the following classes: "
+                        + ", ".join(m for m in all_model_classes) + "\n"
+                        "Hint: you can use interface " + "or ".join(
+                            task + ".from_pretrained" for task in all_tasks) +
+                        f" to load '{pretrained_model_name_or_path}'\n")
+                logger.info("We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
@@ -219,9 +284,26 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_name = getattr(import_class, init_class)
-                return model_name.from_pretrained(pretrained_model_name_or_path,
-                                                  *model_args, **kwargs)
+                try:
+                    model_class = getattr(import_class, init_class)
+                except AttributeError as err:
+                    logger.error(err)
+                    all_model_classes = import_class.__all__
+                    all_tasks = {
+                        get_task_name(m)
+                        for m in all_model_classes
+                        if get_task_name(m) is not None
+                    }
+                    raise AttributeError(
+                        f"module '{import_class.__name__}' only supports the following classes: "
+                        + ", ".join(m for m in all_model_classes) + "\n"
+                        "Hint: you can use interface " + "or ".join(
+                            task + ".from_pretrained" for task in all_tasks) +
+                        f" to load '{pretrained_model_name_or_path}'\n")
+                logger.info("We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 class AutoModel(_BaseAutoModelClass):
@@ -242,7 +324,7 @@ class AutoModel(_BaseAutoModelClass):
                         task=None,
                         *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -295,7 +377,7 @@ class AutoModel(_BaseAutoModelClass):
                 model = AutoModel.from_pretrained('bert-base-uncased', task='ForPretraining')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertForPretraining'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, task,
                                     *model_args, **kwargs)
 
@@ -311,7 +393,7 @@ class AutoModelForPretraining(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForPretraining`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -343,15 +425,15 @@ class AutoModelForPretraining(_BaseAutoModelClass):
                 model = AutoModelForPretraining.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForPretraining'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForSequenceClassification(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForSequenceClassification.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForSequenceClassification')
@@ -359,7 +441,7 @@ class AutoModelForSequenceClassification(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForSequenceClassification`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -391,15 +473,15 @@ class AutoModelForSequenceClassification(_BaseAutoModelClass):
                 model = AutoModelForSequenceClassification.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForSequenceClassification'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForTokenClassification(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForTokenClassification.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForTokenClassification')
@@ -407,7 +489,7 @@ class AutoModelForTokenClassification(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForTokenClassification`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -439,15 +521,15 @@ class AutoModelForTokenClassification(_BaseAutoModelClass):
                 model = AutoModelForTokenClassification.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForTokenClassification'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForQuestionAnswering(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForQuestionAnswering.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForQuestionAnswering')
@@ -455,7 +537,7 @@ class AutoModelForQuestionAnswering(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForQuestionAnswering`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -487,15 +569,15 @@ class AutoModelForQuestionAnswering(_BaseAutoModelClass):
                 model = AutoModelForQuestionAnswering.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForQuestionAnswering'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForMultipleChoice(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForMultipleChoice.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForMultipleChoice')
@@ -503,7 +585,7 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForMultipleChoice`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -535,15 +617,15 @@ class AutoModelForMultipleChoice(_BaseAutoModelClass):
                 model = AutoModelForMultipleChoice.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForMultipleChoice'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForMaskedLM(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForMaskedLM.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForMaskedLM')
@@ -551,7 +633,7 @@ class AutoModelForMaskedLM(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForMaskedLM`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -583,15 +665,15 @@ class AutoModelForMaskedLM(_BaseAutoModelClass):
                 model = AutoModelForMaskedLM.from_pretrained('./my_bert/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertModelForMaskedLM'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForCausalLM(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForCausalLM.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForCausalLM')
@@ -599,7 +681,7 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForCausalLM`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -631,15 +713,15 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                 model = AutoModelForCausalLM.from_pretrained('./my_gpt/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.gpt.modeling.GPTLMHeadModel'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoEncoder(_BaseAutoModelClass):
-    '''
+    """
     AutoEncoder.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Encoder')
@@ -647,7 +729,7 @@ class AutoEncoder(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoEncoder`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -674,15 +756,15 @@ class AutoEncoder(_BaseAutoModelClass):
                 model = AutoEncoder.from_pretrained('./my_bart/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartEncoder'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoDecoder(_BaseAutoModelClass):
-    '''
+    """
     AutoDecoder.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Decoder')
@@ -690,7 +772,7 @@ class AutoDecoder(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoDecoder`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -717,15 +799,15 @@ class AutoDecoder(_BaseAutoModelClass):
                 model = AutoDecoder.from_pretrained('./my_bart/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartEncoder'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoGenerator(_BaseAutoModelClass):
-    '''
+    """
     AutoGenerator.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Generator')
@@ -733,7 +815,7 @@ class AutoGenerator(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoGenerator`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -765,15 +847,15 @@ class AutoGenerator(_BaseAutoModelClass):
                 model = AutoGenerator.from_pretrained('./my_electra/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.electra.modeling.ElectraGenerator'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoDiscriminator(_BaseAutoModelClass):
-    '''
+    """
     AutoDiscriminator.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('Discriminator')
@@ -781,7 +863,7 @@ class AutoDiscriminator(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoDiscriminator`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -813,15 +895,15 @@ class AutoDiscriminator(_BaseAutoModelClass):
                 model = AutoDiscriminator.from_pretrained('./my_electra/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.electra.modeling.ElectraDiscriminator'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
 
 
 class AutoModelForConditionalGeneration(_BaseAutoModelClass):
-    '''
+    """
     AutoModelForConditionalGeneration.
-    '''
+    """
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
     _name_mapping = get_name_mapping('ForConditionalGeneration')
@@ -829,7 +911,7 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
                         **kwargs):
-        '''
+        """
         Creates an instance of `AutoModelForConditionalGeneration`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
         or a local file directory path.
@@ -857,6 +939,6 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
                 model = AutoModelForConditionalGeneration.from_pretrained('./my_bart/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartForConditionalGeneration'>
-        '''
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)
