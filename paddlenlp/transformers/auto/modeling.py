@@ -188,8 +188,9 @@ class _BaseAutoModelClass:
                             raise AttributeError(
                                 f"module '{import_class.__name__}' only supports the following classes: "
                                 + ", ".join(m for m in all_model_classes) + "\n"
-                                "You can use " + ", ".join(
-                                    task for task in all_tasks) +
+                                "You can use interface " + "or ".join(
+                                    task + ".from_pretrained"
+                                    for task in all_tasks) +
                                 f" to load '{pretrained_model_name_or_path}'\n")
                         logger.info(
                             "We are using %s to load '%s'." %
@@ -234,7 +235,8 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "You can use " + ", ".join(task for task in all_tasks) +
+                        "You can use interface " + "or ".join(
+                            task + ".from_pretrained" for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -295,7 +297,8 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "You can use " + ", ".join(task for task in all_tasks) +
+                        "You can use interface " + "or ".join(
+                            task + ".from_pretrained" for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
