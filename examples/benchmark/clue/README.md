@@ -100,6 +100,50 @@ eval loss: 2.572999, acc: 0.112, eval done total : 25.67190170288086 s
 global step 400/20010, epoch: 0, batch: 399, rank_id: 0, loss: 2.631579, lr: 0.0000059970, speed: 2.6238 step/s
 eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
+#### 使用Trainer启动 CLUE 分类任务
+PaddleNLP提供了Trainer API，本示例新增了`run_clue_classifier_trainer.py`脚本供用户使用。需要从源码安装paddlenlp使用。
+```
+export CUDA_VISIBLE_DEVICES=0
+export TASK_NAME=TNEWS
+export LR=3e-5
+export BS=32
+export EPOCH=6
+export MAX_SEQ_LEN=128
+export MODEL_PATH=roberta-wwm-ext-large
+
+cd classification
+mkdir roberta-wwm-ext-large
+
+python -u ./run_clue_classifier_trainer.py \
+    --model_name_or_path ${MODEL_PATH} \
+    --dataset "clue ${TASK_NAME}" \
+    --max_seq_length ${MAX_SEQ_LEN} \
+    --per_device_train_batch_size ${BS}   \
+    --per_device_eval_batch_size ${BS}   \
+    --learning_rate ${LR} \
+    --num_train_epochs ${EPOCH} \
+    --logging_steps 100 \
+    --seed 42  \
+    --save_steps 100 \
+    --warmup_ratio 0.1 \
+    --weight_decay 0.01 \
+    --adam_epsilon 1e-8 \
+    --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/ \
+    --device gpu  \
+    --do_train \
+    --do_eval \
+    --metric_for_best_model "eval_accuracy" \
+    --load_best_model_at_end \
+    --save_total_limit 3 \
+```
+大部分参数含义如上文所述，这里简要介绍一些新参数:
+- `dataset`, 同上文`task_name`，此处为小写字母。表示 Fine-tuning 的分类任务，当前支持 afamc、tnews、iflytek、ocnli、cmnli、csl、cluewsc2020。
+- `per_device_train_batch_size` 同上文`batch_size`。训练时，每次迭代**每张卡**上的样本数目。
+- `per_device_eval_batch_size` 同上文`batch_size`。评估时，每次迭代**每张卡**上的样本数目。
+- `warmup_ratio` 同上文`warmup_proportion`，warmup步数占总步数的比例。
+- `metric_for_best_model` 评估时，最优评估指标。
+- `load_best_model_at_end` 训练结束时，时候加载评估结果最好的 ckpt。
+- `save_total_limit` 保存的ckpt数量的最大限制
 
 ### 启动 CLUE 阅读理解任务
 以 CLUE 的 C<sup>3</sup> 任务为例，多卡启动 CLUE 任务进行 Fine-tuning 的方式如下：
