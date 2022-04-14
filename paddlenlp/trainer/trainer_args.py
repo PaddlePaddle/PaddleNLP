@@ -32,7 +32,6 @@ from typing import Any, Dict, List, Optional
 from .trainer_utils import (
     SchedulerType,
     IntervalStrategy,
-    EvaluationStrategy,
     OptimizerNames, )
 
 # logger = logging.get_logger(__name__)
@@ -285,9 +284,8 @@ class TrainingArguments:
             than computing them on train startup. Ignored unless `group_by_length` is `True` and the dataset is an
             instance of `Dataset`.
         report_to (`str` or `List[str]`, *optional*, defaults to `"all"`):
-            The list of integrations to report the results and logs to. Supported platforms are `"azure_ml"`,
-            `"comet_ml"`, `"mlflow"`, `"tensorboard"` and `"wandb"`. Use `"all"` to report to all integrations
-            installed, `"none"` for no integrations.
+            The list of integrations to report the results and logs to. Supported platforms are `"vdl"`, 
+            `"tensorboard"`. Use `"all"` to report to all integrations installed, `"none"` for no integrations.
         skip_memory_metrics (`bool`, *optional*, defaults to `True`):
             Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
             down the training and evaluation speed.
@@ -322,7 +320,7 @@ class TrainingArguments:
     do_export: bool = field(
         default=False, metadata={"help": "Whether to export infernece model."})
     evaluation_strategy: IntervalStrategy = field(
-        default="steps",
+        default="no",
         metadata={"help": "The evaluation strategy to use."}, )
     prediction_loss_only: bool = field(
         default=False,
@@ -472,7 +470,7 @@ class TrainingArguments:
             "Drop the last incomplete batch if it is not divisible by the batch size."
         })
     eval_steps: int = field(
-        default=200, metadata={"help": "Run an evaluation every X steps."})
+        default=None, metadata={"help": "Run an evaluation every X steps."})
     dataloader_num_workers: int = field(
         default=0,
         metadata={
@@ -546,7 +544,7 @@ class TrainingArguments:
         default="adamw",
         metadata={"help": "The optimizer to use."}, )
     report_to: Optional[List[str]] = field(
-        default=None,
+        default="vdl",
         metadata={
             "help":
             "The list of integrations to report the results and logs to."
@@ -570,7 +568,8 @@ class TrainingArguments:
         # Handle --use_env option in paddle.distributed.launch (local_rank not passed as an arg then).
         # This needs to happen before any call to self.device or self.n_gpu.
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
-        if env_local_rank != -1 and env_local_rank != self.local_rank:
+        if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size(
+        ) > 1:
             self.local_rank = env_local_rank
 
         # convert to int
@@ -590,13 +589,6 @@ class TrainingArguments:
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
 
-        if isinstance(self.evaluation_strategy, EvaluationStrategy):
-            warnings.warn(
-                "using `EvaluationStrategy` for `evaluation_strategy` is deprecated and will be removed in version 5 of 🤗 Transformers. Use `IntervalStrategy` instead",
-                FutureWarning, )
-            # Go back to the underlying string or we won't be able to instantiate `IntervalStrategy` on it.
-            self.evaluation_strategy = self.evaluation_strategy.value
-
         self.evaluation_strategy = IntervalStrategy(self.evaluation_strategy)
         self.logging_strategy = IntervalStrategy(self.logging_strategy)
         self.save_strategy = IntervalStrategy(self.save_strategy)
@@ -604,6 +596,11 @@ class TrainingArguments:
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
         if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
             self.do_eval = True
+        if self.do_eval and self.evaluation_strategy == IntervalStrategy.NO:
+            warnings.warn(
+                "evaluation_strategy reset to IntervalStrategy.STEPS for do eval"
+            )
+            self.evaluation_strategy == IntervalStrategy.STEPS
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (

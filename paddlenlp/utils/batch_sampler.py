@@ -145,7 +145,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         num_samples += int(not self.drop_last) * (self.batch_size - 1)
         return num_samples // self.batch_size
 
-    def set_epoch(self, epoch, consumed_samples=0):
+    def set_epoch(self, epoch=0, consumed_samples=0):
         """
         Sets the epoch number. When :attr:`shuffle=True`, this number is used
         as seeds of random numbers. By default, users may not set this, all
@@ -182,4 +182,4 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         """
         self.epoch = epoch
         # if we reset the epoch, the consumed_samples should be set to 0.
-        self.consumed_samples = 0
+        self.consumed_samples = consumed_samples

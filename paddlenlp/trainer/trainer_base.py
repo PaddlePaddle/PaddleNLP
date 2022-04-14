@@ -44,6 +44,7 @@ from paddle.io import (
     Dataset,
     DataLoader,
     DistributedBatchSampler, )
+import paddlenlp
 from paddlenlp.data import (
     default_data_collator,
     DataCollator,
@@ -54,6 +55,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
+from .integrations import get_reporting_integration_callbacks
 from .trainer_args import TrainingArguments
 from .trainer_utils import (
     IntervalStrategy,
@@ -191,10 +193,13 @@ class Trainer:
             eval_dataset: Optional[Dataset]=None,
             tokenizer: Optional[PretrainedTokenizer]=None,
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]]=None,
+            callbacks: Optional[List[TrainerCallback]]=None,
             optimizers: Tuple[paddle.optimizer.Optimizer,
                               paddle.optimizer.lr.LRScheduler]=(None, None), ):
         if paddle.distributed.get_world_size() > 1:
-            paddle.distributed.init_parallel_env()
+            if not paddle.fluid.dygraph.parallel_helper._is_parallel_ctx_initialized(
+            ):
+                paddle.distributed.init_parallel_env()
 
         if args is None:
             output_dir = "tmp_trainer"
@@ -234,7 +239,9 @@ class Trainer:
         self.control = TrainerControl()
         self._signature_columns = None
 
-        callbacks = DEFAULT_CALLBACKS
+        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(
+            self.args.report_to)
+        callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
                                                 self.lr_scheduler)
@@ -388,16 +395,54 @@ class Trainer:
         logger.info(f"  Total optimization steps = {args.num_training_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
 
-        self.state.epoch = 0
-        self.state.max_steps = int(args.num_training_steps)
-        self.state.num_train_epochs = num_train_epochs
-        self.state.is_local_process_zero = self.is_local_process_zero()
-        self.state.is_world_process_zero = self.is_world_process_zero()
-
         start_time = time.time()
+        self.state.epoch = 0
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
         steps_trained_progress_bar = None
+
+        # Check if continuing training from a checkpoint
+        if resume_from_checkpoint is not None and os.path.isfile(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)):
+            self.state = TrainerState.load_from_json(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
+            if not args.ignore_data_skip:
+                steps_trained_in_current_epoch = self.state.global_step % (
+                    num_update_steps_per_epoch)
+                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
+            else:
+                steps_trained_in_current_epoch = 0
+
+            logger.info(
+                "  Continuing training from checkpoint, will skip to saved global_step"
+            )
+            logger.info(f"  Continuing training from epoch {epochs_trained}")
+            logger.info(
+                f"  Continuing training from global step {self.state.global_step}"
+            )
+            if not args.ignore_data_skip:
+                logger.info(
+                    f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
+                    "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
+                    "flag to your launch command, but you will resume the training on data already seen by your model."
+                )
+                if self.is_local_process_zero() and not args.disable_tqdm:
+                    steps_trained_progress_bar = tqdm(
+                        total=steps_trained_in_current_epoch)
+                    steps_trained_progress_bar.set_description(
+                        "Skipping the first batches")
+            if not args.ignore_data_skip:
+                if isinstance(train_dataloader,
+                              paddle.io.DataLoader) and isinstance(
+                                  train_dataloader.batch_sampler, paddlenlp.
+                                  utils.batch_sampler.DistributedBatchSampler):
+                    consumed_samples = self.state.global_step * args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+                    train_dataloader.batch_sampler.set_epoch(
+                        consumed_samples=consumed_samples)
+                    logger.info(
+                        f"Set DistributedBatchSampler consumed_samples to %d" %
+                        consumed_samples)
 
         epoch_iterator = train_dataloader
         steps_in_epoch = len(epoch_iterator)
@@ -407,6 +452,11 @@ class Trainer:
         self.callback_handler.lr_scheduler = self.lr_scheduler
         self.callback_handler.train_dataloader = train_dataloader
 
+        self.state.max_steps = int(args.num_training_steps)
+        self.state.num_train_epochs = num_train_epochs
+        self.state.is_local_process_zero = self.is_local_process_zero()
+        self.state.is_world_process_zero = self.is_world_process_zero()
+
         self.control = self.callback_handler.on_train_begin(args, self.state,
                                                             self.control)
 
@@ -415,12 +465,44 @@ class Trainer:
         self._globalstep_last_logged = self.state.global_step
 
         for epoch in range(epochs_trained, num_train_epochs):
+            if isinstance(train_dataloader,
+                          paddle.io.DataLoader) and isinstance(
+                              train_dataloader.batch_sampler,
+                              paddle.io.DistributedBatchSampler):
+                train_dataloader.batch_sampler.set_epoch(epoch)
+
             step = -1
 
             self.control = self.callback_handler.on_epoch_begin(
                 args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                # Skip past any already trained steps if resuming training
+                # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
+                # We use consumed_samples to reset the status
+                if isinstance(train_dataloader,
+                              paddle.io.DataLoader) and isinstance(
+                                  train_dataloader.batch_sampler, paddlenlp.
+                                  utils.batch_sampler.DistributedBatchSampler):
+                    if steps_trained_in_current_epoch > 0:
+                        if steps_trained_progress_bar is not None:
+                            steps_trained_progress_bar.update(
+                                steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        steps_trained_in_current_epoch = -1
+                        self._load_rng_state(resume_from_checkpoint)
+
+                if steps_trained_in_current_epoch > 0:
+                    steps_trained_in_current_epoch -= 1
+                    if steps_trained_progress_bar is not None:
+                        steps_trained_progress_bar.update(1)
+                    if steps_trained_in_current_epoch == 0:
+                        self._load_rng_state(resume_from_checkpoint)
+                    continue
+                elif steps_trained_progress_bar is not None:
+                    steps_trained_progress_bar.close()
+                    steps_trained_progress_bar = None
 
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(
@@ -525,19 +607,6 @@ class Trainer:
                                                           self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
-
-    def training_step(
-            self, model: nn.Layer,
-            inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        model.train()
-        inputs = self._prepare_inputs(inputs)
-
-        with self.autocast_smart_context_manager():
-            loss = self.compute_loss(model, inputs)
-
-        loss.backward()
-
-        return loss.detach()
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if not isinstance(self.train_dataset, collections.abc.Sized):
@@ -730,6 +799,41 @@ class Trainer:
 
         return self.optimizer
 
+    def _load_rng_state(self, checkpoint):
+        # Load RNG states from `checkpoint`
+        if checkpoint is None:
+            return
+
+        local_rank = self.args.local_rank
+        if local_rank != -1:
+            rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
+            if not os.path.isfile(os.path.join(checkpoint, rng_file)):
+                logger.info(
+                    f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
+        else:
+            rng_file = os.path.join(checkpoint, "rng_state.pth")
+            if not os.path.isfile(rng_file):
+                logger.info(
+                    "Didn't find an RNG file, if you are resuming a training that was launched in a distributed "
+                    "fashion, reproducibility is not guaranteed.")
+                return
+
+        checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+        random.setstate(checkpoint_rng_state["python"])
+        np.random.set_state(checkpoint_rng_state["numpy"])
+
+        core = paddle.fluid.core
+        if core.is_compiled_with_cuda():
+            for i in range(core.get_cuda_device_count()):
+                core.default_cuda_generator(i)._is_init_py = True
+                core.default_cuda_generator(i).manual_seed(checkpoint_rng_state[
+                    "cuda"][i])
+
+        core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
+
     @staticmethod
     def get_optimizer_cls_and_kwargs(
             args: TrainingArguments) -> Tuple[Any, Any]:
@@ -838,8 +942,9 @@ class Trainer:
             ctx_manager = autocast(
                 True,
                 custom_black_list=[
-                    "reduce_sum", "c_softmax_with_cross_entropy",
-                    "elementwise_div"
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
                 ],
                 level=self.args.fp16_opt_level)
         else:
@@ -1012,6 +1117,9 @@ class Trainer:
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
+            "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
+            "cpu": paddle.fluid.core.default_cpu_generator().get_state()
+            .current_seed(),
         }
 
         # TODO: ZHUI save paddle, cudnn seed.
@@ -1221,7 +1329,8 @@ class Trainer:
             description: str,
             prediction_loss_only: Optional[bool]=None,
             ignore_keys: Optional[List[str]]=None,
-            metric_key_prefix: str="eval", ) -> EvalLoopOutput:
+            metric_key_prefix: str="eval",
+            max_eval_iters: Optional[int]=-1, ) -> EvalLoopOutput:
         """
         Prediction/evaluation loop, shared by `Trainer.evaluate()` and `Trainer.predict()`.
 
@@ -1235,7 +1344,19 @@ class Trainer:
         model = self._wrap_model(self.model, training=False)
 
         batch_size = dataloader.batch_sampler.batch_size
-        num_samples = self.num_examples(dataloader)
+        if max_eval_iters <= 0:
+            num_samples = self.num_examples(dataloader)
+        else:
+            num_samples = batch_size * self.args.world_size * max_eval_iters
+            if isinstance(dataloader, paddle.io.DataLoader) and isinstance(
+                    dataloader.batch_sampler,
+                    paddlenlp.utils.batch_sampler.DistributedBatchSampler):
+                consumed_samples = (
+                    (self.state.global_step + 1) // args.eval_steps
+                ) * max_eval_iters * args.eval_batch_size * args.world_size
+                dataloader.batch_sampler.set_epoch(
+                    consumed_samples=consumed_samples)
+
         logger.info(f"***** Running {description} *****")
         logger.info(f"  Num examples = {num_samples}")
         logger.info(f"  Pre device batch size = {batch_size}")
@@ -1291,6 +1412,8 @@ class Trainer:
                     preds_host, logits, padding_index=-100)
             self.control = self.callback_handler.on_prediction_step(
                 args, self.state, self.control)
+            if max_eval_iters > 0 and step >= max_eval_iters - 1:
+                break
 
         # Gather all remaining tensors and put them back on the CPU
         if losses_host is not None:

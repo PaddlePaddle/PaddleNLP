@@ -397,15 +397,12 @@ class PretrainedModel(Layer, GenerationMixin):
             return model
         return model, state_to_load
 
-    def save_model_config(self, save_dir):
-        """
-        Saves model configuration to a file named "model_config.json" under `save_dir`.
+    def get_model_config(self):
+        """Get model configuration.
 
-        Args:
-            save_dir (str): Directory to save model_config file into.
+        Returns:
+            config: The config of the model.
         """
-        # Save model config
-        model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.init_config
         # If init_config contains a Layer, use the layer's init_config to save
         for key, value in model_config.items():
@@ -418,6 +415,18 @@ class PretrainedModel(Layer, GenerationMixin):
                 model_config[key] = tuple(args)
             elif isinstance(value, PretrainedModel):
                 model_config[key] = value.init_config
+        return model_config
+
+    def save_model_config(self, save_dir):
+        """
+        Saves model configuration to a file named "model_config.json" under `save_dir`.
+
+        Args:
+            save_dir (str): Directory to save model_config file into.
+        """
+        # Save model config
+        model_config_file = os.path.join(save_dir, self.model_config_file)
+        model_config = self.get_model_config()
         with io.open(model_config_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(model_config, ensure_ascii=False))
 
