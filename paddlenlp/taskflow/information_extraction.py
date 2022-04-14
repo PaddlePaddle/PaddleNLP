@@ -27,6 +27,7 @@ usage = r"""
             from paddlenlp import Taskflow
 
             schema = [
+                "寺庙", 
                 {
                     "丈夫": [
                         "妻子"
@@ -36,20 +37,7 @@ usage = r"""
             ie = Taskflow("information_extraction", schema=schema) 
             ie("李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。")           
             '''
-            [{'丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.9852263795480809, 'relation': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9968914045166457}]}}]}]
-            '''
-
-            schema = [
-                {
-                    "人物": [
-                        "民族", "出生日期"
-                    ]
-                }
-            ]
-            ie = Taskflow("information_extraction", schema=schema)
-            ie("刘洪渡，汉族，1929年11月出生")
-            '''
-            [{'人物': [{'text': '刘洪渡', 'start': 0, 'end': 3, 'probability': 0.9257552590538758, 'relation': {'民族': [{'text': '汉族', 'start': 4, 'end': 6, 'probability': 0.9803553864012748}], '出生日期': [{'text': '1929', 'start': 7, 'end': 11, 'probability': 0.9994361304382835}]}}]}]
+            [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.8899254648933592}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.9852263795480809, 'relation': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9968914045166457}]}}]}]
             '''
 
             schema_senta = [
