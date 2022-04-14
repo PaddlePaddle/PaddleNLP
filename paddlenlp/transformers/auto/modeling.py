@@ -76,6 +76,22 @@ MAPPING_NAMES = OrderedDict([
     ("Bart", "bart"),
 ])
 
+MAPPING_TASKS = OrderedDict([
+    ("Model", "AutoModel"),
+    ("ForPretraining", "AutoModelForPretraining"),
+    ("ForSequenceClassification", "AutoModelForSequenceClassification"),
+    ("ForTokenClassification", "AutoModelForTokenClassification"),
+    ("ForQuestionAnswering", "AutoModelForQuestionAnswering"),
+    ("ForMultipleChoice", "AutoModelForMultipleChoice"),
+    ("ForMaskedLM", "AutoModelForMaskedLM"),
+    ("ForCausalLM", "AutoModelForCausalLM"),
+    ("Encoder", "AutoEncoder"),
+    ("Decoder", "AutoDecoder"),
+    ("Generator", "AutoGenerator"),
+    ("Discriminator", "AutoDiscriminator"),
+    ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
+])
+
 
 def get_name_mapping(task='Model'):
     """
@@ -91,6 +107,13 @@ def get_name_mapping(task='Model'):
         NAME_MAPPING[import_class] = value
 
     return NAME_MAPPING
+
+
+def get_task_name(model_class):
+    for key, value in MAPPING_TASKS.items():
+        if model_class.endswith(key):
+            return value
+    return None
 
 
 def get_init_configurations():
@@ -157,9 +180,17 @@ class _BaseAutoModelClass:
                         except AttributeError as err:
                             logger.error(err)
                             all_model_classes = import_class.__all__
+                            all_tasks = {
+                                get_task_name(m)
+                                for m in all_model_classes
+                                if get_task_name(m) is not None
+                            }
                             raise AttributeError(
                                 f"module '{import_class.__name__}' only supports the following classes: "
-                                + ", ".join(m for m in all_model_classes))
+                                + ", ".join(m for m in all_model_classes) + "\n"
+                                "You can use " + ", ".join(
+                                    task for task in all_tasks) +
+                                f" to load '{pretrained_model_name_or_path}'\n")
                         logger.info(
                             "We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -195,9 +226,16 @@ class _BaseAutoModelClass:
                 except AttributeError as err:
                     logger.error(err)
                     all_model_classes = import_class.__all__
+                    all_tasks = {
+                        get_task_name(m)
+                        for m in all_model_classes
+                        if get_task_name(m) is not None
+                    }
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
-                        + ", ".join(m for m in all_model_classes))
+                        + ", ".join(m for m in all_model_classes) + "\n"
+                        "You can use " + ", ".join(task for task in all_tasks) +
+                        f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
@@ -249,9 +287,16 @@ class _BaseAutoModelClass:
                 except AttributeError as err:
                     logger.error(err)
                     all_model_classes = import_class.__all__
+                    all_tasks = {
+                        get_task_name(m)
+                        for m in all_model_classes
+                        if get_task_name(m) is not None
+                    }
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
-                        + ", ".join(m for m in all_model_classes))
+                        + ", ".join(m for m in all_model_classes) + "\n"
+                        "You can use " + ", ".join(task for task in all_tasks) +
+                        f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
