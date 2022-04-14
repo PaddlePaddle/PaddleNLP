@@ -152,7 +152,14 @@ class _BaseAutoModelClass:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(
                             f"paddlenlp.transformers.{class_name}.modeling")
-                        model_class = getattr(import_class, init_class)
+                        try:
+                            model_class = getattr(import_class, init_class)
+                        except AttributeError as err:
+                            logger.error(err)
+                            all_model_classes = import_class.__all__
+                            raise AttributeError(
+                                f"module '{import_class.__name__}' only support the following classes: "
+                                + ", ".join(m for m in all_model_classes))
                         logger.info(
                             "We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -183,7 +190,14 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_class = getattr(import_class, init_class)
+                try:
+                    model_class = getattr(import_class, init_class)
+                except AttributeError as err:
+                    logger.error(err)
+                    all_model_classes = import_class.__all__
+                    raise AttributeError(
+                        f"module '{import_class.__name__}' only support the following classes: "
+                        + ", ".join(m for m in all_model_classes))
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
@@ -230,7 +244,14 @@ class _BaseAutoModelClass:
                 class_name = cls._name_mapping[init_class]
                 import_class = importlib.import_module(
                     f"paddlenlp.transformers.{class_name}.modeling")
-                model_class = getattr(import_class, init_class)
+                try:
+                    model_class = getattr(import_class, init_class)
+                except AttributeError as err:
+                    logger.error(err)
+                    all_model_classes = import_class.__all__
+                    raise AttributeError(
+                        f"module '{import_class.__name__}' only support the following classes: "
+                        + ", ".join(m for m in all_model_classes))
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
