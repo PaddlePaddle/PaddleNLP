@@ -750,3 +750,121 @@ class Customization(object):
                     index = begin + offset
                     if index < len(lac_tags):
                         lac_tags[index] = lac_tags[index][:-1] + "B"
+
+
+class SchemaTree(object):
+    """
+    Implementataion of SchemaTree
+    """
+
+    def __init__(self, name='root', children=None):
+        self.name = name
+        self.children = []
+        self.prefix = None
+        self.parent_relations = None
+        if children is not None:
+            for child in children:
+                self.add_child(child)
+
+    def __repr__(self):
+        return self.name
+
+    def add_child(self, node):
+        assert isinstance(node, SchemaTree)
+        self.children.append(node)
+
+
+def map_offset(ori_offset, offset_mapping):
+    """
+    map ori offset to token offset
+    """
+    for index, span in enumerate(offset_mapping):
+        if span[0] <= ori_offset < span[1]:
+            return index
+    return -1
+
+
+def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
+    """
+    get idx of the last dim in prob arraies, which is greater than a limitation
+    input: [[0.1, 0.1, 0.2, 0.5, 0.1, 0.3], [0.7, 0.6, 0.1, 0.1, 0.1, 0.1]]
+        0.4
+    output: [[3], [0, 1]]
+    """
+    probs = np.array(probs)
+    dim_len = len(probs.shape)
+    if dim_len > 1:
+        result = []
+        for p in probs:
+            result.append(get_bool_ids_greater_than(p, limit, return_prob))
+        return result
+    else:
+        result = []
+        for i, p in enumerate(probs):
+            if p > limit:
+                if return_prob:
+                    result.append((i, p))
+                else:
+                    result.append(i)
+        return result
+
+
+def get_span(start_ids, end_ids, with_prob=False):
+    """
+    every id can only be used once
+    get span set from position start and end list
+    input: [1, 2, 10] [4, 12]
+    output: set((2, 4), (10, 12))
+    """
+    if with_prob:
+        start_ids = sorted(start_ids, key=lambda x: x[0])
+        end_ids = sorted(end_ids, key=lambda x: x[0])
+    else:
+        start_ids = sorted(start_ids)
+        end_ids = sorted(end_ids)
+
+    start_pointer = 0
+    end_pointer = 0
+    len_start = len(start_ids)
+    len_end = len(end_ids)
+    couple_dict = {}
+    while start_pointer < len_start and end_pointer < len_end:
+        if with_prob:
+            if start_ids[start_pointer][0] == end_ids[end_pointer][0]:
+                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+                start_pointer += 1
+                end_pointer += 1
+                continue
+            if start_ids[start_pointer][0] < end_ids[end_pointer][0]:
+                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+                start_pointer += 1
+                continue
+            if start_ids[start_pointer][0] > end_ids[end_pointer][0]:
+                end_pointer += 1
+                continue
+        else:
+            if start_ids[start_pointer] == end_ids[end_pointer]:
+                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+                start_pointer += 1
+                end_pointer += 1
+                continue
+            if start_ids[start_pointer] < end_ids[end_pointer]:
+                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+                start_pointer += 1
+                continue
+            if start_ids[start_pointer] > end_ids[end_pointer]:
+                end_pointer += 1
+                continue
+    result = [(couple_dict[end], end) for end in couple_dict]
+    result = set(result)
+    return result
+
+
+def get_id_and_prob(spans, ids):
+    sentence_id = []
+    prob = []
+    z = ids.index(2)
+    for s, e in spans:
+        prob.append(s[1] * e[1])
+        sentence_id.append((s[0] - z - 1, e[0] - z))
+    return sentence_id, prob

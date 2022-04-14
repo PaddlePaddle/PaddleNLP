@@ -35,6 +35,7 @@ from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
+from .information_extraction import UIETask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -209,6 +210,17 @@ TASKS = {
             "model": "plato-mini"
         }
     },
+    'information_extraction': {
+        "models": {
+            "uie": {
+                "task_class": UIETask,
+                "task_flag": "information_extraction-uie"
+            },
+        },
+        "default": {
+            "model": "uie"
+        }
+    }
 }
 
 
