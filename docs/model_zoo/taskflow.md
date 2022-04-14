@@ -647,10 +647,10 @@ from paddlenlp import Taskflow
 
 这里我们以命名实体识别`Taskflow("ner", mode="accurate")`为例，展示如何定制自己的模型。
 
-调用`Taskflow`接口后，程序自动将相关文件下载到`$HOME/.paddlenlp/taskflow/ner/wordtag/`，该默认路径包含以下文件:
+调用`Taskflow`接口后，程序自动将相关文件下载到`$HOME/.paddlenlp/taskflow/wordtag/`，该默认路径包含以下文件:
 
 ```text
-$HOME/.paddlenlp/taskflow/ner/wordtag/
+$HOME/.paddlenlp/taskflow/wordtag/
 ├── model_state.pdparams # 默认模型参数文件
 ├── model_config.json # 默认模型配置文件
 └── tags.txt # 默认标签文件

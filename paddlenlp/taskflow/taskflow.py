@@ -316,7 +316,7 @@ class Taskflow(object):
         return results
 
     def interactive_mode(self, max_turn):
-        with self.task_instance.interactive_mode(max_turn=3):
+        with self.task_instance.interactive_mode(max_turn):
             while True:
                 human = input("[Human]:").strip()
                 if human.lower() == "exit":
