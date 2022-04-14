@@ -158,7 +158,7 @@ class _BaseAutoModelClass:
                             logger.error(err)
                             all_model_classes = import_class.__all__
                             raise AttributeError(
-                                f"module '{import_class.__name__}' only support the following classes: "
+                                f"module '{import_class.__name__}' only supports the following classes: "
                                 + ", ".join(m for m in all_model_classes))
                         logger.info(
                             "We are using %s to load '%s'." %
@@ -196,7 +196,7 @@ class _BaseAutoModelClass:
                     logger.error(err)
                     all_model_classes = import_class.__all__
                     raise AttributeError(
-                        f"module '{import_class.__name__}' only support the following classes: "
+                        f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes))
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -250,7 +250,7 @@ class _BaseAutoModelClass:
                     logger.error(err)
                     all_model_classes = import_class.__all__
                     raise AttributeError(
-                        f"module '{import_class.__name__}' only support the following classes: "
+                        f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes))
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
