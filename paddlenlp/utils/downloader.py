@@ -377,7 +377,7 @@ class DownloaderCheck(threading.Thread):
 
     def _initialize(self):
         etime = str(int(time.time()))
-        self.cache_info = _md5(str(uuid.uuid1())[-12:])
+        self.full_hash_flag = _md5(str(uuid.uuid1())[-12:])
         self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + etime
 
     def request_check(self, task, command, addition):
@@ -391,14 +391,14 @@ class DownloaderCheck(threading.Thread):
                 "command": self.command,
                 "mtime": os.stat(cache_path).st_mtime,
                 "hub_name": self.hash_flag,
-                "cache_info": self.cache_info
+                "cache_info": self.full_hash_flag
             }
         else:
             extra = {
                 "command": self.command,
                 "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                 "hub_name": self.hash_flag,
-                "cache_info": self.cache_info
+                "cache_info": self.full_hash_flag
             }
         if addition is not None:
             extra.update({"addition": addition})
