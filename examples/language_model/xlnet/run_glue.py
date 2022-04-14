@@ -201,6 +201,8 @@ def create_data_loader(args, tokenizer):
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
+
+        return train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
@@ -214,7 +216,7 @@ def create_data_loader(args, tokenizer):
             num_workers=0,
             return_list=True)
 
-    return train_data_loader, dev_data_loader, train_ds, dev_ds
+        return train_data_loader, dev_data_loader, train_ds, dev_ds
 
 
 def do_train(args):
@@ -231,8 +233,12 @@ def do_train(args):
 
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(
-        args, tokenizer)
+    if args.task_name == "mnli":
+        train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched = create_data_loader(
+            args, tokenizer)
+    else:
+        train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(
+            args, tokenizer)
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = XLNetForSequenceClassification.from_pretrained(

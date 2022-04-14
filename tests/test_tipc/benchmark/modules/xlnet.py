@@ -44,13 +44,21 @@ class XLNetBenchmark(BenchmarkBase):
         args.task_name = args.task_name.lower()
         tokenizer = XLNetTokenizer.from_pretrained(args.model_name_or_path)
 
-        train_loader, dev_loader, train_ds, dev_ds = create_data_loader(
-            args, tokenizer)
+        if args.task_name == "mnli":
+            train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, _, _ = create_data_loader(
+                args, tokenizer)
+        else:
+            train_loader, dev_loader, train_ds, _ = create_data_loader(
+                args, tokenizer)
 
         self.num_batch = len(train_loader)
         self.label_list = train_ds.label_list
 
-        return train_loader, dev_loader
+        if args.task_name == "mnli":
+            return train_data_loader, (dev_data_loader_matched,
+                                       dev_data_loader_mismatched)
+        else:
+            return train_loader, dev_loader
 
     def build_model(self, args, **kwargs):
         num_classes = 1 if self.label_list is None else len(self.label_list)
