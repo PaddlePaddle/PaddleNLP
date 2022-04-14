@@ -91,7 +91,7 @@ def r_data_generation(args, evids, text_dict_list, text_exclusive_dict_list,
             'context_idx']
         if len(temp['rationale']) > 1 and \
             args.inter_mode != 'lime' and \
-            not (args.language == 'en' and args.base_model.startswith('roberta')):
+            not (args.base_model.startswith('roberta')):
             for i in range(len(temp['rationale'][1])):
                 temp['rationale'][1][i] -= len(temp['rationale'][0]) + len(temp[
                     'no_rationale'][0])

@@ -156,7 +156,8 @@ def prepare_validation_features(examples, tokenizer, args):
         # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
         # position is part of the context or not.
         tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index else None)
+            (o if sequence_ids[k] == context_index and
+             k != len(sequence_ids) - 1 else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 

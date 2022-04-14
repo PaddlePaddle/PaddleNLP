@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Notice, most of this file is modified from 
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
+# Thanks a lot.
+
 import contextlib
 import json
 import math
