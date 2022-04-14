@@ -26,23 +26,14 @@ from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_t
 usage = r"""
             from paddlenlp import Taskflow
 
-            schema = [
-                "寺庙", 
-                {
-                    "丈夫": [
-                        "妻子"
-                    ]
-                }
-            ]
+            schema = ["寺庙", {"丈夫": ["妻子"]}]
             ie = Taskflow("information_extraction", schema=schema) 
             ie("李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。")           
             '''
             [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.8899254648933592}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.9852263795480809, 'relation': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9968914045166457}]}}]}]
             '''
 
-            schema_senta = [
-                {"水果": ["情感倾向[正向，负向]"]}
-            ]
+            schema_senta = [{"水果": ["情感倾向[正向，负向]"]}]
             ie = Taskflow("information_extraction", schema=schema_senta)
             ie("今天去超市买了葡萄、苹果，都很好吃")
             '''
