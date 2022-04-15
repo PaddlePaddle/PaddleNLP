@@ -34,7 +34,8 @@ usage = r"""
             '''
 
             schema_senta = [{"水果": ["情感倾向[正向，负向]"]}]
-            ie = Taskflow("information_extraction", schema=schema_senta)
+            # 使用新的schema进行预测
+            ie.set_schema(schema_senta)
             ie("今天去超市买了葡萄、苹果，都很好吃")
             '''
             [{'水果': [{'text': '苹果', 'start': 10, 'end': 12, 'probability': 0.9369744072599353, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.9733151286049946}]}}, {'text': '葡萄', 'start': 7, 'end': 9, 'probability': 0.5165698195669179, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.976208180045397}]}}]}]
@@ -64,7 +65,6 @@ class UIETask(Task):
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
-        self._schema = schema
         self._encoding_model = "ernie-1.0"
         self._check_task_files()
         self._construct_tokenizer()
@@ -75,6 +75,10 @@ class UIETask(Task):
         self._usage = usage
         self._batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
+        self.set_schema(schema)
+
+    def set_schema(self, schema):
+        self._schema = self._build_tree(schema)
 
     def _construct_input_spec(self):
         """
@@ -199,9 +203,8 @@ class UIETask(Task):
         return results
 
     def _run_model(self, inputs):
-        schema_tree = self._build_tree(self._schema)
         raw_inputs = inputs['text']
-        results = self._predict(raw_inputs, schema_tree)
+        results = self._predict(raw_inputs, self._schema)
         inputs['result'] = results
         return inputs
 
