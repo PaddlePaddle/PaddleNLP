@@ -67,6 +67,7 @@ class UIETask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._encoding_model = "ernie-1.0"
+        self._schema = schema
         self._check_task_files()
         self._construct_tokenizer()
         if self._static_mode:
@@ -76,10 +77,9 @@ class UIETask(Task):
         self._usage = usage
         self._batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
-        self.set_schema(schema)
 
     def set_schema(self, schema):
-        self._schema = self._build_tree(schema)
+        self._schema = schema
 
     def _construct_input_spec(self):
         """
@@ -205,7 +205,8 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
-        results = self._multi_stage_predict(raw_inputs, self._schema)
+        schema_tree = self._build_tree(self._schema)
+        results = self._multi_stage_predict(raw_inputs, schema_tree)
         inputs['result'] = results
         return inputs
 
