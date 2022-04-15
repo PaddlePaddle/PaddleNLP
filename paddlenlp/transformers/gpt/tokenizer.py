@@ -19,9 +19,8 @@ from functools import lru_cache
 import json
 import jieba
 import shutil
+import sentencepiece as spm
 from paddle.utils import try_import
-
-from paddlenlp.utils.log import logger
 
 from .. import PretrainedTokenizer, AddedToken
 
@@ -135,8 +134,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
                 "`tokenizer = GPTTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(model_file))
         self.max_len = max_len if max_len is not None else int(1e12)
-        mod = try_import("sentencepiece")
-        self.sp = mod.SentencePieceProcessor(model_file=model_file)
+        self.sp = spm.SentencePieceProcessor()
+        self.sp.Load(model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
 
     '''
