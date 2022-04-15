@@ -316,3 +316,6 @@ class Taskflow(object):
                     exit()
                 robot = self.task_instance(human)[0]
                 print("[Bot]:%s" % robot)
+
+    def set_schema(self, schema):
+        self.task_instance.set_schema(schema)
