@@ -21,7 +21,6 @@ from functools import partial
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 
 from paddle.fluid.layer_helper import LayerHelper
 import paddle
@@ -582,7 +581,7 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
                                                 "cuda" in str(p.place).lower()):
         return p
     if restore_data:
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             param_data = p.numpy()
             # Creating parameters with Assign initializer is too slow. Maybe we
             # can cast to fp16 directly and get a tensor, while we do it more
@@ -813,8 +812,8 @@ def convert_params(faster_model,
                         attr += "_"
                     setattr(faster_model, attr, params["slf_q_bias"][-1])
                     for key in [
-                            f"slf_{m}_{n}" for m in ("k", "v")
-                            for n in ("weight", "bias")
+                            f"slf_{m}_{n}"
+                            for m in ("k", "v") for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))
@@ -1176,28 +1175,39 @@ class FTParaConf(object):
                  tensor_para_size=None,
                  layer_para_size=None,
                  layer_para_batch_size=1):
-        # Maybe we should import mpi4py later.
-        self.word_size = int(
-            os.environ.get(
-                "MPI_LOCALNRANKS",  # MPICH
-                os.environ.get("OMPI_COMM_WORLD_SIZE", 1)))  # OpenMPI
-        self.rank = int(
-            os.environ.get(
-                "MPI_LOCALRANKID",  # MPICH
-                os.environ.get("OMPI_COMM_WORLD_RANK", 0)))  # OpenMPI
-        if tensor_para_size is None: tensor_para_size = 1
-        if layer_para_size is None:
-            layer_para_size = self.word_size // tensor_para_size
+        self.world_size = self._env2int(
+            [  # MPICH, OpenMPI, IMPI
+                "MPI_LOCALNRANKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE",
+                "MV2_COMM_WORLD_SIZE", "WORLD_SIZE"
+            ],
+            1)
+        self.rank = self._env2int(
+            [  # MPICH, OpenMPI, IMPI
+                "MPI_LOCALRANKID", "OMPI_COMM_WORLD_RANK", "PMI_RANK",
+                "MV2_COMM_WORLD_RANK", "RANK"
+            ],
+            0)
+        if layer_para_size is None: layer_para_size = 1
+        if tensor_para_size is None:
+            tensor_para_size = self.world_size // layer_para_size
         self.no_para = tensor_para_size == 1 and layer_para_size == 1
         self.tensor_para_size = tensor_para_size
         self.layer_para_size = layer_para_size
         self.layer_para_batch_size = layer_para_batch_size
 
-        assert self.word_size == tensor_para_size * layer_para_size, (
+        assert self.world_size == tensor_para_size * layer_para_size, (
             "tensor_para_size * layer_para_size must be equal to world_size.")
         self.tensor_para_rank = self.rank % self.tensor_para_size
         self.layer_para_rank = self.rank // self.tensor_para_size
         self.is_partial_model = False
+
+    @staticmethod
+    def _env2int(env_list, default=-1):
+        for e in env_list:
+            val = int(os.environ.get(e, -1))
+            if val >= 0:
+                return val
+        return default
 
     def is_last_group(self):
         r"""

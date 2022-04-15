@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Notice, most of this file is modified from 
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
+# Thanks a lot.
+
 import contextlib
 import json
 import math
@@ -21,6 +25,7 @@ import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
+import types
 from typing import Any, Dict, List, Optional
 
 # from .utils import logging
@@ -67,16 +72,19 @@ class TrainingArguments:
         do_train (`bool`, *optional*, defaults to `False`):
             Whether to run training or not. This argument is not directly used by [`Trainer`], it's intended to be used
             by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/huggingface/transformers/tree/master/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         do_eval (`bool`, *optional*):
             Whether to run evaluation on the validation set or not. Will be set to `True` if `evaluation_strategy` is
             different from `"no"`. This argument is not directly used by [`Trainer`], it's intended to be used by your
             training/evaluation scripts instead. See the [example
-            scripts](https://github.com/huggingface/transformers/tree/master/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         do_predict (`bool`, *optional*, defaults to `False`):
             Whether to run predictions on the test set or not. This argument is not directly used by [`Trainer`], it's
             intended to be used by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/huggingface/transformers/tree/master/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        do_export (`bool`, *optional*, defaults to `False`):
+            Whether to export inference model or not. This argument is not directly used by [`Trainer`], it's
+            intended to be used by your training/evaluation scripts instead. 
         evaluation_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"no"`):
             The evaluation strategy to adopt during training. Possible values are:
 
@@ -286,7 +294,7 @@ class TrainingArguments:
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
-            scripts](https://github.com/huggingface/transformers/tree/master/examples) for more details.
+            scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
     """
 
     output_dir: str = field(
@@ -311,6 +319,8 @@ class TrainingArguments:
     do_predict: bool = field(
         default=False,
         metadata={"help": "Whether to run predictions on the test set."})
+    do_export: bool = field(
+        default=False, metadata={"help": "Whether to export infernece model."})
     evaluation_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The evaluation strategy to use."}, )
@@ -462,7 +472,7 @@ class TrainingArguments:
             "Drop the last incomplete batch if it is not divisible by the batch size."
         })
     eval_steps: int = field(
-        default=200, metadata={"help": "Run an evaluation every X steps."})
+        default=None, metadata={"help": "Run an evaluation every X steps."})
     dataloader_num_workers: int = field(
         default=0,
         metadata={
@@ -494,6 +504,13 @@ class TrainingArguments:
     disable_tqdm: Optional[bool] = field(
         default=None,
         metadata={"help": "Whether or not to disable the tqdm progress bars."})
+
+    remove_unused_columns: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help":
+            "Remove columns not required by the model when using an nlp.Dataset."
+        })
 
     label_names: Optional[List[str]] = field(
         default=None,
@@ -585,8 +602,8 @@ class TrainingArguments:
         self.save_strategy = IntervalStrategy(self.save_strategy)
 
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
-        if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
-            self.do_eval = True
+        # if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
+        #     self.do_eval = True
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (
@@ -835,3 +852,23 @@ class TrainingArguments:
             k: v if type(v) in valid_types else str(v)
             for k, v in d.items()
         }
+
+    def print_config(self, args=None, key=""):
+        """
+        """
+        logger.info("=" * 60)
+        if args is None:
+            args = self
+            key = "Training"
+
+        logger.info('{:^40}'.format("{} Configuration Arguments".format(key)))
+        logger.info('{:30}:{}'.format("paddle commit id",
+                                      paddle.version.commit))
+
+        for a in dir(args):
+            if (a[:2] != "__"):  #don't print double underscore methods
+                v = getattr(args, a)
+                if not isinstance(v, types.MethodType):
+                    logger.info('{:30}:{}'.format(a, v))
+
+        logger.info("")

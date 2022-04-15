@@ -256,6 +256,9 @@ class AddedToken:
     def __getstate__(self):
         return self.__dict__
 
+    def __str__(self):
+        return self.content
+
 
 class Trie:
     """
@@ -907,7 +910,7 @@ class PretrainedTokenizer(object):
     def convert_tokens_to_ids(self, tokens):
         if tokens is None:
             return None
-        if isinstance(tokens, str):
+        if isinstance(tokens, (str, AddedToken)):
             if tokens in self.added_tokens_encoder:
                 return self.added_tokens_encoder[tokens]
             else:
@@ -1068,6 +1071,20 @@ class PretrainedTokenizer(object):
         init_args = init_args if not args else args
         init_kwargs.update(kwargs)
 
+        def convert_added_tokens(obj):
+            if isinstance(
+                    obj,
+                    dict) and "__type" in obj and obj["__type"] == "AddedToken":
+                obj.pop("__type")
+                return AddedToken(**obj)
+            elif isinstance(obj, (list, tuple)):
+                return list(convert_added_tokens(o) for o in obj)
+            elif isinstance(obj, dict):
+                return {k: convert_added_tokens(v) for k, v in obj.items()}
+            return obj
+
+        init_kwargs = convert_added_tokens(init_kwargs)
+
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
         for args_name, file_path in resolved_vocab_files.items():
@@ -1204,7 +1221,7 @@ class PretrainedTokenizer(object):
 
     def __getattr__(self, name):
         if name.endswith('_token'):
-            return self.special_tokens_map[name]
+            return str(self.special_tokens_map[name])
         elif name.endswith('_token_id'):
             return self._convert_token_to_id(self.special_tokens_map[name[:-3]])
         raise AttributeError("'{}' object has no attribute '{}'".format(

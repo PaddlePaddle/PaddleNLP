@@ -99,3 +99,5 @@ from .luke.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .semantic_search.modeling import *
+from .rembert.modeling import *
+from .rembert.tokenizer import *
