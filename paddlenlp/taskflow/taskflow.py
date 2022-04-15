@@ -174,13 +174,13 @@ TASKS = {
     },
     'text_correction': {
         "models": {
-            "csc-ernie-1.0": {
+            "ernie-csc": {
                 "task_class": CSCTask,
-                "task_flag": "text_correction-csc-ernie-1.0"
+                "task_flag": "text_correction-ernie-csc"
             },
         },
         "default": {
-            "model": "csc-ernie-1.0"
+            "model": "ernie-csc"
         }
     },
     'text_similarity': {
