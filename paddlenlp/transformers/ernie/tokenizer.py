@@ -18,7 +18,8 @@ import pickle
 import six
 import shutil
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from paddlenlp.utils.env import MODEL_HOME
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
@@ -425,8 +426,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+        self.sp_model = spm.SentencePieceProcessor()
         self.word_dict = word_dict
 
         self.do_lower_case = do_lower_case
