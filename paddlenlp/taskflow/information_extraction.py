@@ -26,6 +26,7 @@ from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_t
 usage = r"""
             from paddlenlp import Taskflow
 
+            # 定义schema（抽取目标）
             schema = ["寺庙", {"丈夫": ["妻子"]}]
             ie = Taskflow("information_extraction", schema=schema) 
             ie("李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。")           
