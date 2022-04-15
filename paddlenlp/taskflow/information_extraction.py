@@ -1,5 +1,5 @@
 # coding:utf-8
-# Copyright (c) 2021  PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022  PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
 # you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ class UIETask(Task):
         outputs['text'] = inputs
         return outputs
 
-    def _predict_single_stage(self, inputs):
+    def _single_stage_predict(self, inputs):
         def read(inputs):
             max_length = 512
             for example in inputs:
@@ -205,11 +205,11 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
-        results = self._predict(raw_inputs, self._schema)
+        results = self._multi_stage_predict(raw_inputs, self._schema)
         inputs['result'] = results
         return inputs
 
-    def _predict(self, datas, schema_tree):
+    def _multi_stage_predict(self, datas, schema_tree):
         """
         Traversal the schema tree and do multi-stage prediction.
         """
@@ -240,7 +240,7 @@ class UIETask(Task):
                         input_map[cnt] = [i + id for i in range(len(pre))]
                         id += len(pre)
                     cnt += 1
-            result_list = self._predict_single_stage(examples)
+            result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
                 relations = [[] for i in range(len(datas))]
