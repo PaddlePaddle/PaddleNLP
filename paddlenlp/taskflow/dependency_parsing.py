@@ -84,7 +84,7 @@ class DDParserTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "word_vocab": "vocab.json",
+        "word_vocab": "word_vocab.json",
         "rel_vocab": "rel_vocab.json",
     }
     resource_files_urls = {
