@@ -410,8 +410,6 @@ def do_train(args):
             ElectraModel(**model_class.pretrained_init_configuration[
                 args.model_name_or_path + "-discriminator"]))
         model = model_class(generator, discriminator)
-        electra = ElectraModel.from_pretrained('chinese-electra-base')
-        model.set_state_dict(electra.state_dict())
         args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
@@ -524,7 +522,7 @@ def do_train(args):
             exit(0)
 
     if paddle.distributed.get_rank() == 0:
-        writer = SummaryWriter('output/log')
+        writer = SummaryWriter(os.path.join(args.output_dir, 'log'))
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
@@ -595,12 +593,14 @@ def do_train(args):
                                  (time.time() - tic_train) / args.logging_steps)
                         print(log_str)
                         log_list.append(log_str)
-                        writer.add_scalars('loss', {
-                            'generator_loss': tmp_loss['gen'],
-                            'rtd_loss': tmp_loss['rtd'],
-                            'mts_loss': tmp_loss['mts'],
-                            'csp_loss': tmp_loss['csp']
-                        }, global_step)
+                        writer.add_scalar('generator_loss', tmp_loss['gen'],
+                                          global_step)
+                        writer.add_scalar('rtd_loss', tmp_loss['rtd'] * 50,
+                                          global_step)
+                        writer.add_scalar('mts_loss', tmp_loss['mts'] * 20,
+                                          global_step)
+                        writer.add_scalar('csp_loss', tmp_loss['csp'],
+                                          global_step)
                         writer.add_scalar('total_loss', tmp_loss['loss'],
                                           global_step)
                         writer.add_scalar('lr', optimizer.get_lr(), global_step)
@@ -622,8 +622,8 @@ def do_train(args):
                     log_list.append(log_str)
                     writer.add_scalars('loss', {
                         'generator_loss': local_loss['gen'],
-                        'rtd_loss': local_loss['rtd'],
-                        'mts_loss': local_loss['mts'],
+                        'rtd_loss': local_loss['rtd'] * 50,
+                        'mts_loss': local_loss['mts'] * 20,
                         'csp_loss': local_loss['csp']
                     }, global_step)
                     writer.add_scalar('total_loss', local_loss['loss'],
