@@ -63,7 +63,7 @@ class UIETask(Task):
         }
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema, return_prob=True, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._encoding_model = "ernie-1.0"
@@ -75,6 +75,7 @@ class UIETask(Task):
         else:
             self._construct_model(model)
         self._usage = usage
+        self._return_prob = return_prob
         self._batch_size = self.kwargs[
             'batch_size'] if 'batch_size' in self.kwargs else 1
 
@@ -155,7 +156,7 @@ class UIETask(Task):
                     offset_mapping[index][0] += bias
                     offset_mapping[index][1] += bias
 
-                yield tuple([
+                tokenized_output = [
                     np.array(
                         x, dtype="int64") for x in [
                             encoded_inputs["input_ids"],
@@ -163,7 +164,9 @@ class UIETask(Task):
                             encoded_inputs["position_ids"],
                             encoded_inputs["attention_mask"]
                         ]
-                ])
+                ]
+
+                yield tuple(tokenized_output)
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=False)
         batch_sampler = paddle.io.BatchSampler(
