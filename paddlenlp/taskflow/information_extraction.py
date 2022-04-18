@@ -157,13 +157,14 @@ class UIETask(Task):
                     offset_mapping[index][1] += bias
 
                 tokenized_output = [
+                    encoded_inputs["input_ids"],
+                    encoded_inputs["token_type_ids"],
+                    encoded_inputs["position_ids"],
+                    encoded_inputs["attention_mask"]
+                ]
+                tokenized_output = [
                     np.array(
-                        x, dtype="int64") for x in [
-                            encoded_inputs["input_ids"],
-                            encoded_inputs["token_type_ids"],
-                            encoded_inputs["position_ids"],
-                            encoded_inputs["attention_mask"]
-                        ]
+                        x, dtype="int64") for x in tokenized_output
                 ]
 
                 yield tuple(tokenized_output)
@@ -179,8 +180,6 @@ class UIETask(Task):
         probs = []
         for [input_ids, token_type_ids, pos_ids, att_mask] in infer_data_loader(
         ):
-            #start_prob, end_prob = self._model(input_ids, token_type_ids, pos_ids, att_mask)
-
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.input_handles[2].copy_from_cpu(pos_ids.numpy())
