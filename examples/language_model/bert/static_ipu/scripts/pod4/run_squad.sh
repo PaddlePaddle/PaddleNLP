@@ -10,9 +10,9 @@ python3 run_squad.py \
         --max_predictions_per_seq 56 \
         --max_position_embeddings 512 \
         --learning_rate 5.6e-05 \
-        --weight_decay 0 \
+        --weight_decay 1e-2 \
         --epochs 4 \
-        --warmup_steps 52 \
+        --warmup_steps 30 \
         --logging_steps 10 \
         --seed 42 \
         --beta1 0.9 \
