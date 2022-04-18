@@ -27,6 +27,7 @@ from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
+from tensorboardX import SummaryWriter
 
 import paddle
 import paddle.distributed as dist
@@ -36,8 +37,6 @@ from paddlenlp.transformers import ErnieHealthForTotalPretraining, ElectraModel,
 from paddlenlp.transformers import ErnieHealthDiscriminator, ElectraGenerator
 from paddlenlp.transformers import ElectraTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
-
-from utils import PreTokenizer
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -365,7 +364,7 @@ def create_dataloader(dataset,
 
     if mode == 'train' and use_gpu:
         sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=False)  #True)
+            dataset=dataset, batch_size=batch_size, shuffle=True)
         dataloader = paddle.io.DataLoader(
             dataset,
             batch_sampler=sampler,
@@ -411,6 +410,8 @@ def do_train(args):
             ElectraModel(**model_class.pretrained_init_configuration[
                 args.model_name_or_path + "-discriminator"]))
         model = model_class(generator, discriminator)
+        electra = ElectraModel.from_pretrained('chinese-electra-base')
+        model.set_state_dict(electra.state_dict())
         args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
@@ -522,6 +523,9 @@ def do_train(args):
                 % (trained_global_step, num_training_steps))
             exit(0)
 
+    if paddle.distributed.get_rank() == 0:
+        writer = SummaryWriter('output/log')
+
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             if trained_global_step > 0:
@@ -591,6 +595,15 @@ def do_train(args):
                                  (time.time() - tic_train) / args.logging_steps)
                         print(log_str)
                         log_list.append(log_str)
+                        writer.add_scalars('loss', {
+                            'generator_loss': tmp_loss['gen'],
+                            'rtd_loss': tmp_loss['rtd'],
+                            'mts_loss': tmp_loss['mts'],
+                            'csp_loss': tmp_loss['csp']
+                        }, global_step)
+                        writer.add_scalar('total_loss', tmp_loss['loss'],
+                                          global_step)
+                        writer.add_scalar('lr', optimizer.get_lr(), global_step)
                     loss_list = defaultdict(list)
                 else:
                     local_loss = dict(
@@ -607,6 +620,15 @@ def do_train(args):
                              (time.time() - tic_train) / args.logging_steps)
                     print(log_str)
                     log_list.append(log_str)
+                    writer.add_scalars('loss', {
+                        'generator_loss': local_loss['gen'],
+                        'rtd_loss': local_loss['rtd'],
+                        'mts_loss': local_loss['mts'],
+                        'csp_loss': local_loss['csp']
+                    }, global_step)
+                    writer.add_scalar('total_loss', local_loss['loss'],
+                                      global_step)
+                    writer.add_scalar('lr', optimizer.get_lr(), global_step)
                 log_loss = dict(t_loss)
                 tic_train = time.time()
 

@@ -860,6 +860,7 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
             [128], separately.
 
         """
+
         discriminator_sequence_output = self.electra(
             input_ids, token_type_ids, position_ids, attention_mask)
 
@@ -1398,13 +1399,9 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
                 gen_labels=None):
         assert (gen_labels is not None
                 ), "gen_labels should not be None, please check DataCollator"
-        if attention_mask is None:
-            pad_id = self.generator.electra.pad_token_id
-            masks = (
-                input_ids == pad_id).astype(paddle.get_default_dtype()) * -1e9
 
         gen_logits = self.generator(input_ids, token_type_ids, position_ids,
-                                    masks)
+                                    attention_mask)
 
         disc_input_list = self.get_discriminator_inputs_ernie_health(
             input_ids, raw_input_ids, gen_logits, gen_labels,
@@ -1412,11 +1409,16 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         disc_inputs, disc_labels, _, disc_candidates = disc_input_list
 
         logits_rtd, logits_mts, logits_csp = self.discriminator(
-            disc_inputs, disc_candidates, token_type_ids, position_ids, masks)
+            disc_inputs, disc_candidates, token_type_ids, position_ids,
+            attention_mask)
 
-        masks = (masks >= 0)
+        if attention_mask is None:
+            pad_id = self.generator.electra.pad_token_id
+            attention_mask = (input_ids != pad_id)
+        else:
+            attention_mask = attention_mask.astype('bool')
 
-        return gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks
+        return gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):
