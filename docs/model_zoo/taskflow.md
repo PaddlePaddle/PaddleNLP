@@ -438,10 +438,10 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 >>> nptag = Taskflow("knowledge_mining", model="nptag")
 >>> nptag("糖醋排骨")
->>> [{'text': '糖醋排骨', 'label': '菜品'}]
+[{'text': '糖醋排骨', 'label': '菜品'}]
 
-nptag(["糖醋排骨", "红曲霉菌"])
->>> [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
+>>> nptag(["糖醋排骨", "红曲霉菌"])
+[{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
 
 # 使用`linking`输出粗粒度类别标签`category`，即WordTag的词汇标签。
 >>> nptag = Taskflow("knowledge_mining", model="nptag", linking=True)
@@ -471,8 +471,7 @@ nptag(["糖醋排骨", "红曲霉菌"])
 [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇。', 'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇。', 'errors': [{'position': 3, 'correction': {'竟': '境'}}]}]
 
 # 批量预测
->>> corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇。',
-                '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。'])
+>>> corrector(['遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇。', '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。'])
 [{'source': '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇。', 'target': '遇到逆境时，我们必须勇于面对，而且要愈挫愈勇。', 'errors': [{'position': 3, 'correction': {'竟': '境'}}]}, {'source': '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。', 'target': '人生就是如此，经过磨练才能让自己更加茁壮，才能使自己更加乐观。', 'errors': [{'position': 18, 'correction': {'拙': '茁'}}]}]
 ```
 
@@ -628,16 +627,17 @@ nptag(["糖醋排骨", "红曲霉菌"])
 
 |                           任务名称                           |                           默认路径                           |                                                              |
 | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|         `Taskflow("word_segmentation", mode="base")`         |      `$HOME/.paddlenlp/taskflow/word_segmentation/lac`       | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|       `Taskflow("word_segmentation", mode="accurate")`       |    `$HOME/.paddlenlp/taskflow/word_segmentation/wordtag`     | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/ner/lac`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|              `Taskflow("ner", mode="accurate")`              |           `$HOME/.paddlenlp/taskflow/ner/wordtag`            | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|     `Taskflow("text_correction", model="csc-ernie-1.0")`     |  `$HOME/.paddlenlp/taskflow/text_correction/csc-ernie-1.0`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
+|         `Taskflow("word_segmentation", mode="base")`         |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
+|       `Taskflow("word_segmentation", mode="accurate")`       |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
+|       `Taskflow("pos_tagging")`                              |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
+|                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
+|              `Taskflow("ner", mode="accurate")`              |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
+|     `Taskflow("text_correction", model="ernie-csc")`     |  `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
 |      `Taskflow("dependency_parsing", model="ddparser")`      |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`    | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
 | `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
 | `Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
 | `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
-|       `Taskflow("knowledge_mining", model="wordtag")`        |     `$HOME/.paddlenlp/taskflow/knowledge_mining/wordtag`     | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
+|       `Taskflow("knowledge_mining", model="wordtag")`        |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
 |        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
 
 </div></details>  
@@ -647,10 +647,10 @@ nptag(["糖醋排骨", "红曲霉菌"])
 
 这里我们以命名实体识别`Taskflow("ner", mode="accurate")`为例，展示如何定制自己的模型。
 
-调用`Taskflow`接口后，程序自动将相关文件下载到`$HOME/.paddlenlp/taskflow/ner/wordtag/`，该默认路径包含以下文件:
+调用`Taskflow`接口后，程序自动将相关文件下载到`$HOME/.paddlenlp/taskflow/wordtag/`，该默认路径包含以下文件:
 
 ```text
-$HOME/.paddlenlp/taskflow/ner/wordtag/
+$HOME/.paddlenlp/taskflow/wordtag/
 ├── model_state.pdparams # 默认模型参数文件
 ├── model_config.json # 默认模型配置文件
 └── tags.txt # 默认标签文件
