@@ -14,7 +14,7 @@ python3 run_squad.py \
         --epochs 4 \
         --warmup_steps 30 \
         --logging_steps 10 \
-        --seed 42 \
+        --seed 1984 \
         --beta1 0.9 \
         --beta2 0.999 \
         --num_hidden_layers 12 \
