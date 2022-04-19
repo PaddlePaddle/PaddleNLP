@@ -9,9 +9,12 @@
 使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
 
 
-| Model                 | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | CHID  | C<sup>3</sup> |
-| --------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----- | ------------- |
-| RoBERTa-wwm-ext-large | 75.32 | 59.33 | 61.91   | 83.87 | 78.81 | 91.78       | 81.80 | 70.67/90.61 | 85.83 | 74.90         |
+| Model                 | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | CMRC2018        | CHID      | C<sup>3</sup> |
+| --------------------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------------- | --------- | ------------- |
+| RoBERTa-wwm-ext-large | 75.32     | 59.33     | 62.33     | 83.87     | 78.81     | 90.79       | 83.37     | 70.58/89.82     | 85.72     | 75.26         |
+| ernie-3.0-large       | **77.36** | **60.21** | **62.75** | **85.06** | **82.14** | **91.12**   | **84.23** | **72.76/91.87** | **86.84** | **84.67**     |
+| RoBERTa-wwm-ext       | 74.75     | 58.08     | 61.22     | 81.66     | 77.25     | 88.55       | 81.63     | 68.69/88.75     | 83.41     | 67.69         |
+
 
 
 AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM/F1。
@@ -20,7 +23,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优。分类任务训练每间隔 100 steps 评估验证集效果，阅读理解任务每隔一个 epoch 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
 
-2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集效果对 batch_size 较为敏感，对CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索。
+2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集效果对 batch_size 和 dropout 概率值较为敏感，对CLUEWSC2020 评测时额外增加了 batch_size = 8 以及 dropout_prob = 0.0 的超参搜索。
 
 3. 阅读理解任务 Grid Search 超参范围：batch_size: 24, 32; learning rates: 1e-5, 2e-5, 3e-5。阅读理解任务均使用多卡训练，其中 Grid Search 中的 batch_size 是指多张卡上的 batch_size 总和。
 
@@ -29,11 +32,19 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | TASK              | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL  | CMRC2018 | CHID | C<sup>3</sup> |
 | ----------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ---- | -------- | ---- | ------------- |
 | epoch             | 3     | 3     | 3       | 2     | 5     | 50          | 5    | 2        | 3    | 8             |
-| max_seq_length    | 128   | 128   | 128     | 128   | 128   | 128         | 128  | 512      | 64   | 512           |
+| max_seq_length    | 128   | 128   | 128     | 128   | 128   | 128         | 256  | 512      | 64   | 512           |
 | warmup_proportion | 0.1   | 0.1   | 0.1     | 0.1   | 0.1   | 0.1         | 0.1  | 0.1      | 0.06 | 0.1           |
 | num_cards         | 1     | 1     | 1       | 1     | 1     | 1           | 1    | 2        | 4    | 4             |
-| learning_rate     | 1e-5  | 3e-5  | 3e-5    | 1e-5  | 1e-5  | 1e-5        | 2e-5 | 32       | 24   | 24            |
-| batch_size        | 32    | 32    | 32      | 16    | 16    | 16          | 16   | 3e-5     | 1e-5 | 2e-5          |
+
+下表记录了上表不同模型取得最优结果对应的 learning_rate、batch_size：
+
+| Model                 | AFQMC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
+| --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------------- |
+| RoBERTa-wwm-ext-large | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16 | 1e-5,16 | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
+| ernie-3.0-large       | 1e-5,16 | 2e-5,16 | 5e-5,16 | 2e-5,32 | 3e-5,64 | 2e-5,16     | 3e-5,32 | 3e-5,24  | 1e-5,32 | 2e-5,24       |
+| RoBERTa-wwm-ext       | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32 | 2e-5,32 | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
+
+其中，`ernie-3.0-large` 在 CLUEWSC2020 处 dropout_prob = 0.0。
 
 
 ## 一键复现模型效果
