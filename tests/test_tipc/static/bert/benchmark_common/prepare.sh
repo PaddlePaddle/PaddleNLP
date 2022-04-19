@@ -11,7 +11,12 @@ ln -s hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_
 cd ..
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-python -m pip install --upgrade pip
-python -m pip install -r ../requirements.txt -i https://mirror.baidu.com/pypi/simple
-python -m pip install pybind11 regex sentencepiece tqdm -i https://mirror.baidu.com/pypi/simple
-python -m pip install -e ..
+python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install setuptools_scm 
+python -m pip install Cython 
+python -m pip install -r ../requirements.txt  -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
+
+python -m pip install -e ../
+# python -m pip install paddlenlp    # PDC 镜像中安装失败
+python -m pip list
