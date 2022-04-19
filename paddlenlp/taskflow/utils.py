@@ -774,16 +774,6 @@ class SchemaTree(object):
         self.children.append(node)
 
 
-def map_offset(ori_offset, offset_mapping):
-    """
-    map ori offset to token offset
-    """
-    for index, span in enumerate(offset_mapping):
-        if span[0] <= ori_offset < span[1]:
-            return index
-    return -1
-
-
 def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
     """
     get idx of the last dim in prob arraies, which is greater than a limitation
@@ -860,11 +850,10 @@ def get_span(start_ids, end_ids, with_prob=False):
     return result
 
 
-def get_id_and_prob(spans, ids):
+def get_id_and_prob(spans, offset_map):
     sentence_id = []
     prob = []
-    z = ids.index(2)
     for s, e in spans:
         prob.append(s[1] * e[1])
-        sentence_id.append((s[0] - z - 1, e[0] - z))
+        sentence_id.append((offset_map[s[0]][0], offset_map[e[0]][1]))
     return sentence_id, prob
