@@ -80,7 +80,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             "ernie-1.0":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-1.0-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/ernie-1.0-lagre-vocab.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie/ernie-1.0-lagre-vocab_suffix.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
             "ernie-2.0-en":
