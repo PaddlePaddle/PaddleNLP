@@ -24,6 +24,7 @@ import unicodedata
 from collections import OrderedDict, UserDict
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
+from typing import TYPE_CHECKING, Dict, NamedTuple, Sequence, Tuple
 
 from paddle.utils import try_import
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
@@ -40,33 +41,30 @@ from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
 from collections import OrderedDict
 
+from .tokenizer_utils_base import (
+    ENCODE_KWARGS_DOCSTRING,
+    ENCODE_PLUS_ADDITIONAL_KWARGS_DOCSTRING,
+    INIT_TOKENIZER_DOCSTRING,
+    AddedToken,
+    BatchEncoding,
+    EncodedInput,
+    EncodedInputPair,
+    PreTokenizedInput,
+    PreTokenizedInputPair,
+    PreTrainedTokenizerBase,
+    TextInput,
+    TextInputPair,
+    TruncationStrategy, )
+
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
     'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
 ]
 
-
-class BatchEncoding(UserDict):
-    def __init__(self, data=None):
-        super().__init__(data)
-
-    def __getitem__(self, item):
-        if isinstance(item, str):
-            return self.data[item]
-        else:
-            raise KeyError(
-                "Indexing with integers is not available when using tokenizer.__call__()"
-                " with return_dict=True. Please set return_dict to False to use integer indexing."
-            )
-
-    def keys(self):
-        return self.data.keys()
-
-    def values(self):
-        return self.data.values()
-
-    def items(self):
-        return self.data.items()
+# Slow tokenizers are saved in a vocabulary plus three separated files
+SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
+ADDED_TOKENS_FILE = "added_tokens.json"
+TOKENIZER_CONFIG_FILE = "tokenizer_config.json"
 
 
 def convert_to_unicode(text):
@@ -140,6 +138,36 @@ def _is_punctuation(char):
     if cat.startswith("P"):
         return True
     return False
+
+
+def _is_end_of_word(text):
+    """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
+    last_char = text[-1]
+    return bool(
+        _is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(
+            last_char))
+
+
+def _is_start_of_word(text):
+    """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
+    first_char = text[0]
+    return bool(
+        _is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(
+            first_char))
+
+
+def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
+    """
+    Inserts one token to an ordered list if it does not already exist. Note: token_list must be sorted.
+    """
+    insertion_idx = bisect.bisect_left(token_list, new_token)
+    # Checks if new_token is already in the ordered token_list
+    if insertion_idx < len(token_list) and token_list[
+            insertion_idx] == new_token:
+        # new_token is in token_list, don't add
+        return
+    else:
+        token_list.insert(insertion_idx, new_token)
 
 
 def is_chinese_char(cp):
@@ -236,26 +264,6 @@ def tokenize_special_chars(text):
         else:
             output.append(char)
     return "".join(output)
-
-
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
-
-    def __str__(self):
-        return self.content
 
 
 class Trie:
@@ -484,7 +492,7 @@ def tokenize_chinese_chars(text):
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedTokenizer(object):
+class PretrainedTokenizer(PreTrainedTokenizerBase):
     """
     The base class for all pretrained tokenizers. It mainly provides common methods
     for loading (construction and loading) and saving pretrained tokenizers. Loading
@@ -518,6 +526,7 @@ class PretrainedTokenizer(object):
     by which subclasses can track arguments for initialization automatically
     and expose special tokens initialization used as attributes.
     """
+    '''
     tokenizer_config_file = "tokenizer_config.json"
     pretrained_init_configuration = {}
     resource_files_names = {}  # keys are arguments of __init__
@@ -526,7 +535,21 @@ class PretrainedTokenizer(object):
     pad_token_type_id = 0
     special_tokens_map_extended = {}
     _additional_special_tokens = []
+    '''
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Added tokens - We store this for both slow and fast tokenizers
+        # until the serialization of Fast tokenizers is updated
+        self.added_tokens_encoder: Dict[str, int] = {}
+        self.added_tokens_decoder: Dict[int, str] = {}
+        self.unique_no_split_tokens: List[str] = []
+        self.tokens_trie = Trie()
+
+        self._decode_use_source_tokenizer = False
+
+    '''
     def _wrap_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add specials tokens (arguments of
@@ -567,11 +590,16 @@ class PretrainedTokenizer(object):
                 additional_special_tokens.append(token)
         self.special_tokens_map[
             "additional_special_tokens"] = additional_special_tokens
+    '''
 
     def _build_special_tokens_map_extended(self, **kwargs):
         for identifier, token in kwargs.items():
             if identifier.endswith('_token') and isinstance(token, AddedToken):
                 self.special_tokens_map_extended[identifier] = token
+
+    @property
+    def is_fast(self) -> bool:
+        return False
 
     def __call__(self,
                  text,
