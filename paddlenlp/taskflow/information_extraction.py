@@ -141,26 +141,13 @@ class UIETask(Task):
                     return_position_ids=True,
                     return_dict=False)
                 encoded_inputs = encoded_inputs[0]
-                offset_mapping = [
-                    list(x) for x in encoded_inputs["offset_mapping"]
-                ]
-                bias = 0
-                for index in range(len(offset_mapping)):
-                    if index == 0:
-                        continue
-                    mapping = offset_mapping[index]
-                    if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-                        bias = index
-                    if mapping[0] == 0 and mapping[1] == 0:
-                        continue
-                    offset_mapping[index][0] += bias
-                    offset_mapping[index][1] += bias
 
                 tokenized_output = [
                     encoded_inputs["input_ids"],
                     encoded_inputs["token_type_ids"],
                     encoded_inputs["position_ids"],
-                    encoded_inputs["attention_mask"]
+                    encoded_inputs["attention_mask"],
+                    encoded_inputs["offset_mapping"]
                 ]
                 tokenized_output = [
                     np.array(
@@ -178,8 +165,8 @@ class UIETask(Task):
 
         sentence_ids = []
         probs = []
-        for [input_ids, token_type_ids, pos_ids, att_mask] in infer_data_loader(
-        ):
+        for [input_ids, token_type_ids, pos_ids, att_mask,
+             offset_maps] in infer_data_loader():
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.input_handles[2].copy_from_cpu(pos_ids.numpy())
@@ -192,14 +179,15 @@ class UIETask(Task):
                 start_prob, return_prob=True)
             end_ids_list = get_bool_ids_greater_than(end_prob, return_prob=True)
 
-            for start_ids, end_ids, ids in zip(start_ids_list, end_ids_list,
-                                               input_ids.tolist()):
+            for start_ids, end_ids, ids, offset_map in zip(
+                    start_ids_list, end_ids_list,
+                    input_ids.tolist(), offset_maps.tolist()):
                 for i in reversed(range(len(ids))):
                     if ids[i] != 0:
                         ids = ids[:i]
                         break
                 span_list = get_span(start_ids, end_ids, with_prob=True)
-                sentence_id, prob = get_id_and_prob(span_list, ids)
+                sentence_id, prob = get_id_and_prob(span_list, offset_map)
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
         results = self._convert_ids_to_results(inputs, sentence_ids, probs)
