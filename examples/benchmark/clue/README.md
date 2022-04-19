@@ -12,7 +12,7 @@
 | Model                 | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | CMRC2018        | CHID      | C<sup>3</sup> |
 | --------------------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------------- | --------- | ------------- |
 | RoBERTa-wwm-ext-large | 75.32     | 59.33     | 62.33     | 83.87     | 78.81     | 90.79       | 83.37     | 70.58/89.82     | 85.72     | 75.26         |
-| ernie-3.0-large       | **77.36** | **60.21** | **62.75** | **85.06** | **82.14** | **91.12**   | **84.23** | **72.76/91.87** | **86.84** | **84.67**     |
+| ERNIE-3.0-large       | **77.36** | **60.21** | **62.75** | **85.06** | **82.14** | **91.12**   | **84.23** | **72.76/91.87** | **86.84** | **84.67**     |
 | RoBERTa-wwm-ext       | 74.75     | 58.08     | 61.22     | 81.66     | 77.25     | 88.55       | 81.63     | 68.69/88.75     | 83.41     | 67.69         |
 
 
@@ -41,7 +41,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | Model                 | AFQMC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
 | --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------------- |
 | RoBERTa-wwm-ext-large | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16 | 1e-5,16 | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
-| ernie-3.0-large       | 1e-5,16 | 2e-5,16 | 5e-5,16 | 2e-5,32 | 3e-5,64 | 2e-5,16     | 3e-5,32 | 3e-5,24  | 1e-5,32 | 2e-5,24       |
+| ERNIE-3.0-large       | 1e-5,16 | 2e-5,16 | 5e-5,16 | 2e-5,32 | 3e-5,64 | 2e-5,16     | 3e-5,32 | 3e-5,24  | 1e-5,32 | 2e-5,24       |
 | RoBERTa-wwm-ext       | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32 | 2e-5,32 | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
 
 其中，`ernie-3.0-large` 在 CLUEWSC2020 处 dropout_prob = 0.0。
@@ -61,10 +61,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=roberta-wwm-ext-large
+export MODEL_PATH=ernie-3.0-large
 
 cd classification
-mkdir roberta-wwm-ext-large
+mkdir ernie-3.0-large
 python -u ./run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -120,10 +120,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=roberta-wwm-ext-large
+export MODEL_PATH=ernie-3.0-large
 
 cd classification
-mkdir roberta-wwm-ext-large
+mkdir ernie-3.0-large
 
 python -u ./run_clue_classifier_trainer.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -163,8 +163,7 @@ python -u ./run_clue_classifier_trainer.py \
 
 cd mrc
 
-mkdir roberta-wwm-ext-large
-MODEL_PATH=roberta-wwm-ext-large
+MODEL_PATH=ernie-3.0-large
 BATCH_SIZE=6
 LR=2e-5
 
