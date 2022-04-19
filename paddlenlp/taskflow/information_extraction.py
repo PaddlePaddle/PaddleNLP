@@ -76,8 +76,12 @@ class UIETask(Task):
             self._construct_model(model)
         self._usage = usage
         self._return_prob = return_prob
+        self._max_seq_len = self.kwargs[
+            'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 1
+            'batch_size'] if 'batch_size' in self.kwargs else 64
+        self._split_sentence = self.kwargs[
+            'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     def set_schema(self, schema):
         self._schema = schema
@@ -128,14 +132,29 @@ class UIETask(Task):
         return outputs
 
     def _single_stage_predict(self, inputs):
+        input_texts = []
+
+        prompt = inputs[0]["prompt"]
+        for i in range(len(inputs)):
+            input_texts.append(inputs[i]["text"])
+
+        # max predict length should exclude the length of prompt and summary tokens
+        max_predict_len = self._max_seq_len - len(prompt) - 3
+
+        short_input_texts, self.input_mapping = self._auto_splitter(
+            input_texts, max_predict_len, split_sentence=self._split_sentence)
+
+        short_inputs = []
+        for short_input_text in short_input_texts:
+            short_inputs.append({"text": short_input_text, "prompt": prompt})
+
         def read(inputs):
-            max_length = 512
             for example in inputs:
                 encoded_inputs = self._tokenizer(
                     text=[example["prompt"]],
                     text_pair=[example["text"]],
                     stride=len(example["prompt"]),
-                    max_seq_len=max_length,
+                    max_seq_len=self._max_seq_len,
                     pad_to_max_seq_len=True,
                     return_attention_mask=True,
                     return_position_ids=True,
@@ -156,7 +175,7 @@ class UIETask(Task):
 
                 yield tuple(tokenized_output)
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=False)
+        infer_ds = load_dataset(read, inputs=short_inputs, lazy=False)
         batch_sampler = paddle.io.BatchSampler(
             dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
@@ -190,8 +209,31 @@ class UIETask(Task):
                 sentence_id, prob = get_id_and_prob(span_list, offset_map)
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
-        results = self._convert_ids_to_results(inputs, sentence_ids, probs)
+        results = self._convert_ids_to_results(short_inputs, sentence_ids,
+                                               probs)
+        results = self._auto_joiner(results, short_input_texts,
+                                    self.input_mapping)
         return results
+
+    def _auto_joiner(self, short_results, short_inputs, input_mapping):
+        concat_results = []
+        for k, vs in input_mapping.items():
+            offset = 0
+            single_results = []
+            for v in vs:
+                if v == 0:
+                    single_results = short_results[v]
+                    offset += len(short_inputs[v])
+                else:
+                    for i in range(len(short_results[v])):
+                        if short_results[v][i]['start'] > 0:
+                            short_results[v][i]['start'] += offset
+                        if short_results[v][i]['end'] > 0:
+                            short_results[v][i]['end'] += offset
+                    offset += len(short_inputs[v])
+                    single_results.extend(short_results[v])
+            concat_results.append(single_results)
+        return concat_results
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
@@ -299,12 +341,12 @@ class UIETask(Task):
             prompt = example["prompt"]
             for i in range(len(sentence_id)):
                 start, end = sentence_id[i]
-                if end < 0:
+                if end < len(prompt):
                     # ignore [SEP]
                     result = {
-                        "text": prompt[start + 1:end + 1],
-                        "start": start,
-                        "end": end,
+                        "text": prompt[start:end],
+                        "start": -end,
+                        "end": -start,
                         "probability": prob[i]
                     }
                     result_list.append(result)
