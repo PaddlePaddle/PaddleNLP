@@ -473,7 +473,7 @@ def create_masked_lm_predictions(tokens,
                                 0, len(output_tokens))]
                         else:
                             masked_token = vocab_id_list[np_rng.randint(
-                                0, len(vocab_id_list))]
+                                0, len(vocab_id_list) - 20910)]
             elif masking_style == "t5":
                 masked_token = mask_id
             else:
