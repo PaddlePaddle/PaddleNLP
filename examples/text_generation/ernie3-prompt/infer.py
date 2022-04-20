@@ -63,8 +63,6 @@ def infer(args):
 
     texts = ["嗜睡抑郁多梦入睡困难很"]
     encoded_inputs = tokenizer.gen_encode(texts)
-    import pdb
-    pdb.set_trace()
 
     output_ids, scores = model.generate(
         input_ids=encoded_inputs['input_ids'],
