@@ -389,6 +389,119 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                                           end_id);
 }
 
+template <typename T>
+__global__ void start_id_embedding_ernie3_kernel(T* from_tensor,
+                                          const T* embedding_table,
+                                          const T* position_encoding_table,
+                                          const T* position_extra_table,
+                                          const int* position_extra_id,
+                                          const int* word_ids,
+                                          const int* memory_seq_len,
+                                          const int start_step,
+                                          const int max_length,
+                                          const int batch_size,
+                                          const int hidden_units,
+                                          const int* position_id) {
+  int bid = blockIdx.x;
+  int seq_id = blockIdx.y;
+
+  for(int index = threadIdx.x; index < hidden_units; index += blockDim.x) {
+
+    int position_index = position_id[bid * max_length + seq_id] * hidden_units + index;
+
+    from_tensor[bid * max_length * hidden_units + seq_id * hidden_units + index] =
+        embedding_table[word_ids[bid * max_length + seq_id] * hidden_units + index]
+        + position_encoding_table[position_index]
+        + position_extra_table[position_extra_id[bid * max_length + seq_id] * hidden_units + index];
+  }
+}
+
+template <typename T>
+void start_ids_embeddings_ernie3_kernel_launcher(T* from_tensor,
+                                const T* embedding_table,
+                                const T* position_encoding_table,
+                                const T* position_extra_table,
+                                const int* position_extra_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream,
+                                const int* position_id) {
+  dim3 grid(batch_size, max_length);
+  dim3 block(min(hidden_units, 1024));
+  start_id_embedding_ernie3_kernel<T><<<grid, block, 0, stream>>>(from_tensor,
+                                                           embedding_table,
+                                                           position_encoding_table,
+                                                           position_extra_table,
+                                                           position_extra_id,
+                                                           word_ids,
+                                                           memory_seq_len,
+                                                           start_step,
+                                                           max_length,
+                                                           batch_size,
+                                                           hidden_units,
+                                                           position_id);
+}
+
+template <typename T>
+__global__ void embeddings_ernie3_kernels(T* from_tensor,
+                                   const T* embedding_table,
+                                   const T* position_encoding,
+                                   const T* position_extra_table,
+                                   const int* memory_sequence_length,
+                                   const int* decoder_position_ids,
+                                   const int* word_ids,
+                                   const int step,
+                                   const int batch_size,
+                                   const int hidden_units) {
+  // 1. lookup from embedding table
+  // 2. add the position encoding
+  // 3. add the position_extr embedding
+  for (int index = blockIdx.x * blockDim.x + threadIdx.x;
+       index < batch_size * hidden_units;
+       index += blockDim.x * gridDim.x) {
+    const int row_index = index / hidden_units;
+    const int col_index = index % hidden_units;
+
+    int position_extra_index = step * hidden_units + col_index;
+
+    from_tensor[index] =
+        embedding_table[word_ids[row_index] * hidden_units + col_index] +
+        position_extra_table[position_extra_index] +
+        position_encoding[decoder_position_ids[row_index] * hidden_units + col_index];
+  }
+}
+
+template <typename T>
+void embeddings_ernie3_kernel_launcher(T* from_tensor,
+                                const T* embedding_table,
+                                const T* position_encoding_table,
+                                const T* position_extra_table,
+                                const int* memory_sequence_length,
+                                const int* decoder_position_ids,
+                                const int* word_ids,
+                                const int step,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream) {
+  dim3 grid(min(batch_size, 65536));
+  dim3 block(min(hidden_units, 1024));
+
+  embeddings_ernie3_kernels<T><<<grid, block, 0, stream>>>(from_tensor,
+                                                    embedding_table,
+                                                    position_encoding_table,
+                                                    position_extra_table,
+                                                    memory_sequence_length,
+                                                    decoder_position_ids,
+                                                    word_ids,
+                                                    step,
+                                                    batch_size,
+                                                    hidden_units);
+}
+
 template void init_kernelLauncher_v2(bool* finished,
                                      bool* alive_finished,
                                      int* sequence_length,
@@ -540,5 +653,57 @@ template void apply_logits_mask_kernelLauncher(
     const half* logits_mask,
     const bool min_penalty,
     const int end_id);
+
+  template void start_ids_embeddings_ernie3_kernel_launcher(float* from_tensor,
+                                const float* embedding_table,
+                                const float* position_encoding_table,
+                                const float* position_extra_table,
+                                const int* position_extra_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream,
+                                const int* position_id);
+
+template void start_ids_embeddings_ernie3_kernel_launcher(half* from_tensor,
+                                const half* embedding_table,
+                                const half* position_encoding_table,
+                                const half* position_extra_table,
+                                const int* position_extra_id,
+                                const int* word_ids,
+                                const int* memory_seq_len,
+                                const int start_step,
+                                const int max_length,
+                                const int batch_size,
+                                const int hidden_units,
+                                cudaStream_t stream,
+                                const int* position_id);
+                              
+template void embeddings_ernie3_kernel_launcher(float* from_tensor,
+                                         const float* embedding_table,
+                                         const float* position_encoding_table,
+                                         const float* position_extra_table,
+                                         const int* memory_sequence_length,
+                                         const int* decoder_position_ids,
+                                         const int* word_ids,
+                                         const int step,
+                                         const int batch_size,
+                                         const int hidden_units,
+                                         cudaStream_t stream);
+
+template void embeddings_ernie3_kernel_launcher(half* from_tensor,
+                                         const half* embedding_table,
+                                         const half* position_encoding_table,
+                                         const half* position_extra_table,
+                                         const int* memory_sequence_length,
+                                         const int* decoder_position_ids,
+                                         const int* word_ids,
+                                         const int step,
+                                         const int batch_size,
+                                         const int hidden_units,
+                                         cudaStream_t stream);
 
 }  // end of name space fastertransformer

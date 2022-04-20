@@ -550,6 +550,100 @@ def infer_mbart_decoding(
     return output_ids, parent_ids, sequence_length
 
 
+def infer_ernie3_prompt_decoding(
+        input_ids, position_ids, pos_ids_extra, attn_mask, memory_seq_lens,
+        logits_mask, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
+        slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias,
+        slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+        ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
+        decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
+        lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb,
+        pos_extra_emb, decoder_position_id, decoding_strategy, beam_size, topk,
+        topp, n_head, size_per_head, n_layer, bos_id, eos_id, max_out_len,
+        diversity_rate, temperature, len_penalty, normalize_before, hidden_act,
+        rel_len, early_stopping, repetition_penalty, min_length):
+    helper = LayerHelper('fusion_ernie3_prompt', **locals())
+
+    inputs = {
+        "Input": input_ids,
+        "AttentionMask": attn_mask,
+        "StartLength": memory_seq_lens,
+        "WordEmbedding": word_emb,
+        "SelfLayernormWeight@VECTOR": slf_ln_weight,
+        "SelfLayernormBias@VECTOR": slf_ln_bias,
+        "SelfQueryWeight@VECTOR": slf_q_weight,
+        "SelfQueryBias@VECTOR": slf_q_bias,
+        "SelfKeyWeight@VECTOR": slf_k_weight,
+        "SelfKeyBias@VECTOR": slf_k_bias,
+        "SelfValueWeight@VECTOR": slf_v_weight,
+        "SelfValueBias@VECTOR": slf_v_bias,
+        "SelfOutWeight@VECTOR": slf_out_weight,
+        "SelfOutBias@VECTOR": slf_out_bias,
+        "FFNLayernormWeight@VECTOR": ffn_ln_weight,
+        "FFNLayernormBias@VECTOR": ffn_ln_bias,
+        "FFNInterWeight@VECTOR": ffn_inter_weight,
+        "FFNInterBias@VECTOR": ffn_inter_bias,
+        "FFNOutWeight@VECTOR": ffn_out_weight,
+        "FFNOutBias@VECTOR": ffn_out_bias,
+        "DecoderLayernormWeight": decoder_ln_weight,
+        "DecoderLayernormBias": decoder_ln_bias,
+        "TransWeight": trans_weight,
+        "TransBias": trans_bias,
+        "LmLayernormWeight": lm_ln_weight,
+        "LmLayernormBias": lm_ln_bias,
+        "LmOutWeight": linear_weight,
+        "LmOutBias": linear_bias,
+        "PositionIds": position_ids,
+        "PositionEncEmb": pos_emb,
+        "PositionExtraIds": pos_ids_extra,
+        "PositionExtraEncEmb": pos_extra_emb,
+        "LogitsMask": logits_mask,
+        "DecPositionIds": decoder_position_id
+    }
+
+    attrs = {
+        "decoding_strategy": decoding_strategy,
+        "beam_size": beam_size,
+        "topk": topk,
+        "topp": topp,
+        "max_len": max_out_len,
+        "n_head": n_head,
+        "size_per_head": size_per_head,
+        "num_layer": n_layer,
+        "bos_id": bos_id,
+        "eos_id": eos_id,
+        "temperature": temperature,
+        "repetition_penalty": repetition_penalty,
+        "len_penalty": len_penalty,
+        "beam_search_diversity_rate": diversity_rate,
+        "early_stopping": early_stopping,
+        "min_length": min_length,
+        "rel_len": rel_len,
+        "hidden_act": hidden_act,
+        "normalize_before": normalize_before,
+    }
+
+    output_ids = helper.create_variable(dtype="int32")
+    parent_ids = helper.create_variable(dtype="int32")
+    sequence_length = helper.create_variable(dtype="int32")
+    output_scores = helper.create_variable(dtype="float32")
+
+    outputs = {
+        'OutputIds': output_ids,
+        'ParentIds': parent_ids,
+        'SequenceLength': sequence_length,
+        "OutputScores": output_scores
+    }
+
+    helper.append_op(
+        type='fusion_ernie3_prompt',
+        inputs=inputs,
+        outputs=outputs,
+        attrs=attrs)
+
+    return output_ids, parent_ids, sequence_length, output_scores
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -812,8 +906,8 @@ def convert_params(faster_model,
                         attr += "_"
                     setattr(faster_model, attr, params["slf_q_bias"][-1])
                     for key in [
-                            f"slf_{m}_{n}"
-                            for m in ("k", "v") for n in ("weight", "bias")
+                            f"slf_{m}_{n}" for m in ("k", "v")
+                            for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))
@@ -1382,8 +1476,7 @@ def enable_ft_para(tensor_para_size=1,
         def _impl(self, *args, **kwargs):
             func(self, *args, **kwargs)
             # Reset parameters with corresponding slice.
-            for x, attr in [(m, n)
-                            for m in ("q", "k", "v")
+            for x, attr in [(m, n) for m in ("q", "k", "v")
                             for n in ("weight", "bias")]:
                 reset_param(getattr(self.self_attn, x + "_proj"), attr, 1)
             reset_param(self.self_attn.out_proj, "weight", 0)
@@ -2243,3 +2336,174 @@ class InferMBartDecoding(nn.Layer):
             sequence_length,
             decoding_strategy=decoding_strategy)
         return ids
+
+
+class InferErnie3PromptDecoding(nn.Layer):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 logits_mask=None,
+                 n_head=12,
+                 hidden_dims=768,
+                 size_per_head=64,
+                 n_layer=6,
+                 normalize_before=False,
+                 hidden_act="gelu"):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
+            load("FasterTransformer", verbose=True)
+
+        super(InferErnie3PromptDecoding, self).__init__()
+        for arg, value in locals().items():
+            if arg not in ["self"]:
+                setattr(self, "_" + arg, value)
+
+        params = convert_params(
+            self,
+            model,
+            fuse_qkv=1,
+            use_fp16=use_fp16_decoding,
+            restore_data=True)
+
+        params["word_emb"].append((model.embeddings.word_embeddings, "weight"))
+        params["pos_emb"].append(
+            (model.embeddings.position_embeddings, "weight"))
+        if getattr(model.embeddings, "position_extra_embeddings",
+                   None) is not None:
+            params["pos_extra_emb"].append(
+                (model.embeddings.position_extra_embeddings, "weight"))
+        else:
+            # inputs of custom op cannot be None
+            params["pos_extra_emb"].append((paddle.zeros(shape=[1]), False,
+                                            partial(setattr, self,
+                                                    "default_pos_extra_emb")))
+        params["decoder_ln_weight"].append((model.layer_norm, "weight"))
+        params["decoder_ln_bias"].append((model.layer_norm, "bias"))
+        params["trans_weight"].append((model.lm_head.lm_transform, "weight"))
+        params["trans_bias"].append((model.lm_head.lm_transform, "bias"))
+        params["lm_ln_weight"].append((model.lm_head.layer_norm, "weight"))
+        params["lm_ln_bias"].append((model.lm_head.layer_norm, "bias"))
+        # NOTE: newly created tensors should be layer attribute refered to be
+        # able to convert to static graph.
+        params["linear_weight"].append((model.lm_head.lm_out.weight, False,
+                                        partial(setattr, self, "dec_weight")))
+        params["linear_bias"].append((model.lm_head.lm_out, 'bias'))
+        for k, v in params.items():
+            setattr(self, k, v)
+
+    def forward(self,
+                input_ids,
+                position_ids,
+                attn_mask,
+                decoder_position_ids,
+                memory_seq_lens,
+                beam_size=4,
+                diversity_rate=0.0,
+                topk=4,
+                topp=0.0,
+                pos_ids_extra=None,
+                decoding_strategy="greedy_search",
+                max_out_len=5,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=1.0,
+                length_penalty=1.0,
+                rel_len=False,
+                early_stopping=False,
+                min_length=0,
+                repetition_penalty=1.0):
+        if decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
+            topk = 1
+            topp = 0
+        elif decoding_strategy in [
+                "sampling", "topk_sampling", "topp_sampling"
+        ]:
+            if topp == 1 and topk > 0:
+                decoding_strategy = "topk_sampling"
+                topp = 0
+            elif topp > 0 and topk == 0:
+                decoding_strategy = "topp_sampling"
+            else:
+                raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        elif decoding_strategy.startswith("beam_search"):
+            # default: beam_search_v1
+            decoding_strategy = "beam_search"
+
+        output_ids, parent_ids, sequence_length, output_scores = infer_ernie3_prompt_decoding(
+            input_ids=[input_ids],
+            position_ids=[position_ids],
+            pos_ids_extra=[pos_ids_extra],
+            attn_mask=[attn_mask],
+            decoder_position_id=[decoder_position_ids],
+            memory_seq_lens=[memory_seq_lens],
+            logits_mask=[self._logits_mask],
+            word_emb=self.word_emb,
+            slf_ln_weight=self.slf_ln_weight,
+            slf_ln_bias=self.slf_ln_bias,
+            slf_q_weight=self.slf_q_weight,
+            slf_q_bias=self.slf_q_bias,
+            slf_k_weight=self.slf_k_weight,
+            slf_k_bias=self.slf_k_bias,
+            slf_v_weight=self.slf_v_weight,
+            slf_v_bias=self.slf_v_bias,
+            slf_out_weight=self.slf_out_weight,
+            slf_out_bias=self.slf_out_bias,
+            ffn_ln_weight=self.ffn_ln_weight,
+            ffn_ln_bias=self.ffn_ln_bias,
+            ffn_inter_weight=self.ffn_inter_weight,
+            ffn_inter_bias=self.ffn_inter_bias,
+            ffn_out_weight=self.ffn_out_weight,
+            ffn_out_bias=self.ffn_out_bias,
+            decoder_ln_weight=self.decoder_ln_weight,
+            decoder_ln_bias=self.decoder_ln_bias,
+            trans_weight=self.trans_weight,
+            trans_bias=self.trans_bias,
+            lm_ln_weight=self.lm_ln_weight,
+            lm_ln_bias=self.lm_ln_bias,
+            linear_weight=self.linear_weight,
+            linear_bias=self.linear_bias,
+            pos_emb=self.pos_emb,
+            pos_extra_emb=self.pos_extra_emb,
+            decoding_strategy=decoding_strategy,
+            beam_size=beam_size,
+            topk=topk,
+            topp=topp,
+            n_head=self._n_head,
+            size_per_head=self._size_per_head,
+            n_layer=self._n_layer,
+            bos_id=bos_token_id,
+            eos_id=eos_token_id,
+            max_out_len=max_out_len,
+            diversity_rate=-diversity_rate,
+            temperature=temperature,
+            len_penalty=length_penalty,
+            normalize_before=self._normalize_before,
+            hidden_act=self._hidden_act,
+            rel_len=rel_len,
+            early_stopping=early_stopping,
+            repetition_penalty=repetition_penalty,
+            min_length=min_length)
+
+        ids = finalize(
+            beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
+            decoding_strategy=decoding_strategy)
+        return ids, output_scores

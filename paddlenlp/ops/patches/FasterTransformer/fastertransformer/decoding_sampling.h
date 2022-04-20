@@ -101,7 +101,8 @@ public:
                    const bool prefix_lm = false,
                    const bool is_mbart = false,
                    const int min_length = 0,
-                   const int inner_coeff = 4)
+                   const int inner_coeff = 4,
+                   const bool is_ernie3_prompt_ = false)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -127,6 +128,7 @@ public:
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
+    args_.is_ernie3_prompt_ = is_ernie3_prompt_;
 
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;

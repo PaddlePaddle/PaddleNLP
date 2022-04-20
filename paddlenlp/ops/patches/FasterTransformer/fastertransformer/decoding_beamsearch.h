@@ -109,7 +109,8 @@ public:
                      const bool early_stopping = false,
                      const bool is_mbart = false,
                      const int min_length = 0,
-                     const int inner_coeff = 4)
+                     const int inner_coeff = 4,
+                     const bool is_ernie3_prompt_ = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -145,6 +146,7 @@ public:
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
+    args_.is_ernie3_prompt_ = is_ernie3_prompt_;
 
     args_.finished_candidate_num_ = (finished_candidate_num == -1)
                                         ? beam_width * 2
@@ -292,7 +294,9 @@ public:
         sizeof(bool) * (finished_buf_size + alive_finished_buf_size) +
         topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
-        sizeof(int) * finished_count_size));
+        sizeof(int) * finished_count_size+
+        256*1024*1024));
+    //TODO(gongenlei): add extra memory for weight error: 512*1024*1024
 
     if (sizeof(DataType_) == sizeof(half)) {
       cublas_workspace_ = buf_;
@@ -401,6 +405,64 @@ public:
     }
   }
 
+      void print_tensor(int dim, const DataType_ * tensor, std::string output_file, bool everyone=true) {
+        if(std::is_same<DataType_, float>::value){
+            float *data = new float[dim];
+            cudaMemcpy(data, tensor, sizeof(float) * dim,
+                        cudaMemcpyDeviceToHost);
+            output_file = output_file + "_beam_search";
+            std::fstream f(output_file, std::ios::out);
+            //设置打印精度，保留小数点后面16位
+            f.setf(std::ios::fixed);
+            f.setf(std::ios::showpoint);
+            f.precision(16);
+            float sum = 0.0f;
+            for (int i = 0; i < dim; ++i) {
+                sum += data[i];
+                if(everyone)
+                    f<< data[i] << std::endl;
+            }
+            f<<"sum: " << sum << ", mean: " << sum / dim << std::endl;
+            f.close();
+        }else{
+            std::cout<<"print tensor fp16: "<<output_file<<std::endl;
+            half *data = new half[dim];
+            cudaMemcpy(data, tensor, sizeof(half) * dim,
+                        cudaMemcpyDeviceToHost);
+            std::fstream f(output_file, std::ios::out);
+            //设置打印精度，保留小数点后面16位
+            f.setf(std::ios::fixed);
+            f.setf(std::ios::showpoint);
+            f.precision(16);
+            float sum = 0.0f;
+            float ele=0.f;
+            for (int i = 0; i < dim; ++i) {
+                ele = static_cast<float>(data[i]);
+                sum += ele;
+                if(everyone)
+                    f<< ele << std::endl;
+            }
+            f<<"sum: " << sum << ", mean: " << sum / dim << std::endl;
+            f.close();
+        }
+    }
+
+    void print_tensor_int(int dim, const int * tensor, std::string output, bool everyone=true) {
+            int *data = new int[dim];
+            cudaMemcpy(data, tensor, sizeof(int) * dim,
+                       cudaMemcpyDeviceToHost);
+            output = output +  + "_beam_search";
+            std::fstream f(output, std::ios::out);
+            int sum = 0;
+            for (int i = 0; i < dim; ++i) {
+                sum += data[i];
+                if(everyone)
+                    f<< data[i] << std::endl;
+            }
+            f<<"sum: " << sum << ", mean: " << sum*1.0 / dim << std::endl;
+            f.close();
+        }
+
   void forward_context(const DecoderInitParam<DataType_> *decoder_param,
                        const DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
@@ -439,38 +501,71 @@ public:
 #endif
 
       if (args_.normalization_before_) {
-        start_ids_embeddings_kernel_launcher(from_tensor[0],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
+        if(args_.is_ernie3_prompt_){
+              start_ids_embeddings_ernie3_kernel_launcher(from_tensor[0],
+                                                    decoding_params.embedding_table,
+                                                    decoding_params.position_encoding_table,
+                                                    decoding_params.pos_extra_table,
+                                                    decoding_params.pos_ids_extra,
+                                                    decoding_params.d_start_ids,
+                                                    decoding_params.memory_sequence_length,
+                                                    1,
+                                                    input_len,
+                                                    request_batch_size,
+                                                    h_1,
+                                                    decoding_params.stream,
+                                                    decoding_params.position_ids);
+        }else{
+            start_ids_embeddings_kernel_launcher(from_tensor[0],
+                                                decoding_params.embedding_table,
+                                                decoding_params.position_encoding_table,
+                                                decoding_params.type_table,
+                                                decoding_params.type_id,
+                                                decoding_params.d_start_ids,
+                                                decoding_params.memory_sequence_length,
+                                                1,
+                                                input_len,
+                                                request_batch_size,
+                                                h_1,
+                                                decoding_params.stream,
+                                                decoding_params.role_id,
+                                                decoding_params.role_embedding_table,
+                                                decoding_params.position_ids);
+          }
       } else {
         // Memory reuse. from_tensor[1].
-        start_ids_embeddings_kernel_launcher(from_tensor[1],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
+        if(args_.is_ernie3_prompt_){
+            start_ids_embeddings_ernie3_kernel_launcher(from_tensor[1],
+                                                decoding_params.embedding_table,
+                                                decoding_params.position_encoding_table,
+                                                decoding_params.pos_extra_table,
+                                                decoding_params.pos_ids_extra,
+                                                decoding_params.d_start_ids,
+                                                decoding_params.memory_sequence_length,
+                                                1,
+                                                input_len,
+                                                request_batch_size,
+                                                h_1,
+                                                decoding_params.stream,
+                                                decoding_params.position_ids);
+        }else{
+            start_ids_embeddings_kernel_launcher(from_tensor[1],
+                                                decoding_params.embedding_table,
+                                                decoding_params.position_encoding_table,
+                                                decoding_params.type_table,
+                                                decoding_params.type_id,
+                                                decoding_params.d_start_ids,
+                                                decoding_params.memory_sequence_length,
+                                                1,
+                                                input_len,
+                                                request_batch_size,
+                                                h_1,
+                                                decoding_params.stream,
+                                                decoding_params.role_id,
+                                                decoding_params.role_embedding_table,
+                                                decoding_params.position_ids);
+        }
+
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -484,7 +579,6 @@ public:
                    m,
                    h_1,
                    decoding_params.stream);
-
       }
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -645,25 +739,41 @@ public:
             : (m * args_.seq_len_ * args_.hidden_units_);  // type T
 
     for (uint step = 1; step <= args_.seq_len_; ++step) {
+      
       // we use two-way buffer
       int kv_cache_id = step & 0x1;
       if (args_.normalization_before_) {
         if (args_.prefix_lm_) {
-          embeddings_kernel_launcher(from_tensor_[0],
-                                     decoding_params.embedding_table,
-                                     decoding_params.position_encoding_table,
-                                     decoding_params.type_table,
-                                     decoding_params.memory_sequence_length,
-                                     decoding_params.decoder_type_id,
-                                     word_ids_buf_,
-                                     step,
-                                     m,
-                                     args_.hidden_units_,
-                                     args_.pos_bias_,
-                                     decoding_params.stream,
-                                     decoding_params.decoder_role_id,
-                                     decoding_params.role_embedding_table,
-                                     decoding_params.decoder_position_ids);
+            if(args_.is_ernie3_prompt_){
+                embeddings_ernie3_kernel_launcher(from_tensor_[0],
+                                        decoding_params.embedding_table,
+                                        decoding_params.position_encoding_table,
+                                        decoding_params.pos_extra_table, 
+                                        decoding_params.memory_sequence_length,
+                                        decoding_params.decoder_position_ids, //gongnelei add positon_ids input
+                                        word_ids_buf_,
+                                        step,
+                                        m,
+                                        args_.hidden_units_,
+                                        decoding_params.stream);
+            }else{
+              embeddings_kernel_launcher(from_tensor_[0],
+                                        decoding_params.embedding_table,
+                                        decoding_params.position_encoding_table,
+                                        decoding_params.type_table,
+                                        decoding_params.memory_sequence_length,
+                                        decoding_params.decoder_type_id,
+                                        word_ids_buf_,
+                                        step,
+                                        m,
+                                        args_.hidden_units_,
+                                        args_.pos_bias_,
+                                        decoding_params.stream,
+                                        decoding_params.decoder_role_id,
+                                        decoding_params.role_embedding_table,
+                                        decoding_params.decoder_position_ids);
+            }
+
         } else {
           if (args_.is_mbart_) {
             embedding_lookup_sine_position_encoding_kernel_launcher(
@@ -698,21 +808,36 @@ public:
         }
       } else {
         if (args_.prefix_lm_) {
-          embeddings_kernel_launcher(embedding_buf_,
-                                     decoding_params.embedding_table,
-                                     decoding_params.position_encoding_table,
-                                     decoding_params.type_table,
-                                     decoding_params.memory_sequence_length,
-                                     decoding_params.decoder_type_id,
-                                     word_ids_buf_,
-                                     step,
-                                     m,
-                                     args_.hidden_units_,
-                                     args_.pos_bias_,
-                                     decoding_params.stream,
-                                     decoding_params.decoder_role_id,
-                                     decoding_params.role_embedding_table,
-                                     decoding_params.decoder_position_ids);
+          if(args_.is_ernie3_prompt_){
+                embeddings_ernie3_kernel_launcher(embedding_buf_,
+                                        decoding_params.embedding_table,
+                                        decoding_params.position_encoding_table,
+                                        decoding_params.pos_extra_table, 
+                                        decoding_params.memory_sequence_length,
+                                        decoding_params.decoder_position_ids, //gongnelei add positon_ids input
+                                        word_ids_buf_,
+                                        step,
+                                        m,
+                                        args_.hidden_units_,
+                                        decoding_params.stream);
+          }else{
+                embeddings_kernel_launcher(embedding_buf_,
+                                decoding_params.embedding_table,
+                                decoding_params.position_encoding_table,
+                                decoding_params.type_table,
+                                decoding_params.memory_sequence_length,
+                                decoding_params.decoder_type_id,
+                                word_ids_buf_,
+                                step,
+                                m,
+                                args_.hidden_units_,
+                                args_.pos_bias_,
+                                decoding_params.stream,
+                                decoding_params.decoder_role_id,
+                                decoding_params.role_embedding_table,
+                                decoding_params.decoder_position_ids);
+
+          }
         } else {
           // TODO(gongenlei): Only support Bart temporarily.
           embedding_position_lookups_bart_kernel_launcher(
@@ -730,7 +855,6 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-
         layer_norm(embedding_buf_,
                    decoding_params.layernorm.gamma,
                    decoding_params.layernorm.beta,
@@ -769,7 +893,6 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-
         if (args_.prefix_lm_) {
           decoder_->forward_v2(
               from_tensor_[from_id],
@@ -850,6 +973,7 @@ public:
                                                 cublasAlgoMap_,
                                                 cublas_workspace_);
           } else {
+            // prefix_lm_ + post norm
             // trans here
             cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
                                                 decoding_params.cublas_handle,
@@ -885,7 +1009,7 @@ public:
                                       k,
                                       args_.act_,
                                       decoding_params.stream);
-
+        
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -915,7 +1039,7 @@ public:
                                               embedding_kernel_ptr,
                                               AType_,
                                               n,
-                                              lm_normed_result_buf_,
+                                              lm_normed_result_buf_,// gongenlei: lm_normed_result_buf_ 
                                               BType_,
                                               k,
                                               &beta,
@@ -994,7 +1118,7 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
+        if (decoding_params.logits_mask && (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(
               tmp_logits_buf_,
               keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
@@ -1018,7 +1142,7 @@ public:
             // Use separated alive and finish beam queues to avoid the decrease
             // of alive beams.
             topK_softMax_update(tmp_logits_buf_,
-                                embedding_bias_ptr,
+                                embedding_bias_ptr, //gongenlei: embedding_bias_ptr
                                 finished_buf_,
                                 alive_finished_buf_,
                                 decoding_params.sequence_length,
@@ -1194,7 +1318,6 @@ public:
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-
       if (args_.beam_width_ > 1) {
         // chose which self cache to use
         int decoder_max_seq_len =

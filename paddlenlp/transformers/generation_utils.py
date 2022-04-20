@@ -766,13 +766,12 @@ class GenerationMixin(object):
                         dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :
-                                                num_return_sequences, :].reshape(
+                        output_ids = output_ids[:, :num_return_sequences *
+                                                num_beams, :].reshape(
                                                     [-1, output_ids.shape[-1]])
                         if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :
-                                                      num_return_sequences].flatten(
-                                                      )
+                            dummy_srore = dummy_srore[:, :num_return_sequences *
+                                                      num_beams].flatten()
                     else:
                         output_ids = output_ids.transpose([1, 0])
                     return output_ids, dummy_srore

@@ -152,4 +152,32 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       const bool min_penalty = false,
                                       const int end_id = -1);
 
+template <typename T>
+void start_ids_embeddings_ernie3_kernel_launcher(T* from_tensor,
+                                                const T* embedding_table,
+                                                const T* position_encoding_table,
+                                                const T* position_extra_table,
+                                                const int* position_extra_id,
+                                                const int* word_ids,
+                                                const int* memory_seq_len,
+                                                const int start_step,
+                                                const int max_length,
+                                                const int batch_size,
+                                                const int hidden_units,
+                                                cudaStream_t stream,
+                                                const int* position_id);
+
+template <typename T>
+void embeddings_ernie3_kernel_launcher(T* from_tensor,
+                                        const T* embedding_table,
+                                        const T* position_encoding_table,
+                                        const T* position_extra_table,
+                                        const int* memory_sequence_length,
+                                        const int* decoder_position_ids,
+                                        const int* word_ids,
+                                        const int step,
+                                        const int batch_size,
+                                        const int hidden_units,
+                                        cudaStream_t stream);
+
 }  // namespace fastertransformer

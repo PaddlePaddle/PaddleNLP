@@ -101,3 +101,5 @@ from .megatronbert.tokenizer import *
 from .semantic_search.modeling import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
+from .ernie3_prompt.modeling import *
+from .ernie3_prompt.tokenizer import *

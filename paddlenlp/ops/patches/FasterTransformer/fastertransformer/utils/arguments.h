@@ -89,6 +89,10 @@ public:
   const int *d_start_lengths;
   const T *d_attn_mask;
 
+  // For Ernie3Prompt
+  const T *pos_extra_table = nullptr;
+  const int* pos_ids_extra = nullptr;
+
   virtual ~DecodingInitParam() {}
 };
 
@@ -126,6 +130,7 @@ struct DecodingSamplingArguments : public DecodingArguments {
   bool is_mbart_{false};
   // For tensor parallel usage currently.
   int seed_{-1};
+  bool is_ernie3_prompt_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -143,6 +148,7 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   int finished_candidate_num_{-1};
   bool early_stopping_{false};
   bool is_mbart_{false};
+  bool is_ernie3_prompt_{false};
 };
 
 struct GptArguments : public DecodingSamplingArguments {

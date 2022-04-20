@@ -21,10 +21,11 @@ import paddle.nn.functional as F
 
 from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     PositionalEmbedding, position_encoding_init,
-                                    InferTransformerModel, GPTModel)
+                                    InferTransformerModel, GPTModel,
+                                    Ernie3PromptPretrainedModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding,
-                           InferMBartDecoding)
+                           InferMBartDecoding, InferErnie3PromptDecoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
@@ -1366,5 +1367,186 @@ class FasterMBART(MBartPretrainedModel):
             alpha=length_penalty,
             temperature=temperature,
             early_stopping=early_stopping)
+
+    generate = forward
+
+
+class FasterErnie3Prompt(Ernie3PromptPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterErnie3Prompt, self).__init__()
+        self._model = model
+        self._use_fp16_decoding = use_fp16_decoding
+        self.vocab_size = self._model.lm_head.lm_out.bias.shape[0]
+        self.end_token_id = self._model.end_token_id
+        self.gend_token_id = self._model.gend_token_id
+        self.s_token_id = self._model.s_token_id
+        self.pad_token_id = self._model.pad_token_id
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
+        self._size_per_head = self._hidden_dims // self._n_head
+        self._n_layer = self._model.num_hidden_layers
+        self._hidden_act = self._model.hidden_act
+
+        self.decoding = InferErnie3PromptDecoding(
+            model=self._model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            logits_mask=self.logits_mask,
+            n_head=self._n_head,
+            hidden_dims=self._hidden_dims,
+            size_per_head=self._size_per_head,
+            n_layer=self._n_layer,
+            normalize_before=self._normalize_before,
+            hidden_act=self._hidden_act)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      position_ids,
+                                      attention_mask,
+                                      seq_len,
+                                      pos_ids_extra=None,
+                                      **kwargs):
+        input_ids = input_ids[:, :-1]
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, dtype="int32")
+
+        if position_ids.dtype == paddle.int64:
+            position_ids = paddle.cast(position_ids, dtype="int32")
+        position_ids = position_ids[:, :-1]
+        decoder_position_ids = position_ids[:, -1:]
+
+        if pos_ids_extra is not None:
+            if pos_ids_extra.dtype == paddle.int64:
+                pos_ids_extra = paddle.cast(pos_ids_extra, dtype="int32")
+            pos_ids_extra = pos_ids_extra[:, :-1]
+
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        attention_mask = paddle.cast(
+            attention_mask == 0,
+            dtype="float16" if self._use_fp16_decoding else "float32")
+
+        seq_len = seq_len - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
+
+        field_values = {}
+        field_values["input_ids"] = input_ids
+        field_values["position_ids"] = position_ids
+        field_values["decoder_position_ids"] = decoder_position_ids
+        field_values["pos_ids_extra"] = pos_ids_extra
+        field_values["attention_mask"] = attention_mask
+        field_values["seq_len"] = seq_len
+        return field_values
+
+    def generate_logits_mask(self, use_fp16_decoding):
+        # pre-process distribution
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
+
+        if use_fp16_decoding:
+            logits_mask[self.end_token_id] = -1e4
+            logits_mask[self.gend_token_id] = -1e4
+            logits_mask[self.s_token_id] = -1e4
+        else:
+            logits_mask[self.end_token_id] = -1e9
+            logits_mask[self.gend_token_id] = -1e9
+            logits_mask[self.s_token_id] = -1e9
+
+        logits_mask_t = paddle.assign(logits_mask)
+        if use_fp16_decoding:
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
+
+    def forward(self,
+                input_ids,
+                position_ids,
+                pos_ids_extra=None,
+                attention_mask=None,
+                seq_len=None,
+                max_length=128,
+                min_length=0,
+                top_k=4,
+                top_p=0.0,
+                decode_strategy="sampling",
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                num_beams=4,
+                diversity_rate=0.0,
+                temperature=1.0,
+                num_return_sequences=1,
+                length_penalty=0.6,
+                early_stopping=False,
+                repetition_penalty=1.0,
+                forced_eos_token_id=None,
+                **model_kwargs):
+
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(
+                input_ids != self.pad_token_id, dtype="int32"),
+                                 axis=-1,
+                                 keepdim=True,
+                                 dtype="int32")
+        if attention_mask is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating attention_mask."
+            attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(paddle.get_default_dtype()) * -1e4,
+                axis=[1, 2]).tile([1, 1, input_ids.shape[1], 1])
+
+        if decode_strategy.startswith("beam_search"):
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_beams,
+                position_ids=position_ids,
+                pos_ids_extra=pos_ids_extra,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "sampling":
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                position_ids=position_ids,
+                pos_ids_extra=pos_ids_extra,
+                attention_mask=attention_mask,
+                seq_len=seq_len)
+        elif decode_strategy == "greedy_search":
+            model_kwargs = {
+                "position_ids": position_ids,
+                "pos_ids_extra": pos_ids_extra,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len,
+            }
+        else:
+            raise ValueError(
+                "Only greedy search, beam search and sampling are supported. ")
+
+        model_inputs = self.prepare_inputs_for_generation(input_ids,
+                                                          **model_kwargs)
+        return self.decoding(
+            input_ids=model_inputs["input_ids"],
+            position_ids=model_inputs["position_ids"],
+            pos_ids_extra=model_inputs["pos_ids_extra"],
+            attn_mask=model_inputs["attention_mask"],
+            decoder_position_ids=model_inputs["decoder_position_ids"],
+            memory_seq_lens=model_inputs["seq_len"],
+            beam_size=num_beams,
+            diversity_rate=diversity_rate,
+            topk=top_k,
+            topp=top_p,
+            decoding_strategy=decode_strategy,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            temperature=temperature,
+            length_penalty=length_penalty,
+            forced_eos_token_id=forced_eos_token_id,
+            early_stopping=early_stopping,
+            repetition_penalty=repetition_penalty,
+            min_length=min_length)
 
     generate = forward
