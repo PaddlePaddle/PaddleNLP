@@ -1,10 +1,10 @@
-model_item=transformer_big
+model_item=transformer_base
 model=transformer
-bs_item=2560
-fp_item=pure_fp16
+bs_item=4096
+fp_item=fp32
 run_mode=DP
 device_num=N1C1
-max_epochs=500
+max_epochs=1000
 num_workers=0
 
 # get data
