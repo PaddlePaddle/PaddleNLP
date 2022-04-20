@@ -109,12 +109,9 @@ class ProcessFn(object):
         ProcessFn.segmenter = SEGMENTATION_FN[self.args.tokenize_tool]
         # Update vocabulary with '##'-prefixed chinese characters.
         # The ids should coincide with those in run_pretrain.py.
-        orig_len = len(ProcessFn.tokenizer)
         suffix_vocab = {}
-        for token_id in range(len(ProcessFn.tokenizer)):
-            token = ProcessFn.tokenizer.to_tokens(token_id)
-            if ord(token) >= 0x4E00 and ord(token) <= 0x9FA5:
-                suffix_vocab['##' + token] = orig_len + len(suffix_vocab)
+        for idx, token in enumerate(range(0x4E00, 0x9FA6)):
+            suffix_vocab['##' + chr(token)] = len(ProcessFn.tokenizer) + idx
         ProcessFn.tokenizer.added_tokens_encoder.update(suffix_vocab)
 
         def mark_word_in_tokens(tokens, words, max_word_length=4):

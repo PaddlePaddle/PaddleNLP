@@ -26,10 +26,8 @@ class MedicalCorpus(paddle.io.Dataset):
         # It should coincide with the vocab dictionary in preprocess.py.
         orig_len = len(self.tokenizer)
         suffix_vocab = {}
-        for token_id in range(len(self.tokenizer)):
-            token = self.tokenizer.to_tokens(token_id)
-            if ord(token) >= 0x4E00 and ord(token) <= 0x9FA5:
-                suffix_vocab[orig_len + len(suffix_vocab)] = '##' + token
+        for idx, token in enumerate(range(0x4E00, 0x9FA6)):
+            suffix_vocab[len(self.tokenizer) + idx] = '##' + chr(token)
         self.tokenizer.added_tokens_decoder.update(suffix_vocab)
         self._samples, self._global_index = self._read_data_files(data_path)
 
