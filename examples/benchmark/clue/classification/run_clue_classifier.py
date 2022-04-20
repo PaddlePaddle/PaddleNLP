@@ -291,6 +291,8 @@ def do_eval(args):
 
 
 def do_train(args):
+    assert args.batch_size % args.gradient_accumulation_steps == 0, \
+        "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -344,8 +346,7 @@ def do_train(args):
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 
-    if args.dropout != 0.1:
-        update_model_dropout(model, 0.0)
+    update_model_dropout(model, args.dropout)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
