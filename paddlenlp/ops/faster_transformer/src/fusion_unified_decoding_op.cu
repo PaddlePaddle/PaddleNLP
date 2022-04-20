@@ -21,9 +21,210 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
-#include "fastertransformer/cuda/cub/cub.cuh"
+// TODO(guosheng): `HOST` conflict exists in float.h of paddle and mpi.h of mpi
 #include "fusion_unified_decoding_op.h"
 #include "pd_traits.h"
+#ifdef HOST
+#undef HOST
+#endif
+#include "fastertransformer/cuda/cub/cub.cuh"
+#include "fastertransformer/decoding_beamsearch.h"
+#include "fastertransformer/decoding_sampling.h"
+#include "fastertransformer/utils/common.h"
+
+#ifdef BUILD_GPT  // consistent with FasterTransformer
+#include <map>
+#include <memory>
+#include <mutex>
+
+static std::mutex mpi_global_mutex;
+static std::once_flag once_flag_init_mpi;
+
+void MPIExit() {
+  std::unique_lock<std::mutex> global_lock(mpi_global_mutex);
+  MPICHECK(MPI_Finalize());
+}
+
+void InitMPIOnce() {
+  // Initialize MPI environment
+  std::call_once(once_flag_init_mpi, []() {
+    MPICHECK(MPI_Init(nullptr, nullptr));
+    if (std::atexit(MPIExit)) {
+      throw std::runtime_error("Fail to register the MPI exit handler");
+    }
+  });
+}
+
+void InitNCCLComm(ncclUniqueId& tensor_para_nccl_uid,
+                  ncclUniqueId& layer_para_nccl_uid,
+                  ncclComm_t& tensor_para_nccl_comm,
+                  ncclComm_t& layer_para_nccl_comm,
+                  int rank,
+                  int tensor_para_size,
+                  int layer_para_size,
+                  int tensor_para_rank,
+                  int layer_para_rank) {
+  // assume gpu_num = n * k,
+  // tensor parallelism group size is n
+  // layer parallelism group size is k
+
+  if (tensor_para_rank == 0) {
+    // get the uid of each tensor parallelism group
+    // here, 0, 1, ..., n-1 are in group 0,
+    //       n, ..., 2n - 1 are in group 1.
+    NCCLCHECK(ncclGetUniqueId(&tensor_para_nccl_uid));
+    for (int i = 1; i < tensor_para_size; i++) {
+      printf("[INFO] rank %d sends tensor_para_nccl_uid to rank %d \n",
+             rank,
+             rank + i);
+      MPICHECK(MPI_Send(&tensor_para_nccl_uid,
+                        sizeof(tensor_para_nccl_uid),
+                        MPI_BYTE,
+                        rank + i,
+                        0,
+                        MPI_COMM_WORLD));
+    }
+  } else {
+    MPI_Status status;
+    printf("[INFO] rank %d receives tensor_para_nccl_uid from rank %d \n",
+           rank,
+           rank - tensor_para_rank);
+    MPICHECK(MPI_Recv(&tensor_para_nccl_uid,
+                      sizeof(tensor_para_nccl_uid),
+                      MPI_BYTE,
+                      rank - tensor_para_rank,
+                      0,
+                      MPI_COMM_WORLD,
+                      &status));
+  }
+
+  if (layer_para_rank == 0) {
+    // get the uid of each layer parallelism group
+    // 0, k, 2k, are in group 0
+    // 1, k+1, 2k+1 are in group 1
+    NCCLCHECK(ncclGetUniqueId(&layer_para_nccl_uid));
+    for (int i = 1; i < layer_para_size; i++) {
+      printf("[INFO] rank %d sends layer_para_nccl_uid to rank %d \n",
+             rank,
+             rank + i * tensor_para_size);
+      MPICHECK(MPI_Send(&layer_para_nccl_uid,
+                        sizeof(layer_para_nccl_uid),
+                        MPI_BYTE,
+                        rank + i * tensor_para_size,
+                        0,
+                        MPI_COMM_WORLD));
+    }
+  } else {
+    MPI_Status status;
+    printf("[INFO] rank %d receives layer_para_nccl_uid from rank %d \n",
+           rank,
+           rank % tensor_para_size);
+    MPICHECK(MPI_Recv(&layer_para_nccl_uid,
+                      sizeof(layer_para_nccl_uid),
+                      MPI_BYTE,
+                      rank % tensor_para_size,
+                      0,
+                      MPI_COMM_WORLD,
+                      &status));
+  }
+
+  NCCLCHECK(ncclCommInitRank(&tensor_para_nccl_comm,
+                             tensor_para_size,
+                             tensor_para_nccl_uid,
+                             tensor_para_rank));
+  NCCLCHECK(ncclCommInitRank(&layer_para_nccl_comm,
+                             layer_para_size,
+                             layer_para_nccl_uid,
+                             layer_para_rank));
+}
+
+struct ModelParaDesc {
+  TensorParallelParam tensor_parallel_param;
+  LayerParallelParam layer_parallel_param;
+  ncclComm_t tensor_para_nccl_comm, layer_para_nccl_comm;
+  std::mt19937_64 gen;
+  std::uniform_int_distribution<> dist{0, std::numeric_limits<int>::max()};
+
+
+  ModelParaDesc(int head_num,
+                int size_per_head,
+                int layer_num,
+                int tensor_para_size,
+                int layer_para_size,
+                int layer_para_batch_size) {
+    int rank;
+    MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
+    const int local_head_num = head_num / tensor_para_size;
+    const int local_hidden_units = local_head_num * size_per_head;
+    const int layers_per_group = layer_num / layer_para_size;
+    assert(layer_num % layer_para_size == 0);
+    const int tensor_para_rank = rank % tensor_para_size;
+    const int layer_para_rank = rank / tensor_para_size;
+    ncclUniqueId tensor_para_nccl_uid, layer_para_nccl_uid;
+    InitNCCLComm(tensor_para_nccl_uid,
+                 layer_para_nccl_uid,
+                 tensor_para_nccl_comm,
+                 layer_para_nccl_comm,
+                 rank,
+                 tensor_para_size,
+                 layer_para_size,
+                 tensor_para_rank,
+                 layer_para_rank);
+    tensor_parallel_param.rank = tensor_para_rank;
+    tensor_parallel_param.world_size = tensor_para_size;
+    tensor_parallel_param.local_head_num_ = local_head_num;
+    tensor_parallel_param.local_hidden_units_ = local_hidden_units;
+    tensor_parallel_param.nccl_comm = tensor_para_nccl_comm;
+    layer_parallel_param.rank = layer_para_rank;
+    layer_parallel_param.world_size = layer_para_size;
+    layer_parallel_param.layers_per_group = layers_per_group;
+    layer_parallel_param.local_batch_size = layer_para_batch_size;
+    layer_parallel_param.nccl_comm = layer_para_nccl_comm;
+    // fix the seed to prevent the seed of different gpu are differnet in Tensor
+    // Parallel
+    size_t meta_seed =
+        *(reinterpret_cast<size_t*>(tensor_para_nccl_uid.internal));
+    gen = std::mt19937_64(meta_seed);
+  }
+
+  ~ModelParaDesc() {
+    if (tensor_para_nccl_comm) ncclCommDestroy(tensor_para_nccl_comm);
+    if (layer_para_nccl_comm) ncclCommDestroy(layer_para_nccl_comm);
+  }
+};
+
+// Make model parallel settings init only once for one model by using a global
+// dict mapping parameters representing different models to corresponding
+// settings. Note: `paddle::Tensor` for custom_op is re-created every step and
+// we use pointers as keys. Maybe using weakref as keys is better.
+static std::unordered_map<void*, std::unique_ptr<ModelParaDesc>>
+    model_para_infos;
+struct ModelParaDescFactory {
+  static ModelParaDesc* CreateModelParaDesc(int head_num,
+                                            int size_per_head,
+                                            int layer_num,
+                                            int tensor_para_size,
+                                            int layer_para_size,
+                                            int layer_para_batch_size,
+                                            void* param_ptr = nullptr) {
+    InitMPIOnce();
+    auto it = model_para_infos.find(param_ptr);
+    if (it != model_para_infos.end()) {
+      return it->second.get();
+    } else {
+      model_para_infos.emplace(param_ptr,
+                               std::unique_ptr<ModelParaDesc>(
+                                   new ModelParaDesc(head_num,
+                                                     size_per_head,
+                                                     layer_num,
+                                                     tensor_para_size,
+                                                     layer_para_size,
+                                                     layer_para_batch_size)));
+      return model_para_infos[param_ptr].get();
+    }
+  }
+};
+#endif
 
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape) {
@@ -101,7 +302,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const int min_length,
     cublasHandle_t cublas_handle_,
     cublasLtHandle_t cublaslt_handle_,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    const int tensor_para_size = 1,
+    const int layer_para_size = 1,
+    const int layer_para_batch_size = 1) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2" ||
                      decoding_strategy == "beam_search_v3")
@@ -168,78 +372,117 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.request_input_len = memory_max_seq_len;
   decoding_params.request_output_len = max_seq_len_;
 
+#ifdef BUILD_GPT
+  auto* model_para_desc = ModelParaDescFactory::CreateModelParaDesc(
+      head_num_,
+      size_per_head_,
+      num_layer_,
+      tensor_para_size,
+      layer_para_size,
+      layer_para_batch_size,
+      const_cast<data_t_*>(word_emb.data<data_t_>()));
+  auto& tensor_parallel_param = model_para_desc->tensor_parallel_param;
+  auto& layer_parallel_param = model_para_desc->layer_parallel_param;
+  auto seed = model_para_desc->dist(model_para_desc->gen);
+#else
+  TensorParallelParam tensor_parallel_param;
+  LayerParallelParam layer_parallel_param;
+  tensor_parallel_param.rank = 0;
+  tensor_parallel_param.world_size = 1;
+  tensor_parallel_param.local_head_num_ = head_num_;
+  tensor_parallel_param.local_hidden_units_ = memory_hidden_dim;
+
+  layer_parallel_param.rank = 0;
+  layer_parallel_param.world_size = 1;
+  layer_parallel_param.layers_per_group = num_layer_;
+  layer_parallel_param.local_batch_size = batch_size_;
+  int seed = -1;
+#endif
+
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
-  int inner_coeff = ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim;
+  // Allow python passing partial weights for model parallel.
+  int inner_coeff =
+      (memory_hidden_dim == ffn_intermediate_weight[0].shape()[0])
+          ? ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim
+          : (ffn_intermediate_weight[0].shape()[1] * tensor_para_size /
+             memory_hidden_dim);
 
-  for (int i = 0; i < num_layer_; i++) {
-    params[i].stream = stream;
-    params[i].cublas_handle = cublas_handle_;
-    params[i].cublaslt_handle = cublaslt_handle_;
+  for (int i = 0; i < self_layernorm_weight.size(); i++) {
+    // Allow python passing weights of all layers or only passing the
+    // corresponding layers to save memory.
+    int layer_idx = self_layernorm_weight.size() != num_layer_
+                        ? layer_parallel_param.rank *
+                                  layer_parallel_param.layers_per_group +
+                              i
+                        : i;
+    params[layer_idx].stream = stream;
+    params[layer_idx].cublas_handle = cublas_handle_;
+    params[layer_idx].cublaslt_handle = cublaslt_handle_;
 
     if (decoding_strategy == "beam_search" ||
         decoding_strategy == "beam_search_v2" ||
         decoding_strategy == "beam_search_v3") {
-      params[i].request_batch_size = batch_size_ * beam_width_;
-      params[i].request_max_mem_seq_len = memory_max_seq_len;
+      params[layer_idx].request_batch_size = batch_size_ * beam_width_;
+      params[layer_idx].request_max_mem_seq_len = memory_max_seq_len;
     } else if (decoding_strategy == "sampling" ||
                decoding_strategy == "topk_sampling" ||
                decoding_strategy == "topp_sampling") {
-      params[i].request_batch_size = batch_size_;
-      params[i].request_max_mem_seq_len = memory_max_seq_len;
+      params[layer_idx].request_batch_size = batch_size_;
+      params[layer_idx].request_max_mem_seq_len = memory_max_seq_len;
     }
 
     // self attn
-    params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
+    params[layer_idx].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
         self_layernorm_weight[i].data<data_t_>());
-    params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(
+    params[layer_idx].self_layernorm.beta = reinterpret_cast<const DataType_*>(
         self_layernorm_bias[i].data<data_t_>());
     // query
-    params[i].self_attention.query_weight.kernel =
+    params[layer_idx].self_attention.query_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_query_weight[i].data<data_t_>());
-    params[i].self_attention.query_weight.bias =
+    params[layer_idx].self_attention.query_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_query_bias[i].data<data_t_>());
     // key
-    params[i].self_attention.key_weight.kernel =
+    params[layer_idx].self_attention.key_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_key_weight[i].data<data_t_>());
-    params[i].self_attention.key_weight.bias =
+    params[layer_idx].self_attention.key_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_key_bias[i].data<data_t_>());
     // value
-    params[i].self_attention.value_weight.kernel =
+    params[layer_idx].self_attention.value_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_value_weight[i].data<data_t_>());
-    params[i].self_attention.value_weight.bias =
+    params[layer_idx].self_attention.value_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_value_bias[i].data<data_t_>());
     // out proj
-    params[i].self_attention.attention_output_weight.kernel =
+    params[layer_idx].self_attention.attention_output_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_output_weight[i].data<data_t_>());
 
-    params[i].self_attention.attention_output_weight.bias =
+    params[layer_idx].self_attention.attention_output_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_output_bias[i].data<data_t_>());
 
     // ffn
-    params[i].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
         ffn_layernorm_weight[i].data<data_t_>());
-    params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
         ffn_layernorm_bias[i].data<data_t_>());
     // intermediate proj
-    params[i].ffn.intermediate_weight.kernel =
+    params[layer_idx].ffn.intermediate_weight.kernel =
         reinterpret_cast<const DataType_*>(
             ffn_intermediate_weight[i].data<data_t_>());
-    params[i].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
         ffn_intermediate_bias[i].data<data_t_>());
     // out proj
-    params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
         ffn_output_weight[i].data<data_t_>());
-    params[i].ffn.output_weight.bias =
+    params[layer_idx].ffn.output_weight.bias =
         reinterpret_cast<const DataType_*>(ffn_output_bias[i].data<data_t_>());
   }
 
@@ -329,6 +572,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             false,  /*is_mbart*/
             min_length,
             inner_coeff);
+    unified_decoding_beam_search_->set_tensor_parallel_param(
+        tensor_parallel_param);
+    unified_decoding_beam_search_->set_layer_parallel_param(
+        layer_parallel_param);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
@@ -400,6 +647,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         false,  /*is_mbart*/
         min_length,
         inner_coeff);
+    unified_decoding_sampling_->set_tensor_parallel_param(
+        tensor_parallel_param);
+    unified_decoding_sampling_->set_layer_parallel_param(layer_parallel_param);
     unified_decoding_sampling_->forward_context(params, decoding_params);
     unified_decoding_sampling_->forward(params, decoding_params);
 
@@ -477,7 +727,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const bool pos_bias,
     const std::string& hidden_act,
     const bool early_stopping,
-    const int min_length) {
+    const int min_length,
+    const int tensor_para_size = 1,
+    const int layer_para_size = 1,
+    const int layer_para_batch_size = 1) {
   auto stream = input_ids.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -554,7 +807,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           min_length,
           cublas_handle_,
           cublaslt_handle_,
-          stream);
+          stream,
+          tensor_para_size,
+          layer_para_size,
+          layer_para_batch_size);
       break;
     }
     case paddle::DataType::FLOAT32: {
@@ -623,7 +879,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           min_length,
           cublas_handle_,
           cublaslt_handle_,
-          stream);
+          stream,
+          tensor_para_size,
+          layer_para_size,
+          layer_para_batch_size);
       break;
     }
     default: {

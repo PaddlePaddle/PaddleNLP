@@ -1588,7 +1588,11 @@ class InferUnifiedDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer"
+                if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                verbose=True,
+                need_parallel=not get_ft_para_conf().no_para)
 
         super(InferUnifiedDecoding, self).__init__()
         for arg, value in locals().items():
