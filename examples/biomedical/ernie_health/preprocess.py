@@ -26,20 +26,9 @@ from tqdm import tqdm
 
 from paddlenlp.transformers import ElectraTokenizer
 
-try:
-    import nltk
-    nltk_available = True
-except ImportError:
-    nltk_available = False
-
 
 def parse_args():
     parser = argparse.ArgumentParser('Preprocessor for ERNIE-Health')
-    parser.add_argument(
-        '--model_name',
-        type=str,
-        required=True,
-        help='The name of model used for training.')
     parser.add_argument(
         '--input_path',
         type=str,
@@ -116,13 +105,16 @@ class ProcessFn(object):
 
     def initializer(self):
         ProcessFn.tokenizer = ElectraTokenizer.from_pretrained(
-            self.args.model_name)
+            'ernie-health-chinese')
         ProcessFn.segmenter = SEGMENTATION_FN[self.args.tokenize_tool]
         # Update vocabulary with '##'-prefixed chinese characters.
         # The ids should coincide with those in run_pretrain.py.
+        orig_len = len(ProcessFn.tokenizer)
         suffix_vocab = {}
-        for idx, token in enumerate(range(0x4E00, 0x9FA6)):
-            suffix_vocab['##' + chr(token)] = len(ProcessFn.tokenizer) + idx
+        for token_id in range(len(ProcessFn.tokenizer)):
+            token = ProcessFn.tokenizer.to_tokens(token_id)
+            if ord(token) >= 0x4E00 and ord(token) <= 0x9FA5:
+                suffix_vocab['##' + token] = orig_len + len(suffix_vocab)
         ProcessFn.tokenizer.added_tokens_encoder.update(suffix_vocab)
 
         def mark_word_in_tokens(tokens, words, max_word_length=4):
@@ -175,7 +167,7 @@ def main():
                 file_paths.append(os.path.join(root, file_name))
     file_paths.sort()
 
-    tokenizer = ElectraTokenizer.from_pretrained(args.model_name)
+    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
     save_dtype = np.uint16 if tokenizer.vocab_size < 2**16 - 1 else np.int32
     processer = ProcessFn(args)
 
