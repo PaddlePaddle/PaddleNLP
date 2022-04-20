@@ -119,6 +119,12 @@ def parse_args():
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
+        '--gradient_accumulation_steps',
+        type=int,
+        default=1,
+        help="Number of updates steps to accumualte before performing a backward/update pass."
+    )
+    parser.add_argument(
         "--do_train", action='store_true', help="Whether do train.")
     parser.add_argument(
         "--do_eval", action='store_true', help="Whether do train.")
@@ -137,6 +143,7 @@ def parse_args():
         default="gpu",
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--dropout", default=0.1, type=float, help="dropout.")
     parser.add_argument(
         "--max_grad_norm",
         default=1.0,
@@ -284,6 +291,8 @@ def do_eval(args):
 
 
 def do_train(args):
+    assert args.batch_size % args.gradient_accumulation_steps == 0, \
+        "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -293,6 +302,7 @@ def do_train(args):
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
 
+    args.batch_size = int(args.batch_size / args.gradient_accumulation_steps)
     train_ds, dev_ds = load_dataset(
         'clue', args.task_name, splits=('train', 'dev'))
 
@@ -305,6 +315,7 @@ def do_train(args):
         max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
+
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
 
@@ -334,15 +345,20 @@ def do_train(args):
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
+
+    update_model_dropout(model, args.dropout)
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     if args.max_steps > 0:
-        num_training_steps = args.max_steps
+        num_training_steps = args.max_steps / args.gradient_accumulation_steps
         num_train_epochs = math.ceil(num_training_steps /
                                      len(train_data_loader))
     else:
-        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_training_steps = len(
+            train_data_loader
+        ) * args.num_train_epochs / args.gradient_accumulation_steps
         num_train_epochs = args.num_train_epochs
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
@@ -375,38 +391,42 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            global_step += 1
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
             loss = loss_fct(logits, labels)
+            if args.gradient_accumulation_steps > 1:
+                loss = loss / args.gradient_accumulation_steps
             loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                tic_eval = time.time()
-                acc = evaluate(model, loss_fct, metric, dev_data_loader)
-                print("eval done total : %s s" % (time.time() - tic_eval))
-                if acc > best_acc:
-                    best_acc = acc
-                    output_dir = args.output_dir
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-            if global_step >= num_training_steps:
-                print("best_acc: ", best_acc)
-                return
+            if (step + 1) % args.gradient_accumulation_steps == 0:
+                global_step += 1
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+                if global_step % args.logging_steps == 0:
+                    print(
+                        "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                        % (global_step, num_training_steps, epoch, step,
+                           paddle.distributed.get_rank(), loss,
+                           optimizer.get_lr(),
+                           args.logging_steps / (time.time() - tic_train)))
+                    tic_train = time.time()
+                if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                    tic_eval = time.time()
+                    acc = evaluate(model, loss_fct, metric, dev_data_loader)
+                    print("eval done total : %s s" % (time.time() - tic_eval))
+                    if acc > best_acc:
+                        best_acc = acc
+                        output_dir = args.output_dir
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        # Need better way to get inner model of DataParallel
+                        model_to_save = model._layers if isinstance(
+                            model, paddle.DataParallel) else model
+                        model_to_save.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(output_dir)
+                if global_step >= num_training_steps:
+                    print("best_acc: ", best_acc)
+                    return
     print("best_acc: ", best_acc)
 
 
@@ -470,6 +490,14 @@ def print_arguments(args):
     for arg, value in sorted(vars(args).items()):
         print('%s: %s' % (arg, value))
     print('------------------------------------------------')
+
+
+def update_model_dropout(model, p=0.0):
+    model.base_model.embeddings.dropout.p = p
+    for i in range(len(model.base_model.encoder.layers)):
+        model.base_model.encoder.layers[i].dropout.p = p
+        model.base_model.encoder.layers[i].dropout1.p = p
+        model.base_model.encoder.layers[i].dropout2.p = p
 
 
 if __name__ == "__main__":
