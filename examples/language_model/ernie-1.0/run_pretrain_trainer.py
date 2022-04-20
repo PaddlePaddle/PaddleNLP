@@ -20,27 +20,20 @@ import sys
 import random
 import time
 import yaml
-import shutil
 import math
 from typing import Optional
 from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet as fleet
-from paddle.io import DataLoader, Dataset
-from visualdl import LogWriter
-
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.ops import Topology
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import speed_metrics, get_last_checkpoint
 
-from args import parse_args
 sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
 
@@ -56,7 +49,7 @@ MODEL_CLASSES = {
 @dataclass
 class DataTrainingArguments:
     """
-    Arguments pertaining to what data we are going to input our model for training and eval.
+    Arguments pertaining to what data we are going to input our model for training and evaluating.
     Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
     specify them on the command line.
     """
@@ -211,7 +204,6 @@ def create_pretrained_dataset(
             "masked_positions": out[3],
             "labels": (out[4], out[5]),
         }
-        # return out
 
     return train_ds, valid_ds, test_ds, _collate_data
 
@@ -362,14 +354,14 @@ def main():
             attention_probs_dropout_prob=model_args.
             attention_probs_dropout_prob)
 
-    class SopCriterion(paddle.nn.Layer):
+    class CriterionWrapper(paddle.nn.Layer):
         """
         """
 
         def __init__(self):
-            """SopCriterion
+            """CriterionWrapper
             """
-            super(SopCriterion, self).__init__()
+            super(CriterionWrapper, self).__init__()
             self.criterion = criterion_class()
 
         def forward(self, output, labels):
@@ -405,7 +397,7 @@ def main():
 
     trainer = PretrainingTrainer(
         model=model,
-        criterion=SopCriterion(),
+        criterion=CriterionWrapper(),
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,

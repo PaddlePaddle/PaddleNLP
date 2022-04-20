@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notice, most of this file is modified from 
+# This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py
 # Thanks a lot.
 
@@ -120,16 +120,16 @@ def set_seed(seed):
 
 class Trainer:
     """
-    Trainer is a simple but feature-complete training and eval loop for PyTorch, optimized for 🤗 Transformers.
+    Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleNLP.
 
     Args:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
-            The model to train, evaluate or use for predictions. If not provided, a `model_init` must be passed.
+            The model to train, evaluate or use for predictions. 
 
             <Tip>
 
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
-            your own models defined as `paddle.nn.Layer` as long as they work the same way as the 🤗 Transformers
+            your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleNLP
             models.
 
             </Tip>
@@ -141,16 +141,10 @@ class Trainer:
             The function to use to form a batch from a list of elements of `train_dataset` or `eval_dataset`. Will
             default to [`default_data_collator`] if no `tokenizer` is provided, an instance of
             [`DataCollatorWithPadding`] otherwise.
-        train_dataset (`paddle.utils.data.Dataset` or `paddle.utils.data.IterableDataset`, *optional*):
+        train_dataset (`paddle.io.Dataset` or `paddle.io.IterableDataset`, *optional*):
             The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
             `model.forward()` method are automatically removed.
-
-            Note that if it's a `paddle.utils.data.IterableDataset` with some randomization and you are training in a
-            distributed fashion, your iterable dataset should either use a internal attribute `generator` that is a
-            `paddle.Generator` for the randomization that must be identical on all processes (and the Trainer will
-            manually set the seed of this `generator` at each epoch) or have a `set_epoch()` method that internally
-            sets the seed of the RNGs used.
-        eval_dataset (`paddle.utils.data.Dataset`, *optional*):
+        eval_dataset (`paddle.io.Dataset`, *optional*):
              The dataset to use for evaluation. If it is an `datasets.Dataset`, columns not accepted by the
              `model.forward()` method are automatically removed.
         tokenizer ([`PretrainedTokenizer`], *optional*):
@@ -170,7 +164,7 @@ class Trainer:
           subclass.
         - **model_wrapped** -- Always points to the most external model in case one or more other modules wrap the
           original model. This is the model that should be used for the forward pass. For example, the inner model is 
-          wrapped in `paddle.nn.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
+          wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
           as `self.model`.
         - **is_model_parallel** -- Whether or not a model has been switched to a model parallel mode (different from
           data parallelism, this means some of the model layers are split on different GPUs).
@@ -286,23 +280,23 @@ class Trainer:
 
     def pop_callback(self, callback):
         """
-        Remove a callback from the current list of [`~transformer.TrainerCallback`] and returns it.
+        Remove a callback from the current list of [`~TrainerCallback`] and returns it.
         If the callback is not found, returns `None` (and no error is raised).
         Args:
-           callback (`type` or [`~transformer.TrainerCallback`]):
-               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+           callback (`type` or [`~TrainerCallback`]):
+               A [`~TrainerCallback`] class or an instance of a [`~TrainerCallback`]. In the
                first case, will pop the first member of that class found in the list of callbacks.
         Returns:
-            [`~transformer.TrainerCallback`]: The callback removed, if found.
+            [`~TrainerCallback`]: The callback removed, if found.
         """
         return self.callback_handler.pop_callback(callback)
 
     def remove_callback(self, callback):
         """
-        Remove a callback from the current list of [`~transformer.TrainerCallback`].
+        Remove a callback from the current list of [`~TrainerCallback`].
         Args:
-           callback (`type` or [`~transformer.TrainerCallback`]):
-               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+           callback (`type` or [`~TrainerCallback`]):
+               A [`~TrainerCallback`] class or an instance of a [`~TrainerCallback`]. In the
                first case, will remove the first member of that class found in the list of callbacks.
         """
         self.callback_handler.remove_callback(callback)
@@ -1035,6 +1029,14 @@ class Trainer:
                      input_spec=None,
                      load_best_model=False,
                      output_dir: Optional[str]=None):
+        """ Export paddle inference model.
+
+        Args:
+            input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input, 
+                such as shape , dtype , name. Defaults to None.
+            load_best_model (bool, optional): Load best model. Defaults to False.
+            output_dir (Optional[str], optional): Output dir to save the exported model. Defaults to None.
+        """
 
         if output_dir is None:
             output_dir = self.args.output_dir
@@ -1709,6 +1711,7 @@ class Trainer:
 
     def print_config(self, args=None, key=""):
         """
+        print config values
         """
         logger.info("=" * 60)
         if args is None:

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notice, most of this file is modified from 
+# This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
 # Thanks a lot.
 
@@ -58,7 +58,7 @@ class TrainingArguments:
     TrainingArguments is the subset of the arguments we use in our example scripts **which relate to the training loop
     itself**.
 
-    Using [`HfArgumentParser`] we can turn this class into
+    Using [`PdArgumentParser`] we can turn this class into
     [argparse](https://docs.python.org/3/library/argparse#module-argparse) arguments that can be specified on the
     command line.
 
@@ -107,10 +107,6 @@ class TrainingArguments:
 
             </Tip>
 
-        eval_accumulation_steps (`int`, *optional*):
-            Number of predictions steps to accumulate the output tensors for, before moving the results to the CPU. If
-            left unset, the whole predictions are accumulated on GPU before being moved to the CPU (faster but
-            requires more memory).
         learning_rate (`float`, *optional*, defaults to 5e-5):
             The initial learning rate for [`AdamW`] optimizer.
         weight_decay (`float`, *optional*, defaults to 0):
@@ -147,8 +143,7 @@ class TrainingArguments:
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
             node.
         logging_dir (`str`, *optional*):
-            [TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to
-            *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***.
+            log directory. Will default to *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***.
         logging_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"steps"`):
             The logging strategy to adopt during training. Possible values are:
 
@@ -193,9 +188,6 @@ class TrainingArguments:
         seed (`int`, *optional*, defaults to 42):
             Random seed that will be set at the beginning of training. To ensure reproducibility across runs, use the
             [`~Trainer.model_init`] function to instantiate the model if it has some randomly initialized parameters.
-        bf16 (`bool`, *optional*, defaults to `False`):
-            Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
-            NVIDIA architecture. This is an experimental API and it may change.
         fp16 (`bool`, *optional*, defaults to `False`):
             Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
@@ -203,8 +195,6 @@ class TrainingArguments:
             the [Apex documentation](https://nvidia.github.io/apex/amp).
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
-        xpu_backend (`str`, *optional*):
-            The backend to use for xpu distributed training. Must be one of `"mpi"` or `"ccl"`.
         dataloader_drop_last (`bool`, *optional*, defaults to `False`):
             Whether to drop the last incomplete batch (if the length of the dataset is not divisible by the batch size)
             or not.
@@ -215,25 +205,19 @@ class TrainingArguments:
             Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the
             main process.
         past_index (`int`, *optional*, defaults to -1):
-            Some models like [TransformerXL](../model_doc/transformerxl) or [XLNet](../model_doc/xlnet) can make use of
-            the past hidden states for their predictions. If this argument is set to a positive int, the `Trainer` will
-            use the corresponding output (usually index 2) as the past state and feed it to the model at the next
-            training step under the keyword argument `mems`.
+            Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions. 
+            If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as 
+            the past state and feed it to the model at the next training step under the keyword argument `mems`.
         run_name (`str`, *optional*):
-            A descriptor for the run. Typically used for [wandb](https://www.wandb.com/) and
-            [mlflow](https://www.mlflow.org/) logging.
+            A descriptor for the run. Typically used for logging.
         disable_tqdm (`bool`, *optional*):
-            Whether or not to disable the tqdm progress bars and table of metrics produced by
-            [`~notebook.NotebookTrainingTracker`] in Jupyter Notebooks. Will default to `True` if the logging level is
-            set to warn or lower (default), `False` otherwise.
+            Whether or not to disable the tqdm progress bars and table of metrics. Will default to `True` if the logging 
+            level is set to warn or lower (default), `False` otherwise.
         remove_unused_columns (`bool`, *optional*, defaults to `True`):
             If using `datasets.Dataset` datasets, whether or not to automatically remove the columns unused by the
             model forward method.
-
-            (Note that this behavior is not implemented for [`TFTrainer`] yet.)
         label_names (`List[str]`, *optional*):
             The list of keys in your dictionary of inputs that correspond to the labels.
-
             Will eventually default to `["labels"]` except if the model used is one of the `XxxForQuestionAnswering` in
             which case it will default to `["start_positions", "end_positions"]`.
         load_best_model_at_end (`bool`, *optional*, defaults to `False`):
@@ -263,20 +247,6 @@ class TrainingArguments:
             When resuming training, whether or not to skip the epochs and batches to get the data loading at the same
             stage as in the previous training. If set to `True`, the training will begin faster (as that skipping step
             can take a long time) but will not yield the same results as the interrupted training would have.
-        label_smoothing_factor (`float`, *optional*, defaults to 0.0):
-            The label smoothing factor to use. Zero means no label smoothing, otherwise the underlying onehot-encoded
-            labels are changed from 0s and 1s to `label_smoothing_factor/num_labels` and `1 - label_smoothing_factor +
-            label_smoothing_factor/num_labels` respectively.
-        debug (`str` or list of [`~debug_utils.DebugOption`], *optional*, defaults to `""`):
-            Enable one or more debug features. This is an experimental feature.
-
-            Possible options are:
-
-            - `"underflow_overflow"`: detects overflow in model's input/outputs and reports the last frames that led to
-              the event
-            - `"tpu_metrics_debug"`: print debug metrics on TPU
-
-            The options should be separated by whitespaces.
         optim (`str` or [`training_args.OptimizerNames`], *optional*, defaults to `"adamw"`):
             The optimizer to use: adamw, or adafactor.
         length_column_name (`str`, *optional*, defaults to `"length"`):
@@ -284,11 +254,8 @@ class TrainingArguments:
             than computing them on train startup. Ignored unless `group_by_length` is `True` and the dataset is an
             instance of `Dataset`.
         report_to (`str` or `List[str]`, *optional*, defaults to `"all"`):
-            The list of integrations to report the results and logs to. Supported platforms are `"vdl"`, 
-            `"tensorboard"`. Use `"all"` to report to all integrations installed, `"none"` for no integrations.
-        skip_memory_metrics (`bool`, *optional*, defaults to `True`):
-            Whether to skip adding of memory profiler reports to metrics. This is skipped by default because it slows
-            down the training and evaluation speed.
+            The list of integrations to report the results and logs to. Supported platforms are `"visualdl"`.
+            Use `"all"` to report to all integrations installed, `"none"` for no integrations.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -342,12 +309,6 @@ class TrainingArguments:
             "help":
             "Number of updates steps to accumulate before performing a backward/update pass."
         }, )
-    eval_accumulation_steps: Optional[int] = field(
-        default=None,
-        metadata={
-            "help":
-            "Number of predictions steps to accumulate before moving the tensors to the CPU."
-        }, )
 
     learning_rate: float = field(
         default=5e-5,
@@ -391,7 +352,7 @@ class TrainingArguments:
             "When doing a multinode distributed training, whether to log once per node or just once on the main node."
         }, )
     logging_dir: Optional[str] = field(
-        default=None, metadata={"help": "Tensorboard log dir."})
+        default=None, metadata={"help": "log dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."}, )
@@ -438,8 +399,9 @@ class TrainingArguments:
         default="O1",
         metadata={
             "help":
-            ("For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. "
-             "See details at https://nvidia.github.io/apex/amp.html")
+            ("For fp16: Apex AMP optimization level selected in ['O0', 'O1', and 'O2']. "
+             "See details at https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html"
+             )
         }, )
 
     scale_loss: float = field(
@@ -454,14 +416,6 @@ class TrainingArguments:
 
     local_rank: int = field(
         default=-1, metadata={"help": "For distributed training: local_rank"})
-
-    debug: str = field(
-        default="",
-        metadata={
-            "help": "Whether or not to enable debug mode. Current options: "
-            "`underflow_overflow` (Detect underflow and overflow in activations and weights), "
-            "`tpu_metrics_debug` (print debug metrics on TPU)."
-        }, )
 
     dataloader_drop_last: bool = field(
         default=False,
@@ -544,19 +498,11 @@ class TrainingArguments:
         default="adamw",
         metadata={"help": "The optimizer to use."}, )
     report_to: Optional[List[str]] = field(
-        default="vdl",
+        default="visualdl",
         metadata={
             "help":
             "The list of integrations to report the results and logs to."
         })
-
-    skip_memory_metrics: bool = field(
-        default=True,
-        metadata={
-            "help":
-            "Whether or not to skip adding of memory profiler reports to metrics."
-        })
-
     resume_from_checkpoint: Optional[str] = field(
         default=None,
         metadata={
@@ -565,8 +511,6 @@ class TrainingArguments:
         }, )
 
     def __post_init__(self):
-        # Handle --use_env option in paddle.distributed.launch (local_rank not passed as an arg then).
-        # This needs to happen before any call to self.device or self.n_gpu.
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size(
         ) > 1:
@@ -578,7 +522,6 @@ class TrainingArguments:
 
         # expand paths, if not os.makedirs("~/bar") will make directory
         # in the current directory instead of the actual home
-        #  see https://github.com/huggingface/transformers/issues/10628
         if self.output_dir is not None:
             self.output_dir = os.path.expanduser(self.output_dir)
         if self.logging_dir is None and self.output_dir is not None:
@@ -651,9 +594,6 @@ class TrainingArguments:
             logger.info(
                 "Both warmup_ratio and warmup_steps given, warmup_steps will override any effect of warmup_ratio during training"
             )
-
-        if isinstance(self.debug, str):
-            self.debug = [DebugOption(s) for s in self.debug.split()]
 
     def __str__(self):
         self_as_dict = asdict(self)
@@ -832,7 +772,7 @@ class TrainingArguments:
 
     def to_sanitized_dict(self) -> Dict[str, Any]:
         """
-        Sanitized serialization to use with TensorBoard’s hparams
+        Sanitized serialization
         """
         d = self.to_dict()
         d = {
@@ -852,6 +792,7 @@ class TrainingArguments:
 
     def print_config(self, args=None, key=""):
         """
+        print all config values.
         """
         logger.info("=" * 60)
         if args is None:

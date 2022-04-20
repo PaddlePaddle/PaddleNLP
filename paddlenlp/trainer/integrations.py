@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notice, most of this file is modified from 
+# This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/integrations.py
 # Thanks a lot.
 
@@ -25,9 +25,7 @@ from .trainer_utils import PREFIX_CHECKPOINT_DIR, BestRun, IntervalStrategy  # n
 
 
 def is_visualdl_available():
-    return importlib.util.find_spec(
-        "visualdl") is not None or importlib.util.find_spec(
-            "visualdl") is not None
+    return importlib.util.find_spec("visualdl") is not None
 
 
 def rewrite_logs(d):
@@ -82,11 +80,6 @@ class VisualDLCallback(TrainerCallback):
 
         log_dir = None
 
-        if state.is_hyper_param_search:
-            trial_name = state.trial_name
-            if trial_name is not None:
-                log_dir = os.path.join(args.logging_dir, trial_name)
-
         if self.vdl_writer is None:
             self._init_summary_writer(args, log_dir)
 
@@ -119,7 +112,7 @@ class VisualDLCallback(TrainerCallback):
                     logger.warning(
                         "Trainer is attempting to log a value of "
                         f'"{v}" of type {type(v)} for key "{k}" as a scalar. '
-                        "This invocation of Tensorboard's writer.add_scalar() "
+                        "This invocation of VisualDL's writer.add_scalar() "
                         "is incorrect so we dropped this attribute.")
             self.vdl_writer.flush()
 
@@ -129,7 +122,7 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer = None
 
 
-INTEGRATION_TO_CALLBACK = {"vdl": VisualDLCallback, }
+INTEGRATION_TO_CALLBACK = {"visualdl": VisualDLCallback, }
 
 
 def get_reporting_integration_callbacks(report_to):
