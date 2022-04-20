@@ -18,8 +18,9 @@
   - attrdict
   - pyyaml
   - tqdm
+  - datasets
   ```shell
-  pip install jieba h5py colorlog colorama seqeval multiprocess attrdict pyyaml. datasets
+  pip install jieba h5py colorlog colorama seqeval multiprocess attrdict pyyaml datasets
   pip install -U tqdm
   ```
 
