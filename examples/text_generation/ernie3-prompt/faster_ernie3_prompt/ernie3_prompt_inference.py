@@ -37,18 +37,6 @@ def setup_args():
     return args
 
 
-def postprocess_response(token_ids, tokenizer):
-    """Post-process the decoded sequence. Truncate from the first <eos>."""
-    eos_pos = len(token_ids)
-    for i, tok_id in enumerate(token_ids):
-        if tok_id == tokenizer.mask_token_id:
-            eos_pos = i
-            break
-    token_ids = token_ids[:eos_pos]
-    tokens = tokenizer.convert_ids_to_tokens(token_ids)
-    return tokens
-
-
 def infer(args):
     model_name = 'ernie3-prompt'
     tokenizer = Ernie3PromptTokenizer.from_pretrained(model_name)
