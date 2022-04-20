@@ -295,7 +295,7 @@ public:
         topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
         sizeof(int) * finished_count_size+
-        256*1024*1024));
+        512*1024*1024));
     //TODO(gongenlei): add extra memory for weight error: 512*1024*1024
 
     if (sizeof(DataType_) == sizeof(half)) {
