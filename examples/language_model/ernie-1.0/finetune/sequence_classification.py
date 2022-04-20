@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import numpy as np
 
 
@@ -63,11 +62,9 @@ def convert_clue(example,
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        # example['label'] = np.array(example["label"], dtype="int64")
-        if label_dtype == "int64":
-            label = int(example['label'])
-        else:
-            label = float(example['label'])
+        example['label'] = int(example[
+            "label"]) if label_dtype != "float32" else float(example["label"])
+        label = example['label']
     # Convert raw text to feature
     if 'keyword' in example:  # CSL
         sentence1 = " ".join(example['keyword'])
