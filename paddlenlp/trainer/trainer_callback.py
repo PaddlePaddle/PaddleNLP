@@ -72,9 +72,6 @@ class TrainerState:
         is_world_process_zero (`bool`, *optional*, defaults to `True`):
             Whether or not this process is the global main process (when training in a distributed fashion on several
             machines, this is only going to be `True` for one process).
-        is_hyper_param_search (`bool`, *optional*, defaults to `False`):
-            Whether we are in the process of a hyper parameter search using Trainer.hyperparameter_search. This will
-            impact the way data will be logged in TensorBoard.
     """
 
     epoch: Optional[float] = None
@@ -87,7 +84,6 @@ class TrainerState:
     best_model_checkpoint: Optional[str] = None
     is_local_process_zero: bool = True
     is_world_process_zero: bool = True
-    is_hyper_param_search: bool = False
     trial_name: str = None
     trial_params: Dict[str, Union[str, float, int, bool]] = None
 
