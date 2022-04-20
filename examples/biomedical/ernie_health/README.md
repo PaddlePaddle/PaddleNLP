@@ -1,19 +1,25 @@
 # ERNIE-Health: Building Chinese Biomedical Language Models via Multi-Level Text Discrimination
 
-医疗领域存在大量的专业知识和医学术语，人类经过长时间的学习才能成为一名优秀的医生。那机器如何才能“读懂”医疗文献呢？尤其是面对电子病历、生物医疗文献中存在的大量非结构化、非标准化文本，计算机是无法直接使用、处理的。这就需要自然语言处理（Natural Language Processing，NLP）技术大展身手了。近年来，预训练语言模型（Pre-trained Language Model，PLM）逐渐成为自然语言处理的主流方法。这类模型利用大规模的未标注语料进行训练，得到的模型在下游NLP任务上的效果有着明显提升，在通用领域和特定领域均有广泛应用。
+## 模型介绍
 
-中文医疗预训练模型[ERNIE-Health](https://arxiv.org/pdf/2110.07244.pdf) 利用医疗实体掩码策略对专业术语等实体级知识进行学习, 学会了海量的医疗实体知识。同时，通过医疗问答匹配任务学习病患病状描述与医生专业治疗方案的对应关系，获得了医疗实体知识之间的内在联系。ERNIE-Health 共学习了 60 多万的医疗专业术语和 4000 多万的医疗专业问答数据，大幅提升了对医疗专业知识的理解和建模能力。此外，ERNIE-Health 还探索了多级语义判别预训练任务，提升了模型对医疗知识的学习效率。这一模型在中文医疗自然语言处理榜单 CBLUE 上取得了冠军，平均得分达到 77.822。
+中文医疗预训练模型[ERNIE-Health](https://arxiv.org/pdf/2110.07244.pdf) 在模型结构上与 [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB) 相似，包括生成器和判别器两部分，各自包含1个 [ERNIE](https://arxiv.org/pdf/1904.09223.pdf) 模型。生成器的训练任务为Masked Language Model(MLM)，主要作用是给判别器提供训练语料。判别器的训练任务为多任务学习，也是论文的主要改进点：
 
-在模型结构上，ERNIE-HEALTH 与 [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB) 的结构相似，包括生成器和判别器两部分，各自包含1个 [ERNIE](https://arxiv.org/pdf/1904.09223.pdf) 模型。生成器的预训练任务为Masked Language Model(MLM)，主要作用是给判别器提供训练语料。而判别起的预训练过程则设计为多任务：
+#### 字级别任务
 
-- 字级别，包括判断各个位置上的字是否被替换（Replaced Token Detection，RTD）、从候选字中选取被替换位置的原始字（Multi-Token Selection，MTS）两个任务。
-- 句子级别，包括判断对比序列预测（Contrastive Sequence Prediction，CSP）任务，即给定某个句子，通过替换其中个别字构造两个句子作为正例，替换其他句子中的字作为负例来进行分类。
+- 判断各个位置上的字是否被替换（Replaced Token Detection，RTD）
+- 从候选字中选取被替换位置的原始字（Multi-Token Selection，MTS）
+
+#### 句子级别任务
+
+- 判断对比序列预测（Contrastive Sequence Prediction，CSP），即给定某个句子，通过替换其中个别字构造两个句子作为正例，替换其他句子中的字作为负例来进行分类。
 
 预训练结束后将不再使用生成器，只对判别器进行fine-tuning用于下游的医疗文本处理任务。
 
 ![Overview_of_EHealth](https://user-images.githubusercontent.com/25607475/163949632-8b34e23c-d0cd-49df-8d88-8549a253d221.png)
 
 图片来源：来自[ERNIE-Health论文](https://arxiv.org/pdf/2110.07244.pdf)
+
+ERNIE-Health模型在中文医疗自然语言处理榜单 CBLUE 上取得了冠军，平均得分达到 77.822。
 
 本项目是 ERNIE-Health 的开源实现，支持自定义数据上的中文医疗预训练模型训练。
 
@@ -44,10 +50,12 @@ python preprocess.py --input_path ./raw_data/ --output_file ./data/samples --tok
 PaddleNLP中提供了ERNIE-Health训练好的模型参数。该版本为160G医疗文本数据上的训练结果，数据包括脱敏医患对话语料、医疗健康科普文章、脱敏医院电子医疗病例档案以及医学和临床病理学教材。
 
 #### 注意⚠️  : 预训练资源要求
-推荐使用至少4张16G以上显存的GPU进行预训练，同时数据量应尽可能接近ERNIE-Health论文中训练数据的量级，以获得好的预训练模型效果。若资源有限，可以直接使用开源的ERNIE-Health模型进行Fine-tuning，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/biomedical/cblue)。
-```
 
-### 单机单卡
+- 推荐使用至少4张16G以上显存的GPU进行预训练。
+- 数据量应尽可能接近ERNIE-Health论文中训练数据的量级，以获得好的预训练模型效果。
+- 若资源有限，可以直接使用开源的ERNIE-Health模型进行Fine-tuning，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/biomedical/cblue)。
+
+#### 单机单卡
 
 ```
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
@@ -65,7 +73,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
     --use_amp
 ```
 
-### 单机多卡
+#### 单机多卡
 
 ```
 unset CUDA_VISIBLE_DEVICES
