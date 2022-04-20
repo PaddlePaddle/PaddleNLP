@@ -39,11 +39,42 @@ from .dialogue import DialogueTask
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
 TASKS = {
+    'dependency_parsing': {
+        "models": {
+            "ddparser": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-biaffine',
+            },
+            "ddparser-ernie-1.0": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-1.0',
+            },
+            "ddparser-ernie-gram-zh": {
+                "task_class": DDParserTask,
+                "task_flag": 'dependency_parsing-ernie-gram-zh',
+            },
+        },
+        "default": {
+            "model": "ddparser",
+        }
+    },
+    'dialogue': {
+        "models": {
+            "plato-mini": {
+                "task_class": DialogueTask,
+                "task_flag": "dialogue-plato-mini"
+            },
+        },
+        "default": {
+            "model": "plato-mini",
+        }
+    },
     "knowledge_mining": {
         "models": {
             "wordtag": {
                 "task_class": WordTagTask,
                 "task_flag": 'knowledge_mining-wordtag',
+                "task_priority_path": "wordtag",
             },
             "nptag": {
                 "task_class": NPTagTask,
@@ -51,7 +82,21 @@ TASKS = {
             },
         },
         "default": {
-            "model": "wordtag"
+            "model": "wordtag",
+        }
+    },
+    "lexical_analysis": {
+        "models": {
+            "lac": {
+                "task_class": LacTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": 'lexical_analysis-gru_crf',
+                "task_priority_path": "lac",
+            }
+        },
+        "default": {
+            "model": "lac"
         }
     },
     "ner": {
@@ -59,6 +104,7 @@ TASKS = {
             "accurate": {
                 "task_class": NERWordTagTask,
                 "task_flag": "ner-wordtag",
+                "task_priority_path": "wordtag",
                 "linking": False,
             },
             "fast": {
@@ -66,6 +112,7 @@ TASKS = {
                 "hidden_size": 128,
                 "emb_dim": 128,
                 "task_flag": "ner-lac",
+                "task_priority_path": "lac",
             }
         },
         "default": {
@@ -77,56 +124,11 @@ TASKS = {
             "gpt-cpm-large-cn": {
                 "task_class": PoetryGenerationTask,
                 "task_flag": 'poetry_generation-gpt-cpm-large-cn',
+                "task_priority_path": "gpt-cpm-large-cn",
             },
         },
         "default": {
             "model": "gpt-cpm-large-cn",
-        }
-    },
-    "question_answering": {
-        "models": {
-            "gpt-cpm-large-cn": {
-                "task_class": QuestionAnsweringTask,
-                "task_flag": 'question_answering-gpt-cpm-large-cn',
-            },
-        },
-        "default": {
-            "model": "gpt-cpm-large-cn",
-        }
-    },
-    "lexical_analysis": {
-        "models": {
-            "lac": {
-                "task_class": LacTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": 'lexical_analysis-gru_crf',
-            }
-        },
-        "default": {
-            "model": "lac"
-        }
-    },
-    "word_segmentation": {
-        "modes": {
-            "fast": {
-                "task_class": SegJiebaTask,
-                "task_flag": "word_segmentation-jieba",
-            },
-            "base": {
-                "task_class": SegLACTask,
-                "hidden_size": 128,
-                "emb_dim": 128,
-                "task_flag": "word_segmentation-gru_crf",
-            },
-            "accurate": {
-                "task_class": SegWordTagTask,
-                "task_flag": "word_segmentation-wordtag",
-                "linking": False,
-            },
-        },
-        "default": {
-            "mode": "base"
         }
     },
     "pos_tagging": {
@@ -136,10 +138,23 @@ TASKS = {
                 "hidden_size": 128,
                 "emb_dim": 128,
                 "task_flag": 'pos_tagging-gru_crf',
+                "task_priority_path": "lac",
             }
         },
         "default": {
             "model": "lac"
+        }
+    },
+    "question_answering": {
+        "models": {
+            "gpt-cpm-large-cn": {
+                "task_class": QuestionAnsweringTask,
+                "task_flag": 'question_answering-gpt-cpm-large-cn',
+                "task_priority_path": "gpt-cpm-large-cn",
+            },
+        },
+        "default": {
+            "model": "gpt-cpm-large-cn",
         }
     },
     'sentiment_analysis': {
@@ -157,34 +172,15 @@ TASKS = {
             "model": "bilstm"
         }
     },
-    'dependency_parsing': {
-        "models": {
-            "ddparser": {
-                "task_class": DDParserTask,
-                "task_flag": 'dependency_parsing-biaffine',
-            },
-            "ddparser-ernie-1.0": {
-                "task_class": DDParserTask,
-                "task_flag": 'dependency_parsing-ernie-1.0',
-            },
-            "ddparser-ernie-gram-zh": {
-                "task_class": DDParserTask,
-                "task_flag": 'dependency_parsing-ernie-gram-zh',
-            },
-        },
-        "default": {
-            "model": "ddparser"
-        }
-    },
     'text_correction': {
         "models": {
-            "csc-ernie-1.0": {
+            "ernie-csc": {
                 "task_class": CSCTask,
-                "task_flag": "text_correction-csc-ernie-1.0"
+                "task_flag": "text_correction-ernie-csc"
             },
         },
         "default": {
-            "model": "csc-ernie-1.0"
+            "model": "ernie-csc"
         }
     },
     'text_similarity': {
@@ -198,15 +194,28 @@ TASKS = {
             "model": "simbert-base-chinese"
         }
     },
-    'dialogue': {
-        "models": {
-            "plato-mini": {
-                "task_class": DialogueTask,
-                "task_flag": "dialogue-plato-mini"
+    "word_segmentation": {
+        "modes": {
+            "fast": {
+                "task_class": SegJiebaTask,
+                "task_flag": "word_segmentation-jieba",
+            },
+            "base": {
+                "task_class": SegLACTask,
+                "hidden_size": 128,
+                "emb_dim": 128,
+                "task_flag": "word_segmentation-gru_crf",
+                "task_priority_path": "lac",
+            },
+            "accurate": {
+                "task_class": SegWordTagTask,
+                "task_flag": "word_segmentation-wordtag",
+                "task_priority_path": "wordtag",
+                "linking": False,
             },
         },
         "default": {
-            "model": "plato-mini"
+            "mode": "base"
         }
     },
 }
@@ -247,6 +256,13 @@ class Taskflow(object):
             )), "The {} name:{} is not in task:[{}]".format(tag, model, task)
         else:
             self.model = TASKS[task]['default'][ind_tag]
+
+        if "task_priority_path" in TASKS[self.task][tag][self.model]:
+            self.priority_path = TASKS[self.task][tag][self.model][
+                "task_priority_path"]
+        else:
+            self.priority_path = None
+
         # Set the device for the task
         device = get_env_device()
         if device == 'cpu' or device_id == -1:
@@ -261,7 +277,10 @@ class Taskflow(object):
         self.kwargs = kwargs
         task_class = TASKS[self.task][tag][self.model]['task_class']
         self.task_instance = task_class(
-            model=self.model, task=self.task, **self.kwargs)
+            model=self.model,
+            task=self.task,
+            priority_path=self.priority_path,
+            **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
 
@@ -297,7 +316,7 @@ class Taskflow(object):
         return results
 
     def interactive_mode(self, max_turn):
-        with self.task_instance.interactive_mode(max_turn=3):
+        with self.task_instance.interactive_mode(max_turn):
             while True:
                 human = input("[Human]:").strip()
                 if human.lower() == "exit":
