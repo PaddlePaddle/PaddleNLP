@@ -1,20 +1,7 @@
-export BENCHMARK_ROOT=/workspace
-mkdir -p $BENCHMARK_ROOT
-run_env=$BENCHMARK_ROOT/run_env
-
-rm -rf $run_env
-mkdir $run_env
-
-echo `which python3.7`
-
-ln -s $(which python3.7)m-config  $run_env/python3-config
-# ln -s /usr/local/python3.7.0/lib/python3.7m-config /usr/local/bin/python3-config
-
-ln -s $(which python3.7) $run_env/python
-ln -s $(which python3.7) $run_env/python3
-ln -s $(which pip3.7) $run_env/pip
-
-export PATH=$run_env:${PATH}
+cd ../examples/language_model/data_tools/
+sed -i "s/python3/python/g" Makefile
+sed -i "s/python-config/python3.7m-config/g" Makefile
+cd -
 
 mkdir -p data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
