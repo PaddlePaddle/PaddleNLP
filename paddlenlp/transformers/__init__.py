@@ -101,3 +101,5 @@ from .megatronbert.tokenizer import *
 from .prophetnet.modeling import *
 from .prophetnet.tokenizer import *
 from .semantic_search.modeling import *
+from .rembert.modeling import *
+from .rembert.tokenizer import *

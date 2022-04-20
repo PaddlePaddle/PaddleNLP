@@ -16,6 +16,7 @@
 import io
 import os
 import json
+
 from paddle.utils import try_import
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer, GPTTokenizer, AddedToken
