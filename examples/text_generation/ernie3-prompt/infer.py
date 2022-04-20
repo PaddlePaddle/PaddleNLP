@@ -80,7 +80,7 @@ def infer(args):
 
     for idx, out in enumerate(output_ids.numpy()):
         seq = tokenizer.convert_ids_to_string(out)
-        print(f'{idx}: {seq}: {scores[idx]}')
+        print(f'{idx}: {seq}: {scores.numpy()[idx]}')
 
 
 if __name__ == "__main__":

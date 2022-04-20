@@ -54,25 +54,8 @@ export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python infer.py \
---model_name_or_path ernie3-10b \
---topk 4 \
---topp 0.0 \
---temperature 0.9 \
---repetition_penalty 1.1 \
---min_out_len 10 \
---max_out_len 20 \
---decoding_strategy sampling
+python infer.py
 ```
-
-其中，各个选项的意义如下：
-* `--model_name_or_path`: 预训练模型的名称或是路径。
-* `--topk`: 执行 topk-sampling 的时候的 `k` 的大小，默认是 4。
-* `--topp`: 执行 topp-sampling 的时候的阈值的大小，默认是 0.0 表示不执行 topp-sampling。
-* `--temperature`: temperature 的设定。
-* `--min_out_len`: 最长的生成长度。
-* `--max_out_len`: 字符串，表示任意生成的时候的开始 token。
-* `--decoding_strategy`: 解码策略。
 
 若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `ernie3_export_model_sample.py` 时使用 `--decoding_lib ../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。
 注意：如果是自行编译的话，这里的 `libdecoding_op.so` 的动态库是参照文档 [文本生成高性能加速](../../../paddlenlp/ops/README.md) 中 **`Python 动态图使用自定义 op`** 编译出来的 lib
