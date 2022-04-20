@@ -26,7 +26,7 @@ PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
     --logging_steps 20\
     --dataloader_num_workers 4 \
     --eval_steps 1000 \
-    --report_to "vdl" \
+    --report_to "visualdl" \
     --disable_tqdm true \
     --do_train \
     --device "gpu"
