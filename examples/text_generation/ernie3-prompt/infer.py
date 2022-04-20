@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument(
         "--min_out_len", default=0, type=int, help="Minimum output length. ")
     parser.add_argument(
-        "--max_out_len", default=5, type=int, help="Maximum output length. ")
+        "--max_out_len", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--num_return_sequences",
         default=1,
@@ -43,7 +43,7 @@ def parse_args():
         type=str,
         help="The main strategy to decode. ")
     parser.add_argument(
-        "--num_beams", default=5, type=int, help="The beam size. ")
+        "--num_beams", default=10, type=int, help="The beam size. ")
     parser.add_argument(
         "--use_fp16_decoding",
         action="store_true",

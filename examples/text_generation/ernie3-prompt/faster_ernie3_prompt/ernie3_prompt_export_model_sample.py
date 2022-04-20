@@ -48,7 +48,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure top_p sampling. ")
     parser.add_argument(
-        "--max_out_len", default=5, type=int, help="Maximum output length. ")
+        "--max_out_len", default=32, type=int, help="Maximum output length. ")
     parser.add_argument(
         "--min_out_len", default=0, type=int, help="Minimum output length. ")
     parser.add_argument(
@@ -73,7 +73,7 @@ def parse_args():
         help="The main strategy to decode. ")
     parser.add_argument(
         "--num_beams",
-        default=5,
+        default=10,
         type=int,
         help="The number of candidate to procedure beam search. ")
     parser.add_argument(
