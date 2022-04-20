@@ -428,8 +428,6 @@ class Ernie3PromptForGeneration(Ernie3PromptPretrainedModel):
         outputs = self.ernie3_prompt(input_ids, position_ids, pos_ids_extra,
                                      attention_mask, use_cache, cache)
         sequence_output = outputs[0] if use_cache else outputs
-        import pdb
-        pdb.set_trace()
         logits = self.lm_head(sequence_output)
         if use_cache:
             cache = outputs[1]

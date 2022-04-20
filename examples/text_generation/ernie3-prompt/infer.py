@@ -16,7 +16,7 @@ import argparse
 from pprint import pprint
 
 import paddle
-from paddlenlp.transformers import Ernie3PromptForGeneration, Ernie3PromptPretrainedModel, Ernie3PromptModel, Ernie3PromptTokenizer
+from paddlenlp.transformers import Ernie3PromptForGeneration, Ernie3PromptTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -43,7 +43,7 @@ def parse_args():
         type=str,
         help="The main strategy to decode. ")
     parser.add_argument(
-        "--num_beams", default=2, type=int, help="The beam size. ")
+        "--num_beams", default=5, type=int, help="The beam size. ")
     parser.add_argument(
         "--use_fp16_decoding",
         action="store_true",
@@ -61,13 +61,14 @@ def infer(args):
     model = Ernie3PromptForGeneration.from_pretrained(args.model_name_or_path)
     model.eval()
 
-    texts = ["嗜睡抑郁多梦入睡困难很"]
+    texts = ["嗜睡抑郁多梦入睡困难很", "三个月宝宝一天睡几个小时"]
     encoded_inputs = tokenizer.gen_encode(texts)
 
     output_ids, scores = model.generate(
         input_ids=encoded_inputs['input_ids'],
         position_ids=encoded_inputs['position_ids'],
         pos_ids_extra=encoded_inputs['pos_ids_extra'],
+        attention_mask=encoded_inputs['attention_mask'],
         bos_token_id=tokenizer.start_token_id,
         eos_token_id=tokenizer.gend_token_id,
         decode_strategy=args.decoding_strategy,
@@ -75,12 +76,16 @@ def infer(args):
         min_length=args.min_out_len,
         max_length=args.max_out_len,
         use_fp16_decoding=args.use_fp16_decoding,
-        decoding_lib="/home/PaddleNLP_ernie3_prompt/paddlenlp/ops/build/lib/libdecoding_op.so",
+        decoding_lib="/home/gonel/paddlenlp/ops/build/lib/libdecoding_op.so",
         use_faster=True)
 
-    for idx, out in enumerate(output_ids.numpy()):
-        seq = tokenizer.convert_ids_to_string(out)
-        print(f'{idx}: {seq}: {scores.numpy()[idx]}')
+    scores = scores.numpy()
+    output_ids = output_ids.numpy()
+    for idx, out in enumerate(output_ids):
+        for beam_idx, beam in enumerate(out):
+            seq = tokenizer.convert_ids_to_string(beam)
+            score = scores[idx][beam_idx]
+            print(f'{idx}-{beam_idx}: {seq}-{score}')
 
 
 if __name__ == "__main__":

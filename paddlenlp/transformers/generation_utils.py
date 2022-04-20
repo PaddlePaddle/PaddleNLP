@@ -394,6 +394,11 @@ class GenerationMixin(object):
             role_ids = model_kwargs["role_ids"]
             model_kwargs["role_ids"] = paddle.gather(role_ids, index)
 
+        if "pos_ids_extra" in model_kwargs and model_kwargs[
+                "pos_ids_extra"] is not None:
+            pos_ids_extra = model_kwargs["pos_ids_extra"]
+            model_kwargs["pos_ids_extra"] = paddle.gather(pos_ids_extra, index)
+
         return input_ids, model_kwargs
 
     @staticmethod
@@ -766,12 +771,12 @@ class GenerationMixin(object):
                         dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :num_return_sequences *
-                                                num_beams, :].reshape(
-                                                    [-1, output_ids.shape[-1]])
-                        if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :num_return_sequences *
-                                                      num_beams].flatten()
+                        # output_ids = output_ids[:, :num_return_sequences *
+                        #                         num_beams, :].reshape(
+                        #                             [-1, output_ids.shape[-1]])
+                        # if dummy_srore is not None:
+                        #     dummy_srore = dummy_srore[:, :num_return_sequences *
+                        #                               num_beams].flatten()
                     else:
                         output_ids = output_ids.transpose([1, 0])
                     return output_ids, dummy_srore
