@@ -41,7 +41,12 @@ ln -s WMT14.en-de.partial/wmt14_ende_data_bpe/test.tok.bpe.de test.de
 cd -
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-python -m pip install --upgrade pip
-python -m pip install -r ../requirements.txt -i https://mirror.baidu.com/pypi/simple
-python -m pip install attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
-python -m pip install -e ..
+python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install setuptools_scm 
+python -m pip install Cython 
+python -m pip install -r ../requirements.txt  -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install attrdict pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+python -m pip install -e ../
+# python -m pip install paddlenlp    # PDC 镜像中安装失败
+python -m pip list
