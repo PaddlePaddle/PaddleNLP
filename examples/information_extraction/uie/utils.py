@@ -64,14 +64,14 @@ def convert_example(example, tokenizer, max_seq_len):
         end = map_offset(item["end"] - 1 + bias, offset_mapping)
         start_ids[start] = 1.0
         end_ids[end] = 1.0
-    return tuple([
-        np.array(
-            x, dtype="int64") for x in [
-                encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
-                encoded_inputs["position_ids"],
-                encoded_inputs["attention_mask"], start_ids, end_ids
-            ]
-    ])
+
+    tokenized_output = [
+        encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
+        encoded_inputs["position_ids"], encoded_inputs["attention_mask"],
+        start_ids, end_ids
+    ]
+    tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
+    return tuple(tokenized_output)
 
 
 def map_offset(ori_offset, offset_mapping):
