@@ -97,7 +97,7 @@ class Ernie3PromptPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "ernie3-prompt":
-            "http://10.127.1.139:8901/ernie-prompt/ernie3_prompt.pdparams"
+            "http://0.0.0.0:8901/ernie-prompt/ernie3_prompt.pdparams"
         }
     }
     base_model_prefix = "ernie3_prompt"
