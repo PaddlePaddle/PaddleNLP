@@ -53,7 +53,7 @@ prompt为`实体名称` + 的 + `关系类别标签`:
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano.json \
-    --save_dir ./train_data \
+    --save_dir ./data/ext_data \
     --negative_ratio 5
 ```
 

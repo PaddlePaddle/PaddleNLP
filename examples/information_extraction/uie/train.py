@@ -26,26 +26,6 @@ from evaluate import evaluate
 from metric import get_f1, get_metric
 from utils import set_seed, convert_example, reader
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-
-parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
-parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
-parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--num_epochs", default=50, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--init_from_ckpt", default="uie/model_state.pdparams", type=str, help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
-parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-
-args = parser.parse_args()
-# yapf: enable
-
 
 def do_train():
     paddle.set_device(args.device)
@@ -142,4 +122,24 @@ def do_train():
 
 
 if __name__ == "__main__":
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
+    parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
+    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum total input sequence length after tokenization. "
+        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument("--num_epochs", default=50, type=int, help="Total number of training epochs to perform.")
+    parser.add_argument("--init_from_ckpt", default="uie/model_state.pdparams", type=str, help="The path of checkpoint to be loaded.")
+    parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
+    parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
+    parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
+    parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+
+    args = parser.parse_args()
+    # yapf: enable
+
     do_train()

@@ -24,17 +24,6 @@ from model import UIE
 from metric import get_f1, get_metric
 from utils import convert_example, reader
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-
-parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
-parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
-parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
-
-args = parser.parse_args()
-# yapf: enable
-
 
 @paddle.no_grad()
 def evaluate(model, data_loader):
@@ -86,4 +75,15 @@ def do_eval():
 
 
 if __name__ == "__main__":
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
+    parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+
+    args = parser.parse_args()
+    # yapf: enable
+
     do_eval()

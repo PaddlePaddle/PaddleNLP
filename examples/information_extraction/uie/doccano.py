@@ -81,6 +81,7 @@ def doccano2SA(doccano_file,
 
 
 if __name__ == "__main__":
+    # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--doccano_file",
@@ -99,6 +100,7 @@ if __name__ == "__main__":
         help="The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples"
     )
     args = parser.parse_args()
+    # yapf: enable
 
     # Ensure generate the same negative samples for one seed.
     set_seed(1000)
