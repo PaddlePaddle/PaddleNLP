@@ -1,0 +1,13 @@
+python train.py \
+    --train_path "./data/ext_data/train.txt" \
+    --dev_path "./data/ext_data/dev.txt" \
+    --save_dir "./checkpoint" \
+    --learning_rate 1e-5 \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --num_epochs 50 \
+    --init_from_ckpt "./uie_model/model_state.pdparams" \
+    --seed 1000 \
+    --logging_steps 10 \
+    --valid_steps 100 \
+    --device "gpu"
