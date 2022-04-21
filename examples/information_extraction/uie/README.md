@@ -47,8 +47,6 @@ Universal Information Extraction（UIE）将各种类型的信息抽取任务统
     <p>图2 数据标注样例图<p/>
 </div>
 
-![image](https://user-images.githubusercontent.com/40840292/164374314-9beea9ad-08ed-42bc-bbbc-9f68eb8a40ee.png)
-
 - 在doccano平台上，定义实体标签类别和关系标签类别，上例中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
 - 使用以上定义的标签开始标注数据，图2展示了一个标注样例。
 - 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano.json` 后，放入 `./data` 目录下。
