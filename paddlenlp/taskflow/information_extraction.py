@@ -63,11 +63,13 @@ class UIETask(Task):
         }
     }
 
-    def __init__(self, task, model, schema, return_prob=True, **kwargs):
+    def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = True
         self._encoding_model = "ernie-1.0"
         self._schema = schema
+        # Try to build the schema tree to check the format of schema
+        self._build_tree(self._schema)
         self._check_task_files()
         self._construct_tokenizer()
         if self._static_mode:
@@ -75,7 +77,6 @@ class UIETask(Task):
         else:
             self._construct_model(model)
         self._usage = usage
-        self._return_prob = return_prob
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
@@ -84,7 +85,10 @@ class UIETask(Task):
             'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     def set_schema(self, schema):
+        if isinstance(schema, dict):
+            schema = [schema]
         self._schema = schema
+        self._build_tree(self._schema)
 
     def _construct_input_spec(self):
         """
@@ -184,8 +188,8 @@ class UIETask(Task):
 
         sentence_ids = []
         probs = []
-        for [input_ids, token_type_ids, pos_ids, att_mask,
-             offset_maps] in infer_data_loader():
+        for batch in infer_data_loader:
+            input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.input_handles[2].copy_from_cpu(pos_ids.numpy())
@@ -226,9 +230,9 @@ class UIETask(Task):
                     offset += len(short_inputs[v])
                 else:
                     for i in range(len(short_results[v])):
-                        if short_results[v][i]['start'] > 0:
+                        if 'start' in short_results[v][i].keys():
                             short_results[v][i]['start'] += offset
-                        if short_results[v][i]['end'] > 0:
+                        if 'end' in short_results[v][i].keys():
                             short_results[v][i]['end'] += offset
                     offset += len(short_inputs[v])
                     single_results.extend(short_results[v])
@@ -237,6 +241,8 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
+        if isinstance(self._schema, dict):
+            self._schema = [self._schema]
         schema_tree = self._build_tree(self._schema)
         results = self._multi_stage_predict(raw_inputs, schema_tree)
         inputs['result'] = results
@@ -343,12 +349,7 @@ class UIETask(Task):
                 start, end = sentence_id[i]
                 if end < len(prompt):
                     # ignore [SEP]
-                    result = {
-                        "text": prompt[start:end],
-                        "start": -end,
-                        "end": -start,
-                        "probability": prob[i]
-                    }
+                    result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
                     result = {
@@ -371,7 +372,15 @@ class UIETask(Task):
                 schema_tree.add_child(SchemaTree(s))
             elif isinstance(s, dict):
                 for k, v in s.items():
+                    if not isinstance(v, list):
+                        raise TypeError(
+                            "Invalid schema, value for each key:value pairs should be list, "
+                            "but {} received".format(type(v)))
                     schema_tree.add_child(self._build_tree(v, name=k))
+            else:
+                raise TypeError(
+                    "Invalid schema, element should be string or dict, "
+                    "but {} received".format(type(s)))
         return schema_tree
 
     def _postprocess(self, inputs):
