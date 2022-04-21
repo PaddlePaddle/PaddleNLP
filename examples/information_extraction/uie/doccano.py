@@ -54,10 +54,7 @@ def doccano2SA(doccano_file,
     entity_examples, relation_examples = convert_doccano_examples(
         raw_examples, negative_ratio)
 
-    examples = [
-        entity_example + relation_example for entity_example, relation_example
-        in zip(entity_examples, relation_examples)
-    ]
+    examples = [e + r for e, r in zip(entity_examples, relation_examples)]
 
     # index for saving data
     idxs = np.arange(len(examples))
