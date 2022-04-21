@@ -13,7 +13,7 @@ function _set_params(){
     skip_steps=10                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-    max_iter=500                   # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    max_iter=${6:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
     num_workers=0                  # (可选)
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${base_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
@@ -86,10 +86,10 @@ function _train(){
     case ${run_mode} in
     DP) if [[ ${device_num} = "N1C1" ]];then
             echo "run ${run_mode} "
-            train_cmd="python3.7 -u ${static_scripts}/run_pretrain_static.py ${train_cmd}" 
+            train_cmd="python -u ${static_scripts}/run_pretrain_static.py ${train_cmd}" 
         else
             rm -rf ./mylog
-            train_cmd="python3.7 -m paddle.distributed.launch --log_dir=./mylog --gpus=$CUDA_VISIBLE_DEVICES \
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=$CUDA_VISIBLE_DEVICES \
                   ${static_scripts}/run_pretrain_static.py ${train_cmd}" 
         fi
         ;;
