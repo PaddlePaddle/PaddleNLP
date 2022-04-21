@@ -452,11 +452,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         activate,
         pos_bias,
         temperature,
-        1.0,  /*repeat_penalty*/
-        true, /*prefix_lm*/
-        false,  /*is_mbart*/
+        1.0,   /*repeat_penalty*/
+        true,  /*prefix_lm*/
+        false, /*is_mbart*/
         min_length,
-        inner_coeff);
+        inner_coeff,
+        seed,
+        tensor_para_size,
+        layer_para_size);
     unified_decoding_sampling_->set_tensor_parallel_param(
         tensor_parallel_param);
     unified_decoding_sampling_->set_layer_parallel_param(layer_parallel_param);

@@ -1439,6 +1439,7 @@ def enable_ft_para(tensor_para_size=1,
 
         return _impl
 
+    # GPT
     layer_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__
     paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__ = layer_init_wrapper(
         layer_init_fn)
@@ -1450,6 +1451,9 @@ def enable_ft_para(tensor_para_size=1,
     block_state_fn = paddlenlp.transformers.gpt.modeling.GPTModel.state_dict
     paddlenlp.transformers.gpt.modeling.GPTModel.state_dict = block_state_wrapper(
         block_state_fn)
+    # PLATO
+    paddle.nn.TransformerEncoderLayer.__init__ = layer_init_wrapper(
+        paddle.nn.TransformerEncoderLayer.__init__)
     _ft_para_conf.set_partial_model(True)
     # TODO(guosheng): Should we set device here, sometimes we want to create
     # models on CPU first to save memory.

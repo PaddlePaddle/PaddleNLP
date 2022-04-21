@@ -104,6 +104,7 @@ public:
                    const bool is_mbart = false,
                    const int min_length = 0,
                    const int inner_coeff = 4,
+                   const int seed = -1,
                    const int tensor_para_size = 1,
                    const int layer_para_size = 1)
       : allocator_(allocator) {
@@ -128,6 +129,7 @@ public:
     args_.repeat_penalty_ = repeat_penalty;
 
     args_.min_length_ = min_length;
+    args_.seed_ = seed;
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
