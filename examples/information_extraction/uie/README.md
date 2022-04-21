@@ -19,11 +19,9 @@ Universal Information Extraction（UIE）将各种类型的信息抽取任务统
 └── README.md
 ```
 
-### 训练数据格式
+### 模型输入数据格式
 
-模型输入数据格式示例：
-
-命名实体识别任务中，prompt为`实体类别标签`:
+prompt为`实体类别标签`:
 
 ```text
 {"content": "《完美和喜悦在我心中》是2003年海天出版社出版的图书，作者是阿兰科恩", "result_list": [{"text": "完美和喜悦在我心中", "start": 1, "end": 10}], "prompt": "作品名"}
@@ -31,7 +29,7 @@ Universal Information Extraction（UIE）将各种类型的信息抽取任务统
 {"content": "《完美和喜悦在我心中》是2003年海天出版社出版的图书，作者是阿兰科恩", "result_list": [{"text": "阿兰科恩", "start": 31, "end": 35}], "prompt": "人物名"}
 ```
 
-关系抽取、事件抽取任务中，prompt为`实体名称` + 的 + `关系类别标签`:
+prompt为`实体名称` + 的 + `关系类别标签`:
 
 ```text
 {"content": "《完美和喜悦在我心中》是2003年海天出版社出版的图书，作者是阿兰科恩", "result_list": [{"text": "海天出版社", "start": 17, "end": 22}], "prompt": "完美和喜悦在我心中的出版社名称"}
