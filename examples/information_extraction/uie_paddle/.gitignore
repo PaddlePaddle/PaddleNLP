@@ -1,0 +1,19 @@
+# UIE
+/data
+/pretrain_data
+/output
+/hf_models
+/pd_models
+/runs
+/models
+*.lock
+
+# mac
+.DS_Store
+
+# env
+/.vscode
+/.idea
+**/__pycache__
+*.pyc
+.pytest_cache
