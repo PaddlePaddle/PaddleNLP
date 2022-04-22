@@ -1,0 +1,3 @@
+map_strategy: "closest"
+de_duplicate: True
+span_to_token: "list"

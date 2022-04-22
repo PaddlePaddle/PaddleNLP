@@ -1,0 +1,241 @@
+T1:
+  name: duuie_company_info_relation
+  task: record
+  path: data/duuie_pre/company_info_relation
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: set
+  metrics:
+    - string-rel-strict-F1
+
+T2:
+  name: duuie_company_info_event
+  task: record
+  path: data/duuie_pre/company_info_event
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T3:
+  name: duuie_competition_info
+  task: record
+  path: data/duuie_pre/competition_info
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T4:
+  name: duuie_disaster
+  task: record
+  path: data/duuie_pre/disaster
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T5:
+  name: duuie_life_event
+  task: record
+  path: data/duuie_pre/life_event
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T6:
+  name: duuie_life_relation
+  task: record
+  path: data/duuie_pre/life_relation
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-rel-strict-F1
+
+T7:
+  name: duuie_conv_asa
+  task: record
+  path: data/duuie_pre/conv_asa
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-rel-strict-F1
+
+T8:
+  name: duuie_msra
+  task: record
+  path: data/duuie_pre/msra
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-ent-F1
+
+T9:
+  name: duuie_peoples_daily
+  task: record
+  path: data/duuie_pre/peoples_daily
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-ent-F1
+
+T10:
+  name: duuie_finance_gudongjianchi
+  task: record
+  path: data/duuie_pre/finance_gudongjianchi
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T11:
+  name: duuie_finance_gaoguanbiandong
+  task: record
+  path: data/duuie_pre/finance_gaoguanbiandong
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T12:
+  name: duuie_finance_qiyeshougou
+  task: record
+  path: data/duuie_pre/finance_qiyeshougou
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T13:
+  name: duuie_finance_gongsishangshi
+  task: record
+  path: data/duuie_pre/finance_gongsishangshi
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T14:
+  name: duuie_finance_zhijia
+  task: record
+  path: data/duuie_pre/finance_zhijia
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T15:
+  name: duuie_finance_qiyepochan
+  task: record
+  path: data/duuie_pre/finance_qiyepochan
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T16:
+  name: duuie_finance_kuisun
+  task: record
+  path: data/duuie_pre/finance_kuisun
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T17:
+  name: duuie_finance_gufenhuigou
+  task: record
+  path: data/duuie_pre/finance_gufenhuigou
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T18:
+  name: duuie_finance_gudongzengchi
+  task: record
+  path: data/duuie_pre/finance_gudongzengchi
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T19:
+  name: duuie_finance_zhongbiao
+  task: record
+  path: data/duuie_pre/finance_zhongbiao
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T20:
+  name: duuie_finance_jiechuzhijia
+  task: record
+  path: data/duuie_pre/finance_jiechuzhijia
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T21:
+  name: duuie_finance_yuetan
+  task: record
+  path: data/duuie_pre/finance_yuetan
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
+
+T22:
+  name: duuie_finance_qiyerongzi
+  task: record
+  path: data/duuie_pre/finance_qiyerongzi
+  decoding_format: spotasoc
+  weight: 1
+  sel2record: config/offset_map/longer_first_offset_zh.yaml
+  eval_match_mode: normal
+  metrics:
+    - string-evt-role-F1
