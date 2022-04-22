@@ -25,10 +25,10 @@ from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
 nn.MultiHeadAttention._ori_forward = paddle.nn.MultiHeadAttention.forward
 nn.MultiHeadAttention._ori_prepare_qkv = nn.MultiHeadAttention._prepare_qkv
 
-from paddlenlp.trainer import Trainer
+from . import Trainer
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Pad
-from paddlenlp.transformers import AutoModelForSequenceClassification, ErnieModel
+from paddlenlp.transformers import AutoModelForSequenceClassification
 
 
 def try_import_paddleslim():
@@ -106,6 +106,8 @@ def prune(self, output_dir, prune_config=DynabertConfig()):
     """
     Supports DynaBERT strategy.
     """
+    assert isinstance(prune_config, (DynabertConfig)), \
+        "`prune_config` should be an instance of `DynabertConfig`."
     if prune_config.compress_type == "dynabert":
         _dynabert(self, self.model, output_dir, prune_config)
 
@@ -114,8 +116,8 @@ def quant(self, input_dir, output_dir, quantization_config=PTQConfig()):
     """
     Supports Post-Training Quantization now.
     """
-    assert quantization_config.compress_type == "ptq", \
-        "Only Post Training Quantization is supported."
+    assert isinstance(quantization_config, (PTQConfig)), \
+        "`quantization_config` shoule be an instance of `PTQConfig`."
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
     nn.MultiHeadAttention._prepare_qkv = nn.MultiHeadAttention._ori_prepare_qkv
     _post_training_quantization(eval_dataloader, self.eval_dataset, input_dir,

@@ -24,7 +24,7 @@ from paddlenlp.transformers import AutoModelForMultipleChoice
 
 model_large = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-large")
 model_base = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base")
-model_medium = AutoModelForMultipleChoice.from_pretrained("ernie-3.0-tiny")
+model_medium = AutoModelForMultipleChoice.from_pretrained("ernie-3.0-medium")
 ```
 
 ## 对 ERNIE 3.0-Medium 模型进一步压缩
@@ -33,6 +33,7 @@ model_medium = AutoModelForMultipleChoice.from_pretrained("ernie-3.0-tiny")
 ## 压缩后的模型性能
 
 GPU
+
 CPU
 
 # Reference
