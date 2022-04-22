@@ -46,7 +46,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | ERNIE 3.0-Medium      | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32 | 1e-5,64 | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
 
 
-其中，`ERNIE 3.0-Large`、`ERNIE 3.0-Medium` 在 CLUEWSC2020 处 dropout_prob = 0.0。
+其中，`ERNIE 3.0-Large`、`ERNIE 3.0-Medium` 在 CLUEWSC2020 处的 dropout_prob 为 0.0。
 
 
 ## 一键复现模型效果
