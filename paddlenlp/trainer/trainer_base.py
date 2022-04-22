@@ -637,7 +637,7 @@ class Trainer:
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (
-                self.state.global_step - self._globalstep_last_logged), 4)
+                self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
@@ -886,6 +886,9 @@ class Trainer:
         return self.lr_scheduler
 
     def _wrap_model(self, model, training=True):
+        if self.args.world_size > 1:
+            model = paddle.DataParallel(model)
+
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
             return model
@@ -959,7 +962,6 @@ class Trainer:
                       inputs.pop("end_positions"))
         else:
             labels = None
-
         outputs = model(**inputs)
 
         if self.criterion is not None:
@@ -1341,9 +1343,8 @@ class Trainer:
         args = self.args
 
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
-        prediction_loss_only = False
 
-        model = self._wrap_model(self.model, training=False)
+        model = self.model
 
         batch_size = dataloader.batch_sampler.batch_size
         if max_eval_iters <= 0:
@@ -1393,7 +1394,6 @@ class Trainer:
             # Prediction step
             loss, logits, labels = self.prediction_step(
                 model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
-
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
@@ -1416,7 +1416,6 @@ class Trainer:
                 args, self.state, self.control)
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
                 break
-
         # Gather all remaining tensors and put them back on the CPU
         if losses_host is not None:
             losses = nested_numpify(losses_host)

@@ -677,6 +677,13 @@ class TrainingArguments:
         else:
             return self.process_index == 0
 
+    @property
+    def _no_sync_in_gradient_accumulation(self):
+        """
+        Whether or not to use no_sync for the gradients when doing gradient accumulation.
+        """
+        return True
+
     def get_process_log_level(self):
         """
         Returns the log level to be used depending on whether this process is the main process of node 0, main process
