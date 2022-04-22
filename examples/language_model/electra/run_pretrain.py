@@ -562,26 +562,27 @@ def do_train(args):
                 trained_global_step -= 1
                 continue
             global_step += 1
-            input_ids, raw_input_ids, gen_labels = batch
+            input_ids, raw_input_ids, generator_labels = batch
             if args.use_amp:
                 with paddle.amp.auto_cast():
-                    gen_logits, disc_logits, disc_labels, attention_mask = model(
+                    generator_logits, disc_logits, disc_labels, attention_mask = model(
                         input_ids=input_ids,
                         raw_input_ids=raw_input_ids,
-                        gen_labels=gen_labels)
-                    loss = criterion(gen_logits, disc_logits, gen_labels,
-                                     disc_labels, attention_mask)
+                        generator_labels=generator_labels)
+                    loss = criterion(generator_logits, disc_logits,
+                                     generator_labels, disc_labels,
+                                     attention_mask)
                 scaled = scaler.scale(loss)
                 scaled.backward()
                 t_loss += loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                gen_logits, disc_logits, disc_labels, attention_mask = model(
+                generator_logits, disc_logits, disc_labels, attention_mask = model(
                     input_ids=input_ids,
                     raw_input_ids=raw_input_ids,
-                    gen_labels=gen_labels)
-                loss = criterion(gen_logits, disc_logits, gen_labels,
-                                 disc_labels, attention_mask)
+                    generator_labels=generator_labels)
+                loss = criterion(generator_logits, disc_logits,
+                                 generator_labels, disc_labels, attention_mask)
                 loss.backward()
                 t_loss += loss.detach()
                 optimizer.step()

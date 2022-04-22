@@ -308,16 +308,16 @@ def do_train(args):
                 trained_global_step -= 1
                 continue
             global_step += 1
-            masked_input_ids, input_ids, gen_labels = batch
+            masked_input_ids, input_ids, generator_labels = batch
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
                     gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
                         input_ids=masked_input_ids,
                         raw_input_ids=input_ids,
-                        gen_labels=gen_labels)
+                        generator_labels=generator_labels)
                     loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                        gen_logits, gen_labels, logits_rtd, logits_mts,
+                        gen_logits, generator_labels, logits_rtd, logits_mts,
                         logits_csp, disc_labels, masks)
 
                 scaled = scaler.scale(loss)
@@ -332,10 +332,10 @@ def do_train(args):
                 gen_logits, disc_labels, logits_rtd, logits_mts, logits_csp, masks = model(
                     input_ids=masked_input_ids,
                     raw_input_ids=input_ids,
-                    gen_labels=gen_labels)
+                    generator_labels=generator_labels)
                 loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                    gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp,
-                    disc_labels, masks)
+                    gen_logits, generator_labels, logits_rtd, logits_mts,
+                    logits_csp, disc_labels, masks)
                 loss.backward()
                 t_loss['loss'] += loss.detach()
                 t_loss['gen'] += gen_loss.detach()
@@ -389,7 +389,7 @@ def do_train(args):
                     log_str = (
                         "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
                         "avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, "
-                        "seq_contrastive_loss: {8:.15f}, lr: {9:.10f}, speed: {10:.2f} s/it"
+                        "seq_contrastive_loss: {8:.15f}, lr: {9:.7e}, speed: {10:.2f} s/it"
                     ).format(global_step, num_training_steps, epoch, step,
                              local_loss['loss'], local_loss['gen'],
                              local_loss['rtd'], local_loss['mts'],
@@ -398,12 +398,14 @@ def do_train(args):
                              (time.time() - tic_train) / args.logging_steps)
                     logger.info(log_str)
                     log_list.append(log_str)
-                    writer.add_scalars('loss', {
+                    loss_dict = {
                         'generator_loss': local_loss['gen'],
                         'rtd_loss': local_loss['rtd'] * 50,
                         'mts_loss': local_loss['mts'] * 20,
                         'csp_loss': local_loss['csp']
-                    }, global_step)
+                    }
+                    for k, v in loss_dict.items():
+                        writer.add_scalar('loss/%s' % k, v, global_step)
                     writer.add_scalar('total_loss', local_loss['loss'],
                                       global_step)
                     writer.add_scalar('lr', optimizer.get_lr(), global_step)
