@@ -147,7 +147,7 @@ def create_pretrained_dataset(
 
     train_valid_test_num_samples = [
         training_args.per_device_train_batch_size * data_world_size *
-        training_args.max_steps,
+        training_args.max_steps * training_args.gradient_accumulation_steps,
         training_args.per_device_eval_batch_size * data_world_size *
         training_args.eval_iters *
         (training_args.max_steps // training_args.eval_steps + 1),
@@ -380,6 +380,7 @@ def main():
             lm_loss, sop_loss = self.criterion(
                 prediction_scores, seq_relationship_score, masked_lm_labels,
                 next_sentence_labels)
+
             loss = lm_loss + sop_loss
             return loss
 

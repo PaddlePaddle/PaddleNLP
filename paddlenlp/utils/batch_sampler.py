@@ -120,6 +120,11 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.nranks))
         self.total_size = self.num_samples * self.nranks
 
+    def get_start_end_idx(self):
+        start_idx = self.local_rank * self.batch_size
+        end_idx = start_idx + self.batch_size
+        return start_idx, end_idx
+
     def __iter__(self):
         assert self.consumed_samples % self.nranks == 0, \
             "The consumed_samples should be divided by nranks. consumed_samples=%d, nranks=%s" % (
@@ -128,14 +133,14 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
             math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 /
                       self.nranks))
         self.remain_total_size = self.remain_num_samples * self.nranks
+        self.batch_size_times_rank_size = self.batch_size * self.nranks
 
         batch_indices = []
-        for idx in range(self.consumed_samples + self.local_rank,
-                         self.consumed_samples + self.remain_total_size,
-                         self.nranks):
+        for idx in range(self.consumed_samples, self.total_size):
             batch_indices.append(idx)
-            if len(batch_indices) == self.batch_size:
-                yield batch_indices
+            if len(batch_indices) == self.batch_size_times_rank_size:
+                start_idx, end_idx = self.get_start_end_idx()
+                yield batch_indices[start_idx:end_idx]
                 batch_indices = []
         if not self.drop_last and len(batch_indices) > 0:
             yield batch_indices

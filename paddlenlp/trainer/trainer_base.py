@@ -637,7 +637,7 @@ class Trainer:
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (
-                self.state.global_step - self._globalstep_last_logged), 4)
+                self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
@@ -886,6 +886,9 @@ class Trainer:
         return self.lr_scheduler
 
     def _wrap_model(self, model, training=True):
+        if self.args.world_size > 1:
+            model = paddle.DataParallel(model)
+
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
             return model
@@ -959,7 +962,6 @@ class Trainer:
                       inputs.pop("end_positions"))
         else:
             labels = None
-
         outputs = model(**inputs)
 
         if self.criterion is not None:
