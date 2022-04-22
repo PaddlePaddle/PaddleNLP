@@ -11,15 +11,13 @@ FNet模型汇总
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 | Pretrained Weight                                                                | Language     | Details of the model                    |
 +==================================================================================+==============+=========================================+
-|``fnet-base``                                                                     | English      | For details, please refer to the        |
-|                                                                                  |              | corresponding model card of huggingface:|
-|                                                                                  |              | fnet-base_                              |
+|``fnet-base``                                                                     | English      | For details, please refer to:           |
+|                                                                                  |              | `google/fnet-base`_                     |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|``fnet-large``                                                                    | English      | For details, please refer to the        |
-|                                                                                  |              | corresponding model card of huggingface:|
-|                                                                                  |              | fnet-large_                             |
+|``fnet-large``                                                                    | English      | For details, please refer to:           |
+|                                                                                  |              | `google/fnet-large`_                    |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 
 
-.. _fnet-base: https://huggingface.co/google/fnet-base
-.. _fnet-large: https://huggingface.co/google/fnet-large
+.. _google/fnet-base: https://huggingface.co/google/fnet-base
+.. _google/fnet-large: https://huggingface.co/google/fnet-large

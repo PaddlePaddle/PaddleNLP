@@ -7,6 +7,7 @@ ERNIE模型汇总
 
 
 下表汇总介绍了目前PaddleNLP支持的ERNIE模型对应预训练权重。
+关于模型的具体细节可以参考对应链接。
 
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 | Pretrained Weight                                                                | Language     | Details of the model                    |
@@ -14,9 +15,6 @@ ERNIE模型汇总
 |``ernie-1.0``                                                                     | Chinese      | 12-layer, 768-hidden,                   |
 |                                                                                  |              | 12-heads, 108M parameters.              |
 |                                                                                  |              | Trained on Chinese text.                |
-+----------------------------------------------------------------------------------+--------------+-----------------------------------------+
-|``zhui/ernie-1.0-cluecorpussmall``                                                | Chinese      | Link:                                   |
-|                                                                                  |              | ernie-1.0-cluecorpussmall_              |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |``ernie-tiny``                                                                    | Chinese      | 3-layer, 1024-hidden,                   |
 |                                                                                  |              | 16-heads, _M parameters.                |
@@ -34,5 +32,8 @@ ERNIE模型汇总
 |                                                                                  |              | 16-heads, 336M parameters.              |
 |                                                                                  |              | Trained on lower-cased English text.    |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
+|``zhui/ernie-1.0-cluecorpussmall``                                                | Chinese      | Please refer to:                        |
+|                                                                                  |              | `zhui/ernie-1.0-cluecorpussmall`_       |
++----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 
-.. _ernie-1.0-cluecorpussmall: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall
+.. _zhui/ernie-1.0-cluecorpussmall: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall

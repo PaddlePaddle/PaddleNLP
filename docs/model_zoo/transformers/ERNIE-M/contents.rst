@@ -12,12 +12,12 @@ ERNIE-M模型汇总
 | Pretrained Weight                                                                | Language     | Details of the model                    |
 +==================================================================================+==============+=========================================+
 |``ernie-m-base``                                                                  | Multilingual | 12-layer, 768-hidden,                   |
-|                                                                                  |              | 12-heads, ?M parameters.                |
+|                                                                                  |              | 12-heads, _M parameters.                |
 |                                                                                  |              | Trained on  pseudo-parallel sentence    |
 |                                                                                  |              | pairs on a monolingual corpus.          |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 |``ernie-m-large``                                                                 | Multilingual | 24-layer, 1024-hidden,                  |
-|                                                                                  |              | 16-heads, ?M parameters.                |
+|                                                                                  |              | 16-heads, _M parameters.                |
 |                                                                                  |              | Trained on  pseudo-parallel sentence    |
 |                                                                                  |              | pairs on a monolingual corpus.          |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+

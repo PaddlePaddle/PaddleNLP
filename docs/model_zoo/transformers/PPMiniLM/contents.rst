@@ -14,7 +14,7 @@ PPMiniLM模型汇总
 +==================================================================================+==============+=========================================+
 | ``ppminilm-6l-768h``                                                             | Chinese      | A Chinese characteristic small model    |
 |                                                                                  |              | using multiple model compression.       |
-|                                                                                  |              | Link: ppminilm-6l-768h_                 |
+|                                                                                  |              | Please refer to: ppminilm-6l-768h_      |
 +----------------------------------------------------------------------------------+--------------+-----------------------------------------+
 
 .. _ppminilm-6l-768h: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm
