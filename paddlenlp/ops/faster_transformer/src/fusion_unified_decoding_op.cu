@@ -214,7 +214,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
 
   // Allow python passing partial weights for model parallel.
   int inner_coeff =
-      (memory_hidden_dim == ffn_intermediate_weight[0].shape()[0])
+      (memory_hidden_dim == self_attn_output_weight[0].shape()[0])
           ? ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim
           : (ffn_intermediate_weight[0].shape()[1] * tensor_para_size /
              memory_hidden_dim);

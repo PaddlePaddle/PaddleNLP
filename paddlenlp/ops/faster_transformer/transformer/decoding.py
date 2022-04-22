@@ -322,6 +322,10 @@ def infer_unified_decoding(
         "DecPositionIds": decoder_position_id
     }
 
+    tensor_para_size = get_ft_para_conf().tensor_para_size
+    layer_para_size = get_ft_para_conf().layer_para_size
+    layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
+
     attrs = {
         "decoding_strategy": _decoding_strategy,
         "beam_size": _beam_size,
@@ -343,7 +347,10 @@ def infer_unified_decoding(
         "hidden_act": _hidden_act,
         "rel_len": _rel_len,
         "early_stopping": _early_stopping,
-        "min_length": _min_length
+        "min_length": _min_length,
+        "tensor_para_size": tensor_para_size,
+        "layer_para_size": layer_para_size,
+        "layer_para_batch_size": layer_para_batch_size
     }
 
     output_ids = helper.create_variable(dtype="int32")

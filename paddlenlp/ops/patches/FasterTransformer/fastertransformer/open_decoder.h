@@ -43,6 +43,13 @@
 namespace fastertransformer {
 
 template <typename T>
+std::vector<T> copy_data(const T *src, size_t num) {
+  std::vector<T> h_tmp{num};
+  cudaMemcpy(h_tmp.data(), src, sizeof(T) * num, cudaMemcpyDeviceToHost);
+  return h_tmp;
+}
+
+template <typename T>
 class DecoderInitParam : public AbstractParam {
 public:
   /* weights for masked_multi_head_attention */

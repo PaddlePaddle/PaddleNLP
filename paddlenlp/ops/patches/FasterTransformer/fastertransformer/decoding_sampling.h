@@ -376,7 +376,7 @@ public:
 
       const int max_input_len = decoding_params.max_input_len;
 
-      const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
+      const int local_batch_size = ceil(request_batch_size * 1.0 / l_parallel_param_.world_size);
       const int m = local_batch_size * input_len;
       const int h_1 = args_.hidden_units_;
 
@@ -458,7 +458,7 @@ public:
 
       int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
       size_t cache_size = local_batch_size * dummy_decoder_max_seq_len *
-                args_.hidden_units_;
+                          t_parallel_param_.local_hidden_units_;
 
       int in_id, out_id;
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
@@ -703,7 +703,8 @@ public:
 
       int from_id, out_id;
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        if (l_parallel_param_.is_valid(layer)) { /*
+        if (l_parallel_param_.is_valid(layer)) {
+          /*
              For the first layer (layer-0), from_id is 0. We also stored the
              embedding lookup
              result in from_tensor_[0]
