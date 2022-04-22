@@ -199,6 +199,9 @@ def evaluate(model, data_loader, do_predict=False):
 
 
 def run(args):
+    if args.do_train:
+        assert args.batch_size % args.gradient_accumulation_steps == 0, \
+            "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     set_seed(args)
 

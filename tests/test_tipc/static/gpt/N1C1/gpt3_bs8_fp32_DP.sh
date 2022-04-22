@@ -1,10 +1,10 @@
-model_item=transformer_base
-model=transformer
-bs_item=4096
-fp_item=amp_fp16
+model_item=gpt3
+model=gpt
+bs_item=8
+fp_item=fp32
 run_mode=DP
 device_num=N1C1
-max_epochs=500
+max_epochs=200
 num_workers=0
 
 # get data
