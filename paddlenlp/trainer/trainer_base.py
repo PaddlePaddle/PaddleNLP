@@ -1343,9 +1343,8 @@ class Trainer:
         args = self.args
 
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
-        prediction_loss_only = False
 
-        model = self._wrap_model(self.model, training=False)
+        model = self.model
 
         batch_size = dataloader.batch_sampler.batch_size
         if max_eval_iters <= 0:
@@ -1395,7 +1394,6 @@ class Trainer:
             # Prediction step
             loss, logits, labels = self.prediction_step(
                 model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
-
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
@@ -1418,7 +1416,6 @@ class Trainer:
                 args, self.state, self.control)
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
                 break
-
         # Gather all remaining tensors and put them back on the CPU
         if losses_host is not None:
             losses = nested_numpify(losses_host)
