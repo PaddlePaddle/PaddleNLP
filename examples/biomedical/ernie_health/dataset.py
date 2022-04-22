@@ -111,7 +111,7 @@ class DataCollatorForErnieHealth(object):
             [masked_input_ids_a, masked_input_ids_b], axis=0).astype('int64')
         input_ids = paddle.concat([input_ids_a, input_ids_b], axis=0)
         labels = paddle.concat([labels_a, labels_b], axis=0)
-        if return_dict:
+        if self.return_dict:
             return {
                 "input_ids": masked_input_ids,
                 "raw_input_ids": input_ids,

@@ -960,6 +960,8 @@ class Trainer:
         elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
             labels = (inputs.pop("start_positions"),
                       inputs.pop("end_positions"))
+        elif self.criterion is not None and "generator_labels" in inputs:
+            labels = inputs["generator_labels"]
         else:
             labels = None
         outputs = model(**inputs)
