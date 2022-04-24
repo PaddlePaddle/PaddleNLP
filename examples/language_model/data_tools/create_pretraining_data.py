@@ -43,7 +43,7 @@ def get_args():
         required=True,
         choices=[
             'ErnieTokenizer', 'BertTokenizer', 'GPTTokenizer',
-            'GPTChineseTokenizer'
+            'GPTChineseTokenizer', 'ElectraTokenizer'
         ],
         help='What type of tokenizer to use.')
     group = parser.add_argument_group(title='data input/output')
