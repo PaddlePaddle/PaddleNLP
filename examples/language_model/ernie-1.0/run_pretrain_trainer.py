@@ -240,7 +240,8 @@ class PretrainingTrainer(Trainer):
         if eval_dataloader is None:
             eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
             eval_dataloader = self.get_eval_dataloader(eval_dataset)
-            self.eval_dataloader = eval_dataloader
+            # must call data loader, otherwise, it will init many times, cause OOM error.
+            self.eval_dataloader = eval_dataloader()
 
         start_time = time.time()
         # Temporarily disable metric computation, we will do it in the loop here.

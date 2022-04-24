@@ -1346,18 +1346,32 @@ class Trainer:
 
         model = self.model
 
-        batch_size = dataloader.batch_sampler.batch_size
+        batch_sampler = None
+        if isinstance(dataloader, paddle.io.DataLoader):
+            batch_size = dataloader.batch_sampler.batch_size
+        elif isinstance(
+                dataloader,
+                paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+            # support for inner dataloader
+            batch_size = dataloader._batch_sampler.batch_size
+            # alias for inner dataloader
+            dataloader.dataset = dataloader._dataset
+        else:
+            raise ValueError("Only support for paddle.io.DataLoader")
+
         if max_eval_iters <= 0:
             num_samples = self.num_examples(dataloader)
         else:
             num_samples = batch_size * self.args.world_size * max_eval_iters
-            if isinstance(dataloader, paddle.io.DataLoader) and isinstance(
-                    dataloader.batch_sampler,
-                    paddlenlp.utils.batch_sampler.DistributedBatchSampler):
+            if isinstance(
+                    dataloader, paddle.fluid.dataloader.dataloader_iter.
+                    _DataLoaderIterBase) and isinstance(
+                        dataloader._batch_sampler,
+                        paddlenlp.utils.batch_sampler.DistributedBatchSampler):
                 consumed_samples = (
-                    (self.state.global_step + 1) // args.eval_steps
+                    (self.state.global_step) // args.eval_steps
                 ) * max_eval_iters * args.eval_batch_size * args.world_size
-                dataloader.batch_sampler.set_epoch(
+                dataloader._batch_sampler.set_epoch(
                     consumed_samples=consumed_samples)
 
         logger.info(f"***** Running {description} *****")
