@@ -90,7 +90,7 @@ class VisualDLCallback(TrainerCallback):
                 if hasattr(model,
                            "init_config") and model.init_config is not None:
                     model_config_json = json.dumps(
-                        model.get_model_config(), ensure_ascii=False)
+                        model.get_model_config(), ensure_ascii=False, indent=2)
                     self.vdl_writer.add_text("model_config", model_config_json)
             if hasattr(self.vdl_writer, "add_hparams"):
                 self.vdl_writer.add_hparams(

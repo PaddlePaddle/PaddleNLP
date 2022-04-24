@@ -94,10 +94,6 @@ class ModelArguments:
             "help":
             "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
-    hidden_dropout_prob: float = field(
-        default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(
-        default=0.1, metadata={"help": "The attention probs dropout prob."})
     config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -159,7 +155,7 @@ def main():
     ) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(
-                os.listdir(training_args.output_dir)) > 0:
+                os.listdir(training_args.output_dir)) > 1:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
                 "Use --overwrite_output_dir to overcome.")
@@ -194,9 +190,6 @@ def main():
         getattr(model.generator,
                 ElectraGenerator.base_model_prefix).config["vocab_size"],
         model.gen_weight)
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
 
     # Loads dataset.
     tic_load_data = time.time()
