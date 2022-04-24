@@ -479,16 +479,15 @@ class Trainer:
                               paddle.io.DataLoader) and isinstance(
                                   train_dataloader.batch_sampler, paddlenlp.
                                   utils.batch_sampler.DistributedBatchSampler):
-                    if steps_trained_in_current_epoch > 0:
+                    if step == 0:
                         if steps_trained_progress_bar is not None:
                             steps_trained_progress_bar.update(
                                 steps_trained_in_current_epoch)
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
-                        steps_trained_in_current_epoch = -1
                         self._load_rng_state(resume_from_checkpoint)
-
-                if steps_trained_in_current_epoch > 0:
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
