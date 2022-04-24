@@ -32,7 +32,7 @@ def read_by_lines(path):
 
 def write_by_lines(path, data):
     """write the data"""
-    with open(path, "w") as outfile:
+    with open(path, "w", encoding="utf8") as outfile:
         [outfile.write(d + "\n") for d in data]
 
 
