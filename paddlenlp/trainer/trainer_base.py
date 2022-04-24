@@ -84,6 +84,7 @@ from .utils.helper import (
     nested_truncate, )
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
+DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -239,8 +240,8 @@ class Trainer:
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
                                                 self.lr_scheduler)
-
-        self.add_callback(ProgressCallback)
+        self.add_callback(PrinterCallback if self.args.disable_tqdm else
+                          DEFAULT_PROGRESS_CALLBACK)
 
         if args.max_steps > 0:
             logger.info(
