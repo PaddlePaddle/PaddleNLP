@@ -15,4 +15,3 @@
 from .argparser import PdArgumentParser
 from .trainer_args import TrainingArguments
 from .trainer_base import Trainer
-from .trainer_compress import *

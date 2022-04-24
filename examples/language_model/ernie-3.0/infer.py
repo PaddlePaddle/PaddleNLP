@@ -57,9 +57,9 @@ def parse_args():
         help="The directory or name of model.", )
     parser.add_argument(
         "--model_path",
-        default='tnews_quant_models/mse4/int8',  # tnews_for_test_414/float32
+        default='tnews_quant_models/mse4/int8',
         type=str,
-        # required=True,
+        required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
         "--device",
@@ -90,12 +90,6 @@ def parse_args():
         "--perf",
         action='store_true',
         help="Whether to test performance.", )
-    parser.add_argument(
-        "--use_faster_tokenizer",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Whether to use FasterTokenizer to accelerate training or further inference."
-    )
     parser.add_argument(
         "--int8",
         action='store_true',
@@ -161,11 +155,9 @@ def convert_example(example,
             text_pair=example['sentence2'],
             max_seq_len=max_seq_length)
     if not is_test:
-        return example['input_ids'], example[
-            'token_type_ids'], label  #position_ids, attention_mask, task_type_ids, label
+        return example['input_ids'], example['token_type_ids'], label
     else:
-        return example['input_ids'], example[
-            'token_type_ids']  # , position_ids, attention_mask, task_type_ids
+        return example['input_ids'], example['token_type_ids']
 
 
 @paddle.no_grad()
@@ -240,64 +232,32 @@ class Predictor(object):
             min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
             #min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32
             min_seq_len, max_seq_len, opt_seq_len = 1, 512, 32
-            if args.use_faster_tokenizer:
-                min_input_shape = {
-                    "faster_tokenizer_1.tmp_0": [min_batch_size, min_seq_len],
-                    "faster_tokenizer_1.tmp_1": [min_batch_size, min_seq_len],
-                    "tmp_4": [min_batch_size, min_seq_len],
-                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len],
-                }
-                max_input_shape = {
-                    "faster_tokenizer_1.tmp_0": [max_batch_size, max_seq_len],
-                    "faster_tokenizer_1.tmp_1": [max_batch_size, max_seq_len],
-                    "tmp_4": [max_batch_size, max_seq_len],
-                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len],
-                }
-                opt_input_shape = {
-                    "faster_tokenizer_1.tmp_0": [opt_batch_size, opt_seq_len],
-                    "faster_tokenizer_1.tmp_1": [opt_batch_size, opt_seq_len],
-                    "tmp_4": [opt_batch_size, opt_seq_len],
-                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
-                }
-            else:
-                min_input_shape = {
-                    "input_ids": [min_batch_size, min_seq_len],
-                    "token_type_ids": [min_batch_size, min_seq_len],
-                    #"position_ids": [min_batch_size, min_seq_len],
-                    #"task_type_ids": [min_batch_size, min_seq_len],
-                    #"full_like_0.tmp_0": [min_batch_size, min_seq_len],
-                    "full_like_1.tmp_0": [min_batch_size, min_seq_len],
-                    "tmp_4": [min_batch_size, min_seq_len],
-                    #"attention_mask": [min_batch_size,12, min_seq_len, min_seq_len],
-                    #"attention_mask": [min_batch_size, 1, 1, min_seq_len],
-                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
-                    #"cast_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
-                }
-                max_input_shape = {
-                    "input_ids": [max_batch_size, max_seq_len],
-                    "token_type_ids": [max_batch_size, max_seq_len],
-                    #"task_type_ids": [max_batch_size, max_seq_len],
-                    #"position_ids": [max_batch_size, max_seq_len],
-                    "full_like_1.tmp_0": [max_batch_size, max_seq_len],
-                    "tmp_4": [max_batch_size, max_seq_len],
-                    #"cast_0.tmp_0": [max_batch_size, 1, 1, max_seq_len],
-                    #"attention_mask": [max_batch_size, 12, max_seq_len, max_seq_len],
-                    #"attention_mask": [max_batch_size, 1, max_seq_len],
-                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
-                }
-                opt_input_shape = {
-                    "input_ids": [opt_batch_size, opt_seq_len],
-                    "token_type_ids": [opt_batch_size, opt_seq_len],
-                    #"task_type_ids": [opt_batch_size, opt_seq_len],
-                    #"position_ids": [opt_batch_size, opt_seq_len],
-                    "full_like_1.tmp_0": [opt_batch_size, opt_seq_len],
-                    "tmp_4": [opt_batch_size, opt_seq_len],
-                    #"tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
-                    #"cast_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
-                    #"attention_mask": [opt_batch_size, 12, opt_seq_len, opt_seq_len],
-                    #"attention_mask": [opt_batch_size, 1, 1, opt_seq_len],
-                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
-                }
+            min_input_shape = {
+                "input_ids": [min_batch_size, min_seq_len],
+                "token_type_ids": [min_batch_size, min_seq_len],
+                #"full_like_0.tmp_0": [min_batch_size, min_seq_len],
+                "full_like_1.tmp_0": [min_batch_size, min_seq_len],
+                "tmp_4": [min_batch_size, min_seq_len],
+                "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
+                #"cast_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
+            }
+            max_input_shape = {
+                "input_ids": [max_batch_size, max_seq_len],
+                "token_type_ids": [max_batch_size, max_seq_len],
+                "full_like_1.tmp_0": [max_batch_size, max_seq_len],
+                "tmp_4": [max_batch_size, max_seq_len],
+                #"cast_0.tmp_0": [max_batch_size, 1, 1, max_seq_len],
+                "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
+            }
+            opt_input_shape = {
+                "input_ids": [opt_batch_size, opt_seq_len],
+                "token_type_ids": [opt_batch_size, opt_seq_len],
+                "full_like_1.tmp_0": [opt_batch_size, opt_seq_len],
+                "tmp_4": [opt_batch_size, opt_seq_len],
+                #"tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
+                #"cast_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len],
+                "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
+            }
 
             shape_file = "shape_info_aft_prune.txt"
             #config.collect_shape_range_info(shape_file)
@@ -334,69 +294,6 @@ class Predictor(object):
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]
         return output
-
-    def faster_predict(self, dataset, args):
-        batch_num = 0
-        if 'sentence' in dataset[0]:
-            data = [example["sentence"] for example in dataset]
-            batches = [
-                data[idx:idx + args.batch_size]
-                for idx in range(0, len(data), args.batch_size)
-            ]
-            batch_num = len(batches)
-        else:
-            data1 = [example["sentence1"] for example in dataset]
-            data2 = [example["sentence2"] for example in dataset]
-            batches1 = [
-                data1[idx:idx + args.batch_size]
-                for idx in range(0, len(data1), args.batch_size)
-            ]
-            batches2 = [
-                data2[idx:idx + args.batch_size]
-                for idx in range(0, len(data1), args.batch_size)
-            ]
-            batch_num = len(batches1)
-        if args.perf:
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
-                    output = self.predict_batch([batches[i]])
-                else:
-                    output = self.predict_batch([batches1[i], batches2[i]])
-                if i > args.perf_warmup_steps:
-                    break
-            time1 = time.time()
-            if 'sentence' in dataset[0]:
-                for i in range(batch_num):
-                    output = self.predict_batch([batches[i]])
-            else:
-                for i in range(batch_num):
-                    output = self.predict_batch([batches1[i], batches2[i]])
-            print("task name: %s, time: %s, " %
-                  (args.task_name, time.time() - time1))
-            return output
-
-        else:
-            labels = [example['label'] for example in dataset]
-
-            batched_labels = [
-                labels[idx:idx + args.batch_size]
-                for idx in range(0, len(labels), args.batch_size)
-            ]
-            metric = METRIC_CLASSES[args.task_name]()
-            metric.reset()
-
-            for i in range(batch_num):
-                if 'sentence' in dataset[0]:
-                    logits = self.predict_batch([batches[i]])
-                else:
-                    logits = self.predict_batch([batches1[i], batches2[i]])
-                correct = metric.compute(
-                    paddle.to_tensor(logits),
-                    paddle.to_tensor(batched_labels[i]))
-                metric.update(correct)
-
-            res = metric.accumulate()
-            print("task name: %s, acc: %s, " % (args.task_name, res), end='')
 
     def convert_predict_batch(self, args, data, tokenizer, batchify_fn,
                               label_list):
@@ -467,28 +364,20 @@ def main():
     args.task_name = args.task_name.lower()
 
     predictor = Predictor.create_predictor(args)
-    print("predictor")
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    if not args.use_faster_tokenizer:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    else:
-        trans_func = partial(
-            convert_example, label_list=dev_ds.label_list, is_test=False)
-        dev_ds = dev_ds.map(trans_func, lazy=True)
-    if not args.use_faster_tokenizer:
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-            #Pad(axis=0, pad_val=tokenizer.pad_token_id),  # position
-            #Pad(axis=0, pad_val=tokenizer.pad_token_id),  # attention_mask
-            #Pad(axis=0, pad_val=tokenizer.pad_token_id),  # task_type_ids
-            Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-        ): fn(samples)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
-    else:
-        outputs = predictor.faster_predict(dev_ds, args=args)
+    trans_func = partial(
+        convert_example, label_list=dev_ds.label_list, is_test=False)
+    dev_ds = dev_ds.map(trans_func, lazy=True)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+        Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
+    ): fn(samples)
+    outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
 if __name__ == "__main__":

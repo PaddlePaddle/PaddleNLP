@@ -31,6 +31,8 @@ from paddlenlp.transformers import (
     AutoModelForSequenceClassification, )
 from paddlenlp.utils.log import logger
 
+import compress_trainer
+
 sys.path.append("../../language_model/ernie-1.0/finetune")
 
 from sequence_classification import seq_trans_fn, clue_trans_fn
