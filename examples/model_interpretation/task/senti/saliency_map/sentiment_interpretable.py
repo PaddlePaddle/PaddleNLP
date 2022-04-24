@@ -176,14 +176,13 @@ def map_fn_senti(examples, tokenizer, args):
     else:
         contexts = [example['context'] for example in examples]
     tokenized_examples = tokenizer(contexts, max_seq_len=args.max_seq_len)
+    tokenized_examples = convert_tokenizer_res_to_old_version(
+        tokenized_examples)
     for i in range(len(tokenized_examples)):
         tokenized_examples[i]['offset_mapping'] = [
             (0, 0)
         ] + tokenizer.get_offset_mapping(contexts[i])[:args.max_seq_len -
                                                       2] + [(0, 0)]
-    tokenized_examples = convert_tokenizer_res_to_old_version(
-        tokenized_examples)
-
     return tokenized_examples
 
 
