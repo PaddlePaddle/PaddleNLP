@@ -6,18 +6,15 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 ## File Structure
 
-| File                     | Description                                                        |
-| ------------------------ | ------------------------------------------------------------------ |
-| `README.md`              | How to run the model.                                              |
-| `run_pretrain.py`        | The algorithm script to run pretraining tasks (phase1 and phase2). |
-| `run_squad.py`           | The algorithm script to run SQuAD finetune and validation task.    |
-| `modeling.py`            | The algorithm script to build the Bert-Base model.                 |
-| `dataset_ipu.py`         | The algorithm script to load input data in pretraining.            |
-| `custom_ops/`            | The folder contains custom ops that will be used.                  |
-| `run_pretrain.sh`        | Test script to run pretrain phase 1.                               |
-| `run_pretrain_phase2.sh` | Test script to run pretrain phase 2.                               |
-| `run_squad.sh`           | Test script to run SQuAD finetune.                                 |
-| `run_squad_infer.sh`     | Test script to run SQuAD validation.                               |
+| File              | Description                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| `README.md`       | How to run the model.                                              |
+| `run_pretrain.py` | The algorithm script to run pretraining tasks (phase1 and phase2). |
+| `run_squad.py`    | The algorithm script to run SQuAD finetune and validation task.    |
+| `modeling.py`     | The algorithm script to build the Bert-Base model.                 |
+| `dataset_ipu.py`  | The algorithm script to load input data in pretraining.            |
+| `custom_ops/`     | The folder contains custom ops that will be used.                  |
+| `scripts/`        | The folder contains scripts for model running.                     |
 
 ## Dataset
 
@@ -119,25 +116,45 @@ cd /workdir
 - Run pretraining phase1 (sequence_length = 128)
 
 ```bash
-./run_pretrain.sh
+# pod16
+# takes about 11.3 hours
+bash scripts/pod16/run_pretrain.sh
+
+# pod4
+# takes about 11.3 * 4 hours
+bash scripts/pod4/run_pretrain.sh
 ```
 
 - Run pretraining phase2 (sequence_length = 384)
 
 ```bash
-./run_pretrain_phase2.sh
+# pod16
+# takes about 3 hours
+bash scripts/pod16/run_pretrain_phase2.sh
+
+# pod4
+# takes about 3 * 4 hours
+bash scripts/pod4/run_pretrain_phase2.sh
 ```
 
 - Run SQuAD finetune task
 
 ```bash
-./run_squad.sh
+# pod16
+bash scripts/pod16/run_squad.sh
+
+# pod4
+bash scripts/pod4/run_squad.sh
 ```
 
 - Run SQuAD validation
 
 ```bash
-./run_squad_infer.sh
+# pod16
+bash scripts/pod16/run_squad_infer.sh
+
+# pod4
+bash scripts/pod4/run_squad_infer.sh
 ```
 
 #### Parameters
@@ -187,6 +204,8 @@ cd /workdir
 - `tf_checkpoint` Path to Tensorflow Checkpoint to initialise the model.
 
 ## Result
+
+For a POD16 platform:
 
 | Task   | Metric   | Result  |
 | ------ | -------- | ------- |
