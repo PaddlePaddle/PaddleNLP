@@ -84,6 +84,7 @@ from .utils.helper import (
     nested_truncate, )
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
+DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -239,8 +240,8 @@ class Trainer:
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
                                                 self.lr_scheduler)
-
-        self.add_callback(ProgressCallback)
+        self.add_callback(PrinterCallback if self.args.disable_tqdm else
+                          DEFAULT_PROGRESS_CALLBACK)
 
         if args.max_steps > 0:
             logger.info(
@@ -478,16 +479,15 @@ class Trainer:
                               paddle.io.DataLoader) and isinstance(
                                   train_dataloader.batch_sampler, paddlenlp.
                                   utils.batch_sampler.DistributedBatchSampler):
-                    if steps_trained_in_current_epoch > 0:
+                    if step == 0:
                         if steps_trained_progress_bar is not None:
                             steps_trained_progress_bar.update(
                                 steps_trained_in_current_epoch)
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
-                        steps_trained_in_current_epoch = -1
                         self._load_rng_state(resume_from_checkpoint)
-
-                if steps_trained_in_current_epoch > 0:
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
@@ -1348,18 +1348,32 @@ class Trainer:
 
         model = self.model
 
-        batch_size = dataloader.batch_sampler.batch_size
+        batch_sampler = None
+        if isinstance(dataloader, paddle.io.DataLoader):
+            batch_size = dataloader.batch_sampler.batch_size
+        elif isinstance(
+                dataloader,
+                paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+            # support for inner dataloader
+            batch_size = dataloader._batch_sampler.batch_size
+            # alias for inner dataloader
+            dataloader.dataset = dataloader._dataset
+        else:
+            raise ValueError("Only support for paddle.io.DataLoader")
+
         if max_eval_iters <= 0:
             num_samples = self.num_examples(dataloader)
         else:
             num_samples = batch_size * self.args.world_size * max_eval_iters
-            if isinstance(dataloader, paddle.io.DataLoader) and isinstance(
-                    dataloader.batch_sampler,
-                    paddlenlp.utils.batch_sampler.DistributedBatchSampler):
+            if isinstance(
+                    dataloader, paddle.fluid.dataloader.dataloader_iter.
+                    _DataLoaderIterBase) and isinstance(
+                        dataloader._batch_sampler,
+                        paddlenlp.utils.batch_sampler.DistributedBatchSampler):
                 consumed_samples = (
-                    (self.state.global_step + 1) // args.eval_steps
+                    (self.state.global_step) // args.eval_steps
                 ) * max_eval_iters * args.eval_batch_size * args.world_size
-                dataloader.batch_sampler.set_epoch(
+                dataloader._batch_sampler.set_epoch(
                     consumed_samples=consumed_samples)
 
         logger.info(f"***** Running {description} *****")
