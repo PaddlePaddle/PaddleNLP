@@ -1030,10 +1030,8 @@ class AlbertModel(AlbertPretrainedModel):
         if token_type_ids is None:
             token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = paddle.cast(
-            extended_attention_mask, dtype=dtype_float)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask, input_shape)
         head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
 
         embedding_output = self.embeddings(

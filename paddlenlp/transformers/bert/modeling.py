@@ -490,18 +490,14 @@ class BertModel(BertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
-
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
-            if attention_mask.ndim == 2:
-                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(
-                    axis=[1, 2]).astype(paddle.get_default_dtype())
-                attention_mask = (1.0 - attention_mask) * -1e4
+            attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                              input_ids.shape)
 
         embedding_output = self.embeddings(
             input_ids=input_ids,

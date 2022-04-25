@@ -155,6 +155,40 @@ class PretrainedModel(Layer, GenerationMixin):
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
 
+    def get_extended_attention_mask(self, attention_mask, input_shape):
+        """
+        Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
+
+        Arguments:
+            attention_mask (Tensor):
+                Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
+            input_shape (Tuple[int]):
+                The shape of the input to the model.
+
+        Returns:
+            Tensor: The extended attention mask, with a the same dtype as `attention_mask.dtype`.
+        """
+
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        if attention_mask.ndim == 3:
+            extended_attention_mask = attention_mask.unsqueeze(axis=1)
+        # Provided a padding mask of dimensions [batch_size, seq_length]
+        # - if the model is a decoder, apply a causal mask in addition to the padding mask
+        # - if the model is an encoder, make the mask broadcastable to
+        # [batch_size, num_heads, seq_length, seq_length]
+        elif attention_mask.ndim == 2:
+            extended_attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+        else:
+            raise ValueError(
+                f"Wrong shape for input_ids (shape {input_shape}) or attention_mask (shape {attention_mask.shape})"
+            )
+
+        extended_attention_mask = extended_attention_mask.astype(
+            paddle.get_default_dtype())
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        return extended_attention_mask
+
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """

@@ -254,7 +254,9 @@ class BlenderbotEncoder(BlenderbotPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            attention_mask.stop_gradient = True
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                              input_ids.shape)
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         # Different from BlenderbotSmall, Blenderbot Encoder apply the final layer norm on encoder output
