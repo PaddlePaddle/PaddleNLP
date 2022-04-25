@@ -1473,7 +1473,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 pretrained_model_name_or_path, cls.tokenizer_config_file)
         else:
             # Assuming from community-contributed pretrained models
-            for file_id, file_name in cls.vocab_files_target.items():
+            for file_id, file_name in vocab_files_target.items():
                 full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
                                               pretrained_model_name_or_path,
                                               file_name)
@@ -1632,7 +1632,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Check all our special tokens are registered as "no split" token (we don't cut them) and are in the vocab
         added_tokens = tokenizer.sanitize_special_tokens()
         if added_tokens:
-            logger.warning_advice(
+            logger.info(
                 "Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained."
             )
 
