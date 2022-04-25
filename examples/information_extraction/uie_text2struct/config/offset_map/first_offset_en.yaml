@@ -1,0 +1,3 @@
+map_strategy: "first"
+de_duplicate: True
+span_to_token: "space"
