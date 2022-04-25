@@ -26,7 +26,7 @@ from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_t
 usage = r"""
             from paddlenlp import Taskflow
 
-            # 定义schema（抽取目标）
+            # Define the schema for extraction
             schema = ["寺庙", {"丈夫": ["妻子"]}]
             ie = Taskflow("information_extraction", schema=schema) 
             ie("李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。")           
@@ -35,7 +35,7 @@ usage = r"""
             '''
 
             schema_senta = [{"水果": ["情感倾向[正向，负向]"]}]
-            # 使用新的schema进行预测
+            # Set another schema to predict
             ie.set_schema(schema_senta)
             ie("今天去超市买了葡萄、苹果，都很好吃")
             '''
@@ -137,20 +137,23 @@ class UIETask(Task):
 
     def _single_stage_predict(self, inputs):
         input_texts = []
-
-        prompt = inputs[0]["prompt"]
+        prompts = []
         for i in range(len(inputs)):
             input_texts.append(inputs[i]["text"])
-
+            prompts.append(inputs[i]["prompt"])
         # max predict length should exclude the length of prompt and summary tokens
-        max_predict_len = self._max_seq_len - len(prompt) - 3
+        max_predict_len = self._max_seq_len - len(max(prompts)) - 3
 
         short_input_texts, self.input_mapping = self._auto_splitter(
             input_texts, max_predict_len, split_sentence=self._split_sentence)
 
-        short_inputs = []
-        for short_input_text in short_input_texts:
-            short_inputs.append({"text": short_input_text, "prompt": prompt})
+        short_texts_prompts = []
+        for k, v in self.input_mapping.items():
+            short_texts_prompts.extend([prompts[k] for i in range(len(v))])
+        short_inputs = [{
+            "text": short_input_texts[i],
+            "prompt": short_texts_prompts[i]
+        } for i in range(len(short_input_texts))]
 
         def read(inputs):
             for example in inputs:
@@ -372,11 +375,15 @@ class UIETask(Task):
                 schema_tree.add_child(SchemaTree(s))
             elif isinstance(s, dict):
                 for k, v in s.items():
-                    if not isinstance(v, list):
+                    if isinstance(v, str):
+                        child = [v]
+                    elif isinstance(v, list):
+                        child = v
+                    else:
                         raise TypeError(
-                            "Invalid schema, value for each key:value pairs should be list, "
+                            "Invalid schema, value for each key:value pairs should be list or string"
                             "but {} received".format(type(v)))
-                    schema_tree.add_child(self._build_tree(v, name=k))
+                    schema_tree.add_child(self._build_tree(child, name=k))
             else:
                 raise TypeError(
                     "Invalid schema, element should be string or dict, "

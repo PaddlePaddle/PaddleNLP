@@ -318,4 +318,5 @@ class Taskflow(object):
                 print("[Bot]:%s" % robot)
 
     def set_schema(self, schema):
+        assert self.task_instance.model == "uie", 'This method can only used for the task with uie model.'
         self.task_instance.set_schema(schema)
