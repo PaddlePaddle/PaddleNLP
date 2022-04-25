@@ -1,4 +1,4 @@
-python -u -m paddle.distributed.launch --gpus '4' \
+python -u -m paddle.distributed.launch --gpus '0' \
 	train.py \
 	--device gpu \
 	--save_dir ./checkpoints/ \

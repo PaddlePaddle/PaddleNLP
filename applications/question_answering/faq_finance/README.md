@@ -4,7 +4,7 @@
 
 * [1. 场景概述](#场景概述)
 * [2. 系统特色](#系统特色)
-* [3. 保险智能问答系统方案](#政务问答系统方案)
+* [3. 保险智能问答系统方案](#保险问答系统方案)
 * [4. 动手实践——搭建自己的端到端检索式问答系统](#动手实践——搭建自己的端到端检索式问答系统)  
 
 
@@ -22,7 +22,7 @@
     + 手把手搭建检索式保险智能问答
     + 无需相似 Query-Query Pair 标注数据也能构建保险智能问答
 + 效果好
-    + 业界领先的检索预训练模型: RocketQA DualEncoder
+    + 业界领先的检索预训练模型: RocketQA Dual Encoder
     + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
 
 + 性能快
@@ -53,8 +53,9 @@
 | ------------ | ------------ |------------ | ------------ | ------------ |
 |  召回 |  SimCSE  |  3030 | 758 | 3788 |
 
-其中训练集的问题-问题对的构造使用了同义词替换的方法，详情请参考
-其中评估集的问题对的构造使用了中英文回译的方法，数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)
+其中训练集的问题-问题对的构造使用了同义词替换的方法，详情请参考[nlpcda](https://github.com/425776024/nlpcda)
+
+评估集的问题对的构造使用了中英文回译的方法，数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)
 
 
 ```
@@ -64,7 +65,7 @@
     ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
     ├── qa_pair.csv # 问答对，问题对应的答案
 ```
-数据集的下载链接为: [faq_data](https://paddlenlp.bj.bcebos.com/applications/faq_data.zip)
+数据集的下载链接为: [faq_finance](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)
 
 ### 3.3 代码说明
 
@@ -81,7 +82,6 @@
 |—— feature_extract.py # 批量提取文本的特征向量
 |—— milvus_util.py # Milvus的插入和召回类
 |—— vector_insert.py # 向 Milvus 引擎插入向量的函数
-|—— run_system_2.0.py # 动态图抽取向量，并检索相关向量得到文本
 |—— run_system.py # Client Server 模式客户端，向 server 发送文本，得到向量后，利用milvus引擎进行检索
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本
@@ -113,7 +113,7 @@
 ### 4.1 无监督训练
 
 ```
-python -u -m paddle.distributed.launch --gpus '4' \
+python -u -m paddle.distributed.launch --gpus '0' \
 	train.py \
 	--device gpu \
 	--save_dir ./checkpoints/ \
@@ -174,7 +174,7 @@ d. 评估
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
 ```
-python -u -m paddle.distributed.launch --gpus "4" --log_dir "recall_log/" \
+python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
@@ -350,8 +350,6 @@ list_data = ["买了社保，是不是就不用买商业保险了？"]
 
 ```
 ......
-Extract feature time to cost :0.01161503791809082 seconds
-Search milvus time cost is 0.004535675048828125 seconds
 PipelineClient::predict pack_data time:1650712793.4998188
 PipelineClient::predict before time:1650712793.5002873
 Extract feature time to cost :0.012665271759033203 seconds

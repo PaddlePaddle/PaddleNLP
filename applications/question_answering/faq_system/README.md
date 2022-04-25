@@ -80,7 +80,6 @@
 |—— feature_extract.py # 批量提取文本的特征向量
 |—— milvus_util.py # Milvus的插入和召回类
 |—— vector_insert.py # 向 Milvus 引擎插入向量的函数
-|—— run_system_2.0.py # 动态图抽取向量，并检索相关向量得到文本
 |—— run_system.py # Client Server 模式客户端，向 server 发送文本，得到向量后，利用milvus引擎进行检索
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本

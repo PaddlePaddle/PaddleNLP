@@ -1,5 +1,5 @@
 # gpu
-python -u -m paddle.distributed.launch --gpus "4" --log_dir "recall_log/" \
+python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
