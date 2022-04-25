@@ -14,6 +14,7 @@
 
 import math
 import json
+from tqdm import tqdm
 
 import paddle
 import random
@@ -104,32 +105,35 @@ def save_examples(examples, save_path, idxs):
                 f.write(line)
 
 
-def add_negtive_example(examples, texts, prompts, label_set, negative_ratio):
-    for i, prompt in enumerate(prompts):
-        negtive_sample = []
-        redundants_list = list(set(label_set) ^ set(prompt))
-        redundants_list.sort()
+def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
+    with tqdm(total=len(prompts)) as pbar:
+        for i, prompt in enumerate(prompts):
+            negtive_sample = []
+            redundants_list = list(set(label_set) ^ set(prompt))
+            redundants_list.sort()
 
-        if len(examples[i]) == 0:
-            continue
-        else:
-            actual_ratio = math.ceil(len(redundants_list) / len(examples[i]))
+            if len(examples[i]) == 0:
+                continue
+            else:
+                actual_ratio = math.ceil(
+                    len(redundants_list) / len(examples[i]))
 
-        if actual_ratio <= negative_ratio:
-            idxs = [k for k in range(len(redundants_list))]
-        else:
-            idxs = random.sample(
-                range(0, len(redundants_list)),
-                negative_ratio * len(examples[i]))
+            if actual_ratio <= negative_ratio:
+                idxs = [k for k in range(len(redundants_list))]
+            else:
+                idxs = random.sample(
+                    range(0, len(redundants_list)),
+                    negative_ratio * len(examples[i]))
 
-        for idx in idxs:
-            negtive_result = {
-                "content": texts[i],
-                "result_list": [],
-                "prompt": redundants_list[idx]
-            }
-            negtive_sample.append(negtive_result)
-        examples[i].extend(negtive_sample)
+            for idx in idxs:
+                negtive_result = {
+                    "content": texts[i],
+                    "result_list": [],
+                    "prompt": redundants_list[idx]
+                }
+                negtive_sample.append(negtive_result)
+            examples[i].extend(negtive_sample)
+            pbar.update(1)
     return examples
 
 
@@ -153,92 +157,100 @@ def convert_doccano_examples(raw_examples, negative_ratio):
     entity_name_set = []
     predicate_set = []
 
-    for line in raw_examples:
-        items = json.loads(line)
-        text, relations, entities = items["text"], items["relations"], items[
-            "entities"]
-        texts.append(text)
+    print(f"Converting doccano data...")
+    with tqdm(total=len(raw_examples)) as pbar:
+        for line in raw_examples:
+            items = json.loads(line)
+            text, relations, entities = items["text"], items[
+                "relations"], items["entities"]
+            texts.append(text)
 
-        entity_example = []
-        entity_prompt = []
-        entity_example_map = {}
-        entity_map = {}  # id to entity name
-        for entity in entities:
-            entity_name = text[entity["start_offset"]:entity["end_offset"]]
-            entity_map[entity["id"]] = {
-                "name": entity_name,
-                "start": entity["start_offset"],
-                "end": entity["end_offset"]
-            }
-
-            entity_label = entity["label"]
-            result = {
-                "text": entity_name,
-                "start": entity["start_offset"],
-                "end": entity["end_offset"]
-            }
-            if entity_label not in entity_example_map.keys():
-                entity_example_map[entity_label] = {
-                    "content": text,
-                    "result_list": [result],
-                    "prompt": entity_label
+            entity_example = []
+            entity_prompt = []
+            entity_example_map = {}
+            entity_map = {}  # id to entity name
+            for entity in entities:
+                entity_name = text[entity["start_offset"]:entity["end_offset"]]
+                entity_map[entity["id"]] = {
+                    "name": entity_name,
+                    "start": entity["start_offset"],
+                    "end": entity["end_offset"]
                 }
-            else:
-                entity_example_map[entity_label]["result_list"].append(result)
 
-            if entity_label not in entity_label_set:
-                entity_label_set.append(entity_label)
-            if entity_name not in entity_name_set:
-                entity_name_set.append(entity_name)
-            entity_prompt.append(entity_label)
-
-        for v in entity_example_map.values():
-            entity_example.append(v)
-
-        entity_examples.append(entity_example)
-        entity_prompts.append(entity_prompt)
-
-        relation_example = []
-        relation_prompt = []
-        relation_example_map = {}
-        for relation in relations:
-            predicate = relation["type"]
-            subject_id = relation["to_id"]
-            object_id = relation["from_id"]
-            relation_label = entity_map[subject_id]["name"] + "的" + predicate
-            result = {
-                "text": entity_map[object_id]["name"],
-                "start": entity_map[object_id]["start"],
-                "end": entity_map[object_id]["end"]
-            }
-            if relation_label not in relation_example_map.keys():
-                relation_example_map[relation_label] = {
-                    "content": text,
-                    "result_list": [result],
-                    "prompt": relation_label
+                entity_label = entity["label"]
+                result = {
+                    "text": entity_name,
+                    "start": entity["start_offset"],
+                    "end": entity["end_offset"]
                 }
-            else:
-                relation_example_map[relation_label]["result_list"].append(
-                    result)
+                if entity_label not in entity_example_map.keys():
+                    entity_example_map[entity_label] = {
+                        "content": text,
+                        "result_list": [result],
+                        "prompt": entity_label
+                    }
+                else:
+                    entity_example_map[entity_label]["result_list"].append(
+                        result)
 
-            if predicate not in predicate_set:
-                predicate_set.append(predicate)
-            relation_prompt.append(relation_label)
+                if entity_label not in entity_label_set:
+                    entity_label_set.append(entity_label)
+                if entity_name not in entity_name_set:
+                    entity_name_set.append(entity_name)
+                entity_prompt.append(entity_label)
 
-        for v in relation_example_map.values():
-            relation_example.append(v)
+            for v in entity_example_map.values():
+                entity_example.append(v)
 
-        relation_examples.append(relation_example)
-        relation_prompts.append(relation_prompt)
+            entity_examples.append(entity_example)
+            entity_prompts.append(entity_prompt)
 
-    entity_examples = add_negtive_example(entity_examples, texts,
-                                          entity_prompts, entity_label_set,
-                                          negative_ratio)
+            relation_example = []
+            relation_prompt = []
+            relation_example_map = {}
+            for relation in relations:
+                predicate = relation["type"]
+                subject_id = relation["to_id"]
+                object_id = relation["from_id"]
+                relation_label = entity_map[subject_id][
+                    "name"] + "的" + predicate
+                result = {
+                    "text": entity_map[object_id]["name"],
+                    "start": entity_map[object_id]["start"],
+                    "end": entity_map[object_id]["end"]
+                }
+                if relation_label not in relation_example_map.keys():
+                    relation_example_map[relation_label] = {
+                        "content": text,
+                        "result_list": [result],
+                        "prompt": relation_label
+                    }
+                else:
+                    relation_example_map[relation_label]["result_list"].append(
+                        result)
 
+                if predicate not in predicate_set:
+                    predicate_set.append(predicate)
+                relation_prompt.append(relation_label)
+
+            for v in relation_example_map.values():
+                relation_example.append(v)
+
+            relation_examples.append(relation_example)
+            relation_prompts.append(relation_prompt)
+            pbar.update(1)
+
+    print(f"Adding negative samples for first stage prompt...")
+    entity_examples = add_negative_example(entity_examples, texts,
+                                           entity_prompts, entity_label_set,
+                                           negative_ratio)
+
+    print(f"Constructing relation labels...")
     relation_label_set = construct_relation_label_set(entity_name_set,
                                                       predicate_set)
 
-    relation_examples = add_negtive_example(relation_examples, texts,
-                                            relation_prompts,
-                                            relation_label_set, negative_ratio)
+    print(f"Adding negative samples for second stage prompt...")
+    relation_examples = add_negative_example(relation_examples, texts,
+                                             relation_prompts,
+                                             relation_label_set, negative_ratio)
     return entity_examples, relation_examples

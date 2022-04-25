@@ -20,11 +20,11 @@ import numpy as np
 from utils import set_seed, save_examples, convert_doccano_examples
 
 
-def doccano2SA(doccano_file,
-               save_dir,
-               splits=[0.8, 0.9],
-               negative_ratio=1,
-               is_shuffle=True):
+def convert_doccano_file(doccano_file,
+                         save_dir,
+                         splits=[0.8, 0.9],
+                         negative_ratio=1,
+                         is_shuffle=True):
     """
         @Description: Consvert doccano file to data format which is suitable to input to this Application.
         @Param doccano_file: The annotated file exported from doccano labeling platform.
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     # Ensure generate the same negative samples for one seed.
     set_seed(1000)
 
-    doccano2SA(
+    convert_doccano_file(
         args.doccano_file,
         args.save_dir,
         splits=[0.6, 0.8],
