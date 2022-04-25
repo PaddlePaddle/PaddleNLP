@@ -182,7 +182,7 @@ def main():
     for path in tqdm(file_paths):
         text_fp = open(path, 'r')
         processed_text = pool.imap(processer.encode, text_fp, 256)
-        print("Processing %s" % path)
+        print('Processing %s' % path)
         for i, (tokens, bytes_processed) in enumerate(processed_text, start=1):
             step += 1
             total_bytes_processed += bytes_processed
@@ -207,15 +207,15 @@ def main():
                     file=sys.stderr)
 
     pool.close()
-    print("Saving tokens to files...")
+    print('Saving tokens to files...')
     all_token_ids = np.frombuffer(token_id_stream.getbuffer(), dtype=save_dtype)
     all_sent_lens = np.frombuffer(sent_len_stream.getbuffer(), dtype=np.int32)
     np.save(args.output_file + '_ids.npy', all_token_ids)
     np.savez(args.output_file + '_idx.npz', lens=all_sent_lens)
 
-    print("Total sentences num: %d" % len(all_sent_lens))
-    print("Total tokens num: %d" % len(all_token_ids))
-    print("Average tokens per sentence: %.2f" %
+    print('Total sentences num: %d' % len(all_sent_lens))
+    print('Total tokens num: %d' % len(all_token_ids))
+    print('Average tokens per sentence: %.2f' %
           (len(all_token_ids) / len(all_sent_lens)))
 
 
