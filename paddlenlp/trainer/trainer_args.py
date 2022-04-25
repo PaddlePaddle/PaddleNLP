@@ -253,9 +253,9 @@ class TrainingArguments:
             Column name for precomputed lengths. If the column exists, grouping by length will use these values rather
             than computing them on train startup. Ignored unless `group_by_length` is `True` and the dataset is an
             instance of `Dataset`.
-        report_to (`str` or `List[str]`, *optional*, defaults to `"all"`):
-            The list of integrations to report the results and logs to. Supported platforms are `"visualdl"`.
-            Use `"all"` to report to all integrations installed, `"none"` for no integrations.
+        report_to (`str` or `List[str]`, *optional*, defaults to `"visualdl"`):
+            The list of integrations to report the results and logs to. Supported platforms is `"visualdl"`.
+            `"none"` for no integrations.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -352,7 +352,7 @@ class TrainingArguments:
             "When doing a multinode distributed training, whether to log once per node or just once on the main node."
         }, )
     logging_dir: Optional[str] = field(
-        default=None, metadata={"help": "log dir."})
+        default=None, metadata={"help": "VisualDL log dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."}, )
