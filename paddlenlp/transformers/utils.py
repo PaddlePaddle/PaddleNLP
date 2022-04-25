@@ -40,6 +40,7 @@ def fn_args_to_dict(func, *args, **kwargs):
             kwargs_dict.pop(k)
     kwargs_dict.update(kwargs)
     init_dict.update(kwargs_dict)
+    init_dict.pop('self', None)
     return init_dict
 
 

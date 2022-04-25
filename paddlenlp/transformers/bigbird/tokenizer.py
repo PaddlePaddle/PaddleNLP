@@ -20,7 +20,7 @@ import re
 import numpy as np
 
 import sentencepiece as spm
-from paddlenlp.data import Vocab
+from paddlenlp.data.vocab import Vocab
 
 from .. import PretrainedTokenizer, AddedToken
 

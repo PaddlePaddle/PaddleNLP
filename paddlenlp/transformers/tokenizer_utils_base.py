@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Base classes common to both the slow and the fast tokenization classes: PreTrainedTokenizerBase (host all the user
+Base classes common to both the slow and the fast tokenization classes: PretrainedTokenizerBase (host all the user
 fronting encoding methods) Special token mixing (host the special tokens logic) and BatchEncoding (wrap the dictionary
 of output with special method for the Fast tokenizers)
 """
@@ -78,7 +78,7 @@ class ExplicitEnum(Enum):
 
 class PaddingStrategy(ExplicitEnum):
     """
-    Possible values for the `padding` argument in [`PreTrainedTokenizerBase.__call__`]. Useful for tab-completion in an
+    Possible values for the `padding` argument in [`PretrainedTokenizerBase.__call__`]. Useful for tab-completion in an
     IDE.
     """
 
@@ -89,7 +89,7 @@ class PaddingStrategy(ExplicitEnum):
 
 class TensorType(ExplicitEnum):
     """
-    Possible values for the `return_tensors` argument in [`PreTrainedTokenizerBase.__call__`]. Useful for
+    Possible values for the `return_tensors` argument in [`PretrainedTokenizerBase.__call__`]. Useful for
     tab-completion in an IDE.
     """
 
@@ -141,7 +141,7 @@ def _is_numpy(x):
 
 class TruncationStrategy(ExplicitEnum):
     """
-    Possible values for the `truncation` argument in [`PreTrainedTokenizerBase.__call__`]. Useful for tab-completion in
+    Possible values for the `truncation` argument in [`PretrainedTokenizerBase.__call__`]. Useful for tab-completion in
     an IDE.
     """
 
@@ -179,9 +179,9 @@ class TokenSpan(NamedTuple):
 
 class BatchEncoding(UserDict):
     """
-    Holds the output of the [`~tokenization_utils_base.PreTrainedTokenizerBase.__call__`],
-    [`~tokenization_utils_base.PreTrainedTokenizerBase.encode_plus`] and
-    [`~tokenization_utils_base.PreTrainedTokenizerBase.batch_encode_plus`] methods (tokens, attention_masks, etc).
+    Holds the output of the [`~tokenization_utils_base.PretrainedTokenizerBase.__call__`],
+    [`~tokenization_utils_base.PretrainedTokenizerBase.encode_plus`] and
+    [`~tokenization_utils_base.PretrainedTokenizerBase.batch_encode_plus`] methods (tokens, attention_masks, etc).
 
     This class is derived from a python dictionary and can be used as a dictionary. In addition, this class exposes
     utility methods to map from word/character space to token space.
@@ -239,7 +239,7 @@ class BatchEncoding(UserDict):
     @property
     def is_fast(self) -> bool:
         """
-        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PreTrainedTokenizerFast`]
+        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedTokenizerFast`]
         or not.
         """
         return self._encodings is not None
@@ -748,7 +748,7 @@ class BatchEncoding(UserDict):
 
 class SpecialTokensMixin:
     """
-    A mixin derived by [`PreTrainedTokenizer`] and [`PreTrainedTokenizerFast`] to handle specific behaviors related to
+    A mixin derived by [`PretrainedTokenizer`] and [`PretrainedTokenizerFast`] to handle specific behaviors related to
     special tokens. In particular, this class hold the attributes which can be used to directly access these special
     tokens in a model-independent manner and allow to set and update the special tokens.
 
@@ -1273,9 +1273,9 @@ class SpecialTokensMixin:
         return all_ids
 
 
-class PreTrainedTokenizerBase(SpecialTokensMixin):
+class PretrainedTokenizerBase(SpecialTokensMixin):
     """
-    Base class for [`PreTrainedTokenizer`] and [`PreTrainedTokenizerFast`].
+    Base class for [`PretrainedTokenizer`] and [`PretrainedTokenizerFast`].
 
     Handles shared (mostly boiler plate) methods for those two classes.
     """
@@ -1383,7 +1383,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin):
 
     def __repr__(self) -> str:
         return (
-            f"{'PreTrainedTokenizerFast' if self.is_fast else 'PreTrainedTokenizer'}(name_or_path='{self.name_or_path}', "
+            f"{'PretrainedTokenizerFast' if self.is_fast else 'PretrainedTokenizer'}(name_or_path='{self.name_or_path}', "
             f"vocab_size={self.vocab_size}, model_max_len={self.model_max_length}, is_fast={self.is_fast}, "
             f"padding_side='{self.padding_side}', truncation_side='{self.truncation_side}', special_tokens={self.special_tokens_map_extended})"
         )
@@ -1742,7 +1742,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin):
         Save a tokenizer using the slow-tokenizer/legacy format: vocabulary + added tokens.
 
         Fast tokenizers can also be saved in a unique JSON file containing {config + vocab + added-tokens} using the
-        specific [`~tokenization_utils_fast.PreTrainedTokenizerFast._save_pretrained`]
+        specific [`~tokenization_utils_fast.PretrainedTokenizerFast._save_pretrained`]
         """
         save_directory = str(save_directory)
 
@@ -1791,7 +1791,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin):
                 Whether or not to add the special tokens associated with the corresponding model.
             kwargs (additional keyword arguments, *optional*):
                 Will be passed to the underlying model specific encode method. See details in
-                [`~PreTrainedTokenizerBase.__call__`]
+                [`~PretrainedTokenizerBase.__call__`]
 
         Returns:
             `List[str]`: The list of tokens.

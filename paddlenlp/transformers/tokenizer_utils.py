@@ -43,7 +43,7 @@ from .utils import InitTrackerMeta, fn_args_to_dict
 
 from .tokenizer_utils_base import (
     AddedToken, BatchEncoding, EncodedInput, EncodedInputPair,
-    PreTokenizedInput, PreTokenizedInputPair, PreTrainedTokenizerBase,
+    PreTokenizedInput, PreTokenizedInputPair, PretrainedTokenizerBase,
     TextInput, TextInputPair, TruncationStrategy, PaddingStrategy, TensorType)
 
 __all__ = [
@@ -267,17 +267,21 @@ class Trie:
 
         This function is idempotent, adding twice the same word will leave the trie unchanged
 
-        Example::
+        Example:
 
-            >>> trie = Trie()
-            >>> trie.add("Hello 友達")
-            >>> trie.data
-            {"H": {"e": {"l": {"l": {"o": {" ": {"友": {"達": {"": 1}}}}}}}}}
-            >>> trie.add("Hello")
-            >>> trie.data
-            {"H": {"e": {"l": {"l": {"o": {"": 1, " ": {"友": {"達": {"": 1}}}}}}}}}
+        ```python
+        >>> trie = Trie()
+        >>> trie.add("Hello 友達")
+        >>> trie.data
+        {"H": {"e": {"l": {"l": {"o": {" ": {"友": {"達": {"": 1}}}}}}}}}
+
+        >>> trie.add("Hello")
+        >>> trie.data
+        {"H": {"e": {"l": {"l": {"o": {"": 1, " ": {"友": {"達": {"": 1}}}}}}}}}
+        ```
         """
         if not word:
+            # Prevent empty string
             return
         ref = self.data
         for char in word:
@@ -292,16 +296,19 @@ class Trie:
 
         This trie will match the longest possible word first !
 
-        Example::
+        Example:
 
-            >>> trie = Trie()
-            >>> trie.split("[CLS] This is a extra_id_100")
-            ["[CLS] This is a extra_id_100"]
-            >>> trie.add("[CLS]")
-            >>> trie.add("extra_id_1")
-            >>> trie.add("extra_id_100")
-            >>> trie.split("[CLS] This is a extra_id_100")
-            ["[CLS]", " This is a ", "extra_id_100"]
+        ```python
+        >>> trie = Trie()
+        >>> trie.split("[CLS] This is a extra_id_100")
+        ["[CLS] This is a extra_id_100"]
+
+        >>> trie.add("[CLS]")
+        >>> trie.add("extra_id_1")
+        >>> trie.add("extra_id_100")
+        >>> trie.split("[CLS] This is a extra_id_100")
+        ["[CLS]", " This is a ", "extra_id_100"]
+        ```
         """
         # indexes are counted left of the chars index.
         # "hello", index 0, is left of h, index 1 is between h and e.
@@ -325,7 +332,7 @@ class Trie:
         # This is used by the lookahead which needs to skip over
         # some text where the full match exceeded the place in the initial
         # for loop
-        skip = None
+        skip = 0
         # Main loop, Giving this algorithm O(n) complexity
         for current, current_char in enumerate(text):
             if skip and current < skip:
@@ -371,6 +378,11 @@ class Trie:
                         next_char = text[
                             lookahead_index] if lookahead_index < len(
                                 text) else None
+                        if "" in looktrie_pointer:
+                            start = lookstart
+                            end = lookahead_index
+                            skip = lookahead_index
+
                         while next_char in looktrie_pointer:
                             looktrie_pointer = looktrie_pointer[next_char]
                             lookahead_index += 1
@@ -415,7 +427,7 @@ class Trie:
 
             # If this character is a starting character within the trie
             # start keeping track of this partial match.
-            if current_char in self.data:
+            if current >= skip and current_char in self.data:
                 states[current] = self.data[current_char]
 
         # We have a cut at the end with states.
@@ -477,7 +489,7 @@ def tokenize_chinese_chars(text):
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedTokenizer(PreTrainedTokenizerBase):
+class PretrainedTokenizer(PretrainedTokenizerBase):
     """
     The base class for all pretrained tokenizers. It mainly provides common methods
     for loading (construction and loading) and saving pretrained tokenizers. Loading
@@ -529,7 +541,6 @@ class PretrainedTokenizer(PreTrainedTokenizerBase):
         instance.
         """
         init_dict = fn_args_to_dict(original_init, *args, **kwargs)
-        print(init_dict)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
         # Added tokens - We store this for both slow and fast tokenizers
@@ -1204,9 +1215,7 @@ class PretrainedTokenizer(PreTrainedTokenizerBase):
                             "input_ids"])
                         encoded_inputs["seq_len"] = encoded_inputs["length"]
 
-                    encoded_inputs['overflow_to_sample_mapping'] = example_id
-                    encoded_inputs['overflow_to_sample'] = encoded_inputs[
-                        'overflow_to_sample_mapping']
+                    encoded_inputs['overflow_to_sample'] = example_id
 
                     for key, value in encoded_inputs.items():
                         if key not in batch_outputs:
