@@ -15,7 +15,6 @@
 
 # This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py
-# Thanks a lot.
 
 import collections
 import contextlib

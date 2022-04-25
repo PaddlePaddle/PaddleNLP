@@ -15,7 +15,6 @@
 
 # This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
-# Thanks a lot.
 
 import paddle
 import paddle.distributed as dist

@@ -15,7 +15,6 @@
 
 # This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
-# Thanks a lot.
 
 import contextlib
 import json

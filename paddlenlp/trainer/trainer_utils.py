@@ -15,7 +15,6 @@
 
 # This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
-# Thanks a lot.
 """
 Utilities for the Trainer class. 
 """
