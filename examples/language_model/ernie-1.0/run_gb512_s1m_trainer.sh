@@ -1,6 +1,9 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
+# dp8 for 8 worker of data parallel
+# gb512 for the global batch size is 512 = 64 * 8
+# s1m for max steps is 1 million
 task_name="ernie-1.0-dp8-gb512"
 rm -rf output/$task_name/
 
