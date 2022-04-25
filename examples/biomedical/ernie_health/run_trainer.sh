@@ -1,7 +1,7 @@
 #set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="eheath-pre"
+task_name="eheath-pretraining"
 rm -rf output/$task_name/log
 
 PYTHONPATH=../../../  python -u -m paddle.distributed.launch \
@@ -23,10 +23,9 @@ PYTHONPATH=../../../  python -u -m paddle.distributed.launch \
     --dataloader_num_workers 4 \
     --device "gpu"\
     --fp16  \
-    --fp16_opt_level "O2"  \
+    --fp16_opt_level "O1"  \
     --do_train \
     --report_to "visualdl" \
-    --save_total_limit 3 \
-    --attention_probs_dropout_prob 0.0 \
-    --hidden_dropout_prob 0.0\
-    --overwrite_output_dir
+    --save_total_limit 10 
+
+# WARNING: fp16_opt_level O2 may cause ehealth pretraing fail !

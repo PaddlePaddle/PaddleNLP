@@ -54,9 +54,6 @@ class DataTrainingArguments:
         metadata={
             "help": "The name of the dataset to use (via the datasets library)."
         })
-    split: str = field(
-        default='949,50,1', metadata={"help": "Train/valid/test data split."})
-
     max_seq_length: int = field(
         default=512,
         metadata={
@@ -67,15 +64,6 @@ class DataTrainingArguments:
     masked_lm_prob: float = field(
         default=0.15,
         metadata={"help": "Mask token prob."}, )
-    short_seq_prob: float = field(
-        default=0.1,
-        metadata={"help": "Short sequence prob."}, )
-    do_lower_case: bool = field(
-        default=True,
-        metadata={
-            "help":
-            "Whether to lower case the input text. Should be True for uncased models and False for cased models."
-        }, )
 
 
 @dataclass
@@ -94,43 +82,12 @@ class ModelArguments:
             "help":
             "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
-    config_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained config name or path if not the same as model_name"
-        })
-    tokenizer_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained tokenizer name or path if not the same as model_name"
-        })
-    cache_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path to directory to store the pretrained models"}, )
-    export_model_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path to directory to store the pretrained models"}, )
-
-
-def set_seed(seed):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(seed)
-    np.random.seed(seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(seed)
 
 
 def main():
     parser = PdArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    set_seed(training_args.seed)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -165,10 +122,6 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    worker_index = paddle.distributed.get_rank()
-    worker_num = paddle.distributed.get_world_size()
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-
     model_class, tokenizer_class = MODEL_CLASSES['ernie-health']
 
     # Loads or initialize a model.
@@ -185,11 +138,8 @@ def main():
             ElectraModel(**model_class.pretrained_init_configuration[
                 model_args.model_name_or_path + "-discriminator"]))
         model = model_class(generator, discriminator)
-
-    criterion = ErnieHealthPretrainingCriterion(
-        getattr(model.generator,
-                ElectraGenerator.base_model_prefix).config["vocab_size"],
-        model.gen_weight)
+    else:
+        raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
     # Loads dataset.
     tic_load_data = time.time()
@@ -225,8 +175,8 @@ def main():
             """forward function
 
             Args:
-                output (tuple): prediction_scores, seq_relationship_score
-                labels (tuple): masked_lm_labels, next_sentence_labels
+                output (tuple): generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, mask
+                labels (tuple): generator_labels
 
             Returns:
                 Tensor: final loss.
