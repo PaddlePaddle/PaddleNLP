@@ -25,7 +25,8 @@ from paddlenlp.utils.log import logger
 __all__ = ["AutoTokenizer", ]
 
 TOKENIZER_MAPPING_NAMES = OrderedDict([
-    ("AlbertTokenizer", "albert"),
+    ("AlbertEnglishTokenizer", "albert"),
+    ("AlbertChineseTokenizer", "albert"),
     ("BertJapaneseTokenizer", "bert_japanese"),
     ("BigBirdTokenizer", "bigbird"),
     ("BlenderbotSmallTokenizer", "blenderbot_small"),
@@ -37,6 +38,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ElectraTokenizer", "electra"),
     ("ErnieCtmTokenizer", "ernie_ctm"),
     ("ErnieDocTokenizer", "ernie_doc"),
+    ("ErnieDocBPETokenizer", "ernie_doc"),
     ("ErnieGramTokenizer", "ernie_gram"),
     ("ErnieMTokenizer", "ernie_m"),
     ("ErnieTokenizer", "ernie"),
