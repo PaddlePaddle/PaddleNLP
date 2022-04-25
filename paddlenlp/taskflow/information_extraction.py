@@ -27,17 +27,17 @@ usage = r"""
             from paddlenlp import Taskflow
 
             # Define the schema for extraction
-            schema = ["寺庙", {"丈夫": ["妻子"]}]
-            ie = Taskflow("information_extraction", schema=schema) 
-            ie("李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。")           
+            schema = ['寺庙', {'丈夫': ['妻子']}]
+            ie = Taskflow('information_extraction', schema=schema) 
+            ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')      
             '''
             [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.8899254648933592}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.9852263795480809, 'relation': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9968914045166457}]}}]}]
             '''
 
-            schema_senta = [{"水果": ["情感倾向[正向，负向]"]}]
+            schema_senta = [{'水果': ['情感倾向[正向，负向]']}]
             # Set another schema to predict
             ie.set_schema(schema_senta)
-            ie("今天去超市买了葡萄、苹果，都很好吃")
+            ie('今天去超市买了葡萄、苹果，都很好吃')
             '''
             [{'水果': [{'text': '苹果', 'start': 10, 'end': 12, 'probability': 0.9369744072599353, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.9733151286049946}]}}, {'text': '葡萄', 'start': 7, 'end': 9, 'probability': 0.5165698195669179, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.976208180045397}]}}]}]
             '''
