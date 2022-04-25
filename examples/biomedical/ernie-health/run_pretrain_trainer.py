@@ -184,7 +184,7 @@ def main():
             generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = output
             generator_labels = labels
 
-            loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
+            loss, gen_loss, rtd_loss, mts_loss, csp_loss = self.criterion(
                 generator_logits, generator_labels, logits_rtd, logits_mts,
                 logits_csp, disc_labels, masks)
 
