@@ -77,6 +77,8 @@ class UIETask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 64
         self._split_sentence = self.kwargs[
             'split_sentence'] if 'split_sentence' in self.kwargs else False
+        self._position_prob = self.kwargs[
+            'position_prob'] if 'position_prob' in self.kwargs else 0.5
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -196,8 +198,9 @@ class UIETask(Task):
             end_prob = self.output_handle[1].copy_to_cpu().tolist()
 
             start_ids_list = get_bool_ids_greater_than(
-                start_prob, return_prob=True)
-            end_ids_list = get_bool_ids_greater_than(end_prob, return_prob=True)
+                start_prob, limit=self._position_prob, return_prob=True)
+            end_ids_list = get_bool_ids_greater_than(
+                end_prob, limit=self._position_prob, return_prob=True)
 
             for start_ids, end_ids, ids, offset_map in zip(
                     start_ids_list, end_ids_list,
@@ -218,22 +221,42 @@ class UIETask(Task):
 
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
         concat_results = []
+        is_cls_task = False
+        if 'start' not in short_results[0][0].keys(
+        ) and 'end' not in short_results[0][0].keys():
+            is_cls_task = True
         for k, vs in input_mapping.items():
-            offset = 0
-            single_results = []
-            for v in vs:
-                if v == 0:
-                    single_results = short_results[v]
-                    offset += len(short_inputs[v])
-                else:
-                    for i in range(len(short_results[v])):
-                        if 'start' in short_results[v][i].keys():
+            if is_cls_task:
+                cls_options = {}
+                sum_prob = 0
+                single_results = []
+                for v in vs:
+                    if short_results[v][0]['text'] not in cls_options.keys():
+                        cls_options[short_results[v][0][
+                            'text']] = [1, short_results[v][0]['probability']]
+                    else:
+                        cls_options[short_results[v][0]['text']][0] += 1
+                        cls_options[short_results[v][0]['text']][
+                            1] += short_results[v][0]['probability']
+                cls_res, cls_info = max(cls_options.items(), key=lambda x: x[1])
+                concat_results.append([{
+                    'text': cls_res,
+                    'probability': cls_info[1] / cls_info[0]
+                }])
+            else:
+                offset = 0
+                single_results = []
+                for v in vs:
+                    if v == 0:
+                        single_results = short_results[v]
+                        offset += len(short_inputs[v])
+                    else:
+                        for i in range(len(short_results[v])):
                             short_results[v][i]['start'] += offset
-                        if 'end' in short_results[v][i].keys():
                             short_results[v][i]['end'] += offset
-                    offset += len(short_inputs[v])
-                    single_results.extend(short_results[v])
-            concat_results.append(single_results)
+                        offset += len(short_inputs[v])
+                        single_results.extend(short_results[v])
+                concat_results.append(single_results)
         return concat_results
 
     def _run_model(self, inputs):
