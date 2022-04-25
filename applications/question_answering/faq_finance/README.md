@@ -1,10 +1,10 @@
-# 政务问答检索式 FAQ System
+# 保险智能问答
 
  **目录**
 
 * [1. 场景概述](#场景概述)
 * [2. 系统特色](#系统特色)
-* [3. 政务问答系统方案](#政务问答系统方案)
+* [3. 保险智能问答系统方案](#保险问答系统方案)
 * [4. 动手实践——搭建自己的端到端检索式问答系统](#动手实践——搭建自己的端到端检索式问答系统)  
 
 
@@ -12,15 +12,15 @@
 
 ## 1. 场景概述
 
-政府工作人员往往要做很多政策解读等工作，费时费力还耗费大量的人力，在政府内部，工作人员往往积累了很多问答对，但是不知道怎么构建一个问答系统来辅助工作人员提升日常工作效率，简化工作流程。
+智能问答是获取信息和知识的更直接、更高效的方式之一，传统的信息检索方法智能找到相关的文档，而智能问答能够直接找到精准的答案，极大的节省了人们查询信息的时间。问答按照技术分为基于阅读理解的问答和检索式的问答，阅读理解的问答是在正文中找到对应的答案片段，检索式问答则是匹配高频的问题，然后把答案返回给用户。本项目属于检索式的问答，问答的领域用途很广，比如搜索引擎，小度音响等智能硬件，政府，金融，银行，电信，电商领域的智能客服，聊天机器人等。
 
 <a name="系统特色"></a>
 
 ## 2. 系统特色
 
 + 低门槛
-    + 手把手搭建检索式 FAQ System
-    + 无需相似 Query-Query Pair 标注数据也能构建 FAQ System
+    + 手把手搭建检索式保险智能问答
+    + 无需相似 Query-Query Pair 标注数据也能构建保险智能问答
 + 效果好
     + 业界领先的检索预训练模型: RocketQA Dual Encoder
     + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
@@ -30,40 +30,43 @@
     + 基于 Milvus 快速查询和高性能建库
     + 基于 Paddle Serving 高性能部署
 
-<a name="政务问答系统方案"></a>
+<a name="保险问答系统方案"></a>
 
-## 3. 政务问答系统方案
+## 3. 保险智能问答系统方案
 
 ### 3.1 技术方案和评估指标
 
 #### 3.1.1 技术方案
 
-**语义索引**：针对政务问答只有问答对的场景，我们提供了一个 融合SimCSE 和 WR (word reptition)策略的无监督的解决方案。
+**语义索引**：针对保险等金融领域的问答只有问答对的场景，我们提供了一个在SimCSE的基础上融合WR (word reptition)策略，同义词策略，R-Drop策略的无监督的解决方案。
 
 #### 3.1.2 评估指标
 
-* 该政务问答系统使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
+* 该保险智能问答系统使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
 
 
 ### 3.2 数据说明
 
-数据集来源于疫情政务问答比赛数据，包括源文本，问题和答案。
+数据集来源于Github开源的保险的问答数据，包括源用户的问题和相应的回复。
 
 |  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回库 |
 | ------------ | ------------ |------------ | ------------ | ------------ |
-|  召回 |  SimCSE  |  4000 | 1000 | 5000 |
+|  召回 |  SimCSE  |  3030 | 758 | 3788 |
 
-其中评估集的问题对的构造使用了中英文回译的方法，总共有1000条评估集，其中500条数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)，另外500条数据使用了SimBERT模型生成的同义句。
+其中训练集的问题-问题对的构造使用了同义词替换的方法，详情请参考[nlpcda](https://github.com/425776024/nlpcda)
+
+评估集的问题对的构造使用了中英文回译的方法，数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)
 
 
 ```
 ├── data  # 数据集
     ├── train.csv  # 无监督训练集
+    ├── train_aug.csv # 同义词替换后构造的训练集
     ├── test_pair.csv  # 测试集，用于评估模型的效果
     ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
     ├── qa_pair.csv # 问答对，问题对应的答案
 ```
-数据集的下载链接为: [faq_data](https://paddlenlp.bj.bcebos.com/applications/faq_data.zip)
+数据集的下载链接为: [faq_finance](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)
 
 ### 3.3 代码说明
 
@@ -97,12 +100,12 @@
 
 ### 3.3 效果评估
 
-|  模型 |  Recall@1 |Recall@10 |
-| ------------ | ------------ |--------- |
-|  ERNIE1.0 + SimCSE |  68.068     | 85.686|
-|  RocketQA  |  81.381 | 96.997|
-|  RocketQA + SimCSE  |  83.283 | 97.297|
-|  RocketQA + SimCSE + WR |  **83.584** | **97.497**|
+|  模型 |  Recall@1 |Recall@5 |Recall@10 |
+| ------------ | ------------ |--------- |--------- |
+|  RocketQA + SimCSE |  82.827 | 93.791| 96.169|
+|  RocketQA + SimCSE + WR |  82.695 | 93.791| 96.301|
+|  RocketQA + SimCSE + WR + 同义词 |  85.205 | 93.923| 95.509|
+|  RocketQA + SimCSE + 同义词 + RDrop |  **85.469** | **94.716**| **96.433**|
 
 <a name="动手实践——搭建自己的端到端检索式问答系统"></a>
 
@@ -112,18 +115,20 @@
 
 ```
 python -u -m paddle.distributed.launch --gpus '0' \
-    train.py \
-    --device gpu \
-    --save_dir ./checkpoints/ \
-    --batch_size 64 \
-    --learning_rate 5E-5 \
-    --epochs 3 \
-    --save_steps 50 \
-    --max_seq_length 64 \
-    --dropout 0.2 \
-    --output_emb_size 256 \
-    --dup_rate 0.3 \
-    --train_set_file "./data/train.csv"
+	train.py \
+	--device gpu \
+	--save_dir ./checkpoints/ \
+	--batch_size 64 \
+	--learning_rate 5E-5 \
+	--epochs 3 \
+	--save_steps 50 \
+	--eval_steps 50 \
+	--max_seq_length 64 \
+	--dropout 0.2 \
+	--dup_rate 0.1 \
+	--rdrop_coef 0.1 \
+	--output_emb_size 256 \
+	--train_set_file "./data/train_aug.csv"
 ```
 
 参数含义说明
@@ -139,6 +144,7 @@ python -u -m paddle.distributed.launch --gpus '0' \
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `dup_rate` : SimCSE的 Word reptition 策略的重复率
 * `train_set_file`: 训练集文件
+* `rdrop_coef`: R-Drop的系数
 
 也可以使用下面的bash脚本：
 
@@ -174,7 +180,7 @@ python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_150/model_state.pdparams" \
+        --params_path "checkpoints/model_100/model_state.pdparams" \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -219,9 +225,9 @@ sh scripts/evaluate.sh
 输出如下的结果：
 
 ```
-recall@1=83.784
-recall@5=94.995
-recall@10=96.997
+recall@1=84.941
+recall@5=94.452
+recall@10=96.433
 ```
 
 参数含义说明
@@ -238,7 +244,7 @@ recall@10=96.997
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/model_150/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/model_100/model_state.pdparams --output_path=./output
 ```
 也可以运行下面的bash脚本：
 
@@ -309,7 +315,7 @@ python web_service.py
 向服务端发送 POST 请求示例：
 
 ```
-curl -X POST -k http://localhost:8090/ernie/prediction -d '{"key": ["0"], "value": ["宁夏针对哪些人员开通工伤保障绿色通道?"]}'
+curl -X POST -k http://localhost:8090/ernie/prediction -d '{"key": ["0"], "value": ["买了社保，是不是就不用买商业保险了?"]}'
 ```
 
 也可以使用 rpc的方式：
@@ -318,8 +324,7 @@ curl -X POST -k http://localhost:8090/ernie/prediction -d '{"key": ["0"], "value
 
 ```
 list_data = [
-    "湖北省为什么鼓励缴费人通过线上缴费渠道缴费？",
-    "佛山市救助站有多少个救助床位"
+    "买了社保，是不是就不用买商业保险了？",
 ]
 ```
 然后运行：
@@ -339,20 +344,19 @@ python run_system.py
 代码内置的测试用例为：
 
 ```
-list_data = ["嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？"]
+list_data = ["买了社保，是不是就不用买商业保险了？"]
 ```
 
 会输出如下的结果：
 
 ```
 ......
-Extract feature time to cost :0.01161503791809082 seconds
-Search milvus time cost is 0.004535675048828125 seconds
-嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？      拦、查、问、测、记 1.2107588152551751e-12
-上海市黄浦区老西门街道建立的党建责任区包干机制内容是什么？      街道工作人员担任楼宇联络员，分片区对接商务楼宇所属的物业公司，引导楼宇企业共同落实严防严控任务 0.4956303834915161
-上海市街道执行“四个统一”具体指什么？    统一由居委会干部在统一时间（每周三、五下午），递交至统一地点（社区事务受理服务中心专设窗口），街道统一收集至後台 0.6684658527374268
-怀柔区城管委在加强监督检查方面是如何落实的？    严格落实四方责任，保证每周2~3次深入环卫、电、气、热、公共自行车、垃圾处置等单位进行巡查，督促企业做好防疫工作，协调复工复产中存在的问题，确保安全复工复产有效落实。 0.7147952318191528
-华新镇“亮牌分批复工”工作方案具体内容是什么？    所有店铺一律先贴“红牌”禁止经营，经相关部门审批後，再换贴“蓝牌”准许复工。 0.7162970900535583
+PipelineClient::predict pack_data time:1650712793.4998188
+PipelineClient::predict before time:1650712793.5002873
+Extract feature time to cost :0.012665271759033203 seconds
+Search milvus time cost is 0.007043361663818359 seconds
+如果你买社会保险，你不需要买商业保险吗？        社保是基础的，就是我们通常说的“五险”包括：基本养老保险、基本医疗保险、失业保险、工伤保险和生育保险。而商业保险则是保障。 0.4609384536743164
+社保跟商业保险的区别在哪？有了社保还需要买商业保险不？  社会保险是指国家为了预防和分担年老、失业、疾病以及死亡等社会风险,实现社会安全，而强制社会多数成员参加的，具有所得重分配功能的非营利性的社会安全制度。而商业保险是指通过订立保险合同运营，以营利为目的的保险形式，由专门的保险企业经营。这两种保险是不同的，一般在有社会保险基础上，添加商业保险，是一种补充。社保和商业保险的区别在于：1、性质不同社保是属于社会福利保障的范畴，所以最终的赔偿是由国家来承担的，但是商业保险是由商业机构承担的，最终的保险赔偿和风险都是有商业机构所承担的，这就是社保和商业保险的区别最明显的表现之处。2、自愿原则社保是一种国家福利，是强制性缴纳的；商业保险是一种个人行为，可自愿购买。3、期限可选社保必须交满一定年限才可动用或领取；商业保险缴费期限灵活，3年、5年、10年、20年...时间长短由投保人决定。4、交费多少社保的交费，只要参与，每个人都基本一样，由单位交纳20%(或12%)左右，个人交8%，月交方式，金额会随着时间变化而增加；而商保是个人行为，根据自己的实际情况，多少自由，多交多得，少交少得。5、保障水平不同。社会保险为被保险人提供的保障是最基本的，其水平高于社会贫困线，低于社会平均工资的50%，保障程度较低；商业保险提供的保障水平完全取决于保险双方当事人的约定和投保人所缴保费的多少，只要符合投保条件并有一定的缴费能力，被保险人可以获得高水平的保障。 0.5826151371002197
 .....
 ```
 输出的结果包括特征提取和检索的时间，还包含检索出来的问答对。
