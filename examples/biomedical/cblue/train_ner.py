@@ -122,12 +122,22 @@ def do_train():
         if not os.path.isfile(args.init_from_ckpt):
             raise ValueError('init_from_ckpt is not a valid model filename.')
         state_dict = paddle.load(args.init_from_ckpt)
+        state_keys = {
+            x: x.replace('discriminator.', '')
+            for x in state_dict.keys() if 'discriminator.' in x
+        }
+        if len(state_keys) > 0:
+            state_dict = {
+                state_keys[k]: state_dict[k]
+                for k in state_keys.keys()
+            }
         model.set_dict(state_dict)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.epochs
+    args.epochs = num_training_steps // len(train_data_loader) + 1
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
