@@ -94,6 +94,7 @@ from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
+from .byt5.tokenizer import *
 from .luke.modeling import *
 from .luke.tokenizer import *
 from .megatronbert.modeling import *
