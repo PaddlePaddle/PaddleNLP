@@ -61,6 +61,7 @@
 ```
 ├── data  # 数据集
     ├── train.csv  # 无监督训练集
+    ├── train_aug.csv # 同义词替换后构造的训练集
     ├── test_pair.csv  # 测试集，用于评估模型的效果
     ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
     ├── qa_pair.csv # 问答对，问题对应的答案
@@ -85,10 +86,10 @@
 |—— run_system.py # Client Server 模式客户端，向 server 发送文本，得到向量后，利用milvus引擎进行检索
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本
-    |—— predict.sh  # 预测 bash 版本
     |—— evaluate.sh # 评估 bash 版本
     |—— run_build_index.sh # 构建索引 bash 版本
-    |—— train_batch_neg.sh  # 训练 bash 版本
+    |—— train.sh  # 训练 bash 版本
+    |—— feature_extract.sh  # 向量抽取 bash 版本
     |—— export_to_serving.sh  # Paddle Inference 转 Serving 的 bash 脚本
 |—— deploy
     |—— python

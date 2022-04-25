@@ -22,7 +22,7 @@
     + 手把手搭建检索式 FAQ System
     + 无需相似 Query-Query Pair 标注数据也能构建 FAQ System
 + 效果好
-    + 业界领先的检索预训练模型: RocketQA DualEncoder
+    + 业界领先的检索预训练模型: RocketQA Dual Encoder
     + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
 
 + 性能快
@@ -83,10 +83,10 @@
 |—— run_system.py # Client Server 模式客户端，向 server 发送文本，得到向量后，利用milvus引擎进行检索
 |—— scripts
     |—— export_model.sh  # 动态图转换成静态图脚本
-    |—— predict.sh  # 预测 bash 版本
     |—— evaluate.sh # 评估 bash 版本
     |—— run_build_index.sh # 构建索引 bash 版本
-    |—— train_batch_neg.sh  # 训练 bash 版本
+    |—— train.sh  # 训练 bash 版本
+    |—— feature_extract.sh  # 向量抽取 bash 版本
     |—— export_to_serving.sh  # Paddle Inference 转 Serving 的 bash 脚本
 |—— deploy
     |—— python
@@ -111,7 +111,7 @@
 ### 4.1 无监督训练
 
 ```
-python -u -m paddle.distributed.launch --gpus '4' \
+python -u -m paddle.distributed.launch --gpus '0' \
     train.py \
     --device gpu \
     --save_dir ./checkpoints/ \
@@ -169,7 +169,7 @@ d. 评估
 运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
 
 ```
-python -u -m paddle.distributed.launch --gpus "4" --log_dir "recall_log/" \
+python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
