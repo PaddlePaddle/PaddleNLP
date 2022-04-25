@@ -65,17 +65,11 @@ class UIETask(Task):
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = True
+        self.set_schema(schema)
         self._encoding_model = "ernie-1.0"
-        self._schema = schema
-        # Try to build the schema tree to check the format of schema
-        self._build_tree(self._schema)
         self._check_task_files()
         self._construct_tokenizer()
-        if self._static_mode:
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+        self._get_inference_model()
         self._usage = usage
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
@@ -85,7 +79,7 @@ class UIETask(Task):
             'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     def set_schema(self, schema):
-        if isinstance(schema, dict):
+        if isinstance(schema, dict) or isinstance(schema, str):
             schema = [schema]
         self._schema = schema
         self._build_tree(self._schema)
@@ -244,8 +238,6 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
-        if isinstance(self._schema, dict):
-            self._schema = [self._schema]
         schema_tree = self._build_tree(self._schema)
         results = self._multi_stage_predict(raw_inputs, schema_tree)
         inputs['result'] = results

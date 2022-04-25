@@ -772,7 +772,7 @@ class SchemaTree(object):
     def add_child(self, node):
         assert isinstance(
             node, SchemaTree
-        ), "The children of a node should be an instacne of SchemaTree"
+        ), "The children of a node should be an instacne of SchemaTree."
         self.children.append(node)
 
 
