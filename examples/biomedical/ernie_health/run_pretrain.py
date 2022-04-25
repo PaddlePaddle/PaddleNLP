@@ -330,7 +330,7 @@ def do_train(args):
                 t_loss['csp'] += csp_loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
-                gen_logits, disc_labels, logits_rtd, logits_mts, logits_csp, masks = model(
+                gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
                     input_ids=masked_input_ids,
                     raw_input_ids=input_ids,
                     gen_labels=gen_labels)
