@@ -29,7 +29,7 @@ pip install -r requirements.txt
 ├── process_data.py               # 比赛数据处理相关脚本
 ├── README.md                     # 说明文件
 ├── requirements.txt              # Python 依赖包文件
-├── run_seq2struct_multitask.py   # Python 入口
+├── run_seq2struct.py             # Python 入口
 └── uie/
     ├── evaluation                # 信息抽取代码
     └── seq2struct                # 序列到结构代码
@@ -161,7 +161,7 @@ python3 run_seq2struct.py                              \
 ### 快速基线第三步：使用多任务模型进行预测
 
 该步骤将依据不同任务的抽取框架进行信息抽取，并输出到对应的文件夹中。
-首先下载test解压后放置在data目录下，然后使用脚本将其自动处理并预测。
+首先下载[测试文件](https://aistudio.baidu.com/aistudio/competition/detail/161/0/datasets)放置在data目录下，然后使用脚本将其自动处理并预测。
 
 ``` bash
 python process_data.py split-test
