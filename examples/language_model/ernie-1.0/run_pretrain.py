@@ -31,7 +31,7 @@ from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
+from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.ops import Topology
@@ -349,9 +349,15 @@ def do_train(args):
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
         args.decay_steps = args.max_steps
+    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
+    args.warmup_steps = args.warmup_rate * args.max_steps
 
-    lr_scheduler = LinearDecayWithWarmup(
-        args.max_lr, args.max_steps, args.warmup_rate, last_epoch=global_step)
+    lr_scheduler = LinearAnnealingWithWarmupDecay(
+        args.max_lr,
+        args.min_lr,
+        warmup_step=args.warmup_steps,
+        decay_step=args.decay_steps,
+        last_epoch=global_step)
 
     clip = None
     if args.grad_clip > 0:
