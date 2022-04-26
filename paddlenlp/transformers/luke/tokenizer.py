@@ -23,7 +23,7 @@ except:
 import sys
 import json
 import itertools
-from .. import RobertaTokenizer
+from .. import RobertaBPETokenizer
 from itertools import repeat
 import warnings
 
@@ -79,7 +79,7 @@ def bytes_to_unicode():
     return dict(zip(bs, cs))
 
 
-class LukeTokenizer(RobertaTokenizer):
+class LukeTokenizer(RobertaBPETokenizer):
     """
     Constructs a Luke tokenizer. It uses a basic tokenizer to do punctuation
     splitting, lower casing and so on, and follows a WordPiece tokenizer to
