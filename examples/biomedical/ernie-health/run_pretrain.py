@@ -309,16 +309,16 @@ def do_train(args):
                 trained_global_step -= 1
                 continue
             global_step += 1
-            masked_input_ids, input_ids, generator_labels = batch
+            masked_input_ids, input_ids, gen_labels = batch
 
             if args.use_amp:
                 with paddle.amp.auto_cast():
                     gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
                         input_ids=masked_input_ids,
                         raw_input_ids=input_ids,
-                        generator_labels=generator_labels)
+                        generator_labels=gen_labels)
                     loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                        gen_logits, generator_labels, logits_rtd, logits_mts,
+                        gen_logits, gen_labels, logits_rtd, logits_mts,
                         logits_csp, disc_labels, masks)
 
                 scaled = scaler.scale(loss)
@@ -333,10 +333,10 @@ def do_train(args):
                 gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, masks = model(
                     input_ids=masked_input_ids,
                     raw_input_ids=input_ids,
-                    generator_labels=generator_labels)
+                    generator_labels=gen_labels)
                 loss, gen_loss, rtd_loss, mts_loss, csp_loss = criterion(
-                    gen_logits, generator_labels, logits_rtd, logits_mts,
-                    logits_csp, disc_labels, masks)
+                    gen_logits, gen_labels, logits_rtd, logits_mts, logits_csp,
+                    disc_labels, masks)
                 loss.backward()
                 t_loss['loss'] += loss.detach()
                 t_loss['gen'] += gen_loss.detach()
