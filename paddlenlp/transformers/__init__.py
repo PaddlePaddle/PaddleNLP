@@ -86,7 +86,7 @@ from .rembert.modeling import *
 from .rembert.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
-from semantic_search.modeling import *
+from .semantic_search.modeling import *
 from .skep.modeling import *
 from .skep.tokenizer import *
 from .squeezebert.modeling import *
