@@ -410,6 +410,8 @@ from paddlenlp import Taskflow
   ['出租方', '承租方']
   ```
 
+  预测：
+
   ```python
   >>> from paddlenlp import Taskflow
 
@@ -431,6 +433,8 @@ from paddlenlp import Taskflow
 
   在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
+  预测：
+
   ```python
   >>> schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
   >>> ie.set_schema(schema) # Reset schema
@@ -450,6 +454,8 @@ from paddlenlp import Taskflow
 
   触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
 
+  预测：
+
   ```python
   >>> schema = [{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}] # Define the schema for event extraction
   >>> ie.set_schema(schema) # Reset schema
@@ -467,6 +473,8 @@ from paddlenlp import Taskflow
   [{'评价维度': ['观点词']}]
   ```
 
+  预测：
+
   ```python
   >>> schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
   >>> ie.set_schema(schema) # Reset schema
@@ -481,6 +489,8 @@ from paddlenlp import Taskflow
   ```text
   ['情感倾向[正向，负向]']
   ```
+
+  预测：
 
   ```python
   >>> schema = ['情感倾向[正向，负向]'] # Define the schema for sentence-level sentiment classification
