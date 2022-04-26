@@ -67,56 +67,56 @@ PaddleNLP Transformer API在提供丰富预训练模型的同时，也降低了�
 Transformer预训练模型汇总
 ------------------------------------
 
-PaddleNLP的Transformer预训练模型包含从 `huggingface.co model hub`_ 直接转换的模型权重和百度自研模型权重，方便社区用户直接迁移使用。
-目前共包含了40多个主流预训练模型，400多个模型权重。
+PaddleNLP的Transformer预训练模型包含从 `huggingface.co`_ 直接转换的模型权重和百度自研模型权重，方便社区用户直接迁移使用。
+目前共包含了40多个主流预训练模型，500多个模型权重。
 
-.. _huggingface.co model hub: https://huggingface.co/
+.. _huggingface.co: https://huggingface.co/models
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
-   ALBERT <ALBERT/contents>
-   BART <BART/contents>
-   BERT <BERT/contents>
-   BigBird <BigBird/contents>
-   Blenderbot <Blenderbot/contents>
-   Blenderbot-Small <Blenderbot-Small/contents>
-   ChineseBert <ChineseBert/contents>
-   ConvBert <ConvBert/contents>
-   CTRL <CTRL/contents>
-   DistilBert <DistilBert/contents>
-   ELECTRA <ELECTRA/contents>
-   ERNIE <ERNIE/contents>
-   ERNIE-CTM <ERNIE-CTM/contents>
-   ERNIE-DOC <ERNIE-DOC/contents>
-   ERNIE-GEN <ERNIE-GEN/contents>
-   ERNIE-GRAM <ERNIE-GRAM/contents>
-   ERNIE-M <ERNIE-M/contents>
-   FNet <FNet/contents>
-   Funnel <Funnel/contents>
-   GPT <GPT/contents>
-   LayoutLM <LayoutLM/contents>
-   LayoutLMV2 <LayoutLMV2/contents>
-   LayoutXLM <LayoutXLM/contents>
-   Luke <Luke/contents>
-   MBart <MBart/contents>
-   MegatronBert <MegatronBert/contents>
-   MobileBert <MobileBert/contents>
-   MPNet <MPNet/contents>
-   NeZha <NeZha/contents>
-   PPMiniLM <PPMiniLM/contents>
-   ProphetNet <ProphetNet/contents>
-   Reformer <Reformer/contents>
-   RemBert <RemBert/contents>
-   RoBERTa <RoBERTa/contents>
-   RoFormer <RoFormer/contents>
-   SKEP <SKEP/contents>
-   SqueezeBert <SqueezeBert/contents>
-   T5 <T5/contents>
-   TinyBert <TinyBert/contents>
-   UnifiedTransformer <UnifiedTransformer/contents>
-   UNIMO <UNIMO/contents>
-   XLNet <XLNet/contents>
+   ALBERT <transformers/ALBERT/contents>
+   BART <transformers/BART/contents>
+   BERT <transformers/BERT/contents>
+   BigBird <transformers/BigBird/contents>
+   Blenderbot <transformers/Blenderbot/contents>
+   Blenderbot-Small <transformers/Blenderbot-Small/contents>
+   ChineseBert <transformers/ChineseBert/contents>
+   ConvBert <transformers/ConvBert/contents>
+   CTRL <transformers/CTRL/contents>
+   DistilBert <transformers/DistilBert/contents>
+   ELECTRA <transformers/ELECTRA/contents>
+   ERNIE <transformers/ERNIE/contents>
+   ERNIE-CTM <transformers/ERNIE-CTM/contents>
+   ERNIE-DOC <transformers/ERNIE-DOC/contents>
+   ERNIE-GEN <transformers/ERNIE-GEN/contents>
+   ERNIE-GRAM <transformers/ERNIE-GRAM/contents>
+   ERNIE-M <transformers/ERNIE-M/contents>
+   FNet <transformers/FNet/contents>
+   Funnel <transformers/Funnel/contents>
+   GPT <transformers/GPT/contents>
+   LayoutLM <transformers/LayoutLM/contents>
+   LayoutLMV2 <transformers/LayoutLMV2/contents>
+   LayoutXLM <transformers/LayoutXLM/contents>
+   Luke <transformers/Luke/contents>
+   MBart <transformers/MBart/contents>
+   MegatronBert <transformers/MegatronBert/contents>
+   MobileBert <transformers/MobileBert/contents>
+   MPNet <transformers/MPNet/contents>
+   NeZha <transformers/NeZha/contents>
+   PPMiniLM <transformers/PPMiniLM/contents>
+   ProphetNet <transformers/ProphetNet/contents>
+   Reformer <transformers/Reformer/contents>
+   RemBert <transformers/RemBert/contents>
+   RoBERTa <transformers/RoBERTa/contents>
+   RoFormer <transformers/RoFormer/contents>
+   SKEP <transformers/SKEP/contents>
+   SqueezeBert <transformers/SqueezeBert/contents>
+   T5 <transformers/T5/contents>
+   TinyBert <transformers/TinyBert/contents>
+   UnifiedTransformer <transformers/UnifiedTransformer/contents>
+   UNIMO <transformers/UNIMO/contents>
+   XLNet <transformers/XLNet/contents>
 
 
 

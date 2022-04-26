@@ -55,24 +55,24 @@ if __name__ == "__main__":
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
+        print('Loaded parameters from %s' % args.params_path)
     model.eval()
 
     # Convert to static graph with specific input description
     input_spec = [
         paddle.static.InputSpec(
-            shape=[None, None], dtype="int64"),  # input_ids
+            shape=[None, None], dtype='int64'),  # input_ids
         paddle.static.InputSpec(
-            shape=[None, None], dtype="int64"),  # token_type_ids
+            shape=[None, None], dtype='int64'),  # token_type_ids
         paddle.static.InputSpec(
-            shape=[None, None], dtype="int64")  # position_ids
+            shape=[None, None], dtype='int64')  # position_ids
     ]
     if args.train_dataset in ['CMeEE', 'CMeIE']:
         input_spec.append(
             paddle.static.InputSpec(
-                shape=[None, None], dtype="float32"))  # masks
+                shape=[None, None], dtype='float32'))  # masks
 
     model = paddle.jit.to_static(model, input_spec=input_spec)
     # Save in static graph model.
-    save_path = os.path.join(args.output_path, "inference")
+    save_path = os.path.join(args.output_path, 'inference')
     paddle.jit.save(model, save_path)
