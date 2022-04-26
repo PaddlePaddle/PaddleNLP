@@ -539,7 +539,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         `__init__` whose name ends with `_token`) as attributes of the tokenizer
         instance.
         """
-        init_dict = fn_args_to_dict(original_init, *args, **kwargs)
+
+        init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
+        init_dict.pop('self', None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
     def _build_special_tokens_map_extended(self, **kwargs):
