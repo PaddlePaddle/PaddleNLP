@@ -1,6 +1,4 @@
 set -x
-export PADDLE_WITH_GLOO=0
-export FLAGS_call_stack_level=2
 unset CUDA_VISIBLE_DEVICES
 
 rm -rf *.prototxt
@@ -8,6 +6,8 @@ rm -rf core.*
 rm -rf start_sharding*
 rm -rf main_sharding*
 
+# dp8 for 8 worker of data parallel
+# gb512 for the global batch size is 512 = 64 * 8
 task_name="ernie-1.0-dp8-gb512"
 rm -rf output/$task_name/log
 

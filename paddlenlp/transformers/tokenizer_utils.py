@@ -42,7 +42,8 @@ from collections import OrderedDict
 
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
-    'is_chinese_char', 'normalize_chars', 'tokenize_special_chars'
+    'is_chinese_char', 'normalize_chars', 'tokenize_special_chars',
+    'convert_to_unicode'
 ]
 
 
@@ -171,7 +172,8 @@ def _is_nonnormalized_char(char):
     if ((0xFF00 <= cp <= 0xFFEF) or  # Halfwidth and Fullwidth Forms
         (0xFE50 <= cp <= 0xFE6B) or  # Small Form Variants
         (0x3358 <= cp <= 0x33FF) or  # CJK Compatibility
-        (0x249C <= cp <= 0x24E9)):  # Enclosed Alphanumerics: Ⓛ ⒰
+        (0x249C <= cp <= 0x24E9) or  # Enclosed Alphanumerics: Ⓛ ⒰
+        (0x3200 <= cp <= 0x32FF)):  # Enclosed CJK Letters and Months
         return True
 
     return False
