@@ -15,7 +15,7 @@ import os
 import setuptools
 import sys
 import paddlenlp
-long_description = "PaddlePaddle NLP Model Core Library"
+long_description = "Easy-to-use and Fast NLP library with awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications."
 
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
@@ -53,7 +53,7 @@ setuptools.setup(
     long_description_content_type="text/plain",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('examples*', 'tests*')),
+        where='.', exclude=('examples*', 'tests*', 'applications*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',

@@ -127,6 +127,7 @@ Linear-based（[Ribeiro et al.. 2016](https://arxiv.org/pdf/1602.04938.pdf)）�
 * 操作系统 CentOS 7.5
 * Python 3.8.12
 * PaddlePaddle 2.1.0
+* PaddleNLP 2.2.4
 
 除此之外，需要使用支持 GPU 的硬件环境。
 

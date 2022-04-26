@@ -18,7 +18,8 @@ import pickle
 import six
 import shutil
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from paddlenlp.utils.env import MODEL_HOME
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
@@ -105,6 +106,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
             "rocketqa-v1-marco-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "ernie-3.0-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_vocab.txt",
+            "ernie-3.0-large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_large_vocab.txt",
+            "ernie-3.0-medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -151,6 +158,15 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rocketqa-v1-marco-cross-encoder": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-base": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-large": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-medium": {
             "do_lower_case": True
         },
     }
@@ -425,8 +441,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+        self.sp_model = spm.SentencePieceProcessor()
         self.word_dict = word_dict
 
         self.do_lower_case = do_lower_case

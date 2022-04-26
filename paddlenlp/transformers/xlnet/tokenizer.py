@@ -19,7 +19,8 @@ import unicodedata
 from shutil import copyfile
 from typing import List, Optional
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from .. import PretrainedTokenizer
 
 __all__ = ['XLNetTokenizer']
@@ -149,7 +150,6 @@ class XLNetTokenizer(PretrainedTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.vocab_file = vocab_file
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
 
@@ -171,7 +171,6 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.vocab_file)
 
