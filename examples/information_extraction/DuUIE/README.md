@@ -161,9 +161,10 @@ python3 run_seq2struct.py                              \
 ### 快速基线第三步：使用多任务模型进行预测
 
 该步骤将依据不同任务的抽取框架进行信息抽取，并输出到对应的文件夹中。
-首先下载test解压后放置在data目录下，然后使用脚本将其自动
+首先下载test解压后放置在data目录下，然后使用脚本将其自动处理并预测。
 
 ``` bash
+python process_data.py split-test
 python inference.py --data data/duuie_test_a/* --model output/duuie_multi_task_b32_lr5e-4
 ```
 
