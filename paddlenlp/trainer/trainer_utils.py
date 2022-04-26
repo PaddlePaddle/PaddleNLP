@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notice, most of this file is modified from 
+# This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
-# Thanks a lot.
 """
 Utilities for the Trainer class. 
 """
