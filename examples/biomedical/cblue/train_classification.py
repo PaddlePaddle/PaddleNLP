@@ -50,7 +50,7 @@ parser.add_argument('--epochs', default=3, type=int, help='Total number of train
 parser.add_argument('--max_steps', default=-1, type=int, help='If > 0: set total number of training steps to perform. Override epochs.')
 parser.add_argument('--batch_size', default=32, type=int, help='Batch size per GPU/CPU for training.')
 parser.add_argument('--learning_rate', default=6e-5, type=float, help='Learning rate for fine-tuning sequence classification task.')
-parser.add_argument('--weight_decay', default=0.01, type=float, help="Weight decay of optimizer if we apply some.")
+parser.add_argument('--weight_decay', default=0.01, type=float, help='Weight decay of optimizer if we apply some.')
 parser.add_argument('--warmup_proportion', default=0.1, type=float, help='Linear warmup proportion of learning rate over the training process.')
 parser.add_argument('--max_seq_length', default=128, type=int, help='The maximum total input sequence length after tokenization.')
 parser.add_argument('--init_from_ckpt', default=None, type=str, help='The path of checkpoint to be loaded.')
@@ -149,12 +149,22 @@ def do_train():
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
+        state_keys = {
+            x: x.replace('discriminator.', '')
+            for x in state_dict.keys() if 'discriminator.' in x
+        }
+        if len(state_keys) > 0:
+            state_dict = {
+                state_keys[k]: state_dict[k]
+                for k in state_keys.keys()
+            }
         model.set_dict(state_dict)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.epochs
+    args.epochs = num_training_steps // len(train_data_loader) + 1
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)

@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notice, most of this file is modified from 
+# This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
-# Thanks a lot.
 
 import paddle
 import paddle.distributed as dist
@@ -28,10 +27,11 @@ def distributed_concat(tensor: Any,
         if isinstance(tensor, (tuple, list)):
             return type(tensor)(distributed_concat(t, num_total_examples)
                                 for t in tensor)
-        output_tensors = [tensor.clone() for _ in range(dist.get_world_size())]
-        output_tensors = [
-            t if len(t.shape) > 0 else t[None] for t in output_tensors
-        ]
+        output_tensors = []
+        # output_tensors = [tensor.clone() for _ in range(dist.get_world_size())]
+        # output_tensors = [
+        #     t if len(t.shape) > 0 else t[None] for t in output_tensors
+        # ]
         dist.all_gather(output_tensors, tensor)
         concat = paddle.concat(output_tensors, axis=0)
 
