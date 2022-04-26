@@ -14,15 +14,20 @@ def tuple_offset(offset):
 
 
 def warning_tp_increment(gold, pred, prefix):
-    sys.stderr.write(f"{prefix} TP Increment Warning, Gold Offset: {gold['offset']}\n")
-    sys.stderr.write(f"{prefix} TP Increment Warning, Pred Offset: {pred['offset']}\n")
-    sys.stderr.write(f"{prefix} TP Increment Warning, Gold String: {gold['string']}\n")
-    sys.stderr.write(f"{prefix} TP Increment Warning, Pred String: {pred['string']}\n")
+    sys.stderr.write(
+        f"{prefix} TP Increment Warning, Gold Offset: {gold['offset']}\n")
+    sys.stderr.write(
+        f"{prefix} TP Increment Warning, Pred Offset: {pred['offset']}\n")
+    sys.stderr.write(
+        f"{prefix} TP Increment Warning, Gold String: {gold['string']}\n")
+    sys.stderr.write(
+        f"{prefix} TP Increment Warning, Pred String: {pred['string']}\n")
     sys.stderr.write(f"===============\n")
 
 
 class Metric:
     """ Tuple Metric """
+
     def __init__(self, verbose=False, match_mode='normal'):
         self.tp = 0.
         self.gold_num = 0.
@@ -46,13 +51,14 @@ class Metric:
         pred_num = self.pred_num
         gold_num = self.gold_num
         p, r = self.safe_div(tp, pred_num), self.safe_div(tp, gold_num)
-        return {prefix + 'tp': tp,
-                prefix + 'gold': gold_num,
-                prefix + 'pred': pred_num,
-                prefix + 'P': p * 100,
-                prefix + 'R': r * 100,
-                prefix + 'F1': self.safe_div(2 * p * r, p + r) * 100
-                }
+        return {
+            prefix + 'tp': tp,
+            prefix + 'gold': gold_num,
+            prefix + 'pred': pred_num,
+            prefix + 'P': p * 100,
+            prefix + 'R': r * 100,
+            prefix + 'F1': self.safe_div(2 * p * r, p + r) * 100
+        }
 
     def count_instance(self, gold_list, pred_list):
         if self.match_mode == 'set':
@@ -99,7 +105,10 @@ class Scorer:
         raise NotImplementedError
 
     @staticmethod
-    def eval_instance_list(gold_instance_list, pred_instance_list, verbose=False, match_mode='normal'):
+    def eval_instance_list(gold_instance_list,
+                           pred_instance_list,
+                           verbose=False,
+                           match_mode='normal'):
         raise NotImplementedError
 
 
@@ -179,7 +188,10 @@ class EntityScorer(Scorer):
         return pred_instance_list
 
     @staticmethod
-    def eval_instance_list(gold_instance_list: List[Dict], pred_instance_list: List[Dict], verbose=False, match_mode='normal'):
+    def eval_instance_list(gold_instance_list: List[Dict],
+                           pred_instance_list: List[Dict],
+                           verbose=False,
+                           match_mode='normal'):
         """[summary]
 
         Args:
@@ -206,26 +218,30 @@ class EntityScorer(Scorer):
                 (offset, string) X (gold, pred, tp, P, R, F1)
         """
         metrics = {
-            'string': Metric(verbose=verbose, match_mode=match_mode),
-            'offset': Metric(verbose=verbose, match_mode=match_mode),
+            'string': Metric(
+                verbose=verbose, match_mode=match_mode),
+            'offset': Metric(
+                verbose=verbose, match_mode=match_mode),
         }
         for pred, gold in zip(pred_instance_list, gold_instance_list):
 
-            pre_string_tp, pre_offset_tp = metrics['string'].tp, metrics['offset'].tp
+            pre_string_tp, pre_offset_tp = metrics['string'].tp, metrics[
+                'offset'].tp
 
             for eval_key in metrics:
                 metrics[eval_key].count_instance(
                     gold_list=gold.get(eval_key, []),
-                    pred_list=pred.get(eval_key, [])
-                )
+                    pred_list=pred.get(eval_key, []))
 
-            post_string_tp, post_offset_tp = metrics['string'].tp, metrics['offset'].tp
+            post_string_tp, post_offset_tp = metrics['string'].tp, metrics[
+                'offset'].tp
             if verbose and post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp:
                 warning_tp_increment(gold=gold, pred=pred, prefix='Entity')
 
         results = dict()
         for eval_key in metrics:
-            results.update(metrics[eval_key].compute_f1(prefix=eval_key + '-ent-'))
+            results.update(metrics[eval_key].compute_f1(prefix=eval_key +
+                                                        '-ent-'))
 
         return results
 
@@ -266,15 +282,13 @@ class RelationScorer(Scorer):
                     record['args'][0]['type'],
                     tuple_offset(record['args'][0]['offset']),
                     record['args'][1]['type'],
-                    tuple_offset(record['args'][1]['offset']),
-                )]
+                    tuple_offset(record['args'][1]['offset']), )]
                 gold_instance['string'] += [(
                     record['type'],
                     record['args'][0]['type'],
                     record['args'][0]['text'],
                     record['args'][1]['type'],
-                    record['args'][1]['text'],
-                )]
+                    record['args'][1]['text'], )]
             gold_instance_list += [gold_instance]
 
         return gold_instance_list
@@ -316,7 +330,10 @@ class RelationScorer(Scorer):
         return pred_instance_list
 
     @staticmethod
-    def eval_instance_list(gold_instance_list, pred_instance_list, verbose=False, match_mode='normal'):
+    def eval_instance_list(gold_instance_list,
+                           pred_instance_list,
+                           verbose=False,
+                           match_mode='normal'):
         """[summary]
 
         Args:
@@ -343,46 +360,59 @@ class RelationScorer(Scorer):
         """
         # Span Boundary and Type
         metrics = {
-            'offset': Metric(verbose=verbose, match_mode=match_mode),
-            'string': Metric(verbose=verbose, match_mode=match_mode),
+            'offset': Metric(
+                verbose=verbose, match_mode=match_mode),
+            'string': Metric(
+                verbose=verbose, match_mode=match_mode),
         }
         # Span Boundary Only
         boundary_metrics = {
-            'offset': Metric(verbose=verbose, match_mode=match_mode),
-            'string': Metric(verbose=verbose, match_mode=match_mode),
+            'offset': Metric(
+                verbose=verbose, match_mode=match_mode),
+            'string': Metric(
+                verbose=verbose, match_mode=match_mode),
         }
         for pred, gold in zip(pred_instance_list, gold_instance_list):
 
-            pre_string_tp, pre_offset_tp = metrics['string'].tp, metrics['offset'].tp
+            pre_string_tp, pre_offset_tp = metrics['string'].tp, metrics[
+                'offset'].tp
 
             for eval_key in metrics:
                 # Span Boundary and Type
                 metrics[eval_key].count_instance(
                     gold_list=gold.get(eval_key, []),
-                    pred_list=pred.get(eval_key, []),
-                )
+                    pred_list=pred.get(eval_key, []), )
 
-            post_string_tp, post_offset_tp = metrics['string'].tp, metrics['offset'].tp
-            if verbose and (post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp):
-                warning_tp_increment(gold=gold, pred=pred, prefix='Relation Strict')
+            post_string_tp, post_offset_tp = metrics['string'].tp, metrics[
+                'offset'].tp
+            if verbose and (post_offset_tp - pre_offset_tp !=
+                            post_string_tp - pre_string_tp):
+                warning_tp_increment(
+                    gold=gold, pred=pred, prefix='Relation Strict')
 
-            pre_string_tp, pre_offset_tp = boundary_metrics['string'].tp, boundary_metrics['offset'].tp
+            pre_string_tp, pre_offset_tp = boundary_metrics[
+                'string'].tp, boundary_metrics['offset'].tp
 
             for eval_key in boundary_metrics:
                 # Span Boundary Only
                 boundary_metrics[eval_key].count_instance(
-                    gold_list=[(x[0], x[2], x[4]) for x in gold.get(eval_key, [])],
-                    pred_list=[(x[0], x[2], x[4]) for x in pred.get(eval_key, [])],
-                )
-            post_string_tp, post_offset_tp = boundary_metrics['string'].tp, boundary_metrics['offset'].tp
+                    gold_list=[(x[0], x[2], x[4])
+                               for x in gold.get(eval_key, [])],
+                    pred_list=[(x[0], x[2], x[4])
+                               for x in pred.get(eval_key, [])], )
+            post_string_tp, post_offset_tp = boundary_metrics[
+                'string'].tp, boundary_metrics['offset'].tp
             if verbose and post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp:
-                warning_tp_increment(gold=gold, pred=pred, prefix='Relation Boundary')
+                warning_tp_increment(
+                    gold=gold, pred=pred, prefix='Relation Boundary')
 
         results = dict()
         for eval_key in metrics:
-            results.update(metrics[eval_key].compute_f1(prefix=eval_key + '-rel-strict-'))
+            results.update(metrics[eval_key].compute_f1(prefix=eval_key +
+                                                        '-rel-strict-'))
         for eval_key in boundary_metrics:
-            results.update(boundary_metrics[eval_key].compute_f1(prefix=eval_key + '-rel-boundary-'))
+            results.update(boundary_metrics[eval_key].compute_f1(
+                prefix=eval_key + '-rel-boundary-'))
         return results
 
 
@@ -424,11 +454,16 @@ class EventScorer(Scorer):
         for gold in gold_list:
             gold_instance = defaultdict(list)
             for record in gold:
-                gold_instance['offset_trigger'] += [(record['type'], tuple_offset(record['offset']))]
-                gold_instance['string_trigger'] += [(record['type'], record['text'])]
+                gold_instance['offset_trigger'] += [(
+                    record['type'], tuple_offset(record['offset']))]
+                gold_instance['string_trigger'] += [(record['type'],
+                                                     record['text'])]
                 for arg in record['args']:
-                    gold_instance['offset_role'] += [(record['type'], arg['type'], tuple_offset(arg['offset']))]
-                    gold_instance['string_role'] += [(record['type'], arg['type'], arg['text'])]
+                    gold_instance['offset_role'] += [(
+                        record['type'], arg['type'],
+                        tuple_offset(arg['offset']))]
+                    gold_instance['string_role'] += [(record['type'],
+                                                      arg['type'], arg['text'])]
             gold_instance_list += [gold_instance]
         return gold_instance_list
 
@@ -462,21 +497,30 @@ class EventScorer(Scorer):
             pred_instance = defaultdict(list)
 
             for offset_pred in pred['offset']:
-                event_type, trigger_offset = offset_pred['type'], tuple_offset(offset_pred['trigger'])
-                pred_instance['offset_trigger'] += [(event_type, trigger_offset)]
+                event_type, trigger_offset = offset_pred['type'], tuple_offset(
+                    offset_pred['trigger'])
+                pred_instance['offset_trigger'] += [(event_type, trigger_offset)
+                                                    ]
                 for role_type, role_offset in offset_pred['roles']:
-                    pred_instance['offset_role'] += [(event_type, role_type, tuple_offset(role_offset))]
+                    pred_instance['offset_role'] += [(
+                        event_type, role_type, tuple_offset(role_offset))]
 
             for string_pred in pred['string']:
-                event_type, trigger_string = string_pred['type'], string_pred['trigger']
-                pred_instance['string_trigger'] += [(event_type, trigger_string)]
+                event_type, trigger_string = string_pred['type'], string_pred[
+                    'trigger']
+                pred_instance['string_trigger'] += [(event_type, trigger_string)
+                                                    ]
                 for role_type, role_string in string_pred['roles']:
-                    pred_instance['string_role'] += [(event_type, role_type, role_string)]
+                    pred_instance['string_role'] += [(event_type, role_type,
+                                                      role_string)]
             pred_instance_list += [pred_instance]
         return pred_instance_list
 
     @staticmethod
-    def eval_instance_list(gold_instance_list, pred_instance_list, verbose=False, match_mode='normal'):
+    def eval_instance_list(gold_instance_list,
+                           pred_instance_list,
+                           verbose=False,
+                           match_mode='normal'):
         """[summary]
 
         Args:
@@ -508,44 +552,52 @@ class EventScorer(Scorer):
                 (offset, string) X (trigger, role) X (gold, pred, tp, P, R, F1)
         """
         trigger_metrics = {
-                'offset': Metric(verbose=verbose, match_mode=match_mode),
-                'string': Metric(verbose=verbose, match_mode=match_mode),
+            'offset': Metric(
+                verbose=verbose, match_mode=match_mode),
+            'string': Metric(
+                verbose=verbose, match_mode=match_mode),
         }
         role_metrics = {
-                'offset': Metric(verbose=verbose, match_mode=match_mode),
-                'string': Metric(verbose=verbose, match_mode=match_mode),
+            'offset': Metric(
+                verbose=verbose, match_mode=match_mode),
+            'string': Metric(
+                verbose=verbose, match_mode=match_mode),
         }
 
         for pred, gold in zip(pred_instance_list, gold_instance_list):
 
-            pre_string_tp, pre_offset_tp = trigger_metrics['string'].tp, trigger_metrics['offset'].tp
+            pre_string_tp, pre_offset_tp = trigger_metrics[
+                'string'].tp, trigger_metrics['offset'].tp
 
             for eval_key in trigger_metrics:
                 trigger_metrics[eval_key].count_instance(
                     gold_list=gold.get(eval_key + '_trigger', []),
-                    pred_list=pred.get(eval_key + '_trigger', [])
-                )
+                    pred_list=pred.get(eval_key + '_trigger', []))
 
-            post_string_tp, post_offset_tp = trigger_metrics['string'].tp, trigger_metrics['offset'].tp
+            post_string_tp, post_offset_tp = trigger_metrics[
+                'string'].tp, trigger_metrics['offset'].tp
             if verbose and post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp:
                 warning_tp_increment(gold=gold, pred=pred, prefix='Trigger')
 
-            pre_string_tp, pre_offset_tp = role_metrics['string'].tp, role_metrics['offset'].tp
+            pre_string_tp, pre_offset_tp = role_metrics[
+                'string'].tp, role_metrics['offset'].tp
 
             for eval_key in role_metrics:
                 role_metrics[eval_key].count_instance(
                     gold_list=gold.get(eval_key + '_role', []),
-                    pred_list=pred.get(eval_key + '_role', [])
-                )
+                    pred_list=pred.get(eval_key + '_role', []))
 
-            post_string_tp, post_offset_tp = role_metrics['string'].tp, role_metrics['offset'].tp
+            post_string_tp, post_offset_tp = role_metrics[
+                'string'].tp, role_metrics['offset'].tp
             if verbose and post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp:
                 warning_tp_increment(gold=gold, pred=pred, prefix='Role')
 
         results = dict()
         for eval_key in trigger_metrics:
-            results.update(trigger_metrics[eval_key].compute_f1(prefix=f'{eval_key}-evt-trigger-'))
+            results.update(trigger_metrics[eval_key].compute_f1(
+                prefix=f'{eval_key}-evt-trigger-'))
         for eval_key in role_metrics:
-            results.update(role_metrics[eval_key].compute_f1(prefix=f'{eval_key}-evt-role-'))
+            results.update(role_metrics[eval_key].compute_f1(
+                prefix=f'{eval_key}-evt-role-'))
 
         return results

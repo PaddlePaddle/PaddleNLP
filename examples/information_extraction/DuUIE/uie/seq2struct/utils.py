@@ -9,32 +9,23 @@ import tabulate
 import numpy as np
 from dataclasses import dataclass
 import paddle
-from paddlenlp.transformers import (
-    CosineDecayWithWarmup,
-    LinearDecayWithWarmup,
-    PolyDecayWithWarmup
-)
+from paddlenlp.transformers import (CosineDecayWithWarmup,
+                                    LinearDecayWithWarmup, PolyDecayWithWarmup)
 
 from paddlenlp.datasets import load_dataset
 from paddle.io import (
     DistributedBatchSampler,
     BatchSampler,
-    DataLoader,
-)
+    DataLoader, )
 from uie.evaluation import constants
-from uie.evaluation.sel2record import (
-    SEL2Record,
-    RecordSchema,
-    MapConfig
-)
+from uie.evaluation.sel2record import (SEL2Record, RecordSchema, MapConfig)
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.data_collator import (
     DataCollatorForSeq2Seq,
     DynamicSSIGenerator,
     DataCollatorForMultiTaskSeq2Seq,
     DynamicMultiTaskSSIGenerator,
-    SpotAsocNoiser,
-)
+    SpotAsocNoiser, )
 
 logger = logging.getLogger("__main__")
 
@@ -79,12 +70,10 @@ def get_scheduler(
         raise ValueError(
             f"requires `num_training_steps`, please provide that argument.")
 
-    return scheduler_type2cls[scheduler_type](
-        learning_rate=learning_rate,
-        total_steps=num_training_steps,
-        warmup=num_warmup_steps,
-        **scheduler_kwargs
-    )
+    return scheduler_type2cls[scheduler_type](learning_rate=learning_rate,
+                                              total_steps=num_training_steps,
+                                              warmup=num_warmup_steps,
+                                              **scheduler_kwargs)
 
 
 def set_seed(args):
@@ -113,17 +102,13 @@ def set_logger(args):
                 filename=f"{args.output_dir}.log",
                 mode="w",
                 encoding="utf-8", )
-        ],
-    )
+        ], )
     # create console handler and set level to debug
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level=logging.DEBUG)
     # add formatter to console_handler
-    console_handler.setFormatter(
-        fmt=logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-    )
+    console_handler.setFormatter(fmt=logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     # add console_handler to logger
     logger.addHandler(console_handler)
 
@@ -137,15 +122,18 @@ def better_print_multi(results):
     return tabulate.tabulate(table, headers=['Task', 'Metric'])
 
 
-def read_func(tokenizer, data_file, max_source_length, max_target_length, is_train=False, negative_keep=1.0):
-
+def read_func(tokenizer,
+              data_file,
+              max_source_length,
+              max_target_length,
+              is_train=False,
+              negative_keep=1.0):
     def tokenize(x, max_length):
         return tokenizer(
             x,
             return_token_type_ids=False,
             return_attention_mask=True,
-            max_seq_len=max_length,
-        )
+            max_seq_len=max_length, )
 
     negative_drop_count = 0
     with open(data_file, 'r', encoding='utf-8') as f:
@@ -162,11 +150,14 @@ def read_func(tokenizer, data_file, max_source_length, max_target_length, is_tra
                 'spots': instance['spot'],
                 'asocs': instance['asoc'],
                 'spot_asoc': instance['spot_asoc'],
-                'sample_prompt': [is_train] * len(inputs['input_ids']) # Sample SSI during Training
+                'sample_prompt': [is_train] *
+                len(inputs['input_ids'])  # Sample SSI during Training
             })
             yield inputs
     if negative_drop_count > 0:
-        logger.info(f'Drop negative {negative_drop_count} instance during loading {data_file}.')
+        logger.info(
+            f'Drop negative {negative_drop_count} instance during loading {data_file}.'
+        )
 
 
 def get_train_dataloader(model, tokenizer, train_filename, args):
@@ -181,21 +172,18 @@ def get_train_dataloader(model, tokenizer, train_filename, args):
         max_target_length=args.max_target_length,
         is_train=True,
         lazy=False,
-        negative_keep=args.negative_keep
-    )
+        negative_keep=args.negative_keep)
 
     batch_sampler = DistributedBatchSampler(
         dataset=dataset,
         batch_size=args.per_device_train_batch_size,
-        shuffle=True,
-    )
+        shuffle=True, )
 
     if args.spot_noise > 0 or args.asoc_noise > 0:
         spot_asoc_nosier = SpotAsocNoiser(
             spot_noise_ratio=args.spot_noise,
             asoc_noise_ratio=args.asoc_noise,
-            null_span=constants.null_span,
-        )
+            null_span=constants.null_span_symbol, )
     else:
         spot_asoc_nosier = None
 
@@ -221,18 +209,15 @@ def get_train_dataloader(model, tokenizer, train_filename, args):
             schema=schema,
             positive_rate=args.meta_positive_rate,
             negative=args.meta_negative,
-            ordered_prompt=args.ordered_prompt,
-        ),
-        spot_asoc_nosier=spot_asoc_nosier,
-    )
+            ordered_prompt=args.ordered_prompt, ),
+        spot_asoc_nosier=spot_asoc_nosier, )
 
     data_loader = DataLoader(
         dataset=dataset,
         batch_sampler=batch_sampler,
         collate_fn=collate_fn,
         num_workers=args.dataloader_num_workers,
-        return_list=True
-    )
+        return_list=True)
 
     return data_loader
 
@@ -250,14 +235,12 @@ def get_eval_dataloader(model, tokenizer, eval_filename, record_schema, args):
         max_source_length=args.max_source_length,
         max_target_length=args.max_target_length,
         is_train=False,
-        lazy=False
-    )
+        lazy=False)
 
     batch_sampler = BatchSampler(
         dataset=dataset,
         batch_size=args.per_device_eval_batch_size,
-        shuffle=False
-    )
+        shuffle=False)
 
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
 
@@ -277,18 +260,15 @@ def get_eval_dataloader(model, tokenizer, eval_filename, record_schema, args):
             schema=schema,
             positive_rate=1,
             negative=-1,
-            ordered_prompt=True,
-        ),
-        spot_asoc_nosier=None,
-    )
+            ordered_prompt=True, ),
+        spot_asoc_nosier=None, )
 
     data_loader = DataLoader(
         dataset=dataset,
         batch_sampler=batch_sampler,
         collate_fn=collate_fn,
         num_workers=args.dataloader_num_workers,
-        return_list=True
-    )
+        return_list=True)
 
     return data_loader
 
@@ -306,27 +286,23 @@ def load_eval_tasks(model, tokenizer, args):
             tokenizer=tokenizer,
             eval_filename=os.path.join(task_config.data_path, 'val.json'),
             record_schema=os.path.join(task_config.data_path, 'record.schema'),
-            args=args
-        )
+            args=args)
 
         sel2record = SEL2Record(
             schema_dict=SEL2Record.load_schema_dict(task_config.data_path),
             map_config=MapConfig.load_by_name(task_config.sel2record),
-            tokenizer=tokenizer if isinstance(tokenizer, T5BertTokenizer) else None,
-        )
+            tokenizer=tokenizer
+            if isinstance(tokenizer, T5BertTokenizer) else None, )
 
         eval_tasks[task_config.dataset_name] = Task(
             config=task_config,
             dataloader=task_dataloader,
             sel2record=sel2record,
             val_instances=read_json_file(
-                os.path.join(task_config.data_path, 'val.json')
-            ),
-            metrics=task_config.metrics,
-        )
+                os.path.join(task_config.data_path, 'val.json')),
+            metrics=task_config.metrics, )
 
     return eval_tasks
-
 
 
 class TaskConfig:
@@ -337,7 +313,8 @@ class TaskConfig:
         self.sel2record = task_dict.get('sel2record', '')
         self.metrics = task_dict.get('metrics', [])
         self.eval_match_mode = task_dict.get('eval_match_mode', 'normal')
-        self.schema = RecordSchema.read_from_file(f"{self.data_path}/record.schema")
+        self.schema = RecordSchema.read_from_file(
+            f"{self.data_path}/record.schema")
 
     def __repr__(self) -> str:
         return f"dataset: {self.dataset_name}\n" \

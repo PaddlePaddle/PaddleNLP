@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
-spot_prompt = '<spot>'
-asoc_prompt = '<asoc>'
+spot_symbol = '<spot>'
+asoc_symbol = '<asoc>'
 
-type_start = '<extra_id_0>'
-type_end = '<extra_id_1>'
-text_start = '<extra_id_2>'
-span_start = '<extra_id_5>'
-null_span = '<extra_id_6>'
-null_lÍabel = '<extra_id_7>'
-
+type_start_symbol = '<extra_id_0>'
+type_end_symbol = '<extra_id_1>'
+text_start_symbol = '<extra_id_2>'
+span_start_symbol = '<extra_id_5>'
+null_span_symbol = '<extra_id_6>'
+null_label_symbol = '<extra_id_7>'
 
 offset_map_strategy = {
     "closest_en": {

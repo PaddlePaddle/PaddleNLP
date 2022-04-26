@@ -9,7 +9,7 @@ ordered_prompt=False
 seed=42
 batch_size=32
 lr=5e-4
-gradient_accumulation_steps=1
+gradient_accumulation_steps=2
 num_train_epochs=10
 
 model_name="pd_models/uie-char-small"
@@ -19,7 +19,7 @@ metric_for_best_model=all-task-ave
 output_dir=output/duuie_multi_task_b${batch_size}_lr${lr}
 
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} python3              \
-    run_seq2struct_multitask.py                                   \
+    run_seq2struct.py                                   \
     --do_train                                                    \
     --metric_for_best_model=${metric_for_best_model}              \
     --model_name_or_path=${model_name}                            \

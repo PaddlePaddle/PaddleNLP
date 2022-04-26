@@ -18,31 +18,17 @@ from paddle.amp import GradScaler, auto_cast
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from uie.evaluation import constants
-from uie.evaluation.sel2record import (
-    MapConfig,
-    SEL2Record,
-    RecordSchema,
-    evaluate_extraction_results
-)
-from uie.evaluation.scorer import (
-    EntityScorer,
-    RelationScorer,
-    EventScorer
-)
+from uie.evaluation.sel2record import evaluate_extraction_results
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.utils import (
     get_scheduler,
     get_writer,
-    read_json_file,
     set_seed,
     save_checkpoint,
     set_logger,
     better_print_multi,
     get_train_dataloader,
-    get_eval_dataloader,
-    load_eval_tasks,
-)
-
+    load_eval_tasks, )
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +38,21 @@ def parse_args():
     parser.add_argument(
         "--multi_task",
         action="store_true",
-        help="Path to pre-trained model or shortcut name of model.",
-    )
+        help="Path to pre-trained model or shortcut name of model.", )
     parser.add_argument(
         "--multi_task_config",
         required=True,
-        help="Path to pre-trained model or shortcut name of model.",
-    )
+        help="Path to pre-trained model or shortcut name of model.", )
     parser.add_argument(
         "--model_name_or_path",
         default="t5-large",
         type=str,
-        help="Path to pre-trained model or shortcut name of model.",
-    )
+        help="Path to pre-trained model or shortcut name of model.", )
     parser.add_argument(
         "--train_file",
         default=None,
         type=str,
-        help="The input training data jsonlines file.",
-    )
+        help="The input training data jsonlines file.", )
     parser.add_argument(
         "--validation_file",
         default=None,
@@ -81,26 +63,22 @@ def parse_args():
         "--record_schema",
         default=None,
         type=str,
-        help="Schema for information extraction.",
-    )
+        help="Schema for information extraction.", )
     parser.add_argument(
         "--output_dir",
         required=True,
         type=str,
         help="The output directory where the model predictions and checkpoints"
-        " will be written. Default as `outputs`",
-    )
+        " will be written. Default as `outputs`", )
     parser.add_argument(
         "--overwrite_output_dir",
         action='store_true',
-        help="Overwrite output directory",
-    )
+        help="Overwrite output directory", )
     parser.add_argument(
         "--logging_dir",
         required=True,
         type=str,
-        help="The output logging directory",
-    )
+        help="The output logging directory", )
     parser.add_argument(
         "--max_source_length",
         default=256,
@@ -192,35 +170,31 @@ def parse_args():
         "--warmup_steps",
         type=int,
         default=-1,
-        help="warmup_steps.",
-    )
+        help="warmup_steps.", )
     parser.add_argument(
         "--logging_steps",
         type=int,
         default=100,
-        help="Log every X updates steps.",
-    )
+        help="Log every X updates steps.", )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="random seed for initialization",
-    )
+        help="random seed for initialization", )
     parser.add_argument(
         "--writer_type",
         choices=["visualdl", "tensorboard"],
         default="visualdl",
-        help="writer_type.",
-    )
+        help="writer_type.", )
     parser.add_argument(
         "--lr_scheduler_type",
         choices=["linear", "cosine", "poly"],
         default="linear",
         type=str,
-        help="lr_scheduler_type.",
-    )
+        help="lr_scheduler_type.", )
     parser.add_argument(
-        "--use_amp", "--fp16",
+        "--use_amp",
+        "--fp16",
         action="store_true",
         help="Enable mixed precision training.")
     parser.add_argument(
@@ -237,43 +211,36 @@ def parse_args():
         "--spot_noise",
         type=float,
         default=0,
-        help="The noise rate of null spot."
-    )
+        help="The noise rate of null spot.")
     parser.add_argument(
         "--asoc_noise",
         type=float,
         default=0,
-        help="The noise rate of null asoc."
-    )
+        help="The noise rate of null asoc.")
     parser.add_argument(
         '--negative_keep',
         type=float,
         default=1.0,
-        help="The keep rate of negative instance for fast training."
-    )
+        help="The keep rate of negative instance for fast training.")
     parser.add_argument(
         "--meta_positive_rate",
         type=float,
         default=1,
-        help="The keep rate of positive spot."
-    )
+        help="The keep rate of positive spot.")
     parser.add_argument(
         "--meta_negative",
         type=int,
         default=-1,
-        help="Negative Schema Number in Training."
-    )
+        help="Negative Schema Number in Training.")
     parser.add_argument(
         "--ordered_prompt",
         action='store_true',
-        help="Whether to sort the spot prompt and asoc prompt or not."
-    )
+        help="Whether to sort the spot prompt and asoc prompt or not.")
     parser.add_argument(
         '--offset_map',
         dest='map_config',
         help='Offset match strategy.',
-        choices=constants.offset_map_strategy.keys()
-    )
+        choices=constants.offset_map_strategy.keys())
     parser.add_argument('--do_train', action='store_true')
     parser.add_argument('--do_eval', action='store_true')
     parser.add_argument('--do_predict', action='store_true')
@@ -282,27 +249,22 @@ def parse_args():
         type=str,
         default="gpu",
         choices=["cpu", "gpu"],
-        help="Device for selecting for the training."
-    )
+        help="Device for selecting for the training.")
 
     args = parser.parse_args()
 
     # Sanity check
     if not (args.do_train or args.do_predict):
         raise ValueError(
-            "At least one of the \"--do_train\" or \"--do_predict\" should be true.")
+            "At least one of the \"--do_train\" or \"--do_predict\" should be true."
+        )
 
     return args
 
 
 @paddle.no_grad()
-def evaluate(model,
-             tokenizer,
-             data_loader,
-             generate_max_length,
-             eval_instances,
-             sel2record,
-             eval_match_mode):
+def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
+             sel2record, eval_match_mode):
 
     model = model._layers if isinstance(model, paddle.DataParallel) else model
 
@@ -330,15 +292,13 @@ def evaluate(model,
             input_ids=source_ids,
             attention_mask=source_mask,
             max_length=generate_max_length,
-            use_faster=True,
-        )
+            use_faster=True, )
 
         # Convert Token id to Token String
         outputs = tokenizer.batch_decode(
             outputs,
             clean_up_tokenization_spaces=False,
-            skip_special_tokens=False
-        )
+            skip_special_tokens=False)
 
         preds = [postprocess_text(o) for o in outputs]
         all_preds.extend(preds)
@@ -349,17 +309,11 @@ def evaluate(model,
     all_records = []
     for p, instance in zip(all_preds, eval_instances):
         r = sel2record.sel2record(
-            pred=p,
-            text=instance['text'],
-            tokens=instance['tokens']
-        )
+            pred=p, text=instance['text'], tokens=instance['tokens'])
         all_records += [r]
 
     results = evaluate_extraction_results(
-        eval_instances,
-        all_records,
-        eval_match_mode=eval_match_mode
-    )
+        eval_instances, all_records, eval_match_mode=eval_match_mode)
 
     prediction = {
         'preds_record.txt': all_records,
@@ -382,10 +336,10 @@ def eval_all_tasks(eval_tasks, model, tokenizer, generate_max_length):
             generate_max_length=generate_max_length,
             eval_instances=eval_task.val_instances,
             sel2record=eval_task.sel2record,
-            eval_match_mode=eval_task.config.eval_match_mode,
-        )
+            eval_match_mode=eval_task.config.eval_match_mode, )
         for metric_name in eval_task.metrics:
-            eval_overall_results[f"{task_name}:{metric_name}"] = eval_results[metric_name]
+            eval_overall_results[f"{task_name}:{metric_name}"] = eval_results[
+                metric_name]
         eval_overall_predictions[task_name] = eval_prediction
 
     metric_sum = sum(eval_overall_results.values())
@@ -406,16 +360,14 @@ def test(args, model, tokenizer):
         eval_tasks=eval_tasks,
         model=model,
         tokenizer=tokenizer,
-        generate_max_length=generate_max_length,
-    )
+        generate_max_length=generate_max_length, )
 
     better_print_multi(eval_overall_results)
 
     for task_name in eval_overall_predictions:
         write_prediction(
             eval_prediction=eval_overall_predictions[task_name],
-            prefix='test-' + task_name,
-        )
+            prefix='test-' + task_name, )
 
 
 def write_prediction(eval_prediction, prefix='eval'):
@@ -429,11 +381,14 @@ def write_prediction(eval_prediction, prefix='eval'):
                     if isinstance(pred_result, str):
                         output.write(pred + '\n')
                     else:
-                        output.write(json.dumps(pred, ensure_ascii=False) + '\n')
+                        output.write(
+                            json.dumps(
+                                pred, ensure_ascii=False) + '\n')
 
             elif isinstance(pred_result, dict):
                 for pred in pred_result:
-                    output.write(f"{prefix}-{pred} = {pred_result[pred]}" + '\n')
+                    output.write(f"{prefix}-{pred} = {pred_result[pred]}" +
+                                 '\n')
 
 
 def train(args, model, tokenizer):
@@ -454,22 +409,18 @@ def train(args, model, tokenizer):
         model=model,
         tokenizer=tokenizer,
         train_filename=args.train_file,
-        args=args,
-    )
-    eval_tasks = load_eval_tasks(model=model, tokenizer=tokenizer, args=args) if args.do_eval else None
+        args=args, )
+    eval_tasks = load_eval_tasks(
+        model=model, tokenizer=tokenizer, args=args) if args.do_eval else None
 
     def math_ceil(x, y):
         return math.ceil(x / float(y))
 
     num_update_steps_per_epoch = math_ceil(
-        len(train_dataloader),
-        args.gradient_accumulation_steps
-    )
+        len(train_dataloader), args.gradient_accumulation_steps)
     if args.max_steps > 0:
-        args.num_train_epochs = math_ceil(
-            args.max_steps,
-            num_update_steps_per_epoch
-        )
+        args.num_train_epochs = math_ceil(args.max_steps,
+                                          num_update_steps_per_epoch)
     else:
         args.max_steps = args.num_train_epochs * num_update_steps_per_epoch
 
@@ -477,9 +428,9 @@ def train(args, model, tokenizer):
     lr_scheduler = get_scheduler(
         learning_rate=args.learning_rate,
         scheduler_type=args.lr_scheduler_type,
-        num_warmup_steps=args.warmup_steps if args.warmup_steps > 0 else args.warmup_ratio,
-        num_training_steps=args.max_steps,
-    )
+        num_warmup_steps=args.warmup_steps
+        if args.warmup_steps > 0 else args.warmup_ratio,
+        num_training_steps=args.max_steps, )
 
     total_batch_size = args.per_device_train_batch_size * \
         args.gradient_accumulation_steps
@@ -496,8 +447,7 @@ def train(args, model, tokenizer):
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-    )
+        apply_decay_param_fun=lambda x: x in decay_params, )
 
     if args.use_amp:
         scaler = GradScaler(init_loss_scaling=args.scale_loss)
@@ -528,16 +478,14 @@ def train(args, model, tokenizer):
         writer.add_scalar("lr", cur_lr, global_steps)
         writer.add_scalar("loss", cur_loss, global_steps)
         logger.info("global_steps {} - lr: {:.10f}  loss: {:.10f}".format(
-            global_steps,
-            cur_lr,
-            cur_loss)
-        )
+            global_steps, cur_lr, cur_loss))
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
             model.train()
 
-            with auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax"]):
+            with auto_cast(
+                    args.use_amp, custom_white_list=["layer_norm", "softmax"]):
                 outputs = model(**batch)
                 loss = outputs[0] / args.gradient_accumulation_steps
                 tr_loss += loss.item()
@@ -547,8 +495,8 @@ def train(args, model, tokenizer):
             else:
                 loss.backward()
 
-            if (step % args.gradient_accumulation_steps == 0
-                    or step == len(train_dataloader) - 1):
+            if (step % args.gradient_accumulation_steps == 0 or
+                    step == len(train_dataloader) - 1):
                 if args.use_amp:
                     scaler.minimize(optimizer, loss)
                 else:
@@ -565,7 +513,8 @@ def train(args, model, tokenizer):
                         logging_lr_loss()
                         logging_loss = tr_loss
 
-        save_checkpoint(tokenizer, model, os.path.join(args.output_dir, f"step-{global_steps}"))
+        save_checkpoint(tokenizer, model,
+                        os.path.join(args.output_dir, f"step-{global_steps}"))
         if args.do_eval and paddle.distributed.get_rank() == 0:
 
             logger.info(f"********** Running evaluating **********")
@@ -575,27 +524,25 @@ def train(args, model, tokenizer):
                 eval_tasks=eval_tasks,
                 model=model,
                 tokenizer=tokenizer,
-                generate_max_length=generate_max_length,
-            )
+                generate_max_length=generate_max_length, )
 
             for task_name in eval_overall_predictions:
                 write_prediction(
                     eval_overall_predictions[task_name],
-                    'valid-' + task_name,
-                )
+                    'valid-' + task_name, )
 
             if args.metric_for_best_model not in eval_overall_results:
-                raise ValueError(
-                    f"Main metric {args.metric_for_best_model} "
-                    f"is not in {eval_overall_results.keys()}."
-                )
+                raise ValueError(f"Main metric {args.metric_for_best_model} "
+                                 f"is not in {eval_overall_results.keys()}.")
 
             logger.info("********** Evaluating Done **********")
             current_score = eval_overall_results[args.metric_for_best_model]
             if current_score > best_score:
                 logger.info("********** Saving Model **********")
                 best_score = current_score
-                save_checkpoint(tokenizer, model, os.path.join(args.output_dir, f"best"))
+                save_checkpoint(tokenizer, model,
+                                os.path.join(args.output_dir, f"best"))
+    save_checkpoint(tokenizer, model, os.path.join(args.output_dir))
 
 
 def main(args):
@@ -604,11 +551,11 @@ def main(args):
         logger.info(f"{arg}: {value}")
     logger.info("**********************************************")
 
-    if os.path.exists(args.output_dir) and args.do_train and not args.overwrite_output_dir:
+    if os.path.exists(args.output_dir
+                      ) and args.do_train and not args.overwrite_output_dir:
         raise ValueError(
             f"Output directory ({args.output_dir}) already exists and is not empty. "
-            "Use --overwrite_output_dir to overcome."
-        )
+            "Use --overwrite_output_dir to overcome.")
     else:
         os.makedirs(args.output_dir, exist_ok=True)
 
@@ -621,9 +568,7 @@ def main(args):
     else:
         tokenizer_type = T5Tokenizer
 
-    tokenizer = tokenizer_type.from_pretrained(
-        args.model_name_or_path,
-    )
+    tokenizer = tokenizer_type.from_pretrained(args.model_name_or_path, )
     model = T5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
 
     if args.do_train:
