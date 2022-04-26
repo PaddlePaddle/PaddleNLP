@@ -124,7 +124,8 @@ python process_data.py preprocess
 
 ### 快速基线第二步：多任务模型训练
 
-基线采用的预训练模型为字符级别的中文模型 `uie-char-small`，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
+基线采用的预训练模型为字符级别的中文模型 [uie-char-small](https://paddlenlp.bj.bcebos.com/models/ccks2022/uie-char-small.zip)，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
+下载解压缩后开始多任务训练。
 
 #### 多任务配置
 
