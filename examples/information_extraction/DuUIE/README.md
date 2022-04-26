@@ -1,4 +1,4 @@
-# CCKS 2022 通用信息抽取基线
+# CCKS 2022 通用信息抽取 -- 基于UIE的基线系统
 
 信息抽取任务旨在根据特定的抽取需求（Schema，S）从非结构化文本（Text，X）中自动抽取结构化信息（Structure，Y）。
 其中，特定的抽取需求是指抽取任务中的抽取框架，主要由抽取类别（人物名称、公司名称、企业上市事件）及目标结构（实体、关系、事件等）组成。
@@ -124,36 +124,35 @@ python process_data.py preprocess
 
 ### 快速基线第二步：多任务模型训练
 
-基线采用的预训练模型为字符级别的中文生成模型 `uie-char-small`，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
+基线采用的预训练模型为字符级别的中文模型 `uie-char-small`，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
 
 #### 多任务配置
 
 本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multitask/multi-task-duuie.yaml`。
 
 ``` bash
-python3 run_seq2struct.py --multi_task                       \
-  --multi_task_config config/multitask/multi-task-duuie.yaml \
-  --do_train                                                 \
-  --metric_for_best_model=all-task-ave                       \
-  --model_name_or_path=./uie-char-small                      \
-  --max_source_length=384                                    \
-  --max_prefix_length=-1                                     \
-  --max_target_length=192                                    \
-  --num_train_epochs=10                                      \
-  --train_file=data/duuie_pre/train.json                     \
-  --validation_file=data/duuie_pre/val.json                  \
-  --record_schema=data/duuie_pre/record.schema               \
-  --per_device_train_batch_size=16                           \
-  --per_device_eval_batch_size=256                           \
-  --output_dir=output/duuie_multi_task_b32_lr5e-4            \
-  --logging_dir=output/duuie_multi_task_b32_lr5e-4_log       \
-  --learning_rate=5e-4                                       \
-  --seed=42                                                  \
-  --overwrite_output_dir                                     \
-  --gradient_accumulation_steps 1                            \
-  --multi_task                                               \
-  --multi_task_config config/multitask/multi-task-duuie.yaml \
-  --negative_keep 1.0
+python3 run_seq2struct.py                              \
+  --multi_task                                         \
+  --multi_task_config config/multi-task-duuie.yaml     \
+  --negative_keep 1.0                                  \
+  --do_train                                           \
+  --metric_for_best_model=all-task-ave                 \
+  --model_name_or_path=./uie-char-small                \
+  --max_source_length=384                              \
+  --max_prefix_length=-1                               \
+  --max_target_length=192                              \
+  --num_train_epochs=10                                \
+  --train_file=data/duuie_pre/train.json               \
+  --validation_file=data/duuie_pre/val.json            \
+  --record_schema=data/duuie_pre/record.schema         \
+  --per_device_train_batch_size=16                     \
+  --per_device_eval_batch_size=256                     \
+  --output_dir=output/duuie_multi_task_b32_lr5e-4      \
+  --logging_dir=output/duuie_multi_task_b32_lr5e-4_log \
+  --learning_rate=5e-4                                 \
+  --seed=42                                            \
+  --overwrite_output_dir                               \
+  --gradient_accumulation_steps 1
 ```
 
 训练完成后，将生成对应的文件夹 `output/duuie_multi_task_b32_lr5e-4`
@@ -183,7 +182,7 @@ python process_data.py merge-test
 - [OpenKG 开放知识图谱社区](http://openkg.cn)
 
 ## Reference
-- [Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)
+- **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
 - [DuIE: A Large-scale Chinese Dataset for Information Extraction](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)
 - [DuEE: A Large-Scale Dataset for Chinese Event Extraction in Real-World Scenarios](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)
 - [CASA: Conversational Aspect Sentiment Analysis for Dialogue Understanding](https://jair.org/index.php/jair/article/view/12802)
