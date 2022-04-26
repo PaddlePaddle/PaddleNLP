@@ -7,13 +7,25 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 
 ```text
 .
-├── args.py                 # 训练参数配置
-├── dataset.py              # 数据处理
-├── lr.py                   # 学习率控制
-├── README.md               # 文档
-├── run_generation.py       # 生成入口
-├── run_pretrain.py         # 预训练入口
-└── scripts/                # 数据处理/训练/生成脚本
+├── args.py                        # 训练参数配置
+├── dataset.py                     # 数据处理
+├── lr.py                          # 学习率控制
+├── README.md                      # 文档
+├── run_generation.py              # 生成入口
+├── run_pretrain.py                # 预训练入口
+├── scripts/                       # 数据处理/训练/生成脚本
+└── data_tools/  
+    ├── Makefile                   # Makefile
+    ├── README.md                  # 文档
+    ├── code-merges.txt            # GPT分词merge文件
+    ├── code-vocab.json            # GPT分词vocab文件
+    ├── create_pretraining_data.py # 数据预处理脚本
+    ├── dataset_utils.py           # index生成脚本
+    ├── gpt2_tokenization.p        # 分词脚本
+    ├── helpers.cpp                # 数据预处理Cpp文件
+    ├── test.txt                   # 测试集文件
+    ├── tokenizer.py               # 分词脚本
+    └── trans_to_json.py           # 数据预处理脚本
 ```
 
 ## 快速开始
@@ -83,7 +95,7 @@ python -u run_pretrain.py \
     --device "gpu" \
 ```
 
-其中参数释义如下：
+其中部分参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
