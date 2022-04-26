@@ -16,10 +16,8 @@ import os
 from shutil import copyfile
 from typing import List, Optional, Tuple
 
-try:
-    import sentencepiece as spm
-except:
-    pass
+import sentencepiece as spm
+
 from .. import PretrainedTokenizer
 
 __all__ = ['RemBertTokenizer']

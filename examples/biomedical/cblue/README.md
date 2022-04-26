@@ -37,11 +37,11 @@ ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型
 
 ```text
 cblue/
-├── README.md # 使用说明
-├── train_classification.py # 分类任务训练评估脚本
-├── train_ner.py # 实体识别任务训练评估脚本
-├── train_spo.py # 关系抽取任务训练评估脚本
-└── export_model.py #动态图参数导出静态图参数脚本
+├── train_classification.py   # 文本分类任务训练评估脚本
+├── train_ner.py              # 实体识别任务训练评估脚本
+├── train_spo.py              # 关系抽取任务训练评估脚本
+├── export_model.py           # 动态图导出静态图参数脚本
+└── README.md
 ```
 
 ### 依赖安装
@@ -98,7 +98,7 @@ python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_90
 
 ```shell
 $ unset CUDA_VISIBLE_DEVICES
-$ python -m paddle.distributed.launch --gpus "0,1,2,3" train_classification.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
+$ python -m paddle.distributed.launch --gpus '0,1,2,3' train_classification.py --dataset CHIP-CDN-2C --batch_size 256 --max_seq_length 32 --learning_rate 3e-5 --epochs 16
 ```
 
 其他可支持配置的参数：

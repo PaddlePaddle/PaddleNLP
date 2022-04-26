@@ -72,7 +72,7 @@ function get_repo_name(){
     cur_dir=$(pwd)
     IFS="/"
     arr=(${cur_dir})
-    echo ${arr[-1]}
+    echo ${arr[-2]}
 }
 
 FILENAME=$1
@@ -92,10 +92,6 @@ IFS=$'\n'
 lines=(${dataline})
 model_name=$(func_parser_value "${lines[1]}")
 
-if [[ ${model_name} =~ gpt* ]]; then
-    run_env=$BENCHMARK_ROOT/run_env
-    export PATH=$run_env:${PATH}
-fi
 # set env
 python=python
 export str_tmp=$(echo `pip list|grep paddlepaddle-gpu|awk -F ' ' '{print $2}'`)

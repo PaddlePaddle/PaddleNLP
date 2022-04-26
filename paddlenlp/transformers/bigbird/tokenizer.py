@@ -18,8 +18,10 @@ import os
 import six
 import re
 import numpy as np
-from paddle.utils import try_import
+
+import sentencepiece as spm
 from paddlenlp.data import Vocab
+
 from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['BigBirdTokenizer']
@@ -95,8 +97,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
                 "`tokenizer = BigBirdTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(sentencepiece_model_file))
         self.encoding = encoding
-        mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+        self.sp_model = spm.SentencePieceProcessor()
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
         vocab_dict = {}
