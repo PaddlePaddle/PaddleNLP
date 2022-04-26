@@ -78,9 +78,12 @@ class Predictor:
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', '-d', required=True, nargs='+')
+    parser.add_argument('--data', '-d',
+                        required=True, nargs='+',
+                        help='Folder need to been predicted.')
     parser.add_argument(
-        '--model', '-m', required=True, help='Trained model for inference')
+        '--model', '-m',
+        required=True, help='Trained model for inference')
     parser.add_argument(
         '--max_source_length',
         default=384,
@@ -134,7 +137,8 @@ def main():
 
         records = list()
         for p, text, tokens in zip(predict, text_list, token_list):
-            records += [sel2record.sel2record(pred=p, text=text, tokens=tokens)]
+            records += [sel2record.sel2record(pred=p,
+                                              text=text, tokens=tokens)]
 
         pred_filename = os.path.join(f"{task_folder}", "pred.json")
         with open(pred_filename, 'w') as output:

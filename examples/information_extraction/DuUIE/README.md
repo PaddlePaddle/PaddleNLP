@@ -26,11 +26,10 @@ pip install -r requirements.txt
 .
 ├── config/                       # 配置文件
 ├── inference.py                  # 推理入口
+├── process_data.py               # 比赛数据处理相关脚本
 ├── README.md                     # 说明文件
 ├── requirements.txt              # Python 依赖包文件
-├── run_seq2struct_multitask.bash # 多任务运行脚本
 ├── run_seq2struct_multitask.py   # Python 入口
-├── process_data.py               # 比赛数据处理相关脚本
 └── uie/
     ├── evaluation                # 信息抽取代码
     └── seq2struct                # 序列到结构代码
@@ -131,6 +130,7 @@ python process_data.py preprocess
 
 本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multitask/multi-task-duuie.yaml`。
 
+``` bash
 python3 run_seq2struct.py --multi_task                       \
   --multi_task_config config/multitask/multi-task-duuie.yaml \
   --do_train                                                 \
