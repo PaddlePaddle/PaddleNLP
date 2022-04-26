@@ -402,92 +402,92 @@ from paddlenlp import Taskflow
 
 - 命名实体识别
 
-命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名、专有名词等。UIE可以抽取的实体类型包括但不限于人名、地名等类型。
+  命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名、专有名词等。UIE可以抽取的实体类型包括但不限于人名、地名等类型。
 
-例如抽取的目标实体类型是"出租方"和"承租方", schema构造如下：
+  例如抽取的目标实体类型是"出租方"和"承租方", schema构造如下：
 
-```text
-['出租方', '承租方']
-```
+  ```text
+  ['出租方', '承租方']
+  ```
 
-```python
->>> from paddlenlp import Taskflow
+  ```python
+  >>> from paddlenlp import Taskflow
 
->>> schema = ['出租方', '承租方'] # Define the schema for entity extraction
->>> ie = Taskflow('information_extraction', schema=schema)
->>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
-[{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428}]}]
-```
+  >>> schema = ['出租方', '承租方'] # Define the schema for entity extraction
+  >>> ie = Taskflow('information_extraction', schema=schema)
+  >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+  [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428}]}]
+  ```
 
 - 关系抽取
 
-关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，即抽取三元组（entity1，关系类型，entity2）。
+  关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，即抽取三元组（entity1，关系类型，entity2）。
 
-例如抽取的目标是"出租方的地址"、"出租方的电话"、"承租方的地址"和"承租方的电话", schema构造如下：
+  例如抽取的目标是"出租方的地址"、"出租方的电话"、"承租方的地址"和"承租方的电话", schema构造如下：
 
-```text
-[{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}]
-```
+  ```text
+  [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}]
+  ```
 
-在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
+  在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
-```python
->>> schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
->>> ie.set_schema(schema) # Reset schema
->>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
-[{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
-```
+  ```python
+  >>> schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+  [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
+  ```
 
 - 事件抽取
 
-事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取事件并识别事件类型和事件论元的技术。UIE所包含的事件抽取任务，是指根据已知事件类型，抽取该事件所包含的事件论元。
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取事件并识别事件类型和事件论元的技术。UIE所包含的事件抽取任务，是指根据已知事件类型，抽取该事件所包含的事件论元。
 
-例如抽取的目标是"地震"的"地震强度"、"时间"、"震中位置"和"震源深度"，schema构造如下：
+  例如抽取的目标是"地震"的"地震强度"、"时间"、"震中位置"和"震源深度"，schema构造如下：
 
-```text
-[{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}]
-```
+  ```text
+  [{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}]
+  ```
 
-触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+  触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
 
-```python
->>> schema = [{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}] # Define the schema for event extraction
->>> ie.set_schema(schema) # Reset schema
->>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
-[{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relation': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
-```
+  ```python
+  >>> schema = [{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}] # Define the schema for event extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
+  [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relation': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+  ```
 
 - 评论观点抽取
 
-评论观点抽取，是指抽取文本中包含的评价维度、观点词。
+  评论观点抽取，是指抽取文本中包含的评价维度、观点词。
 
-例如希望抽取文本中包含的评价维度以及对应的观点词，schema构造如下：
+  例如希望抽取文本中包含的评价维度以及对应的观点词，schema构造如下：
 
-```text
-[{'评价维度': ['观点词']}]
-```
+  ```text
+  [{'评价维度': ['观点词']}]
+  ```
 
-```python
->>> schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
->>> ie.set_schema(schema) # Reset schema
->>> ie('个人觉得管理太混乱了，票价太高了')
-[{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relation': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relation': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
-```
+  ```python
+  >>> schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('个人觉得管理太混乱了，票价太高了')
+  [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relation': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relation': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
+  ```
 
 - 情感倾向分类
 
-句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
+  句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
 
-```text
-['情感倾向[正向，负向]']
-```
+  ```text
+  ['情感倾向[正向，负向]']
+  ```
 
-```python
->>> schema = ['情感倾向[正向，负向]'] # Define the schema for sentence-level sentiment classification
->>> ie.set_schema(schema) # Reset schema
->>> ie('这个产品用起来真的很流畅，我非常喜欢')
-[{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
-```
+  ```python
+  >>> schema = ['情感倾向[正向，负向]'] # Define the schema for sentence-level sentiment classification
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('这个产品用起来真的很流畅，我非常喜欢')
+  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
+  ```
 
 #### 多模型选择，满足精度、速度要求
 
