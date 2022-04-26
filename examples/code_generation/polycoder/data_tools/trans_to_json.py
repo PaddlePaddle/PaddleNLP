@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ def get_args():
     parser.add_argument(
         '--workers',
         type=int,
-        default=1,
+        default=40,
         help='Number of worker processes to launch')
     parser.add_argument(
         '--log_interval',
@@ -81,27 +81,34 @@ def raw_text_to_json(path, doc_spliter="", json_key="text", min_doc_length=10):
     out_filepath = path + ".jsonl"
     fout = open(out_filepath, "w", encoding="utf-8")
     len_files = 0
-    with open(path, "r") as f:
-        doc = ""
-        line = f.readline()
-        while line:
-            len_files += len(line)
-            if line.strip() == doc_spliter:
-                if len(doc) > min_doc_length:
-                    fout.write(
-                        json.dumps(
-                            {
-                                json_key: doc
-                            }, ensure_ascii=False) + "\n")
-                doc = ""
-            else:
-                doc += line
+    try:
+        with open(path, "r") as f:
+            doc = ""
             line = f.readline()
+            while line:
+                len_files += len(line)
+                # not to strip
+                if line == doc_spliter:
+                    if len(doc) > min_doc_length:
+                        fout.write(
+                            json.dumps(
+                                {
+                                    json_key: doc
+                                }, ensure_ascii=False) + "\n")
+                    doc = ""
+                else:
+                    doc += line
+                line = f.readline()
 
-        if len(doc) > min_doc_length:
-            fout.write(json.dumps({json_key: doc}, ensure_ascii=False) + "\n")
-        doc = ""
-
+            if len(doc) > min_doc_length:
+                fout.write(
+                    json.dumps(
+                        {
+                            json_key: doc
+                        }, ensure_ascii=False) + "\n")
+            doc = ""
+    except UnicodeDecodeError:
+        return None, None
     return len_files, out_filepath
 
 
@@ -156,6 +163,8 @@ def main():
 
     out_paths = []
     for i, (bytes_processed, out_path) in enumerate(encoded_files, start=1):
+        if not bytes_processed:
+            continue
         total_bytes_processed += bytes_processed
         out_paths.append(out_path)
         master_start = time.time()

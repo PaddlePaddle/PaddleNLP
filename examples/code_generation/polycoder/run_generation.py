@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import random
 import argparse
 
@@ -8,10 +22,10 @@ from paddlenlp.transformers import (
     GPTTokenizer,
     GPTChineseTokenizer, )
 
-from tokenizer import _GPT2BPETokenizer
+from data_tools.tokenizer import _GPT2BPETokenizer
 
 MODEL_CLASSES = {
-    "gpt2": (GPTLMHeadModel, GPTTokenizer),
+    "gpt2-en": (GPTLMHeadModel, GPTTokenizer),
     "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
 }
 
@@ -20,15 +34,26 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         '--model_type',
-        default='gpt2-cn',
+        default='gpt2-en',
         type=str,
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument(
         '--model_name_or_path',
-        default='/home/gpt_ppnlp/examples/language_model/gpt/output/gpt-dygraph/model_100000',
+        default='gpt2-en',
         type=str,
         help="The path or shortcut name of the pre-trained model.")
+
+    parser.add_argument(
+        "--vocab_file",
+        type=str,
+        default='./data_tools/code-vocab.json',
+        help="Path to the vocab file")
+    parser.add_argument(
+        "--merge_file",
+        type=str,
+        default='./data_tools/code-merges.txt',
+        help="Path to the BPE merge file (if necessary).", )
     parser.add_argument(
         '--decode_strategy',
         type=str,
@@ -43,7 +68,7 @@ def parse_args():
     parser.add_argument(
         '--temperature',
         type=float,
-        default=0.5,
+        default=1.0,
         help='The value used to module the next token probabilities.')
     parser.add_argument(
         '--top_p',
@@ -126,8 +151,7 @@ def main(args, input_text):
             format(MODEL_CLASSES.keys(), args.model_type))
 
     model = model_class.from_pretrained(args.model_name_or_path)
-    # tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    tokenizer = _GPT2BPETokenizer('code-vocab.json', 'code-merges.txt')
+    tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
     model.eval()
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len,
@@ -139,7 +163,6 @@ def main(args, input_text):
     else:
         # [1, seq_len]
         input_ids = paddle.to_tensor(input_ids, dtype='int64').unsqueeze(0)
-
     ids, scores = model.generate(
         input_ids=input_ids,
         max_length=args.max_dec_len,

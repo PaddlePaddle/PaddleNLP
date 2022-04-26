@@ -1,4 +1,4 @@
-# coding=utf-8
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved
 # Copyright 2018 The Google AI Language Team Authors, and NVIDIA, and PaddlePaddle Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

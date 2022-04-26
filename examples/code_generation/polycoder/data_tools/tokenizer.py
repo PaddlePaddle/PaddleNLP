@@ -1,3 +1,4 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved
 # Copyright (c) 2021, EleutherAI contributors
 # This file is based on code by the authors denoted below and has been modified from its original version.
 #
@@ -24,7 +25,7 @@ from transformers import GPT2Tokenizer, GPT2TokenizerFast
 import numpy as np
 import sentencepiece as spm
 from typing import List, Union
-from gpt2_tokenization import GPT2Tokenizer
+from data_tools.gpt2_tokenization import GPT2Tokenizer
 
 
 def build_tokenizer(args):

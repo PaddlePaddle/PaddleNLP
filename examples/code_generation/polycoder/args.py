@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,6 +47,16 @@ def parse_args(MODEL_CLASSES):
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
             ], [])), )
+    parser.add_argument(
+        "--vocab_file",
+        type=str,
+        default='./data_tools/code-vocab.json',
+        help="Path to the vocab file")
+    parser.add_argument(
+        "--merge_file",
+        type=str,
+        default='./data_tools/code-merges.txt',
+        help="Path to the BPE merge file (if necessary).", )
 
     # Train I/O config
     parser.add_argument(
@@ -262,12 +272,12 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         '--test_file',
         type=str,
-        default='test.txt',
+        default='./data_tools/test.txt',
         help='The file to evaluate model.')
     parser.add_argument(
         '--decode_strategy',
         type=str,
-        default='greedy_search',
+        default='sampling',
         help='The decode strategy in generation.')
     parser.add_argument(
         '--top_k',
@@ -278,7 +288,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         '--temperature',
         type=float,
-        default=1.0,
+        default=0.5,
         help='The value used to module the next token probabilities.')
     parser.add_argument(
         '--top_p',
@@ -309,7 +319,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         '--max_dec_len',
         type=int,
-        default=16,
+        default=512,
         help='The maximum sequence length of generation.')
     parser.add_argument(
         '--num_return_sequences',

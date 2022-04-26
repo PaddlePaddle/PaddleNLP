@@ -4,10 +4,10 @@ export CUDA_VISIBLE_DEVICES=0
 python -u run_pretrain.py \
     --model_type "gpt"\
     --model_name_or_path "gpt2-en"\
-    --input_dir "./data_python"\
+    --input_dir "./data_tools"\
     --output_dir "output"\
     --max_seq_len 1024 \
-    --micro_batch_size 8 \
+    --micro_batch_size 4 \
     --max_lr 0.00015\
     --min_lr 0.00001\
     --max_steps 50000 \

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-import paddlenlp.transformers as tfs
+from data_tools.tokenizer import _GPT2BPETokenizer
 
 try:
     import nltk
@@ -35,17 +35,6 @@ except ImportError:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--model_name', type=str, required=True, help='What model to use.')
-    parser.add_argument(
-        '--tokenizer_name',
-        type=str,
-        required=True,
-        choices=[
-            'ErnieTokenizer', 'BertTokenizer', 'GPTTokenizer',
-            'GPTChineseTokenizer'
-        ],
-        help='What type of tokenizer to use.')
     group = parser.add_argument_group(title='data input/output')
     group.add_argument(
         '--input_path',
@@ -114,7 +103,16 @@ def get_args():
         type=int,
         default=1,
         help='Number of worker processes to launch')
-
+    group.add_argument(
+        "--vocab_file",
+        type=str,
+        default='./data_tools/code-vocab.json',
+        help="Path to the vocab file")
+    group.add_argument(
+        "--merge_file",
+        type=str,
+        default='./data_tools/code-merges.txt',
+        help="Path to the BPE merge file (if necessary).", )
     args = parser.parse_args()
     return args
 
@@ -238,9 +236,8 @@ class Converter(object):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = getattr(
-            tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
-
+        Converter.tokenizer = _GPT2BPETokenizer(self.args.vocab_file,
+                                                self.args.merge_file)
         # Split document to sentence.
         if self.args.split_sentences:
             if self.args.chinese:
@@ -268,8 +265,6 @@ class Converter(object):
         def process(text):
             words = Converter.segment_func(text)
             tokens = Converter.tokenizer.tokenize("".join(words))
-            tokens = Converter.whole_word_mask(tokens, words)
-            tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)
             return tokens
 
         Converter.process = process
@@ -278,7 +273,7 @@ class Converter(object):
         text = json.loads(json_line)[self.args.json_key]
         doc_ids = []
         for sentence in Converter.splitter.tokenize(text):
-            sentence_ids = Converter.process(sentence.strip())
+            sentence_ids = Converter.process(sentence)
             if len(sentence_ids) > 0:
                 doc_ids.append(sentence_ids)
 
@@ -301,8 +296,9 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = getattr(
-        tfs, args.tokenizer_name).from_pretrained(args.model_name)
+    sample_tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
+    print(f"Vocab size: {sample_tokenizer.vocab_size}")
+    print(f"Output prefix: {args.output_prefix}")
     if sample_tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16
     else:
@@ -313,16 +309,10 @@ def main():
     # We use BytesIO to store the ids.
     token_ids_stream = io.BytesIO()
     sentlens_stream = io.BytesIO()
-    # # Cumsum on tokens num
-    # sent_cumsum_stream = io.BytesIO()
-    # sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
-    # Cunsum on document on every sentence num, type=np.int64
     doc_cumsum_stream = io.BytesIO()
     doc_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
 
     sent_count = 0
-    # token_count = 0
-
     file_paths.sort()
 
     step = 0
@@ -339,7 +329,6 @@ def main():
         else:
             print("Unexpected data format, skiped %s" % file_path)
             continue
-
         encoded_docs = pool.imap(convert.encode, text, 256)
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
@@ -355,10 +344,6 @@ def main():
                 sentlens_stream.write(
                     sentence_len.to_bytes(
                         4, byteorder='little', signed=True))
-                # token_count += sentence_len
-                # sent_cumsum_stream.write(
-                #     token_count.to_bytes(
-                #         8, byteorder='little', signed=True))
                 sent_count += 1
                 token_ids_stream.write(
                     np.array(
@@ -381,10 +366,8 @@ def main():
     print("Saving tokens to files...")
     all_doc_ids = np.frombuffer(token_ids_stream.getbuffer(), dtype=save_dtype)
     lens = np.frombuffer(sentlens_stream.getbuffer(), dtype=np.int32)
-    # sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)
     docs = np.frombuffer(doc_cumsum_stream.getbuffer(), dtype=np.int64)
     np.save(args.output_prefix + "_ids.npy", all_doc_ids)
-    # np.savez(args.output_prefix + "_idx.npz", lens=lens, sents=sents, docs=docs)
     np.savez(args.output_prefix + "_idx.npz", lens=lens, docs=docs)
 
     print("Total sentences num: %d" % len(lens))

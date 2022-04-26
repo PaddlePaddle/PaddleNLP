@@ -9,7 +9,7 @@ python -m paddle.distributed.launch \
     --log_dir "output/$task_name/log"  run_pretrain.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en"\
-    --input_dir "./data_python"\
+    --input_dir "./data_tools"\
     --output_dir "output/$task_name"\
     --max_seq_len 1024 \
     --micro_batch_size 4 \
@@ -22,5 +22,5 @@ python -m paddle.distributed.launch \
     --warmup_rate 0.01\
     --grad_clip 1.0\
     --logging_freq 1\
-    --eval_freq 100\
+    --eval_freq 1000\
     --device "gpu"

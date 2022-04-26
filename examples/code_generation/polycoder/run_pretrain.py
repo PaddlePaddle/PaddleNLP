@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
 from paddle.distributed import fleet
-from tokenizer import _GPT2BPETokenizer
+from data_tools.tokenizer import _GPT2BPETokenizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -52,7 +52,6 @@ def set_seed(args):
 def generate(texts, model, tokenizer, args):
     for i, text in enumerate(texts):
         input_ids = tokenizer.tokenize(text)
-        print(input_ids)
         if len(input_ids) == 0:
             input_ids = None
         else:
@@ -165,8 +164,7 @@ def do_train(args):
     default_global_tokens_num = default_global_batch_size * args.max_seq_len
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    # tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    tokenizer = _GPT2BPETokenizer('code-vocab.json', 'code-merges.txt')
+    tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
 
     test_texts = read_file(args.test_file)
     print(test_texts)
