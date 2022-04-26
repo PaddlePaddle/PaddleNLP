@@ -304,7 +304,7 @@ def run_evaluate(data_loader,
                    speed_tokens, ips))
 
             for k in list(eval_fetch.keys()):
-                log_writer.add_scalar("%s_%s" % (task_name, k), average_ret[k],
+                log_writer.add_scalar("%s/%s" % (task_name, k), average_ret[k],
                                       global_step)
 
             break
@@ -617,7 +617,7 @@ def do_train(args):
                         common_loginfo += ", " + additional_loginfo
                     logger.info(common_loginfo)
                     for k, v in res.items():
-                        log_writer.add_scalar(k, v, global_step)
+                        log_writer.add_scalar("train/" + k, v, global_step)
 
                 tic_train = time.time()
 

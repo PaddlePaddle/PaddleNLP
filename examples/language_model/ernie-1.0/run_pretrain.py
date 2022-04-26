@@ -18,12 +18,14 @@ import argparse
 import os
 import sys
 import random
+import json
 import time
 import yaml
 import shutil
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
@@ -144,6 +146,15 @@ def get_train_data_file(args):
     return files
 
 
+def all_gather(v):
+    if dist.get_world_size() <= 1:
+        return v.item()
+    ret = []
+    dist.all_gather(ret, v)
+    concat = paddle.concat(ret, axis=0)
+    return concat.mean().item()
+
+
 @paddle.no_grad()
 def run_evaluate(data_loader,
                  model,
@@ -155,6 +166,13 @@ def run_evaluate(data_loader,
                  task_name="valid"):
     model.eval()
     all_loss, all_lm_loss, all_sop_loss = [], [], []
+
+    loss_global = {
+        "loss": paddle.to_tensor(0.0),
+        "lm_loss": paddle.to_tensor(0.0),
+        "sop_loss": paddle.to_tensor(0.0),
+    }
+
     local_time = time.time()
 
     for eval_step, batch in enumerate(data_loader):
@@ -173,27 +191,33 @@ def run_evaluate(data_loader,
                                       masked_lm_labels, next_sentence_labels)
         loss = lm_loss + sop_loss
 
-        all_loss.append(float(loss.item()))
-        all_lm_loss.append(float(lm_loss.item()))
-        all_sop_loss.append(float(sop_loss.item()))
+        loss_global["loss"] += loss.detach()
+        loss_global["lm_loss"] += lm_loss.detach()
+        loss_global["sop_loss"] += sop_loss.detach()
+
+        # all_loss.append(float(loss.item()))
+        # all_lm_loss.append(float(lm_loss.item()))
+        # all_sop_loss.append(float(sop_loss.item()))
 
         if eval_step >= iter_steps - 1:
-            average_loss = sum(all_loss) / len(all_loss)
-            average_lm_loss = sum(all_lm_loss) / len(all_lm_loss)
-            average_sop_loss = sum(all_sop_loss) / len(all_sop_loss)
-            logger.info(
-                "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f tokens/s"
-                % (task_name, global_step, eval_step, average_loss,
-                   average_lm_loss, average_sop_loss,
-                   iter_steps * args.micro_batch_size * args.max_seq_len /
-                   (time.time() - local_time)))
+            log_info_dict = dict()
+            for k, v in loss_global.items():
+                log_info_dict[k] = all_gather(v) / iter_steps
+                v.subtract_(v)
+            if dist.get_rank() == 0:
+                log_info_dict[
+                    "samples_per_second"] = iter_steps * args.micro_batch_size / (
+                        time.time() - local_time)
+                logger.info(
+                    "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f seqs/s"
+                    % (task_name, global_step, iter_steps,
+                       log_info_dict["loss"], log_info_dict["lm_loss"],
+                       log_info_dict["sop_loss"],
+                       log_info_dict["samples_per_second"]))
 
-            log_writer.add_scalar(task_name + "/loss", average_loss,
-                                  global_step)
-            log_writer.add_scalar(task_name + "/lm_loss", average_lm_loss,
-                                  global_step)
-            log_writer.add_scalar(task_name + "/sop_loss", average_sop_loss,
-                                  global_step)
+                for k, v in log_info_dict.items():
+                    log_writer.add_scalar("%s/%s" % (task_name, k), v,
+                                          global_step)
 
             break
 
@@ -228,6 +252,17 @@ def args_post_process(args, worker_num):
     args.accumulate_steps = accumulate_steps
 
 
+def default_logdir() -> str:
+    """
+    Same default
+    """
+    import socket
+    from datetime import datetime
+
+    current_time = datetime.now().strftime("%b%d_%H-%M-%S")
+    return os.path.join("runs", current_time + "_" + socket.gethostname())
+
+
 def do_train(args):
     paddle.set_device(args.device)
 
@@ -259,10 +294,6 @@ def do_train(args):
     fleet.init(is_collective=True, strategy=strategy)
     hcg = fleet.get_hybrid_communicate_group()
 
-    worker_index = paddle.distributed.get_rank()
-    worker_num = paddle.distributed.get_world_size()
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-
     # Create the random seed for the worker
     set_seed(args)
 
@@ -270,12 +301,9 @@ def do_train(args):
         "The product of degree num should be equal to worker_num."
 
     # Create log write, 
-    log_writer_path = os.path.join(
-        args.output_dir, "train_log",
-        "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_amp,
-            args.use_recompute, worker_index).lower())
-    log_writer = LogWriter(log_writer_path)
+    log_writer = None
+    if worker_index == 0:
+        log_writer = LogWriter(os.path.join(args.output_dir, default_logdir()))
 
     # Define the input data in the static mode
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
@@ -311,6 +339,16 @@ def do_train(args):
             attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
     criterion = criterion_class()
+
+    if worker_index == 0:
+        # log the model config and args 
+        model_config_json = json.dumps(
+            model.get_model_config(), ensure_ascii=False, indent=2)
+        log_writer.add_text("model_config", model_config_json)
+        args_dict = {"paddle commit id": str(paddle.version.commit)}
+        for arg in vars(args):
+            args_dict[arg] = str(getattr(args, arg))
+        log_writer.add_text("args", json.dumps(args_dict, indent=2))
 
     # Create the learning_rate sheduler and optimizer
     if args.decay_steps is None:
@@ -381,6 +419,11 @@ def do_train(args):
             logger.info("Checkpoint loaded from global step: {}".format(
                 global_step))
 
+    loss_global = {
+        "loss": paddle.to_tensor(0.0),
+        "lm_loss": paddle.to_tensor(0.0),
+        "sop_loss": paddle.to_tensor(0.0),
+    }
     tic_train = time.time()
     while True:
         # If not call valid_data_loader, the enumerate will call valid_data_loader
@@ -444,25 +487,46 @@ def do_train(args):
 
             global_step += 1
 
+            loss_global["loss"] += loss.detach()
+            loss_global["lm_loss"] += lm_loss.detach()
+            loss_global["sop_loss"] += sop_loss.detach()
+
             if global_step % args.logging_freq == 0:
-                speed = args.logging_freq / (time.time() - tic_train)
-                common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                    global_step, loss.item(), lm_loss.item(), sop_loss.item(),
-                    speed, speed * args.global_batch_size,
-                    lr_scheduler.get_lr())
-                addition_info = ""
-                if args.use_amp:
-                    addition_info = " loss_scaling: %.1f, incr_count: %d, decr_count: %d" % (
-                        scaler._scale.numpy(), scaler._incr_count,
-                        scaler._decr_count)
-                logger.info(common_loginfo + addition_info)
-                log_writer.add_scalar("learning_rate",
-                                      lr_scheduler.get_lr(), global_step)
-                log_writer.add_scalar("train/loss", loss.item(), global_step)
-                log_writer.add_scalar("train/lm_loss",
-                                      lm_loss.item(), global_step)
-                log_writer.add_scalar("train/sop_loss",
-                                      sop_loss.item(), global_step)
+                log_info_dict = dict()
+                log_info_dict["global_step"] = global_step
+                for k, v in loss_global.items():
+                    log_info_dict[k] = all_gather(v) / args.logging_freq
+                    v.subtract_(v)
+                if worker_index == 0:
+                    speed = args.logging_freq / (time.time() - tic_train)
+                    log_info_dict["learning_rate"] = lr_scheduler.get_lr()
+                    log_info_dict["steps_per_second"] = speed
+                    log_info_dict[
+                        "samples_per_second"] = speed * args.global_batch_size
+
+                    for k, v in log_info_dict.items():
+                        log_writer.add_scalar("train/%s" % k, v, global_step)
+
+                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                        global_step, log_info_dict["loss"],
+                        log_info_dict["lm_loss"], log_info_dict["sop_loss"],
+                        speed, log_info_dict["samples_per_second"],
+                        log_info_dict["learning_rate"])
+
+                    addition_info = ""
+                    if args.use_amp:
+                        amp_info = {
+                            "loss_scaling": scaler._scale.item(),
+                            "incr_count": scaler._incr_count,
+                            "decr_count": scaler._decr_count
+                        }
+                        addition_info = ", ".join("%s: %d" % (k, v)
+                                                  for k, v in amp_info.items())
+                        addition_info = " " + addition_info
+                        for k, v in amp_info.items():
+                            log_writer.add_scalar("amp/%s" % k, v, global_step)
+
+                    logger.info(common_loginfo + addition_info)
 
                 tic_train = time.time()
 
