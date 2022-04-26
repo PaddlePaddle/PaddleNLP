@@ -1,6 +1,6 @@
 model_item=gpt2
 model=gpt
-bs_item=16
+bs_item=8
 fp_item=fp32
 run_mode=DP
 device_num=N1C8
