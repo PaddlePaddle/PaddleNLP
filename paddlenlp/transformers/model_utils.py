@@ -433,7 +433,7 @@ class PretrainedModel(Layer, GenerationMixin):
         model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.get_model_config()
         with io.open(model_config_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(model_config, ensure_ascii=False))
+            f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
     def save_pretrained(self, save_dir):
         """

@@ -75,21 +75,12 @@ class DataTrainingArguments:
     short_seq_prob: float = field(
         default=0.1,
         metadata={"help": "Short sequence prob."}, )
-    do_lower_case: bool = field(
-        default=True,
-        metadata={
-            "help":
-            "Whether to lower case the input text. Should be True for uncased models and False for cased models."
-        }, )
     share_folder: bool = field(
         default=False,
         metadata={
             "help":
             "Use share folder for data dir and output dir on multi machine."
         }, )
-    num_workers: int = field(
-        default=2,
-        metadata={"help": "Num of workers for DataLoader."}, )
 
 
 @dataclass
@@ -125,33 +116,17 @@ class ModelArguments:
             "help":
             "Pretrained tokenizer name or path if not the same as model_name"
         })
-    cache_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path to directory to store the pretrained models"}, )
-    export_model_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path to directory to store the pretrained models"}, )
 
 
-def create_pretrained_dataset(
-        data_args,
-        training_args,
-        data_file,
-        tokenizer,
-        data_world_size,
-        data_world_rank,
-        max_seq_length,
-        places=None,
-        data_holders=None,
-        current_step=0, ):
+def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
 
     train_valid_test_num_samples = [
-        training_args.per_device_train_batch_size * data_world_size *
+        training_args.per_device_train_batch_size * training_args.world_size *
         training_args.max_steps * training_args.gradient_accumulation_steps,
-        training_args.per_device_eval_batch_size * data_world_size *
+        training_args.per_device_eval_batch_size * training_args.world_size *
         training_args.eval_iters *
         (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * data_world_size *
+        training_args.per_device_eval_batch_size * training_args.world_size *
         training_args.test_iters,
     ]
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
@@ -296,6 +271,7 @@ def main():
         (ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     set_seed(training_args)
+    paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
@@ -305,8 +281,6 @@ def main():
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-
-    paddle.set_device(training_args.device)
 
     # Log on each process the small summary:
     logger.warning(
@@ -336,10 +310,6 @@ def main():
         model_args.model_type]
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
-
-    worker_index = paddle.distributed.get_rank()
-    worker_num = paddle.distributed.get_world_size()
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     if model_args.model_name_or_path in pretrained_models_list:
         model_config = model_class.pretrained_init_configuration[
@@ -389,13 +359,7 @@ def main():
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args,
-        training_args,
-        data_file,
-        tokenizer,
-        data_world_size=worker_num,
-        data_world_rank=worker_index,
-        max_seq_length=data_args.max_seq_length)
+        data_args, training_args, data_file, tokenizer)
 
     trainer = PretrainingTrainer(
         model=model,

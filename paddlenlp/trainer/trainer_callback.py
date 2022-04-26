@@ -15,7 +15,6 @@
 
 # This file is modified from 
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_callback.py
-# Thanks a lot.
 """
 Callbacks to use with the Trainer class and customize the training loop.
 """
