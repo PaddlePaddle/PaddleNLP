@@ -431,8 +431,6 @@ from paddlenlp import Taskflow
   [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}]
   ```
 
-  在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
-
   预测：
 
   ```python
@@ -441,6 +439,8 @@ from paddlenlp import Taskflow
   >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
   [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
   ```
+
+  在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
 - 事件抽取
 
