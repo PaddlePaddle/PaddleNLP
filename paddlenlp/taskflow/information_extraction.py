@@ -26,20 +26,44 @@ from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_t
 usage = r"""
             from paddlenlp import Taskflow
 
-            # Define the schema for extraction
-            schema = ['寺庙', {'丈夫': ['妻子']}]
-            ie = Taskflow('information_extraction', schema=schema) 
-            ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')      
+            # Entity Extraction
+            schema = ['出租方', '承租方'] # Define the schema for entity extraction
+            ie = Taskflow('information_extraction', schema=schema)
+            ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
             '''
-            [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.8899254648933592}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.9852263795480809, 'relation': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9968914045166457}]}}]}]
+            [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428}]}]
             '''
 
-            schema_senta = [{'水果': ['情感倾向[正向，负向]']}]
-            # Set another schema to predict
-            ie.set_schema(schema_senta)
-            ie('今天去超市买了葡萄、苹果，都很好吃')
+            # Relation Extraction
+            schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
+            ie.set_schema(schema) # Reset schema
+            ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
             '''
-            [{'水果': [{'text': '苹果', 'start': 10, 'end': 12, 'probability': 0.9369744072599353, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.9733151286049946}]}}, {'text': '葡萄', 'start': 7, 'end': 9, 'probability': 0.5165698195669179, 'relation': {'情感倾向[正向，负向]': [{'text': '正向', 'start': -7, 'end': -5, 'probability': 0.976208180045397}]}}]}]
+            [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
+            '''
+
+            # Event Extraction
+            schema = [{'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}] # Define the schema for event extraction
+            ie.set_schema(schema) # Reset schema
+            ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
+            '''
+            [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relation': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+            '''
+
+            # Opinion Extraction
+            schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
+            ie.set_schema(schema) # Reset schema
+            ie('个人觉得管理太混乱了，票价太高了')
+            '''
+            [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relation': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relation': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
+            '''
+
+            # Sentence-level Sentiment Classification
+            schema = ['情感倾向[正向，负向]'] # Define the schema for sentence-level sentiment classification
+            ie.set_schema(schema) # Reset schema
+            ie('这个产品用起来真的很流畅，我非常喜欢')
+            '''
+            [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
             '''
          """
 
@@ -55,10 +79,10 @@ class UIETask(Task):
 
     resource_files_names = {"model_state": "model_state.pdparams", }
     resource_files_urls = {
-        "uie": {
+        "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie/model_state.pdparams",
-                "af76619dda776ab9432de06db3a002c0"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
+                "004d7e53f5222349741217fabfb241ac"
             ],
         }
     }
@@ -66,7 +90,7 @@ class UIETask(Task):
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self.set_schema(schema)
-        self._encoding_model = "ernie-1.0"
+        self._encoding_model = "ernie-3.0-base"
         self._check_task_files()
         self._construct_tokenizer()
         self._get_inference_model()
@@ -105,7 +129,7 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UIE()
+        model_instance = UIE(self._encoding_model)
         model_path = os.path.join(self._task_path, "model_state.pdparams")
 
         # Load the model parameter for the predict
@@ -222,13 +246,18 @@ class UIETask(Task):
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
         concat_results = []
         is_cls_task = False
-        if 'start' not in short_results[0][0].keys(
-        ) and 'end' not in short_results[0][0].keys():
-            is_cls_task = True
+        for short_result in short_results:
+            if short_result == []:
+                continue
+            elif 'start' not in short_result[0].keys(
+            ) and 'end' not in short_result[0].keys():
+                is_cls_task = True
+                break
+            else:
+                break
         for k, vs in input_mapping.items():
             if is_cls_task:
                 cls_options = {}
-                sum_prob = 0
                 single_results = []
                 for v in vs:
                     if short_results[v][0]['text'] not in cls_options.keys():
@@ -297,7 +326,10 @@ class UIETask(Task):
                         input_map[cnt] = [i + id for i in range(len(pre))]
                         id += len(pre)
                     cnt += 1
-            result_list = self._single_stage_predict(examples)
+            if len(examples) == 0:
+                result_list = []
+            else:
+                result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
                 relations = [[] for i in range(len(datas))]
@@ -365,7 +397,7 @@ class UIETask(Task):
             prompt = example["prompt"]
             for i in range(len(sentence_id)):
                 start, end = sentence_id[i]
-                if end < len(prompt):
+                if end < 0:
                     # ignore [SEP]
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)

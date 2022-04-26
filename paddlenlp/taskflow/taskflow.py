@@ -221,13 +221,13 @@ TASKS = {
     },
     'information_extraction': {
         "models": {
-            "uie": {
+            "uie-base": {
                 "task_class": UIETask,
-                "task_flag": "information_extraction-uie"
+                "task_flag": "information_extraction-uie-base"
             },
         },
         "default": {
-            "model": "uie"
+            "model": "uie-base"
         }
     }
 }
@@ -337,5 +337,7 @@ class Taskflow(object):
                 print("[Bot]:%s" % robot)
 
     def set_schema(self, schema):
-        assert self.task_instance.model == "uie", 'This method can only used for the task with uie model.'
+        assert self.task_instance.model in [
+            "uie-base"
+        ], 'This method can only used for the task with uie model.'
         self.task_instance.set_schema(schema)

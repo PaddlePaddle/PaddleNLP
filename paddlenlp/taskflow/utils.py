@@ -853,6 +853,17 @@ def get_span(start_ids, end_ids, with_prob=False):
 
 
 def get_id_and_prob(spans, offset_map):
+    prompt_length = 0
+    for i in range(1, len(offset_map)):
+        if offset_map[i] != [0, 0]:
+            prompt_length += 1
+        else:
+            break
+
+    for i in range(1, prompt_length):
+        offset_map[i][0] -= prompt_length
+        offset_map[i][1] -= prompt_length
+
     sentence_id = []
     prob = []
     for s, e in spans:
