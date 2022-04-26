@@ -84,13 +84,33 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
                 "004d7e53f5222349741217fabfb241ac"
             ],
-        }
+        },
+        "uie-medium": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_state.pdparams",
+                "6248b4897fec78a61ab6da3edf9707fe"
+            ],
+        },
+        "uie-large": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_large/model_state.pdparams",
+                "83b6452ef2de41cc7ac44bbb18211cf7"
+            ],
+        },
     }
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self.set_schema(schema)
-        self._encoding_model = "ernie-3.0-base"
+        if model == "uie-base":
+            self._encoding_model = "ernie-3.0-base"
+        elif model == "uie-medium":
+            self._encoding_model = "ernie-3.0-medium"
+        elif model == "uie-large":
+            self._encoding_model = "ernie-3.0-large"
+        else:
+            raise ValueError(
+                "Model should be one of uie-base, uie-medium and uie-large")
         self._check_task_files()
         self._construct_tokenizer()
         self._get_inference_model()
@@ -129,7 +149,7 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UIE(self._encoding_model)
+        model_instance = UIE(self._encoding_model, self.kwargs['hidden_size'])
         model_path = os.path.join(self._task_path, "model_state.pdparams")
 
         # Load the model parameter for the predict

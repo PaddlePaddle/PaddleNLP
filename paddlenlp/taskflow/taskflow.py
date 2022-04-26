@@ -223,8 +223,19 @@ TASKS = {
         "models": {
             "uie-base": {
                 "task_class": UIETask,
+                "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base"
             },
+            "uie-medium": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-medium"
+            },
+            "uie-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-large"
+            }
         },
         "default": {
             "model": "uie-base"
@@ -338,6 +349,6 @@ class Taskflow(object):
 
     def set_schema(self, schema):
         assert self.task_instance.model in [
-            "uie-base"
+            "uie-base", "uie-medium", "uie-large"
         ], 'This method can only used for the task with uie model.'
         self.task_instance.set_schema(schema)
