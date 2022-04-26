@@ -19,7 +19,7 @@ from paddlenlp.transformers import AutoModel
 
 
 class UIE(nn.Layer):
-    def __init__(self, encoding_model, hidden_size=768):
+    def __init__(self, encoding_model, hidden_size):
         super(UIE, self).__init__()
         self.encoder = AutoModel.from_pretrained(encoding_model)
         weight_attr_start = paddle.ParamAttr(name="weight_start")
