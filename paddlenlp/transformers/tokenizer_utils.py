@@ -525,16 +525,13 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
     by which subclasses can track arguments for initialization automatically
     and expose special tokens initialization used as attributes.
     """
-    '''
-    
-    pretrained_init_configuration = {}
-    resource_files_names = {}  # keys are arguments of __init__
-    pretrained_resource_files_map = {}
-    padding_side = 'right'
-    pad_token_type_id = 0
-    special_tokens_map_extended = {}
-    _additional_special_tokens = []
-    '''
+
+    added_tokens_encoder: Dict[str, int] = {}
+    added_tokens_decoder: Dict[int, str] = {}
+    unique_no_split_tokens: List[str] = []
+    tokens_trie = Trie()
+
+    _decode_use_source_tokenizer = False
 
     def _wrap_init(self, original_init, *args, **kwargs):
         """
@@ -544,15 +541,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         init_dict = fn_args_to_dict(original_init, *args, **kwargs)
         super(PretrainedTokenizer, self).__init__(**init_dict)
-
-        # Added tokens - We store this for both slow and fast tokenizers
-        # until the serialization of Fast tokenizers is updated
-        self.added_tokens_encoder: Dict[str, int] = {}
-        self.added_tokens_decoder: Dict[int, str] = {}
-        self.unique_no_split_tokens: List[str] = []
-        self.tokens_trie = Trie()
-
-        self._decode_use_source_tokenizer = False
 
     def _build_special_tokens_map_extended(self, **kwargs):
         for key, value in kwargs.items():
@@ -724,9 +712,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if hasattr(self, "do_lower_case") and self.do_lower_case:
             # convert non-special tokens to lowercase
             escaped_special_toks = [
-                re.escape(s_tok)
-                for s_tok in (self.unique_no_split_tokens +
-                              self.all_special_tokens)
+                re.escape(s_tok) for s_tok in
+                (self.unique_no_split_tokens + self.all_special_tokens)
             ]
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
             text = re.sub(
