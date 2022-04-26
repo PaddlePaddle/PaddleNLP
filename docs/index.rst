@@ -41,10 +41,10 @@
    数据处理 <data_prepare/data_preprocess>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: 模型库
 
-   Transformer预训练模型 <model_zoo/transformers/index>
+   Transformer预训练模型 <model_zoo/index>
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
    
