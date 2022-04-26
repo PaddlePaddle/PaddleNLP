@@ -45,7 +45,7 @@ pip install -r requirements.txt
 
 同时，该模型使用结构化框架前缀（Structural Schema Instructor，SSI）作为抽取目标来帮助模型区分不同的抽取任务。
 
-快速基线从[这里](#quick-start)开始。
+报名竞赛下载数据集后，从[这里](#quick-start)开始实现快速基线。
 
 #### 结构化抽取语言
 结构化抽取语言将不同的目标结构进行统一结构表示。
