@@ -396,7 +396,6 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
             train_instances += [new_instance]
-
         for line in open(os.path.join(data_folder, task_folder, 'val.json')):
             new_instance = json.loads(line)
             # 添加任务中所有的 Spot 类别
@@ -404,7 +403,6 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
             val_instances += [new_instance]
-
     # 融合不同任务的 Schema
     multi_schema = merge_schema(schema_list)
     dump_instances(train_instances, os.path.join(data_folder, 'train.json'))
