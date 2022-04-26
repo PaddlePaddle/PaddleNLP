@@ -129,7 +129,7 @@ python process_data.py preprocess
 
 #### 多任务配置
 
-本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multitask/multi-task-duuie.yaml`。
+本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multi-task-duuie.yaml`。
 
 ``` bash
 python3 run_seq2struct.py                              \
