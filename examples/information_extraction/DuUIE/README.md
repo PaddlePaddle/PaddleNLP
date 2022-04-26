@@ -163,7 +163,7 @@ python3 run_seq2struct.py                              \
 首先下载test解压后放置在data目录下，然后使用脚本将其自动
 
 ``` bash
-python inference.py --data data/duuie_testa/* --model output/duuie_multi_task_b32_lr5e-4
+python inference.py --data data/duuie_test_a/* --model output/duuie_multi_task_b32_lr5e-4
 ```
 
 ### 快速基线第四步：后处理提交结果
