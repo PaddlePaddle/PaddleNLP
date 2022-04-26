@@ -35,11 +35,11 @@ usage = r"""
             '''
 
             # Relation Extraction
-            schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
+            schema = [{"歌曲名称":["歌手", "所属专辑"]}] # Define the schema for relation extraction
             ie.set_schema(schema) # Reset schema
-            ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+            ie("《告别了》是孙耀威在专辑爱的故事里面的歌曲")
             '''
-            [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
+            [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.7721050787207417, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9996328066160487}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9981007942846247}]}}]}]
             '''
 
             # Event Extraction
@@ -85,9 +85,9 @@ class UIETask(Task):
                 "004d7e53f5222349741217fabfb241ac"
             ],
         },
-        "uie-medium": {
+        "uie-tiny": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
                 "6248b4897fec78a61ab6da3edf9707fe"
             ],
         },
@@ -104,7 +104,7 @@ class UIETask(Task):
         self.set_schema(schema)
         if model == "uie-base":
             self._encoding_model = "ernie-3.0-base"
-        elif model == "uie-medium":
+        elif model == "uie-tiny":
             self._encoding_model = "ernie-3.0-medium"
         elif model == "uie-large":
             self._encoding_model = "ernie-3.0-large"
@@ -369,26 +369,26 @@ class UIETask(Task):
                     for i in range(len(v)):
                         if len(result_list[v[i]]) == 0:
                             continue
-                        if "relation" not in relations[k][i].keys():
-                            relations[k][i]["relation"] = {
+                        if "relations" not in relations[k][i].keys():
+                            relations[k][i]["relations"] = {
                                 node.name: result_list[v[i]]
                             }
-                        elif node.name not in relations[k][i]["relation"].keys(
+                        elif node.name not in relations[k][i]["relations"].keys(
                         ):
-                            relations[k][i]["relation"][
+                            relations[k][i]["relations"][
                                 node.name] = result_list[v[i]]
                         else:
-                            relations[k][i]["relation"][node.name].extend(
+                            relations[k][i]["relations"][node.name].extend(
                                 result_list[v[i]])
                 new_relations = [[] for i in range(len(datas))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
-                        if "relation" in relations[i][j].keys():
+                        if "relations" in relations[i][j].keys():
                             for k in range(
-                                    len(relations[i][j]["relation"][
+                                    len(relations[i][j]["relations"][
                                         node.name])):
                                 new_relations[i].append(relations[i][j][
-                                    "relation"][node.name][k])
+                                    "relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for i in range(len(datas))]
