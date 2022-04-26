@@ -16,14 +16,18 @@ from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken, normalize_chars, tokenize_special_chars, convert_to_unicode
 from .attention_utils import create_bigbird_rand_mask_idx_list
 
-from .albert.modeling import *
-from .albert.tokenizer import *
-from .auto.modeling import *
-from .auto.tokenizer import *
-from .bart.modeling import *
-from .bart.tokenizer import *
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .gpt.modeling import *
+from .gpt.tokenizer import *
+from .roberta.modeling import *
+from .roberta.tokenizer import *
+from .electra.modeling import *
+from .electra.tokenizer import *
+from .albert.modeling import *
+from .albert.tokenizer import *
+from .bart.modeling import *
+from .bart.tokenizer import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
 from .bigbird.tokenizer import *
@@ -39,8 +43,6 @@ from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
-from .electra.modeling import *
-from .electra.tokenizer import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .ernie_ctm.modeling import *
@@ -56,8 +58,6 @@ from .fnet.modeling import *
 from .fnet.tokenizer import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
-from .gpt.modeling import *
-from .gpt.tokenizer import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
@@ -84,8 +84,6 @@ from .reformer.modeling import *
 from .reformer.tokenizer import *
 from .rembert.modeling import *
 from .rembert.tokenizer import *
-from .roberta.modeling import *
-from .roberta.tokenizer import *
 from .roformer.modeling import *
 from .roformer.tokenizer import *
 from semantic_search.modeling import *
@@ -105,3 +103,5 @@ from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
 from .optimization import *
+from .auto.modeling import *
+from .auto.tokenizer import *
