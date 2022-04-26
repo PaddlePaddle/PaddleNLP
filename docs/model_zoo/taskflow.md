@@ -398,11 +398,13 @@ from paddlenlp import Taskflow
 ### 信息抽取
 <details><summary>&emsp; 适配多场景的开放域通用信息抽取工具 </summary><div>
 
+开放域信息抽取(OIE)是信息抽取的一种全新的范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
+
 #### 支持多场景信息抽取任务
 
 - 命名实体识别
 
-  命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体，主要包括人名、地名、机构名、专有名词等。UIE可以抽取的实体类型包括但不限于人名、地名等类型。
+  命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，用户可以制定任意实体类型作为抽取的目标。
 
   例如抽取的目标实体类型是"出租方"和"承租方", schema构造如下：
 
@@ -434,10 +436,10 @@ from paddlenlp import Taskflow
   预测：
 
   ```python
-  >>> schema = [{'出租方': ['地址', '电话'], '承租方': ['地址', '电话']}] # Define the schema for relation extraction
+  >>> schema = [{"歌曲名称":["歌手", "所属专辑"]}] # Define the schema for relation extraction
   >>> ie.set_schema(schema) # Reset schema
-  >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
-  [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963, 'relation': {'地址': [{'text': '筒子街12号', 'start': 10, 'end': 16, 'probability': 0.9962335807051907}], '电话': [{'text': '12345678900', 'start': 20, 'end': 31, 'probability': 0.9970156522060591}]}}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428, 'relation': {'地址': [{'text': '新华路8号', 'start': 42, 'end': 47, 'probability': 0.9726211208360169}], '电话': [{'text': '1234500000', 'start': 51, 'end': 61, 'probability': 0.9597719304216668}]}}]}]
+  >>> ie("《告别了》是孙耀威在专辑爱的故事里面的歌曲")
+  [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.7721050787207417, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9996328066160487}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9981007942846247}]}}]}]
   ```
 
   在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
@@ -501,29 +503,29 @@ from paddlenlp import Taskflow
 
 #### 多模型选择，满足精度、速度要求
 
-使用`UIE-Medium`进行预测
-```python
->>> from paddlenlp import Taskflow
+- 使用`UIE-Tiny`进行预测
+  ```python
+  >>> from paddlenlp import Taskflow
 
->>> schema = ['出租方', '承租方']
->>> ie = Taskflow('information_extraction', schema=schema, model="uie-medium")
->>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
-[{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9944859053454067}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.8872193425652384}]}]
-```
+  >>> schema = ['出租方', '承租方']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-medium")
+  >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+  [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9944859053454067}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.8872193425652384}]}]
+  ```
 
-使用`UIE-Large`进行预测
-```python
->>> from paddlenlp import Taskflow
+- 使用`UIE-Large`进行预测
+  ```python
+  >>> from paddlenlp import Taskflow
 
->>> schema = ['出租方', '承租方']
->>> ie = Taskflow('information_extraction', schema=schema, model="uie-large")
->>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
-[{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9979592241500157}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.7938207126153785}]}]
-```
+  >>> schema = ['出租方', '承租方']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-large")
+  >>> ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+  [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9979592241500157}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.7938207126153785}]}]
+  ```
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-medium`，`uie-base`和`uie-large`。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-large`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 </div></details>
