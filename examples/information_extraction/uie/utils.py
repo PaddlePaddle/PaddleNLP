@@ -210,8 +210,8 @@ def convert_doccano_examples(raw_examples, negative_ratio):
             relation_example_map = {}
             for relation in relations:
                 predicate = relation["type"]
-                subject_id = relation["to_id"]
-                object_id = relation["from_id"]
+                subject_id = relation["from_id"]
+                object_id = relation["to_id"]
                 relation_label = entity_map[subject_id][
                     "name"] + "的" + predicate
                 result = {
