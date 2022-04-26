@@ -537,11 +537,11 @@ if __name__ == "__main__":
         'split-test', help='Split test file with schema for prediction')
     parser_a.add_argument(
         '--data_file',
-        default='data/duuie_testa.json',
+        default='data/duuie_test_a.json',
         help='Path for DuUIE data file')
     parser_a.add_argument(
         '--output_folder',
-        default='data/duuie_testa',
+        default='data/duuie_test_a',
         help='Path for DuUIE predicted folder')
     parser_a.add_argument(
         '--schema_folder',
@@ -553,11 +553,11 @@ if __name__ == "__main__":
         'merge-test', help='Merge predicted result for submission')
     parser_b.add_argument(
         '--data_file',
-        default='data/duuie_testa.json',
+        default='data/duuie_test_a.json',
         help='Path for DuUIE data file')
     parser_b.add_argument(
         '--pred_folder',
-        default='data/duuie_testa',
+        default='data/duuie_test_a',
         help='Path for DuUIE predicted folder')
     parser_b.add_argument(
         '--submit',
