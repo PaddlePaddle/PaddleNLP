@@ -253,7 +253,7 @@ def do_train(args):
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.num_epochs)
-    args.num_epochs = num_training_steps // len(train_data_loader) + 1
+    args.num_epochs = (num_training_steps - 1) // len(train_data_loader) + 1
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_steps)
