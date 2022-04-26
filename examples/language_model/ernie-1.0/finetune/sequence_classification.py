@@ -38,7 +38,8 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
             "token_type_ids": token_type_ids,
         }
     else:
-        label = np.array([example["label"]], dtype="int64")
+        # label = np.array([example["label"]], dtype="int64")
+        label = int(example["label"])
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
