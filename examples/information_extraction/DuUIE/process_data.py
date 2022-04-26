@@ -5,19 +5,21 @@ from collections import defaultdict
 import yaml
 import json
 import os
-from tqdm import tqdm
-
 
 from uie.evaluation.sel2record import RecordSchema, merge_schema
 
 
 def load_definition_schema_file(filename):
-    # 读取 YAML 定义的 Schema 文件
+    """Load schema file in Yaml
+    读取 YAML 定义的 Schema 文件
+    """
     return yaml.load(open(filename), Loader=yaml.FullLoader)
 
 
 def load_jsonlines_file(filename):
-    # 读取 JSONLINE 文件
+    """Load Data file in JSONLINE
+    读取 JSONLINE 文件
+    """
     return [json.loads(line) for line in open(filename)]
 
 
@@ -75,9 +77,7 @@ def main_entity_relation(schema_file, schema_name, instances, output_folder):
     schema = yaml.load(open(schema_file), Loader=yaml.FullLoader)
     entity_schema = convert_entity_schema(schema.get('实体', {}))
     relation_schema = convert_entity_relation_schema(
-        schema.get('实体', {}),
-        schema.get('关系', {})
-    )
+        schema.get('实体', {}), schema.get('关系', {}))
     event_schema = convert_event_schema({})
     dump_schema(
         output_folder=output_folder,
@@ -86,8 +86,7 @@ def main_entity_relation(schema_file, schema_name, instances, output_folder):
             'relation': relation_schema,
             'event': event_schema,
             'record': relation_schema,
-        }
-    )
+        })
 
     with open(f"{output_folder}/test.json", 'w') as output:
         for instance in instances:
@@ -102,12 +101,11 @@ def main_event(schema_file, schema_name, instances, output_folder):
     dump_schema(
         output_folder=output_folder,
         schema_dict={
-                'entity': [[], [], {}],
-                'relation': [[], [], {}],
-                'event': event_schema,
-                'record': event_schema,
-            }
-        )
+            'entity': [[], [], {}],
+            'relation': [[], [], {}],
+            'event': event_schema,
+            'record': event_schema,
+        })
 
     with open(f"{output_folder}/test.json", 'w') as output:
         for instance in instances:
@@ -116,9 +114,10 @@ def main_event(schema_file, schema_name, instances, output_folder):
     return schema_name
 
 
-# 按照事件类别分离预测任务
-# 用于事件类别较多的任务，例如 DuEE-Fin
 def main_seprate_event(schema_file, schema_name, instances, output_folder):
+    """ Prediction tasks are separated by event types
+    按照事件类别分离预测任务生成抽取的 Schema
+    """
     valid_instances = list()
 
     for instance in instances:
@@ -135,10 +134,13 @@ def main_seprate_event(schema_file, schema_name, instances, output_folder):
             schema_dict={
                 'entity': [[], [], {}],
                 'relation': [[], [], {}],
-                'event': [[event], event_map[event], {event: event_map[event]}],
-                'record': [[event], event_map[event], {event: event_map[event]}],
-            }
-        )
+                'event': [[event], event_map[event], {
+                    event: event_map[event]
+                }],
+                'record': [[event], event_map[event], {
+                    event: event_map[event]
+                }],
+            })
 
         with open(f"{subevent_output_folder}/test.json", 'w') as output:
             for instance in valid_instances:
@@ -151,8 +153,14 @@ def convert_relation(relation):
     return {
         'type': relation[0],
         'args': [
-            {'type': relation[1], 'text': relation[2]},
-            {'type': relation[3], 'text': relation[4]},
+            {
+                'type': relation[1],
+                'text': relation[2]
+            },
+            {
+                'type': relation[3],
+                'text': relation[4]
+            },
         ]
     }
 
@@ -169,14 +177,17 @@ def convert_event(event):
     return {
         'type': event['type'],
         'text': event['trigger'],
-        'args': [
-            {'type': role_type, 'text': arg} for role_type, arg in event['roles']
-        ]
+        'args': [{
+            'type': role_type,
+            'text': arg
+        } for role_type, arg in event['roles']]
     }
 
 
-# 基于实例编号合并抽取结果
 def merge_pred_text_file(text_filename, pred_filename):
+    """ Merge extracted result
+    基于实例编号合并抽取结果
+    """
 
     # 读取原始文件中的数据，用于获取 ID
     test_instances = load_jsonlines_file(text_filename)
@@ -197,7 +208,8 @@ def merge_pred_text_file(text_filename, pred_filename):
         to_sumbit_instance = {
             'id': test_instance['id'],
             'entity': [convert_entity(entity) for entity in entity_list],
-            'relation': [convert_relation(relation) for relation in relation_list],
+            'relation':
+            [convert_relation(relation) for relation in relation_list],
             'event': [convert_event(event) for event in event_list]
         }
         to_sumbit_instances[test_instance['id']] = to_sumbit_instance
@@ -210,67 +222,64 @@ def split_test(options):
     schema_folder = options.schema_folder
     output_folder = options.output_folder
     instances = [json.loads(line) for line in open(test_file)]
-    main_entity_relation(os.path.join(schema_folder, "人生信息.yaml"), "人生信息", instances, os.path.join(output_folder, "人生信息"))
-    main_entity_relation(os.path.join(schema_folder, "机构信息.yaml"), "机构信息", instances, os.path.join(output_folder, "机构信息"))
-    main_entity_relation(os.path.join(schema_folder, "影视情感.yaml"), "影视情感", instances, os.path.join(output_folder, "影视情感"))
-    main_event(os.path.join(schema_folder, "灾害意外.yaml"), "灾害意外", instances, os.path.join(output_folder, "灾害意外"))
-    main_event(os.path.join(schema_folder, "体育竞赛.yaml"), "体育竞赛", instances, os.path.join(output_folder, "体育竞赛"))
-    main_seprate_event(os.path.join(schema_folder, "金融信息.yaml"), "金融信息", instances, os.path.join(output_folder, "金融信息"))
+    main_entity_relation(
+        os.path.join(schema_folder, "人生信息.yaml"), "人生信息", instances,
+        os.path.join(output_folder, "人生信息"))
+    main_entity_relation(
+        os.path.join(schema_folder, "机构信息.yaml"), "机构信息", instances,
+        os.path.join(output_folder, "机构信息"))
+    main_entity_relation(
+        os.path.join(schema_folder, "影视情感.yaml"), "影视情感", instances,
+        os.path.join(output_folder, "影视情感"))
+    main_event(
+        os.path.join(schema_folder, "灾害意外.yaml"), "灾害意外", instances,
+        os.path.join(output_folder, "灾害意外"))
+    main_event(
+        os.path.join(schema_folder, "体育竞赛.yaml"), "体育竞赛", instances,
+        os.path.join(output_folder, "体育竞赛"))
+    main_seprate_event(
+        os.path.join(schema_folder, "金融信息.yaml"), "金融信息", instances,
+        os.path.join(output_folder, "金融信息"))
 
 
 def merge_test(options):
+    """ Merge predicted result from trained model
+    将预测文件夹中的预测结果进行合并
+    """
     output_folder = options.pred_folder
     submit_filename = options.submit
-    schema_list = [
-        "人生信息",
-        "体育竞赛",
-        "影视情感",
-        "机构信息",
-        "灾害意外",
-        "金融信息_中标",
-        "金融信息_亏损",
-        "金融信息_企业收购",
-        "金融信息_企业破产",
-        "金融信息_企业融资",
-        "金融信息_公司上市",
-        "金融信息_股东减持",
-        "金融信息_股东增持",
-        "金融信息_股份回购",
-        "金融信息_被约谈",
-        "金融信息_解除质押",
-        "金融信息_质押",
-        "金融信息_高管变动",
-    ]
 
     to_sumbit_instances = dict()
-    for schema in schema_list:
-        print(f"Merge {schema} ...")
-        test_filename = f"{output_folder}/{schema}/test.json"
-        pred_filename = f"{output_folder}/{schema}/pred.json"
+    for schema in os.listdir(output_folder):
+        test_filename = os.path.join(output_folder, schema, "test.json")
+        pred_filename = os.path.join(output_folder, schema, "pred.json")
         sub_to_sumbit_instances = merge_pred_text_file(
             text_filename=test_filename,
-            pred_filename=pred_filename,
-        )
-        print(len(sub_to_sumbit_instances))
+            pred_filename=pred_filename, )
+        print(
+            f"Merge {schema} with {len(sub_to_sumbit_instances)} instances ...")
         for instance_id, instance in sub_to_sumbit_instances.items():
             if instance_id in to_sumbit_instances:
-                to_sumbit_instances[instance_id]['entity'] += instance.get('entity', [])
-                to_sumbit_instances[instance_id]['relation'] += instance.get('relation', [])
-                to_sumbit_instances[instance_id]['event'] += instance.get('event', [])
+                to_sumbit_instances[instance_id]['entity'] += instance.get(
+                    'entity', [])
+                to_sumbit_instances[instance_id]['relation'] += instance.get(
+                    'relation', [])
+                to_sumbit_instances[instance_id]['event'] += instance.get(
+                    'event', [])
             else:
                 to_sumbit_instances[instance_id] = instance
 
-    print(len(to_sumbit_instances))
+    print(f"To submit instances number: {len(to_sumbit_instances)}")
     with open(submit_filename, 'w') as output:
         for instance in to_sumbit_instances.values():
             output.write(json.dumps(instance, ensure_ascii=False) + '\n')
 
 
-## Code for Training Data Preprocessing
-def annonote_graph(entities: List[Dict] = [],
-                   relations: List[Dict] = [],
-                   events: List[Dict] = []):
+def annonote_graph(entities: List[Dict]=[],
+                   relations: List[Dict]=[],
+                   events: List[Dict]=[]):
     """Convert Entity Relation Event to Spot-Assocation Graph
+    将实体、关系和事件的标注信息转换成需要生成的 Spot-Assocation 结构
 
     Args:
         tokens (List[str]): Token List
@@ -281,6 +290,7 @@ def annonote_graph(entities: List[Dict] = [],
     Returns:
         set: Set of Spot
         set: Set of Asoc
+        list: Instance of Spot-Asoc
     """
     spot_dict = dict()
     asoc_dict = defaultdict(list)
@@ -291,18 +301,17 @@ def annonote_graph(entities: List[Dict] = [],
 
     def add_asoc(spot, asoc, tail):
         spot_key = (tuple(spot['offset']), spot['type'])
-        asoc_dict[spot_key] += [(
-            tuple(tail['offset']),
-            tail['text'],
-            asoc
-        )]
+        asoc_dict[spot_key] += [(tuple(tail['offset']), tail['text'], asoc)]
 
     for entity in entities:
         add_spot(spot=entity)
 
     for relation in relations:
         add_spot(spot=relation['args'][0])
-        add_asoc(spot=relation['args'][0], asoc=relation['type'], tail=relation['args'][1])
+        add_asoc(
+            spot=relation['args'][0],
+            asoc=relation['type'],
+            tail=relation['args'][1])
 
     for event in events:
         add_spot(spot=event)
@@ -316,10 +325,11 @@ def annonote_graph(entities: List[Dict] = [],
         if len(spot_dict[spot_key]['offset']) == 0:
             continue
 
-        spot_instance = {'span': spot_dict[spot_key]['text'],
-                         'label': label,
-                         'asoc': list(),
-                         }
+        spot_instance = {
+            'span': spot_dict[spot_key]['text'],
+            'label': label,
+            'asoc': list(),
+        }
         for tail_offset, tail_text, asoc in sorted(asoc_dict.get(spot_key, [])):
             if len(tail_offset) == 0:
                 continue
@@ -343,8 +353,7 @@ def add_spot_asoc_to_single_file(filename):
             spots, asocs, spot_asoc_instance = annonote_graph(
                 entities=instance['entity'],
                 relations=instance['relation'],
-                events=instance['event'],
-            )
+                events=instance['event'], )
             # 将信息结构转换成 Spot Asoc 形式
             instance['spot_asoc'] = spot_asoc_instance
             # 添加该实例中存在的 Spot 类别
@@ -352,7 +361,6 @@ def add_spot_asoc_to_single_file(filename):
             # 添加该实例中存在的 Asoc 类别
             instance['asoc'] = list(asocs)
             output.write(json.dumps(instance, ensure_ascii=False) + '\n')
-    
 
 
 def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
@@ -369,11 +377,14 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
 
         print(f'Add spot asoc to {task_folder} ...')
         # 读取单任务的 Schema
-        task_schema_file = os.path.join(data_folder, task_folder, 'record.schema')
+        task_schema_file = os.path.join(data_folder, task_folder,
+                                        'record.schema')
 
         # 向单任务数据中添加 Spot Asoc 标注
-        add_spot_asoc_to_single_file(os.path.join(data_folder, task_folder, 'train.json'))
-        add_spot_asoc_to_single_file(os.path.join(data_folder, task_folder, 'val.json'))
+        add_spot_asoc_to_single_file(
+            os.path.join(data_folder, task_folder, 'train.json'))
+        add_spot_asoc_to_single_file(
+            os.path.join(data_folder, task_folder, 'val.json'))
         record_schema = RecordSchema.read_from_file(task_schema_file)
 
         schema_list += [record_schema]
@@ -385,7 +396,7 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
             train_instances += [new_instance]
-        
+
         for line in open(os.path.join(data_folder, task_folder, 'val.json')):
             new_instance = json.loads(line)
             # 添加任务中所有的 Spot 类别
@@ -393,7 +404,7 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
             val_instances += [new_instance]
-    
+
     # 融合不同任务的 Schema
     multi_schema = merge_schema(schema_list)
     dump_instances(train_instances, os.path.join(data_folder, 'train.json'))
@@ -402,7 +413,8 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
 
 
 def add_spotasoc_to_train(options):
-    """ 添加 spot asoc 标注信息
+    """ Add spot asoc annotation
+    添加 spot asoc 标注信息
     """
     import shutil
     shutil.copytree(options.train_data, options.output_folder)
@@ -414,14 +426,17 @@ def dump_instances(instances, output_filename):
         for instance in instances:
             output.write(json.dumps(instance, ensure_ascii=False) + '\n')
 
-### Start Event Processing Code
+
 def dump_event_schema(event_map, output_folder):
     role_list = list()
     for roles in event_map.values():
         role_list += roles['参数']
     rols_list = list(set(role_list))
     type_list = list(event_map.keys())
-    type_role_map = {event_type: list(event_map[event_type]['参数'].keys()) for event_type in event_map}
+    type_role_map = {
+        event_type: list(event_map[event_type]['参数'].keys())
+        for event_type in event_map
+    }
     dump_schema(
         output_folder=output_folder,
         schema_dict={
@@ -429,68 +444,68 @@ def dump_event_schema(event_map, output_folder):
             'relation': [[], [], {}],
             'event': [type_list, rols_list, type_role_map],
             'record': [type_list, rols_list, type_role_map],
-        }
-    )
+        })
 
 
 def filter_event_in_instance(instances, required_event_types):
+    """Filter events in the instance, keep event mentions with `required_event_types`
+    过滤实例中的事件，只保留需要的事件类别的事件标注
+    """
     import copy
     new_instances = list()
     for instance in instances:
         new_instance = copy.deepcopy(instance)
-        new_instance['event'] = list(filter(lambda x: x['type'] in required_event_types, new_instance['event']))
+        new_instance['event'] = list(
+            filter(lambda x: x['type'] in required_event_types, new_instance[
+                'event']))
         new_instances += [new_instance]
     return new_instances
 
 
 def filter_event(data_folder, event_types, output_folder):
-    """ 过滤事件，只保留 event_types """
+    """ Keep event with `event_types` in `data_folder` save to `output_folder`
+    过滤 `data_folder` 中的事件，只保留 `event_types` 类型事件保存到 `output_folder` """
     dump_event_schema(event_types, output_folder)
     for split in ['train', 'val']:
         filename = os.path.join(data_folder, f"{split}.json")
         instances = [json.loads(line.strip()) for line in open(filename)]
-        new_instances = filter_event_in_instance(instances, required_event_types=event_types)
-        dump_instances(new_instances, os.path.join(output_folder, f"{split}.json"))
-
-
-def preprocess_event_with_types(schema_file, data_folder, output_folder):
-    schema = load_definition_schema_file(schema_file)
-    filter_event(
-        data_folder=data_folder,
-        event_types=schema['事件'],
-        output_folder=output_folder,
-    )
-
-
-def preprocess_event_one_by_one(schema_file, data_folder, output_folder):
-    # 对于类别名称较长的多事件分割成多个子任务
-    schema = load_definition_schema_file(schema_file)
-    for event_type in schema['事件']:
-        filter_event(
-            data_folder=data_folder,
-            event_types={event_type: schema['事件'][event_type]},
-            output_folder=output_folder + '_' + event_type,
-        )
+        new_instances = filter_event_in_instance(
+            instances, required_event_types=event_types)
+        dump_instances(new_instances,
+                       os.path.join(output_folder, f"{split}.json"))
 
 
 def preprocess_event():
-    # 对事件数据进行预处理
-    # 过滤除 `灾害意外` 和 `体育竞赛` 外的事件标注
+    """ Preprocessing event dataset for CCKS 2022
+    针对 CCKS 2022 竞赛数据进行预处理
+    """
+
+    # Filter event annotation in raw data, only keep the required event in CCKS 2022
+    # 对事件数据进行预处理，过滤除 `灾害意外` 和 `体育竞赛` 外的事件标注
     for schema in ['灾害意外', '体育竞赛']:
-        print(f'构建 {schema} 数据 ...')
+        print(f'Building {schema} dataset ...')
         data_folder = os.path.join('data', 'duuie', 'DUEE')
         schema_file = os.path.join('data', 'seen_schema', f'{schema}.yaml')
         output_folder = os.path.join('data', 'duuie', schema)
-        preprocess_event_with_types(schema_file, data_folder, output_folder)
-    
+        schema = load_definition_schema_file(schema_file)
+        filter_event(
+            data_folder=data_folder,
+            event_types=schema['事件'],
+            output_folder=output_folder, )
+
     for schema in ['金融信息']:
-        print(f'构建 {schema} 数据 ...')
+        print(f'Building {schema} dataset ...')
         data_folder = os.path.join('data', 'duuie', 'DUEE_FIN_LITE')
         schema_file = os.path.join('data', 'seen_schema', f'{schema}.yaml')
         output_folder = os.path.join('data', 'duuie', schema)
-        preprocess_event_one_by_one(schema_file, data_folder, output_folder)
-### End Event Processing Code
-
+        schema = load_definition_schema_file(schema_file)
+        # 依据不同事件类别将多事件抽取分割成多个单事件类型抽取
+        # Separate multi-type extraction to multiple single-type extraction
+        for event_type in schema['事件']:
+            filter_event(
+                data_folder=data_folder,
+                event_types={event_type: schema['事件'][event_type]},
+                output_folder=output_folder + '_' + event_type, )
 
 
 def preprocess(options):
@@ -502,24 +517,52 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
 
-    subparsers = parser.add_subparsers(help='sub-command help')
+    subparsers = parser.add_subparsers(
+        help='Data preprocessing scripts for CCKS 2022')
 
-    parser_t = subparsers.add_parser('preprocess', help='add help')
-    parser_t.add_argument('--train_data', default='data/duuie')
-    parser_t.add_argument('--output_folder', default='data/duuie_pre')
-    parser_t.add_argument('--ignore_datasets', default=['DUEE', 'DUEE_FIN_LITE'])
+    parser_t = subparsers.add_parser('preprocess', help='Data preprocessing')
+    parser_t.add_argument(
+        '--train_data', default='data/duuie', help='Path for DuUIE data folder')
+    parser_t.add_argument(
+        '--output_folder',
+        default='data/duuie_pre',
+        help='Path for Preprocessed DuUIE data folder')
+    parser_t.add_argument(
+        '--ignore_datasets',
+        default=['DUEE', 'DUEE_FIN_LITE'],
+        help='Ignore dataset in `output_folder` for training')
     parser_t.set_defaults(func=preprocess)
 
-    parser_a = subparsers.add_parser('split-test', help='add help')
-    parser_a.add_argument('--data_file', default='data/duuie_testa.json')
-    parser_a.add_argument('--output_folder', default='data/duuie_testa')
-    parser_a.add_argument('--schema_folder', default='data/seen_schema')
+    parser_a = subparsers.add_parser(
+        'split-test', help='Split test file with schema for prediction')
+    parser_a.add_argument(
+        '--data_file',
+        default='data/duuie_testa.json',
+        help='Path for DuUIE data file')
+    parser_a.add_argument(
+        '--output_folder',
+        default='data/duuie_testa',
+        help='Path for DuUIE predicted folder')
+    parser_a.add_argument(
+        '--schema_folder',
+        default='data/seen_schema',
+        help='Path for seen schema folder')
     parser_a.set_defaults(func=split_test)
 
-    parser_b = subparsers.add_parser('merge-test', help='add help')
-    parser_b.add_argument('--data_file', default='data/duuie_testa.json')
-    parser_b.add_argument('--pred_folder', default='data/duuie_testa')
-    parser_b.add_argument('--submit', default='submit.txt')
+    parser_b = subparsers.add_parser(
+        'merge-test', help='Merge predicted result for submission')
+    parser_b.add_argument(
+        '--data_file',
+        default='data/duuie_testa.json',
+        help='Path for DuUIE data file')
+    parser_b.add_argument(
+        '--pred_folder',
+        default='data/duuie_testa',
+        help='Path for DuUIE predicted folder')
+    parser_b.add_argument(
+        '--submit',
+        default='submit.txt',
+        help='Path for output submission file')
     parser_b.set_defaults(func=merge_test)
 
     options = parser.parse_args()

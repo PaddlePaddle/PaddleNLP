@@ -1,7 +1,7 @@
 # CCKS 2022 通用信息抽取基线
 
 信息抽取任务旨在根据特定的抽取需求（Schema，S）从非结构化文本（Text，X）中自动抽取结构化信息（Structure，Y）。
-其中，特定的抽取需求是指抽取任务中的抽取框架，主要由抽取类别（人物名称、公司名称、企业上市事件）及目标结构（实体、关系、事件等）组成。 
+其中，特定的抽取需求是指抽取任务中的抽取框架，主要由抽取类别（人物名称、公司名称、企业上市事件）及目标结构（实体、关系、事件等）组成。
 本任务为中文信息抽取任务，即按照特定的抽取框架S，从给定的一组自由文本X中抽取出所有符合抽取需求的信息结构Y（实体、关系、事件记录等）。
 对于同一输入文本，不同的抽取框架会抽取不同的信息结构。
 
@@ -18,7 +18,7 @@
 ## 环境安装
 
 ``` bash
-pip install -r requirements.txt 
+pip install -r requirements.txt
 ```
 
 ## 目录结构
@@ -40,8 +40,12 @@ pip install -r requirements.txt
 
 ### 基线说明
 
-本例采用面向信息抽取的统一序列到结构生成模型作为任务基线，该模型将多种不同的信息抽取目标结构表示为统一的结构化抽取语言（Structured Extraction Language，SEL），并且通过端到端生成的方式实现复杂结构的抽取。
+本例采用面向信息抽取的统一序列到结构生成模型作为任务基线。
+
+该模型将多种不同的信息抽取目标结构表示为统一的结构化抽取语言（Structured Extraction Language，SEL），并且通过端到端生成的方式实现复杂结构的抽取。
+
 同时，该模型使用结构化框架前缀（Structural Schema Instructor，SSI）作为抽取目标来帮助模型区分不同的抽取任务。
+
 快速基线从[这里](#quick-start)开始。
 
 #### 结构化抽取语言
@@ -50,15 +54,15 @@ pip install -r requirements.txt
 ```
 (
   (Spot Name: Info Span
-    (Asso Name: Info Span)
-    (Asso Name: Info Span)
+    (Assocation Name: Info Span)
+    (Assocation Name: Info Span)
   )
 )
 ```
 其中，
-- Spot Name：信息点类别，如实体类型；
-- Asso Name: 信息点关联列别，如关系类型、事件论元类型；
-- Info Span：信息点所对应的文本片段。
+- Spot Name: 信息点类别，如实体类型；
+- Assocation Name (asoc/asso): 信息点关联类别，如关系类型、事件论元类型；
+- Info Span: 信息点所对应的文本片段。
 
 以`2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！`中的信息结构为例：
 
@@ -85,75 +89,71 @@ pip install -r requirements.txt
 
 ```
 records = sel2record.sel2record(
-  pred=p,
-  text=instance['text'],
-  tokens=instance['tokens']
+  pred=predicted_sel,  # 生成的 SEL 表达式，例如 ((夺冠: 金牌 (冠军: 谷爱凌)))
+  text=raw_text,
+  ...
 )
+records 为解析后的抽取结果。例如 {类别: 夺冠, 触发词: 金牌, 冠军: 谷爱凌}
+
 ```
 
 #### 结构化模式前缀
 结构化模式前缀与带抽取的文本一同输入序列到结构生成模型，用于区分不同的抽取任务。
-
+基线模型使用特殊字符 `[spot]`、`[asoc]` 来组织结构化模式前缀，`[spot]` 对应 SEL 中的 SpotName 类别，`[asoc]` 对应
 不同任务的形式是：
 - 实体抽取：[spot] 实体类别 [text]
-- 关系抽取：[spot] 实体类别 [asso] 关系类别 [text]
-- 事件抽取：[spot] 事件类别 [asso] 论元类别 [text]
-- 情感抽取：[spot] 评价维度 [asso] 观点类别 [text]
+- 关系抽取：[spot] 实体类别 [asoc] 关系类别 [text]
+- 事件抽取：[spot] 事件类别 [asoc] 论元类别 [text]
+- 情感抽取：[spot] 评价维度 [asoc] 观点类别 [text]
 
-以夺冠事件为例，其对应的SSI为 `[spot]夺冠[asoc]夺冠事件[asoc]冠军[asoc]夺冠赛事[text]`。
+以夺冠事件为例，其对应的SSI为 `[spot] 夺冠 [asoc] 夺冠事件 [asoc] 冠军 [asoc] 夺冠赛事 [text] 2月8日上午北京冬奥会自由...`。
 
-本次大赛在框架定义文件中提供了详细的抽取类别定义和模板类型，欢迎选手尝试多种多样不同的输入形式和输出形式。
+本次大赛在框架定义文件([seen_schema.zip](https://aistudio.baidu.com/aistudio/competition/detail/161/0/datasets))中提供了详细的抽取类别定义和模板类型，欢迎选手尝试多种多样不同的输入形式和输出形式。
 
 ### <span id='quick-start'>快速基线第一步：数据预处理并加载</span>
 
-从比赛官网下载数据集，解压存放于 data/DuUIE 目录下，在原始数据中添加 Spot 和 Asoc 标注。
+从比赛官网下载数据集([duuie.zip](https://aistudio.baidu.com/aistudio/competition/detail/161/0/datasets))，解压存放于 data/ 目录下。
+预处理脚本将在原始数据中添加 Spot 和 Asoc 标注，将需要抽取的内容表示为 Spot-Asoc 的数据形式。
 
 ``` bash
 python process_data.py preprocess
 ```
 
-处理之后的数据将自动生成在同样放在 data/DuUIE_pre 下，每个实例中进一步添加了 `spot`, `asoc` 和 `spot_asoc` 三个字段。每个样例中，spot/asoc 为每个任务中所有的 Spot/Asoc 类型，用于生成对应的 SSI。
+处理之后的数据将自动生成在 data/DuUIE_pre 下，每个实例中添加了 `spot`, `asoc` 和 `spot_asoc` 三个字段。
+
+在多任务训练集 `train.json` 的每个样例中，spot/asoc 为每个任务中所有的 Spot/Asoc 类型，用于生成对应的 SSI。
 
 ### 快速基线第二步：多任务模型训练
 
-基线采用的预训练模型为字符级别的中文生成模型 uie-char-small，首先使用 100G 中文数据进行 Span Corruption 预训练，然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
+基线采用的预训练模型为字符级别的中文生成模型 `uie-char-small`，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
 
 #### 多任务配置
 
-本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式。
-本例采用 baseline 中的所有推荐数据，详见 `config/multitask/multi-task-duuie.yaml`。
+本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multitask/multi-task-duuie.yaml`。
 
-多任务的脚本如下：
-```
-bash run_seq2seq_paddle_multitask.bash
-
---------------------------------------------------------------
-
-CUDA_VISIBLE_DEVICES=0 python3 run_seq2struct_multitask.py   \
+python3 run_seq2struct.py --multi_task                       \
   --multi_task_config config/multitask/multi-task-duuie.yaml \
   --do_train                                                 \
   --metric_for_best_model=all-task-ave                       \
   --model_name_or_path=./uie-char-small                      \
-  --max_source_length=384                                    \    
+  --max_source_length=384                                    \
   --max_prefix_length=-1                                     \
   --max_target_length=192                                    \
   --num_train_epochs=10                                      \
   --train_file=data/duuie_pre/train.json                     \
   --validation_file=data/duuie_pre/val.json                  \
-  --test_file=data/duuie_pre/test.json                       \
   --record_schema=data/duuie_pre/record.schema               \
-  --record_schema_dir=ata/duuie_pre                          \
-  --per_device_train_batch_size=32                           \
+  --per_device_train_batch_size=16                           \
   --per_device_eval_batch_size=256                           \
   --output_dir=output/duuie_multi_task_b32_lr5e-4            \
   --logging_dir=output/duuie_multi_task_b32_lr5e-4_log       \
   --learning_rate=5e-4                                       \
-  --seed=${seed:-"42"}                                       \
+  --seed=42                                                  \
   --overwrite_output_dir                                     \
-  --gradient_accumulation_steps 2                            \
+  --gradient_accumulation_steps 1                            \
   --multi_task                                               \
   --multi_task_config config/multitask/multi-task-duuie.yaml \
-  --negative_keep 0.1
+  --negative_keep 1.0
 ```
 
 训练完成后，将生成对应的文件夹 `output/duuie_multi_task_b32_lr5e-4`
@@ -161,9 +161,9 @@ CUDA_VISIBLE_DEVICES=0 python3 run_seq2struct_multitask.py   \
 ### 快速基线第三步：使用多任务模型进行预测
 
 该步骤将依据不同任务的抽取框架进行信息抽取，并输出到对应的文件夹中。
-``` bash
-python process_data.py split-test
+首先下载test解压后放置在data目录下，然后使用脚本将其自动
 
+``` bash
 python inference.py --data data/duuie_testa/* --model output/duuie_multi_task_b32_lr5e-4
 ```
 
@@ -184,6 +184,6 @@ python process_data.py merge-test
 
 ## Reference
 - [Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)
-- [DuIE: A Large-scale Chinese Dataset for Information Extraction](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/DuIE)
+- [DuIE: A Large-scale Chinese Dataset for Information Extraction](http://tcci.ccf.org.cn/conference/2019/papers/EV10.pdf)
 - [DuEE: A Large-Scale Dataset for Chinese Event Extraction in Real-World Scenarios](https://link.springer.com/chapter/10.1007/978-3-030-60457-8_44)
 - [CASA: Conversational Aspect Sentiment Analysis for Dialogue Understanding](https://jair.org/index.php/jair/article/view/12802)
