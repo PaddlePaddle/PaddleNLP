@@ -164,7 +164,7 @@ def do_train():
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.epochs
-    args.epochs = num_training_steps // len(train_data_loader) + 1
+    args.epochs = (num_training_steps - 1) // len(train_data_loader) + 1
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -250,7 +250,7 @@ def do_train():
                     model.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
 
-            if args.max_steps > 0 and global_step >= args.max_steps:
+            if global_step >= num_training_steps:
                 return
             tic_train = time.time()
 
