@@ -195,10 +195,6 @@ def run_evaluate(data_loader,
         loss_global["lm_loss"] += lm_loss.detach()
         loss_global["sop_loss"] += sop_loss.detach()
 
-        # all_loss.append(float(loss.item()))
-        # all_lm_loss.append(float(lm_loss.item()))
-        # all_sop_loss.append(float(sop_loss.item()))
-
         if eval_step >= iter_steps - 1:
             log_info_dict = dict()
             for k, v in loss_global.items():
