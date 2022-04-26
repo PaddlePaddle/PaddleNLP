@@ -713,7 +713,6 @@ class BatchEncoding(UserDict):
         # Convert to TensorType
         if not isinstance(tensor_type, TensorType):
             tensor_type = TensorType(tensor_type)
-
         # Get a function reference for the correct framework
         if tensor_type == TensorType.PADDLE:
             as_tensor = paddle.to_tensor
@@ -3081,7 +3080,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         """
         # Load from model defaults
         if return_attention_mask is None:
-            return_attention_mask = "attention_mask" in self.model_input_names
+            return_attention_mask = "attention_mask" in self.model_input_names or "attention_mask" in encoded_inputs
 
         required_input = encoded_inputs[self.model_input_names[0]]
 
