@@ -36,9 +36,10 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 
 #### 数据获取与制作
 
-C++ 一共 3309507个文件，共44G  
-Python 一共714758个文件，共7.6G
 一共是4024265个文件，共计51.6G
+- C++ 一共 3309507个文件，共44G  
+- Python 一共714758个文件，共7.6G
+
 链接: https://pan.baidu.com/s/1TEWUZ9rT3rJa3OyIs1Qa-A?pwd=sjet 提取码: sjet
 
 下载以后通过以下命令解压：
