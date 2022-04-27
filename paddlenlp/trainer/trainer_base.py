@@ -390,6 +390,7 @@ class Trainer:
         logger.info(f"  Total num train samples = {num_train_samples}")
 
         start_time = time.time()
+        self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
@@ -640,8 +641,18 @@ class Trainer:
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
+            logs.update(
+                speed_metrics(
+                    "interval",
+                    self._globalstep_last_start_time,
+                    num_samples=self.args.train_batch_size *
+                    self.args.gradient_accumulation_steps,
+                    num_steps=self.state.global_step -
+                    self._globalstep_last_logged, ))
+
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
+            self._globalstep_last_start_time = time.time()
 
             self.log(logs)
 
@@ -959,6 +970,8 @@ class Trainer:
         elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
             labels = (inputs.pop("start_positions"),
                       inputs.pop("end_positions"))
+        elif self.criterion is not None and "generator_labels" in inputs:
+            labels = inputs["generator_labels"]
         else:
             labels = None
         outputs = model(**inputs)
@@ -1263,7 +1276,7 @@ class Trainer:
                 The values to log.
         """
         if self.state.epoch is not None:
-            logs["epoch"] = round(self.state.epoch, 2)
+            logs["epoch"] = round(self.state.epoch, 4)
 
         output = { ** logs, ** {"step": self.state.global_step}}
         self.state.log_history.append(output)
