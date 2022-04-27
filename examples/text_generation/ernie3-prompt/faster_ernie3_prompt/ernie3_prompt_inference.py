@@ -75,8 +75,6 @@ def infer(args):
     predictor.run()
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
-    import pdb
-    pdb.set_trace()
 
     for idx, sample in enumerate(output[0].transpose([1, 2, 0]).tolist()):
         for beam_idx, beam in enumerate(sample):
