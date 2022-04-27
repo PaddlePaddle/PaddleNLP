@@ -88,10 +88,11 @@ class MedicalCorpus(paddle.io.Dataset):
 
 
 class DataCollatorForErnieHealth(object):
-    def __init__(self, tokenizer, mlm_prob, max_seq_length):
+    def __init__(self, tokenizer, mlm_prob, max_seq_length, return_dict=False):
         self.tokenizer = tokenizer
         self.mlm_prob = mlm_prob
         self.max_seq_len = max_seq_length
+        self.return_dict = return_dict
         self._ids = {
             'cls':
             self.tokenizer.convert_tokens_to_ids(self.tokenizer.cls_token),
@@ -110,7 +111,15 @@ class DataCollatorForErnieHealth(object):
             [masked_input_ids_a, masked_input_ids_b], axis=0).astype('int64')
         input_ids = paddle.concat([input_ids_a, input_ids_b], axis=0)
         labels = paddle.concat([labels_a, labels_b], axis=0)
-        return masked_input_ids, input_ids, labels
+        if self.return_dict:
+            return {
+                "input_ids": masked_input_ids,
+                "raw_input_ids": input_ids,
+                "generator_labels": labels
+            }
+
+        else:
+            return masked_input_ids, input_ids, labels
 
     def mask_tokens(self, batch_data):
 
