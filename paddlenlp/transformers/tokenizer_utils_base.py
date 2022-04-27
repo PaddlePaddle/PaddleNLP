@@ -1813,7 +1813,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         """
         old_truncation_strategy = kwargs.pop("truncation_strategy",
                                              "do_not_truncate")
-        old_pad_to_max_length = kwargs.pop("pad_to_max_length", False)
+        old_pad_to_max_length = kwargs.pop("pad_to_max_seq_len", False)
 
         # Backward compatibility for previous behavior, maybe we should deprecate it:
         # If you only set max_length, it activates truncation for max_length
