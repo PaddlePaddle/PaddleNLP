@@ -860,13 +860,13 @@ def get_id_and_prob(spans, offset_map):
         else:
             break
 
-    for i in range(1, prompt_length):
+    for i in range(1, prompt_length + 1):
         offset_map[i][0] -= prompt_length
         offset_map[i][1] -= prompt_length
 
     sentence_id = []
     prob = []
-    for s, e in spans:
-        prob.append(s[1] * e[1])
-        sentence_id.append((offset_map[s[0]][0], offset_map[e[0]][1]))
+    for start, end in spans:
+        prob.append(start[1] * end[1])
+        sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
     return sentence_id, prob
