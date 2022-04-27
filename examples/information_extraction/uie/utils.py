@@ -138,13 +138,12 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
 
 
 def construct_relation_label_set(entity_name_set, predicate_set):
-    relation_label_set = []
+    relation_label_set = set()
     for entity_name in entity_name_set:
         for predicate in predicate_set:
             relation_label = entity_name + "的" + predicate
-            if relation_label not in relation_label_set:
-                relation_label_set.append(relation_label)
-    return relation_label_set
+            relation_label_set.add(relation_label)
+    return sorted(list(relation_label_set))
 
 
 def convert_doccano_examples(raw_examples, negative_ratio):
