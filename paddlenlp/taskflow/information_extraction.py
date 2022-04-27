@@ -307,8 +307,10 @@ class UIETask(Task):
                         offset += len(short_inputs[v])
                     else:
                         for i in range(len(short_results[v])):
-                            short_results[v][i]['start'] += offset
-                            short_results[v][i]['end'] += offset
+                            if 'start' not in short_results[v][
+                                    i] or 'end' not in short_results[v][i]:
+                                short_results[v][i]['start'] += offset
+                                short_results[v][i]['end'] += offset
                         offset += len(short_inputs[v])
                         single_results.extend(short_results[v])
                 concat_results.append(single_results)
