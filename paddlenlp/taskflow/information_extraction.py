@@ -418,10 +418,11 @@ class UIETask(Task):
             prompt = example["prompt"]
             for i in range(len(sentence_id)):
                 start, end = sentence_id[i]
-                if end <= 0:
-                    # ignore [SEP]
-                    start += len(prompt)
-                    end += len(prompt)
+                if start < 0 and end >= 0:
+                    continue
+                if end < 0:
+                    start += (len(prompt) + 1)
+                    end += (len(prompt) + 1)
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
