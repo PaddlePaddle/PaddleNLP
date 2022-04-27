@@ -13,25 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
 """
 Utilities for the Trainer class. 
 """
 import datetime
 import json
-import math
-import copy
-import functools
-import gc
-import inspect
 import os
 import random
 import re
-import threading
 import time
 from enum import Enum
-from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
+from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 
@@ -218,7 +212,7 @@ def metrics_format(self, metrics: Dict[str, float]) -> Dict[str, float]:
             metrics_copy[k] = _secs2timedelta(v)
         elif k == "total_flos":
             metrics_copy[k] = f"{ int(v) >> 30 }GF"
-        elif type(metrics_copy[k]) == float:
+        elif isinstance(metrics_copy[k], float):
             metrics_copy[k] = round(v, 4)
 
     return metrics_copy

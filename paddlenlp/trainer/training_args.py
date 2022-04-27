@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
 
 import contextlib
@@ -23,21 +23,16 @@ import os
 import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from pathlib import Path
 import types
 from typing import Any, Dict, List, Optional
 
-# from .utils import logging
+import paddle
+
+from ..utils.log import logger
 from .trainer_utils import (
     SchedulerType,
     IntervalStrategy,
     OptimizerNames, )
-
-# logger = logging.get_logger(__name__)
-# log_levels = logging.get_log_levels_dict().copy()
-# trainer_log_levels = dict(**log_levels, passive=-1)
-from paddlenlp.utils.log import logger
-import paddle
 
 __all__ = [
     "default_logdir",
@@ -87,7 +82,7 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         do_export (`bool`, *optional*, defaults to `False`):
             Whether to export inference model or not. This argument is not directly used by [`Trainer`], it's
-            intended to be used by your training/evaluation scripts instead. 
+            intended to be used by your training/evaluation scripts instead.
         evaluation_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"no"`):
             The evaluation strategy to adopt during training. Possible values are:
 
@@ -210,12 +205,12 @@ class TrainingArguments:
             main process.
         past_index (`int`, *optional*, defaults to -1):
             Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions. 
-            If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as 
+            If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as
             the past state and feed it to the model at the next training step under the keyword argument `mems`.
         run_name (`str`, *optional*):
             A descriptor for the run. Typically used for logging.
         disable_tqdm (`bool`, *optional*):
-            Whether or not to disable the tqdm progress bars and table of metrics. Will default to `True` if the logging 
+            Whether or not to disable the tqdm progress bars and table of metrics. Will default to `True` if the logging
             level is set to warn or lower (default), `False` otherwise.
         remove_unused_columns (`bool`, *optional*, defaults to `True`):
             If using `datasets.Dataset` datasets, whether or not to automatically remove the columns unused by the
@@ -688,23 +683,6 @@ class TrainingArguments:
         """
         return True
 
-    def get_process_log_level(self):
-        """
-        Returns the log level to be used depending on whether this process is the main process of node 0, main process
-        of node non-0, or a non-main process.
-
-        For the main process the log level defaults to `logging.INFO` unless overridden by `log_level` argument.
-
-        For the replica processes the log level defaults to `logging.WARNING` unless overridden by `log_level_replica`
-        argument.
-
-        The choice between the main and replica process settings is made according to the return value of `should_log`.
-        """
-
-        log_level_main_node = logging.INFO if self.log_level == -1 else self.log_level
-        log_level_replica_node = logging.WARNING if self.log_level_replica == -1 else self.log_level_replica
-        return log_level_main_node if self.should_log else log_level_replica_node
-
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
         """
@@ -815,7 +793,7 @@ class TrainingArguments:
                                       paddle.version.commit))
 
         for a in dir(args):
-            if (a[:2] != "__"):  #don't print double underscore methods
+            if a[:2] != "__":  #don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(a, v))

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py
 
 import collections
@@ -26,12 +26,11 @@ import re
 import shutil
 import sys
 import time
-import warnings
 import types
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from packaging import version
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from tqdm.auto import tqdm
 import numpy as np
@@ -43,23 +42,20 @@ from paddle.io import (
     Dataset,
     DataLoader,
     DistributedBatchSampler, )
-import paddlenlp
-from paddlenlp.data import (
+
+from ..data import (
     default_data_collator,
     DataCollator,
-    DefaultDataCollator,
     DataCollatorWithPadding, )
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
-from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
-from paddlenlp.utils.log import logger
-
+from ..transformers import LinearDecayWithWarmup
+from ..transformers.model_utils import PretrainedModel, unwrap_model
+from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.log import logger
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from .integrations import get_reporting_integration_callbacks
 from .training_args import TrainingArguments
 from .trainer_utils import (
     set_seed,
-    IntervalStrategy,
-    EvaluationStrategy,
     TrainOutput,
     EvalPrediction,
     PredictionOutput,
@@ -97,10 +93,9 @@ SCALER_NAME = "scaler.pdparams"
 WEIGHTS_NAME = "model_state.pdparams"
 CONFIG_NAME = "model_config.json"
 
-import importlib
-
 
 def is_datasets_available():
+    import importlib
     return importlib.util.find_spec("datasets") is not None
 
 
@@ -116,7 +111,7 @@ class Trainer:
 
     Args:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
-            The model to train, evaluate or use for predictions. 
+            The model to train, evaluate or use for predictions.
 
             <Tip>
 
@@ -155,8 +150,8 @@ class Trainer:
         - **model** -- Always points to the core model. If using a transformers model, it will be a [`PretrainedModel`]
           subclass.
         - **model_wrapped** -- Always points to the most external model in case one or more other modules wrap the
-          original model. This is the model that should be used for the forward pass. For example, the inner model is 
-          wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
+          original model. This is the model that should be used for the forward pass. For example, the inner model is
+          wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same
           as `self.model`.
         - **is_model_parallel** -- Whether or not a model has been switched to a model parallel mode (different from
           data parallelism, this means some of the model layers are split on different GPUs).
@@ -248,7 +243,7 @@ class Trainer:
         if args.fp16:
             self.scaler = paddle.amp.GradScaler(
                 init_loss_scaling=self.args.scale_loss)
-            logger.info(f"Using  half precision")
+            logger.info("Using half precision")
 
         default_label_names = (["start_positions", "end_positions"] if
                                "QusetionAnswering" in type(self.model).__name__
@@ -296,13 +291,10 @@ class Trainer:
     def train(
             self,
             resume_from_checkpoint: Optional[Union[str, bool]]=None,
-            ignore_keys_for_eval: Optional[List[str]]=None,
-            **kwargs, ):
+            ignore_keys_for_eval: Optional[List[str]]=None, ):
 
         args = self.args
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
-
-        model_reloaded = False
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
@@ -422,14 +414,14 @@ class Trainer:
             if not args.ignore_data_skip:
                 if isinstance(train_dataloader,
                               paddle.io.DataLoader) and isinstance(
-                                  train_dataloader.batch_sampler, paddlenlp.
-                                  utils.batch_sampler.DistributedBatchSampler):
+                                  train_dataloader.batch_sampler,
+                                  NlpDistributedBatchSampler):
                     consumed_samples = self.state.global_step * args.train_batch_size * args.gradient_accumulation_steps * args.world_size
                     train_dataloader.batch_sampler.set_epoch(
                         consumed_samples=consumed_samples)
                     logger.info(
-                        f"Set DistributedBatchSampler consumed_samples to %d" %
-                        consumed_samples)
+                        f"Set DistributedBatchSampler consumed_samples to {consumed_samples}"
+                    )
 
         epoch_iterator = train_dataloader
         steps_in_epoch = len(epoch_iterator)
@@ -455,7 +447,7 @@ class Trainer:
             if isinstance(train_dataloader,
                           paddle.io.DataLoader) and isinstance(
                               train_dataloader.batch_sampler,
-                              paddle.io.DistributedBatchSampler):
+                              DistributedBatchSampler):
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
@@ -469,8 +461,8 @@ class Trainer:
                 # We use consumed_samples to reset the status
                 if isinstance(train_dataloader,
                               paddle.io.DataLoader) and isinstance(
-                                  train_dataloader.batch_sampler, paddlenlp.
-                                  utils.batch_sampler.DistributedBatchSampler):
+                                  train_dataloader.batch_sampler,
+                                  NlpDistributedBatchSampler):
                     if step == 0:
                         if steps_trained_progress_bar is not None:
                             steps_trained_progress_bar.update(
@@ -536,7 +528,7 @@ class Trainer:
                 logger.warning(
                     f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
                     f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
-                    f" num_steps ({max_steps}) higher than the number of available samples."
+                    f" num_steps ({self.state.max_steps}) higher than the number of available samples."
                 )
                 self.control.should_training_stop = True
 
@@ -604,17 +596,18 @@ class Trainer:
                 shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last)
-        else:
-            return DistributedBatchSampler(
-                self.train_dataset,
-                batch_size=self.args.per_device_train_batch_size,
-                shuffle=True,
-                num_replicas=self.args.world_size,
-                rank=self.args.process_index,
-                drop_last=self.args.dataloader_drop_last)
+
+        return DistributedBatchSampler(
+            self.train_dataset,
+            batch_size=self.args.per_device_train_batch_size,
+            shuffle=True,
+            num_replicas=self.args.world_size,
+            rank=self.args.process_index,
+            drop_last=self.args.dataloader_drop_last)
 
     def _set_state_dict_in_model(self, state_dict):
-        load_result = self.model.set_state_dict(state_dict)
+        # TODO  @ZHUI paddle need return the results of set_state_dict. 
+        self.model.set_state_dict(state_dict)
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
                                  ignore_keys_for_eval):
@@ -859,9 +852,7 @@ class Trainer:
             )
         return optimizer_cls, optimizer_kwargs
 
-    def create_scheduler(self,
-                         num_training_steps: int,
-                         optimizer: paddle.optimizer.Optimizer=None):
+    def create_scheduler(self, num_training_steps: int):
         """
         Setup the scheduler. The optimizer of the trainer must have been set up either before this method is called or
         passed as an argument.
@@ -914,7 +905,7 @@ class Trainer:
         elif isinstance(data, (tuple, list)):
             return type(data)(self._prepare_input(v) for v in data)
         elif isinstance(data, paddle.Tensor):
-            kwargs = dict(device=self.args.current_device)
+            # kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
             return data
             # return data.to(**kwargs)
@@ -1038,7 +1029,7 @@ class Trainer:
         """ Export paddle inference model.
 
         Args:
-            input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input, 
+            input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input,
                 such as shape , dtype , name. Defaults to None.
             load_best_model (bool, optional): Load best model. Defaults to False.
             output_dir (Optional[str], optional): Output dir to save the exported model. Defaults to None.
@@ -1095,9 +1086,8 @@ class Trainer:
         if self.args.should_save:
             paddle.save(self.optimizer.state_dict(),
                         os.path.join(output_dir, OPTIMIZER_NAME))
-            with warnings.catch_warnings(record=True) as caught_warnings:
-                paddle.save(self.lr_scheduler.state_dict(),
-                            os.path.join(output_dir, SCHEDULER_NAME))
+            paddle.save(self.lr_scheduler.state_dict(),
+                        os.path.join(output_dir, SCHEDULER_NAME))
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(),
                             os.path.join(output_dir, SCALER_NAME))
@@ -1129,8 +1119,6 @@ class Trainer:
             "cpu": paddle.fluid.core.default_cpu_generator().get_state()
             .current_seed(),
         }
-
-        # TODO: ZHUI save paddle, cudnn seed.
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
         # not yet exist.
@@ -1350,7 +1338,6 @@ class Trainer:
 
         model = self.model
 
-        batch_sampler = None
         if isinstance(dataloader, paddle.io.DataLoader):
             batch_size = dataloader.batch_sampler.batch_size
         elif isinstance(
@@ -1367,11 +1354,10 @@ class Trainer:
             num_samples = self.num_examples(dataloader)
         else:
             num_samples = batch_size * self.args.world_size * max_eval_iters
-            if isinstance(
-                    dataloader, paddle.fluid.dataloader.dataloader_iter.
-                    _DataLoaderIterBase) and isinstance(
-                        dataloader._batch_sampler,
-                        paddlenlp.utils.batch_sampler.DistributedBatchSampler):
+            if isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter.
+                          _DataLoaderIterBase) and isinstance(
+                              dataloader._batch_sampler,
+                              NlpDistributedBatchSampler):
                 consumed_samples = (
                     (self.state.global_step) // args.eval_steps
                 ) * max_eval_iters * args.eval_batch_size * args.world_size
@@ -1388,7 +1374,7 @@ class Trainer:
 
         self.callback_handler.eval_dataloader = dataloader
         # Do this before wrapping.
-        eval_dataset = dataloader.dataset
+        # eval_dataset = dataloader.dataset
 
         if args.past_index >= 0:
             self._past = None
@@ -1404,7 +1390,6 @@ class Trainer:
         all_labels = None
         # Will be useful when we have an iterable dataset so don't know its length.
 
-        observed_num_examples = 0
         # Main evaluation loop
         losses = []
         for step, inputs in enumerate(dataloader):
@@ -1637,7 +1622,7 @@ class Trainer:
         """
         return self.args.process_index == 0
 
-    def _nested_gather(self, tensors, name=None):
+    def _nested_gather(self, tensors):
         """
         Gather value of `tensors` (tensor or list/tuple of nested tensors) and convert them to numpy before
         concatenating them to `gathered`
@@ -1740,7 +1725,7 @@ class Trainer:
                                       paddle.version.commit))
 
         for a in dir(args):
-            if (a[:2] != "__"):  #don't print double underscore methods
+            if a[:2] != "__":  #don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(a, v))
