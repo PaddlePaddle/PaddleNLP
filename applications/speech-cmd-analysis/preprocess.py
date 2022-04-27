@@ -18,25 +18,25 @@ import argparse
 
 import numpy as np
 
-from utils import set_seed, save_examples, convert_doccano_examples
+from utils import set_seed, save_examples, convert_examples
 
 
-def convert_doccano_file(doccano_file,
-                         save_dir,
-                         splits=[0.8, 0.9],
-                         negative_ratio=1,
-                         is_shuffle=True):
+def convert_data_file(data_file,
+                      save_dir,
+                      splits=[0.8, 0.9],
+                      negative_ratio=1,
+                      is_shuffle=True):
     """
-        @Description: Consvert doccano file to data format which is suitable to input to this Application.
-        @Param doccano_file: The annotated file exported from doccano labeling platform.
+        @Description: Consvert file to data format which is suitable to input to this Application.
+        @Param data_file: The annotated file as defined in README.
         @Param save_dir: The directory of data that you wanna save.
-        @Param splits: Whether to split doccano file into train/dev/test, note: Only []/ len(splits)==2 accepted.
+        @Param splits: Whether to split data file into train/dev/test, note: Only []/ len(splits)==2 accepted.
         @Param negative_ratio: The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples.
         @Param is_shuffle: Whether to shuffle data.
     """
     tic_time = time.time()
-    if not os.path.exists(doccano_file):
-        raise ValueError("Please input the correct path of doccano file.")
+    if not os.path.exists(data_file):
+        raise ValueError("Please input the correct path of data file.")
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -50,10 +50,10 @@ def convert_doccano_file(doccano_file,
             "Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0]."
         )
 
-    with open(doccano_file, "r", encoding="utf-8") as f:
+    with open(data_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    entity_examples, relation_examples = convert_doccano_examples(
+    entity_examples, relation_examples = convert_data_examples(
         raw_examples, negative_ratio)
 
     examples = [e + r for e, r in zip(entity_examples, relation_examples)]
@@ -65,7 +65,7 @@ def convert_doccano_file(doccano_file,
         idxs = np.random.permutation(idxs)
 
     if len(splits) == 0:
-        save_path = os.path.join(save_dir, "doccano.txt")
+        save_path = os.path.join(save_dir, "processed_data.txt")
         save_examples(examples, save_path, idxs)
         print(f"\nSave data to {save_path}.")
     else:
@@ -88,14 +88,14 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--doccano_file",
+        "--input_file",
         type=str,
-        default="./data/doccano.json",
-        help="The doccano file exported from doccano platform.")
+        default="./data/data.txt",
+        help="The file of annotated data as defined in README.")
     parser.add_argument(
         "--save_dir",
         type=str,
-        default="./data/ext_data",
+        default="./data/",
         help="The path of data that you wanna save.")
     parser.add_argument(
         "--negative_ratio",
@@ -114,8 +114,8 @@ if __name__ == "__main__":
     # Ensure generate the same negative samples for one seed.
     set_seed(1000)
 
-    convert_doccano_file(
-        args.doccano_file,
+    convert_data_file(
+        args.input_file,
         args.save_dir,
         splits=args.splits,
         negative_ratio=args.negative_ratio,

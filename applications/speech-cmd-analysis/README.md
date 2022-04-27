@@ -21,7 +21,7 @@
   [Conformer](https://arxiv.org/abs/2005.08100): Anmol Gulati等人在2020年提出的语音识别模型，通过将卷积应用于Transfomer的Encoder层，结合了Transformer提取长序列的优势和卷积提取局部特征的优势，使得语音识别的准确率明显提高。
 
 - **信息抽取模型**
-  [UIE](https://arxiv.org/pdf/2203.12277.pdf): Yaojie Lu等人在2022年提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本范例基于这篇工作的prompt设计思想，实现了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
+  [UIE](https://arxiv.org/pdf/2203.12277.pdf): Yaojie Lu等人在2022年提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本应用基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
 
 ## 2. 安装说明
@@ -54,7 +54,7 @@ pip install pydub
 
 ## 3. 数据准备
 
-本范例来自于语音报销工单信息录入场景，即从语音中抽取出报销需要的``时间``、``出发地``、``目的地``和``费用``字段。相应的数据集为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，共50条标注数据，用于信息抽取模型在交通费报销场景下的优化，示例数据如下：
+本应用来自于语音报销工单信息录入场景，即从语音中抽取出报销需要的``时间``、``出发地``、``目的地``和``费用``字段。相应的数据集为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，共50条标注数据，用于信息抽取模型在交通费报销场景下的优化，示例数据如下：
 ```json
 {"id": 39, "text": "10月16日高铁从杭州到上海南站车次d5414共48元", "relations": [], "entities": [{"id": 90, "start_offset": 0, "end_offset": 6, "label": "时间"}, {"id": 77, "start_offset": 9, "end_offset": 11, "label": "出发地"}, {"id": 91, "start_offset": 12, "end_offset": 16, "label": "目的地"}, {"id": 92, "start_offset": 24, "end_offset": 26, "label": "费用"}]}
 ```
@@ -66,8 +66,8 @@ pip install pydub
     - ``id``: 实体在数据集中的唯一标识ID，不同样本中的相同实体对应同一个ID。
     - ``start_offset``: 实体的起始token在文本中的下标。
     - ``end_offset``: 实体的结束token在文本中下标的下一个位置。
-    - ``label``: 实体的类型。
-- ``relations``: 数据中包含的关系标签（在本范例中无关系标签），每个关系标签包含四个字段：
+    - ``label``: 实体类型。
+- ``relations``: 数据中包含的关系标签（在语音报销工单应用中无关系标签），每个关系标签包含四个字段：
     - ``id``: （关系主语，关系谓语，关系宾语）三元组在数据集中的唯一标识ID，不同样本中的相同三元组对应同一个ID。
     - ``from_id``: 关系主语实体对应的标识ID。
     - ``to_id``: 关系宾语实体对应的标识ID。
@@ -99,16 +99,7 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 
 对于不同的应用场景，关键信息的配置多种多样，直接应用通用信息抽取模型的效果可能不够理想。这时可以标注少量场景相关的数据，利用few-shot learning技术来改进特定场景下的信息抽取效果。
 
-推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，具体标注步骤如下
-
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/164374314-9beea9ad-08ed-42bc-bbbc-9f68eb8a40ee.png />
-    <p>图1 doccano数据标注样例图<p/>
-</div>
-
-- 定义实体标签类别和关系标签类别。例如针对图一中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
-- 依次点击实体标签、文本中对应字段进行实体数据标注；依次点击关系标签、主语实体下的标注圆点、宾语实体下的标注圆点对关系数据进行标注。
-- 从``doccano``平台导出``jsonl``格式的数据标注文件，将文件重命名为``doccano.json``后，放在``./data/``目录下。
+自定义数据的格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)相同，划分为训练集``train.txt``和验证集``dev.txt``，保存在``./data/``目录下。
 
 ## 4. 模型训练
 
@@ -118,31 +109,29 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 
 ```shell
 .
-├── speech_cmd_analysis_example.py   # 语音指令解析脚本
-├── utils.py                         # 语音转文本脚本
-└── uie_finetune                     # 信息抽取模型fine-tune代码目录
-    ├── doccano.py                   # doccano平台导出格式到模型训练标准数据格式转换脚本
-    ├── model.py                     # 信息抽取模型组网脚本
-    ├── metric.py                    # 模型效果验证指标脚本
-    ├── train.py                     # 模型训练脚本
-    ├── evaluate.py                  # 模型评估脚本
-    └── utils.py                     # 数据处理工具
+├── audio_to_wav.py           # 音频文件格式转换脚本
+├── pipeline.py               # 语音指令解析脚本
+├── preprocess.py             # 数据预处理脚本
+├── finetune.py               # 信息抽取模型 fine-tune 脚本
+├── model.py                  # 信息抽取模型（UIE）组网脚本
+├── metric.py                 # 信息抽取模型指标计算脚本
+└── utils.py                  # 辅助函数
 ```
 
 #### 数据预处理
 
-- 使用[doccano.py](./uie_finetune/doccano.py)将``doccano``导出的数据格式转换为模型训练需要的标准格式，用于训练。假设导出数据存储在``./data/doccano.json``，执行命令如下
+准备好符合数据格式要求的自定义数据，放在``./data/data.txt``文件。执行以下脚本，按设置的比例划分数据集，同时构造负样本用于提升模型的学习效果。
 
 ```shell
-python ./uie_finetune/doccano.py \
-    --doccano_file ./data/doccano.json \
-    --save_dir ./data/ext_data \
+python preprocess.py \
+    --input_file ./data/data.txt \
+    --save_dir ./data/ \
     --negative_ratio 5
 ```
 
 可配置参数包括
 
-- ``doccano_file``: 原始数据文件名。文件内容应与``doccano``平台导出格式一致，也即[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)的格式。
+- ``input_file``: 原始数据文件名。文件内容应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)的格式一致。
 - ``save_dir``: 训练数据的保存目录。默认按照``6:2:2``的比例将数据划分为训练集、验证集和测试集，分别存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
 - ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
 
@@ -156,9 +145,9 @@ python ./uie_finetune/doccano.py \
 运行以下命令，使用单卡训练自定义的UIE模型。
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python ./uie_finetune/train.py \
-    --train_path ./data/ext_data/train.txt \
-    --dev_path ./data/ext_data/dev.txt \
+CUDA_VISIBLE_DEVICES=0 python finetune.py \
+    --train_path ./data/train.txt \
+    --dev_path ./data/dev.txt \
     --save_dir ./checkpoint \
     --learning_rate 1e-5 \
     --batch_size 16 \
@@ -186,32 +175,13 @@ CUDA_VISIBLE_DEVICES=0 python ./uie_finetune/train.py \
 - ``device``: 模型训练使用的设备，可选cpu或gpu。
 - ``seed``: 随机数种子，用于训练过程复现。
 
-#### 定制化模型评估
-
-运行以下命令，对finetune后的UIE模型效果进行评估。
-
-```shell
-CUDA_VISIBLE_DEVICES=0 python ./uie_finetune/evaluate.py \
-    --model_path ./checkpoint/model_best/model_state.pdparams \
-    --test_path ./data/ext_data/test.txt \
-    --batch_size 16 \
-    --max_seq_len 512
-```
-
-可配置参数包括
-
-- ``model_path``: 用于评估的模型参数文件所在路径。
-- ``test_path``: 测试集数据文件路径。
-- ``batch_size``: 每次评估的样本数量。
-- ``max_seq_len``: 最大句子长度，超过该长度将被截断。
-
 
 ## 5. 模型预测
 
 在语音报销工单信息录入场景下，按照第3节中的要求准备好音频文件，执行语音指令解析脚本即可抽取报销需要的``时间``、``出发地``、``目的地``和``费用``字段。具体命令如下
 
 ```shell
-python speech_cmd_analysis_example.py \
+python pipeline.py \
     --audio_file ./audios_wav/sample.wav \
     --uie_model ./checkpoint/model_best/model_state.pdparams \
     --schema ['时间', '出发地', '目的地', '费用']
@@ -226,6 +196,6 @@ python speech_cmd_analysis_example.py \
 
 ## 6. 模型部署
 
-在项目中提供了基于Web的部署Demo方案，支持用户在网页录入语音进行预测。用户可根据实际情况参考实现。
+在应用中提供了基于Web的部署Demo方案，支持用户在网页录入语音进行预测。用户可根据实际情况参考实现。
 
 ![demo](https://user-images.githubusercontent.com/25607475/165510522-a7f5f131-cd3f-4855-8932-6d8b6a7bb913.png)
