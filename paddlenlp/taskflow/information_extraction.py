@@ -383,7 +383,8 @@ class UIETask(Task):
                 new_relations = [[] for i in range(len(datas))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
-                        if "relations" in relations[i][j].keys():
+                        if "relations" in relations[i][j].keys(
+                        ) and node.name in relations[i][j]["relations"].keys():
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
