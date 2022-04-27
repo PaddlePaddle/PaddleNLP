@@ -861,8 +861,8 @@ def get_id_and_prob(spans, offset_map):
             break
 
     for i in range(1, prompt_length + 1):
-        offset_map[i][0] -= prompt_length
-        offset_map[i][1] -= prompt_length
+        offset_map[i][0] -= (prompt_length + 1)
+        offset_map[i][1] -= (prompt_length + 1)
 
     sentence_id = []
     prob = []
