@@ -15,8 +15,10 @@
 import argparse
 import time
 import os
+import random
 from functools import partial
 
+import numpy as np
 import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
