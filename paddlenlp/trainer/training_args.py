@@ -39,6 +39,11 @@ from .trainer_utils import (
 from paddlenlp.utils.log import logger
 import paddle
 
+__all__ = [
+    "default_logdir",
+    "TrainingArguments",
+]
+
 
 def default_logdir() -> str:
     """

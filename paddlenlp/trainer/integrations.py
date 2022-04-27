@@ -20,7 +20,7 @@ import importlib
 import json
 
 from .trainer_callback import ProgressCallback, TrainerCallback  # noqa: E402
-from .trainer_utils import PREFIX_CHECKPOINT_DIR, BestRun, IntervalStrategy  # noqa: E402
+from .trainer_utils import PREFIX_CHECKPOINT_DIR, IntervalStrategy  # noqa: E402
 
 
 def is_visualdl_available():

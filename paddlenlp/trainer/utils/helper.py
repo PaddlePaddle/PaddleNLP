@@ -20,6 +20,15 @@ import paddle
 import paddle.distributed as dist
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+__all__ = [
+    "distributed_concat",
+    "paddle_pad_and_concatenate",
+    "nested_concat",
+    "nested_detach",
+    "nested_numpify",
+    "nested_truncate",
+]
+
 
 def distributed_concat(tensor: Any,
                        num_total_examples: Optional[int]=None) -> Any:

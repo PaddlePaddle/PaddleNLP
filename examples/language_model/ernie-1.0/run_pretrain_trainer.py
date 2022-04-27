@@ -32,7 +32,7 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer.trainer_utils import speed_metrics, get_last_checkpoint
+from paddlenlp.trainer import speed_metrics, get_last_checkpoint
 
 sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets

@@ -55,8 +55,9 @@ from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 from .integrations import get_reporting_integration_callbacks
-from .trainer_args import TrainingArguments
+from .training_args import TrainingArguments
 from .trainer_utils import (
+    set_seed,
     IntervalStrategy,
     EvaluationStrategy,
     TrainOutput,
@@ -106,16 +107,7 @@ def is_datasets_available():
 if is_datasets_available():
     import datasets
 
-
-def set_seed(seed):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(seed)
-    np.random.seed(seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(seed)
-    # TODO: cuda state seed 
+__all__ = ["Trainer"]
 
 
 class Trainer:

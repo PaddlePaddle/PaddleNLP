@@ -31,7 +31,7 @@ from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
-from paddlenlp.trainer.trainer_utils import EvalPrediction, get_last_checkpoint
+from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering, )

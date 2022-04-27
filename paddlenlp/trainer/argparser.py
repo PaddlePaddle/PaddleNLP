@@ -29,6 +29,8 @@ from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_typ
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
 
+__all__ = ["PdArgumentParser", ]
+
 
 # From https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
 def string_to_bool(v):
