@@ -75,15 +75,19 @@ class Predictor:
         return [post_processing(x) for x in pred]
 
 
+def find_to_predict_folder(folder_name):
+    for root, dirs, _ in os.walk(folder_name):
+        for dirname in dirs:
+            data_name = os.path.join(root, dirname)
+            if os.path.exists(os.path.join(data_name, 'record.schema')):
+                yield data_name
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--data',
-        '-d',
-        required=True,
-        nargs='+',
-        help='Folder need to been predicted.')
+        '--data', '-d', required=True, help='Folder need to been predicted.')
     parser.add_argument(
         '--model', '-m', required=True, help='Trained model for inference')
     parser.add_argument(
@@ -102,7 +106,8 @@ def main():
     parser.add_argument('--verbose', action='store_true')
     options = parser.parse_args()
 
-    data_folder = options.data
+    # Find the folder need to be predicted with `record.schema`
+    data_folder = find_to_predict_folder(options.data)
     model_path = options.model
 
     predictor = Predictor(
