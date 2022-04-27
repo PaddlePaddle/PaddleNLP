@@ -27,11 +27,11 @@ usage = r"""
             from paddlenlp import Taskflow
 
             # Entity Extraction
-            schema = ['出租方', '承租方'] # Define the schema for entity extraction
+            schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
             ie = Taskflow('information_extraction', schema=schema)
-            ie('出租方：小明 地址：筒子街12号 电话：12345678900　承租方：小红　地址：新华路8号 电话：1234500000')
+            ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
             '''
-            [{'出租方': [{'text': '小明', 'start': 4, 'end': 6, 'probability': 0.9767557939143963}], '承租方': [{'text': '小红', 'start': 36, 'end': 38, 'probability': 0.9588206726186428}]}]
+            [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9907337794563702}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8914310308098763}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8944207860063003}]}]
             '''
 
             # Relation Extraction
@@ -417,8 +417,10 @@ class UIETask(Task):
             prompt = example["prompt"]
             for i in range(len(sentence_id)):
                 start, end = sentence_id[i]
-                if end < 0:
+                if end <= 0:
                     # ignore [SEP]
+                    start += len(prompt)
+                    end += len(prompt)
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
