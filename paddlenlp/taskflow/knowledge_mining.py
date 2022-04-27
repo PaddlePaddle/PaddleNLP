@@ -764,9 +764,12 @@ class NPTagTask(Task):
                         break
                     else:
                         labels_can = self._tree.search_similar_word(cls_label)
-                        result['label'] = labels_can[0][0]
+                        if len(labels_can) != 0:
+                            result['label'] = labels_can[0][0]
+                            break
 
             if self._linking:
-                result['category'] = self._name_dict[result['label']]
+                if result['label'] in self._name_dict:
+                    result['category'] = self._name_dict[result['label']]
             results.append(result)
         return results
