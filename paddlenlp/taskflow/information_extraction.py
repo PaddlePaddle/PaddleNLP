@@ -280,6 +280,8 @@ class UIETask(Task):
                 cls_options = {}
                 single_results = []
                 for v in vs:
+                    if len(short_results[v]) == 0:
+                        continue
                     if short_results[v][0]['text'] not in cls_options.keys():
                         cls_options[short_results[v][0][
                             'text']] = [1, short_results[v][0]['probability']]
@@ -287,11 +289,15 @@ class UIETask(Task):
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
                             1] += short_results[v][0]['probability']
-                cls_res, cls_info = max(cls_options.items(), key=lambda x: x[1])
-                concat_results.append([{
-                    'text': cls_res,
-                    'probability': cls_info[1] / cls_info[0]
-                }])
+                if len(cls_options) != 0:
+                    cls_res, cls_info = max(cls_options.items(),
+                                            key=lambda x: x[1])
+                    concat_results.append([{
+                        'text': cls_res,
+                        'probability': cls_info[1] / cls_info[0]
+                    }])
+                else:
+                    concat_results.append([])
             else:
                 offset = 0
                 single_results = []
