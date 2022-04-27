@@ -26,7 +26,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 **NOTE：具体评测方式如下**
 1. 以上所有任务均基于 Grid Search 方式进行超参寻优。分类任务训练每间隔 100 steps 评估验证集效果，阅读理解任务每隔一个 epoch 评估验证集效果，取验证集最优效果作为表格中的汇报指标。
 
-2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集效果对 batch_size 和 dropout 概率值较为敏感，对 CLUEWSC2020 评测时额外增加了 batch_size = 8, dropout_prob = 0.0，对 IFLYTEK 评测时额外增加了 dropout_prob = 0.0的超参搜索。
+2. 分类任务 Grid Search 超参范围: batch_size: 16, 32, 64; learning rates: 1e-5, 2e-5, 3e-5, 5e-5；因为 CLUEWSC2020 数据集较小，所以模型在该数据集上的效果对 batch_size 较敏感，所以对 CLUEWSC2020 评测时额外增加了 batch_size = 8 的超参搜索； 因为CLUEWSC2020 和 IFLYTEK 数据集对 dropout 概率值较为敏感，所以对 CLUEWSC2020 和 IFLYTEK 数据集评测时额外增加了 dropout_prob = 0.0 的超参搜索。
 
 3. 阅读理解任务 Grid Search 超参范围：batch_size: 24, 32; learning rates: 1e-5, 2e-5, 3e-5。阅读理解任务均使用多卡训练，其中 Grid Search 中的 batch_size 是指多张卡上的 batch_size 总和。
 
