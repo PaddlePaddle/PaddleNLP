@@ -16,7 +16,7 @@ special_to_remove = {'<pad>', '</s>'}
 
 
 def read_json_file(file_name):
-    return [json.loads(line) for line in open(file_name)]
+    return [json.loads(line) for line in open(file_name, encoding='utf8')]
 
 
 def schema_to_ssi(schema: RecordSchema):
@@ -147,7 +147,7 @@ def main():
             records += [sel2record.sel2record(pred=p, text=text, tokens=tokens)]
 
         pred_filename = os.path.join(f"{task_folder}", "pred.json")
-        with open(pred_filename, 'w') as output:
+        with open(pred_filename, 'w', encoding='utf8') as output:
             for record in records:
                 output.write(json.dumps(record, ensure_ascii=False) + '\n')
 
