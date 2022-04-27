@@ -623,9 +623,8 @@ class NeZhaModel(NeZhaPretrainedModel):
             attention_mask = paddle.ones_like(input_ids)
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids)
-
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask, input_ids.shape)
 
         embedding_output = self.embeddings(input_ids, token_type_ids)
 

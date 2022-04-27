@@ -778,10 +778,8 @@ class LukeModel(LukePretrainedModel):
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
-            if attention_mask.ndim == 2:
-                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-                attention_mask = (1.0 - attention_mask) * -1e4
+            attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                              input_ids.shape)
         if entity_ids is not None:
             entity_seq_length = entity_ids.shape[1]
             if entity_attention_mask is None:

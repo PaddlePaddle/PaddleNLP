@@ -278,17 +278,6 @@ class MBartEncoder(MBartPretrainedModel):
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)
 
-        if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        # For 2D attention_mask from tokenizer
-        elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-            attention_mask = (1.0 - attention_mask) * -1e4
-        attention_mask.stop_gradient = True
-
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
 
@@ -588,12 +577,9 @@ class MBartModel(MBartPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        # For 2D attention_mask from tokenizer
-        elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-            attention_mask = (1.0 - attention_mask) * -1e4
-            attention_mask.stop_gradient = True
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                              input_ids.shape)
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
         if use_cache:

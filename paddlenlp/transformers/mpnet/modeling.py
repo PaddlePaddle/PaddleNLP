@@ -503,10 +503,8 @@ class MPNetModel(MPNetPretrainedModel):
         if attention_mask is None:
             attention_mask = (input_ids != self.embeddings.padding_idx
                               ).astype(input_ids.dtype)
-
-        if attention_mask.ndim == 2:
-            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-            attention_mask = (1.0 - attention_mask) * -10000.0
+        attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                          input_ids.shape)
 
         embedding_output = self.embeddings(input_ids, position_ids)
 

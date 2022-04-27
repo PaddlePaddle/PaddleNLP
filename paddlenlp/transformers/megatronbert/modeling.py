@@ -646,9 +646,8 @@ class MegatronBertModel(MegatronBertPretrainedModel):
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
-            if attention_mask.ndim == 2:
-                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+            attention_mask = self.get_extended_attention_mask(attention_mask,
+                                                              input_ids.shape)
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')
 
