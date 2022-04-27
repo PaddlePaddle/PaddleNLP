@@ -165,7 +165,7 @@ python3 run_seq2struct.py                              \
 
 ``` bash
 python process_data.py split-test
-python inference.py --data data/duuie_test_a/* --model output/duuie_multi_task_b32_lr5e-4
+python inference.py --data data/duuie_test_a --model output/duuie_multi_task_b32_lr5e-4
 ```
 
 ### 快速基线第四步：后处理提交结果
