@@ -228,4 +228,4 @@ python speech_cmd_analysis_example.py \
 
 在项目中提供了基于Web的部署Demo方案，支持用户在网页录入语音进行预测。用户可根据实际情况参考实现。
 
-[部署图片] **TODO**
+![demo](https://user-images.githubusercontent.com/25607475/165510522-a7f5f131-cd3f-4855-8932-6d8b6a7bb913.png)
