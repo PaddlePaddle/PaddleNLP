@@ -153,7 +153,7 @@ python3 run_seq2struct.py                              \
   --learning_rate=5e-4                                 \
   --seed=42                                            \
   --overwrite_output_dir                               \
-  --gradient_accumulation_steps 1
+  --gradient_accumulation_steps 2
 ```
 
 训练完成后，将生成对应的文件夹 `output/duuie_multi_task_b32_lr5e-4`
