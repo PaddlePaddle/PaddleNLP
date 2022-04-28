@@ -1273,16 +1273,11 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         if text is None:
             return None
-        split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token
-                                    if sub_token != self.unk_token else token)
-
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
-            if self.basic_tokenizer.do_lower_case:
+            if self.do_lower_case:
                 ch = ch.lower()
                 ch = unicodedata.normalize('NFD', ch)
                 ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
@@ -1294,10 +1289,11 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             normalized_text += ch
 
             char_mapping.extend([i] * len(ch))
-
         text, token_mapping, offset = normalized_text, [], 0
 
         for token in split_tokens:
+            if self.do_lower_case:
+                token = token.lower()
             if token[:2] == '##':
                 token = token[2:]
 
