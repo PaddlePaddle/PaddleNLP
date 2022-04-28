@@ -19,6 +19,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--audio_file', type=str, required=True, help='The audio file name.')
     parser.add_argument(
+        '--api_key',
+        type=str,
+        required=True,
+        help='The app key applied on Baidu AI Platform.')
+    parser.add_argument(
+        '--secret_key',
+        type=str,
+        required=True,
+        help='The app secret key generated on Baidu AI Platform.')
+    parser.add_argument(
         '--uie_model', type=str, default=None, help='The path to uie model.')
     parser.add_argument(
         '--schema',
@@ -38,11 +48,12 @@ if __name__ == '__main__':
         audios = [x for x in os.listdir(args.audio_file)]
         audios = [os.path.join(args.audio_file, x) for x in audios]
     else:
-        raise IOError('%s is neither valid path nor file!' % args.audio_file)
+        raise Exception('%s is neither valid path nor file!' % args.audio_file)
 
     audios = [x for x in audios if x.endswith('.wav')]
     if len(audios) == 0:
-        raise IOError('No valid .wav file! Please check %s.' % args.audio_file)
+        raise Exception('No valid .wav file! Please check %s.' %
+                        args.audio_file)
 
     if args.uie_model is None:
         parser = Taskflow('information_extraction', schema=args.schema)
@@ -55,7 +66,7 @@ if __name__ == '__main__':
     with open(args.save_file, 'w') as fp:
         for audio_file in tqdm(audios):
             # automatic speech recognition
-            text = mandarin_asr_api(audio_file)
+            text = mandarin_asr_api(args.api_key, args.secret_key, audio_file)
             # extract entities according to schema
             result = parser(text)
             fp.write(text + '\n')
