@@ -67,7 +67,7 @@ def convert_doccano_file(doccano_file,
         save_examples(examples, save_path, idxs)
         print(f"\nSave data to {save_path}.")
     else:
-        r1, r2 = splits
+        r1, r2, _ = splits
         n1, n2 = int(len(examples) * r1), int(len(examples) * (r1 + r2))
         save_train_path = os.path.join(save_dir, "train.txt")
         save_dev_path = os.path.join(save_dir, "dev.txt")
