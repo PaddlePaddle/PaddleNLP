@@ -132,12 +132,6 @@ class TrainingArguments:
             Ratio of total training steps used for a linear warmup from 0 to `learning_rate`.
         warmup_steps (`int`, *optional*, defaults to 0):
             Number of steps used for a linear warmup from 0 to `learning_rate`. Overrides any effect of `warmup_ratio`.
-        log_level (`str`, *optional*, defaults to `passive`):
-            Logger log level to use on the main process. Possible choices are the log levels as strings: 'debug',
-            'info', 'warning', 'error' and 'critical', plus a 'passive' level which doesn't set anything and lets the
-            application set the level.
-        log_level_replica (`str`, *optional*, defaults to `passive`):
-            Logger log level to use on replicas. Same choices as `log_level`"
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
             node.
@@ -154,17 +148,6 @@ class TrainingArguments:
             Whether to log and evaluate the first `global_step` or not.
         logging_steps (`int`, *optional*, defaults to 500):
             Number of update steps between two logs if `logging_strategy="steps"`.
-        logging_nan_inf_filter (`bool`, *optional*, defaults to `True`):
-            Whether to filter `nan` and `inf` losses for logging. If set to `True` the loss of every step that is `nan`
-            or `inf` is filtered and the average loss of the current logging window is taken instead.
-
-            <Tip>
-
-            `logging_nan_inf_filter` only influences the logging of loss values, it does not change the behavior the
-            gradient is computed or applied to the model.
-
-            </Tip>
-
         save_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"steps"`):
             The checkpoint save strategy to adopt during training. Possible values are:
 
@@ -190,8 +173,10 @@ class TrainingArguments:
         fp16 (`bool`, *optional*, defaults to `False`):
             Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
-            For `fp16` training, Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. See details on
-            the [Apex documentation](https://nvidia.github.io/apex/amp).
+            For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at 
+            https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
+        scale_loss (`float`,  *optional*, defaults to 32768):
+            The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
         dataloader_drop_last (`bool`, *optional*, defaults to `False`):
@@ -201,7 +186,7 @@ class TrainingArguments:
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
-            Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the
+            Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
         past_index (`int`, *optional*, defaults to -1):
             Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions. 
@@ -398,13 +383,14 @@ class TrainingArguments:
         default="O1",
         metadata={
             "help":
-            ("For fp16: Apex AMP optimization level selected in ['O0', 'O1', and 'O2']. "
+            ("For fp16: AMP optimization level selected in ['O0', 'O1', and 'O2']. "
              "See details at https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html"
              )
         }, )
 
     scale_loss: float = field(
-        default=2**15, metadata={"help": "The value of scale_loss for fp16."})
+        default=2**15,
+        metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
         default=None,
@@ -428,7 +414,7 @@ class TrainingArguments:
         default=0,
         metadata={
             "help":
-            "Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the main process."
+            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
         }, )
 
     past_index: int = field(
@@ -439,18 +425,10 @@ class TrainingArguments:
         }, )
 
     run_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "An optional descriptor for the run. Notably used for wandb logging."
-        })
+        default=None, metadata={"help": "An optional descriptor for the run."})
 
     device: Optional[str] = field(
-        default="gpu",
-        metadata={
-            "help":
-            "An optional descriptor for the run. Notably used for wandb logging."
-        })
+        default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
 
     disable_tqdm: Optional[bool] = field(
         default=None,
