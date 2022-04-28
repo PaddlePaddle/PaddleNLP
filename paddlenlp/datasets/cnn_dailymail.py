@@ -188,7 +188,9 @@ class CnnDailymail(DatasetBuilder):
     def _get_data(self, mode):
         """ Check and download Dataset """
         dl_paths = {}
-        version = self.config.get("version", "3.0.0")
+        version = self.name
+        if version is None:
+            version = "3.0.0"
         if version not in ["1.0.0", "2.0.0", "3.0.0"]:
             raise ValueError("Unsupported version: %s" % version)
         dl_paths["version"] = version

@@ -32,6 +32,7 @@ import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
@@ -162,6 +163,14 @@ def parse_args():
         type=distutils.util.strtobool,
         default=False,
         help="Enable training under @to_static.")
+
+    # For benchmark.
+    parser.add_argument(
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     return args
 
@@ -439,6 +448,11 @@ def do_train(args):
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
+
+                # Profile for model benchmark
+                if args.profiler_options is not None:
+                    profiler.add_profiler_step(args.profiler_options)
+
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
                         logger.info(

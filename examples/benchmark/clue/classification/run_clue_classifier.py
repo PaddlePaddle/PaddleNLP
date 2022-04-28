@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import random
 import time
 import math
-import distutils.util
+import json
 from functools import partial
 
 import numpy as np
@@ -31,9 +30,7 @@ from paddle.metric import Accuracy
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import RobertaForSequenceClassification, RobertaTokenizer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -43,12 +40,6 @@ METRIC_CLASSES = {
     "cmnli": Accuracy,
     "cluewsc2020": Accuracy,
     "csl": Accuracy,
-}
-
-MODEL_CLASSES = {
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "roberta": (RobertaForSequenceClassification, RobertaTokenizer)
 }
 
 
@@ -64,23 +55,11 @@ def parse_args():
         help="The name of the task to train selected in the list: " +
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
         "--output_dir",
         default="best_clue_model",
@@ -140,15 +119,17 @@ def parse_args():
         type=float,
         help="Epsilon for Adam optimizer.")
     parser.add_argument(
-        "--do_train",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether do train.")
+        '--gradient_accumulation_steps',
+        type=int,
+        default=1,
+        help="Number of updates steps to accumualte before performing a backward/update pass."
+    )
     parser.add_argument(
-        "--do_eval",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Whether do train.")
+        "--do_train", action='store_true', help="Whether do train.")
+    parser.add_argument(
+        "--do_eval", action='store_true', help="Whether do train.")
+    parser.add_argument(
+        "--do_predict", action='store_true', help="Whether do predict.")
     parser.add_argument(
         "--max_steps",
         default=-1,
@@ -162,6 +143,7 @@ def parse_args():
         default="gpu",
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--dropout", default=0.1, type=float, help="dropout.")
     parser.add_argument(
         "--max_grad_norm",
         default=1.0,
@@ -259,12 +241,10 @@ def do_eval(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     trans_func = partial(
         convert_example,
         label_list=dev_ds.label_list,
@@ -290,7 +270,7 @@ def do_eval(args):
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
 
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -311,6 +291,8 @@ def do_eval(args):
 
 
 def do_train(args):
+    assert args.batch_size % args.gradient_accumulation_steps == 0, \
+        "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -319,13 +301,12 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
+    args.batch_size = int(args.batch_size / args.gradient_accumulation_steps)
     train_ds, dev_ds = load_dataset(
         'clue', args.task_name, splits=('train', 'dev'))
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
@@ -334,6 +315,7 @@ def do_train(args):
         max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func, lazy=True)
+
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
 
@@ -361,17 +343,22 @@ def do_train(args):
         return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
+
+    update_model_dropout(model, args.dropout)
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     if args.max_steps > 0:
-        num_training_steps = args.max_steps
+        num_training_steps = args.max_steps / args.gradient_accumulation_steps
         num_train_epochs = math.ceil(num_training_steps /
                                      len(train_data_loader))
     else:
-        num_training_steps = len(train_data_loader) * args.num_train_epochs
+        num_training_steps = len(
+            train_data_loader
+        ) * args.num_train_epochs / args.gradient_accumulation_steps
         num_train_epochs = args.num_train_epochs
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
@@ -404,39 +391,97 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            global_step += 1
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
             loss = loss_fct(logits, labels)
+            if args.gradient_accumulation_steps > 1:
+                loss = loss / args.gradient_accumulation_steps
             loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                print(
-                    "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
-                tic_train = time.time()
-            if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                tic_eval = time.time()
-                acc = evaluate(model, loss_fct, metric, dev_data_loader)
-                print("eval done total : %s s" % (time.time() - tic_eval))
-                if acc > best_acc:
-                    best_acc = acc
-                    output_dir = args.output_dir
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
-            if global_step >= num_training_steps:
-                print("best_acc: ", best_acc)
-                return
+            if (step + 1) % args.gradient_accumulation_steps == 0:
+                global_step += 1
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+                if global_step % args.logging_steps == 0:
+                    print(
+                        "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
+                        % (global_step, num_training_steps, epoch, step,
+                           paddle.distributed.get_rank(), loss,
+                           optimizer.get_lr(),
+                           args.logging_steps / (time.time() - tic_train)))
+                    tic_train = time.time()
+                if global_step % args.save_steps == 0 or global_step == num_training_steps:
+                    tic_eval = time.time()
+                    acc = evaluate(model, loss_fct, metric, dev_data_loader)
+                    print("eval done total : %s s" % (time.time() - tic_eval))
+                    if acc > best_acc:
+                        best_acc = acc
+                        output_dir = args.output_dir
+                        if not os.path.exists(output_dir):
+                            os.makedirs(output_dir)
+                        # Need better way to get inner model of DataParallel
+                        model_to_save = model._layers if isinstance(
+                            model, paddle.DataParallel) else model
+                        model_to_save.save_pretrained(output_dir)
+                        tokenizer.save_pretrained(output_dir)
+                if global_step >= num_training_steps:
+                    print("best_acc: ", best_acc)
+                    return
     print("best_acc: ", best_acc)
+
+
+def do_predict(args):
+    paddle.set_device(args.device)
+    args.task_name = args.task_name.lower()
+
+    train_ds, test_ds = load_dataset(
+        'clue', args.task_name, splits=('train', 'test'))
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        label_list=train_ds.label_list,
+        max_seq_length=args.max_seq_length,
+        is_test=True)
+
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+    ): fn(samples)
+
+    test_ds = test_ds.map(trans_func, lazy=True)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_ds, batch_size=args.batch_size, shuffle=False)
+    test_data_loader = DataLoader(
+        dataset=test_ds,
+        batch_sampler=test_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=0,
+        return_list=True)
+
+    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=num_classes)
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    if args.task_name == 'ocnli':
+        args.task_name = 'ocnli_50k'
+    f = open(
+        os.path.join(args.output_dir, args.task_name + "_predict.json"), 'w')
+
+    for step, batch in enumerate(test_data_loader):
+        input_ids, segment_ids = batch
+
+        with paddle.no_grad():
+            logits = model(input_ids, segment_ids)
+
+        preds = paddle.argmax(logits, axis=1)
+        for idx, pred in enumerate(preds):
+            j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
+            f.write(j + "\n")
 
 
 def print_arguments(args):
@@ -447,6 +492,14 @@ def print_arguments(args):
     print('------------------------------------------------')
 
 
+def update_model_dropout(model, p=0.0):
+    model.base_model.embeddings.dropout.p = p
+    for i in range(len(model.base_model.encoder.layers)):
+        model.base_model.encoder.layers[i].dropout.p = p
+        model.base_model.encoder.layers[i].dropout1.p = p
+        model.base_model.encoder.layers[i].dropout2.p = p
+
+
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
@@ -454,3 +507,5 @@ if __name__ == "__main__":
         do_train(args)
     if args.do_eval:
         do_eval(args)
+    if args.do_predict:
+        do_predict(args)

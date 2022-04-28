@@ -175,7 +175,6 @@ def do_train():
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
     tic_train = time.time()
-    total_train_time = 0
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
@@ -201,7 +200,6 @@ def do_train():
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
                 time_diff = time.time() - tic_train
-                total_train_time += time_diff
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accuracy: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -219,8 +217,6 @@ def do_train():
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
-
-    print("Speed: %.2f steps/s" % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

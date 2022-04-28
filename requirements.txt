@@ -5,3 +5,6 @@ colorama
 seqeval
 multiprocess
 datasets
+tqdm
+paddlefsl
+sentencepiece

@@ -31,8 +31,10 @@ from paddlenlp.utils.log import logger
 from . import DatasetBuilder
 
 __all__ = ['XNLI']
-ALL_LANGUAGES = ("ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw",
-                 "th", "tr", "ur", "vi", "zh")
+ALL_LANGUAGES = [
+    "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
+    "ur", "vi", "zh"
+]
 
 
 class XNLI(DatasetBuilder):
@@ -92,6 +94,12 @@ class XNLI(DatasetBuilder):
     def _read(self, filename, split):
         """Reads data."""
         language = self.name
+        if language is None:
+            language = "all_languages"
+        if language not in ALL_LANGUAGES + ["all_languages"]:
+            raise ValueError(
+                f"Name parameter should be specified. Can be one of {ALL_LANGUAGES + ['all_languages']}. "
+            )
         if language == "all_languages":
             languages = ALL_LANGUAGES
         else:

@@ -10,7 +10,7 @@
 | 模型| LCQMC | BQ_Corpus|STS-B|ATEC|
 |-------|-------|-----|------|-----|
 |SimCSE| 57.01 | **51.72** | 74.76 | 33.56 |
-| SimCSE + WR| **59.56** | 50.54 | **77.28** | **34.02** |
+| SimCSE + WR| **58.97** | 51.58 | **78.32** | **33.73** |
 
 SimCSE + WR 策略在中文数据集训练的超参数设置如下：
 
@@ -122,4 +122,5 @@ python -u -m paddle.distributed.launch --gpus "0" \
 
 ## Reference
 [1] Gao, Tianyu, Xingcheng Yao, and Danqi Chen. “SimCSE: Simple Contrastive Learning of Sentence Embeddings.” ArXiv:2104.08821 [Cs], April 18, 2021. http://arxiv.org/abs/2104.08821.
+
 [2] Wu, Xing, et al. "ESimCSE: Enhanced Sample Building Method for Contrastive Learning of Unsupervised Sentence Embedding." arXiv preprint arXiv:2109.04380 (2021). https://arxiv.org/abs/2109.04380.

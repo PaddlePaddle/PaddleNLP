@@ -13,6 +13,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 import paddle.distributed as dist
 
+from paddlenlp.utils import profiler
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 
 sys.path.append(
@@ -82,6 +83,14 @@ def parse_args():
         default=None,
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. ")
+
+    # For benchmark.
+    parser.add_argument(
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     return args
 
@@ -257,6 +266,10 @@ def do_train(args):
             reader_cost_avg.record(train_reader_cost)
             batch_cost_avg.record(train_batch_cost)
 
+            # Profile for model benchmark
+            if args.profiler_options is not None:
+                profiler.add_profiler_step(args.profiler_options)
+
             if step_idx % args.print_step == 0 and (args.benchmark or (
                     args.is_distributed and dist.get_rank() == 0) or
                                                     not args.is_distributed):
@@ -330,5 +343,6 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     pprint(args)
+    args.profiler_options = ARGS.profiler_options
 
     do_train(args)

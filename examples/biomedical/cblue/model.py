@@ -44,6 +44,7 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
 
         logits_sym = self.classifier_sym(sequence_output)
         logits_oth = self.classifier_oth(sequence_output)
+
         return logits_oth, logits_sym
 
 
@@ -62,7 +63,7 @@ class MultiHeadAttentionForSPO(nn.Layer):
 
     def forward(self, query, key):
         q = self.q_proj(query)
-        k = self.k_proj(query)
+        k = self.k_proj(key)
         q = paddle.reshape(q, shape=[0, 0, self.num_heads, self.embed_dim])
         k = paddle.reshape(k, shape=[0, 0, self.num_heads, self.embed_dim])
         q = paddle.transpose(q, perm=[0, 2, 1, 3])
@@ -98,7 +99,7 @@ class ElectraForSPO(ElectraPretrainedModel):
         self.classifier = nn.Linear(self.electra.config['hidden_size'], 2)
         self.span_attention = MultiHeadAttentionForSPO(
             self.electra.config['hidden_size'], num_classes)
-        self.sigmoid = paddle.nn.Sigmoid()
+        self.init_weights()
 
     def forward(self,
                 input_ids=None,
@@ -120,8 +121,5 @@ class ElectraForSPO(ElectraPretrainedModel):
 
         output_size = self.num_classes + self.electra.config['hidden_size']
         rel_logits = self.span_attention(sequence_outputs, subject_output)
-
-        ent_logits = self.sigmoid(ent_logits)
-        rel_logits = self.sigmoid(rel_logits)
 
         return ent_logits, rel_logits
