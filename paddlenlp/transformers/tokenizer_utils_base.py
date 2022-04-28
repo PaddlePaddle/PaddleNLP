@@ -1463,13 +1463,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     pretrained_model_name_or_path])
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
+            vocab_files_target[
+                "tokenizer_config_file"] = cls.tokenizer_config_file
             for file_id, file_name in vocab_files_target.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
-            vocab_files["tokenizer_config_file"] = os.path.join(
-                pretrained_model_name_or_path, cls.tokenizer_config_file)
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
@@ -1606,7 +1606,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             added_tok_encoder_sorted = list(
                 sorted(
                     added_tok_encoder.items(), key=lambda x: x[1]))
-
             for token, index in added_tok_encoder_sorted:
                 if has_tokenizer_file and index != len(
                         tokenizer) and tokenizer.convert_tokens_to_ids(

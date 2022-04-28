@@ -544,6 +544,13 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         init_dict.pop('self', None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
+        self.added_tokens_encoder: Dict[str, int] = {}
+        self.added_tokens_decoder: Dict[int, str] = {}
+        self.unique_no_split_tokens: List[str] = []
+        self.tokens_trie = Trie()
+
+        self._decode_use_source_tokenizer = False
+
     def _build_special_tokens_map_extended(self, **kwargs):
         for key, value in kwargs.items():
             if value is None:
@@ -671,15 +678,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             else:
                 trie.add(token)
         self.tokens_trie = trie
-
-    def add_tokens(self, new_tokens, special_tokens=True):
-        if not new_tokens:
-            return 0
-
-        if not isinstance(new_tokens, (list, tuple)):
-            new_tokens = [new_tokens]
-
-        return self._add_tokens(new_tokens, special_tokens=special_tokens)
 
     def prepare_for_tokenization(self,
                                  text,
