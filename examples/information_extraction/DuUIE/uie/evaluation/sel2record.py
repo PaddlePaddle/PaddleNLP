@@ -10,6 +10,7 @@ import json
 from nltk.tree import ParentedTree
 from uie.evaluation.constants import (span_start, type_start, type_end,
                                       null_span, offset_map_strategy)
+from uie.evaluation.scorer import EntityScorer, RelationScorer, EventScorer
 
 logger = logging.getLogger("__main__")
 
@@ -980,9 +981,14 @@ class SpotAsocPredictParser:
 def evaluate_extraction_results(gold_instances,
                                 pred_instances,
                                 eval_match_mode='normal'):
+    task_scorer_dict = {
+        'entity': EntityScorer,
+        'relation': RelationScorer,
+        'event': EventScorer
+    }
     # Score Record
     results = dict()
-    for task, scorer in task_record_map.items():
+    for task, scorer in task_scorer_dict.items():
 
         gold_list = [x[task] for x in gold_instances]
         pred_list = [x[task] for x in pred_instances]
