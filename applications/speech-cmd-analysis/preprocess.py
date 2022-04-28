@@ -23,16 +23,24 @@ from utils import set_seed, save_examples, convert_data_examples
 
 def convert_data_file(data_file,
                       save_dir,
-                      splits=[0.8, 0.9],
+                      splits=[0.8, 0.1],
                       negative_ratio=1,
                       is_shuffle=True):
     """
-        @Description: Consvert file to data format which is suitable to input to this Application.
-        @Param data_file: The annotated file as defined in README.
-        @Param save_dir: The directory of data that you wanna save.
-        @Param splits: Whether to split data file into train/dev/test, note: Only []/ len(splits)==2 accepted.
-        @Param negative_ratio: The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples.
-        @Param is_shuffle: Whether to shuffle data.
+    Consvert file to data format which is suitable to input to this Application.
+    Args:
+        data_file (str): 
+            The original data file which has the same format as defined in README.
+        save_dir (str): 
+            The directory to save the prrocessed data.
+        splits (float, optional): 
+            Whether to split data file into train/dev/test.
+            Only []/ len(splits)==2 accepted.
+        negative_ratio (int, optional):
+            The ratio of positive and negative samples, where
+            number of negtive samples = negative_ratio * number of positive samples.
+        is_shuffle (bool, optional): 
+            Whether to shuffle data.
     """
     tic_time = time.time()
     if not os.path.exists(data_file):

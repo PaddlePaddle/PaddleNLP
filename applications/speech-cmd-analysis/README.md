@@ -21,7 +21,7 @@
   Baidu大脑AI开放平台[短语音识别标准版](https://ai.baidu.com/tech/speech/asr)采用领先国际的流式端到端语音语言一体化建模方法，融合百度自然语言处理技术，近场中文普通话识别准确率达98%。根据语音内容理解可以将数字序列、小数、时间、分数、基础运算符正确转换为数字格式，使得识别的数字结果更符合使用习惯，直观自然。
 
 - **信息抽取模型**
-  [UIE](https://arxiv.org/pdf/2203.12277.pdf): Yaojie Lu等人在2022年提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本应用基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
+  [Universal Information Extraction, UIE](https://arxiv.org/pdf/2203.12277.pdf): Yaojie Lu等人在2022年提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本应用基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键信息抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
 
 ## 2. 安装说明
@@ -31,13 +31,7 @@
 - paddlepaddle >= 2.2.0
 - paddlenlp >= 2.3.0
 
-安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。如需下载最新版本的PaddleNLP，可执行以下命令
-```shell
-git clone https://github.com/PaddlePaddle/PaddleNLP.git
-cd PaddleNLP
-pip install -r requirements.txt
-pip install -e .
-```
+安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。
 
 #### 可选依赖
 
@@ -54,7 +48,7 @@ pip install pydub
 
 ## 3. 数据准备
 
-本应用来自于语音报销工单信息录入场景，即从语音中抽取出报销需要的``时间``、``出发地``、``目的地``和``费用``字段。相应的数据集为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，共50条标注数据，用于信息抽取模型在交通费报销场景下的优化，示例数据如下：
+本应用来自于语音报销工单信息录入场景，即员工向公司报销部门提出交通费报销的口头申请，在传统场景下，报销审核人员需要人工将语音转换为文字信息，并从中抽取记录报销需要的``时间``、``出发地``、``目的地``和``费用``字段，而在本应用可以端到端的完成这一工作。相应的数据集为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，共50条标注数据，用于信息抽取模型在交通费报销场景下的优化，示例数据如下：
 ```json
 {"id": 39, "text": "10月16日高铁从杭州到上海南站车次d5414共48元", "relations": [], "entities": [{"id": 90, "start_offset": 0, "end_offset": 6, "label": "时间"}, {"id": 77, "start_offset": 9, "end_offset": 11, "label": "出发地"}, {"id": 91, "start_offset": 12, "end_offset": 16, "label": "目的地"}, {"id": 92, "start_offset": 24, "end_offset": 26, "label": "费用"}]}
 ```
@@ -72,6 +66,13 @@ pip install pydub
     - ``from_id``: 关系主语实体对应的标识ID。
     - ``to_id``: 关系宾语实体对应的标识ID。
     - ``type``: 关系类型。
+
+#### BaiduAI开放平台申请使用
+
+- 注册账号。在[百度智能云](https://console.bce.baidu.com)注册账号并登陆。
+- 资源申请。平台提供了免费资源用于功能测试，打开[语音识别控制台](https://console.bce.baidu.com/ai/?fromai=1#/ai/speech/overview/index)，点击``领取免费资源``，勾选短语音识别后点击下方``0元领取``。
+- 创建应用。打开语音识别控制台，点击[创建应用](https://console.bce.baidu.com/ai/?fromai=1#/ai/speech/app/create)，填写必选项后点击``立即创建``。
+- 获取API Key和Secret Key。打开语音识别控制台，点击[管理应用](https://console.bce.baidu.com/ai/?fromai=1#/ai/speech/app/list)即可查看应用对应的API Key和Secret Key。在运行本应用脚本时，设置这两个参数即可调用该平台的语音识别服务。
 
 #### 音频格式转换
 
@@ -99,7 +100,7 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 
 对于不同的应用场景，关键信息的配置多种多样，直接应用通用信息抽取模型的效果可能不够理想。这时可以标注少量场景相关的数据，利用few-shot learning技术来改进特定场景下的信息抽取效果。
 
-自定义数据的格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)相同，划分为训练集``train.txt``和验证集``dev.txt``，保存在``./data/``目录下。
+自定义数据的格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)相同，保存在``./data/``目录下。
 
 ## 4. 模型训练
 
@@ -127,7 +128,7 @@ python preprocess.py \
     --input_file ./data/data.txt \
     --save_dir ./data/ \
     --negative_ratio 5 \
-    --splits 0.6 0.8
+    --splits 0.4 0.6
 ```
 
 可配置参数包括
@@ -135,7 +136,7 @@ python preprocess.py \
 - ``input_file``: 原始数据文件名。文件内容应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)的格式一致。
 - ``save_dir``: 训练数据的保存目录。若``splits``为空，则数据存储在``processed_data.txt``文件，若``splits``设置为长度为2的列表，则数据存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
 - ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.6, 0.8]表示按照``6:2:2``的比例将数据划分为训练集、验证集和测试集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.4, 0.6]表示按照``4:6``的比例将数据划分为训练集和验证集。
 
 #### 预训练模型参数
 
@@ -179,10 +180,12 @@ CUDA_VISIBLE_DEVICES=0 python finetune.py \
 
 ## 5. 模型预测
 
-在语音报销工单信息录入场景下，按照第3节中的要求准备好音频文件，执行语音指令解析脚本即可抽取报销需要的``时间``、``出发地``、``目的地``和``费用``字段。具体命令如下
+预测时使用的schema应与finetune阶段训练数据的schema保持一致。在语音报销工单信息录入场景下，首先准备好``.wav``格式的音频文件，然后在BaiduAI开放平台创建语音识别应用以获取API Key和Secret Key，最后加载用场景数据finetune后的模型参数，执行语音指令解析脚本即可抽取报销需要的``时间``、``出发地``、``目的地``和``费用``字段。具体命令如下
 
 ```shell
 python pipeline.py \
+    --api_key '4E1BG9lTnlSeIf1NQFlrxxxx' \
+    --secret_key '544ca4657ba8002e3dea3ac2f5fxxxxx' \
     --audio_file ./audios_wav/sample.wav \
     --uie_model ./checkpoint/model_best/model_state.pdparams \
     --schema ['时间', '出发地', '目的地', '费用']
@@ -190,6 +193,8 @@ python pipeline.py \
 
 可配置参数包括
 
+- ``api_key``: BaiduAI开放平台上创建应用的API Key。
+- ``secret_key``: BaiduAI开放平台上创建应用的Secret Key。
 - ``audio_file``: ``.wav``格式音频文件路径。
 - ``uie_model``: 预测使用的模型参数文件所在路径。默认为None，即使用通用的预训练UIE模型。
 - ``schema``: 关键实体信息配置。默认为语音报销工单场景下的四个关键字段。

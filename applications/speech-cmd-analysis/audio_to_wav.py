@@ -50,7 +50,7 @@ if __name__ == '__main__':
         ]
         src_files = [os.path.join(args.audio_file, x) for x in src_files]
     else:
-        raise IOError('%s is neither valid path nor file!' % args.audio_file)
+        raise Exception('%s is neither valid path nor file!' % args.audio_file)
 
     if args.wav_file is None:
         wav_files = [os.path.basename(x)[:-3] + 'wav' for x in src_files]
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         if len(src_files) == 1:
             wav_files = [args.wav_file]
         else:
-            raise IOError('All audios in %s will overwrite the same file %s! \
+            raise Exception('All audios in %s will overwrite the same file %s! \
                 Please check it.' % (args.audio_file, args.wav_file))
     else:
         if not os.path.exists(args.wav_file):

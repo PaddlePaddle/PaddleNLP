@@ -38,21 +38,23 @@ class ASRError(Exception):
     pass
 
 
-def mandarin_asr_api(audio_file, audio_format='wav'):
+def mandarin_asr_api(api_key, secret_key, audio_file, audio_format='wav'):
     """ Mandarin ASR
 
     Args:
         audio_file (str):
             Audio file of Mandarin with sampling rate 16000.
         audio_format (str):
-            The file extension of audio_file, 'wav' by default. 
+            The file extension of audio_file, 'wav' by default.
+
+    Please refer to https://github.com/Baidu-AIP/speech-demo for more demos.
     """
     # Configurations.
     TOKEN_URL = 'http://aip.baidubce.com/oauth/2.0/token'
     ASR_URL = 'http://vop.baidu.com/server_api'
     SCOPE = 'audio_voice_assistant_get'
-    API_KEY = 'vMkN1f7KlL3jornZnQGufBt4'
-    SECRET_KEY = 'uHokaF8MM5YWi57dfvqCTpR0IaCXpaGB'
+    API_KEY = api_key
+    SECRET_KEY = secret_key
 
     # Fetch tokens from TOKEN_URL.
     post_data = urlencode({

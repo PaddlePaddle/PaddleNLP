@@ -20,6 +20,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 
@@ -38,10 +39,22 @@ def do_train():
     tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
     model = UIE()
 
-    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+    if args.init_from_ckpt:
+        if not os.path.isfile(args.init_from_ckpt):
+            raise Exception('%s is not a .pdparams file, please check it.' %
+                            args.init_from_ckpt)
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
         print('Init from: {}'.format(args.init_from_ckpt))
+    else:
+        pretrained_uie_url = 'https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams'
+        tmp_path = './_tmp_pretrained_uie/'
+        if not os.path.exists(tmp_path):
+            os.makedirs(tmp_path)
+            get_path_from_url(pretrained_uie_url, tmp_path)
+            state_dict = paddle.load(tmp_path + 'model_state.pdparams')
+        model.set_dict(state_dict)
+        print('Init from: {}'.format(pretrained_uie_url))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -133,7 +146,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_seq_len', default=512, type=int, help='The maximum total input sequence length after tokenization. '
         'Sequences longer than this will be truncated, sequences shorter will be padded.')
     parser.add_argument('--num_epochs', default=50, type=int, help='Total number of training epochs to perform.')
-    parser.add_argument('--init_from_ckpt', default='uie/model_state.pdparams', type=str, help='The path of checkpoint to be loaded.')
+    parser.add_argument('--init_from_ckpt', default=None, type=str, help='The path of checkpoint to be loaded.')
     parser.add_argument('--seed', default=1000, type=int, help='random seed for initialization')
     parser.add_argument('--logging_steps', default=10, type=int, help='The interval steps to logging.')
     parser.add_argument('--valid_steps', default=100, type=int, help='The interval steps to evaluate model performance.')
