@@ -14,7 +14,6 @@
 
 import os
 import argparse
-
 import numpy as np
 
 from utils import set_seed, save_examples, convert_doccano_examples
@@ -26,12 +25,14 @@ def convert_doccano_file(doccano_file,
                          negative_ratio=1,
                          is_shuffle=True):
     """
-        @Description: Consvert doccano file to data format which is suitable to input to this Application.
-        @Param doccano_file: The annotated file exported from doccano labeling platform.
-        @Param save_dir: The directory of data that you wanna save.
-        @Param splits: Whether to split doccano file into train/dev/test, note: Only []/ len(splits)==2 accepted.
-        @Param negative_ratio: The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples.
-        @Param is_shuffle: Whether to shuffle data.
+    Convert the annotated file exported from doccano, convert to the format suitable for few-shot learning and generate negative sample.
+
+    Args:
+        doccano_file: The annotated file exported from doccano labeling platform.
+        save_dir: The directory of data that you wanna save.
+        splits: Whether to split doccano file into train/dev/test, note: Only []/ len(splits)==3 accepted.
+        negative_ratio: The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples.
+        is_shuffle: Whether to shuffle data.
     """
     if not os.path.exists(doccano_file):
         raise ValueError("Please input the correct path of doccano file.")
@@ -39,13 +40,12 @@ def convert_doccano_file(doccano_file,
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    if len(splits) != 0 and len(splits) != 2:
-        raise ValueError("Only []/ len(splits)==2 accepted for splits.")
+    if len(splits) != 0 and len(splits) != 3:
+        raise ValueError("Only []/ len(splits)==3 accepted for splits.")
 
-    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0 or
-                   splits[1] >= 1.0 or splits[0] <= 0. or splits[1] <= 0):
+    if splits and sum(splits) != 1:
         raise ValueError(
-            "Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0]."
+            "Please set correct splits, sum of elements in splits should be equal to 1."
         )
 
     with open(doccano_file, "r", encoding="utf-8") as f:
@@ -67,14 +67,14 @@ def convert_doccano_file(doccano_file,
         save_examples(examples, save_path, idxs)
         print(f"\nSave data to {save_path}.")
     else:
-        eth1, eth2 = int(len(examples) * splits[0]), int(
-            len(examples) * splits[1])
+        r1, r2 = splits
+        n1, n2 = int(len(examples) * r1), int(len(examples) * (r1 + r2))
         save_train_path = os.path.join(save_dir, "train.txt")
         save_dev_path = os.path.join(save_dir, "dev.txt")
         save_test_path = os.path.join(save_dir, "test.txt")
-        save_examples(examples, save_train_path, idxs[:eth1])
-        save_examples(examples, save_dev_path, idxs[eth1:eth2])
-        save_examples(examples, save_test_path, idxs[eth2:])
+        save_examples(examples, save_train_path, idxs[:n1])
+        save_examples(examples, save_dev_path, idxs[n1:n2])
+        save_examples(examples, save_test_path, idxs[n2:])
         print(f"\nSave train data to {save_train_path}.")
         print(f"Save dev data to {save_dev_path}.")
         print(f"Save test data to {save_test_path}.")
@@ -99,6 +99,13 @@ if __name__ == "__main__":
         default=5,
         help="The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples"
     )
+    parser.add_argument(
+        "--splits",
+        type=float,
+        nargs='*',
+        default=[0.6, 0.2, 0.2],
+        help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test."
+    )
     args = parser.parse_args()
     # yapf: enable
 
@@ -108,6 +115,6 @@ if __name__ == "__main__":
     convert_doccano_file(
         args.doccano_file,
         args.save_dir,
-        splits=[0.6, 0.8],
+        splits=args.splits,
         negative_ratio=args.negative_ratio,
         is_shuffle=True)

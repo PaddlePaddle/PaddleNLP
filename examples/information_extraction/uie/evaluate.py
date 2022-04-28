@@ -21,41 +21,39 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 
 from model import UIE
-from metric import get_f1, get_metric
-from utils import convert_example, reader
+from utils import convert_example, reader, MODEL_MAP
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader):
+def evaluate(model, metric, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
+        metric(obj:`paddle.metric.Metric`): The evaluation metric.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
     model.eval()
-    num_correct = 0
-    num_infer = 0
-    num_label = 0
+    metric.reset()
     for batch in data_loader:
         input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
         start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
                                      pos_ids)
         start_ids = paddle.cast(start_ids, 'float32')
         end_ids = paddle.cast(end_ids, 'float32')
-        res = get_metric(start_prob, end_prob, start_ids, end_ids)
-        num_correct += res[0]
-        num_infer += res[1]
-        num_label += res[2]
-    precision, recall, f1 = get_f1(num_correct, num_infer, num_label)
+        num_correct, num_infer, num_label = metric.compute(start_prob, end_prob,
+                                                           start_ids, end_ids)
+        metric.update(num_correct, num_infer, num_label)
+    precision, recall, f1 = metric.accumulate()
     model.train()
     return precision, recall, f1
 
 
 def do_eval():
-    tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
+    encoding_model = MODEL_MAP[args.model]['encoding_model']
+    hidden_size = MODEL_MAP[args.model]['hidden_size']
 
-    model = UIE()
+    model = UIE(encoding_model, hidden_size)
     state_dict = paddle.load(args.model_path)
     model.load_dict(state_dict)
 
@@ -82,6 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-large"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
 
     args = parser.parse_args()
     # yapf: enable

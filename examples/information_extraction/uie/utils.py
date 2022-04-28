@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +14,32 @@
 
 import math
 import json
+import random
 from tqdm import tqdm
 
-import paddle
-import random
 import numpy as np
+import paddle
+
+MODEL_MAP = {
+    "uie-base": {
+        "encoding_model": "ernie-3.0-base",
+        "hidden_size": 768,
+        "url":
+        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams"
+    },
+    "uie-tiny": {
+        "encoding_model": "ernie-3.0-medium",
+        "hidden_size": 768,
+        "url":
+        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams"
+    },
+    "uie-large": {
+        "encoding_model": "ernie-3.0-large",
+        "hidden_size": 1024,
+        "url":
+        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_large/model_state.pdparams"
+    }
+}
 
 
 def set_seed(seed):
@@ -81,9 +102,7 @@ def map_offset(ori_offset, offset_mapping):
     """
     for index, span in enumerate(offset_mapping):
         if span[0] <= ori_offset < span[1]:
-            # print(ori_offset, index, offset_mapping)
             return index
-    # print(ori_offset, -1, offset_mapping)
     return -1
 
 

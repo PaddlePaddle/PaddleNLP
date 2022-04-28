@@ -10,7 +10,6 @@
 .
 ├── utils.py          # 数据处理工具
 ├── model.py          # 模型组网脚本
-├── metric.py         # 模型效果验证指标脚本
 ├── doccano.py        # 数据标注脚本
 ├── train.py          # 模型训练脚本
 ├── evaluate.py       # 模型评估脚本
