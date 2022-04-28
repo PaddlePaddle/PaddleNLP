@@ -12,13 +12,13 @@
 - 工单生成：特定场景，无法完成文字录入。例如，电力路线巡检工作人员在高空巡检高压电线路，不便即时文字记录，滞后记录可能导致信息遗漏。
 - 信息登记：重复性的工作，效率低易出错。例如，某品牌汽车售后客服话务员每天接听约300通电话，重复性工作耗时长，易出错。
 
-针对以上场景，应用[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)的语音识别技术和[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)的信息抽取技术，可以自动识别和抽取语音中的关键信息，帮助相关人员简化记录流程，提高工作效率和质量。
+针对以上场景，应用Baidu大脑AI开放平台[短语音识别标准版](https://ai.baidu.com/tech/speech/asr)和[PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)的信息抽取技术，可以自动识别和抽取语音中的关键信息，帮助相关人员简化记录流程，提高工作效率和质量。
 另外，通过构造小样本优化信息抽取模型，能够获得更加准确的场景定制化效果。
 
 #### 方案选型
 
 - **语音识别模型**
-  [Conformer](https://arxiv.org/abs/2005.08100): Anmol Gulati等人在2020年提出的语音识别模型，通过将卷积应用于Transfomer的Encoder层，结合了Transformer提取长序列的优势和卷积提取局部特征的优势，使得语音识别的准确率明显提高。
+  Baidu大脑AI开放平台[短语音识别标准版](https://ai.baidu.com/tech/speech/asr)采用领先国际的流式端到端语音语言一体化建模方法，融合百度自然语言处理技术，近场中文普通话识别准确率达98%。根据语音内容理解可以将数字序列、小数、时间、分数、基础运算符正确转换为数字格式，使得识别的数字结果更符合使用习惯，直观自然。
 
 - **信息抽取模型**
   [UIE](https://arxiv.org/pdf/2203.12277.pdf): Yaojie Lu等人在2022年提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本应用基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
@@ -126,19 +126,20 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 python preprocess.py \
     --input_file ./data/data.txt \
     --save_dir ./data/ \
-    --negative_ratio 5
+    --negative_ratio 5 \
+    --splits 0.6 0.8
 ```
 
 可配置参数包括
 
 - ``input_file``: 原始数据文件名。文件内容应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)的格式一致。
-- ``save_dir``: 训练数据的保存目录。默认按照``6:2:2``的比例将数据划分为训练集、验证集和测试集，分别存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
+- ``save_dir``: 训练数据的保存目录。若``splits``为空，则数据存储在``processed_data.txt``文件，若``splits``设置为长度为2的列表，则数据存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
 - ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
-
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.6, 0.8]表示按照``6:2:2``的比例将数据划分为训练集、验证集和测试集。
 
 #### 预训练模型参数
 
-下载预训练好的[UIE模型](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie/model_state.pdparams)，放在`./uie_model/`目录下。
+下载预训练好的[UIE模型](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams)，放在`./uie_model/`目录下。
 
 #### 定制化模型训练
 

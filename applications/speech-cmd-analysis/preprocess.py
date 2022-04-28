@@ -18,7 +18,7 @@ import argparse
 
 import numpy as np
 
-from utils import set_seed, save_examples, convert_examples
+from utils import set_seed, save_examples, convert_data_examples
 
 
 def convert_data_file(data_file,
@@ -44,17 +44,19 @@ def convert_data_file(data_file,
     if len(splits) != 0 and len(splits) != 2:
         raise ValueError("Only []/ len(splits)==2 accepted for splits.")
 
-    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0 or
-                   splits[1] >= 1.0 or splits[0] <= 0. or splits[1] <= 0):
+    if splits and (splits[0] + splits[1] > 1.0 or splits[0] > 1.0 or
+                   splits[1] > 1.0 or splits[0] < 0. or splits[1] < 0):
         raise ValueError(
-            "Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0]."
+            "Please set correct splits, the element in it should be in (0,1), and splits[1] + splits[0] <= 1.0."
         )
+    if len(splits) == 2:
+        splits[1] += splits[0]
 
     with open(data_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    entity_examples, relation_examples = convert_data_examples(
-        raw_examples, negative_ratio)
+    entity_examples, relation_examples = convert_data_examples(raw_examples,
+                                                               negative_ratio)
 
     examples = [e + r for e, r in zip(entity_examples, relation_examples)]
 
@@ -106,8 +108,8 @@ if __name__ == "__main__":
         "--splits",
         type=float,
         nargs='*',
-        default=[0.6, 0.8],
-        help="The ratio of samples in datasets. [0.6, 0.8] means 60% samples used for training, 20% for evaluation and 20% for test.")
+        default=[0.6, 0.2],
+        help="The ratio of samples in datasets. [0.6, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     args = parser.parse_args()
     # yapf: enable
 
