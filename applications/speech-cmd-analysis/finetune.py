@@ -24,9 +24,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 
 from model import UIE
-from evaluate import evaluate
-from metric import get_f1, get_metric
-from utils import set_seed, convert_example, reader, create_dataloader
+from utils import set_seed, convert_example, reader, create_dataloader, evaluate, get_f1, get_metric
 
 
 def do_train():
@@ -51,9 +49,7 @@ def do_train():
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
 
     trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len)
+        convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len)
 
     train_data_loader = create_dataloader(
         dataset=train_ds,

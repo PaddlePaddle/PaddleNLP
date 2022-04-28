@@ -30,26 +30,27 @@ if __name__ == '__main__':
     supported = ['mp3', 'm4a', 'wav']
     if args.audio_format is not None:
         if args.audio_format not in supported:
-            raise ValueError('.%s format file is not supported!' % 
-                args.audio_format)
+            raise ValueError('.%s format file is not supported!' %
+                             args.audio_format)
         supported = [args.audio_format]
     print('All %s format files are converted to .wav format...' %
-         ', '.join(supported))
+          ', '.join(supported))
 
     if os.path.isfile(args.audio_file):
         src_files = [args.audio_file]
-        if args.audio_format is None:
+        if args.audio_format is not None:
             if args.audio_format != args.audio_file.strip().split('.')[-1]:
-                raise Warning('Ignore audio_format %s! It is not consistent \
-                    with the format of audio_file %s.' % (args.audio_format,
-                    args.audio_file)) 
+                raise ValueError(
+                    'Ignore audio_format %s! It is not consistent with the format of audio_file %s.'
+                    % (args.audio_format, args.audio_file))
     elif os.path.isdir(args.audio_file):
-        src_files = [x for x in os.listdir(args.audio_file) if x.strip(
-            ).split('.')[-1] in supported]
+        src_files = [
+            x for x in os.listdir(args.audio_file)
+            if x.strip().split('.')[-1] in supported
+        ]
         src_files = [os.path.join(args.audio_file, x) for x in src_files]
     else:
         raise IOError('%s is neither valid path nor file!' % args.audio_file)
-
 
     if args.wav_file is None:
         wav_files = [os.path.basename(x)[:-3] + 'wav' for x in src_files]
@@ -59,15 +60,16 @@ if __name__ == '__main__':
         else:
             raise IOError('All audios in %s will overwrite the same file %s! \
                 Please check it.' % (args.audio_file, args.wav_file))
-    elif os.path.isdir(args.wav_file):
-        wav_files = [os.path.join(args.wav_file, os.path.basename(x)[:-3] + 
-            'wav') for x in src_files]
     else:
-        raise IOError('%s is neither valid path nor file!' % args.wav_file)
+        if not os.path.exists(args.wav_file):
+            os.makedirs(args.wav_file)
+        wav_files = [
+            os.path.join(args.wav_file, os.path.basename(x)[:-3] + 'wav')
+            for x in src_files
+        ]
 
     for src_file, wav_file in zip(src_files, wav_files):
         audio = AudioSegment.from_file(src_file, src_file[-3:])
         wav_audio = audio.export(wav_file, format='wav')
 
     print('%d files converted!' % len(src_files))
-

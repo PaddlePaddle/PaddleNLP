@@ -33,6 +33,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+
 class ASRError(Exception):
     pass
 
@@ -52,12 +53,13 @@ def mandarin_asr_api(audio_file, audio_format='wav'):
     SCOPE = 'audio_voice_assistant_get'
     API_KEY = 'vMkN1f7KlL3jornZnQGufBt4'
     SECRET_KEY = 'uHokaF8MM5YWi57dfvqCTpR0IaCXpaGB'
-    
+
     # Fetch tokens from TOKEN_URL.
     post_data = urlencode({
         'grant_type': 'client_credentials',
         'client_id': API_KEY,
-        'client_secret': SECRET_KEY}).encode('utf-8')
+        'client_secret': SECRET_KEY
+    }).encode('utf-8')
 
     request = Request(TOKEN_URL, post_data)
     try:
@@ -73,8 +75,8 @@ def mandarin_asr_api(audio_file, audio_format='wav'):
             raise ASRError('scope is not correct!')
         token = result['access_token']
     else:
-        raise ASRError('MAYBE API_KEY or SECRET_KEY not correct: ' + 
-            'access_token or scope not found in token response')
+        raise ASRError('MAYBE API_KEY or SECRET_KEY not correct: ' +
+                       'access_token or scope not found in token response')
 
     # Fetch results by ASR api.
     with open(audio_file, 'rb') as speech_file:
@@ -94,13 +96,40 @@ def mandarin_asr_api(audio_file, audio_format='wav'):
         begin = time.time()
         result_str = urlopen(request).read()
         print('Request time cost %f' % (time.time() - begin))
-    except  URLError as error:
+    except URLError as error:
         print('asr http response http code : ' + str(error.code))
         result_str = error.read()
     result_str = str(result_str, 'utf-8')
     result = json.loads(result_str)
 
     return result['result'][0]
+
+
+@paddle.no_grad()
+def evaluate(model, data_loader):
+    """
+    Given a dataset, it evals model and computes the metric.
+    Args:
+        model(obj:`paddle.nn.Layer`): A model to classify texts.
+        data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
+    """
+    model.eval()
+    num_correct = 0
+    num_infer = 0
+    num_label = 0
+    for batch in data_loader:
+        input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
+        start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
+                                     pos_ids)
+        start_ids = paddle.cast(start_ids, 'float32')
+        end_ids = paddle.cast(end_ids, 'float32')
+        res = get_metric(start_prob, end_prob, start_ids, end_ids)
+        num_correct += res[0]
+        num_infer += res[1]
+        num_label += res[2]
+    precision, recall, f1 = get_f1(num_correct, num_infer, num_label)
+    model.train()
+    return precision, recall, f1
 
 
 def get_eval(tokenizer, step, data_loader, model, name):
@@ -419,7 +448,7 @@ def construct_relation_label_set(entity_name_set, predicate_set):
     return sorted(list(relation_label_set))
 
 
-def convert_examples(raw_examples, negative_ratio):
+def convert_data_examples(raw_examples, negative_ratio):
     texts = []
     entity_examples = []
     relation_examples = []
