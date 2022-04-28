@@ -1,6 +1,6 @@
 # UIE
 
-Universal Information Extraction（UIE）将各种类型的信息抽取任务统一转化为自然语言的形式，并进行多任务联合训练。该模型支持多种类型的开放抽取任务，包括但不限于命名实体、关系、事件论元、事件描述片段、评价、评价维度、观点词、情感倾向等。
+[UIE](https://arxiv.org/pdf/2203.12277.pdf)开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
 ## 快速开始
 
@@ -14,8 +14,6 @@ Universal Information Extraction（UIE）将各种类型的信息抽取任务统
 ├── doccano.py        # 数据标注脚本
 ├── train.py          # 模型训练脚本
 ├── evaluate.py       # 模型评估脚本
-├── run_train.sh      # 模型训练命令
-├── run_evaluate.sh   # 模型评估命令
 └── README.md
 ```
 
@@ -69,7 +67,19 @@ python doccano.py \
 通过运行以下命令进行自定义UIE模型训练：
 
 ```shell
-sh run_train.sh
+python train.py \
+    --train_path "./data/ext_data/train.txt" \
+    --dev_path "./data/ext_data/dev.txt" \
+    --save_dir "./checkpoint" \
+    --learning_rate 1e-5 \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --num_epochs 50 \
+    --init_from_ckpt "./uie_model/model_state.pdparams" \
+    --seed 1000 \
+    --logging_steps 10 \
+    --valid_steps 100 \
+    --device "gpu"
 ```
 
 ### 模型评估
@@ -77,7 +87,11 @@ sh run_train.sh
 通过运行以下命令进行模型评估：
 
 ```shell
-sh run_evaluate.sh
+python evaluate.py \
+    --model_path "./checkpoint/model_best/model_state.pdparams" \
+    --test_path "./data/ext_data/test.txt" \
+    --batch_size 16 \
+    --max_seq_len 512
 ```
 
 ### Taskflow一键预测
@@ -92,3 +106,6 @@ schema = [{"作品名": ["作者", "出版社名称"]}]
 # 为任务实例设定抽取目标和定制化模型权重路径
 my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
 ```
+
+## References
+- **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
