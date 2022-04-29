@@ -74,7 +74,7 @@ class Dict(object):
 
 
 @dataclass
-class DataTrainingArguments:
+class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     Using `PdArgumentParser` we can turn this class
