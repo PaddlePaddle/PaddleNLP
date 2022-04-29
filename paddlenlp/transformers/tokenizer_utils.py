@@ -1120,7 +1120,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             verbose=verbose,
             **kwargs)
 
-        return BatchEncoding(batch_outputs)
+        return batch_outputs
 
     def _batch_prepare_for_model(
             self,
