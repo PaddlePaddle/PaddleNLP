@@ -68,33 +68,40 @@ if training_args.do_train:
 Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
 
 ```
-    参数：
-        model（[`PretrainedModel`] 或 `paddle.nn.Layer`，*可选*）：
-            用于训练、评估或预测的模型。
-            [`Trainer`] 对PaddleNLP的 [`PretrainedModel`] 一起使用进行了优化。你仍然可以使用
-            您自己的模型定义为`paddle.nn.Layer`，只要它们的工作方式与 PaddleNLP 模型相同。
-        args（[`TrainingArguments`]，*可选*）：
-            训练时需要用到的参数。将默认使用 [`TrainingArguments`] 初始化。
-            `output_dir` 设置为当前目录中名为 *tmp_trainer* 的目录（如果未提供）。
-        data_collat​​or（`DataCollat​​or`，*可选*）：
-            用于将 `train_dataset` 或 `eval_dataset` 的数据，组合为batch的函数。
-            如果没有提供 `tokenizer`，则默认为 [`default_data_collat​​or`], 否则为
-            [`DataCollat​​orWithPadding`]。
-        train_dataset（`paddle.io.Dataset` 或 `paddle.io.IterableDataset`，*可选*）：
-            用于训练的数据集。如果是 `datasets.Dataset`，那么
-            `model.forward()` 不需要的输入字段会被自动删除。
-        eval_dataset（`paddle.io.Dataset`，*可选*）：
-             用于评估的数据集。如果是 `datasets.Dataset`，那么
-            `model.forward()` 不需要的输入字段会被自动删除。
-        tokenizer（[`PretrainedTokenizer`]，*可选*）：
-            用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
-            batch输入的最大长度，它随模型保存，可以重新运行中断的训练过程。
-        compute_metrics (`Callable[[EvalPrediction], Dict]`, *optional*):
-            用于评估的计算指标的函数。必须采用 [`EvalPrediction`] 并返回
-            dict形式的metrics结果。
-        optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*）：
-            一个tuple, 包含要使用Optimizer和LRScheduler。将默认为模型上的 [`AdamW`] 实例
-            和LinearDecayWithWarmup。
+参数：
+    model（[`PretrainedModel`] 或 `paddle.nn.Layer`，*可选*）：
+        用于训练、评估或预测的模型。
+        [`Trainer`] 对PaddleNLP的 [`PretrainedModel`] 一起使用进行了优化。你仍然可以使用
+        您自己的模型定义为`paddle.nn.Layer`，只要它们的工作方式与 PaddleNLP 模型相同。
+
+    args（[`TrainingArguments`]，*可选*）：
+        训练时需要用到的参数。将默认使用 [`TrainingArguments`] 初始化。
+        `output_dir` 设置为当前目录中名为 *tmp_trainer* 的目录（如果未提供）。
+
+    data_collat​​or（`DataCollat​​or`，*可选*）：
+        用于将 `train_dataset` 或 `eval_dataset` 的数据，组合为batch的函数。
+        如果没有提供 `tokenizer`，则默认为 [`default_data_collat​​or`], 否则为
+        [`DataCollat​​orWithPadding`]。
+
+    train_dataset（`paddle.io.Dataset` 或 `paddle.io.IterableDataset`，*可选*）：
+        用于训练的数据集。如果是 `datasets.Dataset`，那么
+        `model.forward()` 不需要的输入字段会被自动删除。
+
+    eval_dataset（`paddle.io.Dataset`，*可选*）：
+            用于评估的数据集。如果是 `datasets.Dataset`，那么
+        `model.forward()` 不需要的输入字段会被自动删除。
+
+    tokenizer（[`PretrainedTokenizer`]，*可选*）：
+        用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
+        batch输入的最大长度，它随模型保存，可以重新运行中断的训练过程。
+
+    compute_metrics (`Callable[[EvalPrediction], Dict]`, *optional*):
+        用于评估的计算指标的函数。必须采用 [`EvalPrediction`] 并返回
+        dict形式的metrics结果。
+
+    optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*）：
+        一个tuple, 包含要使用Optimizer和LRScheduler。将默认为模型上的 [`AdamW`] 实例
+        和LinearDecayWithWarmup。
 ```
 
 
@@ -365,19 +372,23 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         Remove columns not required by the model when using an
                         nlp.Dataset. (default: True)
   --label_names LABEL_NAMES [LABEL_NAMES ...]
-                        标签名称
+                        训练数据标签label的名称
                         The list of keys in your dictionary of inputs that
                         correspond to the labels. (default: None)
-  --load_best_model_at_end [LOAD_BEST_MODEL_AT_END]
 
+  --load_best_model_at_end [LOAD_BEST_MODEL_AT_END]
+                        训练结束后是否加载最优模型，通常与`metric_for_best_model`配合使用
                         Whether or not to load the best model found during
                         training at the end of training. (default: False)
   --metric_for_best_model METRIC_FOR_BEST_MODEL
+                        最优模型指标，如`eval_accuarcy`等，用于比较模型好坏。
                         The metric to use to compare two different models.
                         (default: None)
   --greater_is_better GREATER_IS_BETTER
+                        与`metric_for_best_model`配合使用。
                         Whether the `metric_for_best_model` should be
                         maximized or not. (default: None)
+
   --ignore_data_skip [IGNORE_DATA_SKIP]
                         重启训练时候，不略过已经训练的数据。
                         When resuming training, whether or not to skip the
