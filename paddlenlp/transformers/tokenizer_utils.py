@@ -493,30 +493,35 @@ def tokenize_chinese_chars(text):
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedTokenizer(PretrainedTokenizerBase):
     """
-    The base class for all pretrained tokenizers. It mainly provides common methods
-    for loading (construction and loading) and saving pretrained tokenizers. Loading
-    and saving also rely on the following class attributes which should be overridden
-    by derived classes accordingly:
+    Base class for all tokenizers.
 
-    - **tokenizer_config_file** (str): Represents the file name of tokenizer
-      configuration for configuration saving and loading in local file system.
-      The value is `tokenizer_config.json`.
-    - **resource_files_names** (dict): Represents resources to specific file
-      names mapping for resource saving and loading in local file system. The
-      keys of dict representing resource items should be argument names in
-      tokenizer's `__init__` method, and the values are file names for saving
-      and loading corresponding resources. The mostly used resources here are
-      vocabulary file and sentence-piece model file.
-    - **pretrained_init_configuration** (dict): Provides the tokenizer configurations
-      of built-in pretrained tokenizers (contrasts to tokenizers in local file
-      system). It has pretrained tokenizer names as keys (the same as pretrained
-      model names, such as `bert-base-uncased`), and the values are dict preserving
-      corresponding configuration for tokenizer initialization.
-    - **pretrained_resource_files_map** (dict): Provides resource URLs of built-in
-      pretrained tokenizers (contrasts to tokenizers in local file system). It
-      has the same keys as `resource_files_names`, and the values are also `dict`
-      mapping specific pretrained tokenizer names (such as `bert-base-uncased`)
-      to corresponding resource URLs.
+    Inherits from [`~tokenizer_utils_base.PretrainedTokenizerBase`].
+
+    Handle all the shared methods for tokenization and special tokens as well as methods downloading/caching/loading
+    pretrained tokenizers as well as adding tokens to the vocabulary.
+
+    This class also contain the added tokens in a unified way on top of all tokenizers so we don't have to handle the
+    specific vocabulary augmentation methods of the various underlying dictionary structures (BPE, sentencepiece...).
+
+    - **resource_files_names** (`Dict[str, str]`) -- A dictionary with, as keys, the `__init__` keyword name of each
+        vocabulary file required by the model, and as associated values, the filename for saving the associated file
+        (string).
+    - **pretrained_resource_files_map** (`Dict[str, Dict[str, str]]`) -- A dictionary of dictionaries, with the
+        high-level keys being the `__init__` keyword name of each vocabulary file required by the model, the
+        low-level being the `short-cut-names` of the pretrained models with, as associated values, the `url` to the
+        associated pretrained vocabulary file.
+    - **max_model_input_sizes** (`Dict[str, Optional[int]]`) -- A dictionary with, as keys, the `short-cut-names`
+        of the pretrained models, and as associated values, the maximum length of the sequence inputs of this model,
+        or `None` if the model has no maximum input size.
+    - **pretrained_init_configuration** (`Dict[str, Dict[str, Any]]`) -- A dictionary with, as keys, the
+        `short-cut-names` of the pretrained models, and as associated values, a dictionary of specific arguments to
+        pass to the `__init__` method of the tokenizer class for this pretrained model when loading the tokenizer
+        with the [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`] method.
+    - **model_input_names** (`List[str]`) -- A list of inputs expected in the forward pass of the model.
+    - **padding_side** (`str`) -- The default value for the side on which the model should have padding applied.
+        Should be `'right'` or `'left'`.
+    - **truncation_side** (`str`) -- The default value for the side on which the model should have truncation
+        applied. Should be `'right'` or `'left'`.
 
     Moreover, methods common to tokenizers for tokenization, token/id conversion
     and encoding as model inputs are also provided here.
@@ -604,7 +609,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         it with indices starting from length of the current vocabulary.
 
         Args:
-            new_tokens (`List[str]`or `List[tokenizers.AddedToken]`):
+            new_tokens (`List[str]`or `List[AddedToken]`):
                 Token(s) to add in vocabulary. A token is only added if it's not already in the vocabulary (tested by
                 checking if the tokenizer assign the index of the `unk_token` to them).
             special_tokens (`bool`, *optional*, defaults to `False`):
@@ -622,8 +627,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         num_added_toks = tokenizer.add_tokens(["new_tok1", "my_new-tok2"])
         print("We have added", num_added_toks, "tokens")
-        # Note: resize_token_embeddings expects to receive the full size of the new vocabulary, i.e. the length of the tokenizer.
-        model.resize_token_embeddings(len(tokenizer))
         ```"""
         new_tokens = [str(tok) for tok in new_tokens]
 
@@ -683,6 +686,26 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                                  text,
                                  is_split_into_words=False,
                                  **kwargs):
+        """
+        Performs any necessary transformations before tokenization.
+
+        This method should pop the arguments from kwargs and return the remaining `kwargs` as well. We test the
+        `kwargs` at the end of the encoding process to be sure all the arguments have been used.
+
+        Args:
+            text (`str`):
+                The text to prepare.
+            is_split_into_words (`bool`, *optional*, defaults to `False`):
+                Whether or not the input is already pre-tokenized (e.g., split into words). If set to `True`, the
+                tokenizer assumes the input is already split into words (for instance, by splitting it on whitespace)
+                which it will tokenize. This is useful for NER or token classification.
+            kwargs:
+                Keyword arguments to use for the tokenization.
+
+        Returns:
+            `Tuple[str, Dict[str, Any]]`: The prepared text and the unused kwargs.
+        """
+
         return (text, kwargs)
 
     def tokenize(self, text: TextInput, **kwargs) -> List[str]:
