@@ -18,7 +18,7 @@ T3:
   name: 体育竞赛
   path: data/duuie_pre/体育竞赛
   sel2record: longer_first_zh
-  eval_match_mode: normal
+  eval_match_mode: set
   metrics:
     - string-evt-role-F1
 
@@ -26,7 +26,7 @@ T4:
   name: 灾害意外
   path: data/duuie_pre/灾害意外
   sel2record: longer_first_zh
-  eval_match_mode: normal
+  eval_match_mode: set
   metrics:
     - string-evt-role-F1
 
@@ -34,7 +34,7 @@ T5:
   name: CONV-ASA
   path: data/duuie_pre/CONV-ASA
   sel2record: longer_first_zh
-  eval_match_mode: normal
+  eval_match_mode: set
   metrics:
     - string-rel-strict-F1
 
@@ -42,7 +42,7 @@ T6:
   name: MSRA
   path: data/duuie_pre/MSRA
   sel2record: longer_first_zh
-  eval_match_mode: normal
+  eval_match_mode: set
   metrics:
     - string-ent-F1
 
@@ -50,7 +50,7 @@ T7:
   name: PEOPLE_DAILY
   path: data/duuie_pre/PEOPLE_DAILY
   sel2record: longer_first_zh
-  eval_match_mode: normal
+  eval_match_mode: set
   metrics:
     - string-ent-F1
 
