@@ -527,6 +527,7 @@ from paddlenlp import Taskflow
   | :---: | :--------: |
   | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
   | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
 
 - 使用`UIE-Tiny`进行预测
 

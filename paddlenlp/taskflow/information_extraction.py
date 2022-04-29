@@ -90,18 +90,25 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
                 "6248b4897fec78a61ab6da3edf9707fe"
             ],
-        }
+        },
+        "uie-medical-base": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
+                "56c2b7d02403f2ede513cedaabc8212a"
+            ],
+        },
     }
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self.set_schema(schema)
-        if model == "uie-base":
+        if model in ["uie-base", "uie-medical-base"]:
             self._encoding_model = "ernie-3.0-base"
         elif model == "uie-tiny":
             self._encoding_model = "ernie-3.0-medium"
         else:
-            raise ValueError("Model should be uie-base or uie-tiny")
+            raise ValueError(
+                "Model should be one of uie-base, uie-tiny and uie-medical-base")
         self._check_task_files()
         self._construct_tokenizer()
         self._get_inference_model()
