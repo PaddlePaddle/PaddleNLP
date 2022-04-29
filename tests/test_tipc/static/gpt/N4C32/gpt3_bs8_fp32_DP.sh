@@ -1,9 +1,9 @@
 model_item=gpt3
 model=gpt
-bs_item=16
+bs_item=8
 fp_item=fp32
 run_mode=DP
-device_num=N1C8
+device_num=N4C32
 max_epochs=200
 num_workers=0
 
