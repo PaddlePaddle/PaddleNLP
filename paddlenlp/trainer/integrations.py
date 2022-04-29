@@ -27,6 +27,14 @@ def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
 
 
+def get_available_reporting_integrations():
+    integrations = []
+    if is_visualdl_available():
+        integrations.append("visualdl")
+
+    return integrations
+
+
 def rewrite_logs(d):
     new_d = {}
     eval_prefix = "eval_"

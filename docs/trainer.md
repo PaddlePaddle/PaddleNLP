@@ -2,14 +2,103 @@
 
 PaddleNLP提供了Trainer训练API，用户可以使用Trainer API高效快速的实现预训练、finetune等任务。
 
-## Trainer的使用方法介绍
+## Trainer基本使用方法介绍
 
+下面是用户使用 Trainer API进行finetune任务的简单示例，这里以中文情感分类数据集`chnsenticorp`为例。
+更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
 
+1. 首先是import一些需要用到的头文件。
+    - 这里主要是模型、Tokenizer。
+    - 还有Trainer组件。
+        - 其中`Trainer`是训练主要入口，用户传入模型，数据集，即可进行训练
+        - `TrainingArguments` 包含了用户需要的大部分训练参数。
+        - `PdArgumentParser` 是用户输出参数的工具
+```python
+from functools import partial
+import paddle
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
+```
+2. 设置好用户参数
+    - PdArgumentParser 可以接受多个类似`TrainingArguments`的参数。用户可以自定义所需要的`ModelArguments`, `DataArguments`为为 tuple 传入 PdArgumentParser即可。
+```python
+parser = PdArgumentParser(TrainingArguments)
+(training_args,) = parser.parse_args_into_dataclasses()
 ```
 
+3. 加载模型，tokenizer, 数据集
+    - 注意，这里的数据集，需要输出的是一个dict。dict中的key，需要和模型的输入名称对应。
+    - 这里的，`labels`如果模型没有使用到，我们还需要额外定义`criterion`，计算最后的loss损失。
+```python
+train_dataset = load_dataset("chnsenticorp", splits=["train"])
+model = AutoModelForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(train_dataset.label_list))
+tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
+
+def convert_example(example, tokenizer):
+    encoded_inputs = tokenizer(text=example["text"], max_seq_len=128, pad_to_max_seq_len=True)
+    encoded_inputs["labels"] = int(example["label"])
+    return encoded_inputs
+
+train_dataset = train_dataset.map(partial(convert_example, tokenizer=tokenizer))
 ```
 
-## Trainer 参数介绍
+4. 构造Trainer示例，进行模型训练。
+    - 这里传入`model,criterion,args,train_dataset,tokenizer`这些训练需要的组件，构建了实例化的trainer
+    - 使用trainer.train()接口开始训练过程。训练完成后，可以保存模型，保存一些日志。
+```python
+trainer = Trainer(
+    model=model,
+    criterion=paddle.nn.loss.CrossEntropyLoss(),
+    args=training_args,
+    train_dataset=train_dataset if training_args.do_train else None,
+    tokenizer=tokenizer)
+
+if training_args.do_train:
+    train_result = trainer.train()
+    metrics = train_result.metrics
+    trainer.save_model()
+    trainer.log_metrics("train", metrics)
+    trainer.save_state()
+```
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0/run_pretrain_trainer.py)版本。
+
+
+## Trainer 实例化参数介绍
+Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
+
+```
+    参数：
+        model（[`PretrainedModel`] 或 `paddle.nn.Layer`，*可选*）：
+            用于训练、评估或预测的模型。
+            [`Trainer`] 对PaddleNLP的 [`PretrainedModel`] 一起使用进行了优化。你仍然可以使用
+            您自己的模型定义为`paddle.nn.Layer`，只要它们的工作方式与 PaddleNLP 模型相同。
+        args（[`TrainingArguments`]，*可选*）：
+            训练时需要用到的参数。将默认使用 [`TrainingArguments`] 初始化。
+            `output_dir` 设置为当前目录中名为 *tmp_trainer* 的目录（如果未提供）。
+        data_collat​​or（`DataCollat​​or`，*可选*）：
+            用于将 `train_dataset` 或 `eval_dataset` 的数据，组合为batch的函数。
+            如果没有提供 `tokenizer`，则默认为 [`default_data_collat​​or`], 否则为
+            [`DataCollat​​orWithPadding`]。
+        train_dataset（`paddle.io.Dataset` 或 `paddle.io.IterableDataset`，*可选*）：
+            用于训练的数据集。如果是 `datasets.Dataset`，那么
+            `model.forward()` 不需要的输入字段会被自动删除。
+        eval_dataset（`paddle.io.Dataset`，*可选*）：
+             用于评估的数据集。如果是 `datasets.Dataset`，那么
+            `model.forward()` 不需要的输入字段会被自动删除。
+        tokenizer（[`PretrainedTokenizer`]，*可选*）：
+            用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
+            batch输入的最大长度，它随模型保存，可以重新运行中断的训练过程。
+        compute_metrics (`Callable[[EvalPrediction], Dict]`, *optional*):
+            用于评估的计算指标的函数。必须采用 [`EvalPrediction`] 并返回
+            dict形式的metrics结果。
+        optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*）：
+            一个tuple, 包含要使用Optimizer和LRScheduler。将默认为模型上的 [`AdamW`] 实例
+            和LinearDecayWithWarmup。
+```
+
+
+## TrainingArguments 参数介绍
 ```
   --output_dir OUTPUT_DIR
                         保存模型输出和和中间checkpoints的输出目录
@@ -276,10 +365,11 @@ PaddleNLP提供了Trainer训练API，用户可以使用Trainer API高效快速�
                         Remove columns not required by the model when using an
                         nlp.Dataset. (default: True)
   --label_names LABEL_NAMES [LABEL_NAMES ...]
-
+                        标签名称
                         The list of keys in your dictionary of inputs that
                         correspond to the labels. (default: None)
   --load_best_model_at_end [LOAD_BEST_MODEL_AT_END]
+
                         Whether or not to load the best model found during
                         training at the end of training. (default: False)
   --metric_for_best_model METRIC_FOR_BEST_MODEL
@@ -289,14 +379,19 @@ PaddleNLP提供了Trainer训练API，用户可以使用Trainer API高效快速�
                         Whether the `metric_for_best_model` should be
                         maximized or not. (default: None)
   --ignore_data_skip [IGNORE_DATA_SKIP]
+                        重启训练时候，不略过已经训练的数据。
                         When resuming training, whether or not to skip the
                         first epochs and batches to get to the same training
                         data. (default: False)
-  --optim OPTIM         The optimizer to use. (default: adamw)
+  --optim OPTIM  
+                        优化器名称，默认为adamw
+                        The optimizer to use. (default: adamw)
   --report_to REPORT_TO [REPORT_TO ...]
+                        日志可视化显示，默认使用visualdl可视化展示。
                         The list of integrations to report the results and
                         logs to. (default: None)
   --resume_from_checkpoint RESUME_FROM_CHECKPOINT
+                        是否从断点重启恢复训练
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
 

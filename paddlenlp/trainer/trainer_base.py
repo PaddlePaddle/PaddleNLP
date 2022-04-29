@@ -153,11 +153,6 @@ class Trainer:
           original model. This is the model that should be used for the forward pass. For example, the inner model is
           wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same
           as `self.model`.
-        - **is_model_parallel** -- Whether or not a model has been switched to a model parallel mode (different from
-          data parallelism, this means some of the model layers are split on different GPUs).
-        - **place_model_on_device** -- Whether or not to automatically place the model on the device - it will be set
-          to `False` if model parallel or deepspeed is used, or if the default
-          `TrainingArguments.place_model_on_device` is overridden to return `False` .
         - **is_in_train** -- Whether or not a model is currently running `train` (e.g. when `evaluate` is called while
           in `train`)
 
@@ -190,6 +185,7 @@ class Trainer:
             args = TrainingArguments(output_dir=output_dir)
 
         self.args = args
+        self.is_in_train = False
         self.do_grad_scaling = args.fp16
 
         # Seed must be set before instantiating the model when using model
@@ -294,6 +290,7 @@ class Trainer:
             ignore_keys_for_eval: Optional[List[str]]=None, ):
 
         args = self.args
+        self.is_in_train = True
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
         # Load potential model checkpoint
