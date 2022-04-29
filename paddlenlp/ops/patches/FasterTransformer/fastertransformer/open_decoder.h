@@ -1901,13 +1901,13 @@ public:
         computeType_,
         cublasAlgo));
 
-    transpose_kernelLauncher(attn_out,
-                             attn_trans_out,
-                             local_batch_size,
-                             seq_len,
-                             t_parallel_param_.local_head_num_,
-                             size_per_head_,
-                             param_.stream);
+    transpose_general_kernelLauncher(attn_out,
+                                     attn_trans_out,
+                                     local_batch_size,
+                                     seq_len,
+                                     t_parallel_param_.local_head_num_,
+                                     size_per_head_,
+                                     param_.stream);
 
     {
       const int k = t_parallel_param_.local_hidden_units_;

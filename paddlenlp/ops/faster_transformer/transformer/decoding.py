@@ -1387,6 +1387,11 @@ def enable_ft_para(tensor_para_size=1,
     def layer_init_wrapper(func):
         @functools.wraps(func)
         def _impl(self, *args, **kwargs):
+            init_dict = fn_args_to_dict(func, *((self, ) + args), **kwargs)
+            init_dict.pop("self")
+            assert init_dict["nhead"] % _ft_para_conf.tensor_para_size == 0, (
+                "The number of heads(%d) cannot be evenly divisible by `tensor_para_size`(%d)."
+                % (init_dict["nhead"], _ft_para_conf.tensor_para_size))
             func(self, *args, **kwargs)
             # Reset parameters with corresponding slice.
             for x, attr in [(m, n)
