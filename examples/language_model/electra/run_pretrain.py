@@ -568,7 +568,7 @@ def do_train(args):
                     gen_logits, disc_logits, disc_labels, attention_mask = model(
                         input_ids=input_ids,
                         raw_input_ids=raw_input_ids,
-                        gen_labels=gen_labels)
+                        generator_labels=gen_labels)
                     loss = criterion(gen_logits, disc_logits, gen_labels,
                                      disc_labels, attention_mask)
                 scaled = scaler.scale(loss)
@@ -579,7 +579,7 @@ def do_train(args):
                 gen_logits, disc_logits, disc_labels, attention_mask = model(
                     input_ids=input_ids,
                     raw_input_ids=raw_input_ids,
-                    gen_labels=gen_labels)
+                    generator_labels=gen_labels)
                 loss = criterion(gen_logits, disc_logits, gen_labels,
                                  disc_labels, attention_mask)
                 loss.backward()

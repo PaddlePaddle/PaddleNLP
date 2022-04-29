@@ -156,7 +156,13 @@ class Predictor(object):
                 logits = self.output_handle.copy_to_cpu()
                 all_embeddings.append(logits)
                 examples = []
-
+        if (len(examples) > 0):
+            input_ids, segment_ids = batchify_fn(examples)
+            self.input_handles[0].copy_from_cpu(input_ids)
+            self.input_handles[1].copy_from_cpu(segment_ids)
+            self.predictor.run()
+            logits = self.output_handle.copy_to_cpu()
+            all_embeddings.append(logits)
         all_embeddings = np.concatenate(all_embeddings, axis=0)
         np.save('corpus_embedding', all_embeddings)
 

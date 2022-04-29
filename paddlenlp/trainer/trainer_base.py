@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is modified from 
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py
+
 import collections
 import contextlib
 import inspect
@@ -27,6 +30,7 @@ import warnings
 import types
 from collections.abc import Mapping
 from pathlib import Path
+from packaging import version
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from tqdm.auto import tqdm
@@ -39,12 +43,19 @@ from paddle.io import (
     Dataset,
     DataLoader,
     DistributedBatchSampler, )
+import paddlenlp
+from paddlenlp.data import (
+    default_data_collator,
+    DataCollator,
+    DefaultDataCollator,
+    DataCollatorWithPadding, )
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.model_utils import PretrainedModel, unwrap_model
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
-from .trainer_args import (TrainingArguments, )
+from .integrations import get_reporting_integration_callbacks
+from .trainer_args import TrainingArguments
 from .trainer_utils import (
     IntervalStrategy,
     EvaluationStrategy,
@@ -72,17 +83,7 @@ from .utils.helper import (
     nested_truncate, )
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
-
-
-class DataCollator:
-    def __init__(self, *args, **kwargs):
-        pass
-
-
-class DataCollatorWithPadding:
-    def __init__(self, *args, **kwargs):
-        pass
-
+DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -94,6 +95,16 @@ SCALER_NAME = "scaler.pdparams"
 
 WEIGHTS_NAME = "model_state.pdparams"
 CONFIG_NAME = "model_config.json"
+
+import importlib
+
+
+def is_datasets_available():
+    return importlib.util.find_spec("datasets") is not None
+
+
+if is_datasets_available():
+    import datasets
 
 
 def set_seed(seed):
@@ -109,16 +120,16 @@ def set_seed(seed):
 
 class Trainer:
     """
-    Trainer is a simple but feature-complete training and eval loop for PyTorch, optimized for 🤗 Transformers.
+    Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleNLP.
 
     Args:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
-            The model to train, evaluate or use for predictions. If not provided, a `model_init` must be passed.
+            The model to train, evaluate or use for predictions. 
 
             <Tip>
 
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
-            your own models defined as `paddle.nn.Layer` as long as they work the same way as the 🤗 Transformers
+            your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleNLP
             models.
 
             </Tip>
@@ -130,16 +141,10 @@ class Trainer:
             The function to use to form a batch from a list of elements of `train_dataset` or `eval_dataset`. Will
             default to [`default_data_collator`] if no `tokenizer` is provided, an instance of
             [`DataCollatorWithPadding`] otherwise.
-        train_dataset (`paddle.utils.data.Dataset` or `paddle.utils.data.IterableDataset`, *optional*):
+        train_dataset (`paddle.io.Dataset` or `paddle.io.IterableDataset`, *optional*):
             The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
             `model.forward()` method are automatically removed.
-
-            Note that if it's a `paddle.utils.data.IterableDataset` with some randomization and you are training in a
-            distributed fashion, your iterable dataset should either use a internal attribute `generator` that is a
-            `paddle.Generator` for the randomization that must be identical on all processes (and the Trainer will
-            manually set the seed of this `generator` at each epoch) or have a `set_epoch()` method that internally
-            sets the seed of the RNGs used.
-        eval_dataset (`paddle.utils.data.Dataset`, *optional*):
+        eval_dataset (`paddle.io.Dataset`, *optional*):
              The dataset to use for evaluation. If it is an `datasets.Dataset`, columns not accepted by the
              `model.forward()` method are automatically removed.
         tokenizer ([`PretrainedTokenizer`], *optional*):
@@ -159,7 +164,7 @@ class Trainer:
           subclass.
         - **model_wrapped** -- Always points to the most external model in case one or more other modules wrap the
           original model. This is the model that should be used for the forward pass. For example, the inner model is 
-          wrapped in `paddle.nn.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
+          wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same 
           as `self.model`.
         - **is_model_parallel** -- Whether or not a model has been switched to a model parallel mode (different from
           data parallelism, this means some of the model layers are split on different GPUs).
@@ -182,8 +187,14 @@ class Trainer:
             eval_dataset: Optional[Dataset]=None,
             tokenizer: Optional[PretrainedTokenizer]=None,
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]]=None,
+            callbacks: Optional[List[TrainerCallback]]=None,
             optimizers: Tuple[paddle.optimizer.Optimizer,
                               paddle.optimizer.lr.LRScheduler]=(None, None), ):
+        if paddle.distributed.get_world_size() > 1:
+            if not paddle.fluid.dygraph.parallel_helper._is_parallel_ctx_initialized(
+            ):
+                paddle.distributed.init_parallel_env()
+
         if args is None:
             output_dir = "tmp_trainer"
             logger.info(
@@ -220,13 +231,16 @@ class Trainer:
 
         self.state = TrainerState()
         self.control = TrainerControl()
+        self._signature_columns = None
 
-        callbacks = DEFAULT_CALLBACKS
+        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(
+            self.args.report_to)
+        callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
                                                 self.lr_scheduler)
-
-        self.add_callback(ProgressCallback)
+        self.add_callback(PrinterCallback if self.args.disable_tqdm else
+                          DEFAULT_PROGRESS_CALLBACK)
 
         if args.max_steps > 0:
             logger.info(
@@ -266,23 +280,23 @@ class Trainer:
 
     def pop_callback(self, callback):
         """
-        Remove a callback from the current list of [`~transformer.TrainerCallback`] and returns it.
+        Remove a callback from the current list of [`~TrainerCallback`] and returns it.
         If the callback is not found, returns `None` (and no error is raised).
         Args:
-           callback (`type` or [`~transformer.TrainerCallback`]):
-               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+           callback (`type` or [`~TrainerCallback`]):
+               A [`~TrainerCallback`] class or an instance of a [`~TrainerCallback`]. In the
                first case, will pop the first member of that class found in the list of callbacks.
         Returns:
-            [`~transformer.TrainerCallback`]: The callback removed, if found.
+            [`~TrainerCallback`]: The callback removed, if found.
         """
         return self.callback_handler.pop_callback(callback)
 
     def remove_callback(self, callback):
         """
-        Remove a callback from the current list of [`~transformer.TrainerCallback`].
+        Remove a callback from the current list of [`~TrainerCallback`].
         Args:
-           callback (`type` or [`~transformer.TrainerCallback`]):
-               A [`~transformer.TrainerCallback`] class or an instance of a [`~transformer.TrainerCallback`]. In the
+           callback (`type` or [`~TrainerCallback`]):
+               A [`~TrainerCallback`] class or an instance of a [`~TrainerCallback`]. In the
                first case, will remove the first member of that class found in the list of callbacks.
         """
         self.callback_handler.remove_callback(callback)
@@ -375,16 +389,55 @@ class Trainer:
         logger.info(f"  Total optimization steps = {args.num_training_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
 
-        self.state.epoch = 0
-        self.state.max_steps = int(args.num_training_steps)
-        self.state.num_train_epochs = num_train_epochs
-        self.state.is_local_process_zero = self.is_local_process_zero()
-        self.state.is_world_process_zero = self.is_world_process_zero()
-
         start_time = time.time()
+        self._globalstep_last_start_time = time.time()
+        self.state.epoch = 0
         epochs_trained = 0
         steps_trained_in_current_epoch = 0
         steps_trained_progress_bar = None
+
+        # Check if continuing training from a checkpoint
+        if resume_from_checkpoint is not None and os.path.isfile(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)):
+            self.state = TrainerState.load_from_json(
+                os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
+            if not args.ignore_data_skip:
+                steps_trained_in_current_epoch = self.state.global_step % (
+                    num_update_steps_per_epoch)
+                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
+            else:
+                steps_trained_in_current_epoch = 0
+
+            logger.info(
+                "  Continuing training from checkpoint, will skip to saved global_step"
+            )
+            logger.info(f"  Continuing training from epoch {epochs_trained}")
+            logger.info(
+                f"  Continuing training from global step {self.state.global_step}"
+            )
+            if not args.ignore_data_skip:
+                logger.info(
+                    f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
+                    "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
+                    "flag to your launch command, but you will resume the training on data already seen by your model."
+                )
+                if self.is_local_process_zero() and not args.disable_tqdm:
+                    steps_trained_progress_bar = tqdm(
+                        total=steps_trained_in_current_epoch)
+                    steps_trained_progress_bar.set_description(
+                        "Skipping the first batches")
+            if not args.ignore_data_skip:
+                if isinstance(train_dataloader,
+                              paddle.io.DataLoader) and isinstance(
+                                  train_dataloader.batch_sampler, paddlenlp.
+                                  utils.batch_sampler.DistributedBatchSampler):
+                    consumed_samples = self.state.global_step * args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+                    train_dataloader.batch_sampler.set_epoch(
+                        consumed_samples=consumed_samples)
+                    logger.info(
+                        f"Set DistributedBatchSampler consumed_samples to %d" %
+                        consumed_samples)
 
         epoch_iterator = train_dataloader
         steps_in_epoch = len(epoch_iterator)
@@ -394,6 +447,11 @@ class Trainer:
         self.callback_handler.lr_scheduler = self.lr_scheduler
         self.callback_handler.train_dataloader = train_dataloader
 
+        self.state.max_steps = int(args.num_training_steps)
+        self.state.num_train_epochs = num_train_epochs
+        self.state.is_local_process_zero = self.is_local_process_zero()
+        self.state.is_world_process_zero = self.is_world_process_zero()
+
         self.control = self.callback_handler.on_train_begin(args, self.state,
                                                             self.control)
 
@@ -402,12 +460,43 @@ class Trainer:
         self._globalstep_last_logged = self.state.global_step
 
         for epoch in range(epochs_trained, num_train_epochs):
+            if isinstance(train_dataloader,
+                          paddle.io.DataLoader) and isinstance(
+                              train_dataloader.batch_sampler,
+                              paddle.io.DistributedBatchSampler):
+                train_dataloader.batch_sampler.set_epoch(epoch)
+
             step = -1
 
             self.control = self.callback_handler.on_epoch_begin(
                 args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                # Skip past any already trained steps if resuming training
+                # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
+                # We use consumed_samples to reset the status
+                if isinstance(train_dataloader,
+                              paddle.io.DataLoader) and isinstance(
+                                  train_dataloader.batch_sampler, paddlenlp.
+                                  utils.batch_sampler.DistributedBatchSampler):
+                    if step == 0:
+                        if steps_trained_progress_bar is not None:
+                            steps_trained_progress_bar.update(
+                                steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        self._load_rng_state(resume_from_checkpoint)
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
+                    steps_trained_in_current_epoch -= 1
+                    if steps_trained_progress_bar is not None:
+                        steps_trained_progress_bar.update(1)
+                    if steps_trained_in_current_epoch == 0:
+                        self._load_rng_state(resume_from_checkpoint)
+                    continue
+                elif steps_trained_progress_bar is not None:
+                    steps_trained_progress_bar.close()
+                    steps_trained_progress_bar = None
 
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(
@@ -513,19 +602,6 @@ class Trainer:
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def training_step(
-            self, model: nn.Layer,
-            inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        model.train()
-        inputs = self._prepare_inputs(inputs)
-
-        with self.autocast_smart_context_manager():
-            loss = self.compute_loss(model, inputs)
-
-        loss.backward()
-
-        return loss.detach()
-
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if not isinstance(self.train_dataset, collections.abc.Sized):
             return None
@@ -561,12 +637,22 @@ class Trainer:
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (
-                self.state.global_step - self._globalstep_last_logged), 4)
+                self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
+            logs.update(
+                speed_metrics(
+                    "interval",
+                    self._globalstep_last_start_time,
+                    num_samples=self.args.train_batch_size *
+                    self.args.gradient_accumulation_steps,
+                    num_steps=self.state.global_step -
+                    self._globalstep_last_logged, ))
+
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
+            self._globalstep_last_start_time = time.time()
 
             self.log(logs)
 
@@ -595,6 +681,10 @@ class Trainer:
             raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
+        if is_datasets_available() and isinstance(train_dataset,
+                                                  datasets.Dataset):
+            train_dataset = self._remove_unused_columns(
+                train_dataset, description="training")
 
         train_sampler = self._get_train_sampler()
 
@@ -636,6 +726,11 @@ class Trainer:
             raise ValueError("Trainer: evaluation requires an eval_dataset.")
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
 
+        if is_datasets_available() and isinstance(eval_dataset,
+                                                  datasets.Dataset):
+            eval_dataset = self._remove_unused_columns(
+                eval_dataset, description="evaluation")
+
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
         return DataLoader(
@@ -655,6 +750,10 @@ class Trainer:
                 The test dataset to use. If it is an `datasets.Dataset`, columns not accepted by the `model.forward()`
                 method are automatically removed. It must implement `__len__`.
         """
+        if is_datasets_available() and isinstance(test_dataset,
+                                                  datasets.Dataset):
+            test_dataset = self._remove_unused_columns(
+                test_dataset, description="test")
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -703,6 +802,41 @@ class Trainer:
                 **optimizer_kwargs)
 
         return self.optimizer
+
+    def _load_rng_state(self, checkpoint):
+        # Load RNG states from `checkpoint`
+        if checkpoint is None:
+            return
+
+        local_rank = self.args.local_rank
+        if local_rank != -1:
+            rng_file = os.path.join(checkpoint, f"rng_state_{local_rank}.pth")
+            if not os.path.isfile(os.path.join(checkpoint, rng_file)):
+                logger.info(
+                    f"Didn't find an RNG file for process {local_rank}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
+        else:
+            rng_file = os.path.join(checkpoint, "rng_state.pth")
+            if not os.path.isfile(rng_file):
+                logger.info(
+                    "Didn't find an RNG file, if you are resuming a training that was launched in a distributed "
+                    "fashion, reproducibility is not guaranteed.")
+                return
+
+        checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+        random.setstate(checkpoint_rng_state["python"])
+        np.random.set_state(checkpoint_rng_state["numpy"])
+
+        core = paddle.fluid.core
+        if core.is_compiled_with_cuda():
+            for i in range(core.get_cuda_device_count()):
+                core.default_cuda_generator(i)._is_init_py = True
+                core.default_cuda_generator(i).manual_seed(checkpoint_rng_state[
+                    "cuda"][i])
+
+        core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(
@@ -762,6 +896,9 @@ class Trainer:
         return self.lr_scheduler
 
     def _wrap_model(self, model, training=True):
+        if self.args.world_size > 1:
+            model = paddle.DataParallel(model)
+
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
             return model
@@ -812,8 +949,9 @@ class Trainer:
             ctx_manager = autocast(
                 True,
                 custom_black_list=[
-                    "reduce_sum", "c_softmax_with_cross_entropy",
-                    "elementwise_div"
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
                 ],
                 level=self.args.fp16_opt_level)
         else:
@@ -832,9 +970,10 @@ class Trainer:
         elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
             labels = (inputs.pop("start_positions"),
                       inputs.pop("end_positions"))
+        elif self.criterion is not None and "generator_labels" in inputs:
+            labels = inputs["generator_labels"]
         else:
             labels = None
-
         outputs = model(**inputs)
 
         if self.criterion is not None:
@@ -904,6 +1043,14 @@ class Trainer:
                      input_spec=None,
                      load_best_model=False,
                      output_dir: Optional[str]=None):
+        """ Export paddle inference model.
+
+        Args:
+            input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input, 
+                such as shape , dtype , name. Defaults to None.
+            load_best_model (bool, optional): Load best model. Defaults to False.
+            output_dir (Optional[str], optional): Output dir to save the exported model. Defaults to None.
+        """
 
         if output_dir is None:
             output_dir = self.args.output_dir
@@ -986,6 +1133,9 @@ class Trainer:
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
+            "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
+            "cpu": paddle.fluid.core.default_cpu_generator().get_state()
+            .current_seed(),
         }
 
         # TODO: ZHUI save paddle, cudnn seed.
@@ -1126,7 +1276,7 @@ class Trainer:
                 The values to log.
         """
         if self.state.epoch is not None:
-            logs["epoch"] = round(self.state.epoch, 2)
+            logs["epoch"] = round(self.state.epoch, 4)
 
         output = { ** logs, ** {"step": self.state.global_step}}
         self.state.log_history.append(output)
@@ -1195,7 +1345,8 @@ class Trainer:
             description: str,
             prediction_loss_only: Optional[bool]=None,
             ignore_keys: Optional[List[str]]=None,
-            metric_key_prefix: str="eval", ) -> EvalLoopOutput:
+            metric_key_prefix: str="eval",
+            max_eval_iters: Optional[int]=-1, ) -> EvalLoopOutput:
         """
         Prediction/evaluation loop, shared by `Trainer.evaluate()` and `Trainer.predict()`.
 
@@ -1204,12 +1355,37 @@ class Trainer:
         args = self.args
 
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
-        prediction_loss_only = False
 
-        model = self._wrap_model(self.model, training=False)
+        model = self.model
 
-        batch_size = dataloader.batch_sampler.batch_size
-        num_samples = self.num_examples(dataloader)
+        batch_sampler = None
+        if isinstance(dataloader, paddle.io.DataLoader):
+            batch_size = dataloader.batch_sampler.batch_size
+        elif isinstance(
+                dataloader,
+                paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+            # support for inner dataloader
+            batch_size = dataloader._batch_sampler.batch_size
+            # alias for inner dataloader
+            dataloader.dataset = dataloader._dataset
+        else:
+            raise ValueError("Only support for paddle.io.DataLoader")
+
+        if max_eval_iters <= 0:
+            num_samples = self.num_examples(dataloader)
+        else:
+            num_samples = batch_size * self.args.world_size * max_eval_iters
+            if isinstance(
+                    dataloader, paddle.fluid.dataloader.dataloader_iter.
+                    _DataLoaderIterBase) and isinstance(
+                        dataloader._batch_sampler,
+                        paddlenlp.utils.batch_sampler.DistributedBatchSampler):
+                consumed_samples = (
+                    (self.state.global_step) // args.eval_steps
+                ) * max_eval_iters * args.eval_batch_size * args.world_size
+                dataloader._batch_sampler.set_epoch(
+                    consumed_samples=consumed_samples)
+
         logger.info(f"***** Running {description} *****")
         logger.info(f"  Num examples = {num_samples}")
         logger.info(f"  Pre device batch size = {batch_size}")
@@ -1244,7 +1420,6 @@ class Trainer:
             # Prediction step
             loss, logits, labels = self.prediction_step(
                 model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
-
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
@@ -1265,7 +1440,8 @@ class Trainer:
                     preds_host, logits, padding_index=-100)
             self.control = self.callback_handler.on_prediction_step(
                 args, self.state, self.control)
-
+            if max_eval_iters > 0 and step >= max_eval_iters - 1:
+                break
         # Gather all remaining tensors and put them back on the CPU
         if losses_host is not None:
             losses = nested_numpify(losses_host)
@@ -1520,8 +1696,47 @@ class Trainer:
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
 
+    def _remove_unused_columns(self,
+                               dataset: "datasets.Dataset",
+                               description: Optional[str]=None):
+        if not self.args.remove_unused_columns:
+            return dataset
+        if self._signature_columns is None:
+            # Inspect model forward signature to keep only the arguments it accepts.
+            signature = inspect.signature(self.model.forward)
+            self._signature_columns = list(signature.parameters.keys())
+            # Labels may be named label or label_ids, the default data collator handles that.
+            self._signature_columns += [
+                "label", "label_ids", "labels", "start_positions",
+                "end_positions"
+            ]
+
+        ignored_columns = list(
+            set(dataset.column_names) - set(self._signature_columns))
+        if len(ignored_columns) > 0:
+            dset_description = "" if description is None else f"in the {description} set "
+            logger.info(
+                f"The following columns {dset_description} don't have a corresponding argument in "
+                f"`{self.model.__class__.__name__}.forward` and have been ignored: {', '.join(ignored_columns)}."
+                f" If {', '.join(ignored_columns)} are not expected by `{self.model.__class__.__name__}.forward`, "
+                f" you can safely ignore this message.")
+
+        columns = [
+            k for k in self._signature_columns if k in dataset.column_names
+        ]
+
+        if version.parse(datasets.__version__) < version.parse("1.4.0"):
+            dataset.set_format(
+                type=dataset.format["type"],
+                columns=columns,
+                format_kwargs=dataset.format["format_kwargs"])
+            return dataset
+        else:
+            return dataset.remove_columns(ignored_columns)
+
     def print_config(self, args=None, key=""):
         """
+        print config values
         """
         logger.info("=" * 60)
         if args is None:

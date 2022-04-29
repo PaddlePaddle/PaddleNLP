@@ -48,14 +48,14 @@ DATASETS_MODULE_PATH = "paddlenlp.datasets."
 from datasets import load_dataset as origin_load_dataset
 
 
-def load_from_ppnlp(path, **kwargs):
+def load_from_ppnlp(path, *args, **kwargs):
     ppnlp_path = paddlenlp.datasets.__path__[0]
     new_path = os.path.split(path)[-1]
     new_path = os.path.join(ppnlp_path, 'hf_datasets', new_path + '.py')
     if os.path.exists(new_path):
-        return origin_load_dataset(new_path, **kwargs)
+        return origin_load_dataset(new_path, *args, **kwargs)
     else:
-        return origin_load_dataset(path, **kwargs)
+        return origin_load_dataset(path, *args, **kwargs)
 
 
 datasets.load_dataset = load_from_ppnlp
@@ -63,20 +63,26 @@ datasets.load_dataset = load_from_ppnlp
 
 class DatasetTuple:
     def __init__(self, splits):
-        self.tuple_cls = namedtuple('datasets', splits)
-        self.tuple = self.tuple_cls(*[None for _ in splits])
+        self.identifier_map, identifiers = self._gen_identifier_map(splits)
+        self.tuple_cls = namedtuple('datasets', identifiers)
+        self.tuple = self.tuple_cls(* [None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
             return self.tuple[key]
         if isinstance(key, str):
-            return getattr(self.tuple, key)
-
-    def __repr__(self):
-        return self.tuple.__repr__()
+            return getattr(self.tuple, self.identifier_map[key])
 
     def __setitem__(self, key, value):
-        self.tuple = self.tuple._replace(**{key: value})
+        self.tuple = self.tuple._replace(**{self.identifier_map[key]: value})
+
+    def _gen_identifier_map(self, splits):
+        identifier_map = {}
+        identifiers = []
+        for i in range(len(splits)):
+            identifiers.append('splits_' + str(i))
+            identifier_map[splits[i]] = 'splits_' + str(i)
+        return identifier_map, identifiers
 
     def __len__(self):
         return len(self.tuple)

@@ -20,45 +20,46 @@ import distutils.util
 import os.path as osp
 from typing import Optional
 
-from datasets import load_metric, load_dataset
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddlenlp
-from paddlenlp.metrics.squad import compute_prediction
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
-from paddlenlp.trainer.trainer_utils import EvalPrediction
+from paddlenlp.trainer.trainer_utils import EvalPrediction, get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering, )
 from paddlenlp.utils.log import logger
+from datasets import load_metric, load_dataset
 
 sys.path.insert(0, os.path.abspath("."))
 from question_answering import (
     QuestionAnsweringTrainer,
     CrossEntropyLossForSQuAD,
     prepare_train_features,
-    prepare_validation_features,
-    qa_collator, )
+    prepare_validation_features, )
 from utils import (
     ALL_DATASETS,
     DataTrainingArguments,
     ModelArguments, )
 
 
-def do_train():
+def main():
     parser = PdArgumentParser(
         (ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+    # Log model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
 
+    paddle.set_device(training_args.device)
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
@@ -85,18 +86,17 @@ def do_train():
 
     # set_seed(args)
     data_args.dataset = data_args.dataset.strip()
-    if data_args.dataset not in ALL_DATASETS:
-        raise ValueError("Not found dataset {}".format(data_args.dataset))
 
-    # Use yaml config to rewrite all args.
-    config = ALL_DATASETS[data_args.dataset]
-    for args in (model_args, data_args, training_args):
-        for arg in vars(args):
-            if arg in config.keys():
-                setattr(args, arg, config[arg])
+    if data_args.dataset in ALL_DATASETS:
+        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
+        config = ALL_DATASETS[data_args.dataset]
+        for args in (model_args, data_args, training_args):
+            for arg in vars(args):
+                if arg in config.keys():
+                    setattr(args, arg, config[arg])
 
-    training_args.per_device_train_batch_size = config["batch_size"]
-    training_args.per_device_eval_batch_size = config["batch_size"]
+        training_args.per_device_train_batch_size = config["batch_size"]
+        training_args.per_device_eval_batch_size = config["batch_size"]
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -114,41 +114,62 @@ def do_train():
 
     loss_fct = CrossEntropyLossForSQuAD()
 
-    train_dataset = raw_datasets["train"]
-    eval_examples = raw_datasets["validation"]
-    predict_examples = raw_datasets["test"]
+    # Preprocessing the datasets.
+    # Preprocessing is slighlty different for training and evaluation.
+    if training_args.do_train:
+        column_names = raw_datasets["train"].column_names
+    elif training_args.do_eval:
+        column_names = raw_datasets["validation"].column_names
+    else:
+        column_names = raw_datasets["test"].column_names
 
-    column_names = raw_datasets["train"].column_names
-    # Dataset pre-process
-    train_dataset = train_dataset.map(
-        partial(
-            prepare_train_features, tokenizer=tokenizer, args=data_args),
-        batched=True,
-        num_proc=4,
-        remove_columns=column_names,
-        load_from_cache_file=not data_args.overwrite_cache,
-        desc="Running tokenizer on train dataset", )
+    if training_args.do_train:
+        train_dataset = raw_datasets["train"]
+        # Create train feature from dataset
+        with training_args.main_process_first(
+                desc="train dataset map pre-processing"):
+            # Dataset pre-process
+            train_dataset = train_dataset.map(
+                partial(
+                    prepare_train_features, tokenizer=tokenizer,
+                    args=data_args),
+                batched=True,
+                num_proc=4,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on train dataset", )
 
-    eval_dataset = eval_examples.map(
-        partial(
-            prepare_validation_features, tokenizer=tokenizer, args=data_args),
-        batched=True,
-        num_proc=4,
-        remove_columns=column_names,
-        load_from_cache_file=not data_args.overwrite_cache,
-        desc="Running tokenizer on validation dataset", )
-
-    predict_dataset = predict_examples.map(
-        partial(
-            prepare_validation_features, tokenizer=tokenizer, args=data_args),
-        batched=True,
-        num_proc=4,
-        remove_columns=column_names,
-        load_from_cache_file=not data_args.overwrite_cache,
-        desc="Running tokenizer on prediction dataset", )
+    if training_args.do_eval:
+        eval_examples = raw_datasets["validation"]
+        with training_args.main_process_first(
+                desc="evaluate dataset map pre-processing"):
+            eval_dataset = eval_examples.map(
+                partial(
+                    prepare_validation_features,
+                    tokenizer=tokenizer,
+                    args=data_args),
+                batched=True,
+                num_proc=4,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on validation dataset", )
+    if training_args.do_predict:
+        predict_examples = raw_datasets["test"]
+        with training_args.main_process_first(
+                desc="test dataset map pre-processing"):
+            predict_dataset = predict_examples.map(
+                partial(
+                    prepare_validation_features,
+                    tokenizer=tokenizer,
+                    args=data_args),
+                batched=True,
+                num_proc=4,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on prediction dataset", )
 
     # Define data collector
-    data_collator = qa_collator(tokenizer, data_args)
+    data_collator = DataCollatorWithPadding(tokenizer)
 
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
@@ -160,40 +181,38 @@ def do_train():
             n_best_size=data_args.n_best_size,
             max_answer_length=data_args.max_answer_length,
             null_score_diff_threshold=data_args.null_score_diff_threshold, )
-        # Format the result to the format the metric expects.
-        formatted_predictions = [{
-            "id": k,
-            "prediction_text": v
-        } for k, v in predictions.items()]
+
+        # # Format the result to the format the metric expects.
+        # formatted_predictions = [{
+        #     "id": k,
+        #     "prediction_text": v
+        # } for k, v in predictions.items()]
+
         references = [{
             "id": ex["id"],
             "answers": ex["answers"]
         } for ex in examples]
-        return EvalPrediction(
-            predictions=formatted_predictions, label_ids=references)
-
-    # Define the metrics of tasks.
-    # Metrics
-    metric = load_metric("squad")
+        return EvalPrediction(predictions=predictions, label_ids=references)
 
     def compute_metrics(p: EvalPrediction):
-        return metric.compute(predictions=p.predictions, references=p.label_ids)
+        ret = squad_evaluate(
+            examples=p.label_ids,
+            preds=p.predictions,
+            is_whitespace_splited=False)
+        return dict(ret)
+        # return metric.compute(predictions=p.predictions, references=p.label_ids)
 
     trainer = QuestionAnsweringTrainer(
         model=model,
         criterion=loss_fct,
         args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        eval_examples=eval_examples,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        eval_examples=eval_examples if training_args.do_eval else None,
         data_collator=data_collator,
         post_process_function=post_processing_function,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics, )
-
-    # Log model and data config
-    trainer.print_config(model_args, "Model")
-    trainer.print_config(data_args, "Data")
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -201,37 +220,45 @@ def do_train():
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
 
-    # Training
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    metrics = train_result.metrics
-    trainer.save_model()  # Saves the tokenizer too for easy upload
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
-    trainer.save_state()
+    if training_args.do_train:
+        # Training
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    # model.set_state_dict(paddle.load("tmp/model_state.pdparams"))
 
     # Evaluate and tests model
-    eval_metrics = trainer.evaluate()
-    trainer.log_metrics("eval", eval_metrics)
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
 
-    test_ret = trainer.predict(predict_dataset, predict_examples)
-    trainer.log_metrics("predict", test_ret.metrics)
-    if test_ret.label_ids is None:
-        paddle.save(
-            test_ret.predictions,
-            os.path.join(training_args.output_dir, "test_results.pdtensor"), )
+    if training_args.do_predict:
+        test_ret = trainer.predict(predict_dataset, predict_examples)
+        trainer.log_metrics("predict", test_ret.metrics)
 
-    # export inference model
-    input_spec = [
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64"),  # input_ids
-        paddle.static.InputSpec(
-            shape=[None, None], dtype="int64")  # segment_ids
-    ]
-    trainer.export_model(
-        input_spec=input_spec,
-        load_best_model=True,
-        output_dir=model_args.export_model_dir)
+        if test_ret.label_ids is None:
+            paddle.save(
+                test_ret.predictions,
+                os.path.join(training_args.output_dir, "test_results.pdtensor"),
+            )
+
+    if training_args.do_export:
+        # export inference model
+        input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(
+                shape=[None, None], dtype="int64")  # segment_ids
+        ]
+        trainer.export_model(
+            input_spec=input_spec,
+            load_best_model=True,
+            output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":
-    do_train()
+    main()

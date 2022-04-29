@@ -68,6 +68,8 @@ def cal_acc(golden_label, pred_label):
     """
     acc = 0.0
     for ids in pred_label:
+        if ids not in golden_label:
+            continue
         if pred_label[ids] == golden_label[ids]:
             acc += 1
     if len(golden_label):

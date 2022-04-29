@@ -3,7 +3,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -542,7 +541,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             beam_state=states)
 
         if kwargs.get("trg_word", None) is not None:
-            if in_dygraph_mode():
+            if paddle.in_dynamic_mode():
                 if paddle.shape(kwargs.get("trg_word"))[1] > time:
                     beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state,

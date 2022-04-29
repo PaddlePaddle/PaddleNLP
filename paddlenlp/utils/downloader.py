@@ -362,8 +362,7 @@ class DownloaderCheck(threading.Thread):
         self.command = command
         self.task = task
         self.addition = addition
-        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + str(
-            int(time.time()))
+        self._initialize()
 
     def uri_path(self, server_url, api):
         srv = server_url
@@ -376,23 +375,30 @@ class DownloaderCheck(threading.Thread):
             srv += api
         return srv
 
+    def _initialize(self):
+        etime = str(int(time.time()))
+        self.full_hash_flag = _md5(str(uuid.uuid1())[-12:])
+        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + etime
+
     def request_check(self, task, command, addition):
         if task is None:
             return SUCCESS_STATUS
         payload = {'word': self.task}
-        api_url = self.uri_path(DOWNLOAD_SERVER, 'search')
+        api_url = self.uri_path(DOWNLOAD_SERVER, 'stat')
         cache_path = os.path.join("～")
         if os.path.exists(cache_path):
             extra = {
                 "command": self.command,
                 "mtime": os.stat(cache_path).st_mtime,
-                "hub_name": self.hash_flag
+                "hub_name": self.hash_flag,
+                "cache_info": self.full_hash_flag
             }
         else:
             extra = {
                 "command": self.command,
                 "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-                "hub_name": self.hash_flag
+                "hub_name": self.hash_flag,
+                "cache_info": self.full_hash_flag
             }
         if addition is not None:
             extra.update({"addition": addition})
@@ -400,6 +406,7 @@ class DownloaderCheck(threading.Thread):
             import paddle
             payload['hub_version'] = " "
             payload['paddle_version'] = paddle.__version__.split('-')[0]
+            payload['from'] = 'ppnlp'
             payload['extra'] = json.dumps(extra)
             r = requests.get(api_url, payload, timeout=1).json()
             if r.get("update_cache", 0) == 1:

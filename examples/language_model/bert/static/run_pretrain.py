@@ -29,6 +29,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
 
+from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
 from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
 from paddlenlp.transformers import BertTokenizer
@@ -154,6 +155,14 @@ def parse_args():
         default=1,
         help="Number of merge steps before gradient update."
         "global_batch_size = gradient_merge_steps * batch_size.")
+
+    # For benchmark.
+    parser.add_argument(
+        '--profiler_options',
+        type=str,
+        default=None,
+        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     return args
 
@@ -385,6 +394,11 @@ def do_train(args):
                 lr_scheduler.step()
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
+
+                # Profile for model benchmark
+                if args.profiler_options is not None:
+                    profiler.add_profiler_step(args.profiler_options)
+
                 if global_step % args.logging_steps == 0:
                     print(
                         "tobal step: %d, epoch: %d, batch: %d, loss: %f, "

@@ -154,6 +154,9 @@ def evaluate(model, loss_fct, dev_data_loader, metric):
 
 
 def run(args):
+    if args.do_train:
+        assert args.batch_size % args.gradient_accumulation_steps == 0, \
+            "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     max_seq_length = args.max_seq_length
     max_num_choices = 4
 

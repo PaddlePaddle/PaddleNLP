@@ -4,6 +4,8 @@
 
 本项目是 GLUE评测任务 在 Paddle 2.0上的开源实现。
 
+本项目支持BERT, ELECTRA,ERNIE,ALBERT,RoBERTa模型，可在model_type中进行指定。
+
 ## 快速开始
 
 ### 启动GLUE任务
@@ -15,12 +17,12 @@ export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
 
 python -u ./run_glue.py \
-    --model_type bert \
     --model_name_or_path bert-base-uncased \
+    --tokenizer_name_or_path bert-base-uncased \
     --task_name $TASK_NAME \
     --max_seq_length 128 \
     --batch_size 32   \
-    --learning_rate 1e-4 \
+    --learning_rate 3e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
     --save_steps 100 \
@@ -35,12 +37,12 @@ unset CUDA_VISIBLE_DEVICES
 export TASK_NAME=SST-2
 
 python -m paddle.distributed.launch --gpus "0,1" run_glue.py \
-    --model_type bert \
     --model_name_or_path bert-base-uncased \
+    --tokenizer_name_or_path bert-base-uncased \
     --task_name $TASK_NAME \
     --max_seq_length 128 \
     --batch_size 32   \
-    --learning_rate 1e-4 \
+    --learning_rate 3e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
     --save_steps 100 \
@@ -49,10 +51,9 @@ python -m paddle.distributed.launch --gpus "0,1" run_glue.py \
 
 ```
 其中参数释义如下：
-- `model_type` 指示了Fine-tuning使用的预训练模型类型，如：ernie、bert、electra等，因不同类型的预训练模型可能有不同的 Fine-tuning layer 和 tokenizer。
 - `model_name_or_path` 指示了Fine-tuning使用的具体预训练模型，可以是PaddleNLP提供的预训练模型 或者 本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: /home/xx_model/，目录中需包含paddle预训练模型model_state.pdparams。
 如果使用PaddleNLP提供的预训练模型，可以选择`model_type`在[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的英文预训练权重。注意这里选择的模型权重要和上面配置的模型类型匹配，例如model_type 配置的是bert，则model_name_or_path只能选择bert相关的模型。另，glue任务应选择英文预训练权重。
-
+- `tokenizer_name_or_path` 指示了Fine-tuning使用的具体tokenizer，一般保持和model_name_or_path一致，也可以单独指定
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。

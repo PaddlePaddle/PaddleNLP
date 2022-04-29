@@ -186,7 +186,7 @@ def init_lstm_var(args):
             unk_token='[UNK]',
             pad_token='[PAD]')
 
-    tokenizer = CharTokenizer(vocab, language=args.language)
+    tokenizer = CharTokenizer(vocab, args.language, '../punctuations')
     model = SimNet(network='lstm', vocab_size=len(vocab), num_classes=2)
 
     dev_ds = SimilarityData().read(os.path.join(args.data_dir, 'dev'))

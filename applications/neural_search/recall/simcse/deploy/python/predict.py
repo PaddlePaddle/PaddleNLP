@@ -280,7 +280,6 @@ if __name__ == "__main__":
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     res = predictor.extract_embedding(corpus_list, tokenizer)
-    res = predictor.predict(corpus_list, tokenizer)
     print(res.shape)
     print(res)
     corpus_list = [['中西方语言与文化的差异', '中西方文化差异以及语言体现中西方文化,差异,语言体现'],

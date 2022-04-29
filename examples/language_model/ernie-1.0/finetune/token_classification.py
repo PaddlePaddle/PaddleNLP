@@ -12,24 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import os
-import random
-import time
-import math
-import sys
-from functools import partial
-
-import numpy as np
-import paddle
-import paddlenlp as ppnlp
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.utils.log import logger
-
-# from paddlenlp.trainer.trainer_base import TrainerBase
-sys.path.insert(0, os.path.abspath("."))
-from utils import Dict
-
 
 def tokenize_and_align_labels(example, tokenizer, no_entity_id,
                               max_seq_len=512):
@@ -48,16 +30,6 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
         len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
 
     return tokenized_input
-
-
-def ner_collator(tokenizer, args):
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'labels': Pad(axis=0, pad_val=args.ignore_label, dtype='int64')  # label
-    }): fn(samples)
-
-    return batchify_fn
 
 
 def ner_trans_fn(example, tokenizer, args):
