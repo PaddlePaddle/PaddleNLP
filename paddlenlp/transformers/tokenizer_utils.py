@@ -1296,7 +1296,12 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         if text is None:
             return None
-        split_tokens = self.tokenize(text)
+        split_tokens = []
+        for token in self.basic_tokenizer.tokenize(text):
+            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                split_tokens.append(sub_token
+                                    if sub_token != self.unk_token else token)
+
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
@@ -1315,12 +1320,12 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         text, token_mapping, offset = normalized_text, [], 0
 
         for token in split_tokens:
-            if self.do_lower_case:
-                token = token.lower()
+
             if token[:2] == '##':
                 token = token[2:]
 
             start = text[offset:].index(token) + offset
+
             end = start + len(token)
 
             token_mapping.append(
