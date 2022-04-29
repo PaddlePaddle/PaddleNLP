@@ -110,6 +110,46 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_pretrain.py \
 - ``use_amp`` 表示是否开启混合精度(float16)进行训练，默认不开启。如果在命令中加上了--use_amp，则会开启。
 - ``init_from_ckpt`` 表示是否从某个checkpoint继续训练（断点恢复训练），默认不开启。如果在命令中加上了--init_from_ckpt，且 --model_name_or_path 配置的是路径，则会开启从某个checkpoint继续训练。
 
+#### Trainer 训练版本
+本样例同时提供了Trainer版本的预训练流程，预训练重启、可视化等流程较为完备。需要从源码安装paddlenlp使用。
+
+```
+unset CUDA_VISIBLE_DEVICES
+task_name="eheath-pretraining"
+
+PYTHONPATH=../../../  python -u -m paddle.distributed.launch \
+    --gpus 0,1,2,3,4,5,6,7  \
+    run_pretrain_trainer.py \
+    --input_dir "./data" \
+    --output_dir "output/$task_name" \
+    --max_seq_length 512 \
+    --gradient_accumulation_steps 1\
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 8 \
+    --learning_rate 0.001 \
+    --max_steps 1000000 \
+    --save_steps 50000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 20 \
+    --dataloader_num_workers 2 \
+    --device "gpu"\
+    --fp16  \
+    --fp16_opt_level "O1"  \
+    --do_train \
+    --disable_tqdm \
+    --save_total_limit 10
+```
+大部分参数含义如上文所述，这里简要介绍一些新参数:
+
+- dataset, 同上文task_name，此处为小写字母。表示 Fine-tuning 的分类任务，当前支持 afamc、tnews、iflytek、ocnli、cmnli、csl、cluewsc2020。
+- per_device_train_batch_size 同上文batch_size。训练时，每次迭代每张卡上的样本数目。
+- per_device_eval_batch_size 同上文batch_size。评估时，每次迭代每张卡上的样本数目。
+- warmup_ratio 与warmup_steps类似，warmup步数占总步数的比例。
+-fp16 与`use_amp`相同，表示使用混合精度
+-fp16_opt_level 混合精度的策略。注：O2训练eHealth存在部分问题，暂时请勿使用。
+- save_total_limit 保存的ckpt数量的最大限制
 
 ## Reference
 
