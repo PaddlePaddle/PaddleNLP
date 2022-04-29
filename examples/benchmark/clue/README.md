@@ -10,12 +10,11 @@
 
 | Model                 | Config   | AVG       | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | CMRC2018        | CHID      | C<sup>3</sup> |
 | --------------------- | -------- | --------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------------- | --------- | ------------- |
-| RoBERTa-wwm-ext-large | 24L1024H | 76.54     | 75.32     | 59.33     | 62.33     | 83.87     | 78.81     | 90.79       | 83.37     | 70.58/89.82     | 85.72     | 75.26         |
-| ERNIE 3.0-Large       | 24L1024H | **78.71** | **77.36** | **60.21** | **62.75** | **85.06** | **82.14** | **91.12**   | **84.23** | **72.76/91.87** | **86.84** | **84.67**     |
-| RoBERTa-wwm-ext       | 12L768H  | 74.29     | 74.75     | 58.08     | 61.22     | 81.66     | 77.25     | 88.55       | 81.63     | 68.69/88.75     | 83.41     | 67.69         |
-| ERNIE 3.0-Base        | 12L768H  | **76.27** | **76.53** | **58.73** | 61.33     | **83.65** | **80.31** | **86.18**   | **83.30** | **70.52/90.72** | **84.08** | **78.07**     |
-| RBT6, Chinese         | 6L768H   | 70.37     | 73.93     | 56.4      | 59.68     | 79.53     | 73.73     | 76.97       | 81.37     | 62.26/84.72     | 78.35     | 61.43         |
-| ERNIE 3.0-Medium      | 6L768H   | **72.87** | **75.35** | **57.45** | **60.18** | **81.16** | **77.19** | **79.28**   | **81.93** | **65.83/87.29** | **80.00** | **70.36**     |
+| RoBERTa-wwm-ext-large | 24L1024H | 76.61     | 76.00     | 59.33     | 62.02     | 83.88     | 78.81     | 90.79       | 83.67     | 70.58/89.82     | 85.72     | 75.26         |
+| RoBERTa-wwm-ext       | 12L768H  | 74.11     | 74.60     | 58.08     | 61.23     | 81.11     | 76.92     | 88.49       | 80.77     | 68.39/88.50     | 83.43     | 68.03         |
+| ERNIE 3.0-Base        | 12L768H  | **75.83** | **75.93** | **58.26** | 61.23     | **83.02** | **80.10** | 86.18       | **82.63** | **70.71/90.41** | **84.26** | **77.88**     |
+| RBT6, Chinese         | 6L768H   | 69.74     | 73.15     | 56.62     | 59.68     | 79.26     | 73.15     | 75.00       | 80.04     | 62.26/84.72     | 78.26     | 59.93         |
+| ERNIE 3.0-Medium      | 6L768H   | 72.49     | **73.37** | **57.00** | **60.67** | **80.64** | **76.88** | **79.28**   | **81.60** | **65.83/87.30** | **79.91** | **69.73**     |
 
 
 
@@ -44,14 +43,14 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | Model                 | AFQMC   | TNEWS   | IFLYTEK | CMNLI   | OCNLI   | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
 | --------------------- | ------- | ------- | ------- | ------- | ------- | ----------- | ------- | -------- | ------- | ------------- |
 | RoBERTa-wwm-ext-large | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16 | 1e-5,16 | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
-| ERNIE 3.0-Large       | 1e-5,16 | 2e-5,16 | 5e-5,16 | 2e-5,32 | 3e-5,64 | 2e-5,16     | 3e-5,32 | 3e-5,24  | 1e-5,32 | 2e-5,24       |
 | RoBERTa-wwm-ext       | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32 | 2e-5,32 | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Base        | 3e-5,16 | 3e-5,32 | 5e-5,32 | 3e-5,32 | 2e-5,64 | 2e-5,16     | 2e-5,32 | 2e-5,24  | 3e-5,24 | 3e-5,32       |
 | RBT6, Chinese         | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64 | 3e-5,32 | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
 | ERNIE 3.0-Medium      | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32 | 1e-5,64 | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
 
 
-其中，`ERNIE 3.0-Large`、`ERNIE 3.0-Base`、`ERNIE 3.0-Medium` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base`、`RBT6, Chinese` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+
+其中，`ERNIE 3.0-Base`、`ERNIE 3.0-Medium` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base`、`RBT6, Chinese` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 
 ## 一键复现模型效果
@@ -68,10 +67,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-large
+export MODEL_PATH=ernie-3.0-base
 
 cd classification
-mkdir ernie-3.0-large
+mkdir ernie-3.0-base
 python -u ./run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -129,10 +128,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-large
+export MODEL_PATH=ernie-3.0-base
 
 cd classification
-mkdir ernie-3.0-large
+mkdir ernie-3.0-base
 
 python -u ./run_clue_classifier_trainer.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -172,7 +171,7 @@ python -u ./run_clue_classifier_trainer.py \
 
 cd mrc
 
-MODEL_PATH=ernie-3.0-large
+MODEL_PATH=ernie-3.0-base
 BATCH_SIZE=6
 LR=2e-5
 
