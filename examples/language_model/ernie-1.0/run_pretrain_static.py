@@ -34,7 +34,7 @@ from paddlenlp.utils.log import logger
 
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
 
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
+from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 
 from paddlenlp.ops import guard, Topology, get_rng_state_tracker
 from paddlenlp.utils.log import logger
@@ -304,7 +304,7 @@ def run_evaluate(data_loader,
                    speed_tokens, ips))
 
             for k in list(eval_fetch.keys()):
-                log_writer.add_scalar("%s_%s" % (task_name, k), average_ret[k],
+                log_writer.add_scalar("%s/%s" % (task_name, k), average_ret[k],
                                       global_step)
 
             break
@@ -446,16 +446,11 @@ def do_train(args):
         if args.decay_steps is None:
             args.decay_steps = args.max_steps
 
-        # lr_scheduler = CosineAnnealingWithWarmupDecay(
-        #     max_lr=args.max_lr,
-        #     min_lr=args.min_lr,
-        #     warmup_step=args.warmup_rate * args.max_steps,
-        #     decay_step=args.decay_steps, last_epoch=global_step)
-
-        lr_scheduler = LinearDecayWithWarmup(
+        lr_scheduler = LinearAnnealingWithWarmupDecay(
             args.max_lr,
-            args.max_steps,
-            args.warmup_rate,
+            args.min_lr,
+            warmup_step=args.warmup_rate * args.max_steps,
+            decay_step=args.decay_steps,
             last_epoch=global_step)
 
         clip = None
@@ -482,7 +477,7 @@ def do_train(args):
         # if args.use_recompute:
         #     dist_strategy.recompute = True
         #     dist_strategy.recompute_configs = {
-        #         "checkpoints": model.bert.checkpoints
+        #         "checkpoints": model.ernie.checkpoints
         #     }
 
         # Use the fleet api to compile the distributed optimizer
@@ -617,7 +612,7 @@ def do_train(args):
                         common_loginfo += ", " + additional_loginfo
                     logger.info(common_loginfo)
                     for k, v in res.items():
-                        log_writer.add_scalar(k, v, global_step)
+                        log_writer.add_scalar("train/" + k, v, global_step)
 
                 tic_train = time.time()
 
