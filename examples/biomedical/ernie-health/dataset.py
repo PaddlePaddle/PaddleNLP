@@ -35,10 +35,10 @@ class MedicalCorpus(paddle.io.Dataset):
         # Get all prefix of .npy/.npz files in the current and next-level directories.
         files = [
             os.path.join(data_path, f) for f in os.listdir(data_path)
-            if (os.path.isfile(os.path.join(data_path, f)) and "_idx.npz" in
+            if (os.path.isfile(os.path.join(data_path, f)) and '_idx.npz' in
                 str(f))
         ]
-        files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace('_idx.npz', '') for x in files]
         return files
 
     def _read_data_files(self, data_path):
@@ -47,17 +47,17 @@ class MedicalCorpus(paddle.io.Dataset):
         indexes = []
         for file_id, file_name in enumerate(data_files):
 
-            for suffix in ["_ids.npy", "_idx.npz"]:
+            for suffix in ['_ids.npy', '_idx.npz']:
                 if not os.path.isfile(file_name + suffix):
-                    raise ValueError("File Not found, %s" %
+                    raise ValueError('File Not found, %s' %
                                      (file_name + suffix))
 
             token_ids = np.load(
-                file_name + "_ids.npy", mmap_mode="r", allow_pickle=True)
+                file_name + '_ids.npy', mmap_mode='r', allow_pickle=True)
             samples.append(token_ids)
 
-            split_ids = np.load(file_name + "_idx.npz")
-            end_ids = np.cumsum(split_ids["lens"], dtype=np.int64)
+            split_ids = np.load(file_name + '_idx.npz')
+            end_ids = np.cumsum(split_ids['lens'], dtype=np.int64)
             file_ids = np.full(end_ids.shape, file_id)
             split_ids = np.stack([file_ids, end_ids], axis=-1)
             indexes.extend(split_ids)
@@ -88,10 +88,11 @@ class MedicalCorpus(paddle.io.Dataset):
 
 
 class DataCollatorForErnieHealth(object):
-    def __init__(self, tokenizer, mlm_prob, max_seq_length):
+    def __init__(self, tokenizer, mlm_prob, max_seq_length, return_dict=False):
         self.tokenizer = tokenizer
         self.mlm_prob = mlm_prob
         self.max_seq_len = max_seq_length
+        self.return_dict = return_dict
         self._ids = {
             'cls':
             self.tokenizer.convert_tokens_to_ids(self.tokenizer.cls_token),
@@ -110,7 +111,15 @@ class DataCollatorForErnieHealth(object):
             [masked_input_ids_a, masked_input_ids_b], axis=0).astype('int64')
         input_ids = paddle.concat([input_ids_a, input_ids_b], axis=0)
         labels = paddle.concat([labels_a, labels_b], axis=0)
-        return masked_input_ids, input_ids, labels
+        if self.return_dict:
+            return {
+                "input_ids": masked_input_ids,
+                "raw_input_ids": input_ids,
+                "generator_labels": labels
+            }
+
+        else:
+            return masked_input_ids, input_ids, labels
 
     def mask_tokens(self, batch_data):
 
@@ -122,14 +131,14 @@ class DataCollatorForErnieHealth(object):
         data = self.add_special_tokens_and_set_maskprob(token_ids, is_suffix)
         token_ids, is_suffix, prob_matrix = data
         token_ids = paddle.to_tensor(
-            token_ids, dtype="int64", stop_gradient=True)
+            token_ids, dtype='int64', stop_gradient=True)
         masked_token_ids = token_ids.clone()
         labels = token_ids.clone()
 
         # Create masks for words, where '百' must be masked if '度' is masked
         # for the word '百度'.
         prob_matrix = prob_matrix * (1 - is_suffix)
-        word_mask_index = np.random.binomial(1, prob_matrix).astype("float")
+        word_mask_index = np.random.binomial(1, prob_matrix).astype('float')
         is_suffix_mask = (is_suffix == 1)
         word_mask_index_tmp = word_mask_index
         while word_mask_index_tmp.sum() > 0:
@@ -151,7 +160,7 @@ class DataCollatorForErnieHealth(object):
 
         # 10% replaced with random token ids.
         token_random_index = paddle.to_tensor(
-            paddle.bernoulli(paddle.full(labels.shape, 0.5)).astype("bool")
+            paddle.bernoulli(paddle.full(labels.shape, 0.5)).astype('bool')
             .numpy() & word_mask_index & ~token_mask_index)
         random_tokens = paddle.randint(
             low=0,

@@ -188,11 +188,11 @@ def run_evaluate(data_loader,
                    iter_steps * args.micro_batch_size * args.max_seq_len /
                    (time.time() - local_time)))
 
-            log_writer.add_scalar(task_name + "_loss", average_loss,
+            log_writer.add_scalar(task_name + "/loss", average_loss,
                                   global_step)
-            log_writer.add_scalar(task_name + "_lm_loss", average_lm_loss,
+            log_writer.add_scalar(task_name + "/lm_loss", average_lm_loss,
                                   global_step)
-            log_writer.add_scalar(task_name + "_sop_loss", average_sop_loss,
+            log_writer.add_scalar(task_name + "/sop_loss", average_sop_loss,
                                   global_step)
 
             break
@@ -456,9 +456,13 @@ def do_train(args):
                         scaler._scale.numpy(), scaler._incr_count,
                         scaler._decr_count)
                 logger.info(common_loginfo + addition_info)
-                log_writer.add_scalar("loss", loss.item(), global_step)
-                log_writer.add_scalar("lm_loss", lm_loss.item(), global_step)
-                log_writer.add_scalar("sop_loss", sop_loss.item(), global_step)
+                log_writer.add_scalar("learning_rate",
+                                      lr_scheduler.get_lr(), global_step)
+                log_writer.add_scalar("train/loss", loss.item(), global_step)
+                log_writer.add_scalar("train/lm_loss",
+                                      lm_loss.item(), global_step)
+                log_writer.add_scalar("train/sop_loss",
+                                      sop_loss.item(), global_step)
 
                 tic_train = time.time()
 
