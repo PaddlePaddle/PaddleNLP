@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.roberta.tokenizer.rst:2
+#: ../source/paddlenlp.transformers.roberta.tokenizer.rst:2
 msgid "tokenizer"
 msgstr ""
 
@@ -27,99 +27,173 @@ msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:1
 msgid ""
-"Constructs a RoBERTa tokenizer. It uses a basic tokenizer to do "
+"Constructs a RoBerta tokenizer. It uses a basic tokenizer to do "
 "punctuation splitting, lower casing and so on, and follows a WordPiece "
-"tokenizer to tokenize as subwords. :param vocab_file: file path of the "
-"vocabulary :type vocab_file: str :param do_lower_case: Whether the text "
-"strips accents and convert to"
+"tokenizer to tokenize as subwords."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:7
-msgid "lower case. Default: `True`. Default: True."
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:5
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.save_resources
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize
 msgid "参数"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:10
-msgid "The special token for unkown words. Default: \"[UNK]\"."
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:9
+msgid ""
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:12
-msgid "The special token for separator token . Default: \"[SEP]\"."
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:14
-msgid "The special token for padding. Default: \"[PAD]\"."
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:15
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:16
-msgid "The special token for cls. Default: \"[CLS]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:18
-msgid "The special token for mask. Default: \"[MASK]\"."
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:19
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:22
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:25
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:28
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:34
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids:10
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string:12
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:10
 msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.vocab_size:1
-msgid ""
-"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
-"int"
-msgstr ""
-
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:1
-msgid ""
-"End-to-end tokenization for RoBERTa models. :param text: The text to be "
-"tokenized. :type text: str"
+msgid "Return the size of vocabulary."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.vocab_size
 msgid "返回"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:5
-msgid "A list of string representing converted tokens."
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.vocab_size:3
+msgid "The size of vocabulary."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.vocab_size
 msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:1
+msgid "Converts a string to a list of tokens."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:3
+msgid "The text to be tokenized."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.tokenize:6
+msgid "A list of string representing converted tokens."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string:1
 msgid ""
-"Converts a sequence of tokens (list of string) in a single string. Since "
-"the usage of WordPiece introducing `##` to concat subwords, also remove "
-"`##` when converting. :param tokens: A list of string representing tokens"
-" to be converted. :type tokens: list"
+"Converts a sequence of tokens (list of string) to a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also removes "
+"`##` when converting."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string:7
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids:3
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_string:8
 msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens:1
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids:1
+msgid "Converts a sequence of tokens (list of string) to a list of ids."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_tokens_to_ids:6
+msgid "Converted ids from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens:3
+msgid "A list of ids to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens:5
+msgid "Whether or not to skip specical tokens. Defaults to `False`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.convert_ids_to_tokens:8
+msgid "A list of converted tokens."
 msgstr ""
 
 #: of
@@ -130,23 +204,15 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add:5
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add:3
 msgid ""
-"This encodes inputs and checks the number of added tokens, and is "
-"therefore not efficient. Do not put this inside your training loop."
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add:8
-msgid ""
-"Returns the number of added tokens in the case of a sequence pair if set "
-"to True, returns the number of added tokens in the case of a single "
-"sequence if set to False."
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add:11
-msgid "Number of tokens added to sequences"
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.num_special_tokens_to_add:7
+msgid "Number of tokens added to sequences."
 msgstr ""
 
 #: of
@@ -158,7 +224,17 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:4
-msgid "A RoBERTa sequence has the following format: ::"
+msgid "A RoBERTa sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:       ``[CLS] X [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
 msgstr ""
 
 #: of
@@ -168,19 +244,12 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:11
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences:13
-msgid "Optional second list of IDs for sequence pairs."
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:14
-msgid "List of input_id with the appropriate special tokens."
+msgid "Optional second list of IDs for sequence pairs. Defaults to `None`."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_inputs_with_special_tokens:15
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences:17
-msgid ":obj:`List[int]`"
+msgid "List of input_id with the appropriate special tokens."
 msgstr ""
 
 #: of
@@ -192,27 +261,36 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:3
-msgid "A ERNIE offset_mapping has the following format: ::"
+msgid "A RoBERTa offset_mapping has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:5
+msgid "single sequence:      ``(0,0) X (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "pair of sequences:        ``(0,0) A (0,0) B (0,0)``"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:8
-msgid "List of char offsets to which the special tokens will be added."
+msgid "List of wordpiece offsets to which the special tokens will be added."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:10
-msgid "Optional second list of char offsets for offset mapping pairs."
+msgid ""
+"Optional second list of wordpiece offsets for offset mapping pairs. "
+"Defaults to None."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:13
-msgid "List of char offsets with the appropriate offsets of special tokens."
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.build_offset_mapping_with_special_tokens:14
-msgid ":obj:`List[tuple]`"
+msgid ""
+"A list of wordpiece offsets with the appropriate offsets of special "
+"tokens."
 msgstr ""
 
 #: of
@@ -236,7 +314,14 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences:11
-msgid "List of IDs."
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:4
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.create_token_type_ids_from_sequences:13
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:6
+msgid "Optional second list of IDs for sequence pairs. Defaults to None."
 msgstr ""
 
 #: of
@@ -253,16 +338,6 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:4
-msgid "List of ids of the first sequence."
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:6
-msgid "List of ids of the second sequence."
-msgstr ""
-
-#: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:8
 msgid ""
 "Whether or not the token list is already formatted with special tokens "
@@ -272,7 +347,20 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.get_special_tokens_mask:12
 msgid ""
-"The list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"The list of integers either be 0 or 1: 1 for a special token, 0 for a "
 "sequence token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.save_resources:1
+msgid ""
+"Save tokenizer related resources to `resource_files_names` indicating "
+"files under `save_directory` by copying directly. Override it if "
+"necessary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer.save_resources:4
+msgid "Directory to save files into."
 msgstr ""
 

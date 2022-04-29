@@ -27,6 +27,7 @@ from paddle.nn import Layer
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict
@@ -35,6 +36,12 @@ __all__ = [
     'PretrainedModel',
     'register_base_model',
 ]
+
+
+def unwrap_model(model, *args, **kwargs):
+    raw_model = model._layers if isinstance(model,
+                                            paddle.DataParallel) else model
+    return raw_model
 
 
 def register_base_model(cls):
@@ -332,6 +339,13 @@ class PretrainedModel(Layer, GenerationMixin):
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
 
+        # NOTE: Allow to load partial model for model parallel.
+        # TODO(guosheng): To make model loading for the model parallel automatic,
+        # maybe we should make rank 0 worker load weights of the full model on
+        # CPU, then split weights into multiple parts and pickle separately.
+        # The other workers wait util pickle finish and then load the corresponding
+        # partial weights. Also we can directly use separate weight files for
+        # simplicity.
         state_dict = paddle.load(weight_path, return_numpy=load_state_as_np)
 
         # Make sure we are able to load base models as well as derived models
@@ -374,6 +388,9 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
+        # For model parallel if FasterGeneration
+        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(
+            model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model

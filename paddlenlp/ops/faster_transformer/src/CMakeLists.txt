@@ -169,6 +169,10 @@ if(ON_INFER)
     add_dependencies(decoding_infer_op extern_sentencepiece)
   endif()
 
+  if(WITH_PARALLEL)
+    set(DEPS ${DEPS} mpi nccl)
+  endif()
+
   if(WIN32)
     if(USE_TENSORRT)
       add_custom_command(TARGET ${DEMO_NAME} POST_BUILD
@@ -265,6 +269,10 @@ else(ON_INFER)
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils
   )
+
+  if(WITH_PARALLEL)
+    set(ft_lib_link ${ft_lib_link} -lmpi -lnccl)
+  endif()
 
   add_definitions(-DPADDLE_WITH_CUDA)
   add_definitions(-DEIGEN_USE_GPU)

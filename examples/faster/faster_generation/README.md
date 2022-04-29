@@ -1,8 +1,8 @@
 # FasterGeneration
 
-FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。
+FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功能，其支持GPT、BART、UnifiedTransformer等多种NLP生成类预训练模型，并且支持多种解码策略，可以用于机器翻译、文本续写、文本摘要、对话生成等多种NLG任务的GPU场景预测加速。
 
-功能底层依托于[FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为关闭状态）。通过调用generate函数，用户可以简单实现模型的高性能推理功能。下图展示了FasterGeneration的启动流程：
+功能底层依托于[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库针对标准的Transformer和GPT模型、beam search和sampling解码策略进行了性能优化。PaddleNLP FasterGeneration在其之上进行了扩展，实现了更多模型和生成策略的优化支持，并将功能入口封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为关闭状态）。通过调用generate函数，用户可以简单的使用模型高性能推理功能。下图展示了FasterGeneration的启动流程：
 
 
 <p align="center">
@@ -15,6 +15,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
 - 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
+- GPT模型支持高性能并行推理，在具备MPI和NCCL的环境中一行代码即可开启使用。
 
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration对预训练模型和解码策略的支持情况（GPU）。
@@ -125,6 +126,37 @@ outputs, _ = model.generate(
 ```
 
 关于该函数的详细介绍可以参考API文档[generate](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html)和**Aistudio教程[文本生成任务实战：如何使用PaddleNLP实现各种解码策略](https://aistudio.baidu.com/aistudio/projectdetail/3243711?contributionType=1)。**`samples`文件夹中的其他示例的使用方法相同。
+
+### **GPT 并行推理**
+
+对于GPT模型下的文本生成，FasterGeneration除高性能加速外还集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)的模型并行推理能力，支持Tensor Parallel和Layer Parallel（Pipeline Parallel）两种并行策略的组合。关于这两种并行策略的详细介绍请参考[Megatron论文](https://arxiv.org/pdf/2104.04473.pdf)。
+
+并行推理当前依赖MPI和NCCL，如需使用GPT高性能并行推理功能，还请先安装依赖。在使用时，相比上面的高性能加速，只需在`from_pretrained`创建加载模型之前加上一行代码，如下所示：
+
+```
+enable_ft_para(tensor_para_size=2, layer_para_size=2)
+...
+model = GPTLMHeadModel.from_pretrained(model_name)
+...
+outputs, _ = model.generate(
+    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
+    use_faster=True)
+```
+
+完整的使用示例已在`gpt_mp_sample.py`中提供，按照如下方式启动即可：
+
+```sh
+mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 4 --layer_para_size 1
+```
+
+其中`-n 4`指明使用的进程和GPU数，`tensor_para_size`和`tensor_para_size`分别指明Tensor Parallel和Layer Parallel各自使用的GPU数，均设置为1则进行单卡预测。另外加上`--use_fp16`以使用FP16，加上`--profile`可以进行相应设置的性能测试。其他生成相关的参数设置释义如下：
+- `model_name` 指定使用的GPT模型，默认为[`gpt-cpm-larg-cn`](https://github.com/TsinghuaAI/CPM-1-Generate)。
+- `max_length` 指定生成的最大长度，默认为50。
+- `topk` 用于Top-K采样策略，采样时将只从概率最高K个token中采样，默认为1，即greedy search。
+- `topp` 用于Top-P采样策略，采样时将只从概率最高且累加概率不超过该值的token中采样，默认为1.0。
+- `temperature` 用于调整预测概率分布，默认为1.0，即保持模型原有的预测概率。
+
+使用`gpt-cpm-larg-cn`和默认设置，在V100上4卡Tensor Parallel较单卡高性能预测速度提升约40%。
 
 ## Generate Examples
 

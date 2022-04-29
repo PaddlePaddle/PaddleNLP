@@ -118,7 +118,7 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
-    --task_name SST-2 \
+    --task_name SST2 \
     --max_seq_length 128 \
     --batch_size 32   \
     --learning_rate 2e-5 \
@@ -148,11 +148,11 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 
 | Task  | Metric                       | Result            |
 |:-----:|:----------------------------:|:-----------------:|
-| SST-2 | Accuracy                     |      0.92660      |
+| SST2 | Accuracy                     |      0.92660      |
 | QNLI  | Accuracy                     |      0.91707      |
 | CoLA  | Mattehew's corr              |      0.59557      |
 | MRPC  | F1/Accuracy                  |  0.91667/0.88235  |
-| STS-B | Person/Spearman corr         |  0.88847/0.88350  |
+| STSB | Person/Spearman corr         |  0.88847/0.88350  |
 | QQP   | Accuracy/F1                  |  0.90581/0.87347  |
 | MNLI  | Matched acc/MisMatched acc   |  0.84422/0.84825  |
 | RTE   | Accuracy                     |      0.711191     |
@@ -178,7 +178,7 @@ python -u ./export_model.py \
 
 ```shell
 python -u ./predict_glue.py \
-    --task_name SST-2 \
+    --task_name SST2 \
     --model_type bert \
     --model_path ./infer_model/model \
     --batch_size 32 \

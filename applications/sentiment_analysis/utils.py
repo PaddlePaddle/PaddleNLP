@@ -98,3 +98,36 @@ def decoding(text, tag_seq):
         aps.append(no_a_words)
 
     return aps
+
+
+def concate_aspect_and_opinion(text, aspect, opinions):
+    aspect_text = ""
+    for opinion in opinions:
+        if text.find(aspect) <= text.find(opinion):
+            aspect_text += aspect + opinion + "，"
+        else:
+            aspect_text += opinion + aspect + "，"
+    aspect_text = aspect_text[:-1]
+
+    return aspect_text
+
+def save_examples(examples, save_path, idxs):
+    with open(save_path, "w", encoding="utf-8") as f:
+        for idx in idxs:
+            line = "\t".join(examples[idx])+"\n"
+            f.write(line)
+
+def save_dict(dict_path, dict_type):
+    if dict_type not in ["ext", "cls"]:
+        raise ValueError("Only ext/cls should be accepted for dict_type.")
+
+    with open(dict_path, "w", encoding="utf-8") as f:
+        if dict_type == "ext":
+            label_list = ["O", "B-Aspect", "I-Aspect", "B-Opinion", "I-Opinion"]
+        else:
+            label_list = ["负向", "正向"]
+
+        for label in label_list:
+            f.write(label+"\n")
+        
+

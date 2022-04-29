@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 import argparse
 from pprint import pprint
@@ -73,6 +74,11 @@ def setup_args():
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
+    parser.add_argument(
+        "--num_return_sequences",
+        default=1,
+        type=int,
+        help="The number of returned sequences. ")
 
     args = parser.parse_args()
 
@@ -93,9 +99,16 @@ def postprocess_response(token_ids, tokenizer):
 
 
 def infer(args):
+    if args.faster and args.use_fp16_decoding and os.getenv("PPFG_QKV_MEM_OPT",
+                                                            "0") == "1":
+        paddle.set_default_dtype("float16")
+
     model_name = 'plato-xl'
-    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
+    model = UnifiedTransformerLMHeadModel.from_pretrained(
+        model_name, load_state_as_np=True)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
+
+    model.eval()
 
     context = [
         "Hi , Becky , what's up ?",
@@ -136,6 +149,7 @@ def infer(args):
             top_k=args.topk,
             top_p=args.topp,
             num_beams=args.num_beams,
+            num_return_sequences=args.num_return_sequences,
             use_fp16_decoding=args.use_fp16_decoding,
             use_faster=args.faster)
 

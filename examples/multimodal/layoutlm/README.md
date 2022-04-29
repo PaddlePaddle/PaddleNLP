@@ -2,7 +2,7 @@
 
 ## 模型简介
 本项目是 [LayoutLM:Pre-training of Text and Layout for Document Image Understanding](https://arxiv.org/pdf/1912.13318v5.pdf) 在 Paddle 2.2上的开源实现，
-包含了在 [FUNSD数据集](https://github.com/doc-analysis/FUNSD) 上的微调代码。
+包含了在 [FUNSD数据集](https://guillaumejaume.github.io/FUNSD/) 上的微调代码。
 
 ## 快速开始
 ### 配置环境

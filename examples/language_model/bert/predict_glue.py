@@ -18,10 +18,10 @@ from functools import partial
 
 import paddle
 from paddle import inference
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
+from datasets import load_dataset
+from paddlenlp.data import Stack, Tuple, Pad, Dict
 
-from run_glue import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from run_glue import METRIC_CLASSES, MODEL_CLASSES, task_to_keys
 
 
 def parse_args():
@@ -134,22 +134,27 @@ def main():
     args.task_name = args.task_name.lower()
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    sentence1_key, sentence2_key = task_to_keys[args.task_name]
 
-    test_ds = load_dataset('glue', args.task_name, splits="test")
+    test_ds = load_dataset('glue', args.task_name, split="test")
     tokenizer = tokenizer_class.from_pretrained(
         os.path.dirname(args.model_path))
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=test_ds.label_list,
-        max_seq_length=args.max_seq_length,
-        is_test=True)
-    test_ds = test_ds.map(trans_func)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
-    ): fn(samples)
+    def preprocess_function(examples):
+        # Tokenize the texts
+        texts = ((examples[sentence1_key], ) if sentence2_key is None else
+                 (examples[sentence1_key], examples[sentence2_key]))
+        result = tokenizer(*texts, max_seq_len=args.max_seq_length)
+        if "label" in examples:
+            # In all cases, rename the column to labels because the model will expect that.
+            result["labels"] = examples["label"]
+        return result
+
+    test_ds = test_ds.map(preprocess_function)
+    batchify_fn = lambda samples, fn=Dict({
+        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+    }): fn(samples)
     predictor.predict(
         test_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
 

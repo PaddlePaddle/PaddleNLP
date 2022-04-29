@@ -25,19 +25,14 @@ ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/ernie-1.0-dp8-gb512/log" \
-    run_pretrain_static.py \
+    run_pretrain.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0" \
     --input_dir "./data" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
     --max_seq_len 512 \
     --micro_batch_size 64 \
-    --global_batch_size 512 \
-    --sharding_degree 1\
-    --dp_degree 8 \
-    --use_sharding false \
     --use_amp true \
-    --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 1000000 \
@@ -58,29 +53,23 @@ python -u  -m paddle.distributed.launch \
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
 - `max_seq_len` 输入文本序列的长度。
-- `micro_batch_size` 单卡单次的 batch size大小。即单张卡运行一次前向网络的 batch size大小。
-- `global_batch_size` 全局的batch size大小，即一次参数更新等效的batch size。
-- `sharding_degree` 切参数切分的分组大小（如 sharding_degree=4 表示参数分为4组，分别到4个设备）。
-- `dp_degree` 数据并行参数。
-- `use_sharding` 开启sharding策略，sharding_degree > 1时，请设置为True。
+- `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
 - `use_amp` 开启混合精度策略。
-- `use_recompute` 开启重计算策略。暂时未支持，后续将支持。
 - `max_lr` 训练学习率。
 - `min_lr` 学习率衰减的最小值。
 - `max_steps` 最大训练步数。
-- `save_steps` 保存模型间隔。
-- `checkpoint_steps` 模型checkpoint间隔，用于模型断点重启训练。
+- `save_steps` 保存模型间隔。默认保存地址格式为`output_dir/model_50000`(5w 步时的权重)。
+- `checkpoint_steps` 模型checkpoint间隔，用于模型断点重启训练。默认地址为`output_dir/model_last`.
 - `weight_decay` 权重衰减参数。
 - `warmup_rate` 学习率warmup参数。
 - `grad_clip` 梯度裁剪范围。
 - `logging_freq` 日志输出间隔。
+- `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_freq` 模型评估间隔。
 - `device` 训练设备。
 
 注：
-- 一般而言，需要设置 `mp_degree * sharding_degree` = 训练机器的总卡数。
-- 一般而言， `global_batch_size = micro_batch_size * sharding_degree * dp_degree`。可以使用梯度累积的方式增大`global_batch_size`。设置`global_batch_size`为理论值的整数倍是，默认启用梯度累积。
-- 训练断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。
+- 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。请确保重启的训练配置与之前相同。
 
 
 ### CLUECorpusSmall 数据集训练结果
@@ -109,15 +98,6 @@ CMRC2018 | 72.05/85.67 | - |
 
 
 ### 其他
-#### 模型参数转换
-本示例提供了静态图训练脚本，但Paddle目前主要的使用方式是动态图。因此，本示例提供了静态图参数到动态图参数的转换脚本：
-
-```python
-python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_100000/static_vars
-# or
-python converter/params_static_to_dygraph.py --model ernie-1.0 --path ./output/task_name/model_last/static_vars.pdparams
-```
-在当前目录下，可以看到转换后的参数`ernie-1.0_converted.pdparams`, 也可以设置脚本中`--output_path`参数，指定输出路径。
 
 #### 为PaddleNLP贡献预训练参数
 PaddleNLP为开发者支持了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。

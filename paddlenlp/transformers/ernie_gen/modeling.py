@@ -271,7 +271,7 @@ class ErnieGenPretrainedModel(object):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
             "ernie-gen-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
-            "ernie-gen-large-430g-en":
+            "ernie-gen-large-en-430g":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
         }
     }

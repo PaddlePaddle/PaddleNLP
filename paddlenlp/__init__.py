@@ -31,6 +31,7 @@ from . import utils
 from . import losses
 from . import experimental
 from .taskflow import Taskflow
+from . import trainer
 import paddle
 
 paddle.disable_signal_handler()

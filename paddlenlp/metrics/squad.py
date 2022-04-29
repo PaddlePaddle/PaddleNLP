@@ -125,8 +125,6 @@ def compute_prediction(examples,
                             end_index >= len(offset_mapping) or
                             offset_mapping[start_index] is None or
                             offset_mapping[end_index] is None or
-                            offset_mapping[start_index] == (0, 0) or
-                            offset_mapping[end_index] == (0, 0) or
                             len(offset_mapping[start_index]) == 0 or
                             len(offset_mapping[end_index]) == 0):
                         continue
@@ -225,6 +223,22 @@ def make_qid_to_has_ans(examples):
     return qid_to_has_ans
 
 
+def remove_punctuation(in_str):
+    in_str = str(in_str).lower().strip()
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
+    out_segs = []
+    for char in in_str:
+        if char in sp_char:
+            continue
+        else:
+            out_segs.append(char)
+    return ''.join(out_segs)
+
+
 def normalize_answer(s):
     #Lower text and remove punctuation, articles and extra whitespace.
     def remove_articles(text):
@@ -236,7 +250,8 @@ def normalize_answer(s):
 
     def remove_punc(text):
         exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
+        return remove_punctuation(''.join(ch for ch in text
+                                          if ch not in exclude))
 
     def lower(text):
         return text.lower()
@@ -370,7 +385,6 @@ def squad_evaluate(examples,
                    is_whitespace_splited=True):
     '''
     Computes and prints the f1 score and em score of input prediction.
-
     Args:
         examples (list): List of raw squad-style data (see `run_squad.py
             <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/

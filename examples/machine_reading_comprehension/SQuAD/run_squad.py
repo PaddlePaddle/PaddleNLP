@@ -28,7 +28,7 @@ from args import parse_args
 
 import paddlenlp as ppnlp
 
-from paddlenlp.data import Pad, Stack, Tuple, Dict
+from paddlenlp.data import default_data_collator, DataCollatorWithPadding
 from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, FunnelForQuestionAnswering, FunnelTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
@@ -170,7 +170,7 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader, raw_dataset, args):
+def evaluate(model, data_loader, raw_dataset, features, args):
     model.eval()
 
     all_start_logits = []
@@ -178,11 +178,10 @@ def evaluate(model, data_loader, raw_dataset, args):
     tic_eval = time.time()
 
     for batch in data_loader:
-        input_ids, token_type_ids, attention_mask = batch
         start_logits_tensor, end_logits_tensor = model(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+            batch['input_ids'],
+            token_type_ids=batch['token_type_ids'],
+            attention_mask=batch['attention_mask'])
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
@@ -194,7 +193,7 @@ def evaluate(model, data_loader, raw_dataset, args):
             all_end_logits.append(end_logits_tensor.numpy()[idx])
 
     all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
-        raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
+        raw_dataset, features, (all_start_logits, all_end_logits),
         args.version_2_with_negative, args.n_best_size, args.max_answer_length,
         args.null_score_diff_threshold)
 
@@ -262,13 +261,7 @@ def run(args):
                                       num_proc=4)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
-        train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            'attention_mask': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "start_positions": Stack(dtype="int64"),
-            "end_positions": Stack(dtype="int64")
-        }): fn(samples)
+        train_batchify_fn = DataCollatorWithPadding(tokenizer)
 
         train_data_loader = DataLoader(
             dataset=train_ds,
@@ -304,12 +297,12 @@ def run(args):
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                input_ids, token_type_ids, attention_mask, start_positions, end_positions = batch
                 logits = model(
-                    input_ids=input_ids,
-                    token_type_ids=token_type_ids,
-                    attention_mask=attention_mask)
-                loss = criterion(logits, (start_positions, end_positions))
+                    input_ids=batch['input_ids'],
+                    token_type_ids=batch['token_type_ids'],
+                    attention_mask=batch['attention_mask'])
+                loss = criterion(logits, (batch['start_positions'],
+                                          batch['end_positions']))
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
@@ -344,20 +337,17 @@ def run(args):
                                   num_proc=4)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.batch_size, shuffle=False)
-
-        dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+        dev_ds_for_model = dev_ds.remove_columns(
+            ["example_id", "offset_mapping"])
+        dev_batchify_fn = DataCollatorWithPadding(tokenizer)
 
         dev_data_loader = DataLoader(
-            dataset=dev_ds,
+            dataset=dev_ds_for_model,
             batch_sampler=dev_batch_sampler,
             collate_fn=dev_batchify_fn,
             return_list=True)
 
-        evaluate(model, dev_data_loader, dev_examples, args)
+        evaluate(model, dev_data_loader, dev_examples, dev_ds, args)
 
 
 if __name__ == "__main__":

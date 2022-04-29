@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,14 +17,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.layers.crf.rst:2
+#: ../source/paddlenlp.layers.crf.rst:2
 msgid "crf"
-msgstr ""
-
-#: of paddlenlp.layers.crf.LinearChainCrf:1
-#: paddlenlp.layers.crf.LinearChainCrfLoss:1
-#: paddlenlp.layers.crf.ViterbiDecoder:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf:1
@@ -48,60 +42,88 @@ msgid "参数"
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf:5
-msgid "The batch size."
-msgstr ""
-
-#: of paddlenlp.layers.crf.LinearChainCrf:7
 msgid "The label number."
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrf:9
-msgid "The crf layer learning rate."
+#: of paddlenlp.layers.crf.LinearChainCrf:7
+msgid "The crf layer learning rate. Defaults to ``0.1``."
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrf:11
+#: of paddlenlp.layers.crf.LinearChainCrf:9
 msgid ""
 "If set to True, the start tag and stop tag will be considered, the "
-"transitions params will be a tensor with shape `[num_labels+2, "
-"num_labels+2]`. Else, the transitions params will be a tensor with shape "
-"`[num_labels, num_labels]`."
+"transitions params will be a tensor with a shape of `[num_labels+2, "
+"num_labels+2]`. Else, the transitions params will be a tensor with a "
+"shape of `[num_labels, num_labels]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf.forward:1
 msgid ""
 "Computes the normalization in a linear-chain CRF. See "
-"http://www.cs.columbia.edu/~mcollins/fb.pdf for reference. $$ F = logZ(x)"
-" = log\\sum_y exp(score(x,y)) $$ $$ score(x,y) = \\sum_i Emit(x_i,y_i) + "
-"Trans(y_{i-1}, y_i) $$ mark $$ p(y_i) = Emit(x_i,y_i), T(y_{i-1}, "
-"y_i)=Trans(y_{i-1}, y_i) $$ then we can get $$ F(1) = log\\sum_{y1} "
-"exp(p(y_1) + T([START], y1)) $$ $$ F(2) = log\\sum_{y1}\\sum_{y2} "
-"exp(p(y_1) + T([START], y1) + p(y_2) + T(y_1,y_2)) =  log\\sum_{y2} "
-"exp(F(1) + p(y_2) + T(y_1,y_2)) $$ $$ F(...) = ... $$ A recursive "
-"formula."
+"http://www.cs.columbia.edu/~mcollins/fb.pdf for reference."
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrf.forward:11
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:3
+msgid ""
+"F & = logZ(x) = log\\sum_y exp(score(x,y))\n"
+"\n"
+"score(x,y) & = \\sum_i Emit(x_i,y_i) + Trans(y_{i-1}, y_i)\n"
+"\n"
+"p(y_i) & = Emit(x_i,y_i), T(y_{i-1}, y_i) = Trans(y_{i-1}, y_i)"
+msgstr ""
+
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:10
+msgid "then we can get:"
+msgstr ""
+
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:12
+msgid ""
+"F(1) = log\\sum_{y1} exp(p(y_1) + T([START], y1))\n"
+"\n"
+msgstr ""
+
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:15
+msgid ""
+"F(2) & = log\\sum_{y1}\\sum_{y2} exp(p(y_1) + T([START], y1) + p(y_2) + "
+"T(y_1,y_2)) \\\\\n"
+"& = log\\sum_{y2} exp(F(1) + p(y_2) + T(y_1,y_2))\n"
+"\n"
+msgstr ""
+
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:19
+msgid "Further, We can get F(n) is a recursive formula with F(n-1)."
+msgstr ""
+
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:21
 #: paddlenlp.layers.crf.LinearChainCrf.gold_score:4
-msgid "The input tensor with shape `[batch_size, sequence_length, num_tags]`."
+#: paddlenlp.layers.crf.LinearChainCrfLoss.forward:4
+msgid ""
+"The input predicted tensor. Its dtype is float32 and has a shape of "
+"`[batch_size, sequence_length, num_tags]`."
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrf.forward:13
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:23
 #: paddlenlp.layers.crf.LinearChainCrf.gold_score:8
-msgid "The input length with shape `[batch_size]`."
+#: paddlenlp.layers.crf.LinearChainCrfLoss.forward:6
+msgid "The input length. Its dtype is int64 and has a shape of `[batch_size]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf.forward
 #: paddlenlp.layers.crf.LinearChainCrf.gold_score
+#: paddlenlp.layers.crf.LinearChainCrfLoss.forward
 #: paddlenlp.layers.crf.ViterbiDecoder.forward
 msgid "返回"
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrf.forward:16
-msgid "The normalizers tensor, with shape `[batch_size]`."
+#: of paddlenlp.layers.crf.LinearChainCrf.forward:26
+msgid ""
+"Returns the normalizers tensor `norm_score`. Its dtype is float32 and has"
+" a shape of `[batch_size]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf.forward
 #: paddlenlp.layers.crf.LinearChainCrf.gold_score
+#: paddlenlp.layers.crf.LinearChainCrfLoss.forward
 #: paddlenlp.layers.crf.ViterbiDecoder.forward
 msgid "返回类型"
 msgstr ""
@@ -113,11 +135,16 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf.gold_score:6
-msgid "The label tensor with shape `[batch_size, sequence_length]`"
+#: paddlenlp.layers.crf.LinearChainCrfLoss.forward:8
+msgid ""
+"The input label tensor. Its dtype is int64 and has a shape of "
+"`[batch_size, sequence_length]`"
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrf.gold_score:11
-msgid "The unnormalized sequence scores tensor, with shape `[batch_size]`."
+msgid ""
+"Returns the unnormalized sequence scores tensor `unnorm_score`. Its dtype"
+" is float32 and has a shape of `[batch_size]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrfLoss:1
@@ -128,27 +155,25 @@ msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrfLoss:3
 msgid ""
-"let $$ Z(x) = \\sum_{y'}exp(score(x,y')) $$, means the sum of all path "
-"scores, then we have $$ loss = -logp(y|x) = -log(exp(score(x,y))/Z(x)) = "
-"-score(x,y) + logZ(x) $$"
-msgstr ""
-
-#: of paddlenlp.layers.crf.LinearChainCrfLoss:6
-msgid "The LinearChainCrf network."
+"The `LinearChainCrf` network object. Its parameter will be used to "
+"calculate the loss."
 msgstr ""
 
 #: of paddlenlp.layers.crf.LinearChainCrfLoss.forward:1
 msgid ""
-"Defines the computation performed at every call. Should be overridden by "
-"all subclasses."
+"Calculate the crf loss. Let $$ Z(x) = \\sum_{y'}exp(score(x,y')) $$, "
+"means the sum of all path scores, then we have $$ loss = -logp(y|x) = "
+"-log(exp(score(x,y))/Z(x)) = -score(x,y) + logZ(x) $$"
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrfLoss.forward:4
-msgid "unpacked tuple arguments"
+#: of paddlenlp.layers.crf.LinearChainCrfLoss.forward:10
+msgid ""
+"Unnecessary parameter for compatibility with older versions. Defaults to "
+"``None``."
 msgstr ""
 
-#: of paddlenlp.layers.crf.LinearChainCrfLoss.forward:6
-msgid "unpacked dict arguments"
+#: of paddlenlp.layers.crf.LinearChainCrfLoss.forward:13
+msgid "The crf loss. Its dtype is float32 and has a shape of `[batch_size]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.ViterbiDecoder:1
@@ -158,7 +183,9 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.layers.crf.ViterbiDecoder:3
-msgid "The transition matrix with shape `[num_tags, num_tags]`."
+msgid ""
+"The transition matrix.  Its dtype is float32 and has a shape of "
+"`[num_tags, num_tags]`."
 msgstr ""
 
 #: of paddlenlp.layers.crf.ViterbiDecoder:5
@@ -166,7 +193,7 @@ msgid ""
 "If set to True, the last row and the last column of transitions will be "
 "considered as start tag, the the penultimate row and the penultimate "
 "column of transitions will be considered as stop tag. Else, all the rows "
-"and columns will be considered as the real tag."
+"and columns will be considered as the real tag. Defaults to ``None``."
 msgstr ""
 
 #: of paddlenlp.layers.crf.ViterbiDecoder.forward:1
@@ -175,20 +202,22 @@ msgstr ""
 
 #: of paddlenlp.layers.crf.ViterbiDecoder.forward:3
 msgid ""
-"The unary emission tensor with shape `[batch_size, sequence_length, "
-"num_tags]`."
+"The unary emission tensor. Its dtype is float32 and has a shape of "
+"`[batch_size, sequence_length, num_tags]`."
 msgstr ""
 
-#: of paddlenlp.layers.crf.ViterbiDecoder.forward:4
+#: of paddlenlp.layers.crf.ViterbiDecoder.forward:5
 msgid ""
-"The input length tensor with shape `[batch_size]`, storing real length of"
-" each sequence for correctness."
+"The input length tensor storing real length of each sequence for "
+"correctness. Its dtype is int64 and has a shape of `[batch_size]`."
 msgstr ""
 
-#: of paddlenlp.layers.crf.ViterbiDecoder.forward:6
+#: of paddlenlp.layers.crf.ViterbiDecoder.forward:8
 msgid ""
-"The scores tensor containing the score for the Viterbi sequence, with "
-"shape `[batch_size]`. paths: The paths tensor containing the highest "
-"scoring tag indices, with shape `[batch_size, sequence_length`]."
+"Returns tuple (scores, paths). The `scores` tensor containing the score "
+"for the Viterbi sequence. Its dtype is float32 and has a shape of "
+"`[batch_size]`. The `paths` tensor containing the highest scoring tag "
+"indices. Its dtype is int64 and has a shape of `[batch_size, "
+"sequence_length]`."
 msgstr ""
 

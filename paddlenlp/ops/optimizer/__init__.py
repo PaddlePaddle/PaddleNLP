@@ -14,5 +14,6 @@
 import os
 
 from .adamwdl import AdamWDL
+from .ema import ExponentialMovingAverage
 
-__all__ = ['AdamWDL', ]
+__all__ = ['AdamWDL', 'ExponentialMovingAverage']

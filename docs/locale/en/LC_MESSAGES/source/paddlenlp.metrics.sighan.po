@@ -1,0 +1,74 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.metrics.sighan.rst:2
+msgid "sighan"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1:1
+msgid "基类：:class:`paddle.metric.metrics.Metric`"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.CorrectionF1.update:1
+#: paddlenlp.metrics.sighan.DetectionF1.update:1
+msgid "Update states for metric"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.CorrectionF1.update:3
+#: paddlenlp.metrics.sighan.DetectionF1.update:3
+msgid ""
+"Inputs of :code:`update` is the outputs of :code:`Metric.compute`, if "
+":code:`compute` is not defined, the inputs of :code:`update` will be "
+"flatten arguments of **output** of mode and **label** from data: "
+":code:`update(output1, output2, ..., label1, label2,...)`"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.CorrectionF1.update:8
+#: paddlenlp.metrics.sighan.DetectionF1.update:8
+msgid "see :code:`Metric.compute`"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.reset:1
+msgid "Resets all of the metric state."
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.accumulate:1
+msgid "Accumulates statistics, computes and returns the metric value"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.name:1
+msgid "Returns name of the metric instance."
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.name
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.name:3
+msgid "The name of the metric instance."
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.DetectionF1.name
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.metrics.sighan.CorrectionF1:1
+msgid "基类：:class:`paddlenlp.metrics.sighan.DetectionF1`"
+msgstr ""
+

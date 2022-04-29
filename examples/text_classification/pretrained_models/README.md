@@ -95,13 +95,13 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 ```python
 # 使用ernie预训练模型
 # ernie-1.0
-model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained('ernie-1.0',num_classes=2))
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0',num_classes=2))
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 
 # 使用bert预训练模型
 # bert-base-chinese
-model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
-tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
+model = AutoModelForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
+tokenizer = AutoTokenizer.from_pretrained('bert-base-chinese')
 ```
 更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
 

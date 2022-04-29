@@ -1,0 +1,85 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.prophetnet.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel:1
+msgid "基类：:class:`paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration.forward:1
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel.forward:1
+msgid ""
+"Defines the computation performed at every call. Should be overridden by "
+"all subclasses."
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration.forward
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward:4
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward:4
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration.forward:4
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel.forward:4
+msgid "unpacked tuple arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward:6
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward:6
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration.forward:6
+#: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel.forward:6
+msgid "unpacked dict arguments"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel:1
+msgid ""
+"An abstract class for pretrained Prophetnet models. It provides "
+"Prophetnet related `model_config_file`, `pretrained_init_configuration`, "
+"`resource_files_names`, `pretrained_resource_files_map`, "
+"`base_model_prefix` for downloading and loading pretrained models."
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder:4
+msgid ""
+"word_embeddings  (:obj:`torch.nn.Embeddings` of shape "
+":obj:`(config.vocab_size, config.hidden_size)`, `optional`):"
+msgstr ""
+
+#: of paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder:2
+msgid ""
+"The word embedding parameters. This can be used to initialize "
+":class:`~transformers.ProphetNetEncoder` with pre-defined word embeddings"
+" instead of randomly initialized word embeddings."
+msgstr ""
+

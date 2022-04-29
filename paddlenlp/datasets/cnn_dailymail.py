@@ -20,7 +20,12 @@ import shutil
 
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url, _decompress, _get_unique_endpoints
-from paddle.distributed import ParallelEnv
+try:
+    from paddle.distributed import ParallelEnv
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
+
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.utils.log import logger
 from . import DatasetBuilder
@@ -183,7 +188,9 @@ class CnnDailymail(DatasetBuilder):
     def _get_data(self, mode):
         """ Check and download Dataset """
         dl_paths = {}
-        version = self.config.get("version", "3.0.0")
+        version = self.name
+        if version is None:
+            version = "3.0.0"
         if version not in ["1.0.0", "2.0.0", "3.0.0"]:
             raise ValueError("Unsupported version: %s" % version)
         dl_paths["version"] = version

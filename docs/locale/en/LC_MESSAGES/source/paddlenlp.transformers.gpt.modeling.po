@@ -1,0 +1,428 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.gpt.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:1
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining:1
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification:1
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification:1
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel:1
+#: paddlenlp.transformers.gpt.modeling.GPTModel:1
+msgid "基类：:class:`paddlenlp.transformers.gpt.modeling.GPTPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:1
+msgid "The bare GPT Model transformer outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTModel
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:10
+msgid ""
+"Vocabulary size of `inputs_ids` in `GPTModel`. Also is the vocab size of "
+"token embedding matrix. Defines the number of different tokens that can "
+"be represented by the `inputs_ids` passed when calling `GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:13
+msgid ""
+"Dimensionality of the embedding layer and decoder layer. Defaults to "
+"`768`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:15
+msgid "Number of hidden layers in the Transformer decoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:17
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"decoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:20
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the decoder. Input "
+"tensors to ff layers are firstly projected from `hidden_size` to "
+"`intermediate_size`, and then projected back to `hidden_size`. Typically "
+"`intermediate_size` is larger than `hidden_size`. Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:25
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to `\"gelu\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:29
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and decoder. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:32
+msgid ""
+"The dropout probability used in MultiHeadAttention in all decoder layers "
+"to drop some attention target. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:35
+msgid ""
+"The maximum value of the dimensionality of position encoding, which "
+"dictates the maximum supported length of an input sequence. Defaults to "
+"`512`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:38
+msgid ""
+"The vocabulary size of the `token_type_ids`. Defaults to `16`.  .. note::"
+"     Please NOT using `type_vocab_size`, for it will be obsolete in the "
+"future.."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:38
+msgid "The vocabulary size of the `token_type_ids`. Defaults to `16`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:41
+msgid ""
+"Please NOT using `type_vocab_size`, for it will be obsolete in the "
+"future.."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:43
+msgid ""
+"The standard deviation of the normal initializer. Default to `0.02`.  .. "
+"note::     A normal_initializer initializes weight matrices as normal "
+"distributions.     See :meth:`GPTPretrainedModel._init_weights()` for how"
+" weights are initialized in `GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:43
+msgid "The standard deviation of the normal initializer. Default to `0.02`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:46
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`GPTPretrainedModel._init_weights()` for how weights are "
+"initialized in `GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel:49
+msgid "The index of padding token in the token vocabulary. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:1
+msgid "The GPTModel forward method, overrides the `__call__()` special method."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:7
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, max_position_embeddings - 1]``. "
+"Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to "
+"`None`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:11
+msgid ""
+"Mask used in self attention to avoid performing attention to some "
+"unwanted positions, usually the subsequent positions. It is a tensor with"
+" shape broadcasted to `[batch_size, num_attention_heads, sequence_length,"
+" sequence_length]`. It is a tensor with shape broadcasted to "
+"`[batch_size, num_attention_heads, sequence_length, sequence_length]`. "
+"For example, its shape can be  [batch_size, sequence_length], "
+"[batch_size, sequence_length, sequence_length], [batch_size, "
+"num_attention_heads, sequence_length, sequence_length]. Its data type "
+"should be float32. The `masked` tokens have `-1e-9` values, and the "
+"`unmasked` tokens have `0` values. Defaults to `None`, which means "
+"nothing needed to be prevented attention to."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:21
+msgid ""
+"Whether or not to use cache. Defaults to `False`. If set to `True`, key "
+"value states will be returned and can be used to speed up decoding."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:24
+msgid ""
+"It is a list, and each element in the list is a tuple "
+"`(incremental_cache, static_cache)`. See `TransformerDecoder.gen_cache "
+"<https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__"
+" for more details. It is only used for inference and should be None for "
+"training. Default to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTModel.forward:30
+msgid ""
+"Returns tensor `encoder_output`, which is the output at the last layer of"
+" the model. Its data type should be float32 and has a shape of "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward
+#: paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:19
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:15
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:15
+#: paddlenlp.transformers.gpt.modeling.GPTModel.forward:35
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel:1
+msgid ""
+"An abstract class for pretrained GPT models. It provides GPT related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForPretraining:1
+msgid "GPT Model with pretraining tasks on top."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForPretraining:3
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel:3
+msgid "An instance of :class:`GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:1
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:3
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:5
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:7
+#: paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:9
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:3
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:5
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:7
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:9
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:3
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:5
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:7
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:3
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:5
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:7
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:1
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:3
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:5
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:7
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:9
+msgid "See :class:`GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.model:12
+#: paddlenlp.transformers.gpt.modeling.GPTForPretraining.forward:12
+#: paddlenlp.transformers.gpt.modeling.GPTLMHeadModel.forward:12
+msgid ""
+"Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` "
+"is True, tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor"
+" `logits` will be returned. `logits` is the output of the gpt model. "
+"`cache_kvs` is the cache output of gpt model if `use_cache` is True."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion:1
+msgid "Criterion for GPT. It calculates the final loss."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:1
+msgid ""
+"The logits of masked token prediction. Its data type should be float32 "
+"and its shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:4
+msgid ""
+"The labels of the masked language modeling, the dimensionality of "
+"`masked_lm_labels` is equal to `prediction_scores`. Its data type should "
+"be int64 and its shape is [batch_size, sequence_length, 1]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:8
+msgid ""
+"Mask used for calculating the loss of the masked language modeling to "
+"avoid calculating some unwanted tokens. Its data type should be float32 "
+"and its shape is [batch_size, sequence_length, 1]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTPretrainingCriterion.forward:13
+msgid ""
+"The pretraining loss. Its data type should be float32 and its shape is "
+"[1]."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:1
+msgid ""
+"The generate model for GPT-2. It use the greedy strategy and generate the"
+" output sequence with highest probability."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:4
+msgid "An instance of `paddlenlp.transformers.GPTModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration:6
+msgid "The max length of the prediction."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForGreedyGeneration.forward:4
+msgid ""
+"Returns tensor `src_ids`, which means the indices of output sequence "
+"tokens in the vocabulary. They are numerical representations of tokens "
+"that build the output sequence."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTLMHeadModel:1
+msgid "The GPT Model with a `language modeling` head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForTokenClassification:1
+msgid ""
+"GPT Model with a token classification head on top (a linear layer on top "
+"of the hidden-states output) e.g. for Named-Entity-Recognition (NER) "
+"tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification:4
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification:4
+msgid "An instance of GPTModel."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification:6
+#: paddlenlp.transformers.gpt.modeling.GPTForTokenClassification:6
+msgid "The number of classes. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForTokenClassification:8
+msgid ""
+"The dropout probability for output of GPT. If None, use the same value as"
+" `hidden_dropout_prob` of `GPTModel` instance `gpt`. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:1
+msgid ""
+"The GPTForTokenClassification forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForTokenClassification.forward:10
+msgid ""
+"Returns tensor `logits`, a tensor of the input token classification "
+"logits. Shape as `[batch_size, sequence_length, num_classes]` and dtype "
+"as `float32`."
+msgstr ""
+
+#: of paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification:1
+msgid ""
+"GPT Model with a sequence classification/regression head on top (a linear"
+" layer on top of the pooled output) e.g. for GLUE tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:1
+msgid ""
+"The GPTForSequenceClassification forward method, overrides the __call__()"
+" special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.gpt.modeling.GPTForSequenceClassification.forward:10
+msgid ""
+"Returns tensor `logits`, a tensor of the input text classification "
+"logits. Shape as `[batch_size, num_classes]` and dtype as float32."
+msgstr ""
+

@@ -1,0 +1,237 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.squeezebert.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:1
+msgid ""
+"Constructs a SqueezeBert tokenizer. It uses a basic tokenizer to do "
+"punctuation splitting, lower casing and so on, and follows a WordPiece "
+"tokenizer to tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:5
+msgid "file path of the vocabulary"
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:7
+msgid ""
+"Whether the text strips accents and convert to lower case. Default: "
+"`True`. Default: True."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:11
+msgid "The special token for unkown words. Default: \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:13
+msgid "The special token for separator token . Default: \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:15
+msgid "The special token for padding. Default: \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:17
+msgid "The special token for cls. Default: \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:19
+msgid "The special token for mask. Default: \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:23
+msgid "实际案例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.vocab_size:1
+msgid ""
+"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
+"int"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting. :param tokens: A list of string representing tokens"
+" to be converted. :type tokens: list"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.convert_tokens_to_string:7
+msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens. .. note::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add:7
+msgid ""
+"Returns the number of added tokens in the case of a sequence pair if set "
+"to True, returns the number of added tokens in the case of a single "
+"sequence if set to False."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add:10
+msgid "Number of tokens added to sequences"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens. A "
+"SqueezeBert sequence has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens:7
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens:9
+msgid "Optional second list of IDs for sequence pairs."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens:12
+msgid "List of input_id with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_inputs_with_special_tokens:13
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences:13
+msgid ":obj:`List[int]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens:1
+msgid ""
+"Build offset map from a pair of offset map by concatenating and adding "
+"offsets of special tokens. A SqueezeBert offset_mapping has the following"
+" format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "List of char offsets to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens:8
+msgid "Optional second list of char offsets for offset mapping pairs."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens:11
+msgid "List of char offsets with the appropriate offsets of special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens:12
+msgid ":obj:`List[tuple]`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Create a mask from the two sequences passed to be used in a sequence-pair"
+" classification task. A SqueezeBert sequence pair mask has the following "
+"format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences:6
+msgid ""
+"If :obj:`token_ids_1` is :obj:`None`, this method only returns the first "
+"portion of the mask (0s). :param token_ids_0: List of IDs. :type "
+"token_ids_0: :obj:`List[int]` :param token_ids_1: Optional second list of"
+" IDs for sequence pairs. :type token_ids_1: :obj:`List[int]`, `optional`"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences:12
+msgid "List of token_type_id according to the given sequence(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask:1
+msgid ""
+"Retrieves sequence ids from a token list that has no special tokens "
+"added. This method is called when adding special tokens using the "
+"tokenizer ``encode`` methods. :param token_ids_0: List of ids of the "
+"first sequence. :type token_ids_0: List[int] :param token_ids_1: List of "
+"ids of the second sequence. :type token_ids_1: List[int], optinal :param "
+"already_has_special_tokens: Whether or not the token list is already"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask:8
+msgid "formatted with special tokens for the model. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask:11
+msgid ""
+"The list of integers in the range [0, 1]: 1 for a special token, 0 for a "
+"sequence token."
+msgstr ""
+

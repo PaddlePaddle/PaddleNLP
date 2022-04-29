@@ -55,7 +55,7 @@ from .log import logger
 
 __all__ = ['get_weights_path_from_url']
 
-COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/transformers/community/"
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
 
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
 

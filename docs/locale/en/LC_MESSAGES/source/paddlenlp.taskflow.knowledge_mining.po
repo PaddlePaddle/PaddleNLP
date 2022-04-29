@@ -1,0 +1,62 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.knowledge_mining.rst:2
+msgid "knowledge\\_mining"
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.NPTagTask:1
+#: paddlenlp.taskflow.knowledge_mining.WordTagTask:1
+msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.WordTagTask:1
+msgid ""
+"This the NER(Named Entity Recognition) task that convert the raw text to "
+"entities. And the task with the `wordtag` model will link the more "
+"meesage with the entity. :param task: The name of task. :type task: "
+"string :param model: The model name in the task. :type model: string "
+":param kwargs: Additional keyword arguments passed along to the specific "
+"task. :type kwargs: dict, optional"
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.NPTagTask:12
+#: paddlenlp.taskflow.knowledge_mining.WordTagTask:11
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.NPTagTask.summary_num:1
+#: paddlenlp.taskflow.knowledge_mining.WordTagTask.summary_num:1
+msgid "Number of model summary token"
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.WordTagTask.linking:1
+msgid "Whether to do term linking."
+msgstr ""
+
+#: of paddlenlp.taskflow.knowledge_mining.NPTagTask:1
+msgid ""
+"Noun phrase tagging task that convert the noun phrase to POS tag. :param "
+"task: The name of task. :type task: string :param model: The model name "
+"in the task. :type model: string :param batch_size: Numbers of examples a"
+" batch. :type batch_size: int :param linking: Returns the categories. If "
+"`linking` is True, the fine-grained label (label) will link with the "
+"coarse-grained label (category). :type linking: bool"
+msgstr ""
+

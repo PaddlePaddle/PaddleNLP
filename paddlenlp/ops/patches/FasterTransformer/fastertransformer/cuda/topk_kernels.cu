@@ -40,7 +40,7 @@ void ker_curand_setupLauncher(curandState_t* state,
                               cudaStream_t stream) {
   dim3 block(256);
   dim3 grid((int)(ceil(args.batch_size_ * 1.0 / 256)));
-  int seed = clock();
+  int seed = args.seed_ != -1 ? args.seed_ : clock();
   ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
 }
 

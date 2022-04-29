@@ -21,12 +21,16 @@ import copy
 import itertools
 
 import numpy as np
+import jieba
 from .utils import download_file
+from .task import Task
 from .lexical_analysis import load_vocab, LacTask
+from .named_entity_recognition import NERWordTagTask
 
 usage = r"""
            from paddlenlp import Taskflow 
 
+           # Taskflow base模式
            seg = Taskflow("word_segmentation")
            seg("第十四届全运会在西安举办")
            '''
@@ -37,12 +41,76 @@ usage = r"""
            '''
            [['第十四届', '全运会', '在', '西安', '举办'], ['三亚', '是', '一个', '美丽', '的', '城市']]
            '''
+
+           # 快速模式分词
+           seg = Taskflow("word_segmentation", mode="fast")
+           seg("第十四届全运会在西安举办")
+           '''
+           ['第十四届', '全运会', '在', '西安', '举办']
+           '''
+
+           # 精确模式分词
+           seg = Taskflow("word_segmentation", mode="accurate")
+           seg("李伟拿出具有科学性、可操作性的《陕西省高校管理体制改革实施方案》")
+           '''
+           ['李伟', '拿出', '具有', '科学性', '、', '可操作性', '的', '《', '陕西省高校管理体制改革实施方案', '》']
+           '''
          """
 
 
-class WordSegmentationTask(LacTask):
+class SegJiebaTask(Task):
     """
-    Segement the sentences to the words. 
+    Word Segmentation task for the raw text.
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        user_dict(string): The user-defined dictionary, default to None.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    """
+
+    def __init__(self, task, model, user_dict=None, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._user_dict = user_dict
+        if self._user_dict:
+            jieba.load_userdict(user_dict)
+
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        return None
+
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
+        return None
+
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        return None
+
+    def _preprocess(self, inputs):
+        inputs = self._check_input_text(inputs)
+        return inputs
+
+    def _postprocess(self, inputs):
+        results = inputs if len(inputs) > 1 else inputs[0]
+        return results
+
+    def _run_model(self, inputs):
+        def cut(string):
+            return jieba.lcut(string)
+
+        results = list(map(cut, inputs))
+        return results
+
+
+class SegLACTask(LacTask):
+    """
+    Segement the sentences to the words using LAC mode. 
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -50,7 +118,7 @@ class WordSegmentationTask(LacTask):
     """
 
     def __init__(self, task, model, **kwargs):
-        super().__init__(task=task, model=model, **kwargs)
+        super().__init__(task=task, model="lac", **kwargs)
 
     def _postprocess(self, inputs):
         """
@@ -88,6 +156,33 @@ class WordSegmentationTask(LacTask):
             if len(sent_out) < len(tags_out):
                 sent_out.append(parital_word)
             final_results.append(sent_out)
+        final_results = self._auto_joiner(final_results, self.input_mapping)
         final_results = final_results if len(
             final_results) > 1 else final_results[0]
         return final_results
+
+
+class SegWordTagTask(NERWordTagTask):
+    """
+    Segement the sentences to the words using WordTag model. 
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+
+    """
+
+    def __init__(self, model, task, **kwargs):
+        super().__init__(model="wordtag", task=task, **kwargs)
+
+    def _simplify_result(self, results):
+        simple_results = []
+        for result in results:
+            simple_result = []
+            if 'items' in result:
+                for item in result['items']:
+                    simple_result.append(item['item'])
+            simple_results.append(simple_result)
+        simple_results = simple_results[0] if len(
+            simple_results) == 1 else simple_results
+        return simple_results

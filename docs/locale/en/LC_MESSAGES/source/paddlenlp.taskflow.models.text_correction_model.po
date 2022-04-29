@@ -1,0 +1,167 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.models.text_correction_model.rst:2
+msgid "text\\_correction\\_model"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC:1
+msgid "ErnieForCSC is a model specified for Chinese Spelling Correction task."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC:3
+msgid ""
+"It integrates phonetic features into language model by leveraging the "
+"powerful pre-training and fine-tuning method."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC:6
+msgid ""
+"See more details on https://aclanthology.org/2021.findings-acl.198.pdf. "
+":param ernie: An instance of `paddlenlp.transformers.ErnieModel`. :type "
+"ernie: ErnieModel :param pinyin_vocab_size: The vocab size of pinyin "
+"vocab. :type pinyin_vocab_size: int :param pad_pinyin_id: The pad token "
+"id of pinyin vocab. Defaults to 0. :type pad_pinyin_id: int, optional"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:1
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:5
+msgid ""
+"Indices of pinyin tokens of input sequence in the pinyin vocabulary. They"
+" are numerical representations of tokens that build the pinyin input "
+"sequence. It's data type should be `int64` and has a shape of "
+"[batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:9
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:  - 0 corresponds to a **sentence "
+"A** token, - 1 corresponds to a **sentence B** token.  It's data type "
+"should be `int64` and has a shape of [batch_size, sequence_length]. "
+"Defaults to None, which means no segment embeddings is added to token "
+"embeddings."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:9
+msgid ""
+"Segment token indices to indicate first and second portions of the "
+"inputs. Indices can be either 0 or 1:"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:12
+msgid "0 corresponds to a **sentence A** token,"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:13
+msgid "1 corresponds to a **sentence B** token."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:15
+msgid ""
+"It's data type should be `int64` and has a shape of [batch_size, "
+"sequence_length]. Defaults to None, which means no segment embeddings is "
+"added to token embeddings."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:18
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, config.max_position_embeddings - "
+"1]``. Defaults to `None`. Shape as `(batch_sie, num_tokens)` and dtype as"
+" `int32` or `int64`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:22
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**.  - **1** for tokens that are "
+"**not masked**, - **0** for tokens that are **masked**.  It's data type "
+"should be `float32` and has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:22
+msgid ""
+"Mask to indicate whether to perform attention on each input token or not."
+" The values should be either 0 or 1. The attention scores will be set to "
+"**-infinity** for any positions in the mask that are **0**, and will be "
+"**unchanged** for positions that are **1**."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:27
+msgid "**1** for tokens that are **not masked**,"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:28
+msgid "**0** for tokens that are **masked**."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:30
+msgid ""
+"It's data type should be `float32` and has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:34
+msgid ""
+"A Tensor of the detection prediction of each tokens.     Shape as "
+"`(batch_size, sequence_length)` and dtype as `int`.  char_preds (Tensor):"
+"     A Tensor of the correction prediction of each tokens.     Shape as "
+"`(batch_size, sequence_length)` and dtype as `int`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:35
+msgid "A Tensor of the detection prediction of each tokens."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:35
+msgid "Shape as `(batch_size, sequence_length)` and dtype as `int`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:38
+msgid "char_preds (Tensor):"
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:38
+msgid ""
+"A Tensor of the correction prediction of each tokens. Shape as "
+"`(batch_size, sequence_length)` and dtype as `int`."
+msgstr ""
+
+#: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
+msgid "返回类型"
+msgstr ""
+

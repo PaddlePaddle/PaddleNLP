@@ -88,7 +88,7 @@ class T5Tokenizer(AlbertEnglishTokenizer):
                  sentencepiece_model_file,
                  do_lower_case=False,
                  remove_space=True,
-                 keep_accents=False,
+                 keep_accents=True,
                  eos_token="</s>",
                  unk_token="<unk>",
                  pad_token="<pad>",

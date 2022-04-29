@@ -1,0 +1,135 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.mpnet.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer:1
+msgid ""
+"Construct a MPNet tokenizer which is almost identical to `BertTokenizer`."
+" For more information regarding those methods, please refer to this "
+"superclass."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:4
+msgid "A MPNet sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      ``<s> X </s>``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``<s> A </s></s> B </s>``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:9
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:11
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences:6
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:6
+msgid "Optional second list of IDs for sequence pairs. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:14
+msgid "List of input_id with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:1
+msgid ""
+"Retrieves sequence ids from a token list that has no special tokens "
+"added. This method is called when adding special tokens using the "
+"tokenizer ``encode`` methods."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences:4
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:4
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:8
+msgid ""
+"Whether or not the token list is already formatted with special tokens "
+"for the model. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:12
+msgid ""
+"The list of integers either be 0 or 1: 1 for a special token, 0 for a "
+"sequence token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Creates a mask from the two sequences passed to be used in a sequence-"
+"pair classification task. MPNet does not make use of token type ids, "
+"therefore a list of zeros is returned."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences:9
+msgid "List of token_type_id according to the given sequence(s)."
+msgstr ""
+

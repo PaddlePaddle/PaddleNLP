@@ -1,0 +1,92 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.utils.profiler.rst:2
+msgid "profiler"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:1
+msgid ""
+"Use a string to initialize a ProfilerOptions. The string should be in the"
+" format: \"key1=value1;key2=value;key3=value3\". For example:"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:4
+msgid ""
+"\"profile_path=model.profile\" \"batch_range=[50, 60]; "
+"profile_path=model.profile\" \"batch_range=[50, 60]; "
+"tracer_option=OpDetail; profile_path=model.profile\""
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:16
+msgid "ProfilerOptions supports following key-value pair:"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:9
+msgid ""
+"batch_range      - a integer list, e.g. [100, 110]. state            - a "
+"string, the optional values are 'CPU', 'GPU' or 'All'. sorted_key       -"
+" a string, the optional values are 'calls', 'total',"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:12
+msgid "'max', 'min' or 'ave."
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:13
+msgid ""
+"tracer_option    - a string, the optional values are 'Default', "
+"'OpDetail',"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:14
+msgid "'AllOpDetail'."
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:15
+msgid "profile_path     - a string, the path to save the serialized profile data,"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:16
+msgid "which can be used to generate a timeline."
+msgstr ""
+
+#: of paddlenlp.utils.profiler.ProfilerOptions:17
+msgid "exit_on_finished - a boolean."
+msgstr ""
+
+#: of paddlenlp.utils.profiler.add_profiler_step:1
+msgid ""
+"Enable the operator-level timing using PaddlePaddle's profiler. The "
+"profiler uses a independent variable to count the profiler steps. One "
+"call of this function is treated as a profiler step."
+msgstr ""
+
+#: of paddlenlp.utils.profiler.add_profiler_step
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.utils.profiler.add_profiler_step:5
+msgid "Default is None, and the profiler is disabled."
+msgstr ""
+

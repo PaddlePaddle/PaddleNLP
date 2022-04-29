@@ -48,7 +48,6 @@ python -m paddle.distributed.launch --gpus "0" run_du.py \
     --device gpu \
  ```
 
-* `task_name`: 数据集的名称，不区分大小写，如dureader_robust，cmrc2018, drcd。
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
 * `model_name_or_path`: 预训练模型的具体名称。如bert-base-chinese，roberta-wwm-ext等。或者是模型文件的本地路径。
 * `output_dir`: 保存模型checkpoint的路径。
