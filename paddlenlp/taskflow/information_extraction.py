@@ -21,7 +21,7 @@ from ..datasets import load_dataset
 from ..transformers import AutoTokenizer
 from .models import UIE
 from .task import Task
-from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than
+from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc
 
 usage = r"""
             from paddlenlp import Taskflow
@@ -90,13 +90,7 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
                 "6248b4897fec78a61ab6da3edf9707fe"
             ],
-        },
-        "uie-large": {
-            "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_large/model_state.pdparams",
-                "83b6452ef2de41cc7ac44bbb18211cf7"
-            ],
-        },
+        }
     }
 
     def __init__(self, task, model, schema, **kwargs):
@@ -106,11 +100,8 @@ class UIETask(Task):
             self._encoding_model = "ernie-3.0-base"
         elif model == "uie-tiny":
             self._encoding_model = "ernie-3.0-medium"
-        elif model == "uie-large":
-            self._encoding_model = "ernie-3.0-large"
         else:
-            raise ValueError(
-                "Model should be one of uie-base, uie-medium and uie-large")
+            raise ValueError("Model should be uie-base or uie-tiny")
         self._check_task_files()
         self._construct_tokenizer()
         self._get_inference_model()
@@ -201,6 +192,7 @@ class UIETask(Task):
                     text=[example["prompt"]],
                     text_pair=[example["text"]],
                     stride=len(example["prompt"]),
+                    truncation=True,
                     max_seq_len=self._max_seq_len,
                     pad_to_max_seq_len=True,
                     return_attention_mask=True,
@@ -338,7 +330,10 @@ class UIETask(Task):
             id = 0
             if not node.prefix:
                 for data in datas:
-                    examples.append({"text": data, "prompt": node.name})
+                    examples.append({
+                        "text": data,
+                        "prompt": dbc2sbc(node.name)
+                    })
                     input_map[cnt] = [id]
                     id += 1
                     cnt += 1
@@ -350,7 +345,7 @@ class UIETask(Task):
                         for p in pre:
                             examples.append({
                                 "text": data,
-                                "prompt": p + node.name
+                                "prompt": dbc2sbc(p + node.name)
                             })
                         input_map[cnt] = [i + id for i in range(len(pre))]
                         id += len(pre)
