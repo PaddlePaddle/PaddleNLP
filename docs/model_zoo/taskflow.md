@@ -32,6 +32,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [词性标注](#词性标注)              | `Taskflow("pos_tagging")`        | ✅        | ✅        | ✅        | ✅          | ✅          | 基于百度前沿词法分析工具LAC                            |
 | [命名实体识别](#命名实体识别)      | `Taskflow("ner")`                | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖最全中文实体标签                                   |
 | [依存句法分析](#依存句法分析)      | `Taskflow("dependency_parsing")` | ✅        | ✅        | ✅        |            | ✅          | 基于最大规模中文依存句法树库研发的DDParser             |
+| [信息抽取](#信息抽取) | `Taskflow("information_extraction")`   | ✅        | ✅        | ✅        | ✅          |           | 适配多场景的开放域通用信息抽取工具                     |
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`   | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
 | [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百度知道2200万对相似句组训练                       |
@@ -392,6 +393,159 @@ from paddlenlp import Taskflow
 * `use_cuda`：是否使用GPU进行切词，默认为False。
 * `return_visual`：是否返回句法树的可视化结果，默认为False。
 * `task_path`：自定义任务路径，默认为None。
+</div></details>
+
+### 信息抽取
+<details><summary>&emsp; 适配多场景的开放域通用信息抽取工具 </summary><div>
+
+开放域信息抽取(OIE)是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
+
+#### 支持多场景信息抽取任务
+
+- 命名实体识别
+
+  命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
+
+  例如抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
+
+  ```text
+  ['时间', '选手', '赛事名称']
+  ```
+
+  预测：
+
+  ```python
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+  >>> ie = Taskflow('information_extraction', schema=schema)
+  >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
+  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9907337794563702}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8914310308098763}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8944207860063003}]}]
+  ```
+
+- 关系抽取
+
+  关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，即抽取三元组（entity1，关系类型，entity2）。
+
+  例如抽取的目标是"歌曲名"对应实体词的"歌手"、"所属专辑", schema构造如下：
+
+  ```text
+  {'歌曲名称': ['歌手', '所属专辑']}
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = {'歌曲名称': ['歌手', '所属专辑']} # Define the schema for relation extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('《告别了》是孙耀威在专辑爱的故事里面的歌曲')
+  [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.7721050787207417, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9996328066160487}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9981007942846247}]}}]}]
+  ```
+
+  在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
+
+- 事件抽取
+
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取事件并识别事件类型和事件论元的技术。UIE所包含的事件抽取任务，是指根据已知事件类型，抽取该事件所包含的事件论元。
+
+  例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
+
+  ```text
+  {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}
+  ```
+
+  触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+
+  预测：
+
+  ```python
+  >>> schema = {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']} # Define the schema for event extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
+  [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+  ```
+
+- 评论观点抽取
+
+  评论观点抽取，是指抽取文本中包含的评价维度、观点词。
+
+  例如抽取的目标是文本中包含的评价维度以及对应的观点词，schema构造如下：
+
+  ```text
+  {'评价维度': '观点词'}
+  ```
+
+  评论观点抽取默认统一使用`评价维度`和`观点词`作为schema。
+
+  预测：
+
+  ```python
+  >>> schema = {'评价维度': '观点词'} # Define the schema for opinion extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('个人觉得管理太混乱了，票价太高了')
+  [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relations': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relations': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
+  ```
+
+- 情感倾向分类
+
+  句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
+
+  ```text
+  '情感倾向[正向，负向]'
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('这个产品用起来真的很流畅，我非常喜欢')
+  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
+  ```
+
+- 跨任务跨领域抽取
+
+  例如同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
+
+  ```text
+  ['寺庙', {'丈夫': '妻子'}]
+  ```
+
+  ```python
+  >>> schema = ['寺庙', {'丈夫': '妻子'}]
+  >>> ie.set_schema(schema)
+  >>> ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')
+  [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.998334669586864}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.993496447299993, 'relations': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9994008822614759}]}}]}]
+  ```
+
+
+#### 多模型选择，满足精度、速度要求
+
+- 模型选择
+
+  | 模型 |  结构  |
+  | :---: | :--------: |
+  | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
+  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
+  | `uie-large`| 24-layers, 1024-hidden, 16-heads |
+
+- 使用`UIE-Tiny`进行预测
+
+  ```python
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['时间', '选手', '赛事名称']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-tiny")
+  >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
+  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9939956659967066}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8323544377549155}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.624098394612048}]}]
+  ```
+
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-large`。
+* `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
+* `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 </div></details>
 
 ### 解语知识标注

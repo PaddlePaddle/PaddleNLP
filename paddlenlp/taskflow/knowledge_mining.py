@@ -746,12 +746,10 @@ class NPTagTask(Task):
 
         for i in range(len(inputs['texts'])):
             cls_label = self._decode(inputs['pred_ids'][i])
-
             result = {
                 'text': inputs['texts'][i],
                 'label': cls_label,
             }
-
             if cls_label not in self._name_dict:
                 scores_can = inputs['all_scores_can'][i]
                 pred_ids_can = inputs['all_preds_can'][i]
@@ -764,9 +762,11 @@ class NPTagTask(Task):
                         break
                     else:
                         labels_can = self._tree.search_similar_word(cls_label)
-                        result['label'] = labels_can[0][0]
-
+                        if len(labels_can) != 0:
+                            result['label'] = labels_can[0][0]
+                            break
             if self._linking:
-                result['category'] = self._name_dict[result['label']]
+                if result['label'] in self._name_dict:
+                    result['category'] = self._name_dict[result['label']]
             results.append(result)
         return results
