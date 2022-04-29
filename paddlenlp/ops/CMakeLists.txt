@@ -303,7 +303,6 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/open_attention.h open_attention_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.h open_attention_h_dst)
 
-file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/open_attention.cu open_attention_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/open_attention.cu open_attention_cu_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/CMakeLists.txt fastertransformer_cmakelists_src)
@@ -330,7 +329,6 @@ set(FT_PATCH_COMMAND
   && cp ${trans_kernels_cu_src} ${trans_kernels_cu_dst}
   && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
   && cp ${open_attention_h_src} ${open_attention_h_dst}
-  && cp ${open_attention_cu_src} ${open_attention_cu_dst}
   && cp ${fastertransformer_cmakelists_src} ${fastertransformer_cmakelists_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
@@ -341,6 +339,8 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
+  && sed -i "2091,2119d" ${open_attention_cu_dst}
+  && rm blank_lines
   && ${MUTE_COMMAND}
   && ${OPEN_ATTENTION_MUTE_COMMAND}
 )

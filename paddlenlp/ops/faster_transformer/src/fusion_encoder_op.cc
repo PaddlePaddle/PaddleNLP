@@ -52,7 +52,7 @@ std::vector<paddle::Tensor> EncoderForward(
   if (input.place() == paddle::PlaceType::kGPU) {
     auto shape = input.shape();
     std::vector<paddle::Tensor> encoder_out({
-      input, paddle::Tensor(paddle::PlaceType::kGPU, shape)
+      paddle::Tensor(paddle::PlaceType::kGPU, shape), paddle::Tensor(paddle::PlaceType::kGPU, shape)
     });
 
     return EncoderCUDAForward(input,

@@ -117,15 +117,28 @@ std::vector<paddle::Tensor> encoder_kernel(
                             size_per_head_,
                             use_trt_kernel_);
 
+    std::vector<data_t_*> enc_buf({
+        encoder_out[0].mutable_data<data_t_>(input.place()),
+        encoder_out[1].mutable_data<data_t_>(input.place())});
+
     for (int layer = 0; layer < layers; ++layer) {
         in_id = layer & 0x1;
 
-        encoder_param.from_tensor = reinterpret_cast<DataType_*>(
-            encoder_out[in_id].data<data_t_>());
-        encoder_param.to_tensor = reinterpret_cast<DataType_*>(
-            encoder_out[in_id].data<data_t_>());
-        encoder_param.transformer_out = reinterpret_cast<DataType_*>(
-            encoder_out[1 - in_id].mutable_data<data_t_>(input.place()));
+        if (0 == layer) {
+            encoder_param.from_tensor = reinterpret_cast<const DataType_*>(
+                input.data<data_t_>());
+            encoder_param.to_tensor = reinterpret_cast<const DataType_*>(
+                input.data<data_t_>());
+            encoder_param.transformer_out = reinterpret_cast<DataType_*>(
+                enc_buf[1 - in_id]);
+        } else {
+            encoder_param.from_tensor = reinterpret_cast<DataType_*>(
+                enc_buf[in_id]);
+            encoder_param.to_tensor = reinterpret_cast<DataType_*>(
+                enc_buf[in_id]);
+            encoder_param.transformer_out = reinterpret_cast<DataType_*>(
+                enc_buf[1 - in_id]);
+        }
 
         // self attn
         encoder_param.self_attention.query_weight.kernel =
@@ -217,12 +230,21 @@ std::vector<paddle::Tensor> encoder_kernel(
     for (int layer = 0; layer < layers; ++layer) {
         in_id = layer & 0x1;
 
-        encoder_param.from_tensor = reinterpret_cast<DataType_*>(
-            encoder_out[in_id].data<data_t_>());
-        encoder_param.to_tensor = reinterpret_cast<DataType_*>(
-            encoder_out[in_id].data<data_t_>());
-        encoder_param.transformer_out = reinterpret_cast<DataType_*>(
-            encoder_out[1 - in_id].mutable_data<data_t_>(input.place()));
+        if (0 == layer) {
+            encoder_param.from_tensor = reinterpret_cast<const DataType_*>(
+                input.data<data_t_>());
+            encoder_param.to_tensor = reinterpret_cast<const DataType_*>(
+                input.data<data_t_>());
+            encoder_param.transformer_out = reinterpret_cast<DataType_*>(
+                encoder_out[1 - in_id].mutable_data<data_t_>(input.place()));
+        } else {
+            encoder_param.from_tensor = reinterpret_cast<DataType_*>(
+                encoder_out[in_id].data<data_t_>());
+            encoder_param.to_tensor = reinterpret_cast<DataType_*>(
+                encoder_out[in_id].data<data_t_>());
+            encoder_param.transformer_out = reinterpret_cast<DataType_*>(
+                encoder_out[1 - in_id].mutable_data<data_t_>(input.place()));
+        }
 
         // self attn
         encoder_param.self_attention.query_weight.kernel =
