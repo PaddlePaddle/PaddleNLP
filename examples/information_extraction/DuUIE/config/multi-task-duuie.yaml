@@ -4,7 +4,7 @@ T1:
   sel2record: longer_first_zh
   eval_match_mode: set
   metrics:
-    - string-rel-strict-F1
+    - string-rel-boundary-F1
 
 T2:
   name: DUIE_ORG_SPO
@@ -12,7 +12,7 @@ T2:
   sel2record: longer_first_zh
   eval_match_mode: set
   metrics:
-    - string-rel-strict-F1
+    - string-rel-boundary-F1
 
 T3:
   name: 体育竞赛
