@@ -1154,18 +1154,18 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         else:
             return None
 
-    def get_discriminator_inputs(self, inputs, raw_inputs, gen_logits,
-                                 gen_labels, use_softmax_sample):
+    def get_discriminator_inputs(self, inputs, raw_inputs, generator_logits,
+                                 generator_labels, use_softmax_sample):
         # get generator token result
-        sampled_tokens = (self.sample_from_softmax(gen_logits,
+        sampled_tokens = (self.sample_from_softmax(generator_logits,
                                                    use_softmax_sample)).detach()
         sampled_tokids = paddle.argmax(sampled_tokens, axis=-1)
         # update token only at mask position
-        # gen_labels : [B, L], L contains -100(unmasked) or token value(masked)
+        # generator_labels : [B, L], L contains -100(unmasked) or token value(masked)
         # mask_positions : [B, L], L contains 0(unmasked) or 1(masked)
-        umask_positions = paddle.zeros_like(gen_labels)
-        mask_positions = paddle.ones_like(gen_labels)
-        mask_positions = paddle.where(gen_labels == -100, umask_positions,
+        umask_positions = paddle.zeros_like(generator_labels)
+        mask_positions = paddle.ones_like(generator_labels)
+        mask_positions = paddle.where(generator_labels == -100, umask_positions,
                                       mask_positions)
         updated_inputs = self.update_inputs(inputs, sampled_tokids,
                                             mask_positions)
@@ -1208,7 +1208,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 raw_input_ids=None,
-                gen_labels=None):
+                generator_labels=None):
         r"""
         The ElectraForPretraining forward method, overrides the __call__() special method.
 
@@ -1224,17 +1224,17 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
             raw_input_ids(Tensor, optional):
                 Raw inputs used to get discriminator labels.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            gen_labels(Tensor, optional):
+            generator_labels(Tensor, optional):
                 Labels to compute the discriminator inputs.
                 Its data type should be int64 and its shape is [batch_size, sequence_length].
                 The value for unmasked tokens should be -100 and value for masked tokens should be 0.
 
         Returns:
-            tuple: Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask).
+            tuple: Returns tuple (generator_logits, disc_logits, disc_labels, attention_mask).
 
             With the fields:
 
-            - `gen_logits` (Tensor):
+            - `generator_logits` (Tensor):
                 The scores of Electra Generator.
                 Its data type should be int64 and its shape is [batch_size, sequence_length, vocab_size].
 
@@ -1253,14 +1253,14 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         """
 
         assert (
-            gen_labels is not None
-        ), "gen_labels should not be None, please check DataCollatorForLanguageModeling"
+            generator_labels is not None
+        ), "generator_labels should not be None, please check DataCollatorForLanguageModeling"
 
-        gen_logits = self.generator(input_ids, token_type_ids, position_ids,
-                                    attention_mask)
+        generator_logits = self.generator(input_ids, token_type_ids,
+                                          position_ids, attention_mask)
 
         disc_inputs, disc_labels, generator_predict_tokens = self.get_discriminator_inputs(
-            input_ids, raw_input_ids, gen_logits, gen_labels,
+            input_ids, raw_input_ids, generator_logits, generator_labels,
             self.use_softmax_sample)
 
         disc_logits = self.discriminator(disc_inputs, token_type_ids,
@@ -1272,7 +1272,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         else:
             attention_mask = attention_mask.astype("bool")
 
-        return gen_logits, disc_logits, disc_labels, attention_mask
+        return generator_logits, disc_logits, disc_labels, attention_mask
 
 
 class ElectraPooler(nn.Layer):
@@ -1336,15 +1336,16 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         }
     }
 
-    def get_discriminator_inputs_ernie_health(self, inputs, raw_inputs,
-                                              gen_logits, gen_labels,
-                                              use_softmax_sample):
+    def get_discriminator_inputs_ernie_health(
+            self, inputs, raw_inputs, generator_logits, generator_labels,
+            use_softmax_sample):
         updated_inputs, labels, sampled_tokids = self.get_discriminator_inputs(
-            inputs, raw_inputs, gen_logits, gen_labels, use_softmax_sample)
+            inputs, raw_inputs, generator_logits, generator_labels,
+            use_softmax_sample)
 
         # Get negative samples to construct candidates.
         neg_samples_ids = self.sample_negatives_from_softmax(
-            gen_logits, raw_inputs, use_softmax_sample)
+            generator_logits, raw_inputs, use_softmax_sample)
         candidate_ids = paddle.concat(
             [raw_inputs.unsqueeze(2), neg_samples_ids], axis=2).detach()
         return updated_inputs, labels, sampled_tokids, candidate_ids
@@ -1396,15 +1397,16 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
                 position_ids=None,
                 attention_mask=None,
                 raw_input_ids=None,
-                gen_labels=None):
-        assert (gen_labels is not None
-                ), "gen_labels should not be None, please check DataCollator"
+                generator_labels=None):
+        assert (
+            generator_labels is not None
+        ), "generator_labels should not be None, please check DataCollator"
 
-        gen_logits = self.generator(input_ids, token_type_ids, position_ids,
-                                    attention_mask)
+        generator_logits = self.generator(input_ids, token_type_ids,
+                                          position_ids, attention_mask)
 
         disc_input_list = self.get_discriminator_inputs_ernie_health(
-            input_ids, raw_input_ids, gen_logits, gen_labels,
+            input_ids, raw_input_ids, generator_logits, generator_labels,
             self.use_softmax_sample)
         disc_inputs, disc_labels, _, disc_candidates = disc_input_list
 
@@ -1418,7 +1420,7 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         else:
             attention_mask = attention_mask.astype('bool')
 
-        return gen_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
+        return generator_logits, logits_rtd, logits_mts, logits_csp, disc_labels, attention_mask
 
 
 class ElectraForMultipleChoice(ElectraPretrainedModel):

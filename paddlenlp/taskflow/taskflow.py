@@ -35,6 +35,7 @@ from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
+from .information_extraction import UIETask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -218,6 +219,28 @@ TASKS = {
             "mode": "base"
         }
     },
+    'information_extraction': {
+        "models": {
+            "uie-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-base"
+            },
+            "uie-tiny": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-tiny"
+            },
+            "uie-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-large"
+            }
+        },
+        "default": {
+            "model": "uie-base"
+        }
+    }
 }
 
 
@@ -323,3 +346,9 @@ class Taskflow(object):
                     exit()
                 robot = self.task_instance(human)[0]
                 print("[Bot]:%s" % robot)
+
+    def set_schema(self, schema):
+        assert self.task_instance.model in [
+            "uie-base", "uie-tiny", "uie-large"
+        ], 'This method can only used for the task with uie model.'
+        self.task_instance.set_schema(schema)
