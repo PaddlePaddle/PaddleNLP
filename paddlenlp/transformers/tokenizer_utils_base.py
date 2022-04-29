@@ -1,5 +1,7 @@
 # coding=utf-8
-# Copyright 2020 The HuggingFace Inc. team.
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -190,9 +192,6 @@ class BatchEncoding(UserDict):
             initialization.
         prepend_batch_axis (`bool`, *optional*, defaults to `False`):
             Whether or not to add a batch axis when converting to tensors (see `tensor_type` above).
-        n_sequences (`Optional[int]`, *optional*):
-            You can give a tensor_type here to convert the lists of integers in Paddle/Numpy Tensors at
-            initialization.
     """
 
     def __init__(
@@ -1265,7 +1264,68 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     """
     Base class for [`PretrainedTokenizer`].
 
-    Handles shared (mostly boiler plate) methods for those two classes.
+    Class attributes (overridden by derived classes)
+
+         - **resource_files_names** (`Dict[str, str]`) -- A dictionary with, as keys, the `__init__` keyword name of each
+            vocabulary file required by the model, and as associated values, the filename for saving the associated file
+            (string).
+        - **pretrained_resource_files_map** (`Dict[str, Dict[str, str]]`) -- A dictionary of dictionaries, with the
+            high-level keys being the `__init__` keyword name of each vocabulary file required by the model, the
+            low-level being the `short-cut-names` of the pretrained models with, as associated values, the `url` to the
+            associated pretrained vocabulary file.
+        - **max_model_input_sizes** (`Dict[str, Optional[int]]`) -- A dictionary with, as keys, the `short-cut-names`
+            of the pretrained models, and as associated values, the maximum length of the sequence inputs of this model,
+            or `None` if the model has no maximum input size.
+        - **pretrained_init_configuration** (`Dict[str, Dict[str, Any]]`) -- A dictionary with, as keys, the
+            `short-cut-names` of the pretrained models, and as associated values, a dictionary of specific arguments to
+            pass to the `__init__` method of the tokenizer class for this pretrained model when loading the tokenizer
+            with the [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`] method.
+        - **model_input_names** (`List[str]`) -- A list of inputs expected in the forward pass of the model.
+        - **padding_side** (`str`) -- The default value for the side on which the model should have padding applied.
+            Should be `'right'` or `'left'`.
+        - **truncation_side** (`str`) -- The default value for the side on which the model should have truncation
+            applied. Should be `'right'` or `'left'`.
+
+    Args:
+        model_max_length (`int`, *optional*):
+            The maximum length (in number of tokens) for the inputs to the transformer model. When the tokenizer is
+            loaded with [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`], this will be set to the
+            value stored for the associated model in `max_model_input_sizes` (see above). If no value is provided, will
+            default to VERY_LARGE_INTEGER (`int(1e30)`).
+        padding_side (`str`, *optional*):
+            The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+            Default value is picked from the class attribute of the same name.
+        truncation_side (`str`, *optional*):
+            The side on which the model should have truncation applied. Should be selected between ['right', 'left'].
+            Default value is picked from the class attribute of the same name.
+        model_input_names (`List[string]`, *optional*):
+            The list of inputs accepted by the forward pass of the model (like `"token_type_ids"` or
+            `"attention_mask"`). Default value is picked from the class attribute of the same name.
+        bos_token (`str` or `AddedToken`, *optional*):
+            A special token representing the beginning of a sentence. Will be associated to `self.bos_token` and
+            `self.bos_token_id`.
+        eos_token (`str` or `AddedToken`, *optional*):
+            A special token representing the end of a sentence. Will be associated to `self.eos_token` and
+            `self.eos_token_id`.
+        unk_token (`str` or `AddedToken`, *optional*):
+            A special token representing an out-of-vocabulary token. Will be associated to `self.unk_token` and
+            `self.unk_token_id`.
+        sep_token (`str` or `AddedToken`, *optional*):
+            A special token separating two different sentences in the same input (used by BERT for instance). Will be
+            associated to `self.sep_token` and `self.sep_token_id`.
+        pad_token (`str` or `AddedToken`, *optional*):
+            A special token used to make arrays of tokens the same size for batching purpose. Will then be ignored by
+            attention mechanisms or loss computation. Will be associated to `self.pad_token` and `self.pad_token_id`.
+        cls_token (`str` or `AddedToken`, *optional*):
+            A special token representing the class of the input (used by BERT for instance). Will be associated to
+            `self.cls_token` and `self.cls_token_id`.
+        mask_token (`str` or `AddedToken`, *optional*):
+            A special token representing a masked token (used by masked-language modeling pretraining objectives, like
+            BERT). Will be associated to `self.mask_token` and `self.mask_token_id`.
+        additional_special_tokens (tuple or list of `str` or `AddedToken`, *optional*):
+            A tuple or a list of additional special tokens. Add them here to ensure they won't be split by the
+            tokenization process. Will be associated to `self.additional_special_tokens` and
+            `self.additional_special_tokens_ids`.
     """
 
     resource_files_names: Dict[str, str] = {}
@@ -1639,6 +1699,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         Args:
             save_directory (str): Directory to save files into.
+            filename_prefix: (str, optional):
+                A prefix to add to the names of the files saved by the tokenizer.
 
         Example:
             .. code-block::
