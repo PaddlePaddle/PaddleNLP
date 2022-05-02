@@ -247,8 +247,9 @@ class BatchEncoding(UserDict):
             return self._encodings[item]
         else:
             raise KeyError(
-                "Indexing with integers (to access backend Encoding for a given batch index) "
-                "is not available when using Python based tokenizers")
+                "Indexing with integers is not available when using tokenizer.__call__()"
+                " with return_dict=True. Please set return_dict to False to use integer indexing."
+            )
 
     def __getattr__(self, item: str):
         try:
