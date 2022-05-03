@@ -20,17 +20,19 @@
 
 [Universal Information Extraction(UIE)](https://arxiv.org/pdf/2203.12277.pdf)开放域信息抽取的统一框架。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键数据抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
-#### UIE特点
+#### UIE的优势
 
-- 跨任务跨领域抽取
+- 使用简单：用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**
 
-- 抽取的类别没有限制
+- 降本增效：以往的信息抽取技术需要大量标注数据才能保证信息抽取的效果，为了提高开发过程中的开发效率，减少不必要的重复工作时间，开放域信息抽取可以实现零样本（zero-shot）或者少样本（few-shot）抽取，**大幅度降低标注数据依赖，在降低成本的同时，还提升了效果**
 
-- 通过少量训练数据即可实现模型定制
+- 效果领先：开放域信息抽取在多种场景，多种任务上，均有不俗的表现
 
 <a name="应用场景"></a>
 
 ## 3. 应用场景
+
+UIE可以从自然语言文本中，抽取出结构化的关键字段信息，目前在医疗、金融、法律、电商等领域均有应用。
 
 #### 医疗
 
@@ -44,11 +46,22 @@
 
 ## 4. 一键预测
 
+```python
+>>> from paddlenlp import Taskflow
+
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
+[{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9907337794563702}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8914310308098763}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8944207860063003}]}]
+```
+
+更多使用方法请参考[Taskflow信息抽取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E4%BF%A1%E6%81%AF%E6%8A%BD%E5%8F%96)
+
 <a name="轻定制功能"></a>
 
 ## 5. 轻定制功能
 
-### 代码结构
+#### 代码结构
 
 ```shell
 .
@@ -60,7 +73,7 @@
 └── README.md
 ```
 
-### 数据标注
+#### 数据标注
 
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本案例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
 
@@ -86,7 +99,7 @@ python doccano.py \
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
 
-### 模型训练
+#### 模型训练
 
 通过运行以下命令进行自定义UIE模型训练：
 
@@ -106,7 +119,7 @@ python train.py \
     --device "gpu"
 ```
 
-### 模型评估
+#### 模型评估
 
 通过运行以下命令进行模型评估：
 
@@ -118,7 +131,7 @@ python evaluate.py \
     --max_seq_len 512
 ```
 
-### Taskflow装载定制模型
+#### Taskflow装载定制模型
 
 通过`schema`自定义抽取目标，`task_path`指定使用标注数据训练的UIE模型。
 
