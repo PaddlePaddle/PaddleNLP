@@ -71,7 +71,7 @@ def parse_args():
         help="The initial learning rate for Adam.")
     parser.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
@@ -94,7 +94,7 @@ def parse_args():
     )
     parser.add_argument(
         "--warmup_proportion",
-        default=0.0,
+        default=0.1,
         type=float,
         help="Proportion of training steps to perform linear learning rate warmup for."
     )
@@ -220,6 +220,9 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
 
 
 def run(args):
+    if args.do_train:
+        assert args.batch_size % args.gradient_accumulation_steps == 0, \
+            "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()

@@ -9,12 +9,14 @@
 #include <vector>
 
 // TODO(guosheng): `HOST` conflict exists in float.h of paddle and mpi.h of mpi
-#include "fastertransformer/cuda/cub/cub.cuh"
-#include "fastertransformer/gpt.h"
-#include "fastertransformer/open_decoder.h"
-#include "fastertransformer/utils/common.h"
 #include "fusion_gpt_op.h"
 #include "pd_traits.h"
+#ifdef HOST
+#undef HOST
+#endif
+#include "fastertransformer/cuda/cub/cub.cuh"
+#include "fastertransformer/gpt.h"
+#include "fastertransformer/utils/common.h"
 
 #ifdef BUILD_GPT  // consistent with FasterTransformer
 #include <map>
@@ -274,14 +276,14 @@ std::vector<paddle::Tensor> gpt2_kernel(
   const int hidden_unit = size_per_head * n_head;
 
 #ifdef BUILD_GPT
-  auto* model_para_desc =
-      ModelParaDescFactory::CreateModelParaDesc(n_head,
-                                                size_per_head,
-                                                num_layer,
-                                                tensor_para_size,
-                                                layer_para_size,
-                                                layer_para_batch_size,
-                                                word_emb.data<data_t_>());
+  auto* model_para_desc = ModelParaDescFactory::CreateModelParaDesc(
+      n_head,
+      size_per_head,
+      num_layer,
+      tensor_para_size,
+      layer_para_size,
+      layer_para_batch_size,
+      const_cast<data_t_*>(word_emb.data<data_t_>()));
   auto& tensor_parallel_param = model_para_desc->tensor_parallel_param;
   auto& layer_parallel_param = model_para_desc->layer_parallel_param;
   auto seed = model_para_desc->dist(model_para_desc->gen);

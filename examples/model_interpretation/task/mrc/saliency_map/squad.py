@@ -45,12 +45,22 @@ class RCInterpret(DatasetBuilder):
                 title = example_dic['title']
                 context = example_dic['context']
                 question = example_dic['question']
-                yield {
-                    'id': id,
-                    'title': title,
-                    'context': context,
-                    'question': question
-                }
+                if 'sent_token' in example_dic:
+                    sent_token = example_dic['sent_token']
+                    yield {
+                        'id': id,
+                        'title': title,
+                        'context': context,
+                        'question': question,
+                        'sent_token': sent_token
+                    }
+                else:
+                    yield {
+                        'id': id,
+                        'title': title,
+                        'context': context,
+                        'question': question
+                    }
 
 
 class DuReaderChecklist(DatasetBuilder):

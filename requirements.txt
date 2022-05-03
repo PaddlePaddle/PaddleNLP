@@ -7,3 +7,4 @@ multiprocess
 datasets
 tqdm
 paddlefsl
+sentencepiece
