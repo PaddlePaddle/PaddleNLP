@@ -33,12 +33,6 @@ MODEL_MAP = {
         "url":
         "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams"
     },
-    "uie-large": {
-        "encoding_model": "ernie-3.0-large",
-        "hidden_size": 1024,
-        "url":
-        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_large/model_state.pdparams"
-    }
 }
 
 
@@ -114,14 +108,6 @@ def reader(data_path):
         for line in f:
             json_line = json.loads(line)
             yield json_line
-
-
-def save_examples(examples, save_path, idxs):
-    with open(save_path, "w", encoding="utf-8") as f:
-        for idx in idxs:
-            for example in examples[idx]:
-                line = json.dumps(example, ensure_ascii=False) + "\n"
-                f.write(line)
 
 
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):

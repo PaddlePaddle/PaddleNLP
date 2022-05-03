@@ -16,7 +16,7 @@ import os
 import argparse
 import numpy as np
 
-from utils import set_seed, save_examples, convert_doccano_examples
+from utils import set_seed, convert_doccano_examples
 
 
 def convert_doccano_file(doccano_file,
@@ -51,33 +51,46 @@ def convert_doccano_file(doccano_file,
     with open(doccano_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    entity_examples, relation_examples = convert_doccano_examples(
-        raw_examples, negative_ratio)
+    def _create_examples(examples, negative_ratio=0, shuffle=False):
+        entities, relations = convert_doccano_examples(examples, negative_ratio)
+        examples = [e + r for e, r in zip(entities, relations)]
+        if shuffle:
+            indexes = np.random.permutation(len(examples))
+            examples = [examples[i] for i in indexes]
+        return examples
 
-    examples = [e + r for e, r in zip(entity_examples, relation_examples)]
-
-    # index for saving data
-    idxs = np.arange(len(examples))
-
-    if is_shuffle:
-        idxs = np.random.permutation(idxs)
+    def _save_examples(save_dir, file_name, examples):
+        count = 0
+        save_path = os.path.join(save_dir, file_name)
+        with open(save_path, "w", encoding="utf-8") as f:
+            for example in examples:
+                for x in example:
+                    f.write(json.dumps(x, ensure_ascii=False) + "\n")
+                    count += 1
+        print("\nSave %d examples to %s." % (count, save_path))
 
     if len(splits) == 0:
-        save_path = os.path.join(save_dir, "doccano.txt")
-        save_examples(examples, save_path, idxs)
-        print(f"\nSave data to {save_path}.")
+        examples = _create_examples(raw_examples, negative_ratio, is_shuffle)
+        _save_examples(save_dir, "doccano.txt", examples)
     else:
-        r1, r2, _ = splits
-        n1, n2 = int(len(examples) * r1), int(len(examples) * (r1 + r2))
-        save_train_path = os.path.join(save_dir, "train.txt")
-        save_dev_path = os.path.join(save_dir, "dev.txt")
-        save_test_path = os.path.join(save_dir, "test.txt")
-        save_examples(examples, save_train_path, idxs[:n1])
-        save_examples(examples, save_dev_path, idxs[n1:n2])
-        save_examples(examples, save_test_path, idxs[n2:])
-        print(f"\nSave train data to {save_train_path}.")
-        print(f"Save dev data to {save_dev_path}.")
-        print(f"Save test data to {save_test_path}.")
+        if is_shuffle:
+            indexes = np.random.permutation(len(raw_examples))
+            raw_examples = [raw_examples[i] for i in indexes]
+
+        i1, i2, _ = splits
+        p1 = int(len(raw_examples) * i1)
+        p2 = int(len(raw_examples) * (i1 + i2))
+
+        train_examples = _create_examples(raw_examples[:p1], negative_ratio,
+                                          is_shuffle)
+        dev_examples = _create_examples(raw_examples[p1:p2])
+        test_examples = _create_examples(raw_examples[p2:])
+
+        _save_examples(save_dir, "train.txt", train_examples)
+        _save_examples(save_dir, "dev.txt", dev_examples)
+        _save_examples(save_dir, "test.txt", test_examples)
+
+    print('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
