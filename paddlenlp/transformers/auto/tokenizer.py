@@ -59,6 +59,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("RobertaChineseTokenizer", "roberta"),
     ("RobertaBPETokenizer", "roberta"),
     ("RoFormerTokenizer", "roformer"),
+    ("RoFormerv2Tokenizer", "roformerv2"),
     ("SkepTokenizer", "skep"),
     ("SqueezeBertTokenizer", "squeezebert"),
     ("TinyBertTokenizer", "tinybert"),
