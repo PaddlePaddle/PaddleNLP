@@ -24,7 +24,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-from data_tools.tokenizer import _GPT2BPETokenizer
+from tokenizer import _GPT2BPETokenizer
 
 try:
     import nltk

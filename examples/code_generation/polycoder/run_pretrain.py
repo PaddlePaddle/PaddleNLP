@@ -17,6 +17,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import numpy as np
 import paddle
@@ -31,7 +32,11 @@ from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
 from paddle.distributed import fleet
-from data_tools.tokenizer import _GPT2BPETokenizer
+
+# Used to load data_tools path.
+sys.path.insert(0, "./data_tools")
+
+from tokenizer import _GPT2BPETokenizer
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),

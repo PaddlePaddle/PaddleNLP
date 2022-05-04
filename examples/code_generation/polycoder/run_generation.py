@@ -14,6 +14,7 @@
 
 import random
 import argparse
+import sys
 
 import numpy as np
 import paddle
@@ -22,7 +23,10 @@ from paddlenlp.transformers import (
     GPTTokenizer,
     GPTChineseTokenizer, )
 
-from data_tools.tokenizer import _GPT2BPETokenizer
+# Used to load data_tools path.
+sys.path.insert(0, "./data_tools")
+
+from tokenizer import _GPT2BPETokenizer
 
 MODEL_CLASSES = {
     "gpt2-en": (GPTLMHeadModel, GPTTokenizer),

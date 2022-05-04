@@ -20,12 +20,9 @@
 from abc import ABC
 from abc import abstractmethod
 
-from tokenizers import Tokenizer
-from transformers import GPT2Tokenizer, GPT2TokenizerFast
 import numpy as np
-import sentencepiece as spm
 from typing import List, Union
-from data_tools.gpt2_tokenization import GPT2Tokenizer
+from gpt2_tokenization import GPT2Tokenizer
 
 
 def build_tokenizer(args):
