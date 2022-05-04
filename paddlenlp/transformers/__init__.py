@@ -99,3 +99,5 @@ from .luke.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .semantic_indexing.modeling import *
+from .roformerv2.modeling import *
+from .roformerv2.tokenizer import *
