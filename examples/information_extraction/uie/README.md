@@ -38,13 +38,19 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 在医疗场景下，医生需要从病历中快速重要信息以便分析病人病情，UIE可将专病信息进行结构化处理，快速抽取病历内容中的检查内容、炎症部位、结节大小等信息，大幅提升医务人员对患者的诊断效率以及准确率，协助医务人员高效诊断病情。
 
-![image](https://user-images.githubusercontent.com/40840292/166708474-8f05bdba-143f-4d11-8bd5-8ce26ab7c987.png)
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/166708474-8f05bdba-143f-4d11-8bd5-8ce26ab7c987.png height=300 hspace='10'/>
+    <p>图1 医疗场景示例<p/>
+</div>
 
 #### 金融
 
 在金融场景下，工作人员想要整理一份资产评估证明，UIE可以根据抽取内容自定义抽取目标，大幅提升工作人员的工作效率及准确率，协助工作人员对数据进行整理和调研。
 
-![image](https://user-images.githubusercontent.com/40840292/166708694-e2671e29-3c02-4e29-9823-9fbdfd117eb6.png)
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/166708694-e2671e29-3c02-4e29-9823-9fbdfd117eb6.png height=400 hspace='10'/>
+    <p>图2 金融场景示例<p/>
+</div>
 
 <a name="开箱即用"></a>
 
@@ -87,7 +93,7 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/164374314-9beea9ad-08ed-42bc-bbbc-9f68eb8a40ee.png />
-    <p>图2 数据标注样例图<p/>
+    <p>图3 数据标注样例图<p/>
 </div>
 
 - 在doccano平台上，定义实体标签类别和关系标签类别，上例中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
