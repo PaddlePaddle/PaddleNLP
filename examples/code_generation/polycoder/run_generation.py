@@ -90,6 +90,11 @@ def parse_args():
         default=1.0,
         help='The exponential penalty to the sequence length for beam search.')
     parser.add_argument(
+        '--repetition_penalty',
+        type=float,
+        default=1.0,
+        help='The parameter for repetition penalty. 1.0 means no penalty.')
+    parser.add_argument(
         '--early_stopping',
         type=eval,
         default=False,
@@ -177,6 +182,7 @@ def main(args, input_text):
         top_p=args.top_p,
         num_beams=args.num_beams,
         length_penalty=args.length_penalty,
+        repetition_penalty=args.repetition_penalty,
         early_stopping=args.early_stopping,
         num_return_sequences=args.num_return_sequences)
 
