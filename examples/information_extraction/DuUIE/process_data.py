@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+import copy
 from typing import List, Dict
 from collections import defaultdict
 import yaml
@@ -23,6 +24,8 @@ def load_jsonlines_file(filename):
 
 
 def convert_entity_schema(entity_schema):
+    """ Convert entity schmea to record schema
+    """
     spots = list()
     asocs = list()
     spot_asoc_map = dict()
@@ -33,6 +36,8 @@ def convert_entity_schema(entity_schema):
 
 
 def convert_entity_relation_schema(entity_schema, relation_schema):
+    """ Convert entity and relation chmea to record schema
+    """
     spots = list()
     asocs = list()
     spot_asoc_map = dict()
@@ -50,6 +55,8 @@ def convert_entity_relation_schema(entity_schema, relation_schema):
 
 
 def convert_event_schema(schema):
+    """ Convert event schmea to record schema
+    """
     spots = list()
     asocs = set()
     spot_asoc_map = dict()
@@ -75,8 +82,7 @@ def dump_schema(output_folder, schema_dict):
 
 def main_entity_relation(schema_file, schema_name, instances, output_folder):
     schema = yaml.load(
-        open(
-            schema_file, encoding='utf8'), Loader=yaml.FullLoader)
+        open(schema_file, encoding='utf8'), Loader=yaml.FullLoader)
     entity_schema = convert_entity_schema(schema.get('实体', {}))
     relation_schema = convert_entity_relation_schema(
         schema.get('实体', {}), schema.get('关系', {}))
@@ -373,8 +379,6 @@ def add_spot_asoc_to_single_file(filename):
 
 def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
 
-    train_instances = list()
-    val_instances = list()
     schema_list = list()
 
     for task_folder in os.listdir(data_folder):
@@ -405,7 +409,6 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             new_instance['spot'] = record_schema.type_list
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
-            train_instances += [new_instance]
 
         for line in open(
                 os.path.join(data_folder, task_folder, 'val.json'),
@@ -415,12 +418,9 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
             new_instance['spot'] = record_schema.type_list
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
-            val_instances += [new_instance]
 
     # 融合不同任务的 Schema
     multi_schema = merge_schema(schema_list)
-    dump_instances(train_instances, os.path.join(data_folder, 'train.json'))
-    dump_instances(val_instances, os.path.join(data_folder, 'val.json'))
     multi_schema.write_to_file(os.path.join(data_folder, 'record.schema'))
 
 
@@ -525,7 +525,89 @@ def preprocess_event():
                 output_folder=output_folder + '_' + event_type, )
 
 
+def merge_instance(instance_list):
+    def all_equal(_x):
+        for __x in _x:
+            if __x != _x[0]:
+                return False
+        return True
+
+    def entity_key(_x):
+        return (tuple(_x['offset']), _x['type'])
+
+    def relation_key(_x):
+        return (tuple(_x['type']),
+                tuple(_x['args'][0]['offset']),
+                _x['args'][0]['type'],
+                tuple(_x['args'][1]['offset']),
+                _x['args'][1]['type'],)
+
+    def event_key(_x):
+        return (tuple(_x['offset']), _x['type'])
+
+    assert all_equal([x['text'] for x in instance_list])
+
+    element_dict = {
+        'entity': dict(),
+        'relation': dict(),
+        'event': dict(),
+    }
+    instance_id_list = list()
+    for x in instance_list:
+        instance_id_list += [x['id']]
+        for entity in x.get('entity', list()):
+            element_dict['entity'][entity_key(entity)] = entity
+        for relation in x.get('relation', list()):
+            element_dict['relation'][relation_key(relation)] = relation
+        for event in x.get('event', list()):
+            element_dict['event'][event_key(event)] = event
+
+    return {
+        'id': '-'.join(instance_id_list),
+        'text': instance_list[0]['text'],
+        'tokens': instance_list[0]['tokens'],
+        'entity': list(element_dict['entity'].values()),
+        'relation': list(element_dict['relation'].values()),
+        'event': list(element_dict['event'].values())
+    }
+
+
+def preprocess_duie():
+    life_folder = os.path.join('data', 'duuie', 'DUIE_LIFE_SPO')
+    org_folder = os.path.join('data', 'duuie', 'DUIE_ORG_SPO')
+    life_train_instances = load_jsonlines_file(f"{life_folder}/train.json")
+    org_train_instances = load_jsonlines_file(f"{org_folder}/train.json")
+    life_relation = RecordSchema.read_from_file(f"{life_folder}/record.schema").role_list
+    org_relation = RecordSchema.read_from_file(f"{org_folder}/record.schema").role_list
+
+    instance_dict = defaultdict(list)
+    for instance in life_train_instances + org_train_instances:
+        instance_dict[instance['text']] += [instance]
+
+    for text in instance_dict:
+        instance_dict[text] = merge_instance(instance_dict[text])
+
+    with open(f"{life_folder}/train.json", 'w') as output:
+        print(f'Filter relation not in {life_relation}')
+        for instance in instance_dict.values():
+            new_instance = copy.deepcopy(instance)
+            new_instance['relation'] = list(
+                filter(lambda x: x['type'] in life_relation, instance['relation'])
+            )
+            output.write(json.dumps(new_instance) + '\n')
+
+    with open(f"{org_folder}/train.json", 'w') as output:
+        print(f'Filter relation not in {org_relation}')
+        for instance in instance_dict.values():
+            new_instance = copy.deepcopy(instance)
+            new_instance['relation'] = list(
+                filter(lambda x: x['type'] in org_relation, instance['relation'])
+            )
+            output.write(json.dumps(new_instance) + '\n')
+
+
 def preprocess(options):
+    preprocess_duie()
     preprocess_event()
     add_spotasoc_to_train(options)
 
@@ -547,6 +629,7 @@ if __name__ == "__main__":
     parser_t.add_argument(
         '--ignore_datasets',
         default=['DUEE', 'DUEE_FIN_LITE'],
+        nargs='+',
         help='Ignore dataset in `output_folder` for training')
     parser_t.set_defaults(func=preprocess)
 
