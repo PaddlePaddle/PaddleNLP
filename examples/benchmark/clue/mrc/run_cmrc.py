@@ -71,7 +71,7 @@ def parse_args():
         help="The initial learning rate for Adam.")
     parser.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
@@ -94,7 +94,7 @@ def parse_args():
     )
     parser.add_argument(
         "--warmup_proportion",
-        default=0.0,
+        default=0.1,
         type=float,
         help="Proportion of training steps to perform linear learning rate warmup for."
     )

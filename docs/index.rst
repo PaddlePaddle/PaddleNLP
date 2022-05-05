@@ -44,9 +44,10 @@
    :maxdepth: 1
    :caption: 模型库
 
-   Transformer预训练模型 <model_zoo/transformers>
+   Transformer预训练模型 <model_zoo/index>
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
+   
 
 .. toctree::
    :maxdepth: 1
