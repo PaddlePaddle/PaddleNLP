@@ -11,7 +11,7 @@ import paddle
 
 from paddle.optimizer import AdamW
 from paddle.amp import GradScaler, auto_cast
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
+from paddlenlp.transformers import T5ForConditionalGeneration
 
 from uie.evaluation import constants
 from uie.evaluation.sel2record import evaluate_extraction_results
@@ -371,7 +371,7 @@ def write_prediction(eval_prediction, prefix='eval'):
     for pred_file, pred_result in eval_prediction.items():
         output_filename = os.path.join(args.output_dir, f"{prefix}-{pred_file}")
 
-        with open(output_filename, 'w') as output:
+        with open(output_filename, 'w', encoding='utf8') as output:
             if isinstance(pred_result, list):
                 for pred in pred_result:
                     if isinstance(pred_result, str):
@@ -557,12 +557,8 @@ def main(args):
     paddle.set_device(args.device)
 
     # get model and tokenizer
-    if 'char' in args.model_name_or_path:
-        tokenizer_type = T5BertTokenizer
-    else:
-        tokenizer_type = T5Tokenizer
 
-    tokenizer = tokenizer_type.from_pretrained(args.model_name_or_path, )
+    tokenizer = T5BertTokenizer.from_pretrained(args.model_name_or_path, )
     model = T5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
 
     if args.do_train:

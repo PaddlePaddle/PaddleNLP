@@ -114,7 +114,7 @@ def set_logger(args):
 
 
 def read_json_file(file_name):
-    return [json.loads(line) for line in open(file_name)]
+    return [json.loads(line) for line in open(file_name, encoding='utf8')]
 
 
 def better_print_multi(results):
@@ -327,7 +327,9 @@ class TaskConfig:
     @staticmethod
     def load_list_from_yaml(task_config):
         import yaml
-        configs = yaml.load(open(task_config), Loader=yaml.FullLoader)
+        configs = yaml.load(
+            open(
+                task_config, encoding='utf8'), Loader=yaml.FullLoader)
         task_configs = filter(lambda x: x.startswith('T'), configs)
         for task_config in task_configs:
             yield TaskConfig(configs[task_config])
