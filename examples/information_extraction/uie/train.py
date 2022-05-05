@@ -142,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum total input sequence length after tokenization. "
         "Sequences longer than this will be truncated, sequences shorter will be padded.")
     parser.add_argument("--num_epochs", default=50, type=int, help="Total number of training epochs to perform.")
-    parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
+    parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
