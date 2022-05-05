@@ -6,15 +6,15 @@
 
 ## CLUE 评测结果
 
-使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
+使用多种**中文**预训练模型微调在 CLUE 的各验证集上有如下结果：
 
 | Model                 | Config   | AVG       | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | CMRC2018        | CHID      | C<sup>3</sup> |
 | --------------------- | -------- | --------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------------- | --------- | ------------- |
 | RoBERTa-wwm-ext-large | 24L1024H | 76.61     | 76.00     | 59.33     | 62.02     | 83.88     | 78.81     | 90.79       | 83.67     | 70.58/89.82     | 85.72     | 75.26         |
 | RoBERTa-wwm-ext       | 12L768H  | 74.11     | 74.60     | 58.08     | 61.23     | 81.11     | 76.92     | 88.49       | 80.77     | 68.39/88.50     | 83.43     | 68.03         |
-| ERNIE 3.0-Base        | 12L768H  | **75.83** | **75.93** | **58.26** | 61.23     | **83.02** | **80.10** | 86.18       | **82.63** | **70.71/90.41** | **84.26** | **77.88**     |
+| ERNIE 3.0-Base        | 12L768H  | **76.05** | **75.93** | **58.26** | **61.56** | **83.02** | **80.10** | 86.18       | **82.63** | **70.71/90.41** | **84.26** | **77.88**     |
 | RBT6, Chinese         | 6L768H   | 69.74     | 73.15     | 56.62     | 59.68     | 79.26     | 73.15     | 75.00       | 80.04     | 62.26/84.72     | 78.26     | 59.93         |
-| ERNIE 3.0-Medium      | 6L768H   | 72.49     | **73.37** | **57.00** | **60.67** | **80.64** | **76.88** | **79.28**   | **81.60** | **65.83/87.30** | **79.91** | **69.73**     |
+| ERNIE 3.0-Medium      | 6L768H   | **72.49** | **73.37** | **57.00** | **60.67** | **80.64** | **76.88** | **79.28**   | **81.60** | **65.83/87.30** | **79.91** | **69.73**     |
 
 
 
@@ -67,10 +67,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=ernie-3.0-base-zh
 
 cd classification
-mkdir ernie-3.0-base
+mkdir ernie-3.0-base-zh
 python -u ./run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -128,10 +128,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=ernie-3.0-base-zh
 
 cd classification
-mkdir ernie-3.0-base
+mkdir ernie-3.0-base-zh
 
 python -u ./run_clue_classifier_trainer.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -171,7 +171,7 @@ python -u ./run_clue_classifier_trainer.py \
 
 cd mrc
 
-MODEL_PATH=ernie-3.0-base
+MODEL_PATH=ernie-3.0-base-zh
 BATCH_SIZE=6
 LR=2e-5
 

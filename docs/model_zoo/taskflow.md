@@ -500,7 +500,7 @@ from paddlenlp import Taskflow
   >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
   >>> ie.set_schema(schema) # Reset schema
   >>> ie('这个产品用起来真的很流畅，我非常喜欢')
-  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
+  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
   ```
 
 - 跨任务跨领域抽取
@@ -527,7 +527,7 @@ from paddlenlp import Taskflow
   | :---: | :--------: |
   | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
   | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
-  | `uie-large`| 24-layers, 1024-hidden, 16-heads |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
 
 - 使用`UIE-Tiny`进行预测
 

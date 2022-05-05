@@ -103,9 +103,11 @@ def do_predict(data,
                     break
                 else:
                     labels_can = bk_tree.search_similar_word(label)
-                    result['label'] = labels_can[0][0]
+                    if len(labels_can) != 0:
+                        result['label'] = labels_can[0][0]
 
-        result['category'] = name_dict[result['label']]
+        if result['label'] in name_dict:
+            result['category'] = name_dict[result['label']]
         results.append(result)
     return results
 
