@@ -73,7 +73,15 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 ## 5. 轻定制功能
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取。对于复杂目标可以标注少量数据进行模型微调以进一步提升效果。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取。对于复杂目标可以标注少量数据进行模型微调以进一步提升效果。我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+
+<table>
+<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
+<tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
+<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
+<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
+
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
 
 #### 代码结构
 
