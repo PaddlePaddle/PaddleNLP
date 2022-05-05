@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import os
+import time
 import argparse
+import json
 import numpy as np
 
 from utils import set_seed, convert_doccano_examples
@@ -34,6 +36,7 @@ def convert_doccano_file(doccano_file,
         negative_ratio: The ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples.
         is_shuffle: Whether to shuffle data.
     """
+    tic_time = time.time()
     if not os.path.exists(doccano_file):
         raise ValueError("Please input the correct path of doccano file.")
 

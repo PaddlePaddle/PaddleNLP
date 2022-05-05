@@ -73,7 +73,11 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 ## 5. 轻定制功能
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取。对于复杂目标可以标注少量数据进行模型微调以进一步提升效果。我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取。对于复杂目标我们推荐使用轻定制功能（标注少量数据进行模型训练）以进一步提升效果。
+
+#### 实验结果
+
+我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
 <tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
@@ -101,7 +105,7 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本案例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/164374314-9beea9ad-08ed-42bc-bbbc-9f68eb8a40ee.png />
+    <img src=https://user-images.githubusercontent.com/40840292/166907872-26240036-4055-4663-b48d-07fa370eed34.png />
     <p>图3 数据标注样例图<p/>
 </div>
 
@@ -116,6 +120,13 @@ python doccano.py \
     --save_dir ./data/ext_data \
     --negative_ratio 5
 ```
+
+可配置参数包括
+
+- ``doccano_file``: 原始数据文件名。
+- ``save_dir``: 训练数据的保存目录，默认存储在``data/ext_data``目录下。
+- ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.4, 0.6]表示按照``4:6``的比例将数据划分为训练集和验证集。
 
 **备注：**
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
