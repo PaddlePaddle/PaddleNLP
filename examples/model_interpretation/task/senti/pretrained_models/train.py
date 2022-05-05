@@ -17,7 +17,6 @@
 from functools import partial
 import argparse
 import os
-import six
 import random
 import time
 import sys
@@ -96,11 +95,6 @@ parser.add_argument(
     default=None,
     help="Language that the model is built for")
 args = parser.parse_args()
-
-print('\n-----------  Configuration Arguments -----------')
-for arg, value in sorted(six.iteritems(vars(args))):
-    print('%s: %s\n' % (arg, value))
-print('------------------------------------------------\n')
 
 
 def set_seed(seed):
