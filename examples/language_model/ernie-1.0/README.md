@@ -68,34 +68,38 @@ python -u  -m paddle.distributed.launch \
 - `eval_freq` 模型评估间隔。
 - `device` 训练设备。
 
+
 注：
 - 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。请确保重启的训练配置与之前相同。
+- visualdl的日志在 `./output/ernie-1.0-dp8-gb512/train_log/xxx` 中。
 
 
 ### CLUECorpusSmall 数据集训练结果
 
 数据准备部分参考[data_tools](../data_tools/)中的附录部分，根据文档，创建训练clue_corpus_small_14g数据集。
-使用本训练脚本, batch_size=512, max_steps=100w，详细训练日志请参考：https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/scalar?id=b0e19e554d68b9165a55901f0eb92812
+使用本训练脚本, batch_size=512, max_steps=100w，[详细训练日志](https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/index?id=3fddf650db14b9319f9dc3a91dfe4ac6)
 
 最终训练loss结果：
 
 |Loss | Train | Validation |
 |-|-|-|
-|loss |2.72 | 2.60 |
-|lm_loss|2.60 | 2.50 |
-|sop_loss|0.12 | 0.10 |
+|loss |2.59 | 2.48 |
+|lm_loss|2.48 | 2.38 |
+|sop_loss|0.11 | 0.10 |
 
-训练集 lm_loss=2.60 左右, 验证集 lm_loss=2.50 左右。
+训练集 lm_loss=2.48 左右, 验证集 lm_loss=2.38 左右。
 
-使用训练好的模型参数，在下游任务重进行finetune（需要先将静态图参数转换为动态图，请参考模型参数转换部分）。这里报告部分数据集上的finetune结果：
+使用训练好的模型参数，在下游任务重进行finetune。这里报告部分数据集上的finetune结果：
 
-|Dataset | Dev | Test|
-|--|--|--|
-XNLI-CN | 0.79269 | 0.78339 |
-ChnSentiCorp | 0.94495 | 0.95496 |
-PeoplesDailyNer | 0.95128 | 0.94035 |
-CMRC2018 | 72.05/85.67 | - |
+CLUE评估结果：
 
+Model | Arch | CLUE 平均值 |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL
+-- | -- | -- | -- | -- | -- | -- |  -- | -- | --
+Metrics |   |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc
+ERNIE-1.0 Base | 12L768H | 73.78 |  74.95 | 58.73 | 61.37 | 81.77 | 75.46 | 81.25 | 82.93
+ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.15 | 76.64 | 81.25 | 81.33
+
+注: `ERNIE-1.0 Base`采用的训练batch_size是1024，cluecorpussmall复现版本效果已经与base版本相差不大。
 
 ### 其他
 
