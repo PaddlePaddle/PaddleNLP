@@ -1044,7 +1044,7 @@ class Trainer:
                      load_best_model=False,
                      output_dir: Optional[str]=None,
                      export_model_format: Optional[str]="paddle"):
-        """ Export paddle inference model or ONNX model.
+        """ Export paddle inference model or onnx model.
 
         Args:
             input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input, 
@@ -1099,7 +1099,8 @@ class Trainer:
             logger.info("ONNX model exported.")
         else:
             logger.info(
-                "This export format is not supported, please select paddle or onnx!")
+                "This export format is not supported, please select paddle or onnx!"
+            )
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
