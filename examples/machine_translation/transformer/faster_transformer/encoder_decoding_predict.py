@@ -38,6 +38,15 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
+        "--enable_faster_encoder",
+        action="store_true",
+        help="Whether to use faster version encoder to predict. This is experimental option for now. "
+    )
+    parser.add_argument(
+        "--use_fp16_encoder",
+        action="store_true",
+        help="Whether to use fp16 encoder to predict. ")
+    parser.add_argument(
         "--decoding_strategy",
         default="beam_search",
         type=str,
@@ -153,7 +162,9 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+        use_fp16_decoding=args.use_fp16_decoding,
+        enable_faster_encoder=args.enable_faster_encoder,
+        use_fp16_encoder=args.use_fp16_encoder)
 
     # Set evaluate mode
     transformer.eval()
@@ -212,6 +223,8 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.enable_faster_encoder = ARGS.enable_faster_encoder
+    args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size
     args.diversity_rate = ARGS.diversity_rate

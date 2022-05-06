@@ -219,7 +219,11 @@ def compute_prediction(examples,
 def make_qid_to_has_ans(examples):
     qid_to_has_ans = {}
     for example in examples:
-        qid_to_has_ans[example['id']] = not example.get('is_impossible', False)
+        if 'is_impossible' in example:
+            has_ans = example['is_impossible']
+        else:
+            has_ans = not len(example['answers']['answer_start']) == 0
+        qid_to_has_ans[example['id']] = has_ans
     return qid_to_has_ans
 
 

@@ -25,6 +25,7 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 from paddle.metric import Metric, Accuracy, Precision, Recall
+import paddlenlp
 
 from datasets import load_dataset
 from paddlenlp.data import default_data_collator, DataCollatorWithPadding

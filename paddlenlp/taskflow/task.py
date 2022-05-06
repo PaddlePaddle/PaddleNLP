@@ -33,9 +33,10 @@ class Task(metaclass=abc.ABCMeta):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, model, task, **kwargs):
+    def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
         self.task = task
+        self.priority_path = priority_path
         self.kwargs = kwargs
         self._usage = ""
         # The dygraph model instantce 
@@ -50,6 +51,9 @@ class Task(metaclass=abc.ABCMeta):
             'task_flag'] if 'task_flag' in self.kwargs else self.model
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
+        elif self.priority_path:
+            self._task_path = os.path.join(self._home_path, "taskflow",
+                                           self.priority_path)
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)

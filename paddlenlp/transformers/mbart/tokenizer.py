@@ -14,7 +14,8 @@
 
 import itertools
 from contextlib import contextmanager
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['MBartTokenizer']
@@ -239,7 +240,6 @@ class _MBartTokenizer(PretrainedTokenizer):
             mask_token, lstrip=True,
             rstrip=False) if isinstance(mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
-        spm = try_import('sentencepiece')
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
         self.fairseq_offset = 1
@@ -432,7 +432,6 @@ class _MBart50Tokenizer(PretrainedTokenizer):
             mask_token, lstrip=True,
             rstrip=False) if isinstance(mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
-        spm = try_import('sentencepiece')
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
         self.fairseq_offset = 1

@@ -19,7 +19,6 @@ from collections import OrderedDict
 import io
 from paddlenlp.data import Pad, Dict
 import json
-import six
 import sys
 import ast
 import argparse

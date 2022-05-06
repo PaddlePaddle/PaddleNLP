@@ -16,14 +16,8 @@
 import time
 import json
 import os
-import sys
-from functools import partial
 
-import numpy as np
 import paddle
-import paddlenlp as ppnlp
-from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.utils.log import logger
 from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.trainer_utils import PredictionOutput
 
