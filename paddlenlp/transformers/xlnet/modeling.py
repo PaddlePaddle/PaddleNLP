@@ -134,8 +134,6 @@ class XLNetRelativeAttention(Layer):
         # q_head = Exi * Wq; self.r_r_bias = v; k_head_r = Wkr * Rij
         # b = Exi * Wq * Wkr * Rij; d = v * Wkr * Rij; bd = b + d
         bd = paddle.einsum("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
-        import pdb
-        pdb.set_trace()
         bd = self.rel_shift_bnij(bd, klen=paddle.shape(ac)[3])
 
         # Segment based attention score
@@ -174,7 +172,6 @@ class XLNetRelativeAttention(Layer):
         # Compute einsum4x4("ibnd,hnd->ibh", attn_vec, self.o)
         shape = paddle.shape(attn_vec)
         attn_vec = attn_vec.reshape([shape[0], shape[1], shape[2] * shape[3]])
-
         attn_out = paddle.einsum("ibm,hm->ibh", attn_vec, self.o)
 
         attn_out = self.dropout(attn_out)
@@ -224,7 +221,7 @@ class XLNetRelativeAttention(Layer):
             k_head_r = paddle.reshape(
                 k_head_r,
                 shape=[r.shape[0], r.shape[1], self.n_head, self.d_head])
-            print(k_head_r.shape)
+
             # H-stream
             # Content-stream query head
             # Compute q_head_h = einsum4x4("ibh,h(n*d)->ibnd", h, self.q)
@@ -328,12 +325,10 @@ class XLNetRelativeAttention(Layer):
             # Position-based key head
             # Compute k_head_r = einsum4x4("ibh,hnd->ibnd", r, self.r)
             k_head_r = paddle.matmul(r, self.r)
-            print(k_head_r.shape, r.shape, self.r.shape)
             k_head_r = paddle.reshape(
                 k_head_r,
                 shape=[k_head_r.shape[0], -1, self.n_head, self.d_head])
 
-            print(k_head_r.shape)
             # Core attention ops
             attn_vec = self.rel_attn_core(
                 q_head_h,
@@ -786,17 +781,9 @@ class XLNetModel(XLNetPretrainedModel):
     @staticmethod
     def positional_embedding(pos_seq, inv_freq, bsz=None):
         # Compute sinusoid_inp = einsum4x4("i,d->id", pos_seq, inv_freq)
-        print(pos_seq.shape)
-        print(inv_freq.shape)
-        pos_seq = pos_seq.unsqueeze(-1)
-        inv_freq = inv_freq.unsqueeze(0)
-        sinusoid_inp = paddle.matmul(pos_seq, inv_freq)
-        # sinusoid_inp = paddle.einsum("i,d->id", pos_seq, inv_freq)
-        print(sinusoid_inp.shape)
+        sinusoid_inp = paddle.einsum("i,d->id", pos_seq, inv_freq)
         pos_emb = paddle.concat(
             [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
-        print("------------")
-        print(pos_emb.shape)
         pos_emb = paddle.unsqueeze(pos_emb, axis=1)
         if bsz is not None:
             pos_emb = pos_emb.expand([-1, bsz, -1])
@@ -804,14 +791,11 @@ class XLNetModel(XLNetPretrainedModel):
         pos_emb.stop_gradient = True
         return pos_emb
 
-    @paddle.jit.not_to_static
     def relative_positional_encoding(self, qlen, klen, bsz=None):
-        print("+++++++++")
-        print(qlen, klen)
         # Create relative positional encoding.
         freq_seq = paddle.arange(0, self.d_model, 2.0, dtype=dtype_float)
         inv_freq = 1 / 10000**(freq_seq / self.d_model)
-        # import pdb;pdb.set_trace()
+
         if self.attn_type == "bi":
             beg, end = klen, -qlen
         elif self.attn_type == "uni":
@@ -838,8 +822,6 @@ class XLNetModel(XLNetPretrainedModel):
             pos_emb = paddle.concat([fwd_pos_emb, bwd_pos_emb], axis=1)
         else:
             fwd_pos_seq = paddle.arange(beg, end, -1.0, dtype=dtype_float)
-            print(fwd_pos_seq.shape)
-            print(beg, end)
             if self.clamp_len > 0:
                 fwd_pos_seq = fwd_pos_seq.clamp(-self.clamp_len, self.clamp_len)
             pos_emb = self.positional_embedding(fwd_pos_seq, inv_freq, bsz)
@@ -1007,7 +989,8 @@ class XLNetModel(XLNetPretrainedModel):
             qlen, bsz = paddle.shape(input_ids)[0], paddle.shape(input_ids)[1]
         elif inputs_embeds is not None:
             inputs_embeds = paddle.transpose(inputs_embeds, perm=[1, 0])
-            qlen, bsz = inputs_embeds.shape[0], inputs_embeds.shape[1]
+            qlen, bsz = paddle.shape(inputs_embeds)[0], paddle.shape(
+                inputs_embeds)[1]
         else:
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
@@ -1152,7 +1135,7 @@ class XLNetModel(XLNetPretrainedModel):
             if return_dict:
                 hidden_states.append((output_h, output_g)
                                      if output_g is not None else output_h)
-            print(pos_emb.shape)
+
             outputs = layer_module(
                 output_h,
                 output_g,
