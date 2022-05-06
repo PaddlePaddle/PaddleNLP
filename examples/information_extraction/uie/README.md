@@ -1,4 +1,4 @@
-# 通用信息抽取UIE
+# 通用信息抽取 Universal Information Extraction (UIE)
 
  **目录**
 

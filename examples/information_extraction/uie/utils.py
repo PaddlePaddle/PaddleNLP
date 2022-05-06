@@ -109,7 +109,8 @@ def reader(data_path, max_seq_len=512):
             json_line = json.loads(line)
             content = json_line['content']
             prompt = json_line['prompt']
-            # Include three summary tokens, one [CLS] and two [SEP]
+            # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
+            # It include three summary tokens.
             if max_seq_len <= len(prompt) + 3:
                 raise ValueError(
                     "The value of max_seq_len is too small, please set a larger value"
@@ -203,13 +204,15 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
     return examples
 
 
-def construct_relation_label_set(entity_name_set, predicate_set):
-    relation_label_set = set()
+def construct_relation_prompt_set(entity_name_set, predicate_set):
+    relation_prompt_set = set()
     for entity_name in entity_name_set:
         for predicate in predicate_set:
-            relation_label = entity_name + "的" + predicate
-            relation_label_set.add(relation_label)
-    return sorted(list(relation_label_set))
+            # The relation prompt is constructed as follows: 
+            # subject + "的" + predicate
+            relation_prompt = entity_name + "的" + predicate
+            relation_prompt_set.add(relation_prompt)
+    return sorted(list(relation_prompt_set))
 
 
 def convert_doccano_examples(raw_examples, negative_ratio):
@@ -292,26 +295,26 @@ def convert_doccano_examples(raw_examples, negative_ratio):
                 predicate = relation["type"]
                 subject_id = relation["from_id"]
                 object_id = relation["to_id"]
-                relation_label = entity_map[subject_id][
-                    "name"] + "的" + predicate
+                # The relation prompt is constructed as follows: 
+                # subject + "的" + predicate
+                prompt = entity_map[subject_id]["name"] + "的" + predicate
                 result = {
                     "text": entity_map[object_id]["name"],
                     "start": entity_map[object_id]["start"],
                     "end": entity_map[object_id]["end"]
                 }
-                if relation_label not in relation_example_map.keys():
-                    relation_example_map[relation_label] = {
+                if prompt not in relation_example_map.keys():
+                    relation_example_map[prompt] = {
                         "content": text,
                         "result_list": [result],
-                        "prompt": relation_label
+                        "prompt": prompt
                     }
                 else:
-                    relation_example_map[relation_label]["result_list"].append(
-                        result)
+                    relation_example_map[prompt]["result_list"].append(result)
 
                 if predicate not in predicate_set:
                     predicate_set.append(predicate)
-                relation_prompt.append(relation_label)
+                relation_prompt.append(prompt)
 
             for v in relation_example_map.values():
                 relation_example.append(v)
@@ -325,12 +328,12 @@ def convert_doccano_examples(raw_examples, negative_ratio):
                                            entity_prompts, entity_label_set,
                                            negative_ratio)
 
-    print(f"Constructing relation labels...")
-    relation_label_set = construct_relation_label_set(entity_name_set,
-                                                      predicate_set)
+    print(f"Constructing relation prompts...")
+    relation_prompt_set = construct_relation_prompt_set(entity_name_set,
+                                                        predicate_set)
 
     print(f"Adding negative samples for second stage prompt...")
-    relation_examples = add_negative_example(relation_examples, texts,
-                                             relation_prompts,
-                                             relation_label_set, negative_ratio)
+    relation_examples = add_negative_example(
+        relation_examples, texts, relation_prompts, relation_prompt_set,
+        negative_ratio)
     return entity_examples, relation_examples

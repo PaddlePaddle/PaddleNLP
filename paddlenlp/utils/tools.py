@@ -166,10 +166,14 @@ def compare_version(version, pair_version):
 
 def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
     """
-    get idx of the last dim in prob arraies, which is greater than a limitation
-    input: [[0.1, 0.1, 0.2, 0.5, 0.1, 0.3], [0.7, 0.6, 0.1, 0.1, 0.1, 0.1]]
-        0.4
-    output: [[3], [0, 1]]
+    Get idx of the last dimension in probability arrays, which is greater than a limitation.
+
+    Args:
+        probs (List[List[float]]): The input probability arrays.
+        limit (float): The limitation for probability.
+        return_prob (bool): Whether to return the probability
+    Returns:
+        List[List[int]]: The index of the last dimension meet the conditions.
     """
     probs = np.array(probs)
     dim_len = len(probs.shape)
@@ -191,10 +195,14 @@ def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
 
 def get_span(start_ids, end_ids, with_prob=False):
     """
-    every id can only be used once
-    get span set from position start and end list
-    input: [1, 2, 10] [4, 12]
-    output: set((2, 4), (10, 12))
+    Get span set from position start and end list.
+
+    Args:
+        start_ids (List[int]/List[tuple]): The start index list.
+        end_ids (List[int]/List[tuple]): The end index list.
+        with_prob (bool): If True, each element for start_ids and end_ids is a tuple aslike: (index, probability).
+    Returns:
+        set: The span set without overlapping, every id can only be used once .
     """
     if with_prob:
         start_ids = sorted(start_ids, key=lambda x: x[0])
@@ -210,31 +218,24 @@ def get_span(start_ids, end_ids, with_prob=False):
     couple_dict = {}
     while start_pointer < len_start and end_pointer < len_end:
         if with_prob:
-            if start_ids[start_pointer][0] == end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer][0] < end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer][0] > end_ids[end_pointer][0]:
-                end_pointer += 1
-                continue
+            start_id = start_ids[start_pointer][0]
+            end_id = end_ids[end_pointer][0]
         else:
-            if start_ids[start_pointer] == end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer] < end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer] > end_ids[end_pointer]:
-                end_pointer += 1
-                continue
+            start_id = start_ids[start_pointer]
+            end_id = end_ids[end_pointer]
+
+        if start_id == end_id:
+            couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+            start_pointer += 1
+            end_pointer += 1
+            continue
+        if start_id < end_id:
+            couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
+            start_pointer += 1
+            continue
+        if start_id > end_id:
+            end_pointer += 1
+            continue
     result = [(couple_dict[end], end) for end in couple_dict]
     result = set(result)
     return result

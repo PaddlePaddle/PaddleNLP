@@ -45,12 +45,12 @@ def do_train():
 
     pretrained_model_path = os.path.join(args.model, "model_state.pdparams")
 
-    if os.path.exists(pretrained_model_path):
-        state_dict = paddle.load(pretrained_model_path)
-        model.set_dict(state_dict)
-        print("Init from: {}".format(pretrained_model_path))
-    else:
+    if not os.path.exists(pretrained_model_path):
         get_path_from_url(url, args.model)
+
+    state_dict = paddle.load(pretrained_model_path)
+    model.set_dict(state_dict)
+    print("Init from: {}".format(pretrained_model_path))
 
     train_ds = load_dataset(
         reader,
