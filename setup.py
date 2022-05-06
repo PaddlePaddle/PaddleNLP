@@ -46,8 +46,8 @@ def get_package_data_files(package, data, package_dir=None):
 setuptools.setup(
     name="paddlenlp",
     version=paddlenlp.__version__,
-    author="PaddlePaddle Speech and Language Team",
-    author_email="paddlesl@baidu.com",
+    author="PaddleNLP Team",
+    author_email="paddlenlp@baidu.com",
     description=long_description,
     long_description=long_description,
     long_description_content_type="text/plain",
