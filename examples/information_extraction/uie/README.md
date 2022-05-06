@@ -104,28 +104,50 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本案例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
 
+**抽取式任务标注规则：**
+
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166907872-26240036-4055-4663-b48d-07fa370eed34.png />
-    <p>图3 数据标注样例图<p/>
+    <p>图3 抽取式任务标注样例图<p/>
 </div>
 
-- 在doccano平台上，定义实体标签类别和关系标签类别，上例中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
-- 使用以上定义的标签开始标注数据，图2展示了一个标注样例。
-- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano.json` 后，放入 `./data` 目录下。
+- 在doccano平台上，创建一个类型为``Sequence Labeling``的标注项目。
+- 定义实体标签类别和关系标签类别，上例中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
+- 使用以上定义的标签开始标注数据，图3展示了一个抽取式任务的标注样例。
+- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano_ext.json` 后，放入 `./data` 目录下。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
 
 ```shell
 python doccano.py \
-    --doccano_file ./data/doccano.json \
+    --doccano_file ./data/doccano_ext.json \
     --save_dir ./data/ext_data \
     --negative_ratio 5
+```
+
+**分类式任务标注规则：**
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/166918397-eb7cf540-4636-48e6-8ca6-dcdd10a11d0a.png />
+    <p>图4 分类式任务标注样例图<p/>
+</div>
+
+- 在doccano平台上，创建一个类型为``Text Classification``的标注项目。
+- 定义标签类别，上例中需要定义的类别标签有`正向`和`负向`，分类任务需要保证最终导出的标注数据包含所有的类别标签。
+- 使用以上定义的标签开始标注数据，图4展示了一个分类式任务的标注样例。
+- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
+- 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
+
+```shell
+python doccano.py \
+    --doccano_file ./data/doccano_cls.json \
+    --save_dir ./data/cls_data
 ```
 
 可配置参数包括
 
 - ``doccano_file``: 原始数据文件名。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data/ext_data``目录下。
-- ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取式任务生效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.4, 0.6]表示按照``4:6``的比例将数据划分为训练集和验证集。
 
 **备注：**

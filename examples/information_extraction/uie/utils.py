@@ -100,14 +100,75 @@ def map_offset(ori_offset, offset_mapping):
     return -1
 
 
-def reader(data_path):
+def reader(data_path, max_seq_len=512):
     """
     read json
     """
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             json_line = json.loads(line)
-            yield json_line
+            content = json_line['content']
+            prompt = json_line['prompt']
+            # Include three summary tokens, one [CLS] and two [SEP]
+            if max_seq_len <= len(prompt) + 3:
+                raise ValueError(
+                    "The value of max_seq_len is too small, please set a larger value"
+                )
+            max_content_len = max_seq_len - len(prompt) - 3
+            if len(content) <= max_content_len:
+                yield json_line
+            else:
+                result_list = json_line['result_list']
+                json_lines = []
+                accumulate = 0
+                while True:
+                    cur_result_list = []
+
+                    for result in result_list:
+                        if result['start'] + 1 <= max_content_len < result[
+                                'end']:
+                            max_content_len = result['start']
+                            break
+
+                    cur_content = content[:max_content_len]
+                    res_content = content[max_content_len:]
+
+                    while True:
+                        if len(result_list) == 0:
+                            break
+                        elif result_list[0]['end'] <= max_content_len:
+                            cur_result = result_list.pop(0)
+                            cur_result_list.append(cur_result)
+                        else:
+                            break
+
+                    json_line = {
+                        'content': cur_content,
+                        'result_list': cur_result_list,
+                        'prompt': prompt
+                    }
+                    json_lines.append(json_line)
+
+                    for result in result_list:
+                        result['start'] -= max_content_len
+                        result['end'] -= max_content_len
+                    accumulate += max_content_len
+                    max_content_len = max_seq_len - len(prompt) - 3
+                    if len(res_content) == 0:
+                        break
+                    elif len(res_content) < max_content_len:
+                        json_line = {
+                            'content': res_content,
+                            'result_list': result_list,
+                            'prompt': prompt
+                        }
+                        json_lines.append(json_line)
+                        break
+                    else:
+                        content = res_content
+
+                for json_line in json_lines:
+                    yield json_line
 
 
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
@@ -165,8 +226,23 @@ def convert_doccano_examples(raw_examples, negative_ratio):
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
-            text, relations, entities = items["text"], items[
-                "relations"], items["entities"]
+            entity_id = 0
+            if "data" in items.keys():
+                text = items["data"]
+                entities = []
+                for item in items["label"]:
+                    entity = {
+                        "id": entity_id,
+                        "start_offset": item[0],
+                        "end_offset": item[1],
+                        "label": item[2]
+                    }
+                    entities.append(entity)
+                    entity_id += 1
+                relations = []
+            else:
+                text, relations, entities = items["text"], items[
+                    "relations"], items["entities"]
             texts.append(text)
 
             entity_example = []

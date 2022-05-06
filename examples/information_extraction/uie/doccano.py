@@ -23,7 +23,7 @@ from utils import set_seed, convert_doccano_examples
 
 def convert_doccano_file(doccano_file,
                          save_dir,
-                         splits=[0.8, 0.9],
+                         splits=[0.8, 0.1, 0.1],
                          negative_ratio=1,
                          is_shuffle=True):
     """
@@ -74,7 +74,7 @@ def convert_doccano_file(doccano_file,
 
     if len(splits) == 0:
         examples = _create_examples(raw_examples, negative_ratio, is_shuffle)
-        _save_examples(save_dir, "doccano.txt", examples)
+        _save_examples(save_dir, "train.txt", examples)
     else:
         if is_shuffle:
             indexes = np.random.permutation(len(raw_examples))

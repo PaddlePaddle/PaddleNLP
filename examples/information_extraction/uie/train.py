@@ -52,8 +52,16 @@ def do_train():
     else:
         get_path_from_url(url, args.model)
 
-    train_ds = load_dataset(reader, data_path=args.train_path, lazy=False)
-    dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
+    train_ds = load_dataset(
+        reader,
+        data_path=args.train_path,
+        max_seq_len=args.max_seq_len,
+        lazy=False)
+    dev_ds = load_dataset(
+        reader,
+        data_path=args.dev_path,
+        max_seq_len=args.max_seq_len,
+        lazy=False)
 
     train_ds = train_ds.map(
         partial(
@@ -139,9 +147,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum total input sequence length after tokenization. "
+    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
         "Sequences longer than this will be truncated, sequences shorter will be padded.")
-    parser.add_argument("--num_epochs", default=50, type=int, help="Total number of training epochs to perform.")
+    parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
