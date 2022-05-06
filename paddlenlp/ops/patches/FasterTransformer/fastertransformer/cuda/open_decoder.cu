@@ -103,11 +103,10 @@ void transpose_general_kernelLauncher(T* dst,
                                       cudaStream_t stream) {
   dim3 grid, block;
   int grid_size = batch_size * head_num * seq_len;
-  if (sizeof(T) == 2 && grid_size % 4 == 0) {
-    const int seq_per_block = 4;
+  if (sizeof(T) == 2) {
+    int seq_per_block = grid_size % 4 == 0 ? 4 : 1;
     grid.x = grid_size / seq_per_block;
     block.x = seq_per_block * size_per_head / 2;
-
     transpose<T><<<grid, block, 0, stream>>>(
         src, dst, batch_size, seq_len, head_num, size_per_head / 2);
   } else {
