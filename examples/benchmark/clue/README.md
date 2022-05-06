@@ -6,7 +6,7 @@
 
 ## CLUE 评测结果
 
-使用多种中文预训练模型微调在 CLUE 的各验证集上有如下结果：
+使用多种**中文**预训练模型微调在 CLUE 的各验证集上有如下结果：
 
 | Model                 | Config   | AVG       | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | CMRC2018        | CHID      | C<sup>3</sup> |
 | --------------------- | -------- | --------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------------- | --------- | ------------- |
@@ -67,10 +67,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=ernie-3.0-base-zh
 
 cd classification
-mkdir ernie-3.0-base
+mkdir ernie-3.0-base-zh
 python -u ./run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -128,10 +128,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base
+export MODEL_PATH=ernie-3.0-base-zh
 
 cd classification
-mkdir ernie-3.0-base
+mkdir ernie-3.0-base-zh
 
 python -u ./run_clue_classifier_trainer.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -171,7 +171,7 @@ python -u ./run_clue_classifier_trainer.py \
 
 cd mrc
 
-MODEL_PATH=ernie-3.0-base
+MODEL_PATH=ernie-3.0-base-zh
 BATCH_SIZE=6
 LR=2e-5
 
