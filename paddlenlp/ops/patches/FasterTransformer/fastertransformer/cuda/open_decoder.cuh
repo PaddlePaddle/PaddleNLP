@@ -38,4 +38,12 @@ void transpose_general_kernelLauncher(T* dst,
                                       const int head_num,
                                       const int size_per_head,
                                       cudaStream_t stream);
+
+template <typename T>
+__global__ void transpose(T* src,
+                          T* dst,
+                          const int batch_size,
+                          const int seq_len,
+                          const int head_num,
+                          const int size_per_head);
 }
