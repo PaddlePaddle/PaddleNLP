@@ -103,9 +103,9 @@ class UIETask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self.set_schema(schema)
         if model in ["uie-base", "uie-medical-base"]:
-            self._encoding_model = "ernie-3.0-base"
+            self._encoding_model = "ernie-3.0-base-zh"
         elif model == "uie-tiny":
-            self._encoding_model = "ernie-3.0-medium"
+            self._encoding_model = "ernie-3.0-medium-zh"
         else:
             raise ValueError(
                 "Model should be one of uie-base, uie-tiny and uie-medical-base")
