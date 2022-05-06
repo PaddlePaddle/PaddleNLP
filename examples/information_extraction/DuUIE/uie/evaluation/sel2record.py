@@ -162,6 +162,7 @@ def span_to_token(text, span_to_token_strategy='space'):
 class MapConfig:
     """ Config of mapping string to offset
     """
+
     def __init__(self,
                  map_strategy: str='first',
                  de_duplicate: bool=True,
@@ -193,6 +194,7 @@ class RecordSchema:
     role_list: list of asoc name
     type_role_dict: the mapping of spot-to-asoc
     """
+
     def __init__(self, type_list, role_list, type_role_dict):
         self.type_list = type_list
         self.role_list = role_list
@@ -200,8 +202,7 @@ class RecordSchema:
 
     def __repr__(self) -> str:
         repr_list = [
-            f"Type: {self.type_list}\n",
-            f"Role: {self.role_list}\n",
+            f"Type: {self.type_list}\n", f"Role: {self.role_list}\n",
             f"Map: {self.type_role_dict}"
         ]
         return '\n'.join(repr_list)
@@ -224,7 +225,8 @@ class RecordSchema:
             output.write(json.dumps(self.type_list, ensure_ascii=False) + '\n')
             output.write(json.dumps(self.role_list, ensure_ascii=False) + '\n')
             output.write(
-                json.dumps(self.type_role_dict, ensure_ascii=False) + '\n')
+                json.dumps(
+                    self.type_role_dict, ensure_ascii=False) + '\n')
 
 
 def merge_schema(schema_list: List[RecordSchema]):
@@ -263,6 +265,7 @@ def merge_schema(schema_list: List[RecordSchema]):
 class Record:
     """ Record for converting generated string to information record
     """
+
     def __init__(self, map_config) -> None:
         self._map_config = map_config
 
@@ -274,6 +277,7 @@ class Record:
 class EntityRecord(Record):
     """ Record for converting generated string to information record <type, span>
     """
+
     @staticmethod
     def to_string(pred_record_list):
         entity_list = list()
@@ -380,6 +384,7 @@ class RelationRecord(Record):
     """ Record for converting generated string to information record
     <type, arg1_type, arg1_span, arg2_type, arg2_span>
     """
+
     def to_offset(self, instance, tokens):
         map_strategy_dict = {
             'first': self.record_to_offset_first_role,
@@ -499,6 +504,7 @@ class EventRecord(Record):
         args: [(arg_type, arg_span), ...]
     }
     """
+
     def to_offset(self, instance, tokens):
         map_strategy_dict = {
             'first': self.record_to_offset_first_role,
@@ -634,6 +640,7 @@ class EventRecord(Record):
 class SEL2Record:
     """ Converting sel expression to information records
     """
+
     def __init__(self, schema_dict, map_config: MapConfig,
                  tokenizer=None) -> None:
         self._schema_dict = schema_dict
@@ -756,9 +763,11 @@ def fix_unk_from_text_without_tokenizer(span, text, unk='<unk>'):
 
 def fix_unk_from_text_with_tokenizer(span, text, tokenizer, unk='<unk>'):
     unk_id = tokenizer.vocab.to_indices(unk)
-    # Remvoe last special token in the result of Paddle Tokenizer
-    tokenized_span = tokenizer.encode(span)['input_ids'][:-1]
-    tokenized_text = tokenizer.encode(text)['input_ids'][:-1]
+    tokenized_span = tokenizer.encode(
+        span, add_special_tokens=False)['input_ids']
+    tokenized_text = tokenizer.encode(
+        text, add_special_tokens=False)['input_ids']
+
     matched = match_sublist(tokenized_text, tokenized_span)
     if len(matched) == 0:
         return span
@@ -932,7 +941,8 @@ def convert_spot_asoc(spot_asoc_instance, structure_maker):
 class SpotAsocPredictParser:
     """ Parser for converting generated sel to extraction record
     """
-    def __init__(self, record_schema: RecordSchema = None, tokenizer=None):
+
+    def __init__(self, record_schema: RecordSchema=None, tokenizer=None):
         self.spot_set = set(record_schema.type_list) if record_schema else None
         self.asoc_set = set(record_schema.role_list) if record_schema else None
         self.tokenizer = tokenizer
@@ -982,7 +992,7 @@ class SpotAsocPredictParser:
             counter.update(['gold_tree' for _ in gold_tree])
 
             _, _, instance['gold_record'] = self.get_record_list(
-                    sel_tree=instance["gold_tree"], text=instance['text'])
+                sel_tree=instance["gold_tree"], text=instance['text'])
 
             try:
                 if not check_well_form(pred):
@@ -1002,7 +1012,7 @@ class SpotAsocPredictParser:
                     left_bracket + right_bracket, brackets=brackets)
 
             _, _, instance['pred_record'] = self.get_record_list(
-                    sel_tree=instance["pred_tree"], text=instance['text'])
+                sel_tree=instance["pred_tree"], text=instance['text'])
 
             well_formed_list += [instance]
 

@@ -18,7 +18,11 @@ from paddle.io import (
     BatchSampler,
     DataLoader, )
 from uie.evaluation import constants
-from uie.evaluation.sel2record import SEL2Record, RecordSchema, MapConfig
+from uie.evaluation.sel2record import (
+    SEL2Record,
+    RecordSchema,
+    MapConfig,
+    merge_schema, )
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.data_collator import (
     DataCollatorForSeq2Seq,
@@ -134,8 +138,8 @@ def better_print_multi(results):
 def read_func(tokenizer,
               data_file: str,
               max_source_length: int,
-              is_train: bool = False,
-              negative_keep: float = 1.0):
+              is_train: bool=False,
+              negative_keep: float=1.0):
     """ Read instance from data_file
 
     Args:
@@ -159,8 +163,10 @@ def read_func(tokenizer,
                     continue
 
             inputs = tokenizer(
-                instance['text'], return_token_type_ids=False,
-                return_attention_mask=True, max_seq_len=max_source_length, )
+                instance['text'],
+                return_token_type_ids=False,
+                return_attention_mask=True,
+                max_seq_len=max_source_length, )
 
             # `sample_ssi` can be True in the training stage
             # `sample_ssi` can only be False in the evaluation stage
@@ -183,7 +189,7 @@ def read_func(tokenizer,
 def read_training_instance_based_config(tokenizer,
                                         config_file: str,
                                         max_source_length: int,
-                                        negative_keep: float = 1.0):
+                                        negative_keep: float=1.0):
     """Read training instances based on config_file
 
     Args:
@@ -239,7 +245,6 @@ def read_training_instance_based_config(tokenizer,
 
 def get_train_dataloader(model, tokenizer, args):
     logger.info(f'Load data according to {args.multi_task_config} ...')
-    schema = RecordSchema.read_from_file(args.record_schema)
 
     dataset = load_dataset(
         read_training_instance_based_config,
@@ -248,6 +253,13 @@ def get_train_dataloader(model, tokenizer, args):
         max_source_length=args.max_source_length,
         lazy=False,
         negative_keep=args.negative_keep)
+
+    # Merge schema in all datasets for pre-tokenize
+    schema_list = list()
+    for task_config in TaskConfig.load_list_from_yaml(args.multi_task_config):
+        schema_file = os.path.join(task_config.data_path, "record.schema")
+        schema_list += [RecordSchema.read_from_file(schema_file)]
+    schema = merge_schema(schema_list)
 
     batch_sampler = DistributedBatchSampler(
         dataset=dataset,
@@ -264,16 +276,10 @@ def get_train_dataloader(model, tokenizer, args):
 
     label_pad_token_id = -100 if args.ignore_pad_token_for_loss else tokenizer.pad_token_id
 
-    if args.multi_task:
-        seq2seq_data_collator = DataCollatorForMultiTaskSeq2Seq
-    else:
-        seq2seq_data_collator = DataCollatorForSeq2Seq
-
-    collate_fn = seq2seq_data_collator(
+    collate_fn = DataCollatorForMultiTaskSeq2Seq(
         tokenizer,
         model=model,
         label_pad_token_id=label_pad_token_id,
-        pad_to_multiple_of=8 if args.use_amp else None,
         max_source_length=args.max_source_length,
         max_prefix_length=args.max_prefix_length,
         max_target_length=args.max_target_length,
@@ -322,7 +328,6 @@ def get_eval_dataloader(model, tokenizer, eval_filename, record_schema, args):
         tokenizer,
         model=model,
         label_pad_token_id=label_pad_token_id,
-        pad_to_multiple_of=8 if args.use_amp else None,
         max_source_length=args.max_source_length,
         max_prefix_length=args.max_prefix_length,
         max_target_length=args.max_target_length,
@@ -431,10 +436,8 @@ class TaskConfig:
 
     def __repr__(self) -> str:
         task_config_list = [
-            f"dataset: {self.dataset_name}",
-            f"task   : {self.task_name}",
-            f"path   : {self.data_path}",
-            f"schema : {self.schema}",
+            f"dataset: {self.dataset_name}", f"task   : {self.task_name}",
+            f"path   : {self.data_path}", f"schema : {self.schema}",
             f"metrics: {self.metrics}",
             f"eval_match_mode : {self.eval_match_mode}"
         ]
@@ -444,7 +447,8 @@ class TaskConfig:
     def load_list_from_yaml(task_config):
         import yaml
         configs = yaml.load(
-            open(task_config, encoding='utf8'), Loader=yaml.FullLoader)
+            open(
+                task_config, encoding='utf8'), Loader=yaml.FullLoader)
         task_configs = filter(lambda x: x.startswith('T'), configs)
         for task_config in task_configs:
             yield TaskConfig(configs[task_config])

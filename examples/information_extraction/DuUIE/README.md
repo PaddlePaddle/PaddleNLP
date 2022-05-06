@@ -129,31 +129,23 @@ python process_data.py preprocess
 
 #### 多任务配置
 
-本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multi-task-duuie.yaml`。
-
+本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见多任务配置文件 `config/multi-task-duuie.yaml`。
+本例将依据配置文件自动读取每个任务所需的训练数据进行训练，并对每个任务进行验证并汇报结果。
 ``` bash
 python3 run_seq2struct.py                              \
-  --multi_task                                         \
   --multi_task_config config/multi-task-duuie.yaml     \
   --negative_keep 1.0                                  \
-  --do_train                                           \
+  --do_train.                                          \
   --metric_for_best_model=all-task-ave                 \
   --model_name_or_path=./uie-char-small                \
-  --max_source_length=384                              \
-  --max_prefix_length=-1                               \
-  --max_target_length=192                              \
   --num_train_epochs=10                                \
-  --train_file=data/duuie_pre/train.json               \
-  --validation_file=data/duuie_pre/val.json            \
-  --record_schema=data/duuie_pre/record.schema         \
-  --per_device_train_batch_size=16                     \
-  --per_device_eval_batch_size=256                     \
+  --per_device_train_batch_size=32                     \
+  --per_device_eval_batch_size=512                     \
   --output_dir=output/duuie_multi_task_b32_lr5e-4      \
   --logging_dir=output/duuie_multi_task_b32_lr5e-4_log \
   --learning_rate=5e-4                                 \
-  --seed=42                                            \
   --overwrite_output_dir                               \
-  --gradient_accumulation_steps 2
+  --gradient_accumulation_steps 1
 ```
 
 训练完成后，将生成对应的文件夹 `output/duuie_multi_task_b32_lr5e-4`

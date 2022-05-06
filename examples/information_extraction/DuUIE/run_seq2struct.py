@@ -10,7 +10,6 @@ from paddle.optimizer import AdamW
 from paddle.amp import GradScaler, auto_cast
 from paddlenlp.transformers import T5ForConditionalGeneration
 
-from uie.evaluation import constants
 from uie.evaluation.sel2record import evaluate_extraction_results
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.utils import (
@@ -21,8 +20,7 @@ from uie.seq2struct.utils import (
     set_logger,
     better_print_multi,
     get_train_dataloader,
-    load_eval_tasks,
-    write_prediction)
+    load_eval_tasks, )
 
 logger = logging.getLogger(__name__)
 
@@ -30,37 +28,16 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--multi_task",
-        action="store_true",
-        help="Path to pre-trained model or shortcut name of model.", )
-    parser.add_argument(
         "--multi_task_config",
         required=True,
-        help="Path to pre-trained model or shortcut name of model.", )
+        help="Path to multi-task config file.", )
     parser.add_argument(
         "--model_name_or_path",
         default="t5-large",
         type=str,
         help="Path to pre-trained model or shortcut name of model.", )
     parser.add_argument(
-        "--train_file",
-        default=None,
-        type=str,
-        help="The input training data jsonlines file.", )
-    parser.add_argument(
-        "--validation_file",
-        default=None,
-        type=str,
-        help="An optional input evaluation data file to evaluate the metrics.",
-    )
-    parser.add_argument(
-        "--record_schema",
-        default=None,
-        type=str,
-        help="Schema for information extraction.", )
-    parser.add_argument(
         "--output_dir",
-        required=True,
         type=str,
         help="The output directory where the model predictions and checkpoints"
         " will be written. Default as `outputs`", )
@@ -103,7 +80,7 @@ def parse_args():
     parser.add_argument(
         "--metric_for_best_model",
         type=str,
-        help="The main metric to choose the best epoch.", )
+        help="The main metric to choose the best checkpoint.", )
     parser.add_argument(
         "--gradient_accumulation_steps",
         default=1,
@@ -229,11 +206,6 @@ def parse_args():
         "--ordered_prompt",
         action='store_true',
         help="Whether to sort the spot prompt and asoc prompt or not.")
-    parser.add_argument(
-        '--offset_map',
-        dest='map_config',
-        help='Offset match strategy.',
-        choices=constants.offset_map_strategy.keys())
     parser.add_argument('--do_train', action='store_true')
     parser.add_argument('--do_eval', action='store_true')
     parser.add_argument(
@@ -250,6 +222,9 @@ def parse_args():
         raise ValueError(
             "At least one of the \"--do_train\" or \"--do_eval\" should be true."
         )
+    if not (args.do_train or args.output_dir):
+        raise ValueError(
+            "--output_dir should be given when --do_train is true.")
 
     return args
 
@@ -359,12 +334,6 @@ def test(args, model, tokenizer):
     for line in better_print_multi(eval_overall_results).split('\n'):
         logger.info(line)
 
-    for task_name in eval_predictions:
-        write_prediction(
-            eval_prediction=eval_predictions[task_name],
-            output_dir=args.output_dir,
-            prefix=f'valid-{task_name}', )
-
 
 def train(args, model, tokenizer):
 
@@ -408,9 +377,9 @@ def train(args, model, tokenizer):
         if args.warmup_steps > 0 else args.warmup_ratio,
         num_training_steps=args.max_steps, )
 
-    total_batch_size = (args.per_device_train_batch_size
-                        * args.gradient_accumulation_steps
-                        * paddle.distributed.get_world_size())
+    total_batch_size = (args.per_device_train_batch_size *
+                        args.gradient_accumulation_steps *
+                        paddle.distributed.get_world_size())
 
     decay_params = [
         p.name for n, p in model.named_parameters()
@@ -488,7 +457,8 @@ def train(args, model, tokenizer):
                         logging_lr_loss()
                         logging_loss = tr_loss
 
-        save_checkpoint(tokenizer, model, args.output_dir)
+        save_checkpoint(tokenizer, model,
+                        os.path.join(args.output_dir, f"ckpt_epoch{epoch}"))
         if args.do_eval and paddle.distributed.get_rank() == 0:
 
             logger.info(f"********** Running evaluating **********")
@@ -503,12 +473,6 @@ def train(args, model, tokenizer):
             for line in better_print_multi(eval_overall_results).split('\n'):
                 logger.info(line)
 
-            for task_name in eval_predictions:
-                write_prediction(
-                    eval_prediction=eval_predictions[task_name],
-                    output_dir=args.output_dir,
-                    prefix=f'valid-{task_name}')
-
             if args.metric_for_best_model not in eval_overall_results:
                 raise ValueError(f"Main metric {args.metric_for_best_model} "
                                  f"is not in {eval_overall_results.keys()}.")
@@ -520,6 +484,14 @@ def train(args, model, tokenizer):
                 best_score = current_score
                 save_checkpoint(tokenizer, model,
                                 os.path.join(args.output_dir, f"best"))
+
+    best_ckpt_file = os.path.join(args.output_dir, "best",
+                                  "model_state.pdparams")
+    if os.path.exists(best_ckpt_file):
+        logger.info(f"Load best checkpoint from {best_ckpt_file}")
+        model.load_dict(paddle.load(best_ckpt_file))
+
+    save_checkpoint(tokenizer, model, args.output_dir)
 
 
 def main(args):

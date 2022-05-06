@@ -29,7 +29,7 @@ logger = logging.getLogger("__main__")
 class SpotAsocNoiser:
     spot_noise_ratio: float = 0.  # Ratio of insert spot not in raw record
     asoc_noise_ratio: float = 0.  # Ratio of insert asoc not in raw record
-    null_span: str = null_span    # Null span string
+    null_span: str = null_span  # Null span string
 
     def random_insert_spot(self, spot_asoc, spot_label_list=None):
         """ Insert negative spot in random, sample negative spot from spot_label_list
@@ -44,7 +44,9 @@ class SpotAsocNoiser:
             random_position = np.random.randint(low=0, high=len(spot_asoc))
             to_insert_negative_spot = {
                 "span": self.null_span,
-                "label": np.random.choice(spot_label_list),  # Sample negative spot from spot_label_list
+                "label":
+                np.random.choice(spot_label_list
+                                 ),  # Sample negative spot from spot_label_list
                 'asoc': list()
             }
             spot_asoc.insert(random_position, to_insert_negative_spot)
@@ -232,11 +234,10 @@ class DataCollatorForSeq2Seq:
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
-                 max_source_length: Optional[int] = None,
-                 max_target_length: Optional[int] = None,
-                 max_prefix_length: Optional[int] = None,
-                 pad_to_multiple_of: Optional[int] = None,
-                 spot_asoc_nosier: SpotAsocNoiser = None,
+                 max_source_length: Optional[int]=None,
+                 max_target_length: Optional[int]=None,
+                 max_prefix_length: Optional[int]=None,
+                 spot_asoc_nosier: SpotAsocNoiser=None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
@@ -247,7 +248,6 @@ class DataCollatorForSeq2Seq:
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
         self.max_prefix_length = max_prefix_length
-        self.pad_to_multiple_of = pad_to_multiple_of
         self.spot_asoc_nosier = spot_asoc_nosier
         self.return_tensors = return_tensors
 
@@ -299,8 +299,7 @@ class DataCollatorForSeq2Seq:
             # Prepare target record ids
             # Generate new record
             target_record = convert_spot_asoc(
-                target_spot_asoc,
-                structure_maker=BaseStructureMarker())
+                target_spot_asoc, structure_maker=BaseStructureMarker())
             target_labels = self.tokenizer.encode(
                 target_record,
                 return_token_type_ids=False,
@@ -310,8 +309,8 @@ class DataCollatorForSeq2Seq:
             new_data.append({
                 'input_ids': source_text_id,
                 'labels': target_labels['input_ids'],
-                'attention_mask':  [1] * len(source_text_id),
-                'decoder_attention_mask':  target_labels['attention_mask'],
+                'attention_mask': [1] * len(source_text_id),
+                'decoder_attention_mask': target_labels['attention_mask'],
             })
 
         first = new_data[0]
@@ -366,11 +365,10 @@ class DataCollatorForMultiTaskSeq2Seq:
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
-                 max_source_length: Optional[int] = None,
-                 max_target_length: Optional[int] = None,
-                 max_prefix_length: Optional[int] = None,
-                 pad_to_multiple_of: Optional[int] = None,
-                 spot_asoc_nosier: SpotAsocNoiser = None,
+                 max_source_length: Optional[int]=None,
+                 max_target_length: Optional[int]=None,
+                 max_prefix_length: Optional[int]=None,
+                 spot_asoc_nosier: SpotAsocNoiser=None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
@@ -381,7 +379,6 @@ class DataCollatorForMultiTaskSeq2Seq:
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
         self.max_prefix_length = max_prefix_length
-        self.pad_to_multiple_of = pad_to_multiple_of
         self.spot_asoc_nosier = spot_asoc_nosier
         self.return_tensors = return_tensors
 
@@ -428,21 +425,19 @@ class DataCollatorForMultiTaskSeq2Seq:
             else:
                 # Evaluation using Ordered SSI
                 spot_prefix = self.ssi_generator.full_spot(
-                    candidates=ins['spots'],
-                    shuffle=self.model.training)
+                    candidates=ins['spots'], shuffle=self.model.training)
                 asoc_prefix = self.ssi_generator.full_asoc(
-                    candidates=ins['asocs'],
-                    shuffle=self.model.training)
+                    candidates=ins['asocs'], shuffle=self.model.training)
 
             # Prepare prefix ids
-            prefix = spot_prefix + asoc_prefix
+            prefix_id = spot_prefix + asoc_prefix
             # truncate `prefix` to max length
             if self.max_prefix_length is not None and self.max_prefix_length >= 0:
-                prefix = prefix[:self.max_prefix_length]
-            prefix = prefix + [self.ssi_generator.text_start_id]
+                prefix_id = prefix_id[:self.max_prefix_length]
+            prefix_id = prefix_id + [self.ssi_generator.text_start_id]
 
             # Prepare source text ids
-            source_text_id = prefix + ins['input_ids']
+            source_text_id = prefix_id + ins['input_ids']
             # truncate `input_ids` to max source length
             if self.max_source_length is not None:
                 source_text_id = source_text_id[:self.max_source_length]
@@ -450,8 +445,7 @@ class DataCollatorForMultiTaskSeq2Seq:
             # Prepare target record ids
             # Generate new record
             target_record = convert_spot_asoc(
-                target_spot_asoc,
-                structure_maker=BaseStructureMarker())
+                target_spot_asoc, structure_maker=BaseStructureMarker())
             target_labels = self.tokenizer.encode(
                 target_record,
                 return_token_type_ids=False,
@@ -461,8 +455,8 @@ class DataCollatorForMultiTaskSeq2Seq:
             new_data.append({
                 'input_ids': source_text_id,
                 'labels': target_labels['input_ids'],
-                'attention_mask':  [1] * len(source_text_id),
-                'decoder_attention_mask':  target_labels['attention_mask'],
+                'attention_mask': [1] * len(source_text_id),
+                'decoder_attention_mask': target_labels['attention_mask'],
             })
 
         first = new_data[0]
