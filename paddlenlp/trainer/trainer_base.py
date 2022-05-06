@@ -1043,7 +1043,7 @@ class Trainer:
                      input_spec=None,
                      load_best_model=False,
                      output_dir: Optional[str]=None,
-                     export_model_format: Optional[str]="paddle"):
+                     model_format: Optional[str]="paddle"):
         """ Export paddle inference model or onnx model.
 
         Args:
@@ -1051,7 +1051,7 @@ class Trainer:
                 such as shape , dtype , name. Defaults to None.
             load_best_model (bool, optional): Load best model. Defaults to False.
             output_dir (Optional[str], optional): Output dir to save the exported model. Defaults to None.
-            export_model_format (Optional[str], optional): Export model format. There are two options: paddle or onnx, defaults to paddle.
+            model_format (Optional[str], optional): Export model format. There are two options: paddle or onnx, defaults to paddle.
         """
 
         if output_dir is None:
@@ -1081,8 +1081,8 @@ class Trainer:
         model = unwrap_model(self.model)
         model.eval()
 
-        export_model_format = export_model_format.lower()
-        if export_model_format == "paddle":
+        model_format = model_format.lower()
+        if model_format == "paddle":
             # Convert to static graph with specific input description
             model = paddle.jit.to_static(model, input_spec=input_spec)
 
@@ -1091,7 +1091,7 @@ class Trainer:
             logger.info("Exporting inference model to %s" % save_path)
             paddle.jit.save(model, save_path)
             logger.info("Inference model exported.")
-        elif export_model_format == "onnx":
+        elif model_format == "onnx":
             # Export ONNX model.
             save_path = os.path.join(output_dir, "onnx", "model")
             logger.info("Exporting ONNX model to %s" % save_path)
