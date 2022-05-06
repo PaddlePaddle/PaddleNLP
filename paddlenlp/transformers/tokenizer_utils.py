@@ -983,6 +983,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
+                #TODO aligns with HuggingFace here in breaking change
                 return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
@@ -1058,7 +1059,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-
+                #TODO aligns with HuggingFace here in breaking change
                 return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
