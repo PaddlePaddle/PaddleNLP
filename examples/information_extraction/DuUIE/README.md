@@ -135,7 +135,7 @@ python process_data.py preprocess
 python3 run_seq2struct.py                              \
   --multi_task_config config/multi-task-duuie.yaml     \
   --negative_keep 1.0                                  \
-  --do_train.                                          \
+  --do_train                                           \
   --metric_for_best_model=all-task-ave                 \
   --model_name_or_path=./uie-char-small                \
   --num_train_epochs=10                                \
