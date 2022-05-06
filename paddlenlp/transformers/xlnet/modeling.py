@@ -171,7 +171,8 @@ class XLNetRelativeAttention(Layer):
         # Post-attention projection (back to 'd_model')
         # Compute einsum4x4("ibnd,hnd->ibh", attn_vec, self.o)
         shape = paddle.shape(attn_vec)
-        attn_vec = attn_vec.reshape([shape[0], shape[1], shape[2] * shape[3]])
+        attn_vec = attn_vec.reshape(
+            [shape[0], shape[1], attn_vec.shape[2] * attn_vec.shape[3]])
         attn_out = paddle.einsum("ibm,hm->ibh", attn_vec, self.o)
 
         attn_out = self.dropout(attn_out)
@@ -1051,8 +1052,9 @@ class XLNetModel(XLNetPretrainedModel):
             attn_mask = paddle.cast((attn_mask > 0), dtype=dtype_float)
 
         if attn_mask is not None:
-            non_tgt_mask = paddle.cast(-paddle.eye(qlen), dtype=dtype_float)
-
+            fill_val = paddle.ones(qlen)
+            non_tgt_mask = paddle.cast(
+                -paddle.diag(fill_val), dtype=dtype_float)
             if mlen > 0:
                 non_tgt_mask = paddle.concat(
                     [
