@@ -983,14 +983,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                if is_split_into_words:
-                    tokens = list(
-                        itertools.chain(*(self.tokenize(
-                            t, is_split_into_words=True, **kwargs)
-                                          for t in text)))
-                    return self.convert_tokens_to_ids(tokens)
-                else:
-                    return self.convert_tokens_to_ids(text)
+                #TODO aligns with HuggingFace here in breaking change
+                return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1065,14 +1059,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                if is_split_into_words:
-                    tokens = list(
-                        itertools.chain(*(self.tokenize(
-                            t, is_split_into_words=True, **kwargs)
-                                          for t in text)))
-                    return self.convert_tokens_to_ids(tokens)
-                else:
-                    return self.convert_tokens_to_ids(text)
+                #TODO aligns with HuggingFace here in breaking change
+                return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
