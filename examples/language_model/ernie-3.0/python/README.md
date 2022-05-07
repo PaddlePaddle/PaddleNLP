@@ -1,4 +1,4 @@
-# Ernie-3.0 python部署说明
+# Ernie-3.0 Python部署说明
 
 ## 环境依赖
 - python >= 3.6
@@ -22,17 +22,17 @@
 ### 运行指令
 1. CPU非量化模型
 ```
-python infer.py --model_path ../tnews_0421/pruned_fp32/float32 --device ‘cpu’
+python infer.py --model_path tnews/pruned_fp32/float32 --device ‘cpu’
 ```
 2. CPU量化模型
 ```
-python infer.py --model_path ../tnews_0421/pruned_fp32/float32 --device ‘cpu’ --int8
+python infer.py --model_path tnews/pruned_fp32/float32 --device ‘cpu’ --int8
 ```
 3. GPU非量化模型
 ```
-python infer.py --model_path ../tnews_0421/pruned_fp32/float32 --device ‘gpu’
+python infer.py --model_path tnews/pruned_fp32/float32 --device ‘gpu’
 ```
 4. GPU量化模型
 ```
-python infer.py --model_path ../tnews_0421/pruned_quant/int8 --device ‘gpu’ --int8
+python infer.py --model_path tnews/pruned_quant/int8 --device ‘gpu’ --int8
 ```

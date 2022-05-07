@@ -199,7 +199,9 @@ class Predictor(object):
             for batch in batches:
                 print(len(batch))
                 inference_backend.infer(batch)
-            print("Collect_shape finished!")
+            print(
+                "collect_shape finished, please close collect_shape and restart."
+            )
             exit(0)
 
     def predict_batch(self, data):
