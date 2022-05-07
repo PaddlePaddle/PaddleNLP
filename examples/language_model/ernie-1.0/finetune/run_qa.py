@@ -46,13 +46,13 @@ from question_answering import (
     prepare_validation_features, )
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Log model and data config

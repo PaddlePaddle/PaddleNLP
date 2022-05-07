@@ -127,6 +127,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             **kwargs  # The token of newline.
     ):
         self._model_file = model_file
+        self.eol_token = eol_token
         if not os.path.isfile(model_file):
             raise ValueError(
                 "Can't find a model file at path '{}'. To load the "
@@ -138,29 +139,11 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         self.sp.Load(model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
 
-    '''
-    def tokenize(self, text):
-        """
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List[str]: A list of string representing converted tokens.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import GPTChineseTokenizer
-
-                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.tokenize('欢迎使用百度飞桨！'))
-                # ['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']
-        """
-
-        return self._tokenize(text)
-    '''
+    @property
+    def eol_token_id(self):
+        if self.eol_token is None:
+            return None
+        return self.convert_tokens_to_ids(self.eol_token)
 
     def _tokenize(self, text):
         """ Tokenize a string. """
@@ -386,7 +369,7 @@ class GPTTokenizer(PretrainedTokenizer):
         unk_token = AddedToken(
             unk_token, lstrip=False,
             rstrip=False) if isinstance(unk_token, str) else unk_token
-
+        self.eol_token = eol_token
         self._build_special_tokens_map_extended(
             bos_token=pad_token, eos_token=eos_token, unk_token=unk_token)
 
@@ -424,6 +407,12 @@ class GPTTokenizer(PretrainedTokenizer):
         """
 
         return len(self.encoder)
+
+    @property
+    def eol_token_id(self):
+        if self.eol_token is None:
+            return None
+        return self.convert_tokens_to_ids(self.eol_token)
 
     def bpe(self, token):
         if token in self.cache:

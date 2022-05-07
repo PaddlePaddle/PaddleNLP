@@ -123,7 +123,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  sentencepiece_model_file,
                  do_lower_case=False,
                  unk_token="[UNK]",
-                 pad_token="[PAD]",
+                 pad_token="[UNK]",
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",

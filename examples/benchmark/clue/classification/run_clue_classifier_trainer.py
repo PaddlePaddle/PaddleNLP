@@ -37,7 +37,7 @@ from paddlenlp.utils.log import logger
 
 
 @dataclass
-class DataTrainingArguments:
+class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
@@ -184,7 +184,7 @@ def clue_trans_fn(example, tokenizer, args):
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Log model and data config
