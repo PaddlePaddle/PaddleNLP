@@ -314,13 +314,23 @@ class Predictor(object):
             ]
         if args.perf:
             for i, batch in enumerate(batches):
-                input_ids, segment_ids, label = batchify_fn(batch)
-                output = self.predict_batch([input_ids, segment_ids])
+                if args.task_name == "msra_ner":
+                    batch = batchify_fn(batch)
+                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
+                        "token_type_ids"].numpy()
+                else:
+                    input_ids, segment_ids, label = batchify_fn(batch)
+                    output = self.predict_batch([input_ids, segment_ids])
                 if i > args.perf_warmup_steps:
                     break
             time1 = time.time()
             for batch in batches:
-                input_ids, segment_ids, _ = batchify_fn(batch)
+                if args.task_name == "msra_ner":
+                    batch = batchify_fn(batch)
+                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
+                        "token_type_ids"].numpy()
+                else:
+                    input_ids, segment_ids, _ = batchify_fn(batch)
                 output = self.predict_batch([input_ids, segment_ids])
 
             print("task name: %s, time: %s, " %
