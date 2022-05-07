@@ -40,17 +40,17 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 from compress_trainer import CompressConfig, PTQConfig
-sys.path.append("../../language_model/ernie-1.0/finetune")
-from token_classification import ner_trans_fn, tokenize_and_align_labels
+sys.path.append("../ernie-1.0/finetune")
+from token_classification import ner_trans_fn
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -105,8 +105,8 @@ def main():
     trans_fn = partial(ner_trans_fn, tokenizer=tokenizer, args=data_args)
 
     # Define data collector
-    data_collator = DataCollatorForTokenClassification(tokenizer,
-                                                       data_args.ignore_label)
+    data_collator = DataCollatorForTokenClassification(
+        tokenizer, label_pad_token_id=data_args.ignore_label)
 
     column_names = raw_datasets["train"].column_names
 
