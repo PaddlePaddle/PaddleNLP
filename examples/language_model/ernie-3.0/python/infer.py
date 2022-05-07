@@ -197,7 +197,6 @@ class Predictor(object):
                 ],
             ]
             for batch in batches:
-                print(len(batch))
                 inference_backend.infer(batch)
             print(
                 "collect_shape finished, please close collect_shape and restart."
