@@ -14,27 +14,25 @@
 
 import argparse
 import os
+import time
+import copy
+from functools import partial
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
-from scipy.special import softmax
 from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
+import paddlenlp as ppnlp
+from paddlenlp.data import Pad
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.datasets import load_dataset
+
+from data import create_dataloader, convert_example, load_vocab
+from utils import flat_words, pad_sequence, istree, eisner
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, required=True,
-    help="The directory to static model.")
-parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="The selected pretrained model name.")
-parser.add_argument("--max_seq_length", default=128, type=int,
-    help="The maximum total input sequence length after tokenization. Sequences "
-    "longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=2, type=int,
-    help="Batch size per GPU/CPU for training.")
+parser.add_argument("--model_dir", type=str, required=True, help="The path to static model.")
+parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
 
@@ -52,63 +50,55 @@ parser.add_argument("--benchmark", type=eval, default=False,
     help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/",
     help="The file path to save log.")
+parser.add_argument("--batch_size", type=int, default=64, help="Numbers of examples a batch for training.")
+parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
+parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
-    """
-    Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
-    to be used in a sequence-pair classification task.
-        
-    A BERT sequence has the following format:
-
-    - single sequence: ``[CLS] X [SEP]``
-    - pair of sequences: ``[CLS] A [SEP] B [SEP]``
-
-    A BERT sequence pair mask has the following format:
-    ::
-        0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
-        | first sequence    | second sequence |
-
-    If only one sequence, only returns the first portion of the mask (0's).
+def batchify_fn(batch):
+    raw_batch = [raw for raw in zip(*batch)]
+    batch = [pad_sequence(data) for data in raw_batch]
+    return batch
 
 
-    Args:
-        example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label_list(obj:`list[str]`): All the labels that the data has.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
+def flat_words(words, pad_index=0):
+    mask = words != pad_index
+    lens = np.sum(mask.astype(int), axis=-1)
+    position = np.cumsum(lens + (lens == 0).astype(int), axis=1) - 1
+    lens = np.sum(lens, -1)
+    words = words.ravel()[np.flatnonzero(words)]
 
-    Returns:
-        input_ids(obj:`list[int]`): The list of token ids.
-        segment_ids(obj: `list[int]`): List of sequence pair mask.
-        label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
-    """
-    text = example
-    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
-    input_ids = encoded_inputs["input_ids"]
-    segment_ids = encoded_inputs["token_type_ids"]
+    sequences = []
+    idx = 0
+    for l in lens:
+        sequences.append(words[idx:idx + l])
+        idx += l
+    words = Pad(pad_val=pad_index)(sequences)
 
-    if not is_test:
-        # create label maps
-        label_map = {}
-        for (i, l) in enumerate(label_list):
-            label_map[l] = i
+    max_len = words.shape[1]
 
-        label = label_map[label]
-        label = np.array([label], dtype="int64")
-        return input_ids, segment_ids, label
-    else:
-        return input_ids, segment_ids
+    mask = (position >= max_len).astype(int)
+    position = position * np.logical_not(mask) + mask * (max_len - 1)
+    return words, position
+
+
+def decode(s_arc, s_rel, mask, tree=True):
+
+    lens = np.sum(mask.astype(int), axis=-1)
+    arc_preds = np.argmax(s_arc, axis=-1)
+
+    bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    if tree and any(bad):
+        arc_preds[bad] = eisner(s_arc[bad], mask[bad])
+
+    rel_preds = np.argmax(s_rel, axis=-1)
+    rel_preds = [
+        rel_pred[np.arange(len(arc_pred)), arc_pred]
+        for arc_pred, rel_pred in zip(arc_preds, rel_preds)
+    ]
+    return arc_preds, rel_preds
 
 
 class Predictor(object):
@@ -121,20 +111,16 @@ class Predictor(object):
                  precision="fp32",
                  cpu_threads=10,
                  enable_mkldnn=False):
-        self.max_seq_length = max_seq_length
-        self.batch_size = batch_size
-
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
+        self.batch_size = batch_size
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
             raise ValueError("not find params file path {}".format(params_file))
         config = paddle.inference.Config(model_file, params_file)
-
         if device == "gpu":
             # set GPU configs accordingly
-            # such as intialize the gpu memory, enable tensorrt
             config.enable_use_gpu(100, 0)
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
@@ -142,13 +128,43 @@ class Predictor(object):
                 "int8": inference.PrecisionType.Int8
             }
             precision_mode = precision_map[precision]
-
             if args.use_tensorrt:
                 config.switch_ir_optim(True)
                 config.enable_tensorrt_engine(
                     max_batch_size=batch_size,
-                    min_subgraph_size=30,
+                    min_subgraph_size=5,
                     precision_mode=precision_mode)
+                min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
+                min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32
+                min_input_shape = {
+                    "input_ids": [min_batch_size, min_seq_len],
+                    "tmp_4": [min_batch_size, min_seq_len],
+                    "tmp_5": [min_batch_size, min_seq_len],
+                    "words": [min_batch_size, min_seq_len],
+                    "full_like_1.tmp_0": [min_batch_size, min_seq_len],
+                    "token_type_ids": [min_batch_size, min_seq_len],
+                    "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
+                }
+                max_input_shape = {
+                    "input_ids": [max_batch_size, max_seq_len],
+                    "tmp_4": [max_batch_size, max_seq_len],
+                    "tmp_5": [max_batch_size, max_seq_len],
+                    "words": [max_batch_size, max_seq_len],
+                    "full_like_1.tmp_0": [max_batch_size, max_seq_len],
+                    "token_type_ids": [max_batch_size, max_seq_len],
+                    "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
+                }
+                opt_input_shape = {
+                    "input_ids": [opt_batch_size, opt_seq_len],
+                    "tmp_4": [opt_batch_size, opt_seq_len],
+                    "tmp_5": [opt_batch_size, opt_seq_len],
+                    "words": [opt_batch_size, opt_seq_len],
+                    "full_like_1.tmp_0": [opt_batch_size, opt_seq_len],
+                    "token_type_ids": [opt_batch_size, opt_seq_len],
+                    "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
+                }
+                config.set_trt_dynamic_shape_info(
+                    min_input_shape, max_input_shape, opt_input_shape)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -161,21 +177,24 @@ class Predictor(object):
         elif device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
-
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
+
         self.input_handles = [
             self.predictor.get_input_handle(name)
             for name in self.predictor.get_input_names()
         ]
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+
+        self.output_handle = [
+            self.predictor.get_output_handle(name)
+            for name in self.predictor.get_output_names()
+        ]
 
         if args.benchmark:
             import auto_log
             pid = os.getpid()
             self.autolog = auto_log.AutoLogger(
-                model_name=args.model_name_or_path,
+                model_name='ddparser',
                 model_precision=precision,
                 batch_size=self.batch_size,
                 data_shape="dynamic",
@@ -190,78 +209,72 @@ class Predictor(object):
                 warmup=0,
                 logger=logger)
 
-    def predict(self, data, tokenizer, label_map):
-        """
-        Predicts the data labels.
-
-        Args:
-            data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
-                which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-            label_map(obj:`dict`): The label id (key) to label str (value) map.
-
-        Returns:
-            results(obj:`dict`): All the predictions labels.
-        """
-        if args.benchmark:
-            self.autolog.times.start()
-
+    def predict(self, data, vocabs):
+        word_vocab, _, rel_vocab = vocabs
+        word_pad_index = word_vocab.to_indices("[PAD]")
+        word_bos_index = word_vocab.to_indices("[CLS]")
+        word_eos_index = word_vocab.to_indices("[SEP]")
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example(
-                text,
-                tokenizer,
-                label_list=label_map.values(),
-                max_seq_length=self.max_seq_length,
-                is_test=True)
-            examples.append((input_ids, segment_ids))
+            example = {
+                "FORM": text["FORM"],
+                "CPOS": text["CPOS"],
+            }
+            example = convert_example(
+                example,
+                vocabs=vocabs,
+                mode="test", )
+            examples.append(example)
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-        ): fn(samples)
+        batches = [
+            examples[idx:idx + args.batch_size]
+            for idx in range(0, len(examples), args.batch_size)
+        ]
 
-        if args.benchmark:
-            self.autolog.times.stamp()
+        arcs, rels = [], []
+        for batch in batches:
+            words = batchify_fn(batch)[0]
+            words, position = flat_words(words, word_pad_index)
+            self.input_handles[0].copy_from_cpu(words)
+            self.input_handles[1].copy_from_cpu(position)
+            self.predictor.run()
+            s_arc = self.output_handle[0].copy_to_cpu()
+            s_rel = self.output_handle[1].copy_to_cpu()
+            words = self.output_handle[2].copy_to_cpu()
 
-        input_ids, segment_ids = batchify_fn(examples)
-        self.input_handles[0].copy_from_cpu(input_ids)
-        self.input_handles[1].copy_from_cpu(segment_ids)
-        self.predictor.run()
-        logits = self.output_handle.copy_to_cpu()
-        if args.benchmark:
-            self.autolog.times.stamp()
+            mask = np.logical_and(
+                np.logical_and(words != word_pad_index,
+                               words != word_bos_index),
+                words != word_eos_index, )
 
-        probs = softmax(logits, axis=1)
-        idx = np.argmax(probs, axis=1)
-        idx = idx.tolist()
-        labels = [label_map[i] for i in idx]
+            arc_preds, rel_preds = decode(s_arc, s_rel, mask, args.tree)
 
-        if args.benchmark:
-            self.autolog.times.end(stamp=True)
+            arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
+            rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
 
-        return labels
+        arcs = [[str(s) for s in seq] for seq in arcs]
+        rels = [rel_vocab.to_tokens(seq) for seq in rels]
+        return arcs, rels
 
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
-                          args.batch_size, args.use_tensorrt, args.precision,
-                          args.cpu_threads, args.enable_mkldnn)
+    predictor = Predictor(args.model_dir, args.device)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    test_ds = load_dataset("chnsenticorp", splits=["test"])
-    data = [d["text"] for d in test_ds]
-    batches = [
-        data[idx:idx + args.batch_size]
-        for idx in range(0, len(data), args.batch_size)
-    ]
-    label_map = {0: 'negative', 1: 'positive'}
+    # Load vocabs from model file path
+    vocabs = load_vocab(args.model_dir)
 
-    results = []
-    for batch_data in batches:
-        results.extend(predictor.predict(batch_data, tokenizer, label_map))
-    for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
-    if args.benchmark:
-        predictor.autolog.report()
+    test_ds = load_dataset(args.task_name, splits=["test"])
+    test_ds_copy = copy.deepcopy(test_ds)
+
+    pred_arcs, pred_rels = predictor.predict(test_ds, vocabs)
+
+    with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
+        for res, head, rel in zip(test_ds_copy, pred_arcs, pred_rels):
+            res["HEAD"] = tuple(head)
+            res["DEPREL"] = tuple(rel)
+            res = '\n'.join('\t'.join(map(str, line))
+                            for line in zip(*res.values())) + '\n'
+            out_file.write("{}\n".format(res))
+    out_file.close()
+    print("Results saved!")

@@ -154,18 +154,21 @@ class Predictor(object):
                 min_input_shape = {
                     "input_ids": [min_batch_size, min_seq_len],
                     "tmp_4": [min_batch_size, min_seq_len],
+                    "tmp_5": [min_batch_size, min_seq_len],
                     "token_type_ids": [min_batch_size, min_seq_len],
                     "unsqueeze2_0.tmp_0": [min_batch_size, 1, 1, min_seq_len]
                 }
                 max_input_shape = {
                     "input_ids": [max_batch_size, max_seq_len],
                     "tmp_4": [max_batch_size, max_seq_len],
+                    "tmp_5": [max_batch_size, max_seq_len],
                     "token_type_ids": [max_batch_size, max_seq_len],
                     "unsqueeze2_0.tmp_0": [max_batch_size, 1, 1, max_seq_len]
                 }
                 opt_input_shape = {
                     "input_ids": [opt_batch_size, opt_seq_len],
                     "tmp_4": [opt_batch_size, opt_seq_len],
+                    "tmp_5": [opt_batch_size, opt_seq_len],
                     "token_type_ids": [opt_batch_size, opt_seq_len],
                     "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
                 }
