@@ -13,6 +13,11 @@
 
 [Universal Information Extraction (UIE)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键信息抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/167235608-52c95da5-f059-4b92-be5b-407c84eb7d55.png height=400 hspace='10'/>
+    <p>图1 模型结构图 <p/>
+</div>
+
 #### UIE的优势
 
 - **使用简单**：用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**。
@@ -33,7 +38,7 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166708474-8f05bdba-143f-4d11-8bd5-8ce26ab7c987.png height=300 hspace='10'/>
-    <p>图1 医疗场景示例<p/>
+    <p>图2 医疗场景示例<p/>
 </div>
 
 #### 金融
@@ -42,7 +47,7 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166708694-e2671e29-3c02-4e29-9823-9fbdfd117eb6.png height=400 hspace='10'/>
-    <p>图2 金融场景示例<p/>
+    <p>图3 金融场景示例<p/>
 </div>
 
 <a name="开箱即用"></a>
@@ -97,11 +102,11 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本案例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
 
-**抽取式任务标注规则：**
+**抽取任务标注规则：**
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166907872-26240036-4055-4663-b48d-07fa370eed34.png />
-    <p>图3 抽取式任务标注样例图<p/>
+    <p>图4 抽取任务标注样例图<p/>
 </div>
 
 - 在doccano平台上，创建一个类型为``Sequence Labeling``的标注项目。
@@ -113,19 +118,20 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
+    --task_type "ext" \
     --save_dir ./data/ext_data \
     --negative_ratio 5
 ```
 
-**分类式任务标注规则：**
+**分类任务标注规则：**
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166918397-eb7cf540-4636-48e6-8ca6-dcdd10a11d0a.png />
-    <p>图4 分类式任务标注样例图<p/>
+    <p>图5 分类任务标注样例图<p/>
 </div>
 
 - 在doccano平台上，创建一个类型为``Text Classification``的标注项目。
-- 定义标签类别，上例中需要定义的类别标签有`正向`和`负向`，分类任务需要保证最终导出的标注数据包含所有的类别标签。
+- 定义标签类别，上例中需要定义的类别标签有`正向`和`负向`。
 - 使用以上定义的标签开始标注数据，图4展示了一个分类式任务的标注样例。
 - 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
@@ -133,7 +139,11 @@ python doccano.py \
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_cls.json \
-    --save_dir ./data/cls_data
+    --task_type "cls" \
+    --save_dir ./data/cls_data \
+    --splits 0.6 0.2 0.2 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向"
 ```
 
 可配置参数包括

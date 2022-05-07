@@ -19,6 +19,7 @@ from functools import partial
 import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.metrics import SpanEvaluator
 
 from model import UIE
 from utils import convert_example, reader, MODEL_MAP
@@ -53,6 +54,7 @@ def do_eval():
     encoding_model = MODEL_MAP[args.model]['encoding_model']
     hidden_size = MODEL_MAP[args.model]['hidden_size']
 
+    tokenizer = AutoTokenizer.from_pretrained(encoding_model)
     model = UIE(encoding_model, hidden_size)
     state_dict = paddle.load(args.model_path)
     model.load_dict(state_dict)
@@ -67,7 +69,8 @@ def do_eval():
     test_data_loader = paddle.io.DataLoader(
         dataset=test_ds, batch_sampler=test_batch_sampler, return_list=True)
 
-    precision, recall, f1 = evaluate(model, test_data_loader)
+    metric = SpanEvaluator()
+    precision, recall, f1 = evaluate(model, metric, test_data_loader)
     print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
           (precision, recall, f1))
 
