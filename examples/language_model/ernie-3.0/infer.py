@@ -19,13 +19,13 @@ import sys
 from functools import partial
 import distutils.util
 import numpy as np
+import onnxruntime as ort
 
 import paddle
 from paddle import inference
 from paddle.metric import Accuracy
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
-import onnxruntime as ort
 
 from paddlenlp.transformers import AutoTokenizer
 
@@ -52,7 +52,7 @@ def parse_args():
         ", ".join(METRIC_CLASSES.keys()), )
     parser.add_argument(
         "--model_name_or_path",
-        default="ernie-3.0-medium",
+        default="ernie-3.0-medium-zh",
         type=str,
         help="The directory or name of model.", )
     parser.add_argument(
@@ -91,6 +91,10 @@ def parse_args():
         action='store_true',
         help="Whether to test performance.", )
     parser.add_argument(
+        "--collect_shape",
+        action='store_true',
+        help="Whether to collect shape info.", )
+    parser.add_argument(
         "--int8",
         action='store_true',
         help="Whether to use int8 inference.", )
@@ -104,18 +108,16 @@ def parse_args():
 
 
 def convert_example(example,
+                    tokenizer,
                     label_list,
-                    tokenizer=None,
                     is_test=False,
-                    max_seq_length=512,
-                    **kwargs):
+                    max_seq_length=512):
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        example['label'] = np.array(example["label"], dtype="int64")
-        label = example['label']
+        label = np.array(example["label"], dtype="int64")
     # Convert raw text to feature
     if 'keyword' in example:  # CSL
         sentence1 = " ".join(example['keyword'])
@@ -145,8 +147,6 @@ def convert_example(example,
             text_list.insert(query_idx + len(query) + 2 + 1, "_")
         text = "".join(text_list)
         example['sentence'] = text
-    if tokenizer is None:
-        return example
     if 'sentence' in example:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     elif 'sentence1' in example:
@@ -259,9 +259,11 @@ class Predictor(object):
                 "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
             }
 
-            shape_file = "shape_info_aft_prune.txt"
-            #config.collect_shape_range_info(shape_file)
-            config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+            shape_file = "shape_info.txt"
+            if args.collect_shape:
+                config.collect_shape_range_info(shape_file)
+            else:
+                config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
             #config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape,
             #                                  opt_input_shape)
         config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
@@ -295,19 +297,6 @@ class Predictor(object):
         ]
         return output
 
-    def convert_predict_batch(self, args, data, tokenizer, batchify_fn,
-                              label_list):
-        examples = []
-        for example in data:
-            example = convert_example(
-                example,
-                label_list,
-                tokenizer,
-                max_seq_length=args.max_seq_length)
-            examples.append(example)
-
-        return examples
-
     def predict(self, dataset, tokenizer, batchify_fn, args):
         batches = [
             dataset[idx:idx + args.batch_size]
@@ -315,27 +304,13 @@ class Predictor(object):
         ]
         if args.perf:
             for i, batch in enumerate(batches):
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
-                input_ids, segment_ids, label = batchify_fn(examples)
-
-                ones = paddle.ones_like(input_ids, dtype="int64")
-                seq_length = paddle.cumsum(ones, axis=1)
-                position_ids = seq_length - ones
-                task_type_ids = paddle.ones_like(input_ids, dtype="int64") * 0
-                attention_mask = paddle.unsqueeze(
-                    (input_ids == 0).astype("float32") * -1e4, axis=[1, 2])
-                output = self.predict_batch([
-                    input_ids, segment_ids, position_ids, attention_mask,
-                    task_type_ids
-                ])
+                input_ids, segment_ids, label = batchify_fn(batch)
+                output = self.predict_batch([input_ids, segment_ids])
                 if i > args.perf_warmup_steps:
                     break
             time1 = time.time()
             for batch in batches:
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
-                input_ids, segment_ids, _ = batchify_fn(examples)
+                input_ids, segment_ids, _ = batchify_fn(batch)
                 output = self.predict_batch([input_ids, segment_ids])
 
             print("task name: %s, time: %s, " %
@@ -345,9 +320,7 @@ class Predictor(object):
             metric = METRIC_CLASSES[args.task_name]()
             metric.reset()
             for i, batch in enumerate(batches):
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
-                input_ids, segment_ids, label = batchify_fn(examples)
+                input_ids, segment_ids, label = batchify_fn(batch)
                 output = self.predict_batch([input_ids, segment_ids])
                 correct = metric.compute(
                     paddle.to_tensor(output), paddle.to_tensor(label))
@@ -364,14 +337,16 @@ def main():
     args.task_name = args.task_name.lower()
 
     predictor = Predictor.create_predictor(args)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     dev_ds = load_dataset('clue', args.task_name, splits='dev')
 
     trans_func = partial(
-        convert_example, label_list=dev_ds.label_list, is_test=False)
-    dev_ds = dev_ds.map(trans_func, lazy=True)
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        convert_example,
+        label_list=dev_ds.label_list,
+        tokenizer=tokenizer,
+        is_test=False)
+    dev_ds = dev_ds.map(trans_func, lazy=False)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
