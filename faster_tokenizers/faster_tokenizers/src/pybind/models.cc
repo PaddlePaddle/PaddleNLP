@@ -113,7 +113,14 @@ void BindModels(pybind11::module* m) {
       .def("id_to_token", &models::WordPiece::IdToToken)
       .def("get_vocab", &models::WordPiece::GetVocab)
       .def("get_vocab_size", &models::WordPiece::GetVocabSize)
-      .def("get_vocab_from_file", &models::WordPiece::GetVocabFromFile)
+      .def_static(
+          "read_file", &models::WordPiece::GetVocabFromFile, py::arg("vocab"))
+      .def_static("from_file",
+                  &models::WordPiece::GetWordPieceFromFile,
+                  py::arg("vocab"),
+                  py::arg("unk_token") = "[UNK]",
+                  py::arg("max_input_chars_per_word") = 100,
+                  py::arg("continuing_subword_prefix") = "##")
       .def("save", &models::WordPiece::Save);
 }
 

@@ -40,6 +40,11 @@ struct WordPiece : public Model {
   virtual std::string Save(const std::string& folder,
                            const std::string& filename_prefix) const override;
   static core::Vocab GetVocabFromFile(const std::string& file);
+  static WordPiece GetWordPieceFromFile(
+      const std::string& file,
+      const std::string& unk_token = "[UNK]",
+      size_t max_input_chars_per_word = 100,
+      const std::string& continuing_subword_prefix = "##");
 
 private:
   core::Vocab vocab_;

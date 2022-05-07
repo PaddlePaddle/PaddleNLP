@@ -52,7 +52,7 @@ include_directories(${TOKENIZERS_INSTALL_INCLUDE_DIR})
 include(generic)
 include(third_party)
 
-add_subdirectory(tokenizers)
+add_subdirectory(faster_tokenizers)
 add_subdirectory(python)
 
 add_custom_target(build_tokenizers_bdist_wheel ALL

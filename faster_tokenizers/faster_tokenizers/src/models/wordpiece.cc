@@ -176,6 +176,17 @@ core::Vocab WordPiece::GetVocabFromFile(const std::string& file) {
   return vocab;
 }
 
+WordPiece WordPiece::GetWordPieceFromFile(
+    const std::string& file,
+    const std::string& unk_token,
+    size_t max_input_chars_per_word,
+    const std::string& continuing_subword_prefix) {
+  auto vocab = GetVocabFromFile(file);
+  return WordPiece(
+      vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix);
+}
+
+
 WordPieceConfig::WordPieceConfig()
     : unk_token_("[UNK]"),
       max_input_chars_per_word_(100),
