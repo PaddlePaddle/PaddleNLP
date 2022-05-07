@@ -42,13 +42,13 @@ sys.path.insert(0, os.path.abspath("."))
 from token_classification import ner_trans_fn
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # Log model and data config
     training_args.print_config(model_args, "Model")

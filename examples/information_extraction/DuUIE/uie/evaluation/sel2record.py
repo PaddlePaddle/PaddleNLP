@@ -2,7 +2,6 @@
 # -*- coding:utf-8 -*-
 from typing import Tuple, List, Dict
 from collections import defaultdict, OrderedDict, Counter
-from dataclasses import dataclass
 import os
 import numpy
 import logging
@@ -11,6 +10,7 @@ import json
 from nltk.tree import ParentedTree
 from uie.evaluation.constants import (span_start, type_start, type_end,
                                       null_span, offset_map_strategy)
+from uie.evaluation.scorer import EntityScorer, RelationScorer, EventScorer
 
 logger = logging.getLogger("__main__")
 
@@ -155,14 +155,14 @@ class RecordSchema:
 
     @staticmethod
     def read_from_file(filename):
-        lines = open(filename).readlines()
+        lines = open(filename, encoding='utf8').readlines()
         type_list = json.loads(lines[0])
         role_list = json.loads(lines[1])
         type_role_dict = json.loads(lines[2])
         return RecordSchema(type_list, role_list, type_role_dict)
 
     def write_to_file(self, filename):
-        with open(filename, 'w') as output:
+        with open(filename, 'w', encoding='utf8') as output:
             output.write(json.dumps(self.type_list, ensure_ascii=False) + '\n')
             output.write(json.dumps(self.role_list, ensure_ascii=False) + '\n')
             output.write(
@@ -981,9 +981,14 @@ class SpotAsocPredictParser:
 def evaluate_extraction_results(gold_instances,
                                 pred_instances,
                                 eval_match_mode='normal'):
+    task_scorer_dict = {
+        'entity': EntityScorer,
+        'relation': RelationScorer,
+        'event': EventScorer
+    }
     # Score Record
     results = dict()
-    for task, scorer in task_record_map.items():
+    for task, scorer in task_scorer_dict.items():
 
         gold_list = [x[task] for x in gold_instances]
         pred_list = [x[task] for x in pred_instances]
