@@ -169,7 +169,7 @@ def evaluate(outputs, metric, data_loader):
 
 class Predictor(object):
     def __init__(self, args):
-        inference_backend = InferBackend(
+        self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
@@ -197,7 +197,7 @@ class Predictor(object):
                 ],
             ]
             for batch in batches:
-                inference_backend.infer(batch)
+                self.inference_backend.infer(batch)
             print(
                 "collect_shape finished, please close collect_shape and restart."
             )
