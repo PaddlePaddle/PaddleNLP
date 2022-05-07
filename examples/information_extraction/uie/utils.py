@@ -22,13 +22,13 @@ import paddle
 
 MODEL_MAP = {
     "uie-base": {
-        "encoding_model": "ernie-3.0-base",
+        "encoding_model": "ernie-3.0-base-zh",
         "hidden_size": 768,
         "url":
         "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams"
     },
     "uie-tiny": {
-        "encoding_model": "ernie-3.0-medium",
+        "encoding_model": "ernie-3.0-medium-zh",
         "hidden_size": 768,
         "url":
         "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams"
@@ -55,6 +55,7 @@ def convert_example(example, tokenizer, max_seq_len):
         text=[example["prompt"]],
         text_pair=[example["content"]],
         stride=len(example["prompt"]),
+        truncation=True,
         max_seq_len=max_seq_len,
         pad_to_max_seq_len=True,
         return_attention_mask=True,

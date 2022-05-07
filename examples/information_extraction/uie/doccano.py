@@ -29,7 +29,7 @@ def do_convert():
         raise ValueError("Please input the correct path of doccano file.")
 
     if not os.path.exists(args.save_dir):
-        os.makedirs(save_dir)
+        os.makedirs(args.save_dir)
 
     if len(args.splits) != 0 and len(args.splits) != 3:
         raise ValueError("Only []/ len(splits)==3 accepted for splits.")

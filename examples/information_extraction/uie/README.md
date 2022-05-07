@@ -14,7 +14,7 @@
 [Universal Information Extraction (UIE)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键信息抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167235608-52c95da5-f059-4b92-be5b-407c84eb7d55.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
     <p>图1 模型结构图 <p/>
 </div>
 
