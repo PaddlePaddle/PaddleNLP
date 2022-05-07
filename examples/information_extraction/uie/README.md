@@ -100,9 +100,9 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 #### 数据标注
 
-我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本案例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
+我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本示例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
 
-**抽取任务标注规则：**
+抽取任务标注规则：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166907872-26240036-4055-4663-b48d-07fa370eed34.png />
@@ -123,7 +123,7 @@ python doccano.py \
     --negative_ratio 5
 ```
 
-**分类任务标注规则：**
+分类任务标注规则：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/166918397-eb7cf540-4636-48e6-8ca6-dcdd10a11d0a.png />
@@ -146,14 +146,14 @@ python doccano.py \
     --options "正向" "负向"
 ```
 
-可配置参数包括
+可配置参数说明：
 
 - ``doccano_file``: 原始数据文件名。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data/ext_data``目录下。
 - ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取式任务生效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.4, 0.6]表示按照``4:6``的比例将数据划分为训练集和验证集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 
-**备注：**
+备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
