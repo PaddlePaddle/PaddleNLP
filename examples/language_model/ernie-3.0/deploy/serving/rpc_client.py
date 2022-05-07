@@ -28,22 +28,30 @@ client.connect(['127.0.0.1:18090'])
 dev_ds = load_dataset('clue', "tnews", splits='dev')
 
 batches = []
+labels = []
 idx = 0
-batch_size = 64
+batch_size = 2
 while idx < len(dev_ds):
     datas = []
+    label = []
     for i in range(batch_size):
         if idx + i >= len(dev_ds):
             break
         datas.append(dev_ds[idx + i]["sentence"])
+        label.append(dev_ds[idx + i]["label"])
     batches.append(datas)
+    labels.append(np.array(label))
     idx += batch_size
 
-print("Print to view data format:", batches[0])
-for data in batches:
+accuracy = 0
+for i, data in enumerate(batches):
     data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
     ret = client.predict(feed_dict={"sentence" : data}, fetch=["test"])
-    ret = eval(ret.value[0])
-    print(ret)
-
-    
+    # print("ret:", ret)
+    for index, value in zip(ret.key, ret.value):
+        if index == "index":
+            value = eval(value)
+            # print(value, labels[i])
+            accuracy += np.sum(labels[i] == value)
+            break
+print("acc:", 1.0*accuracy/len(dev_ds))
