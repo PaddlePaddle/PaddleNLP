@@ -21,9 +21,8 @@ import sys
 import unicodedata
 from typing import List, Optional
 
-import sacremoses as sm
-
 from ...utils.log import logger
+from paddle.utils import try_import
 
 from .. import PretrainedTokenizer
 
@@ -650,6 +649,7 @@ class XLMTokenizer(PretrainedTokenizer):
             **kwargs, ):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
+        self.sm = try_import("sacremoses")
 
         # cache of sm.MosesPunctNormalizer instance
         self.cache_moses_punct_normalizer = dict()
@@ -681,7 +681,7 @@ class XLMTokenizer(PretrainedTokenizer):
 
     def moses_punct_norm(self, text, lang):
         if lang not in self.cache_moses_punct_normalizer:
-            punct_normalizer = sm.MosesPunctNormalizer(lang=lang)
+            punct_normalizer = self.sm.MosesPunctNormalizer(lang=lang)
             self.cache_moses_punct_normalizer[lang] = punct_normalizer
         else:
             punct_normalizer = self.cache_moses_punct_normalizer[lang]
@@ -689,7 +689,7 @@ class XLMTokenizer(PretrainedTokenizer):
 
     def moses_tokenize(self, text, lang):
         if lang not in self.cache_moses_tokenizer:
-            moses_tokenizer = sm.MosesTokenizer(lang=lang)
+            moses_tokenizer = self.sm.MosesTokenizer(lang=lang)
             self.cache_moses_tokenizer[lang] = moses_tokenizer
         else:
             moses_tokenizer = self.cache_moses_tokenizer[lang]
