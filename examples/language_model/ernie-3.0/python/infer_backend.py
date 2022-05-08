@@ -31,16 +31,10 @@ def optimize(onnx_model_path: Path) -> Path:
 
 def dynamic_quantize(input_float_model: str, dynamic_quantized_model: str):
     import onnx
-    from onnxruntime.quantization import QuantizationMode, quantize
+    from onnxruntime.quantization import QuantizationMode, quantize_dynamic
     onnx_model = Path(input_float_model).absolute()
     optimized_output = optimize(onnx_model)
-    onnx_model = onnx.load(optimized_output.as_posix())
-    quantized_model = quantize(
-        model=onnx_model,
-        quantization_mode=QuantizationMode.IntegerOps,
-        force_fusions=True,
-        symmetric_weight=True, )
-    onnx.save_model(quantized_model, dynamic_quantized_model)
+    quantize_dynamic(optimized_output, dynamic_quantized_model)
 
 
 class InferBackend(object):
