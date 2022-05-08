@@ -5,3 +5,4 @@ numpy
 paddlenlp
 scipy
 wandb
+tqdm

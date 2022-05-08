@@ -30,7 +30,7 @@ from modeling import (
     BertModel, DeviceScope, IpuBertConfig, IpuBertPretrainingMLMAccAndLoss,
     IpuBertPretrainingMLMHeads, IpuBertPretrainingNSPAccAndLoss,
     IpuBertPretrainingNSPHeads)
-from utils import load_custom_ops, parse_args
+from utils import load_custom_ops, parse_args, ProgressBar
 
 
 def set_seed(seed):
@@ -155,6 +155,8 @@ def create_ipu_strategy(args):
     }
 
     options['enable_engine_caching'] = args.enable_engine_caching
+
+    options['compilation_progress_logger'] = ProgressBar()
 
     ipu_strategy.set_options(options)
 
@@ -282,9 +284,6 @@ def main(args):
     ipu_compiler = paddle.static.IpuCompiledProgram(
         main_program, ipu_strategy=ipu_strategy)
     logging.info(f'start compiling, please wait some minutes')
-    logging.info(
-        f'you can run `export POPART_LOG_LEVEL=INFO` before running program to see the compile progress'
-    )
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
