@@ -70,6 +70,7 @@ MAPPING_NAMES = OrderedDict([
     ("UnifiedTransformer", "unified_transformer"),
     ("UNIMO", "unimo"),
     ("XLNet", "xlnet"),
+    ("XLM", "xlm"),
     ("GPT", "gpt"),
     ("T5", 't5'),
     ("Bert", "bert"),

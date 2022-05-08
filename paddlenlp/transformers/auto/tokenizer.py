@@ -65,6 +65,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("UnifiedTransformerTokenizer", "unified_transformer"),
     ("UNIMOTokenizer", "unimo"),
     ("XLNetTokenizer", "xlnet"),
+    ("XLMTokenizer", "xlm"),
     ("GPTTokenizer", "gpt"),
     ("T5Tokenizer", 't5'),
     ("BertTokenizer", "bert"),
