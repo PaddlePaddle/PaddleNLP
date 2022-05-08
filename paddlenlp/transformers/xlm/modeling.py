@@ -43,7 +43,7 @@ class SinusoidalPositionalEmbedding(nn.Embedding):
 
     @staticmethod
     def _init_weight(out):
-        n_pos, dim = out.shape
+        n_pos, dim = paddle.shape(out)
         out.stop_gradient = True
         position_ids = paddle.arange(0, n_pos, dtype=out.dtype).unsqueeze(1)
         indices = paddle.arange(0, dim // 2, dtype=out.dtype).unsqueeze(0)
@@ -1433,19 +1433,20 @@ class XLMForMultipleChoice(XLMPretrainedModel):
                 )
         """
         # input_ids: [bs, num_choice, seqlen]
-        input_ids = input_ids.reshape(shape=(
-            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice, seqlen]
+        input_ids = input_ids.reshape(
+            shape=(-1, paddle.shape(input_ids)[-1]
+                   ))  # flat_input_ids: [bs*num_choice, seqlen]
 
         if langs is not None:
-            langs = langs.reshape(shape=(-1, langs.shape[-1]))
+            langs = langs.reshape(shape=(-1, paddle.shape(langs)[-1]))
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
-                shape=(-1, attention_mask.shape[-1]))
+                shape=(-1, paddle.shape(attention_mask)[-1]))
 
         if position_ids is not None:
             position_ids = position_ids.reshape(
-                shape=(-1, position_ids.shape[-1]))
+                shape=(-1, paddle.shape(position_ids)[-1]))
 
         if lengths is not None:
             lengths = lengths.reshape(shape=(-1, ))
