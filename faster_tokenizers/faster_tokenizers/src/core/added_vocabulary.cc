@@ -107,6 +107,8 @@ bool AddedToken::GetUseRStrip() const { return use_rstrip_; }
 
 bool AddedToken::GetIsSingleWord() const { return is_single_word_; }
 
+void AddedToken::SetContent(const std::string& content) { content_ = content; }
+
 void AddedToken::SetUseLStrip(bool use_lstrip) { use_lstrip_ = use_lstrip; }
 
 void AddedToken::SetUseRStrip(bool use_rstrip) { use_rstrip_ = use_rstrip; }
@@ -114,6 +116,8 @@ void AddedToken::SetUseRStrip(bool use_rstrip) { use_rstrip_ = use_rstrip; }
 void AddedToken::SetUseNormalized(bool use_normalized) {
   use_normalized_ = use_normalized;
 }
+
+void AddedToken::SetIsSpecial(bool is_special) { is_special_ = is_special; }
 
 bool AddedToken::operator==(const AddedToken& other) const {
   return content_ == other.content_;
@@ -181,12 +185,12 @@ size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
     } else {
       uint new_id = model.GetVocabSize() + GetLen();
       vocab_[token.GetContent()] = new_id;
-      vocab_reversed_[new_id] = token;
       if (special_tokens_set_.count(token.GetContent()) == 0) {
         added_tokens_.push_back(token);
       }
       id = new_id;
     }
+    vocab_reversed_[id] = token;
   }
   RefreshAddedTokens(model, normalizers);
   return tokens.size() - ignored_tokens_num;
@@ -359,6 +363,57 @@ void AddedVocabulary::ExtractAndNormalize(
               *normalized, this->split_normalized_trie_, string_splits);
         }
       });
+}
+
+const std::unordered_map<uint, AddedToken>&
+AddedVocabulary::GetAddedTokenVocabReversed() const {
+  return vocab_reversed_;
+}
+
+
+void to_json(nlohmann::json& j, const AddedTokenWithId& added_token) {
+  j = {
+      {"id", added_token.id_},
+      {"content", added_token.added_token_.GetContent()},
+      {"single_word", added_token.added_token_.GetIsSingleWord()},
+      {"lstrip", added_token.added_token_.GetUseLStrip()},
+      {"rstrip", added_token.added_token_.GetUseRStrip()},
+      {"normalized", added_token.added_token_.GetUseNormalized()},
+      {"special", added_token.added_token_.GetIsSpecial()},
+  };
+}
+
+void from_json(const nlohmann::json& j, AddedTokenWithId& added_token) {
+  j.at("id").get_to(added_token.id_);
+  std::string content = j.at("content").get<std::string>();
+  added_token.added_token_.SetContent(content);
+
+  bool single_word = j.at("single_word").get<bool>();
+  added_token.added_token_.SetIsSingleWord(single_word);
+
+  bool lstrip = j.at("lstrip").get<bool>();
+  added_token.added_token_.SetUseLStrip(lstrip);
+
+  bool rstrip = j.at("rstrip").get<bool>();
+  added_token.added_token_.SetUseRStrip(rstrip);
+
+  bool normalized = j.at("normalized").get<bool>();
+  added_token.added_token_.SetUseNormalized(normalized);
+
+  bool special = j.at("special").get<bool>();
+  added_token.added_token_.SetIsSpecial(special);
+}
+
+void to_json(nlohmann::json& j, const AddedVocabulary& added_vocab) {
+  nlohmann::json jarray = nlohmann::json::array();
+  for (const auto& vocab_item : added_vocab.vocab_reversed_) {
+    AddedTokenWithId added_token_with_id;
+    added_token_with_id.id_ = vocab_item.first;
+    added_token_with_id.added_token_ = vocab_item.second;
+    nlohmann::json jo = added_token_with_id;
+    jarray.emplace_back(jo);
+  }
+  j = jarray;
 }
 
 }  // core

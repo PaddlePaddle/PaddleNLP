@@ -19,6 +19,7 @@ limitations under the License. */
 #include <unordered_set>
 
 #include "core/base.h"
+#include "nlohmann/json.hpp"
 
 namespace re2 {
 class RE2;
@@ -62,6 +63,8 @@ public:
   void SetUseLStrip(bool use_lstrip);
   void SetUseRStrip(bool use_rstrip);
   void SetUseNormalized(bool use_normalized);
+  void SetContent(const std::string& content);
+  void SetIsSpecial(bool is_special);
   std::string GetContent() const;
   bool GetIsSpecial() const;
   bool GetUseNormalized() const;
@@ -77,6 +80,14 @@ private:
   bool use_rstrip_;
   bool use_normalized_;
   bool is_special_;
+  friend struct AddedTokenWithId;
+};
+
+struct AddedTokenWithId {
+  AddedToken added_token_;
+  uint id_;
+  friend void to_json(nlohmann::json& j, const AddedTokenWithId& added_token);
+  friend void from_json(const nlohmann::json& j, AddedTokenWithId& added_token);
 };
 
 class AddedVocabulary {
@@ -109,6 +120,8 @@ public:
       const normalizers::Normalizer* normalizers,
       const std::string& sequence,
       pretokenizers::PreTokenizedString* pretokenized) const;
+  const std::unordered_map<uint, AddedToken>& GetAddedTokenVocabReversed()
+      const;
 
 private:
   core::Vocab vocab_;
@@ -118,6 +131,8 @@ private:
   std::unordered_set<std::string> special_tokens_set_;
   MatchSet split_trie_;
   MatchSet split_normalized_trie_;
+  friend void to_json(nlohmann::json& j, const AddedVocabulary& added_vocab);
+  friend void from_json(const nlohmann::json& j, AddedVocabulary& added_vocab);
 };
 
 }  // core

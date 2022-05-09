@@ -326,9 +326,9 @@ int TokenizerInit(PyObject* self, PyObject* args, PyObject* kwargs) {
       py_tokenizer_ptr->tokenizer.SetModel(model);
     }
     return 0;
-  } else {
+  } else if (args_num >= 1) {
     std::ostringstream oss;
-    oss << "Expected number of arguments is 1, but recive " << args_num;
+    oss << "Expected number of arguments is 0 or 1, but recive " << args_num;
     throw std::runtime_error(oss.str());
   }
   return 1;
@@ -935,6 +935,113 @@ static PyObject* NumSpecialTokensToAdd(TokenizerObject* self,
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
 }
 
+
+static PyObject* Save(TokenizerObject* self, PyObject* args, PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_path = NULL;
+  PyObject* kw_pretty = NULL;
+  static char* kwlist[] = {
+      const_cast<char*>("path"), const_cast<char*>("pretty"), NULL};
+  bool flag_ = PyArg_ParseTupleAndKeywords(
+      args, kwargs, "|OO", kwlist, &kw_path, &kw_pretty);
+  bool pretty = true;
+  Py_ssize_t args_num = PyTuple_Size(args);
+  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
+    if (args_num == (Py_ssize_t)2) {
+      pretty = CastPyArg2AttrBoolean(kw_pretty, 1);
+    }
+    std::string path = CastPyArg2AttrString(kw_path, 0);
+    self->tokenizer.Save(path, pretty);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  Py_RETURN_NONE;
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
+static PyObject* ToStr(TokenizerObject* self,
+                       PyObject* args,
+                       PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_pretty = NULL;
+  static char* kwlist[] = {const_cast<char*>("pretty"), NULL};
+  bool flag_ =
+      PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &kw_pretty);
+  bool pretty = true;
+  Py_ssize_t args_num = PyTuple_Size(args);
+  std::string json_str;
+  if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)1) {
+    if (args_num == (Py_ssize_t)1) {
+      pretty = CastPyArg2AttrBoolean(kw_pretty, 0);
+    }
+    self->tokenizer.ToJsonStr(&json_str, pretty);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  return ToPyObject(json_str);
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
+static PyObject* FromStr(TokenizerObject* self,
+                         PyObject* args,
+                         PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_json = NULL;
+  static char* kwlist[] = {const_cast<char*>("json"), NULL};
+  bool flag_ =
+      PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &kw_json);
+  Py_ssize_t args_num = PyTuple_Size(args);
+  std::string json_str;
+  core::Tokenizer tokenizer;
+  if (args_num == (Py_ssize_t)1) {
+    json_str = CastPyArg2AttrString(kw_json, 0);
+    tokenizer = core::Tokenizer::LoadFromStr(json_str);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  PyObject* obj = PyObject_CallObject((PyObject*)&p_tokenizer_type, NULL);
+  auto v = reinterpret_cast<TokenizerObject*>(obj);
+  v->tokenizer = tokenizer;
+  return obj;
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
+static PyObject* FromFile(TokenizerObject* self,
+                          PyObject* args,
+                          PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_path = NULL;
+  static char* kwlist[] = {const_cast<char*>("json"), NULL};
+  bool flag_ =
+      PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &kw_path);
+  Py_ssize_t args_num = PyTuple_Size(args);
+  std::string path;
+  core::Tokenizer tokenizer;
+  if (args_num == (Py_ssize_t)1) {
+    path = CastPyArg2AttrString(kw_path, 0);
+    tokenizer = core::Tokenizer::LoadFromFile(path);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  TokenizerObject* obj = PyObject_New(TokenizerObject, p_tokenizer_type);
+  PyObject_Init((PyObject*)obj, p_tokenizer_type);
+  obj->tokenizer = tokenizer;
+  return (PyObject*)obj;
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
 PyMethodDef tokenizer_variable_methods[] = {
     {"add_special_tokens",
      (PyCFunction)(void (*)(void))AddSpecialTokens,
@@ -988,30 +1095,30 @@ PyMethodDef tokenizer_variable_methods[] = {
      (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
      METH_VARARGS | METH_KEYWORDS,
      NULL},
+    {"save",
+     (PyCFunction)(void (*)(void))Save,
+     METH_VARARGS | METH_KEYWORDS,
+     NULL},
+    {"to_str",
+     (PyCFunction)(void (*)(void))ToStr,
+     METH_VARARGS | METH_KEYWORDS,
+     NULL},
+    {"from_str",
+     (PyCFunction)(void (*)(void))FromStr,
+     METH_VARARGS | METH_KEYWORDS | METH_STATIC,
+     NULL},
+    {"from_file",
+     (PyCFunction)(void (*)(void))FromFile,
+     METH_VARARGS | METH_KEYWORDS | METH_STATIC,
+     NULL},
     // TODO(zhoushunjie): Need to implement
-    // {"save",
-    //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
-    //  NULL},
-    // {"to_str",
-    //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
-    //  NULL},
-    // {"from_file",
-    //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
-    //  NULL},
     // {"from_buffer",
     //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
+    //  METH_VARARGS | METH_KEYWORDS | METH_STATIC,
     //  NULL},
     // {"from_pretrained",
     //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
-    //  NULL},
-    // {"from_str",
-    //  (PyCFunction)(void (*)(void))NumSpecialTokensToAdd,
-    //  METH_VARARGS | METH_KEYWORDS,
+    //  METH_VARARGS | METH_KEYWORDS | METH_STATIC,
     //  NULL},
     {NULL, NULL, 0, NULL}};
 

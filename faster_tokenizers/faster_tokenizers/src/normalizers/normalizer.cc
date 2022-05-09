@@ -163,16 +163,16 @@ void NormalizedString::UpdateNormalizedRange(
       third_len = alignments_.size() - n_range.second;
     }
     new_alignments.resize(n_range.first + alignments.size() + third_len);
-    std::copy(new_alignments.begin(),
-              new_alignments.begin() + n_range.first,
-              alignments_.begin());
-    std::copy(new_alignments.begin() + n_range.first,
-              new_alignments.begin() + n_range.first + alignments.size(),
-              alignments.begin());
+    if (n_range.first > 0) {
+      std::copy_n(alignments_.begin(), n_range.first, new_alignments.begin());
+    }
+    std::copy_n(alignments.begin(),
+                alignments.size(),
+                new_alignments.begin() + n_range.first);
     if (third_len > 0) {
-      std::copy(new_alignments.begin() + n_range.first + alignments.size(),
-                new_alignments.end(),
-                alignments_.begin() + n_range.second);
+      std::copy_n(alignments_.begin() + n_range.second,
+                  third_len,
+                  new_alignments.begin() + n_range.first + alignments.size());
     }
     alignments_ = std::move(new_alignments);
   }
@@ -292,7 +292,6 @@ void NormalizedString::RunNormalization(const std::string& mode) {
       }
     }
   }
-
   OffsetMapping new_normalized_offset{u32new_normalized, changes};
   // Update normalized_ and alignments_
   UpdateNormalized(new_normalized_offset, 0);

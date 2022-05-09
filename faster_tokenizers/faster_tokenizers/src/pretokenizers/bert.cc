@@ -63,5 +63,12 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
       });
 }
 
+void to_json(nlohmann::json& j, const BertPreTokenizer& bert_pre_tokenizer) {
+  j = {
+      {"type", "BertPreTokenizer"},
+  };
+}
+
+
 }  // pretokenizers
 }  // tokenizers

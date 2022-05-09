@@ -18,6 +18,7 @@ limitations under the License. */
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "nlohmann/json.hpp"
 
 namespace tokenizers {
 namespace core {
@@ -26,6 +27,30 @@ enum OffsetType { CHAR, BYTE };
 enum Direction { LEFT, RIGHT };
 enum TruncStrategy { LONGEST_FIRST, ONLY_FIRST, ONLY_SECOND };
 enum PadStrategy { BATCH_LONGEST, FIXED_SIZE };
+
+NLOHMANN_JSON_SERIALIZE_ENUM(OffsetType,
+                             {
+                                 {CHAR, "CHAR"}, {BYTE, "BYTE"},
+                             });
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Direction,
+                             {
+                                 {LEFT, "LEFT"}, {RIGHT, "RIGHT"},
+                             });
+
+NLOHMANN_JSON_SERIALIZE_ENUM(TruncStrategy,
+                             {
+                                 {LONGEST_FIRST, "LONGEST_FIRST"},
+                                 {ONLY_FIRST, "ONLY_FIRST"},
+                                 {ONLY_SECOND, "ONLY_SECOND"},
+                             });
+
+
+NLOHMANN_JSON_SERIALIZE_ENUM(PadStrategy,
+                             {
+                                 {BATCH_LONGEST, "BATCH_LONGEST"},
+                                 {FIXED_SIZE, "FIXED_SIZE"},
+                             });
 
 struct TruncMethod {
   Direction direction_;
@@ -57,6 +82,45 @@ struct PadMethod {
         pad_len_(0),
         pad_to_mutiple_of(0) {}
 };
+
+inline void to_json(nlohmann::json& j, const TruncMethod& trunc_method) {
+  j = {
+      {"strategy", trunc_method.strategy_},
+      {"direction", trunc_method.direction_},
+      {"max_len", trunc_method.max_len_},
+      {"stride", trunc_method.stride_},
+  };
+}
+
+inline void from_json(const nlohmann::json& j, TruncMethod& trunc_method) {
+  j["strategy"].get_to(trunc_method.strategy_);
+  j["direction"].get_to(trunc_method.direction_);
+  j["max_len"].get_to(trunc_method.max_len_);
+  j["stride"].get_to(trunc_method.stride_);
+}
+
+
+inline void to_json(nlohmann::json& j, const PadMethod& pad_method) {
+  j = {
+      {"strategy", pad_method.strategy_},
+      {"direction", pad_method.direction_},
+      {"pad_id", pad_method.pad_id_},
+      {"pad_token_type_id", pad_method.pad_token_type_id_},
+      {"pad_token", pad_method.pad_token_},
+      {"pad_len", pad_method.pad_len_},
+      {"pad_to_mutiple_of", pad_method.pad_to_mutiple_of},
+  };
+}
+
+inline void from_json(const nlohmann::json& j, PadMethod& pad_method) {
+  j["strategy"].get_to(pad_method.strategy_);
+  j["direction"].get_to(pad_method.direction_);
+  j["pad_id"].get_to(pad_method.pad_id_);
+  j["pad_token_type_id"].get_to(pad_method.pad_token_type_id_);
+  j["pad_token"].get_to(pad_method.pad_token_);
+  j["pad_len"].get_to(pad_method.pad_len_);
+  j["pad_to_mutiple_of"].get_to(pad_method.pad_to_mutiple_of);
+}
 
 using Offset = std::pair<uint, uint>;
 using Range = std::pair<uint, uint>;

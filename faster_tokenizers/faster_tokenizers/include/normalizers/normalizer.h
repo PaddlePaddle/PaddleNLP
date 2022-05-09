@@ -18,6 +18,7 @@ limitations under the License. */
 #include <string>
 #include <vector>
 #include "core/base.h"
+#include "glog/logging.h"
 
 namespace re2 {
 class RE2;

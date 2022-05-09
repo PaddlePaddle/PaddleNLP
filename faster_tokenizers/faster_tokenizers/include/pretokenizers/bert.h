@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
 
 namespace tokenizers {
@@ -21,6 +22,10 @@ namespace pretokenizers {
 
 struct BertPreTokenizer : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
+  friend void to_json(nlohmann::json& j,
+                      const BertPreTokenizer& bert_pre_tokenizer);
+  friend void from_json(const nlohmann::json& j,
+                        BertPreTokenizer& bert_pre_tokenizer);
 };
 
 }  // pretokenizers

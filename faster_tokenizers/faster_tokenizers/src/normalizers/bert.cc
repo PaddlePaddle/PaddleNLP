@@ -106,5 +106,23 @@ void BertNormalizer::operator()(NormalizedString* input) const {
     input->Lowercase();
   }
 }
+
+void to_json(nlohmann::json& j, const BertNormalizer& bert_normalizer) {
+  j = {
+      {"type", "BertNormalizer"},
+      {"clean_text", bert_normalizer.clean_text_},
+      {"handle_chinese_chars", bert_normalizer.handle_chinese_chars_},
+      {"strip_accents", bert_normalizer.strip_accents_},
+      {"lowercase", bert_normalizer.lowercase_},
+  };
+}
+
+void from_json(const nlohmann::json& j, BertNormalizer& bert_normalizer) {
+  j.at("clean_text").get_to(bert_normalizer.clean_text_);
+  j.at("handle_chinese_chars").get_to(bert_normalizer.handle_chinese_chars_);
+  j.at("lowercase").get_to(bert_normalizer.lowercase_);
+  j.at("strip_accents").get_to(bert_normalizer.strip_accents_);
+}
+
 }  // normalizers
 }  // tokenizers

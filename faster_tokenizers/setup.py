@@ -44,7 +44,7 @@ setup(
     description=long_description,
     long_description=long_description,
     zip_safe=False,
-    url="https://github.com/PaddlePaddle/PaddleNLP",
+    url="https://github.com/PaddlePaddle/PaddleNLP/faster_tokenizers",
     package_dir={"": "python"},
     packages=[
         "faster_tokenizers", "faster_tokenizers.tokenizers_impl",

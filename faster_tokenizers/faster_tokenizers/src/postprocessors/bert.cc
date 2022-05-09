@@ -186,5 +186,18 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
   *result_encoding = std::move(new_encoding);
 }
 
+void to_json(nlohmann::json& j, const BertPostProcessor& bert_postprocessor) {
+  j = {
+      {"type", "BertPostProcessor"},
+      {"sep", bert_postprocessor.sep_},
+      {"cls", bert_postprocessor.cls_},
+  };
+}
+
+void from_json(const nlohmann::json& j, BertPostProcessor& bert_postprocessor) {
+  j["cls"].get_to(bert_postprocessor.cls_);
+  j["sep"].get_to(bert_postprocessor.sep_);
+}
+
 }  // postprocessors
 }  // tokenizers

@@ -139,3 +139,17 @@ class BaseFasterTokenizer:
     @postprocessor.setter
     def postprocessor(self, postprocessor):
         self._tokenizer.postprocessor = postprocessor
+
+    def save(self, path, pretty=True):
+        self._tokenizer.save(path, pretty)
+
+    def to_str(self, pretty=True):
+        return self._tokenizer.to_str(pretty)
+
+    @staticmethod
+    def from_str(json):
+        return Tokenizer.from_str(json)
+
+    @staticmethod
+    def from_file(path):
+        return Tokenizer.from_file(path)

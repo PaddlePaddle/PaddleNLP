@@ -15,6 +15,7 @@ limitations under the License. */
 #include <codecvt>
 #include <fstream>
 #include <locale>
+#include <map>
 
 #include "glog/logging.h"
 #include "models/wordpiece.h"
@@ -184,6 +185,23 @@ WordPiece WordPiece::GetWordPieceFromFile(
   auto vocab = GetVocabFromFile(file);
   return WordPiece(
       vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix);
+}
+
+void to_json(nlohmann::json& j, const WordPiece& model) {
+  j = {
+      {"type", "WordPiece"},
+      {"vocab", model.vocab_},
+      {"unk_token", model.unk_token_},
+      {"max_input_chars_per_word", model.max_input_chars_per_word_},
+      {"continuing_subword_prefix", model.continuing_subword_prefix_},
+  };
+}
+
+void from_json(const nlohmann::json& j, WordPiece& model) {
+  j["vocab"].get_to(model.vocab_);
+  j["unk_token"].get_to(model.unk_token_);
+  j["max_input_chars_per_word"].get_to(model.max_input_chars_per_word_);
+  j["continuing_subword_prefix"].get_to(model.continuing_subword_prefix_);
 }
 
 

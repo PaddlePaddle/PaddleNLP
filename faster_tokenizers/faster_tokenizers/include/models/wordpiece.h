@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include "models/model.h"
+#include "nlohmann/json.hpp"
 
 namespace tokenizers {
 namespace models {
@@ -52,6 +53,8 @@ private:
   std::string unk_token_;
   size_t max_input_chars_per_word_;
   std::string continuing_subword_prefix_;
+  friend void to_json(nlohmann::json& j, const WordPiece& model);
+  friend void from_json(const nlohmann::json& j, WordPiece& model);
 };
 
 struct WordPieceConfig {

@@ -18,6 +18,7 @@ limitations under the License. */
 #include "boost/variant.hpp"
 #include "core/added_vocabulary.h"
 #include "core/base.h"
+#include "nlohmann/json.hpp"
 
 namespace tokenizers {
 
@@ -162,6 +163,13 @@ public:
                         uint type_id,
                         OffsetType offset_type,
                         Encoding* encodings) const;
+  const AddedVocabulary& GetAddedVocabulary() const;
+  void Save(const std::string& json_path, bool pretty = true) const;
+  void ToJsonStr(std::string* json_str, bool pretty = true) const;
+
+  // Create a tokenzier from json path
+  static Tokenizer LoadFromFile(const std::string& json_path);
+  static Tokenizer LoadFromStr(const std::string& json_str);
 
 private:
   Encoding EncodeTextToEncoding(const std::vector<uint>& word_idx,
@@ -179,6 +187,8 @@ private:
   bool use_truncation_;
   bool use_padding_;
   // TODO(zhoushunjie): Implement Decoder later.
+  friend void to_json(nlohmann::json& j, const Tokenizer& tokenizer);
+  friend void from_json(const nlohmann::json& j, Tokenizer& tokenizer);
 };
 
 }  // core

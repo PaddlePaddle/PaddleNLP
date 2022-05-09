@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include <string>
+#include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 
 namespace tokenizers {
@@ -33,6 +34,9 @@ private:
   bool lowercase_;
   void DoCleanText(NormalizedString* input) const;
   void DoHandleChineseChars(NormalizedString* input) const;
+  friend void to_json(nlohmann::json& j, const BertNormalizer& bert_normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        BertNormalizer& bert_normalizer);
 };
 }  // normalizers
 }  // tokenizers

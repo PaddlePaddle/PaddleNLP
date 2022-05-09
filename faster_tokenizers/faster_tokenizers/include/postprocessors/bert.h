@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
 
 namespace tokenizers {
@@ -30,6 +31,10 @@ struct BertPostProcessor : public PostProcessor {
                           core::Encoding* result_encoding) const override;
   std::pair<std::string, uint> sep_;
   std::pair<std::string, uint> cls_;
+  friend void to_json(nlohmann::json& j,
+                      const BertPostProcessor& bert_postprocessor);
+  friend void from_json(const nlohmann::json& j,
+                        BertPostProcessor& bert_postprocessor);
 };
 }  // postprocessors
 }  // tokenizers

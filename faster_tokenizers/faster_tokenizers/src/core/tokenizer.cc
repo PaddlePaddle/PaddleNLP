@@ -12,6 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include <fstream>
 #include "glog/logging.h"
 
 #include "core/added_vocabulary.h"
@@ -322,7 +323,164 @@ Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint>& word_idx,
   DoTokenize(&pretokenized, type_id, word_idx, offset_type, &encoding);
   return encoding;
 }
+const AddedVocabulary& Tokenizer::GetAddedVocabulary() const {
+  return added_vocabulary_;
+}
 
+void Tokenizer::Save(const std::string& path, bool pretty) const {
+  std::string json_str;
+  ToJsonStr(&json_str, pretty);
+  std::ofstream fout(path);
+  fout << json_str;
+}
+
+void Tokenizer::ToJsonStr(std::string* json_str, bool pretty) const {
+  int indent = -1;
+  if (pretty) {
+    indent = 2;
+  }
+  nlohmann::json j = *this;
+  *json_str = j.dump(indent);
+}
+
+Tokenizer Tokenizer::LoadFromFile(const std::string& json_path) {
+  std::ifstream fin(json_path);
+  nlohmann::json j;
+  fin >> j;
+  Tokenizer tokenizer;
+  j.get_to(tokenizer);
+  return tokenizer;
+}
+
+Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
+  auto jo = nlohmann::json::parse(json_str);
+  Tokenizer tokenizer;
+  jo.get_to(tokenizer);
+  return tokenizer;
+}
+
+void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
+  j = {
+      {"added_tokens", tokenizer.added_vocabulary_},
+  };
+
+  j["truncation"] = nullptr;
+  if (tokenizer.use_truncation_) {
+    j["truncation"] = tokenizer.trunc_method_;
+  }
+
+  j["padding"] = nullptr;
+  if (tokenizer.use_padding_) {
+    j["padding"] = tokenizer.pad_method_;
+  }
+
+  j["normalizer"] = nullptr;
+  if (tokenizer.normalizer_ != nullptr) {
+    if (typeid(*tokenizer.normalizer_.get()) ==
+        typeid(normalizers::BertNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::BertNormalizer*>(
+          tokenizer.normalizer_.get());
+    }
+  }
+
+  j["pretokenizer"] = nullptr;
+  if (tokenizer.pretokenizer_ != nullptr) {
+    if (typeid(*tokenizer.pretokenizer_.get()) ==
+        typeid(pretokenizers::BertPreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::BertPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
+    }
+  }
+
+  j["model"] = nullptr;
+  if (tokenizer.model_ != nullptr) {
+    if (typeid(*tokenizer.model_.get()) == typeid(models::WordPiece)) {
+      j["model"] = *dynamic_cast<models::WordPiece*>(tokenizer.model_.get());
+    }
+  }
+
+  j["postprocessor"] = nullptr;
+  if (tokenizer.post_processor_ != nullptr) {
+    if (typeid(*tokenizer.post_processor_.get()) ==
+        typeid(postprocessors::BertPostProcessor)) {
+      j["postprocessor"] = *dynamic_cast<postprocessors::BertPostProcessor*>(
+          tokenizer.post_processor_.get());
+    }
+  }
+}
+
+void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
+  // deserialize normalizer_
+  try {
+    const auto& normalizer = j.at("normalizer");
+    if (!normalizer.is_null()) {
+      if (normalizer.at("type") == "BertNormalizer") {
+        normalizers::BertNormalizer bert_normalizer;
+        normalizer.get_to(bert_normalizer);
+        tokenizer.SetNormalizer(bert_normalizer);
+      }
+    }
+
+    // deserialize pretokenizer_
+    const auto& pretokenizer = j.at("pretokenizer");
+    if (!pretokenizer.is_null()) {
+      if (pretokenizer.at("type") == "BertPreTokenizer") {
+        pretokenizers::BertPreTokenizer bert_pretokenizer;
+        tokenizer.SetPreTokenizer(bert_pretokenizer);
+      }
+    }
+
+    // deserialize model_
+    const auto& model = j.at("model");
+    if (!model.is_null()) {
+      if (model.at("type") == "WordPiece") {
+        models::WordPiece wordpiece;
+        model.get_to(wordpiece);
+        tokenizer.SetModel(wordpiece);
+      }
+    }
+
+    // deserialize post_processor_
+    const auto& post_processor = j.at("postprocessor");
+    if (!post_processor.is_null()) {
+      if (post_processor.at("type") == "BertPostProcessor") {
+        postprocessors::BertPostProcessor bert_postprocessor;
+        post_processor.get_to(bert_postprocessor);
+        tokenizer.SetPostProcessor(bert_postprocessor);
+      }
+    }
+
+    // deserialize trunc_method_
+    const auto& trunc_method = j.at("truncation");
+    if (!trunc_method.is_null()) {
+      tokenizer.use_truncation_ = true;
+      trunc_method.get_to(tokenizer.trunc_method_);
+    } else {
+      tokenizer.use_truncation_ = false;
+    }
+
+    // deserialize pad_method_
+    const auto& pad_method = j.at("padding");
+    if (!pad_method.is_null()) {
+      tokenizer.use_padding_ = true;
+      pad_method.get_to(tokenizer.pad_method_);
+    } else {
+      tokenizer.use_padding_ = false;
+    }
+
+    // deserialize added_vocabulary_
+    const auto& added_tokens = j.at("added_tokens");
+    core::AddedTokenWithId added_token_with_id;
+    std::vector<AddedToken> tokens(added_tokens.size());
+    for (int i = 0; i < added_tokens.size(); ++i) {
+      added_tokens[i].get_to(added_token_with_id);
+      tokens[i] = added_token_with_id.added_token_;
+    }
+    tokenizer.AddSpecialTokens(tokens);
+  } catch (nlohmann::json::out_of_range& e) {
+    VLOG(0) << e.what();
+  }
+}
 // Instantiate normalizers
 template void Tokenizer::SetNormalizer(const normalizers::BertNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::LowercaseNormalizer&);
