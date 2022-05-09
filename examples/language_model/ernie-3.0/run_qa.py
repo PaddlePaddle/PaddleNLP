@@ -165,8 +165,7 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
     all_end_logits = []
     tic_eval = time.time()
     for batch in data_loader:
-        start_logits, end_logits = model(batch["input_ids"],
-                                         batch["token_type_ids"])
+        start_logits, end_logits = model(**batch)
         for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 print("Processing example: %d" % len(all_start_logits))
@@ -423,11 +422,10 @@ def run(args):
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_data_loader):
-                logits = model(
-                    input_ids=batch["input_ids"],
-                    token_type_ids=batch["token_type_ids"])
-                loss = criterion(logits, (batch["start_positions"],
-                                          batch["end_positions"]))
+                start_positions = batch.pop("start_positions")
+                end_positions = batch.pop("end_positions")
+                logits = model(**batch)
+                loss = criterion(logits, (start_positions, end_positions))
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
                 loss.backward()
