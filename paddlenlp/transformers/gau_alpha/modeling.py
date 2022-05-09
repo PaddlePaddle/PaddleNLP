@@ -51,7 +51,7 @@ def attention_normalize(a, mask=None, axis=-1, method="softmax"):
         if mask is not None:
             l = mask.sum(-1, keepdim=True)
         else:
-            l = paddle.ones_like(a) * a.shape[-2]
+            l = paddle.ones_like(a) * paddle.shape(a)[-2]
         if method == "squared_relu":
             return F.relu(a)**2 / l
         elif method == "softmax_plus":
