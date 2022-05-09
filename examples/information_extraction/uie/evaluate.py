@@ -59,7 +59,11 @@ def do_eval():
     state_dict = paddle.load(args.model_path)
     model.load_dict(state_dict)
 
-    test_ds = load_dataset(reader, data_path=args.test_path, lazy=False)
+    test_ds = load_dataset(
+        reader,
+        data_path=args.test_path,
+        max_seq_len=args.max_seq_len,
+        lazy=False)
     test_ds = test_ds.map(
         partial(
             convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))
@@ -83,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-large"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
 
     args = parser.parse_args()
     # yapf: enable

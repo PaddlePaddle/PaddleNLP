@@ -20,20 +20,22 @@
 
 ## 2. 项目创建
 
-#### 抽取任务
+UIE支持抽取与分类两种类型的任务，根据实际需要创建一个新的项目。
 
-创建项目时选择``序列标注``任务，并勾选``Use Relation Labeling``
+#### 2.1 抽取任务
+
+创建项目时选择``序列标注``任务，并勾选``Use Relation Labeling``。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=180 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
 </div>
 
-#### 分类任务
+#### 2.2 分类任务
 
 创建项目时选择``文本分类``任务
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249258-48fb4f0c-f68c-4c9a-ab84-5c555ddcf427.png height=180 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249258-48fb4f0c-f68c-4c9a-ab84-5c555ddcf427.png height=230 hspace='15'/>
 </div>
 
 <a name="数据上传"></a>
@@ -50,75 +52,106 @@
 上传数据类型选择``TextLine``
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='15'/>
 </div>
 
 <a name="标签构建"></a>
 
 ## 4. 标签构建
 
-#### 抽取任务
+#### 4.1 构建抽取任务标签
 
-添加Span类型标签
+抽取任务包含Span与Relation两种标签类型，Span指原文本中的目标信息片段，如实体识别中某个类型的实体，事件抽取中的触发词和论元；Relation指原文本中Span之间的关系，如关系抽取中两个实体（Subject&Object）之间的关系，事件抽取中论元和触发词之间的关系。
+
+添加Span类型标签:
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248034-afa3f637-65c5-4038-ada0-344ffbd776a2.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248034-afa3f637-65c5-4038-ada0-344ffbd776a2.png height=300 hspace='15'/>
 </div>
 
-添加Relation类型标签
+添加Relation类型标签：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248307-916c77f6-bf80-4d6b-aa71-30c719f68257.png height=260 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248307-916c77f6-bf80-4d6b-aa71-30c719f68257.png height=260 hspace='16'/>
 </div>
 
-#### 分类任务
+#### 4.2 构建分类任务标签
 
-添加类别标签
+支持多类别、多标签等多种类型的文本分类任务。
+
+添加分类类别标签：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249484-2b5f6338-8a91-48f3-8d56-edc2b26b41d7.png height=160 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249484-2b5f6338-8a91-48f3-8d56-edc2b26b41d7.png height=160 hspace='15'/>
 </div>
 
 <a name="任务标注"></a>
 
 ## 5. 任务标注
 
-#### 命名实体识别
+#### 5.1 命名实体识别
+
+命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
+
+标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248557-f1da3694-1063-465a-be9a-1bb811949530.png height=200 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248557-f1da3694-1063-465a-be9a-1bb811949530.png height=200 hspace='15'/>
 </div>
 
-#### 关系抽取
+示例中定义了`时间`、`选手`、`赛事名称`和`得分`四种Span类型标签。
+
+#### 5.2 关系抽取
+
+关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，即抽取三元组（实体一，关系类型，实体二）。
+
+标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248502-16a87902-3878-4432-b5b8-9808bd8d4de5.png height=200 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248502-16a87902-3878-4432-b5b8-9808bd8d4de5.png height=200 hspace='15'/>
 </div>
 
-#### 事件抽取
+示例中定义了`作品名`、`人物名`和`时间`三种Span类型标签，以及`歌手`、`发行时间`和`所属专辑`三种Relation标签。Relation标签由Subject对应实体指向Object对应实体。
+
+#### 5.3 事件抽取
+
+事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取事件并识别事件类型和事件论元的技术。UIE所包含的事件抽取任务，是指根据已知事件类型，抽取该事件所包含的事件论元。
+
+标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248793-138a1e37-43c9-4933-bf89-f3ac7228bf9c.png height=200 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248793-138a1e37-43c9-4933-bf89-f3ac7228bf9c.png height=200 hspace='15'/>
 </div>
 
-#### 评价观点抽取
+示例中定义了`地震触发词`（触发词）、`等级`（事件论元）和`时间`（事件论元）三种Span标签，以及`时间`和`震级`两种Relation标签。触发词标签统一格式为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。Relation标签由触发词指向对应的事件论元。
+
+#### 5.4 评价观点抽取
+
+评论观点抽取，是指抽取文本中包含的评价维度、观点词。
+
+标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249035-6c16c68e-d94e-4a37-8489-111ee65924a3.png height=190 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249035-6c16c68e-d94e-4a37-8489-111ee65924a3.png height=190 hspace='15'/>
 </div>
 
+示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签由评价维度指向观点词。
 
-#### 文本分类
+#### 5.5 文本分类
+
+标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='15'/>
 </div>
+
+示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类，除了二分类，UIE还支持多类别、多标签分类。
 
 <a name="数据导出"></a>
 
 ## 6. 数据导出
 
-#### 抽取任务
+#### 6.1 导出抽取任务数据
 
 选择导出的文件类型为``JSONL(relation)``，导出数据示例：
 
@@ -156,7 +189,21 @@
 }
 ```
 
-#### 分类任务
+标注数据保存在同一个文本文件中，每条样例占一行且存储为``json``格式，其包含以下字段
+- ``id``: 样本在数据集中的唯一标识ID。
+- ``text``: 原始文本数据。
+- ``entities``: 数据中包含的Span标签，每个Span标签包含四个字段：
+    - ``id``: Span在数据集中的唯一标识ID。
+    - ``start_offset``: Span的起始token在文本中的下标。
+    - ``end_offset``: Span的结束token在文本中下标的下一个位置。
+    - ``label``: Span类型。
+- ``relations``: 数据中包含的Relation标签，每个Relation标签包含四个字段：
+    - ``id``: (Span1, Relation, Span2)三元组在数据集中的唯一标识ID，不同样本中的相同三元组对应同一个ID。
+    - ``from_id``: Span1对应的标识ID。
+    - ``to_id``: Span2对应的标识ID。
+    - ``type``: Relation类型。
+
+#### 6.2 导出分类任务数据
 
 选择导出的文件类型为``JSONL``，导出数据示例：
 
@@ -170,11 +217,18 @@
 }
 ```
 
+标注数据保存在同一个文本文件中，每条样例占一行且存储为``json``格式，其包含以下字段
+- ``id``: 样本在数据集中的唯一标识ID。
+- ``data``: 原始文本数据。
+- ``label``: 文本对应类别标签。
+
 <a name="数据转换"></a>
 
 ## 7.数据转换
 
-抽取任务：
+该章节详细说明如何通过`doccano.py`脚本对doccano平台导出的标注数据进行转换，一键生成训练/验证/测试集。
+
+#### 7.1 抽取任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSONL(relation)` 形式的文件，并将其重命名为 `doccano_ext.json` 后，放入 `./data` 目录下。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
@@ -187,7 +241,7 @@ python doccano.py \
     --negative_ratio 5
 ```
 
-分类任务：
+#### 7.2 分类任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSON` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
 - 在数据转换阶段，我们会自动构造用于模型训练需要的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。

@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-large"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
 
     args = parser.parse_args()
     # yapf: enable
