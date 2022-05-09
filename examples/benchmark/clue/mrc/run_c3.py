@@ -190,7 +190,8 @@ def run(args):
             text = '\n'.join(examples.data["context"][idx]).lower()
             question = examples.data["question"][idx].lower()
             choice_list = examples.data["choice"][idx]
-            choice_list = [choice.lower() for choice in choice_list]
+            choice_list = [choice.lower()
+                           for choice in choice_list][:max_num_choices]
             if not do_predict:
                 answer = examples.data["answer"][idx].lower()
                 label = choice_list.index(answer)

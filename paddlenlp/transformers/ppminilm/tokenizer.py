@@ -94,7 +94,8 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
