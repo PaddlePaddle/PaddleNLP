@@ -165,16 +165,16 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
     all_end_logits = []
     tic_eval = time.time()
     for batch in data_loader:
-        start_logits_tensor, end_logits_tensor = model(batch["input_ids"],
-                                                       batch["token_type_ids"])
-        for idx in range(start_logits_tensor.shape[0]):
+        start_logits, end_logits = model(batch["input_ids"],
+                                         batch["token_type_ids"])
+        for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 print("Processing example: %d" % len(all_start_logits))
                 print('time per 1000:', time.time() - tic_eval)
                 tic_eval = time.time()
 
-            all_start_logits.append(start_logits_tensor.numpy()[idx])
-            all_end_logits.append(end_logits_tensor.numpy()[idx])
+            all_start_logits.append(start_logits.numpy()[idx])
+            all_end_logits.append(end_logits.numpy()[idx])
 
     all_predictions, _, _ = compute_prediction(
         raw_dataset, dataset, (all_start_logits, all_end_logits), False,
@@ -431,9 +431,6 @@ def run(args):
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
                 loss.backward()
-                evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
-                sys.exit()
-
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     global_step += 1
                     optimizer.step()
