@@ -56,10 +56,9 @@ from .log import logger
 __all__ = ['get_weights_path_from_url']
 
 COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
-
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
-
 DOWNLOAD_RETRY_LIMIT = 3
+DOWNLOAD_CHECK = False
 
 nlp_models = OrderedDict((
     ('RoBERTa-zh-base',
@@ -418,3 +417,14 @@ class DownloaderCheck(threading.Thread):
 
     def run(self):
         self.request_check(self.task, self.command, self.addition)
+
+
+def download_check(model_id, model_class, addition=None):
+    logger.disable()
+    global DOWNLOAD_CHECK
+    if not DOWNLOAD_CHECK:
+        DOWNLOAD_CHECK = True
+        checker = DownloaderCheck(model_id, model_class, addition)
+        checker.start()
+        checker.join()
+    logger.enable()
