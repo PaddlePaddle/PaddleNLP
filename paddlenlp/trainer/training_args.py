@@ -13,31 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/training_args.py
 
 import contextlib
 import json
 import math
 import os
-import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from pathlib import Path
 import types
 from typing import Any, Dict, List, Optional
 
-# from .utils import logging
+import paddle
+
+from ..utils.log import logger
 from .trainer_utils import (
     SchedulerType,
     IntervalStrategy,
     OptimizerNames, )
 
-# logger = logging.get_logger(__name__)
-# log_levels = logging.get_log_levels_dict().copy()
-# trainer_log_levels = dict(**log_levels, passive=-1)
-from paddlenlp.utils.log import logger
-import paddle
+__all__ = [
+    "default_logdir",
+    "TrainingArguments",
+]
 
 
 def default_logdir() -> str:
@@ -82,7 +81,7 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         do_export (`bool`, *optional*, defaults to `False`):
             Whether to export inference model or not. This argument is not directly used by [`Trainer`], it's
-            intended to be used by your training/evaluation scripts instead. 
+            intended to be used by your training/evaluation scripts instead.
         evaluation_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"no"`):
             The evaluation strategy to adopt during training. Possible values are:
 
@@ -132,12 +131,6 @@ class TrainingArguments:
             Ratio of total training steps used for a linear warmup from 0 to `learning_rate`.
         warmup_steps (`int`, *optional*, defaults to 0):
             Number of steps used for a linear warmup from 0 to `learning_rate`. Overrides any effect of `warmup_ratio`.
-        log_level (`str`, *optional*, defaults to `passive`):
-            Logger log level to use on the main process. Possible choices are the log levels as strings: 'debug',
-            'info', 'warning', 'error' and 'critical', plus a 'passive' level which doesn't set anything and lets the
-            application set the level.
-        log_level_replica (`str`, *optional*, defaults to `passive`):
-            Logger log level to use on replicas. Same choices as `log_level`"
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
             node.
@@ -154,17 +147,6 @@ class TrainingArguments:
             Whether to log and evaluate the first `global_step` or not.
         logging_steps (`int`, *optional*, defaults to 500):
             Number of update steps between two logs if `logging_strategy="steps"`.
-        logging_nan_inf_filter (`bool`, *optional*, defaults to `True`):
-            Whether to filter `nan` and `inf` losses for logging. If set to `True` the loss of every step that is `nan`
-            or `inf` is filtered and the average loss of the current logging window is taken instead.
-
-            <Tip>
-
-            `logging_nan_inf_filter` only influences the logging of loss values, it does not change the behavior the
-            gradient is computed or applied to the model.
-
-            </Tip>
-
         save_strategy (`str` or [`~trainer_utils.IntervalStrategy`], *optional*, defaults to `"steps"`):
             The checkpoint save strategy to adopt during training. Possible values are:
 
@@ -190,8 +172,10 @@ class TrainingArguments:
         fp16 (`bool`, *optional*, defaults to `False`):
             Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
-            For `fp16` training, Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. See details on
-            the [Apex documentation](https://nvidia.github.io/apex/amp).
+            For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at 
+            https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
+        scale_loss (`float`,  *optional*, defaults to 32768):
+            The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
         dataloader_drop_last (`bool`, *optional*, defaults to `False`):
@@ -201,16 +185,16 @@ class TrainingArguments:
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
-            Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the
+            Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
         past_index (`int`, *optional*, defaults to -1):
             Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions. 
-            If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as 
+            If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as
             the past state and feed it to the model at the next training step under the keyword argument `mems`.
         run_name (`str`, *optional*):
             A descriptor for the run. Typically used for logging.
         disable_tqdm (`bool`, *optional*):
-            Whether or not to disable the tqdm progress bars and table of metrics. Will default to `True` if the logging 
+            Whether or not to disable the tqdm progress bars and table of metrics. Will default to `True` if the logging
             level is set to warn or lower (default), `False` otherwise.
         remove_unused_columns (`bool`, *optional*, defaults to `True`):
             If using `datasets.Dataset` datasets, whether or not to automatically remove the columns unused by the
@@ -398,13 +382,14 @@ class TrainingArguments:
         default="O1",
         metadata={
             "help":
-            ("For fp16: Apex AMP optimization level selected in ['O0', 'O1', and 'O2']. "
+            ("For fp16: AMP optimization level selected in ['O0', 'O1', and 'O2']. "
              "See details at https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html"
              )
         }, )
 
     scale_loss: float = field(
-        default=2**15, metadata={"help": "The value of scale_loss for fp16."})
+        default=2**15,
+        metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
         default=None,
@@ -428,7 +413,7 @@ class TrainingArguments:
         default=0,
         metadata={
             "help":
-            "Number of subprocesses to use for data loading (PyTorch only). 0 means that the data will be loaded in the main process."
+            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
         }, )
 
     past_index: int = field(
@@ -439,18 +424,10 @@ class TrainingArguments:
         }, )
 
     run_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "An optional descriptor for the run. Notably used for wandb logging."
-        })
+        default=None, metadata={"help": "An optional descriptor for the run."})
 
     device: Optional[str] = field(
-        default="gpu",
-        metadata={
-            "help":
-            "An optional descriptor for the run. Notably used for wandb logging."
-        })
+        default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
 
     disable_tqdm: Optional[bool] = field(
         default=None,
@@ -497,7 +474,7 @@ class TrainingArguments:
         default="adamw",
         metadata={"help": "The optimizer to use."}, )
     report_to: Optional[List[str]] = field(
-        default="visualdl",
+        default=None,
         metadata={
             "help":
             "The list of integrations to report the results and logs to."
@@ -538,11 +515,12 @@ class TrainingArguments:
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
         if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
             self.do_eval = True
+
         if self.do_eval and self.evaluation_strategy == IntervalStrategy.NO:
-            warnings.warn(
-                "evaluation_strategy reset to IntervalStrategy.STEPS for do eval"
+            logger.warning(
+                "evaluation_strategy reset to IntervalStrategy.STEPS for do_eval is True. you can also set evaluation_strategy='epoch'."
             )
-            self.evaluation_strategy == IntervalStrategy.STEPS
+            self.evaluation_strategy = IntervalStrategy.STEPS
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (
@@ -586,6 +564,23 @@ class TrainingArguments:
             self.run_name = self.output_dir
 
         self.optim = OptimizerNames(self.optim)
+
+        if self.report_to is None:
+            logger.info(
+                "The default value for the training argument `--report_to` will change in v5 (from all installed "
+                "integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as "
+                "now. You should start updating your code and make this info disappear :-)."
+            )
+            self.report_to = "all"
+        if self.report_to == "all" or self.report_to == ["all"]:
+            # Import at runtime to avoid a circular import.
+            from .integrations import get_available_reporting_integrations
+
+            self.report_to = get_available_reporting_integrations()
+        elif self.report_to == "none" or self.report_to == ["none"]:
+            self.report_to = []
+        elif not isinstance(self.report_to, list):
+            self.report_to = [self.report_to]
 
         if self.warmup_ratio < 0 or self.warmup_ratio > 1:
             raise ValueError("warmup_ratio must lie in range [0,1]")
@@ -682,23 +677,6 @@ class TrainingArguments:
         Whether or not to use no_sync for the gradients when doing gradient accumulation.
         """
         return True
-
-    def get_process_log_level(self):
-        """
-        Returns the log level to be used depending on whether this process is the main process of node 0, main process
-        of node non-0, or a non-main process.
-
-        For the main process the log level defaults to `logging.INFO` unless overridden by `log_level` argument.
-
-        For the replica processes the log level defaults to `logging.WARNING` unless overridden by `log_level_replica`
-        argument.
-
-        The choice between the main and replica process settings is made according to the return value of `should_log`.
-        """
-
-        log_level_main_node = logging.INFO if self.log_level == -1 else self.log_level
-        log_level_replica_node = logging.WARNING if self.log_level_replica == -1 else self.log_level_replica
-        return log_level_main_node if self.should_log else log_level_replica_node
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
@@ -810,7 +788,7 @@ class TrainingArguments:
                                       paddle.version.commit))
 
         for a in dir(args):
-            if (a[:2] != "__"):  #don't print double underscore methods
+            if a[:2] != "__":  #don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(a, v))
