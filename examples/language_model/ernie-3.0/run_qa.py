@@ -431,6 +431,9 @@ def run(args):
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
                 loss.backward()
+                evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
+                sys.exit()
+
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     global_step += 1
                     optimizer.step()
