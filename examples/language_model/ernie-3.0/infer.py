@@ -24,7 +24,8 @@ import onnxruntime as ort
 import paddle
 from paddle import inference
 from paddle.metric import Accuracy
-from paddlenlp.data import Stack, Tuple, Pad
+from datasets import load_dataset
+from paddlenlp.datasets import load_dataset as ppnlp_load_dataset
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithPadding
@@ -337,11 +338,11 @@ class Predictor(object):
                     input_ids, segment_ids = batch["input_ids"].numpy(), batch[
                         "token_type_ids"].numpy()
                     output = self.predict_batch([input_ids, segment_ids])[0]
-                    output = paddle.to_tensor(output)
-                    preds = output.argmax(axis=2)
-                    all_predictions.append(preds.numpy().tolist())
+                    preds = np.argmax(output, axis=2)
+                    all_predictions.append(preds.tolist())
                     num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-                        batch["seq_len"], preds, batch["labels"])
+                        batch["seq_len"],
+                        paddle.to_tensor(preds), batch["labels"])
                     metric.update(num_infer_chunks.numpy(),
                                   num_label_chunks.numpy(),
                                   num_correct_chunks.numpy())
@@ -369,6 +370,9 @@ class Predictor(object):
                 all_predictions, _, _ = compute_prediction(
                     dev_example, dataset, (all_start_logits, all_end_logits),
                     False, n_best_size, max_answer_length)
+                all_predictions, _, _ = compute_prediction(
+                    dev_example, dataset, (all_start_logits, all_end_logits),
+                    False, n_best_size, max_answer_length)
                 res = squad_evaluate(
                     examples=[raw_data for raw_data in dev_example],
                     preds=all_predictions,
@@ -386,10 +390,10 @@ class Predictor(object):
                         batch["input_ids"].numpy(), batch["token_type_ids"]
                         .numpy()
                     ])[0]
-                    output = paddle.to_tensor(output)
-                    preds = paddle.argmax(output, axis=1)
-                    all_predictions.append(preds.numpy().tolist())
-                    correct = metric.compute(output, batch["labels"])
+                    preds = np.argmax(output, axis=1)
+                    all_predictions.append(preds.tolist())
+                    correct = metric.compute(
+                        paddle.to_tensor(output), batch["labels"])
                     metric.update(correct)
                 res = metric.accumulate()
 
@@ -468,7 +472,6 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     if args.task_name == "msra_ner":
-        from datasets import load_dataset
 
         def ner_trans_fn(example, tokenizer, max_seq_length=128,
                          no_entity_id=0):
@@ -493,7 +496,6 @@ def main():
             tokenizer, label_pad_token_id=ignore_label)
         outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     elif args.task_name == "cmrc2018":
-        from datasets import load_dataset
         dev_example = load_dataset("cmrc2018", split="validation")
         column_names = dev_example.column_names
         dev_ds = dev_example.map(
@@ -512,8 +514,7 @@ def main():
         outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args,
                                     dev_example)
     else:
-        from paddlenlp.datasets import load_dataset
-        dev_ds = load_dataset('clue', args.task_name, splits='dev')
+        dev_ds = ppnlp_load_dataset('clue', args.task_name, splits='dev')
 
         trans_func = partial(
             convert_example,

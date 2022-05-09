@@ -15,7 +15,6 @@
 
 def tokenize_and_align_labels(example, tokenizer, no_entity_id,
                               max_seq_len=512):
-    # import pdb; pdb.set_trace()
     if 'labels' in example:
         labels = example['labels']
         example = example['tokens']
