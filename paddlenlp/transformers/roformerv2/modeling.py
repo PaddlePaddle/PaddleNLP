@@ -454,7 +454,7 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
                 Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_outputs`, `pooled_output`).
+            tuple: Returns `sequence_output` or `encoder_outputs`.
 
             With the fields:
 
