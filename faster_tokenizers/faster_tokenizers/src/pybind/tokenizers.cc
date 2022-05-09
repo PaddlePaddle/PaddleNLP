@@ -1008,10 +1008,10 @@ static PyObject* FromStr(TokenizerObject* self,
         << args_num;
     throw std::runtime_error(oss.str());
   }
-  PyObject* obj = PyObject_CallObject((PyObject*)&p_tokenizer_type, NULL);
-  auto v = reinterpret_cast<TokenizerObject*>(obj);
-  v->tokenizer = tokenizer;
-  return obj;
+  TokenizerObject* obj =
+      (TokenizerObject*)TokenizerNew(p_tokenizer_type, NULL, NULL);
+  obj->tokenizer = tokenizer;
+  return (PyObject*)obj;
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
 }
 
@@ -1035,8 +1035,8 @@ static PyObject* FromFile(TokenizerObject* self,
         << args_num;
     throw std::runtime_error(oss.str());
   }
-  TokenizerObject* obj = PyObject_New(TokenizerObject, p_tokenizer_type);
-  PyObject_Init((PyObject*)obj, p_tokenizer_type);
+  TokenizerObject* obj =
+      (TokenizerObject*)TokenizerNew(p_tokenizer_type, NULL, NULL);
   obj->tokenizer = tokenizer;
   return (PyObject*)obj;
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
