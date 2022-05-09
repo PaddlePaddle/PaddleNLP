@@ -13,27 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
 """
 Utilities for the Trainer class. 
 """
 import datetime
 import json
-import math
-import copy
-import functools
-import gc
-import inspect
 import os
 import random
 import re
-import threading
 import time
 from enum import Enum
-from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
+from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+
+__all__ = [
+    "TrainOutput",
+    "PredictionOutput",
+    "EvalPrediction",
+    "IntervalStrategy",
+    "SchedulerType",
+    "set_seed",
+    "speed_metrics",
+    "get_last_checkpoint",
+]
+
+
+def set_seed(seed: int):
+    import paddle
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
 
 
 class ExplicitEnum(Enum):
@@ -120,49 +132,6 @@ class OptimizerNames(ExplicitEnum):
     ADAFACTOR = "adafactor"
 
 
-class BestRun(NamedTuple):
-    """
-    The best run found by an hyperparameter search (see [`~Trainer.hyperparameter_search`]).
-
-    Parameters:
-        run_id (`str`):
-            The id of the best run (if models were saved, the corresponding checkpoint will be in the folder ending
-            with run-{run_id}).
-        objective (`float`):
-            The objective that was obtained for this run.
-        hyperparameters (`Dict[str, Any]`):
-            The hyperparameters picked to get this run.
-    """
-
-    run_id: str
-    objective: float
-    hyperparameters: Dict[str, Any]
-
-
-def default_compute_objective(metrics: Dict[str, float]) -> float:
-    """
-    The default objective to maximize/minimize when doing an hyperparameter search. It is the evaluation loss if no
-    metrics are provided to the [`Trainer`], the sum of all metrics otherwise.
-
-    Args:
-        metrics (`Dict[str, float]`): The metrics returned by the evaluate method.
-
-    Return:
-        `float`: The objective to minimize or maximize
-    """
-    metrics = copy.deepcopy(metrics)
-    loss = metrics.pop("eval_loss", None)
-    _ = metrics.pop("epoch", None)
-    # Remove speed metrics
-    speed_metrics = [
-        m for m in metrics.keys()
-        if m.endswith("_runtime") or m.endswith("_per_second")
-    ]
-    for sm in speed_metrics:
-        _ = metrics.pop(sm, None)
-    return loss if len(metrics) == 0 else sum(metrics.values())
-
-
 def is_main_process(local_rank):
     """
     Whether or not the current process is the local process, based on `xm.get_ordinal()` (for TPUs) first, then on
@@ -243,7 +212,7 @@ def metrics_format(self, metrics: Dict[str, float]) -> Dict[str, float]:
             metrics_copy[k] = _secs2timedelta(v)
         elif k == "total_flos":
             metrics_copy[k] = f"{ int(v) >> 30 }GF"
-        elif type(metrics_copy[k]) == float:
+        elif isinstance(metrics_copy[k], float):
             metrics_copy[k] = round(v, 4)
 
     return metrics_copy
