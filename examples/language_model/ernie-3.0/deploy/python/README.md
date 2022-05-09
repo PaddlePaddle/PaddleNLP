@@ -2,15 +2,16 @@
 
 ## 环境依赖
 - python >= 3.6
-- onnxruntime-gpu >= 1.10.0
+- onnxruntime-gpu >= 1.11.0
 - paddleinference-trt
-- onnx >= 1.10.0
-- paddle2onnx develop版本
+- onnx >= 1.9.0
+- paddle2onnx
 
 ## 部署说明
 ### 参数选项
 | 参数 |参数说明 |
 |----------|--------------|
+|--task_name | 配置任务名称，默认tnews|
 |--model_path | 配置包含Paddle模型的目录路径|
 |--device | 配置部署设备，可选‘cpu’或者‘gpu’|
 |--batch_size |测试的batch size大小|
@@ -22,17 +23,20 @@
 ### 运行指令
 1. CPU非量化模型
 ```
-python infer.py --model_path tnews/pruned_fp32/float32 --device ‘cpu’
+python infer.py --model_path tnews/pruned_fp32/float32 --device cpu
 ```
 2. CPU量化模型
 ```
-python infer.py --model_path tnews/pruned_fp32/float32 --device ‘cpu’ --int8
+python infer.py --model_path tnews/pruned_fp32/float32 --device cpu --int8
 ```
 3. GPU非量化模型
 ```
-python infer.py --model_path tnews/pruned_fp32/float32 --device ‘gpu’
+python infer.py --model_path tnews/pruned_fp32/float32 --device gpu
 ```
 4. GPU量化模型
 ```
-python infer.py --model_path tnews/pruned_quant/int8 --device ‘gpu’ --int8
+# 第一步，设置dynamic shape
+python infer.py --model_path tnews/pruned_quant/int8 --device gpu --int8 --collect_shape
+# 第二步，启动inference
+python infer.py --model_path tnews/pruned_quant/int8 --device gpu --int8
 ```

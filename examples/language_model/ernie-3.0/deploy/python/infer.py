@@ -1,4 +1,4 @@
-# C#opyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+#Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,6 +98,14 @@ def parse_args():
         default=10,
         type=int,
         help="num_threads for cpu.", )
+    parser.add_argument(
+        "--use_inference",
+        action='store_true',
+        help="Whether use paddleinference to inference.", )
+    parser.add_argument(
+        "--use_trt",
+        action='store_true',
+        help="Whether to use inference engin TensorRT.", )
     args = parser.parse_args()
     return args
 
@@ -175,7 +183,9 @@ class Predictor(object):
             device=args.device,
             use_int8=args.int8,
             collect_shape=args.collect_shape,
-            num_threads=args.num_threads)
+            num_threads=args.num_threads,
+            use_inference=args.use_inference,
+            use_trt=args.use_trt)
         if args.collect_shape:
             min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
             min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32

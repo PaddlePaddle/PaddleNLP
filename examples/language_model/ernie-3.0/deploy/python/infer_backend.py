@@ -1,4 +1,4 @@
-# C#opyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from pathlib import Path
+import six
 
 
 def generate_identified_filename(filename: Path, identifier: str) -> Path:
@@ -38,21 +39,25 @@ def dynamic_quantize(input_float_model: str, dynamic_quantized_model: str):
 
 
 class InferBackend(object):
-    def __init__(self,
-                 model_path,
-                 batch_size=32,
-                 device='cpu',
-                 use_int8=False,
-                 collect_shape=False,
-                 num_threads=10):
+    def __init__(
+            self,
+            model_path,
+            batch_size=32,
+            device='cpu',
+            use_int8=False,
+            collect_shape=False,
+            num_threads=10,
+            use_inference=False,  # Users can specify to use paddleinference for inference
+            use_trt=False):
         self.device = device
         self.use_int8 = use_int8
-        import six
+        self.use_inference = use_inference
         if not isinstance(device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
                 type(device))
             exit(0)
+        device = device.lower()
         if device not in ['cpu', 'gpu']:
             print(
                 ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
@@ -60,6 +65,60 @@ class InferBackend(object):
             exit(0)
 
         print(">>> [InferBackend] creat engine ...")
+        if use_inference:
+            print("[InferBackend] use PaddleInference to infer ...")
+            from paddle import inference
+            import paddle
+            config = paddle.inference.Config(model_path + ".pdmodel",
+                                             model_path + ".pdiparams")
+            if device == "gpu":
+                # set GPU configs accordingly
+                config.enable_use_gpu(100, 0)
+                paddle.set_device("gpu")
+            elif device == "cpu":
+                config.disable_gpu()
+                config.switch_ir_optim(True)
+                config.enable_mkldnn()
+                config.set_cpu_math_library_num_threads(num_threads)
+                paddle.set_device("cpu")
+
+            if use_trt:
+                assert device == "gpu", "when use_trt, the device must be gpu."
+                if use_int8:
+                    config.enable_tensorrt_engine(
+                        workspace_size=1 << 30,
+                        precision_mode=inference.PrecisionType.Int8,
+                        max_batch_size=batch_size,
+                        min_subgraph_size=5,
+                        use_static=False,
+                        use_calib_mode=False)
+                else:
+                    config.enable_tensorrt_engine(
+                        workspace_size=1 << 30,
+                        precision_mode=inference.PrecisionType.Float32,
+                        max_batch_size=batch_size,
+                        min_subgraph_size=5,
+                        use_static=False,
+                        use_calib_mode=False)
+                shape_file = "shape_info.txt"
+                if collect_shape:
+                    config.collect_shape_range_info(shape_file)
+                else:
+                    config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+
+            config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
+            self.predictor = paddle.inference.create_predictor(config)
+            self.input_handles = [
+                self.predictor.get_input_handle(name)
+                for name in self.predictor.get_input_names()
+            ]
+            self.output_handles = [
+                self.predictor.get_output_handle(name)
+                for name in self.predictor.get_output_names()
+            ]
+            print(">>> [InferBackend] PaddleInference engine created ...")
+            return
+
         if device == 'gpu' and use_int8:
             from paddle import inference
             import paddle
@@ -126,7 +185,7 @@ class InferBackend(object):
         print(">>> [InferBackend] engine created ...")
 
     def infer(self, data):
-        if self.device == 'gpu' and self.use_int8:
+        if self.use_inference or self.device == 'gpu' and self.use_int8:
             for input_field, input_handle in zip(data, self.input_handles):
                 input_handle.copy_from_cpu(input_field)
             self.predictor.run()
