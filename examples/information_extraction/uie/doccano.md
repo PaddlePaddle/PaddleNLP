@@ -10,9 +10,13 @@
 * [6. 数据导出](#数据导出)
 * [7. 数据转换](#数据转换)
 
+<a name="安装"></a>
+
 ## 1. 安装
 
 参考[doccano官方文档](https://github.com/doccano/doccano) 完成doccano的安装与初始配置。
+
+<a name="项目创建"></a>
 
 ## 2. 项目创建
 
@@ -32,6 +36,8 @@
     <img src=https://user-images.githubusercontent.com/40840292/167249258-48fb4f0c-f68c-4c9a-ab84-5c555ddcf427.png height=180 hspace='10'/>
 </div>
 
+<a name="数据上传"></a>
+
 ## 3. 数据上传
 
 上传的文件为txt格式，每一行为一条待标注文本，示例：
@@ -46,6 +52,8 @@
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='10'/>
 </div>
+
+<a name="标签构建"></a>
 
 ## 4. 标签构建
 
@@ -71,6 +79,7 @@
     <img src=https://user-images.githubusercontent.com/40840292/167249484-2b5f6338-8a91-48f3-8d56-edc2b26b41d7.png height=160 hspace='10'/>
 </div>
 
+<a name="任务标注"></a>
 
 ## 5. 任务标注
 
@@ -105,6 +114,7 @@
     <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='10'/>
 </div>
 
+<a name="数据导出"></a>
 
 ## 6. 数据导出
 
@@ -160,6 +170,8 @@
 }
 ```
 
+<a name="数据转换"></a>
+
 ## 7.数据转换
 
 抽取任务：
@@ -171,36 +183,37 @@
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --task_type "ext" \
-    --save_dir ./data/ext_data \
+    --save_dir ./data \
     --negative_ratio 5
 ```
 
 分类任务：
 
 - 当标注完成后，在 doccano 平台上导出 `JSON` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
+- 在数据转换阶段，我们会自动构造用于模型训练需要的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
 
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_cls.json \
     --task_type "cls" \
-    --save_dir ./data/cls_data \
-    --splits 0.6 0.2 0.2 \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
     --prompt_prefix "情感倾向" \
     --options "正向" "负向"
 ```
 
 可配置参数说明：
 
-- ``doccano_file``: 原始数据文件名。
-- ``save_dir``: 训练数据的保存目录，默认存储在``data/ext_data``目录下。
-- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取式任务生效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``doccano_file``: 从doccano导出的数据标注文件。
+- ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
+- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取类型任务有效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-- ``task_type``
-- ``options``
-- ``prompt_prefix``
-- ``is_shuffle``
-- ``seed``
+- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
+- ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。
+- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
+- ``seed``: 随机种子，默认为1000.
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集

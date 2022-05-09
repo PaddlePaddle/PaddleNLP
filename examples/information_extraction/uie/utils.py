@@ -358,13 +358,13 @@ def convert_ext_examples(raw_examples, negative_ratio):
     entity_examples = add_negative_example(entity_examples, texts,
                                            entity_prompts, entity_label_set,
                                            negative_ratio)
+    if len(predicate_set) != 0:
+        print(f"Constructing relation prompts...")
+        relation_prompt_set = construct_relation_prompt_set(entity_name_set,
+                                                            predicate_set)
 
-    print(f"Constructing relation prompts...")
-    relation_prompt_set = construct_relation_prompt_set(entity_name_set,
-                                                        predicate_set)
-
-    print(f"Adding negative samples for second stage prompt...")
-    relation_examples = add_negative_example(
-        relation_examples, texts, relation_prompts, relation_prompt_set,
-        negative_ratio)
+        print(f"Adding negative samples for second stage prompt...")
+        relation_examples = add_negative_example(
+            relation_examples, texts, relation_prompts, relation_prompt_set,
+            negative_ratio)
     return entity_examples, relation_examples

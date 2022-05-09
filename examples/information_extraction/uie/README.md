@@ -71,20 +71,7 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 ## 4. 轻定制功能
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取。对于复杂目标我们推荐使用轻定制功能（标注少量数据进行模型训练）以进一步提升效果。
-
-#### 实验结果
-
-我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
-
-<table>
-<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
-<tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
-<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
-</table>
-
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用轻定制功能（标注少量数据进行模型训练）以进一步提升效果。下面通过`报销工单信息抽取`的例子展示如何进行模型微调。
 
 #### 代码结构
 
@@ -93,84 +80,66 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 ├── utils.py          # 数据处理工具
 ├── model.py          # 模型组网脚本
 ├── doccano.py        # 数据标注脚本
-├── train.py          # 模型训练脚本
+├── doccano.md        # 数据标注文档
+├── finetune.py       # 模型微调脚本
 ├── evaluate.py       # 模型评估脚本
 └── README.md
 ```
 
 #### 数据标注
 
-我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本示例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。为达到这个目的，您需要按以下标注规则在doccano平台上标注数据：
+我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本示例也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。
 
-抽取任务标注规则：
+原始数据示例：
+
+```text
+深大到双龙28块钱4月24号交通费
+```
+
+抽取的目标(schema)为：
+
+```python
+schema = ['出发地', '目的地', '费用', '时间']
+```
+
+详细步骤如下：
+
+- 在doccano平台上，创建一个类型为``序列标注``的标注项目。
+- 定义实体标签类别，上例中需要定义的实体标签有``出发地``、``目的地``、``费用``和``时间``。
+- 使用以上定义的标签开始标注数据，下面展示了一个doccano标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166907872-26240036-4055-4663-b48d-07fa370eed34.png />
-    <p>图4 抽取任务标注样例图<p/>
+    <img src=https://user-images.githubusercontent.com/40840292/167336891-afef1ad5-8777-456d-805b-9c65d9014b80.png height=100 hspace='10'/>
+    <p>图4 标注示例图<p/>
 </div>
 
-- 在doccano平台上，创建一个类型为``Sequence Labeling``的标注项目。
-- 定义实体标签类别和关系标签类别，上例中需要定义的实体标签有`作品名`、`机构名`和`人物名`，关系标签有`出版社名称`和`作者`。
-- 使用以上定义的标签开始标注数据，图3展示了一个抽取式任务的标注样例。
-- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano_ext.json` 后，放入 `./data` 目录下。
-- 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
+- 标注完成后，在doccano平台上导出``JSONL``形式的文件，并将其重命名为``doccano_ext.json``后，放入``./data``目录下
+
+- 这里我们提供标注好的文件[doccano_ext.json](https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json)，可直接下载并放入`./data`目录。通过``doccano.py``脚本进行数据形式转换，执行以下脚本后将会在`./data`目录下生成训练/验证/测试集文件。
 
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --task_type "ext" \
-    --save_dir ./data/ext_data \
-    --negative_ratio 5
+    --save_dir ./data \
+    --splits 0.1 0.9 0
 ```
 
-分类任务标注规则：
-
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166918397-eb7cf540-4636-48e6-8ca6-dcdd10a11d0a.png />
-    <p>图5 分类任务标注样例图<p/>
-</div>
-
-- 在doccano平台上，创建一个类型为``Text Classification``的标注项目。
-- 定义标签类别，上例中需要定义的类别标签有`正向`和`负向`。
-- 使用以上定义的标签开始标注数据，图4展示了一个分类式任务的标注样例。
-- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
-- 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
-
-```shell
-python doccano.py \
-    --doccano_file ./data/doccano_cls.json \
-    --task_type "cls" \
-    --save_dir ./data/cls_data \
-    --splits 0.6 0.2 0.2 \
-    --prompt_prefix "情感倾向" \
-    --options "正向" "负向"
-```
-
-可配置参数说明：
-
-- ``doccano_file``: 原始数据文件名。
-- ``save_dir``: 训练数据的保存目录，默认存储在``data/ext_data``目录下。
-- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取式任务生效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-
-备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
-- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
-- 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
+更多不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及使用方法，请参考[doccano数据标注指南](doccano.md)。
 
 #### 模型训练
 
 通过运行以下命令进行自定义UIE模型训练：
 
 ```shell
-python train.py \
-    --train_path "./data/ext_data/train.txt" \
-    --dev_path "./data/ext_data/dev.txt" \
+python finetune.py \
+    --train_path "./data/train.txt" \
+    --dev_path "./data/dev.txt" \
     --save_dir "./checkpoint" \
     --learning_rate 1e-5 \
     --batch_size 16 \
     --max_seq_len 512 \
-    --num_epochs 50 \
+    --num_epochs 100 \
     --model "uie-base" \
     --seed 1000 \
     --logging_steps 10 \
@@ -185,23 +154,37 @@ python train.py \
 ```shell
 python evaluate.py \
     --model_path "./checkpoint/model_best/model_state.pdparams" \
-    --test_path "./data/ext_data/test.txt" \
+    --test_path "./data/dev.txt" \
     --batch_size 16 \
     --max_seq_len 512
 ```
 
 #### Taskflow装载定制模型
 
-通过`schema`自定义抽取目标，`task_path`指定使用标注数据训练的UIE模型。
+通过`task_path`指定使用定制UIE模型。
 
 ```python
-from paddlenlp import Taskflow
+>>> from paddlenlp import Taskflow
 
-schema = [{"作品名": ["作者", "出版社名称"]}]
-
-# 为任务实例设定抽取目标和定制化模型权重路径
-my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
+>>> schema = ['出发地', '目的地', '费用', '时间']
+# 设定抽取目标和定制化模型权重路径
+>>> my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
+>>> my_ie("城市内交通费7月5日金额114广州至佛山")
+[{'出发地': [{'text': '广州', 'start': 15, 'end': 17, 'probability': 0.9975287467835301}], '目的地': [{'text': '佛山', 'start': 18, 'end': 20, 'probability': 0.9998511131226735}], '费用': [{'text': '114', 'start': 12, 'end': 15, 'probability': 0.9994474579292856}], '时间': [{'text': '7月5日', 'start': 6, 'end': 10, 'probability': 0.9999476678061399}]}]
 ```
+
+#### Few-Shot实验
+
+我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+
+<table>
+<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
+<tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
+<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
+<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
+</table>
+
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
 
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
