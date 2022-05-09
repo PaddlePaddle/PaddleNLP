@@ -173,7 +173,12 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::BertNormalizer::operator());
+      .def("__call__", &normalizers::BertNormalizer::operator())
+      .def("__getstate__", [](const normalizers::BertNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
+
   py::class_<normalizers::ReplaceNormalizer, PyReplaceNormalizer>(
       submodule, "ReplaceNormalizer")
       .def(py::init<const normalizers::ReplaceNormalizer&>(),
