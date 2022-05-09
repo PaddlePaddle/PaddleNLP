@@ -20,19 +20,19 @@
 
 ## 2. 项目创建
 
-UIE支持抽取与分类两种类型的任务，根据实际需要创建一个新的项目。
+UIE支持抽取与分类两种类型的任务，根据实际需要创建一个新的项目：
 
-#### 2.1 抽取任务
+#### 2.1 抽取式任务项目创建
 
-创建项目时选择``序列标注``任务，并勾选``Use Relation Labeling``。
+创建项目时选择``序列标注``任务，并勾选``Use Relation Labeling``。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
 </div>
 
-#### 2.2 分类任务
+#### 2.2 分类式任务项目创建
 
-创建项目时选择``文本分类``任务
+创建项目时选择``文本分类``任务。适配**文本分类、句子级情感倾向分类**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249258-48fb4f0c-f68c-4c9a-ab84-5c555ddcf427.png height=230 hspace='15'/>
@@ -49,35 +49,37 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
 第十四届全运会在西安举办
 ```
 
-上传数据类型选择``TextLine``
+**上传数据类型选择``TextLine``**
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='15'/>
 </div>
 
+**NOTE**：doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，UIE中**统一使用``TextLine``这一文件格式**，即上传的文件需要为txt格式，且在数据标注时，该文件的每一行文本显示为一页内容。
+
 <a name="标签构建"></a>
 
 ## 4. 标签构建
 
-#### 4.1 构建抽取任务标签
+#### 4.1 构建抽取式任务标签
 
-抽取任务包含Span与Relation两种标签类型，Span指原文本中的目标信息片段，如实体识别中某个类型的实体，事件抽取中的触发词和论元；Relation指原文本中Span之间的关系，如关系抽取中两个实体（Subject&Object）之间的关系，事件抽取中论元和触发词之间的关系。
+抽取式任务包含**Span**与**Relation**两种标签类型，**Span指原文本中的目标信息片段**，如实体识别中某个类型的实体，事件抽取中的触发词和论元；**Relation指原文本中Span之间的关系**，如关系抽取中两个实体（Subject&Object）之间的关系，事件抽取中论元和触发词之间的关系。
 
-添加Span类型标签:
+Span类型标签构建示例:
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167248034-afa3f637-65c5-4038-ada0-344ffbd776a2.png height=300 hspace='15'/>
 </div>
 
-添加Relation类型标签：
+Relation类型标签构建示例：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167248307-916c77f6-bf80-4d6b-aa71-30c719f68257.png height=260 hspace='16'/>
 </div>
 
-#### 4.2 构建分类任务标签
+#### 4.2 构建分类式任务标签
 
-支持多类别、多标签等多种类型的文本分类任务。
+分类式任务支持句子级情感倾向分类，以及多类别分类、多标签分类等多种类型的文本分类任务。
 
 添加分类类别标签：
 
@@ -91,7 +93,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
 
 #### 5.1 命名实体识别
 
-命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
+命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，**抽取的类别没有限制，用户可以自己定义**。
 
 标注示例：
 
@@ -111,7 +113,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
     <img src=https://user-images.githubusercontent.com/40840292/167248502-16a87902-3878-4432-b5b8-9808bd8d4de5.png height=200 hspace='15'/>
 </div>
 
-示例中定义了`作品名`、`人物名`和`时间`三种Span类型标签，以及`歌手`、`发行时间`和`所属专辑`三种Relation标签。Relation标签由Subject对应实体指向Object对应实体。
+示例中定义了`作品名`、`人物名`和`时间`三种Span类型标签，以及`歌手`、`发行时间`和`所属专辑`三种Relation标签。Relation标签**由Subject对应实体指向Object对应实体**。
 
 #### 5.3 事件抽取
 
@@ -123,7 +125,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
     <img src=https://user-images.githubusercontent.com/40840292/167248793-138a1e37-43c9-4933-bf89-f3ac7228bf9c.png height=200 hspace='15'/>
 </div>
 
-示例中定义了`地震触发词`（触发词）、`等级`（事件论元）和`时间`（事件论元）三种Span标签，以及`时间`和`震级`两种Relation标签。触发词标签统一格式为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。Relation标签由触发词指向对应的事件论元。
+示例中定义了`地震触发词`（触发词）、`等级`（事件论元）和`时间`（事件论元）三种Span标签，以及`时间`和`震级`两种Relation标签。触发词标签**统一格式为`XX触发词`**，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。Relation标签**由触发词指向对应的事件论元**。
 
 #### 5.4 评价观点抽取
 
@@ -135,7 +137,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
     <img src=https://user-images.githubusercontent.com/40840292/167249035-6c16c68e-d94e-4a37-8489-111ee65924a3.png height=190 hspace='15'/>
 </div>
 
-示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签由评价维度指向观点词。
+示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签**由评价维度指向观点词**。
 
 #### 5.5 文本分类
 
