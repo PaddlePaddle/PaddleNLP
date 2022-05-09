@@ -82,7 +82,7 @@ class RotaryPositionEmbedding(Layer):
 
     def forward(self, x, offset=0):
         # x shape [batch_size, num_heads, seqlen, head_dim]
-        seqlen = paddle.shape(x)[2]
+        seqlen = paddle.shape(x)[-2]
         sin, cos = (
             self.sin[offset:offset + seqlen, :],
             self.cos[offset:offset + seqlen, :], )
@@ -721,7 +721,7 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
     
     Args:
-        roformer (:class:`RoFormerv2Model`):
+        roformerv2 (:class:`RoFormerv2Model`):
             An instance of RoFormerv2Model.
         num_choices (int, optional):
             The number of choices. Defaults to `2`.
