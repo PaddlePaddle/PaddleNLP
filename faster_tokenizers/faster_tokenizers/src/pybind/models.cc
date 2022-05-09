@@ -121,8 +121,18 @@ void BindModels(pybind11::module* m) {
                   py::arg("unk_token") = "[UNK]",
                   py::arg("max_input_chars_per_word") = 100,
                   py::arg("continuing_subword_prefix") = "##")
-      .def("save", &models::WordPiece::Save);
+      .def("save",
+           [](const models::WordPiece& wordpiece,
+              const std::string& folder,
+              const py::object& py_obj) {
+             std::string prefix = "";
+             if (!py_obj.is(py::none())) {
+               prefix = py_obj.cast<std::string>();
+             }
+             return wordpiece.Save(folder, prefix);
+           },
+           py::arg("folder"),
+           py::arg("prefix") = py::none());
 }
-
 }  // pybind
 }  // tokenizers
