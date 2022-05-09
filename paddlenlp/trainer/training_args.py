@@ -20,7 +20,6 @@ import contextlib
 import json
 import math
 import os
-import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 import types
@@ -516,11 +515,12 @@ class TrainingArguments:
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
         if self.do_eval is False and self.evaluation_strategy != IntervalStrategy.NO:
             self.do_eval = True
+
         if self.do_eval and self.evaluation_strategy == IntervalStrategy.NO:
-            warnings.warn(
-                "evaluation_strategy reset to IntervalStrategy.STEPS for do eval"
+            logger.warning(
+                "evaluation_strategy reset to IntervalStrategy.STEPS for do_eval is True. you can also set evaluation_strategy='epoch'."
             )
-            self.evaluation_strategy == IntervalStrategy.STEPS
+            self.evaluation_strategy = IntervalStrategy.STEPS
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (
