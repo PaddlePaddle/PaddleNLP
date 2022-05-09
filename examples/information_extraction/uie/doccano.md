@@ -55,7 +55,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
     <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='15'/>
 </div>
 
-**NOTE**：doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，UIE中**统一使用TextLine**这一文件格式，即上传的文件需要为txt格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
+**NOTE**：doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，UIE定制训练中**统一使用TextLine**这一文件格式，即上传的文件需要为txt格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
 
 <a name="标签构建"></a>
 
@@ -98,7 +98,7 @@ Relation类型标签构建示例：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248557-f1da3694-1063-465a-be9a-1bb811949530.png height=200 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248557-f1da3694-1063-465a-be9a-1bb811949530.png height=200 hspace='20'/>
 </div>
 
 示例中定义了`时间`、`选手`、`赛事名称`和`得分`四种Span类型标签。
@@ -110,7 +110,7 @@ Relation类型标签构建示例：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248502-16a87902-3878-4432-b5b8-9808bd8d4de5.png height=200 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248502-16a87902-3878-4432-b5b8-9808bd8d4de5.png height=200 hspace='20'/>
 </div>
 
 示例中定义了`作品名`、`人物名`和`时间`三种Span类型标签，以及`歌手`、`发行时间`和`所属专辑`三种Relation标签。Relation标签**由Subject对应实体指向Object对应实体**。
@@ -122,7 +122,7 @@ Relation类型标签构建示例：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167248793-138a1e37-43c9-4933-bf89-f3ac7228bf9c.png height=200 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167248793-138a1e37-43c9-4933-bf89-f3ac7228bf9c.png height=200 hspace='20'/>
 </div>
 
 示例中定义了`地震触发词`（触发词）、`等级`（事件论元）和`时间`（事件论元）三种Span标签，以及`时间`和`震级`两种Relation标签。触发词标签**统一格式为`XX触发词`**，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。Relation标签**由触发词指向对应的事件论元**。
@@ -134,7 +134,7 @@ Relation类型标签构建示例：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249035-6c16c68e-d94e-4a37-8489-111ee65924a3.png height=190 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249035-6c16c68e-d94e-4a37-8489-111ee65924a3.png height=190 hspace='20'/>
 </div>
 
 示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签**由评价维度指向观点词**。
@@ -144,7 +144,7 @@ Relation类型标签构建示例：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='20'/>
 </div>
 
 示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类，除了二分类，UIE还支持多类别、多标签分类。
@@ -153,7 +153,7 @@ Relation类型标签构建示例：
 
 ## 6. 数据导出
 
-#### 6.1 导出抽取任务数据
+#### 6.1 导出抽取式任务数据
 
 选择导出的文件类型为``JSONL(relation)``，导出数据示例：
 
@@ -205,7 +205,7 @@ Relation类型标签构建示例：
     - ``to_id``: Span2对应的标识ID。
     - ``type``: Relation类型。
 
-#### 6.2 导出分类任务数据
+#### 6.2 导出分类式任务数据
 
 选择导出的文件类型为``JSONL``，导出数据示例：
 
@@ -230,7 +230,7 @@ Relation类型标签构建示例：
 
 该章节详细说明如何通过`doccano.py`脚本对doccano平台导出的标注数据进行转换，一键生成训练/验证/测试集。
 
-#### 7.1 抽取任务数据转换
+#### 7.1 抽取式任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSONL(relation)` 形式的文件，并将其重命名为 `doccano_ext.json` 后，放入 `./data` 目录下。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
@@ -243,7 +243,7 @@ python doccano.py \
     --negative_ratio 5
 ```
 
-#### 7.2 分类任务数据转换
+#### 7.2 分类式任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSON` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
 - 在数据转换阶段，我们会自动构造用于模型训练需要的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
