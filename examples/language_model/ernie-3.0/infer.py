@@ -155,22 +155,10 @@ def convert_example(example,
             example['sentence1'],
             text_pair=example['sentence2'],
             max_seq_len=max_seq_length)
+
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
-
-
-@paddle.no_grad()
-def evaluate(outputs, metric, data_loader):
-    metric.reset()
-    for i, batch in enumerate(data_loader):
-        input_ids, segment_ids, labels = batch
-        logits = paddle.to_tensor(outputs[i][0])
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-    res = metric.accumulate()
-    print("acc: %s, " % res, end='')
+        example["labels"] = label
+    return example
 
 
 class Predictor(object):
@@ -305,15 +293,7 @@ class Predictor(object):
                 args,
                 dev_example=None,
                 dev_ds_ori=None):
-
-        if args.task_name == "msra_ner":
-            sample_num = len(dataset)
-            batches = []
-            for i in range(0, sample_num, args.batch_size):
-                batch_size = min(args.batch_size, sample_num - i)
-                batch = [dataset[i + j] for j in range(batch_size)]
-                batches.append(batch)
-        elif args.task_name == "cmrc2018":
+        if args.task_name == "cmrc2018":
             dataset_removed = dataset.remove_columns(
                 ["offset_mapping", "attention_mask", "example_id"])
             sample_num = len(dataset)
@@ -323,31 +303,26 @@ class Predictor(object):
                 batch = [dataset_removed[i + j] for j in range(batch_size)]
                 batches.append(batch)
         else:
-            batches = [
-                dataset[idx:idx + args.batch_size]
-                for idx in range(0, len(dataset), args.batch_size)
-            ]
+            sample_num = len(dataset)
+            batches = []
+            for i in range(0, sample_num, args.batch_size):
+                batch_size = min(args.batch_size, sample_num - i)
+                batch = [dataset[i + j] for j in range(batch_size)]
+                batches.append(batch)
         if args.perf:
             for i, batch in enumerate(batches):
-                if args.task_name in ("msra_ner", "cmrc2018"):
-                    batch = batchify_fn(batch)
-                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                        "token_type_ids"].numpy()
-                else:
-                    input_ids, segment_ids, label = batchify_fn(batch)
+                batch = batchify_fn(batch)
+                input_ids, segment_ids = batch["input_ids"].numpy(), batch[
+                    "token_type_ids"].numpy()
                 output = self.predict_batch([input_ids, segment_ids])
                 if i > args.perf_warmup_steps:
                     break
             time1 = time.time()
             for batch in batches:
-                if args.task_name in ("msra_ner", "cmrc2018"):
-                    batch = batchify_fn(batch)
-                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                        "token_type_ids"].numpy()
-                else:
-                    input_ids, segment_ids, _ = batchify_fn(batch)
+                batch = batchify_fn(batch)
+                input_ids, segment_ids = batch["input_ids"].numpy(), batch[
+                    "token_type_ids"].numpy()
                 output = self.predict_batch([input_ids, segment_ids])
-
             print("task name: %s, time: %s, " %
                   (args.task_name, time.time() - time1))
 
@@ -355,6 +330,7 @@ class Predictor(object):
             if args.task_name == "msra_ner":
                 metric = ChunkEvaluator(label_list=args.label_list)
                 metric.reset()
+                all_predictions = []
                 batch_num = len(dataset['input_ids'])
                 for batch in batches:
                     batch = batchify_fn(batch)
@@ -363,6 +339,7 @@ class Predictor(object):
                     output = self.predict_batch([input_ids, segment_ids])[0]
                     output = paddle.to_tensor(output)
                     preds = output.argmax(axis=2)
+                    all_predictions.append(preds.numpy().tolist())
                     num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
                         batch["seq_len"], preds, batch["labels"])
                     metric.update(num_infer_chunks.numpy(),
@@ -398,19 +375,26 @@ class Predictor(object):
                     is_whitespace_splited=False)
                 print("task name: %s, EM: %s, F1: %s" %
                       (args.task_name, res['exact'], res['f1']))
+                return all_predictions
             else:
+                all_predictions = []
                 metric = METRIC_CLASSES[args.task_name]()
                 metric.reset()
                 for i, batch in enumerate(batches):
-                    input_ids, segment_ids, label = batchify_fn(batch)
-                    output = self.predict_batch([input_ids, segment_ids])[0]
+                    batch = batchify_fn(batch)
+                    output = self.predict_batch([
+                        batch["input_ids"].numpy(), batch["token_type_ids"]
+                        .numpy()
+                    ])[0]
                     output = paddle.to_tensor(output)
-
-                    correct = metric.compute(output, paddle.to_tensor(label))
+                    preds = paddle.argmax(output, axis=1)
+                    all_predictions.append(preds.numpy().tolist())
+                    correct = metric.compute(output, batch["labels"])
                     metric.update(correct)
-
                 res = metric.accumulate()
+
                 print("task name: %s, acc: %s, " % (args.task_name, res))
+                return all_predictions
 
 
 def tokenize_and_align_labels(example, tokenizer, no_entity_id,
@@ -537,11 +521,8 @@ def main():
             tokenizer=tokenizer,
             is_test=False)
         dev_ds = dev_ds.map(trans_func, lazy=False)
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-            Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-        ): fn(samples)
+        batchify_fn = DataCollatorWithPadding(tokenizer)
+
         outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
