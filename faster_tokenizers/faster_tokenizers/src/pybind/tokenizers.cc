@@ -541,7 +541,7 @@ static PyObject* EnableTruncation(TokenizerObject* self,
   std::string strategy = "longest_first";
   std::string direction = "right";
 
-  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)4) {
+  if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)4) {
     max_length = CastPyArg2AttrSize_t(kw_max_length, 0);
     if ((args_num <= 1 && flag_kwargs && kw_stride) || (args_num >= 2)) {
       stride = CastPyArg2AttrSize_t(kw_stride, 1);
