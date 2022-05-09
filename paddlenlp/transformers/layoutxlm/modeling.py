@@ -30,7 +30,7 @@ from .visual_backbone import read_config
 __all__ = [
     'LayoutXLMModel', "LayoutXLMPretrainedModel",
     "LayoutXLMForTokenClassification", "LayoutXLMForPretraining",
-    "LayoutXLMForRelationExtraction"
+    "LayoutXLMForRelationExtraction", "LayoutXLMForSequenceClassification"
 ]
 
 
@@ -904,6 +904,93 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
             outputs = (loss, ) + outputs
 
         return outputs
+
+    
+class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
+    def __init__(self, layoutxlm, num_classes=2, dropout=None):
+        super(LayoutXLMForSequenceClassification, self).__init__()
+        self.num_classes = num_classes
+        if isinstance(layoutxlm, dict):
+            self.layoutxlm = LayoutXLMModel(**layoutxlm)
+        else:
+            self.layoutxlm = layoutxlm
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.layoutxlm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"],
+                                    num_classes)
+        self.classifier.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.layoutxlm.embeddings.word_embeddings
+
+    def forward(
+            self,
+            input_ids=None,
+            bbox=None,
+            image=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            labels=None, ):
+        outputs = self.layoutxlm(
+            input_ids=input_ids,
+            bbox=bbox,
+            image=image,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask, )
+        seq_length = input_ids.shape[1]
+        # sequence out and image out
+        sequence_output, image_output = outputs[0][:, :seq_length], outputs[
+            0][:, seq_length:]
+
+        batches = input_ids.shape[0]
+        for batch_id in range(batches):
+            start_idx = -1
+            for i in range(0, seq_length):
+                if input_ids[batch_id, i] == 6:
+                    if start_idx > -1:
+                        feature_block = sequence_output[batch_id, start_idx + 1:
+                                                        i]
+                        sequence_output[batch_id, start_idx] = paddle.mean(
+                            feature_block, axis=0)
+                    start_idx = i
+
+                if input_ids[batch_id, i] == 1:
+                    feature_block = sequence_output[batch_id, start_idx + 1:i]
+                    sequence_output[batch_id, start_idx] = paddle.mean(
+                        feature_block, axis=0)
+                    break
+
+            if i == seq_length - 1:
+                sequence_output[batch_id, start_idx] = paddle.mean(
+                    feature_block, axis=0)
+
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
+
+        outputs = logits,
+
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+
+            if attention_mask is not None:
+                active_loss = attention_mask.reshape([-1, ]) == 1
+                active_logits = logits.reshape(
+                    [-1, self.num_classes])[active_loss]
+                active_labels = labels.reshape([-1, ])[active_loss]
+                loss = loss_fct(active_logits, active_labels)
+            else:
+                loss = loss_fct(
+                    logits.reshape([-1, self.num_classes]),
+                    labels.reshape([-1, ]))
+
+            outputs = (loss, ) + outputs
+
+        return outputs
+
 
 
 class LayoutXLMPredictionHead(Layer):
