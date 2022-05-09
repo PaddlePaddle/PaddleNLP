@@ -102,6 +102,8 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .gau_alpha.modeling import *
+from .gau_alpha.tokenizer import *
 from .optimization import *
 from .auto.modeling import *
 from .auto.tokenizer import *
