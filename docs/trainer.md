@@ -87,46 +87,78 @@ if training_args.do_train:
 ## Trainer 实例化参数介绍
 Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
 
-```
+```python
 参数：
     model（[`PretrainedModel`] 或 `paddle.nn.Layer`，可选）：
         用于训练、评估或预测的模型。
         [`Trainer`] 对PaddleNLP的 [`PretrainedModel`] 一起使用进行了优化。你仍然可以使用
         您自己的模型定义为`paddle.nn.Layer`，只要它们的工作方式与 PaddleNLP 模型相同。
 
+        ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
+        The model to train, evaluate or use for predictions.
+
     args（[`TrainingArguments`]，可选）：
         训练时需要用到的参数。将默认使用 [`TrainingArguments`] 初始化。
         `output_dir` 设置为当前目录中名为 *tmp_trainer* 的目录（如果未提供）。
 
-    data_collat​​or（`DataCollat​​or`，可选）：
+        ([`TrainingArguments`], *optional*):
+        The arguments to tweak for training. Will default to a basic instance of [`TrainingArguments`] with the
+        `output_dir` set to a directory named *tmp_trainer* in the current directory if not provided.
+
+    data_collator（`DataCollator`，可选）：
         用于将 `train_dataset` 或 `eval_dataset` 的数据，组合为batch的函数。
-        如果没有提供 `tokenizer`，则默认为 [`default_data_collat​​or`], 否则为
-        [`DataCollat​​orWithPadding`]。
+        如果没有提供 `tokenizer`，则默认为 [`default_data_collator`], 否则为
+        [`DataCollatorWithPadding`]。
+
+         (`DataCollator`, *optional*):
+        The function to use to form a batch from a list of elements of `train_dataset` or `eval_dataset`. Will
+        default to [`default_data_collator`] if no `tokenizer` is provided, an instance of
+        [`DataCollatorWithPadding`] otherwise.
+
 
     train_dataset（`paddle.io.Dataset` 或 `paddle.io.IterableDataset`，可选）：
         用于训练的数据集。如果是 `datasets.Dataset`，那么
         `model.forward()` 不需要的输入字段会被自动删除。
 
+        (`paddle.io.Dataset` or `paddle.io.IterableDataset`, *optional*):
+        The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
+        `model.forward()` method are automatically removed.
+
     eval_dataset（`paddle.io.Dataset`，可选）：
-            用于评估的数据集。如果是 `datasets.Dataset`，那么
+        用于评估的数据集。如果是 `datasets.Dataset`，那么
         `model.forward()` 不需要的输入字段会被自动删除。
+
+        The dataset to use for evaluation.
 
     tokenizer（[`PretrainedTokenizer`]，可选）：
         用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
         batch输入的最大长度，它随模型保存，可以重新运行中断的训练过程。
 
+         ([`PretrainedTokenizer`], *optional*):
+        The tokenizer used to preprocess the data. If provided, will be used to automatically pad the inputs the
+        maximum length when batching inputs, and it will be saved along the model to make it easier to rerun an
+        interrupted training or reuse the fine-tuned model.
+
     compute_metrics (`Callable[[EvalPrediction], Dict]`, 可选):
         用于评估的计算指标的函数。必须采用 [`EvalPrediction`] 并返回
         dict形式的metrics结果。
 
+        (`Callable[[EvalPrediction], Dict]`, *optional*):
+        The function that will be used to compute metrics at evaluation. Must take a [`EvalPrediction`] and return
+        a dictionary string to metric values.
+
     optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, 可选）：
         一个tuple, 包含要使用Optimizer和LRScheduler。将默认为模型上的 [`AdamW`] 实例
         和LinearDecayWithWarmup。
+
+        (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*)
+        A tuple containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your model
+        and a scheduler  [`LinearDecayWithWarmup`].
 ```
 
 
 ## TrainingArguments 参数介绍
-```
+```python
   --output_dir OUTPUT_DIR
                         保存模型输出和和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
@@ -194,9 +226,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         performing a backward/update pass. (default: 1)
 
   --learning_rate LEARNING_RATE
-                        AdamW优化器的初始学习率, （`float`，可选，默认为 5e-05）
+                        优化器的初始学习率, （`float`，可选，默认为 5e-05）
 
-                        The initial learning rate for AdamW. (default: 5e-05)
+                        The initial learning rate for optimizer. (default: 5e-05)
 
   --weight_decay WEIGHT_DECAY
                         除了所有bias和 LayerNorm 权重之外，应用于所有层的权重衰减数值。（`float`，可选，默认为 0.0）
@@ -337,7 +369,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         32-bit (default: False)
 
   --fp16_opt_level FP16_OPT_LEVEL
-                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1.
+                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效
                         (`str`, 可选, 默认为 `O1`)
 
                         For fp16: AMP optimization level selected in
