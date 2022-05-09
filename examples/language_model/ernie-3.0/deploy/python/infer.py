@@ -188,7 +188,7 @@ class Predictor(object):
             use_trt=args.use_trt)
         if args.collect_shape:
             min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
-            min_seq_len, max_seq_len, opt_seq_len = 1, 128, 32
+            min_seq_len, max_seq_len, opt_seq_len = 2, 128, 32
             batches = [
                 [
                     np.zeros(

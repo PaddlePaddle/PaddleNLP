@@ -26,15 +26,23 @@ def optimize(onnx_model_path: Path) -> Path:
     opt_model_path = generate_identified_filename(onnx_model_path, "-optimized")
     sess_option = SessionOptions()
     sess_option.optimized_model_filepath = opt_model_path.as_posix()
-    _ = InferenceSession(onnx_model_path.as_posix(), sess_option)
+    _ = InferenceSession(
+        onnx_model_path.as_posix(),
+        sess_option,
+        providers=['CPUExecutionProvider'])
     return opt_model_path
 
 
-def dynamic_quantize(input_float_model: str, dynamic_quantized_model: str):
+def dynamic_quantize(input_float_model: str,
+                     dynamic_quantized_model: str,
+                     use_optimize=False):
     import onnx
     from onnxruntime.quantization import QuantizationMode, quantize_dynamic
     onnx_model = Path(input_float_model).absolute()
-    optimized_output = optimize(onnx_model)
+    optimized_output = input_float_model
+    if use_optimize:
+        onnx_model = Path(input_float_model).absolute()
+        optimized_output = optimize(onnx_model)
     quantize_dynamic(optimized_output, dynamic_quantized_model)
 
 
