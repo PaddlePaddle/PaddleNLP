@@ -33,5 +33,6 @@ EncodeInput = Union[TextEncodeInput, PreTokenizedEncodeInput]
 from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
                               TruncMethod, OffsetType, Direction, TruncStrategy,
                               PadStrategy)
+from .core_tokenizers import models, normalizers, pretokenizers, postprocessors
 
 from .tokenizers_impl import ErnieFasterTokenizer
