@@ -168,9 +168,10 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
     for batch in data_loader:
-        logits = model(batch["input_ids"], batch["token_type_ids"])
-        loss = loss_fct(logits, batch["labels"])
-        correct = metric.compute(logits, batch["labels"])
+        labels = batch.pop("labels")
+        logits = model(**batch)
+        loss = loss_fct(logits, labels)
+        correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
     print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
@@ -276,8 +277,9 @@ def do_eval(args):
     model.eval()
     metric.reset()
     for batch in dev_data_loader:
-        logits = model(batch["input_ids"], batch["token_type_ids"])
-        correct = metric.compute(logits, batch["labels"])
+        labels = batch.pop("labels")
+        logits = model(**batch)
+        correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
     print("acc: %s\n, " % (res), end='')
@@ -381,8 +383,9 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            logits = model(batch["input_ids"], batch["token_type_ids"])
-            loss = loss_fct(logits, batch["labels"])
+            labels = batch.pop("labels")
+            logits = model(**batch)
+            loss = loss_fct(logits, labels)
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
             loss.backward()
@@ -460,8 +463,7 @@ def do_predict(args):
 
     for step, batch in enumerate(test_data_loader):
         with paddle.no_grad():
-            logits = model(batch["input_ids"], batch["token_type_ids"])
-
+            logits = model(**batch)
         preds = paddle.argmax(logits, axis=1)
         for idx, pred in enumerate(preds):
             j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
