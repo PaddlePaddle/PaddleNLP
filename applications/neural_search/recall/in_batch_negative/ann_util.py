@@ -21,7 +21,9 @@ from paddlenlp.utils.log import logger
 
 def build_index(args, data_loader, model):
 
-    index = hnswlib.Index(space='ip', dim=args.output_emb_size)
+    index = hnswlib.Index(
+        space='ip',
+        dim=args.output_emb_size if args.output_emb_size > 0 else 768)
 
     # Initializing index
     # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
