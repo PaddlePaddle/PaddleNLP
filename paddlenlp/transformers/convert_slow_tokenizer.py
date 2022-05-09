@@ -34,14 +34,13 @@ class BertConverter(Converter):
         vocab = self.original_tokenizer.vocab
         tokenizer = Tokenizer(
             WordPiece(
-                vocab, unk_token=str(self.original_tokenizer.unk_token)))
+                vocab._token_to_idx,
+                unk_token=str(self.original_tokenizer.unk_token)))
 
-        tokenize_chinese_chars = False
-        strip_accents = False
+        tokenize_chinese_chars = True
+        strip_accents = True
         do_lower_case = False
         if hasattr(self.original_tokenizer, "basic_tokenizer"):
-            tokenize_chinese_chars = self.original_tokenizer.basic_tokenizer.tokenize_chinese_chars
-            strip_accents = self.original_tokenizer.basic_tokenizer.strip_accents
             do_lower_case = self.original_tokenizer.basic_tokenizer.do_lower_case
 
         tokenizer.normalizer = normalizers.BertNormalizer(

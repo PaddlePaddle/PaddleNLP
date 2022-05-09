@@ -18,32 +18,38 @@ import json
 import os
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
+import six
 
 from faster_tokenizers import Encoding as EncodingFast
 from faster_tokenizers import Tokenizer as TokenizerFast
 
+from .utils import InitTrackerMeta, fn_args_to_dict
 from .convert_slow_tokenizer import convert_slow_tokenizer
-from .tokenization_utils_base import (
+from .tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
+    EncodedInput,
+    EncodedInputPair,
     PreTokenizedInput,
     PreTokenizedInputPair,
-    PreTrainedTokenizerBase,
+    PretrainedTokenizerBase,
     SpecialTokensMixin,
     TextInput,
     TextInputPair,
     TruncationStrategy,
     PaddingStrategy, )
+from .tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 TOKENIZER_FILE = "tokenizer.json"
 VOCAB_FILES_NAMES = {"tokenizer_file": TOKENIZER_FILE}
+ADDED_TOKENS_FILE = "added_tokens.json"
+SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-@six.add_metaclass(InitTrackerMeta)
-class PreTrainedTokenizerFast(PretrainedTokenizerBase):
-    vocab_files_names = VOCAB_FILES_NAMES
-    slow_tokenizer_class: PreTrainedTokenizer = None
+class PretrainedTokenizerFast(PretrainedTokenizerBase):
+    resource_files_names = VOCAB_FILES_NAMES
+    slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True
 
     def __init__(self, *args, **kwargs):
@@ -91,10 +97,10 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
         """
         `int`: Size of the base vocabulary (without the added tokens).
         """
-        return self._tokenizer.get_vocab_size(with_added_tokens=False)
+        return self._tokenizer.get_vocab_size(with_added_vocabulary=False)
 
     def get_vocab(self) -> Dict[str, int]:
-        return self._tokenizer.get_vocab(with_added_tokens=True)
+        return self._tokenizer.get_vocab(with_added_vocabulary=True)
 
     @property
     def vocab(self) -> Dict[str, int]:
@@ -107,8 +113,8 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
         Returns:
             `Dict[str, int]`: The added tokens.
         """
-        base_vocab = self._tokenizer.get_vocab(with_added_tokens=False)
-        full_vocab = self._tokenizer.get_vocab(with_added_tokens=True)
+        base_vocab = self._tokenizer.get_vocab(with_added_vocabulary=False)
+        full_vocab = self._tokenizer.get_vocab(with_added_vocabulary=True)
         added_vocab = dict((tok, index) for tok, index in full_vocab.items()
                            if tok not in base_vocab)
         return added_vocab
@@ -121,9 +127,6 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
 
     @property
     def backend_tokenizer(self) -> TokenizerFast:
-        """
-        `tokenizers.implementations.BaseTokenizer`: The Rust tokenizer used as a backend.
-        """
         return self._tokenizer
 
     def _convert_encoding(
@@ -286,7 +289,7 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
         # Set truncation and padding on the backend tokenizer
         if truncation_strategy == TruncationStrategy.DO_NOT_TRUNCATE:
             if _truncation is not None:
-                self._tokenizer.no_truncation()
+                self._tokenizer.disable_truncation()
         else:
             target = {
                 "max_length": max_length,
@@ -309,7 +312,7 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
 
         if padding_strategy == PaddingStrategy.DO_NOT_PAD:
             if _padding is not None:
-                self._tokenizer.no_padding()
+                self._tokenizer.disable_padding()
         else:
             length = max_length if padding_strategy == PaddingStrategy.MAX_LENGTH else None
             target = {
@@ -362,9 +365,7 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
             pad_to_multiple_of=pad_to_multiple_of, )
 
         encodings = self._tokenizer.encode_batch(
-            batch_text_or_text_pairs,
-            add_special_tokens=add_special_tokens,
-            is_pretokenized=is_split_into_words, )
+            batch_text_or_text_pairs, add_special_tokens=add_special_tokens)
 
         # Convert encoding to dict
         # `Tokens` has type: Tuple[
@@ -518,5 +519,4 @@ class PreTrainedTokenizerFast(PretrainedTokenizerBase):
                                  if filename_prefix else "") + TOKENIZER_FILE)
             self.backend_tokenizer.save(tokenizer_file)
             file_names = file_names + (tokenizer_file, )
-
         return file_names
