@@ -202,6 +202,25 @@ def main(args):
     # custom_ops
     custom_ops = load_custom_ops()
 
+    # Load the training dataset
+    logging.info("Loading dataset")
+    input_files = [
+        os.path.join(args.input_files, f) for f in os.listdir(args.input_files)
+        if os.path.isfile(os.path.join(args.input_files, f)) and "training" in f
+    ]
+    input_files.sort()
+
+    dataset = PretrainingHDF5DataLoader(
+        input_files=input_files,
+        max_seq_length=args.seq_len,
+        max_mask_tokens=args.max_predictions_per_seq,
+        batch_size=args.batch_size,
+        shuffle=args.shuffle)
+    logging.info(f"dataset length: {len(dataset)}")
+    total_samples = dataset.total_samples
+    logging.info("total samples: %d, total batch_size: %d, max steps: %d" %
+                 (total_samples, args.batch_size, args.max_steps))
+
     logging.info("Building Model")
 
     [
@@ -288,24 +307,6 @@ def main(args):
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
     logging.info(f'finish compiling! time cost: {time_cost}')
-
-    # Load the training dataset
-    input_files = [
-        os.path.join(args.input_files, f) for f in os.listdir(args.input_files)
-        if os.path.isfile(os.path.join(args.input_files, f)) and "training" in f
-    ]
-    input_files.sort()
-
-    dataset = PretrainingHDF5DataLoader(
-        input_files=input_files,
-        max_seq_length=args.seq_len,
-        max_mask_tokens=args.max_predictions_per_seq,
-        batch_size=args.batch_size,
-        shuffle=args.shuffle)
-    logging.info(f"dataset length: {len(dataset)}")
-    total_samples = dataset.total_samples
-    logging.info("total samples: %d, total batch_size: %d, max steps: %d" %
-                 (total_samples, args.batch_size, args.max_steps))
 
     batch_start = time.time()
     global_step = 0
