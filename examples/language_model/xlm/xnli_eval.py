@@ -155,4 +155,4 @@ def print_arguments(args):
 if __name__ == "__main__":
     args = parse_args()
     print_arguments(args)
-    do_eval()
+    do_eval(args)
