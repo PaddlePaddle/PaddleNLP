@@ -359,6 +359,15 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
   return tokenizer;
 }
 
+
+bool Tokenizer::GetUseTruncation() const {
+  return use_truncation_;
+}
+
+bool Tokenizer::GetUsePadding() const {
+  return use_padding_;
+}
+
 void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
   j = {
       {"added_tokens", tokenizer.added_vocabulary_},

@@ -200,6 +200,9 @@ static int TokenizerPropertiesSetPostProcessor(TokenizerObject* self,
 
 static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                                                void* closure) {
+  if (!self->tokenizer.GetUsePadding()) {
+    Py_RETURN_NONE;
+  }
   auto pad_method = self->tokenizer.GetPadMethod();
   PyObject* py_dict = PyDict_New();
   PyDict_SetItem(py_dict, ToPyObject("pad_id"), ToPyObject(pad_method.pad_id_));
@@ -218,16 +221,19 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                                                                    : "left"));
   if (pad_method.strategy_ == core::PadStrategy::BATCH_LONGEST) {
     PyDict_SetItem(
-        py_dict, ToPyObject("pad_strategy"), ToPyObject("batch_longest"));
+        py_dict, ToPyObject("strategy"), ToPyObject("batch_longest"));
   } else {
     PyDict_SetItem(
-        py_dict, ToPyObject("pad_len"), ToPyObject(pad_method.pad_len_));
+        py_dict, ToPyObject("length"), ToPyObject(pad_method.pad_len_));
   }
   return py_dict;
 }
 
 static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
                                                   void* closure) {
+  if (!self->tokenizer.GetUseTruncation()) {
+    Py_RETURN_NONE;
+  }
   auto trunc_method = self->tokenizer.GetTruncMethod();
   PyObject* py_dict = PyDict_New();
   PyDict_SetItem(
@@ -241,13 +247,13 @@ static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
                                                                      : "left"));
   if (trunc_method.strategy_ == core::TruncStrategy::LONGEST_FIRST) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("longest_first"));
+        py_dict, ToPyObject("strategy"), ToPyObject("longest_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_FIRST) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("only_first"));
+        py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_SECOND) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("only_second"));
+        py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
   }
   return py_dict;
 }
