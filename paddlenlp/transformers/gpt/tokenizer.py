@@ -139,6 +139,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         self.sp.Load(model_file)
         self.translator = str.maketrans(" \n", "\u2582\u2583")
 
+    #NOTE need this because it refers to the implementation of Megatron-LM 
     @property
     def eol_token_id(self):
         if self.eol_token is None:
@@ -160,35 +161,6 @@ class GPTChineseTokenizer(PretrainedTokenizer):
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
         return self.sp.IdToPiece(index)
-
-    '''
-    def convert_tokens_to_ids(self, tokens):
-        """
-        Converts a single token or a sequence of tokens to an index or a
-        sequence of indices.
-
-        Args:
-            tokens (str|List[str]|tuple(str)):
-                A single token or a sequence of tokens.
-
-        Returns:
-            int|List[int]: The converted token id or token ids.
-
-        Example:
-            .. code-block::
-
-                from paddlenlp.transformers import GPTChineseTokenizer
-
-                tokenizer = GPTChineseTokenizer.from_pretrained('gpt-cpm-large-cn')
-                print(tokenizer.convert_tokens_to_ids(['▁欢迎', '▁使用', '▁百度', '▁飞', '桨', '▁!']))
-                # [2092, 260, 1014, 1596, 17620, 45]
-        """
-
-        if not isinstance(tokens, (list, tuple)):
-            return self._convert_token_to_id(tokens)
-        else:
-            return [self._convert_token_to_id(token) for token in tokens]
-    '''
 
     def convert_ids_to_tokens(self, ids):
         """
@@ -408,6 +380,7 @@ class GPTTokenizer(PretrainedTokenizer):
 
         return len(self.encoder)
 
+    #NOTE need this because it refers to the implementation of Megatron-LM 
     @property
     def eol_token_id(self):
         if self.eol_token is None:
