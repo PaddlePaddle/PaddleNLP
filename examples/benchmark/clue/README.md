@@ -8,6 +8,7 @@
 
 使用多种**中文**预训练模型微调在 CLUE 的各验证集上有如下结果：
 
+
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
@@ -91,7 +92,7 @@
                         </td>
                 </tr>
                 <tr>
-			                  <td rowspan=6 align=center> 12L768H </td>
+			<td rowspan=6 align=center> 12L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
                         </td>
@@ -128,8 +129,8 @@
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>77.88</b></span>
                         </td>
-               </tr>
-               <tr>
+                </tr>
+                <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE-Gram-zh</span>
                         </td>
@@ -166,7 +167,7 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">73.69</span>
                         </td>
-              </tr>
+                </tr>
                <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">Mengzi-Bert-Base</span>
@@ -204,8 +205,8 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">70.70</span>
                         </td>
-              </tr>
-               <tr>
+                </tr>
+                <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE-1.0</span>
                         </td>
@@ -242,7 +243,7 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">69.68</span>
                         </td>
-              </tr>
+                </tr>
                          <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">RoBERTa-wwm-ext</span>
@@ -280,7 +281,7 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">68.03</span>
                         </td>
-              </tr>
+                </tr>
                          <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">BERT-Base-Chinese</span>
@@ -318,8 +319,8 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">65.38</span>
                         </td>
-              </tr>
-              <tr>
+                </tr>
+                <tr>
                        <td rowspan=2 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
@@ -357,8 +358,8 @@
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>69.73</b></span>
                         </td>
-              </tr>
-               <tr>
+                </tr>
+                <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">RBT6, Chinese</span>
                         </td>
@@ -395,7 +396,10 @@
                         <td style="text-align:center">
                                 <span style="font-size:18px">59.93</span>
                         </td>
-              </tr>
+                </tr>
+        <tbody>
+</table>
+<br />
 
 
 AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
