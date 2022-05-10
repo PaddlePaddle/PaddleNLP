@@ -31,21 +31,8 @@ from paddle.metric import Accuracy
 from paddle.optimizer import Adam
 
 all_languages = [
-    "ar",
-    "bg",
-    "de",
-    "el",
-    "en",
-    "es",
-    "fr",
-    "hi",
-    "ru",
-    "sw",
-    "th",
-    "tr",
-    "ur",
-    "vi",
-    "zh",
+    "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
+    "ur", "vi", "zh"
 ]
 
 
