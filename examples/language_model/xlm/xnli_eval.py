@@ -84,7 +84,7 @@ def evaluate(model, metric, data_loader, language, tokenizer):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("[%s] acc: %s, " % (language.upper(), res))
+    print("[%s] acc: %s " % (language.upper(), res))
     return res
 
 
@@ -138,7 +138,7 @@ def do_eval(args):
     metric = Accuracy()
     all_languages_acc = []
     for language in all_languages:
-        test_dataloader = get_test_dataloader(args, "en", tokenizer)
+        test_dataloader = get_test_dataloader(args, language, tokenizer)
         acc = evaluate(model, metric, test_dataloader, language, tokenizer)
         all_languages_acc.append(acc)
     print("test mean acc: %.4f" % np.mean(all_languages_acc))
