@@ -1,7 +1,7 @@
-optimizer
+utils
 ===============================
 
-.. automodule:: paddlenlp.ops.optimizer
+.. automodule:: paddlenlp.trainer.utils
    :members:
    :no-undoc-members:
    :show-inheritance:
@@ -10,5 +10,4 @@ optimizer
 .. toctree::
    :maxdepth: 4
 
-   paddlenlp.ops.optimizer.adamwdl
-   paddlenlp.ops.optimizer.ema
+   paddlenlp.trainer.utils.helper
