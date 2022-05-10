@@ -53,7 +53,7 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()))
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -64,14 +64,14 @@ def parse_args():
         "--output_dir",
         default="best_clue_model",
         type=str,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help="The output directory where the model predictions and checkpoints will be written."
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        "than this will be truncated, sequences shorter will be padded.")
     parser.add_argument(
         "--learning_rate",
         default=1e-4,
@@ -81,7 +81,7 @@ def parse_args():
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
+        help="Total number of training epochs to perform.")
     parser.add_argument(
         "--logging_steps",
         type=int,
@@ -96,7 +96,7 @@ def parse_args():
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per GPU/CPU for training.")
     parser.add_argument(
         "--weight_decay",
         default=0.0,
@@ -134,7 +134,7 @@ def parse_args():
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
