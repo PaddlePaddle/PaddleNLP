@@ -12,7 +12,7 @@ pip install -r requirement_cpu.txt
 ```
 pip install -r requirement_gpu.txt
 ```
-在计算能力大于7.0的GPU硬件上，比如T4，如果需要FP16或者Int8量化推理加速，还需安装TensorRT和PaddleInference，具体硬件和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
+在计算能力大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和PaddleInference-TRT，具体硬件和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
 1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，简要步骤如下：  
     (1)下载TensorRT8.4版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
     (2)解压得到TensorRT-XXX文件夹  
@@ -29,7 +29,7 @@ pip install -r requirement_gpu.txt
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer
 ```
-如果在支持AVX512VNNI的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或十代i9等cascade lake及以上机器，可开启enable_quantize开关，无需数据便可对ONNX FP32模型进行量化，获得2到3倍的加速效果，具体部署指令如下，如无法确认是否支持avx512-vnni，可使用lscpu命令查看cpu信息，并在Flags中查找是否有avx512-vnni支持
+如果在支持AVX512VNNI的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或11代CPU以上机器，可开启enable_quantize开关，无需数据便可对ONNX FP32模型进行量化，获得1到2倍的加速效果，具体部署指令如下，如无法确认是否支持avx512-vnni，可使用lscpu命令查看cpu信息，并在Flags中查找是否有avx512-vnni支持
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantize
 ```
@@ -54,7 +54,7 @@ python infer_gpu.py --task_name tnews --model_path ./model/infer --enable_fp16
 ```
 如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化具体请参考：[模型量化脚本使用说明]()，量化模型的部署指令为  
 ```
-python infer_gpu.py --task_name tnews --model_path ./model/infer
+python infer_gpu.py --task_name tnews --model_path ./quantize_model/int8
 ```
 参数说明：
 | 参数 |参数说明 |
