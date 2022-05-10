@@ -32,7 +32,7 @@ from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
-from paddlenlp.trainer.trainer_utils import get_last_checkpoint
+from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForTokenClassification, )
@@ -42,13 +42,13 @@ sys.path.insert(0, os.path.abspath("."))
 from token_classification import ner_trans_fn
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -184,7 +184,7 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()

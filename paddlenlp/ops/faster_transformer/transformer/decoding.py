@@ -14,7 +14,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 import os
-from importlib_metadata import functools
+import functools
 import numpy as np
 from functools import partial
 

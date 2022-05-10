@@ -17,7 +17,6 @@ import re
 import time
 import logging
 import json
-import six
 import sys
 from pathlib import Path
 from visualdl import LogWriter
@@ -194,10 +193,6 @@ def map_fn_DuCheckList_finetune(examples):
 
 if __name__ == "__main__":
     args = get_args()
-    log.debug('-----------  Configuration Arguments -----------')
-    for arg, value in sorted(six.iteritems(vars(args))):
-        log.debug('%s: %s' % (arg, value))
-    log.debug('------------------------------------------------')
 
     if args.language == 'ch':
         tokenizer = RobertaTokenizer.from_pretrained(args.from_pretrained)
