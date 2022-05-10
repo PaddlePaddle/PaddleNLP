@@ -91,13 +91,14 @@ class BaseFasterTokenizer:
         return self._tokenizer.encode(sequence, pair, is_pretokenized,
                                       add_special_tokens)
 
-    def encode_batch(
-            self,
-            inputs,
-            add_special_tokens=True, ):
+    def encode_batch(self,
+                     inputs,
+                     add_special_tokens=True,
+                     is_pretokenized=False):
         if inputs is None:
             raise ValueError("encode_batch: `inputs` can't be `None`")
-        return self._tokenizer.encode_batch(inputs, add_special_tokens)
+        return self._tokenizer.encode_batch(inputs, add_special_tokens,
+                                            is_pretokenized)
 
     def token_to_id(self, token):
         return self._tokenizer.token_to_id(token)
