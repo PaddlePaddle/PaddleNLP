@@ -18,18 +18,18 @@ from paddlenlp.transformers import AutoModel
 
 
 class UIE(nn.Layer):
-    def __init__(self, encoding_model='ernie-1.0', hidden_size=768):
+    def __init__(self, encoding_model, hidden_size):
         super(UIE, self).__init__()
         self.encoder = AutoModel.from_pretrained(encoding_model)
-        weight_attr_start = paddle.ParamAttr(name='weight_start')
-        bias_attr_start = paddle.ParamAttr(name='bias_start')
+        weight_attr_start = paddle.ParamAttr(name="weight_start")
+        bias_attr_start = paddle.ParamAttr(name="bias_start")
         self.linear_start = paddle.nn.Linear(
             hidden_size,
             1,
             weight_attr=weight_attr_start,
             bias_attr=bias_attr_start)
-        weight_attr_end = paddle.ParamAttr(name='weight_end')
-        bias_attr_end = paddle.ParamAttr(name='bias_end')
+        weight_attr_end = paddle.ParamAttr(name="weight_end")
+        bias_attr_end = paddle.ParamAttr(name="bias_end")
         self.linear_end = paddle.nn.Linear(
             hidden_size,
             1,
