@@ -47,7 +47,7 @@ ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-class PretrainedTokenizerFast(PretrainedTokenizerBase):
+class PretrainedFasterTokenizer(PretrainedTokenizerBase):
     resource_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True

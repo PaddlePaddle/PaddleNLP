@@ -76,13 +76,13 @@ def convert_slow_tokenizer(transformer_tokenizer) -> Tokenizer:
     Utilities to convert a slow tokenizer instance in a fast tokenizer instance.
 
     Args:
-        transformer_tokenizer ([`~tokenization_utils_base.PreTrainedTokenizer`]):
+        transformer_tokenizer ([`~tokenizer_utils_base.PretrainedTokenizer`]):
             Instance of a slow tokenizer to convert in the backend tokenizer for
-            [`~tokenization_utils_base.PreTrainedTokenizerFast`].
+            [`~tokenizer_utils_base.PretrainedFasterTokenizer`].
 
     Return:
         A instance of [`~tokenizers.Tokenizer`] to be used as the backend tokenizer of a
-        [`~tokenization_utils_base.PreTrainedTokenizerFast`]
+        [`~tokenizer_utils_base.PretrainedFasterTokenizer`]
     """
 
     tokenizer_class_name = transformer_tokenizer.__class__.__name__

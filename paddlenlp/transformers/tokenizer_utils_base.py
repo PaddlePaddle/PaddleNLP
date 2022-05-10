@@ -229,7 +229,7 @@ class BatchEncoding(UserDict):
     @property
     def is_fast(self) -> bool:
         """
-        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedTokenizerFast`]
+        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedFasterTokenizer`]
         or not.
         """
         return self._encodings is not None
@@ -543,8 +543,8 @@ class BatchEncoding(UserDict):
         else:
             batch_index = 0
             token_index = batch_or_token_index
-        return CharSpan(*(self._encodings[batch_index].token_to_chars(
-            token_index)))
+        return CharSpan(*(
+            self._encodings[batch_index].token_to_chars(token_index)))
 
     def char_to_token(self,
                       batch_or_char_index: int,
@@ -1280,7 +1280,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         - **pretrained_init_configuration** (`Dict[str, Dict[str, Any]]`) -- A dictionary with, as keys, the
             `short-cut-names` of the pretrained models, and as associated values, a dictionary of specific arguments to
             pass to the `__init__` method of the tokenizer class for this pretrained model when loading the tokenizer
-            with the [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`] method.
+            with the [`~tokenizer_utils_base.PretrainedTokenizerBase.from_pretrained`] method.
         - **model_input_names** (`List[str]`) -- A list of inputs expected in the forward pass of the model.
         - **padding_side** (`str`) -- The default value for the side on which the model should have padding applied.
             Should be `'right'` or `'left'`.
@@ -1290,7 +1290,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     Args:
         model_max_length (`int`, *optional*):
             The maximum length (in number of tokens) for the inputs to the transformer model. When the tokenizer is
-            loaded with [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`], this will be set to the
+            loaded with [`~tokenizer_utils_base.PretrainedTokenizerBase.from_pretrained`], this will be set to the
             value stored for the associated model in `max_model_input_sizes` (see above). If no value is provided, will
             default to VERY_LARGE_INTEGER (`int(1e30)`).
         padding_side (`str`, *optional*):

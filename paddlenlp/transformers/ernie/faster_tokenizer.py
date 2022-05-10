@@ -17,7 +17,7 @@ import json
 from typing import List, Optional, Tuple
 
 from faster_tokenizers import normalizers
-from ..tokenizer_utils_faster import PretrainedTokenizerFast
+from ..tokenizer_utils_faster import PretrainedFasterTokenizer
 from .tokenizer import ErnieTokenizer
 
 VOCAB_FILES_NAMES = {
@@ -26,7 +26,7 @@ VOCAB_FILES_NAMES = {
 }
 
 
-class ErnieFasterTokenizer(PretrainedTokenizerFast):
+class ErnieFasterTokenizer(PretrainedFasterTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {

@@ -84,9 +84,9 @@ def get_configurations():
     for key, class_name in TOKENIZER_MAPPING_NAMES.items():
         faster_name = ""
         if "Faster" in key:
-            faster_name = "_faster"
+            faster_name = "faster_"
         import_class = importlib.import_module(
-            f"paddlenlp.transformers.{class_name}.tokenizer{faster_name}")
+            f"paddlenlp.transformers.{class_name}.{faster_name}tokenizer")
         tokenizer_name = getattr(import_class, key)
         name = tuple(tokenizer_name.pretrained_init_configuration.keys())
         # FasterTokenizer will share the same config with python tokenizer
