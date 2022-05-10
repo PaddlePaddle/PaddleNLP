@@ -84,7 +84,6 @@ class PretrainedTokenizerFast(PretrainedTokenizerBase):
             kwargs.update(slow_tokenizer.init_kwargs)
 
         self._decode_use_source_tokenizer = False
-
         # We call this after having initialized the backend tokenizer because we update it.
         super().__init__(**kwargs)
 
@@ -250,7 +249,7 @@ class PretrainedTokenizerFast(PretrainedTokenizerBase):
                  pair: Optional[str]=None,
                  add_special_tokens: bool=False,
                  **kwargs) -> List[str]:
-        return self.encode_plus(
+        return self.encode(
             text=text,
             text_pair=pair,
             add_special_tokens=add_special_tokens,
@@ -363,9 +362,10 @@ class PretrainedTokenizerFast(PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of, )
-
         encodings = self._tokenizer.encode_batch(
-            batch_text_or_text_pairs, add_special_tokens=add_special_tokens)
+            batch_text_or_text_pairs,
+            add_special_tokens=add_special_tokens,
+            is_pretokenized=is_split_into_words)
 
         # Convert encoding to dict
         # `Tokens` has type: Tuple[
