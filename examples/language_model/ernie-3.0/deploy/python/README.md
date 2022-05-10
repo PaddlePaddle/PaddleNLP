@@ -29,7 +29,7 @@ pip install -r requirement_gpu.txt
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer
 ```
-如果在支持AVX512VNNI的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C，可开启enable_quantize开关，无需数据便可对ONNX FP32模型进行量化，获得2到3倍的加速效果，具体部署指令为
+如果在支持AVX512VNNI的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或十代i9等cascade lake及以上机器，可开启enable_quantize开关，无需数据便可对ONNX FP32模型进行量化，获得2到3倍的加速效果，具体部署指令如下，如无法确认是否支持avx512-vnni，可使用lscpu命令查看cpu信息，并在Flags中查找是否有avx512-vnni支持
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantize
 ```
