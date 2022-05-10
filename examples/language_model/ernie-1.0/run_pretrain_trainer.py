@@ -32,7 +32,7 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer.trainer_utils import speed_metrics, get_last_checkpoint
+from paddlenlp.trainer import speed_metrics, get_last_checkpoint
 
 sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
@@ -415,7 +415,7 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
