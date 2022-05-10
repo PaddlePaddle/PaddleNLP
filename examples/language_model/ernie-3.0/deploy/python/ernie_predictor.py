@@ -34,7 +34,7 @@ class InferBackend(object):
                  model_path,
                  batch_size=32,
                  device='cpu',
-                 enable_fp16=False,
+                 use_fp16=False,
                  enable_quantize=False,
                  collect_shape=False,
                  num_threads=10):
@@ -44,21 +44,21 @@ class InferBackend(object):
             model_dir, file_name + ".pdmodel", file_name + ".pdiparams")
         print("int8_model", int8_model)
         print(">>> [InferBackend] creat engine ...")
-        if device == 'gpu' and int8_model or enable_fp16:
+        if device == 'gpu' and int8_model or use_fp16:
             from paddle import inference
             import paddle
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
             config.enable_use_gpu(100, 0)
             paddle.set_device("gpu")
-            if int8_model and enable_fp16:
+            if int8_model and use_fp16:
                 print(
-                    ">>> [InferBackend] load a paddle quantize model, enable_fp16 has been closed..."
+                    ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
                 )
-                enable_fp16 = False
+                use_fp16 = False
 
-            if enable_fp16:
-                assert device == 'gpu', "When enable_fp16, please set device to gpu and install requirement_gpu.txt."
+            if use_fp16:
+                assert device == 'gpu', "When use_fp16, please set device to gpu and install requirement_gpu.txt."
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
                     precision_mode=inference.PrecisionType.Half,
@@ -255,7 +255,7 @@ class ErniePredictor(object):
                 type(args.device))
             exit(0)
         if args.device == 'cpu':
-            args.enable_fp16 = False
+            args.use_fp16 = False
             args.collect_shape = False
         if args.device == 'gpu':
             args.num_threads = 10
@@ -264,7 +264,7 @@ class ErniePredictor(object):
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
-            enable_fp16=args.enable_fp16,
+            use_fp16=args.use_fp16,
             enable_quantize=args.enable_quantize,
             collect_shape=args.collect_shape,
             num_threads=args.num_threads)

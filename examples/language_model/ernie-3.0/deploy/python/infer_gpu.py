@@ -61,7 +61,7 @@ def parse_args():
         action='store_true',
         help="Whether to collect shape info.", )
     parser.add_argument(
-        "--enable_fp16",
+        "--use_fp16",
         action='store_true',
         help="Whether to use fp16 inference.", )
     args = parser.parse_args()

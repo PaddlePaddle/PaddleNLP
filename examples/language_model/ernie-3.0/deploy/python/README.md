@@ -1,18 +1,18 @@
-# Ernie-3.0 Python部署指南
+# Ernie3.0 Python部署指南
 
 ## 安装
-Ernie-3.0的部署分为cpu和gpu两种情况，请根据你的部署环境安装对应的依赖。
+Ernie3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
 ### CPU端
 CPU端的部署请使用如下指令安装所需依赖
 ```
-pip install -r requirement_cpu.txt
+pip install -r requirements_cpu.txt
 ```
 ### GPU端
 在进行GPU部署之前请先确保机器已经安装好CUDA11.04和CUDNN8.2+，然后请使用如下指令安装所需依赖
 ```
-pip install -r requirement_gpu.txt
+pip install -r requirements_gpu.txt
 ```
-在计算能力大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和PaddleInference-TRT，具体硬件和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
+在计算能力（Compute Capability）大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和PaddleInference-TRT，具体硬件和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
 1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，简要步骤如下：  
     (1)下载TensorRT8.4版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
     (2)解压得到TensorRT-XXX文件夹  
@@ -40,8 +40,8 @@ python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantiz
 |--model_name_or_path | 模型的路径或者名字|
 |--model_path | 用于推理的Paddle模型的路径|
 |--batch_size |测试的batch size大小，默认为32|
-|--perf | 是否测试性能 |
-|--enable_quantize | 是否启动ONNX FP32的动态量化进行加速 |
+|--perf | 是否测试性能，默认关闭 |
+|--enable_quantize | 是否使用动态量化进行加速，默认关闭 |
 |--num_threads | 配置cpu的线程数，默认为10 |
 ### GPU端
 在GPU端，请使用如下指令进行部署
@@ -60,10 +60,9 @@ python infer_gpu.py --task_name tnews --model_path ./quantize_model/int8
 | 参数 |参数说明 |
 |----------|--------------|
 |--task_name | 配置任务名称，默认tnews|
+|--model_name_or_path | 模型的路径或者名字|
 |--model_path | 配置包含Paddle模型的目录路径|
-|--device | 配置部署设备，可选‘cpu’或者‘gpu’|
-|--batch_size |测试的batch size大小|
-|--enable_fp16 | 是否使用FP16进行加速 |
-|--perf | 是否测试性能 |
-|--collect_shape | 配置是否自动配置TensorRT的dynamic shape，开启enable_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shapeinfo.txt后再关闭 |
-|--num_threads | 配置cpu的线程数 |
+|--batch_size |测试的batch size大小，默认为32|
+|--use_fp16 | 是否使用FP16进行加速，默认关闭 |
+|--perf | 是否测试性能，默认关闭 |
+|--collect_shape | 配置是否自动配置TensorRT的dynamic shape，开启enable_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shapeinfo.txt后再关闭，默认关闭 |
