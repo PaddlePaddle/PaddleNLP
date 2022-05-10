@@ -1,0 +1,7 @@
+add_subdirectory(decoders)
+add_subdirectory(models)
+add_subdirectory(normalizers)
+add_subdirectory(pretokenizers)
+add_subdirectory(postprocessors)
+add_subdirectory(core)
+add_subdirectory(pybind)

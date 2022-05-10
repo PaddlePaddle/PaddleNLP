@@ -32,7 +32,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [词性标注](#词性标注)              | `Taskflow("pos_tagging")`        | ✅        | ✅        | ✅        | ✅          | ✅          | 基于百度前沿词法分析工具LAC                            |
 | [命名实体识别](#命名实体识别)      | `Taskflow("ner")`                | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖最全中文实体标签                                   |
 | [依存句法分析](#依存句法分析)      | `Taskflow("dependency_parsing")` | ✅        | ✅        | ✅        |            | ✅          | 基于最大规模中文依存句法树库研发的DDParser             |
-| [信息抽取](#信息抽取) | `Taskflow("information_extraction")`   | ✅        | ✅        | ✅        | ✅          |           | 适配多场景的开放域通用信息抽取工具                     |
+| [信息抽取](#信息抽取) | `Taskflow("information_extraction")`   | ✅        | ✅        | ✅        | ✅          | ✅          | 适配多场景的开放域通用信息抽取工具                     |
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`   | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
 | [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百度知道2200万对相似句组训练                       |
@@ -398,7 +398,7 @@ from paddlenlp import Taskflow
 ### 信息抽取
 <details><summary>&emsp; 适配多场景的开放域通用信息抽取工具 </summary><div>
 
-开放域信息抽取(OIE)是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
+开放域信息抽取是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
 
 #### 支持多场景信息抽取任务
 
@@ -540,6 +540,20 @@ from paddlenlp import Taskflow
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9939956659967066}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8323544377549155}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.624098394612048}]}]
   ```
 
+#### 定制训练
+
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie)（标注少量数据进行模型微调）以进一步提升效果。
+
+我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+
+<table>
+<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
+<tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
+<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
+<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
+</table>
+
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
@@ -786,6 +800,8 @@ from paddlenlp import Taskflow
 |       `Taskflow("pos_tagging")`                              |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
 |                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
 |              `Taskflow("ner", mode="accurate")`              |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
+|              `Taskflow("information_extraction", model="uie-base")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie) |
+|              `Taskflow("information_extraction", model="uie-tiny")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie) |
 |     `Taskflow("text_correction", model="ernie-csc")`     |  `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
 |      `Taskflow("dependency_parsing", model="ddparser")`      |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`    | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
 | `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
@@ -843,6 +859,8 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
   <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
+  <tr><td rowspan="2">信息抽取<td> UIE-Base <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie"> 训练详情 <td> 百度自建数据集
+  <tr><td> UIE-Tiny <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
   <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
   <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
