@@ -464,7 +464,7 @@ if __name__ == "__main__":
             input_ids = feature['input_ids']
             SEP_idx = input_ids.index(tokenizer.sep_token_id)
             context_ids = input_ids[SEP_idx + 1:-1]
-            offset = offset_map[SEP_idx + add_idx:-1]
+            offset = feature['offset_mapping'][SEP_idx + 1:-1]
             context_tokens = tokenizer.convert_ids_to_tokens(context_ids)
 
             ch_per_example(args, scores_in_one_example, context_tokens, dev_ds,

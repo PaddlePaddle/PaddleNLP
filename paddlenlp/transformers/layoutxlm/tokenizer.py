@@ -17,8 +17,9 @@
 import itertools
 from dataclasses import dataclass, field
 from collections import OrderedDict
-from paddle.utils import try_import
 from typing import List, Optional
+
+import sentencepiece as spm
 
 from .. import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
@@ -90,7 +91,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self._unk_token = unk_token
         self._pad_token = pad_token
         self._mask_token = mask_token
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
         self.vocab_file = vocab_file

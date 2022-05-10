@@ -25,7 +25,7 @@ from shutil import copyfile
 import numpy as np
 import jieba
 import paddle
-from paddle.utils import try_import
+import sentencepiece as spm
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control
@@ -123,14 +123,13 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                  sentencepiece_model_file,
                  do_lower_case=False,
                  unk_token="[UNK]",
-                 pad_token="[PAD]",
+                 pad_token="[UNK]",
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",
                  special_tokens_file="",
                  **kwargs):
-        mod = try_import('sentencepiece')
-        self.spm_model = mod.SentencePieceProcessor()
+        self.spm_model = spm.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
         if not os.path.isfile(vocab_file):
