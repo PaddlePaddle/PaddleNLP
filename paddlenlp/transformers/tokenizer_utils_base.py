@@ -55,7 +55,7 @@ class AddedToken:
 
 
 @dataclass
-class EncodingFast:
+class FasterEncoding:
     """This is dummy class reserved for fast tokenizer"""
 
     pass
@@ -197,14 +197,14 @@ class BatchEncoding(UserDict):
     def __init__(
             self,
             data: Optional[Dict[str, Any]]=None,
-            encoding: Optional[Union[EncodingFast, Sequence[
-                EncodingFast]]]=None,
+            encoding: Optional[Union[FasterEncoding, Sequence[
+                FasterEncoding]]]=None,
             tensor_type: Union[None, str]=None,
             prepend_batch_axis: bool=False,
             n_sequences: Optional[int]=None, ):
         super().__init__(data)
 
-        if isinstance(encoding, EncodingFast):
+        if isinstance(encoding, FasterEncoding):
             encoding = [encoding]
 
         self._encodings = encoding
@@ -234,7 +234,7 @@ class BatchEncoding(UserDict):
         """
         return self._encodings is not None
 
-    def __getitem__(self, item: Union[int, str]) -> Union[Any, EncodingFast]:
+    def __getitem__(self, item: Union[int, str]) -> Union[Any, FasterEncoding]:
         """
         If the key is a string, returns the value of the dict associated to `key` ('input_ids', 'attention_mask',
         etc.).
@@ -281,9 +281,9 @@ class BatchEncoding(UserDict):
     # not yet supported
 
     @property
-    def encodings(self) -> Optional[List[EncodingFast]]:
+    def encodings(self) -> Optional[List[FasterEncoding]]:
         """
-        `Optional[List[EncodingFast]]`: The list all encodings from the tokenization process. Returns `None` if
+        `Optional[List[FasterEncoding]]`: The list all encodings from the tokenization process. Returns `None` if
         the input was tokenized through Python (i.e., not a fast) tokenizer.
         """
         return self._encodings
