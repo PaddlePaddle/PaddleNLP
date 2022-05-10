@@ -541,7 +541,7 @@ static PyObject* EnableTruncation(TokenizerObject* self,
   std::string strategy = "longest_first";
   std::string direction = "right";
 
-  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)4) {
+  if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)4) {
     max_length = CastPyArg2AttrSize_t(kw_max_length, 0);
     if ((args_num <= 1 && flag_kwargs && kw_stride) || (args_num >= 2)) {
       stride = CastPyArg2AttrSize_t(kw_stride, 1);
@@ -769,24 +769,41 @@ static PyObject* Encode(TokenizerObject* self,
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
 }
 
-// def encode(input, add_special_tokens=True)
+// def encode(input, add_special_tokens=True, is_pretokenized=False)
 static PyObject* EncodeBatch(TokenizerObject* self,
                              PyObject* args,
                              PyObject* kwargs) {
   TOKENIZERS_TRY
   PyObject* kw_input = NULL;
   PyObject* kw_special_tokens = NULL;
+  PyObject* kw_is_pretokenized = NULL;
   bool flag_kwargs = false;
   if (kwargs) flag_kwargs = true;
   static char* kwlist[] = {const_cast<char*>("input"),
                            const_cast<char*>("add_special_tokens"),
+                           const_cast<char*>("is_pretokenized"),
                            NULL};
-  bool flag_ = PyArg_ParseTupleAndKeywords(
-      args, kwargs, "|OO", kwlist, &kw_input, &kw_special_tokens);
+  bool flag_ = PyArg_ParseTupleAndKeywords(args,
+                                           kwargs,
+                                           "|OOO",
+                                           kwlist,
+                                           &kw_input,
+                                           &kw_special_tokens,
+                                           &kw_is_pretokenized);
   bool add_special_tokens = true;
+  bool is_pretokenized = false;
   Py_ssize_t args_num = PyTuple_Size(args);
+  VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
+          << ", flag_: " << flag_;
   std::vector<core::EncodeInput> batch_encode_input;
-  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
+  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)3) {
+    if ((args_num <= 1 && flag_kwargs && kw_special_tokens) ||
+        (args_num >= 2)) {
+      add_special_tokens = CastPyArg2AttrBoolean(kw_special_tokens, 1);
+    }
+    if ((args_num <= 2 && kw_is_pretokenized && flag_kwargs) || args_num == 3) {
+      is_pretokenized = CastPyArg2AttrBoolean(kw_is_pretokenized, 2);
+    }
     if (PyList_Check(kw_input)) {
       Py_ssize_t list_size = PyList_Size(kw_input);
       for (Py_ssize_t i = 0; i < list_size; ++i) {
@@ -796,7 +813,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
           PyObject* text = PyTuple_GetItem(item, 0);
           PyObject* text_pair = PyTuple_GetItem(item, 1);
           // pretokenized
-          if (PyList_Check(text) && PyList_Check(text_pair)) {
+          if (is_pretokenized) {
             Py_ssize_t pretokenized_size = PyList_Size(item);
             std::vector<std::string> text_vec;
             std::vector<std::string> text_pair_vec;
@@ -817,7 +834,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
           }
         } else {
           // Only get text
-          if (PyList_Check(item)) {
+          if (is_pretokenized) {
             Py_ssize_t pretokenized_size = PyList_Size(item);
             std::vector<std::string> str_vec(pretokenized_size);
             for (Py_ssize_t j = 0; j < pretokenized_size; ++j) {
@@ -832,12 +849,8 @@ static PyObject* EncodeBatch(TokenizerObject* self,
       }
     } else {
       std::ostringstream oss;
-      oss << "Expected the input argument, but not pass.";
+      oss << "Expected the type of input argument is list";
       throw std::runtime_error(oss.str());
-    }
-    if ((args_num <= 1 && flag_kwargs && kw_special_tokens) ||
-        (args_num >= 2)) {
-      add_special_tokens = CastPyArg2AttrBoolean(kw_special_tokens, 1);
     }
     std::vector<core::Encoding> result_encodings;
     self->tokenizer.EncodeBatchStrings(

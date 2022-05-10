@@ -242,9 +242,9 @@ void Tokenizer::EncodeBatchStrings(
     bool add_special_tokens,
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
-#ifdef WITH_OMP
-#pragma omp parallel for
-#endif
+  // #ifdef WITH_OMP
+  // #pragma omp parallel for
+  // #endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     EncodePairStrings(
         batch_encode_input[i], add_special_tokens, &(*encodings)[i]);
@@ -278,9 +278,9 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
     bool add_special_tokens,
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
-#ifdef WITH_OMP
-#pragma omp parallel for
-#endif
+  // #ifdef WITH_OMP
+  // #pragma omp parallel for
+  // #endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(

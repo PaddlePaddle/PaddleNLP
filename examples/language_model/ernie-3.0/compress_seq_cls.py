@@ -33,18 +33,18 @@ from paddlenlp.utils.log import logger
 
 from compress_trainer import CompressConfig, PTQConfig
 
-sys.path.append("../../language_model/ernie-1.0/finetune")
+sys.path.append("../ernie-1.0/finetune")
 
 from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Log model and data config
