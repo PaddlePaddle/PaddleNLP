@@ -70,6 +70,8 @@ from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
+from .prophetnet.modeling import *
+from .prophetnet.tokenizer import *
 from .mobilebert.modeling import *
 from .mobilebert.tokenizer import *
 from .mpnet.modeling import *
@@ -102,6 +104,14 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .roformerv2.modeling import *
+from .roformerv2.tokenizer import *
 from .optimization import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+
+# For faster tokenizer
+from ..utils.import_utils import is_faster_tokenizers_available
+if is_faster_tokenizers_available():
+    from .bert.faster_tokenizer import *
+    from .ernie.faster_tokenizer import *
