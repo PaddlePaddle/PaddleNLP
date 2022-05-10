@@ -1548,14 +1548,17 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     resolved_vocab_files[file_id] = get_path_from_url(
                         file_path, default_root)
                 except RuntimeError as err:
-                    logger.error(err)
-                    raise RuntimeError(
-                        f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                        "- a correct model-identifier of built-in pretrained models,\n"
-                        "- or a correct model-identifier of community-contributed pretrained models,\n"
-                        "- or the correct path to a directory containing relevant tokenizer files.\n"
-                    )
+                    if file_id not in cls.resource_files_names:
+                        resolved_vocab_files[file_id] = None
+                    else:
+                        logger.error(err)
+                        raise RuntimeError(
+                            f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+                            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                            "- a correct model-identifier of built-in pretrained models,\n"
+                            "- or a correct model-identifier of community-contributed pretrained models,\n"
+                            "- or the correct path to a directory containing relevant tokenizer files.\n"
+                        )
 
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
