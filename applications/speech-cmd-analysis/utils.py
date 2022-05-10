@@ -329,36 +329,6 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
     return sorted(list(relation_prompt_set))
 
 
-def convert_cls_examples(raw_examples, prompt_prefix, options):
-    examples = []
-    print(f"Converting doccano data...")
-    with tqdm(total=len(raw_examples)) as pbar:
-        for line in raw_examples:
-            items = json.loads(line)
-            text, labels = items["data"], items["label"]
-            random.shuffle(options)
-            prompt = ""
-            sep = ","
-            for option in options:
-                prompt += option
-                prompt += sep
-            prompt = prompt_prefix + "[" + prompt.rstrip(sep) + "]"
-
-            result_list = []
-            example = {
-                "content": text,
-                "result_list": result_list,
-                "prompt": prompt
-            }
-            for label in labels:
-                start = prompt.rfind(label[0]) - len(prompt) - 1
-                end = start + len(label)
-                result = {"text": label, "start": start, "end": end}
-                example["result_list"].append(result)
-            examples.append(example)
-    return examples
-
-
 def convert_ext_examples(raw_examples, negative_ratio):
     texts = []
     entity_examples = []
