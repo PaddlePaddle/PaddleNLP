@@ -507,7 +507,8 @@ global step 400/20010, epoch: 0, batch: 399, rank_id: 0, loss: 2.631579, lr: 0.0
 eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
 #### 使用Trainer启动 CLUE 分类任务
-PaddleNLP提供了Trainer API，本示例新增了`run_clue_classifier_trainer.py`脚本供用户使用。需要从源码安装paddlenlp使用。
+PaddleNLP 提供了 Trainer API，本示例新增了`run_clue_classifier_trainer.py`脚本供用户使用。
+
 ```
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=TNEWS
