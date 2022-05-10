@@ -446,9 +446,10 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
                 Its data type can be int, float and bool.
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
                 When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                Defaults to `None`, which means nothing needed to be prevented attention to.
+                Currently, we only support 2D attention_mask.
+                Defaults to `None`, which means `pad_token_id` will be ignored.
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
                 Defaults to `False`.
@@ -486,11 +487,15 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
                 (input_ids == self.pad_token_id
                  ).astype(paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
-        # For 2D attention_mask from tokenizer
-        elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-            attention_mask = (1.0 - attention_mask) * -1e4
+        else:
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(
+                    axis=[1, 2]).astype(paddle.get_default_dtype())
+                attention_mask = (1.0 - attention_mask) * -1e4
+            else:
+                raise ValueError("Currently we only support 2D attention_mask.")
+
         attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
