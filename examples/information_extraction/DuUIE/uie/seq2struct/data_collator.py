@@ -499,7 +499,7 @@ class DataCollatorForMultiTaskSeq2Seq:
     """
     Data collator that will dynamically pad the inputs received, as well as the labels.
     Args:
-        tokenizer ([`PreTrainedTokenizer`] or [`PreTrainedTokenizerFast`]):
+        tokenizer ([`PretrainedTokenizer`] or [`PretrainedFasterTokenizer`]):
             The tokenizer used for encoding the data.
         model ([`PreTrainedModel`]):
             The model that is being trained. If set and has the *prepare_decoder_input_ids_from_labels*, use it to
