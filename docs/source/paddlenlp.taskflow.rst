@@ -18,6 +18,7 @@ paddlenlp.taskflow
 
    paddlenlp.taskflow.dependency_parsing
    paddlenlp.taskflow.dialogue
+   paddlenlp.taskflow.information_extraction
    paddlenlp.taskflow.knowledge_mining
    paddlenlp.taskflow.lexical_analysis
    paddlenlp.taskflow.named_entity_recognition
