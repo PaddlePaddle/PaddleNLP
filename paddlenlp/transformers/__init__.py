@@ -104,6 +104,8 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .roformerv2.modeling import *
+from .roformerv2.tokenizer import *
 from .optimization import *
 from .auto.modeling import *
 from .auto.tokenizer import *
