@@ -24,21 +24,8 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddle.metric import Accuracy
 
 all_languages = [
-    "ar",
-    "bg",
-    "de",
-    "el",
-    "en",
-    "es",
-    "fr",
-    "hi",
-    "ru",
-    "sw",
-    "th",
-    "tr",
-    "ur",
-    "vi",
-    "zh",
+    "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
+    "ur", "vi", "zh"
 ]
 
 
