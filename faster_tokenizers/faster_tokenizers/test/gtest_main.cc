@@ -1,0 +1,62 @@
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */
+
+#include "gtest/gtest.h"
+#include "gflags/gflags.h"
+#include "glog/logging.h"
+
+
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  std::vector<char*> new_argv;
+  for (int i = 0; i < argc; ++i) {
+    new_argv.push_back(argv[i]);
+  }
+
+  std::vector<std::string> envs;
+  std::vector<std::string> undefok;
+
+  char* env_str = nullptr;
+  if (envs.size() > 0) {
+    std::string env_string = "--tryfromenv=";
+    for (auto t : envs) {
+      env_string += t + ",";
+    }
+    env_string = env_string.substr(0, env_string.length() - 1);
+    env_str = strdup(env_string.c_str());
+    new_argv.push_back(env_str);
+    VLOG(1) << "gtest env_string:" << env_string;
+  }
+
+  char* undefok_str = nullptr;
+  if (undefok.size() > 0) {
+    std::string undefok_string = "--undefok=";
+    for (auto t : undefok) {
+      undefok_string += t + ",";
+    }
+    undefok_string = undefok_string.substr(0, undefok_string.length() - 1);
+    undefok_str = strdup(undefok_string.c_str());
+    new_argv.push_back(undefok_str);
+    VLOG(1) << "gtest undefok_string:" << undefok_string;
+  }
+
+  int new_argc = static_cast<int>(new_argv.size());
+  char** new_argv_address = new_argv.data();
+  ::GFLAGS_NAMESPACE::ParseCommandLineFlags(
+      &new_argc, &new_argv_address, false);
+  int ret = RUN_ALL_TESTS();
+  if (env_str) free(env_str);
+  if (undefok_str) free(undefok_str);
+  return ret;
+}

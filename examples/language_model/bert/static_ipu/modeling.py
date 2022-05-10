@@ -493,10 +493,10 @@ class IpuBertQAAccAndLoss(paddle.nn.Layer):
         with paddle.static.name_scope("loss"):
             start_loss = paddle.fluid.layers.softmax(start_logits)
             start_loss = self.custom_ops.custom_nll_loss(
-                start_loss, start_labels, 1, -100, False)
+                start_loss, start_labels, 1, "None", False)
             end_loss = paddle.fluid.layers.softmax(end_logits)
             end_loss = self.custom_ops.custom_nll_loss(end_loss, end_labels, 1,
-                                                       -100, False)
+                                                       "None", False)
             loss = paddle.add(start_loss, end_loss)
 
         with paddle.static.name_scope("acc"):
@@ -662,7 +662,7 @@ class IpuBertPretrainingMLMAccAndLoss(Layer):
 
         masked_lm_softmax = paddle.fluid.layers.softmax(mlm)
         mlm_loss = self.custom_ops.custom_nll_loss(
-            masked_lm_softmax, masked_lm_ids, 1, self.ignore_index, False)
+            masked_lm_softmax, masked_lm_ids, 1, str(self.ignore_index), False)
 
         return mlm_acc, mlm_loss
 
@@ -700,6 +700,6 @@ class IpuBertPretrainingNSPAccAndLoss(Layer):
 
         next_sentence_softmax = paddle.fluid.layers.softmax(nsp)
         nsp_loss = self.custom_ops.custom_nll_loss(next_sentence_softmax,
-                                                   nsp_label, 1, -100, False)
+                                                   nsp_label, 1, "None", False)
 
         return nsp_acc, nsp_loss

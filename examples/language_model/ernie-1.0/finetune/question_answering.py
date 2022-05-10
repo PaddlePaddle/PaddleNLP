@@ -19,7 +19,7 @@ import os
 
 import paddle
 from paddlenlp.trainer import Trainer
-from paddlenlp.trainer.trainer_utils import PredictionOutput
+from paddlenlp.trainer import PredictionOutput
 
 
 class QuestionAnsweringTrainer(Trainer):
