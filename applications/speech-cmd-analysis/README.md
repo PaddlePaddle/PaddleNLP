@@ -131,7 +131,6 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 ```shell
 python preprocess.py \
     --input_file ./data/audio-expense-account.jsonl \
-    --task_type "ext" \
     --save_dir ./data/ \
     --negative_ratio 5 \
     --splits 0.2 0.8 0.0 \
@@ -140,13 +139,10 @@ python preprocess.py \
 
 可配置参数包括
 
-- ``input_file``: 标注数据文件名。数据格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)一致，即doccano平台导出格式。
+- ``input_file``: 标注数据文件名。数据格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)一致。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。若``splits``为空，则数据存储在``train.txt``文件，若``splits``为长度为3的列表，则数据存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
-- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取类型任务有效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。本应用场景为抽取式任务``ext``。
-- ``options``:（可选）指定分类任务的类别标签，该参数只对分类类型任务有效。
-- ``prompt_prefix``:（可选）声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 
