@@ -139,8 +139,14 @@ def reader(data_path, max_seq_len=512):
                         if len(result_list) == 0:
                             break
                         elif result_list[0]['end'] <= max_content_len:
-                            cur_result = result_list.pop(0)
-                            cur_result_list.append(cur_result)
+                            if result_list[0]['end'] > 0:
+                                cur_result = result_list.pop(0)
+                                cur_result_list.append(cur_result)
+                            else:
+                                cur_result_list = [
+                                    result for result in result_list
+                                ]
+                                break
                         else:
                             break
 
@@ -152,6 +158,8 @@ def reader(data_path, max_seq_len=512):
                     json_lines.append(json_line)
 
                     for result in result_list:
+                        if result['end'] <= 0:
+                            break
                         result['start'] -= max_content_len
                         result['end'] -= max_content_len
                     accumulate += max_content_len
