@@ -22,7 +22,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
             example,
             is_split_into_words=True,
             max_seq_len=max_seq_len,
-            return_length=True)
+            return_length=False)
 
         # -2 for [CLS] and [SEP]
         if len(tokenized_input['input_ids']) - 2 < len(labels):
@@ -36,7 +36,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
                 'labels': [],
                 'input_ids': [],
                 'token_type_ids': [],
-                'seq_len': 0
+                # 'seq_len': 0
             }
             return tokenized_input
         tokenized_input = tokenizer(
@@ -44,7 +44,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
             max_seq_len=max_seq_len,
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
             is_split_into_words=True,
-            return_length=True)
+            return_length=False)
         label_ids = example['ner_tags']
         if len(tokenized_input['input_ids']) - 2 < len(label_ids):
             label_ids = label_ids[:len(tokenized_input['input_ids']) - 2]
