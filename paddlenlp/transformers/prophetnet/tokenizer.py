@@ -98,7 +98,8 @@ class ProphetNetTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  x_sep_token="[X_SEP]",
                  pad_token="[PAD]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         self.unique_no_split_tokens = [
             x_sep_token, unk_token, sep_token, bos_token, eos_token, cls_token,
             pad_token, mask_token
