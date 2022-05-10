@@ -51,55 +51,59 @@ def parse_args():
         default='tnews',
         type=str,
         help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()))
     parser.add_argument(
         "--model_name_or_path",
         default="ernie-3.0-medium-zh",
         type=str,
-        help="The directory or name of model.", )
+        help="The directory or name of model.")
     parser.add_argument(
         "--model_path",
         default='tnews_quant_models/mse4/int8',
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.")
     parser.add_argument(
         "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.", )
+        help="Device selected for inference.")
     parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size for predict.", )
+        "--batch_size", default=32, type=int, help="Batch size for predict.")
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        "than this will be truncated, sequences shorter will be padded.")
     parser.add_argument(
         "--perf_warmup_steps",
         default=20,
         type=int,
-        help="Warmup steps for performance test.", )
+        help="Warmup steps for performance test.")
+    parser.add_argument(
+        "--n_best_size",
+        default=20,
+        type=int,
+        help="The total number of n-best predictions to generate in the nbest_predictions.json output file."
+    )
+    parser.add_argument(
+        "--max_answer_length",
+        default=50,
+        type=int,
+        help="Max answer length for question answering task.")
     parser.add_argument(
         "--use_trt",
         action='store_true',
-        help="Whether to use inference engin TensorRT.", )
+        help="Whether to use inference engin TensorRT.")
     parser.add_argument(
-        "--perf",
-        action='store_true',
-        help="Whether to test performance.", )
+        "--perf", action='store_true', help="Whether to test performance.")
     parser.add_argument(
         "--collect_shape",
         action='store_true',
-        help="Whether to collect shape info.", )
+        help="Whether to collect shape info.")
     parser.add_argument(
-        "--int8",
-        action='store_true',
-        help="Whether to use int8 inference.", )
+        "--int8", action='store_true', help="Whether to use int8 inference.")
     parser.add_argument(
         "--use_onnxruntime",
         type=distutils.util.strtobool,
@@ -355,7 +359,6 @@ class Predictor(object):
                     batch = batchify_fn(batch)
                     input_ids, segment_ids = batch["input_ids"].numpy(), batch[
                         "token_type_ids"].numpy()
-                    # (32, 128)
                     start_logits, end_logits = self.predict_batch(
                         [input_ids, segment_ids])
                     for idx in range(start_logits.shape[0]):
@@ -365,14 +368,9 @@ class Predictor(object):
                                   len(all_start_logits))
                         all_start_logits.append(start_logits[idx])
                         all_end_logits.append(end_logits[idx])
-                n_best_size = 20
-                max_answer_length = 50
                 all_predictions, _, _ = compute_prediction(
                     dev_example, dataset, (all_start_logits, all_end_logits),
-                    False, n_best_size, max_answer_length)
-                all_predictions, _, _ = compute_prediction(
-                    dev_example, dataset, (all_start_logits, all_end_logits),
-                    False, n_best_size, max_answer_length)
+                    False, args.n_best_size, args.max_answer_length)
                 res = squad_evaluate(
                     examples=[raw_data for raw_data in dev_example],
                     preds=all_predictions,
@@ -491,9 +489,7 @@ def main():
 
         column_names = dev_ds.column_names
         dev_ds = dev_ds.map(trans_fn, remove_columns=column_names)
-        ignore_label = -100
-        batchify_fn = DataCollatorForTokenClassification(
-            tokenizer, label_pad_token_id=ignore_label)
+        batchify_fn = DataCollatorForTokenClassification(tokenizer)
         outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     elif args.task_name == "cmrc2018":
         dev_example = load_dataset("cmrc2018", split="validation")
