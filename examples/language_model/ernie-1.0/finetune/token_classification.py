@@ -36,7 +36,6 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
                 'labels': [],
                 'input_ids': [],
                 'token_type_ids': [],
-                # 'seq_len': 0
             }
             return tokenized_input
         tokenized_input = tokenizer(
