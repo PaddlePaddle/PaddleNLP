@@ -302,12 +302,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             # supports. Use only the target keys to trigger `enable_truncation`.
             # This should enable this code to works on various `tokenizers`
             # targets.
-            if _truncation is None:
-                current = None
-            else:
-                current = {k: _truncation.get(k, None) for k in target}
-
-            if current != target:
+            if _truncation != target:
                 self._tokenizer.enable_truncation(**target)
 
         if padding_strategy == PaddingStrategy.DO_NOT_PAD:

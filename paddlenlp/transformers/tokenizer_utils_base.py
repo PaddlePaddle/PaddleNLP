@@ -2509,7 +2509,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return_tensors (`str` or [`TensorType`], *optional*):
                 If set, will return tensors instead of list of python integers. Acceptable values are:
 
-                - `'pd'`: Return Paddle `torch.Tensor` objects.
+                - `'pd'`: Return Paddle `paddle.Tensor` objects.
                 - `'np'`: Return Numpy `np.ndarray` objects.
             verbose (`bool`, *optional*, defaults to `True`):
                 Whether or not to print more information and warnings.
@@ -3045,7 +3045,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
     def batch_decode(self,
                      sequences: Union[List[int], List[List[int]], "np.ndarray",
-                                      "torch.Tensor", "tf.Tensor"],
+                                      "paddle.Tensor"],
                      skip_special_tokens: bool=False,
                      clean_up_tokenization_spaces: bool=True,
                      **kwargs) -> List[str]:
@@ -3053,7 +3053,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Convert a list of lists of token ids into a list of strings by calling decode.
 
         Args:
-            sequences (`Union[List[int], List[List[int]], np.ndarray, torch.Tensor, tf.Tensor]`):
+            sequences (`Union[List[int], List[List[int]], np.ndarray, paddle.Tensor]`):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
@@ -3085,7 +3085,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Similar to doing `self.convert_tokens_to_string(self.convert_ids_to_tokens(token_ids))`.
 
         Args:
-            token_ids (`Union[int, List[int], np.ndarray, paddle.Tensor, tf.Tensor]`):
+            token_ids (`Union[int, List[int], np.ndarray, paddle.Tensor]`):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
