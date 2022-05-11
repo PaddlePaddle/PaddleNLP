@@ -82,6 +82,8 @@ void Tokenizer::EnablePadMethod(Direction direction,
   }
   if (pad_to_multiple_of != nullptr) {
     pad_method_.pad_to_mutiple_of = *pad_to_multiple_of;
+  } else {
+    pad_method_.pad_to_mutiple_of = 0;
   }
 }
 void Tokenizer::DisablePadMethod() { use_padding_ = false; }
@@ -357,6 +359,15 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
   Tokenizer tokenizer;
   jo.get_to(tokenizer);
   return tokenizer;
+}
+
+
+bool Tokenizer::GetUseTruncation() const {
+  return use_truncation_;
+}
+
+bool Tokenizer::GetUsePadding() const {
+  return use_padding_;
 }
 
 void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
