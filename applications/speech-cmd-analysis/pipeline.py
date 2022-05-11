@@ -32,7 +32,8 @@ if __name__ == '__main__':
         '--uie_model', type=str, default=None, help='The path to uie model.')
     parser.add_argument(
         '--schema',
-        type=list,
+        type=str,
+        nargs='+',
         default=['时间', '出发地', '目的地', '费用'],
         help='The type of entities expected to extract.')
     parser.add_argument(
