@@ -20,14 +20,14 @@ pip install ./dist/pipelines-0.1.0a0-py3-none-any.whl
 ```
 
 
-## 快速开始
+## 效果速览
 
-### 一键体验智能问答应用效果
-```python
-python ./examples/question-answering/dense_qa_example.py
-```
-我们针对中国重点城市的基本信息搭建了百科知识问答小系统，运行上述代码体验效果如下:
-![](https://tianxin1860.github.io/img/question_answering.png)
+### 智能问答系统
+我们针对中国重点城市的基本信息搭建了百科知识智能问答系统, 您可以根据自己的需求基于业务数据快速搭建适合自己的智能问答系统。点击[这里](./examples/question-answering/)查看如何快速构建智能问答系统
+![](https://tianxin1860.github.io/img/qa.jif)
+
+### 语义检索系统
+
 
 ### 讨论组
 - [文心大模型官方主页](https://wenxin.baidu.com/)
