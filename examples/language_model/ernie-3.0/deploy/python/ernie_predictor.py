@@ -36,13 +36,12 @@ class InferBackend(object):
                  device='cpu',
                  use_fp16=False,
                  enable_quantize=False,
-                 collect_shape=False,
+                 set_dynamic_shape=False,
                  num_threads=10):
         file_name = model_path.split('/')[-1]
         model_dir = model_path[:-1 * len(file_name)]
         int8_model = self.paddle_quantize_model(
             model_dir, file_name + ".pdmodel", file_name + ".pdiparams")
-        print("int8_model", int8_model)
         print(">>> [InferBackend] creat engine ...")
         if device == 'gpu' and int8_model or use_fp16:
             from paddle import inference
@@ -75,7 +74,7 @@ class InferBackend(object):
                     use_static=False,
                     use_calib_mode=False)
             shape_file = "shape_info.txt"
-            if collect_shape:
+            if set_dynamic_shape:
                 config.collect_shape_range_info(shape_file)
             else:
                 config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
@@ -256,7 +255,7 @@ class ErniePredictor(object):
             exit(0)
         if args.device == 'cpu':
             args.use_fp16 = False
-            args.collect_shape = False
+            args.set_dynamic_shape = False
         if args.device == 'gpu':
             args.num_threads = 10
             args.enable_quantize = False
@@ -266,34 +265,38 @@ class ErniePredictor(object):
             device=args.device,
             use_fp16=args.use_fp16,
             enable_quantize=args.enable_quantize,
-            collect_shape=args.collect_shape,
+            set_dynamic_shape=args.set_dynamic_shape,
             num_threads=args.num_threads)
-        if args.collect_shape:
-            min_batch_size, max_batch_size, opt_batch_size = 1, 32, 32
-            min_seq_len, max_seq_len, opt_seq_len = 2, 128, 32
-            batches = [
-                [
-                    np.zeros(
-                        [min_batch_size, min_seq_len], dtype="int64"), np.zeros(
-                            [min_batch_size, min_seq_len], dtype="int64")
-                ],
-                [
-                    np.zeros(
-                        [max_batch_size, max_seq_len], dtype="int64"), np.zeros(
-                            [max_batch_size, max_seq_len], dtype="int64")
-                ],
-                [
-                    np.zeros(
-                        [opt_batch_size, opt_seq_len], dtype="int64"), np.zeros(
-                            [opt_batch_size, opt_seq_len], dtype="int64")
-                ],
-            ]
-            for batch in batches:
-                self.inference_backend.infer(batch)
-            print(
-                "collect_shape finished, please close collect_shape and restart."
-            )
+        if args.set_dynamic_shape:
+            # If set_dynamic_shape is turned on, all required dynamic shapes will be automatically set according to the batch_size and max_seq_length.
+            self.set_dynamic_shape(args.max_seq_length, args.max_seq_length)
             exit(0)
+
+    def set_dynamic_shape(self, max_seq_length, batch_size):
+        min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
+        min_seq_len, max_seq_len, opt_seq_len = 2, args.max_seq_length, 32
+        batches = [
+            [
+                np.zeros(
+                    [min_batch_size, min_seq_len], dtype="int64"), np.zeros(
+                        [min_batch_size, min_seq_len], dtype="int64")
+            ],
+            [
+                np.zeros(
+                    [max_batch_size, max_seq_len], dtype="int64"), np.zeros(
+                        [max_batch_size, max_seq_len], dtype="int64")
+            ],
+            [
+                np.zeros(
+                    [opt_batch_size, opt_seq_len], dtype="int64"), np.zeros(
+                        [opt_batch_size, opt_seq_len], dtype="int64")
+            ],
+        ]
+        for batch in batches:
+            self.inference_backend.infer(batch)
+        print(
+            "[InferBackend] Set dynamic shape finished, please close set_dynamic_shape and restart."
+        )
 
     def predict_batch(self, data):
         return self.inference_backend.infer(data)

@@ -29,9 +29,13 @@ pip install -r requirements_gpu.txt
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer
 ```
-如果在支持AVX512VNNI的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或11代CPU以上机器，可开启enable_quantize开关，无需数据便可对FP32模型进行量化，获得1到2倍的加速效果，具体部署指令如下，如无法确认是否支持avx512-vnni，可使用lscpu命令查看cpu信息，并在Flags中查找是否有avx512-vnni支持
+如果在支持avx512_vnni的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或11代CPU以上机器，可开启enable_quantize开关，无需数据便可对FP32模型进行量化，获得1到2倍的加速效果，具体部署指令如下
 ```
 python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantize
+```
+如无法确认是否支持avx512_vnni指令集，可使用如下命令进行查看
+```
+cat /proc/cpuinfo | grep avx512_vnni
 ```
 参数说明：
 | 参数 |参数说明 |
@@ -42,7 +46,7 @@ python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantiz
 |--batch_size |测试的batch size大小，默认为32|
 |--perf | 是否测试性能，默认关闭 |
 |--enable_quantize | 是否使用动态量化进行加速，默认关闭 |
-|--num_threads | 配置cpu的线程数，默认为10 |
+|--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 ### GPU端
 在GPU端，请使用如下指令进行部署
 ```
@@ -52,7 +56,7 @@ python infer_gpu.py --task_name tnews --model_path ./model/infer
 ```
 python infer_gpu.py --task_name tnews --model_path ./model/infer --enable_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化具体请参考：[模型量化脚本使用说明]()，量化模型的部署指令为  
+如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明]()，量化模型的部署指令为  
 ```
 python infer_gpu.py --task_name tnews --model_path ./quantize_model/int8
 ```

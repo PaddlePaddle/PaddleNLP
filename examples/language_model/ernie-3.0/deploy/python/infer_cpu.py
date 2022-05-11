@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from ernie_predictor import *
+from multiprocessing import cpu_count
 
 
 def parse_args():
@@ -62,7 +63,7 @@ def parse_args():
         help="Whether to enable quantization for acceleration.", )
     parser.add_argument(
         "--num_threads",
-        default=10,
+        default=cpu_count(),
         type=int,
         help="num_threads for cpu.", )
     args = parser.parse_args()

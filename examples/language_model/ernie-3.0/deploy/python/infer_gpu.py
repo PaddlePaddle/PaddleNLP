@@ -57,9 +57,9 @@ def parse_args():
         action='store_true',
         help="Whether to test performance.", )
     parser.add_argument(
-        "--collect_shape",
+        "--set_dynamic_shape",
         action='store_true',
-        help="Whether to collect shape info.", )
+        help="Whether to automatically set dynamic shape.", )
     parser.add_argument(
         "--use_fp16",
         action='store_true',
