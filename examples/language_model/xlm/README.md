@@ -95,7 +95,7 @@ python xnli_eval.py \
 ```shell
 python -m paddle.distributed.launch --gpus 0,1 --log_dir outputs xnli_train.py \
     --batch_size 8 \
-    --model_name_or_path ernie-m-base \
+    --model_name_or_path xlm-mlm-tlm-xnli15-1024 \
     --save_steps 24544 \
     --output_dir outputs
 ```
