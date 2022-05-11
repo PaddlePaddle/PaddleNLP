@@ -1067,7 +1067,7 @@ class Trainer:
             model = paddle.jit.to_static(model, input_spec=input_spec)
 
             # Save in static graph model.
-            save_path = os.path.join(output_dir, "inference", "infer")
+            save_path = os.path.join(output_dir, "infer", "inference")
             logger.info("Exporting inference model to %s" % save_path)
             paddle.jit.save(model, save_path)
             logger.info("Inference model exported.")
