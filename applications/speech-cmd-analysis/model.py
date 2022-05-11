@@ -18,7 +18,7 @@ from paddlenlp.transformers import AutoModel
 
 
 class UIE(nn.Layer):
-    def __init__(self, encoding_model='ernie-1.0', hidden_size=768):
+    def __init__(self, encoding_model, hidden_size):
         super(UIE, self).__init__()
         self.encoder = AutoModel.from_pretrained(encoding_model)
         self.linear_start = paddle.nn.Linear(hidden_size, 1)
