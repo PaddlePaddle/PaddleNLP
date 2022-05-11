@@ -559,7 +559,7 @@ class NeZhaModel(NeZhaPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
-        r'''
+        r"""
         The NeZhaModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -618,7 +618,7 @@ class NeZhaModel(NeZhaPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞浆!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
         extended_attention_mask = self.get_extended_attention_mask(
