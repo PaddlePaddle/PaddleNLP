@@ -59,7 +59,7 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 ```bash
 # clone paddle repo
-git clone https://github.com/paddlepaddle/Paddle.git
+git clone https://github.com/paddlepaddle/Paddle.git -b release/2.3
 cd Paddle
 
 # build docker image
@@ -92,7 +92,7 @@ All of later processes are required to be executed in the container.
 
 ```bash
 # clone paddle repo
-git clone https://github.com/paddlepaddle/Paddle.git
+git clone https://github.com/paddlepaddle/Paddle.git -b release/2.3
 cd Paddle
 
 mkdir build && cd build

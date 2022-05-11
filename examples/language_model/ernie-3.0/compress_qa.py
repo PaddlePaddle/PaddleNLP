@@ -39,7 +39,7 @@ from compress_trainer import CompressConfig, PTQConfig
 from paddlenlp.utils.log import logger
 from datasets import load_metric, load_dataset
 
-sys.path.append("../../language_model/ernie-1.0/finetune")
+sys.path.append("../ernie-1.0/finetune")
 from question_answering import (
     QuestionAnsweringTrainer,
     CrossEntropyLossForSQuAD,
@@ -47,13 +47,13 @@ from question_answering import (
     prepare_validation_features, )
 from utils import (
     ALL_DATASETS,
-    DataTrainingArguments,
+    DataArguments,
     ModelArguments, )
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Log model and data config
@@ -157,7 +157,6 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # prune = False
     prune = True
     compress_config = CompressConfig(quantization_config=PTQConfig(
         algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
@@ -167,51 +166,6 @@ def main():
         pruning=prune,
         quantization=True,
         compress_config=compress_config)
-
-    # checkpoint = None
-    # if training_args.resume_from_checkpoint is not None:
-    #     checkpoint = training_args.resume_from_checkpoint
-    # elif last_checkpoint is not None:
-    #     checkpoint = last_checkpoint
-
-    # if training_args.do_train:
-    #     # Training
-    #     train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    #     metrics = train_result.metrics
-    #     trainer.save_model()  # Saves the tokenizer too for easy upload
-    #     trainer.log_metrics("train", metrics)
-    #     trainer.save_metrics("train", metrics)
-    #     trainer.save_state()
-
-    # model.set_state_dict(paddle.load("tmp/model_state.pdparams"))
-
-    # Evaluate and tests model
-    # if training_args.do_eval:
-    #     eval_metrics = trainer.evaluate()
-    #     trainer.log_metrics("eval", eval_metrics)
-
-    # if training_args.do_predict:
-    #     test_ret = trainer.predict(predict_dataset, predict_examples)
-    #     trainer.log_metrics("predict", test_ret.metrics)
-
-    #     if test_ret.label_ids is None:
-    #         paddle.save(
-    #             test_ret.predictions,
-    #             os.path.join(training_args.output_dir, "test_results.pdtensor"),
-    #         )
-
-    # if training_args.do_export:
-    #     # export inference model
-    #     input_spec = [
-    #         paddle.static.InputSpec(
-    #             shape=[None, None], dtype="int64"),  # input_ids
-    #         paddle.static.InputSpec(
-    #             shape=[None, None], dtype="int64")  # segment_ids
-    #     ]
-    #     trainer.export_model(
-    #         input_spec=input_spec,
-    #         load_best_model=True,
-    #         output_dir=model_args.export_model_dir)
 
 
 if __name__ == "__main__":
