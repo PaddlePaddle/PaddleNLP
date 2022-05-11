@@ -37,20 +37,15 @@ def do_train():
     set_seed(args.seed)
 
     encoding_model = MODEL_MAP[args.model]['encoding_model']
-    hidden_size = MODEL_MAP[args.model]['hidden_size']
-    url = MODEL_MAP[args.model]['url']
+    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
+
+    for key, val in resource_file_urls.items():
+        file_path = os.path.join(args.model, key)
+        if not os.path.exists(file_path):
+            get_path_from_url(val, args.model)
 
     tokenizer = AutoTokenizer.from_pretrained(encoding_model)
-    model = UIE(encoding_model, hidden_size)
-
-    pretrained_model_path = os.path.join(args.model, "model_state.pdparams")
-
-    if not os.path.exists(pretrained_model_path):
-        get_path_from_url(url, args.model)
-
-    state_dict = paddle.load(pretrained_model_path)
-    model.set_dict(state_dict)
-    print("Init from: {}".format(pretrained_model_path))
+    model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(
         reader,
@@ -79,6 +74,10 @@ def do_train():
         dataset=dev_ds, batch_size=args.batch_size, shuffle=False)
     dev_data_loader = paddle.io.DataLoader(
         dataset=dev_ds, batch_sampler=dev_batch_sampler, return_list=True)
+
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=args.learning_rate, parameters=model.parameters())
@@ -120,8 +119,7 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                paddle.save(model.state_dict(), save_param_path)
+                model.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
                 print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
@@ -132,9 +130,7 @@ def do_train():
                     )
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
-                    save_best_param_path = os.path.join(save_dir,
-                                                        "model_state.pdparams")
-                    paddle.save(model.state_dict(), save_best_param_path)
+                    model.save_pretrained(save_dir)
                 tic_train = time.time()
 
 
@@ -155,6 +151,7 @@ if __name__ == "__main__":
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--model", choices=["uie-base", "uie-tiny"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
+    parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 
     args = parser.parse_args()
     # yapf: enable
