@@ -315,7 +315,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 "direction": self.padding_side,
                 "pad_id": self.pad_token_id,
                 "pad_token": self.pad_token,
-                "pad_type_id": self.pad_token_type_id,
+                "pad_token_type_id": self.pad_token_type_id,
                 "pad_to_multiple_of": pad_to_multiple_of,
             }
             if _padding != target:
