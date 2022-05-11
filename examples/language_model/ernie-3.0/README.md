@@ -48,48 +48,9 @@ ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLU
                         </td>  
                 </tr>
                 <tr>
-                        <td rowspan=1 align=center> 24L1024H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">RoBERTa-wwm-ext-large</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.61</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.33</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.02</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.88</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">78.81</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">90.79</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.67</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">70.58/89.82</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">85.72</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.26</span>
-                        </td>
-                </tr>
-                <tr>
             <td rowspan=6 align=center> 12L768H </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
+                                <span style="font-size:18px"><b>ERNIE 3.0-Base-zh</b></span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>76.05</b></span>
@@ -318,7 +279,7 @@ ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLU
                 <tr>
                        <td rowspan=2 align=center> 6L768H </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
+                                <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>72.49</b></span>
@@ -435,6 +396,37 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --do_train
 ### 模型压缩 API 及使用
 
 ERNIE 3.0 基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` API 即可一键启动裁剪和量化，并自动保存压缩后的模型。
+
+首先需要安装 paddleslim 包
+
+```shell
+pip install paddleslim
+```
+
+可以这样使用压缩 API (示例代码只提供了核心调用，如需跑通完整的例子可参考下方完整样例脚本):
+
+```python
+
+trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer)
+
+output_dir = os.path.join(model_args.model_name_or_path, "compress")
+
+compress_config = CompressConfig(quantization_config=PTQConfig(
+    algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
+
+trainer.compress(
+    data_args.dataset,
+    output_dir,
+    pruning=True,
+    quantization=True,
+    compress_config=compress_config)
+```
 
 并且，ERNIE 3.0 还提供了压缩 API 在分类、命名实体识别、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
