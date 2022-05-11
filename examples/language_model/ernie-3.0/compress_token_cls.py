@@ -52,9 +52,6 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
 
     paddle.set_device(training_args.device)
 
@@ -72,6 +69,10 @@ def main():
 
         training_args.per_device_train_batch_size = config["batch_size"]
         training_args.per_device_eval_batch_size = config["batch_size"]
+
+    # Log model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
