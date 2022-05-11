@@ -170,39 +170,18 @@ class PretrainedModel(Layer, GenerationMixin):
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         if attention_mask.ndim == 3:
-            extended_attention_mask = attention_mask.unsqueeze(axis=1)
+            attention_mask = attention_mask.unsqueeze(axis=1)
         # Provided a padding mask of dimensions [batch_size, seq_length]
         # Todo yingyibiao
         # - if the model is a decoder, apply a causal mask in addition to the padding mask
         # - if the model is an encoder, make the mask broadcastable to
         # [batch_size, num_heads, seq_length, seq_length]
         elif attention_mask.ndim == 2:
-            extended_attention_mask = attention_mask.unsqueeze(axis=[1, 2])
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-        extended_attention_mask = extended_attention_mask.astype(
+        extended_attention_mask = attention_mask.astype(
             paddle.get_default_dtype())
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        return extended_attention_mask
-
-    def create_extended_attention_mask_for_decoder(input_shape, attention_mask,):
-        batch_size, seq_length = input_shape
-        seq_ids = torch.arange(seq_length)
-        causal_mask = seq_ids[None, None, :].repeat(batch_size, seq_length, 1) <= seq_ids[None, :, None]
-        # in case past_key_values are used we need to add a prefix ones mask to the causal mask
-        # causal and attention masks must have same type with pytorch version < 1.3
-        causal_mask = causal_mask.to(attention_mask.dtype)
-
-        if causal_mask.shape[1] < attention_mask.shape[1]:
-            prefix_seq_len = attention_mask.shape[1] - causal_mask.shape[1]
-            causal_mask = torch.cat(
-                [
-                    torch.ones((batch_size, seq_length, prefix_seq_len), device=device, dtype=causal_mask.dtype),
-                    causal_mask,
-                ],
-                axis=-1,
-            )
-
-        extended_attention_mask = causal_mask[:, None, :, :] * attention_mask[:, None, None, :]
         return extended_attention_mask
 
     @classmethod
