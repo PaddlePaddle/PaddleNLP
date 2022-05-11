@@ -1,12 +1,8 @@
 import paddle
-#paddle.disable_signal_handler()
 
 from pipelines.document_stores import ElasticsearchDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
 
-# Note: Here import paddle occure core
-#import paddle
-#paddle.disable_signal_handler()
 
 def semantic_search_tutorial():
     document_store = ElasticsearchDocumentStore(host="10.21.226.175", port="8200", username="", password="", index="dureader_robust_query_encoder")
@@ -30,7 +26,6 @@ def semantic_search_tutorial():
     from pipelines.pipelines import SemanticSearchPipeline
     pipe = SemanticSearchPipeline(retriever, ranker)
 
-    ## ask question.
     prediction = pipe.run(
         query="北京有多少个行政区？", params={"Retriever": {"top_k": 50}, "Ranker":{"top_k": 5} })
 

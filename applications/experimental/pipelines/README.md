@@ -24,7 +24,8 @@ pip install ./dist/pipelines-0.1.0a0-py3-none-any.whl
 
 ### 智能问答系统
 我们针对中国重点城市的基本信息搭建了百科知识智能问答系统, 您可以根据自己的需求基于业务数据快速搭建适合自己的智能问答系统。点击[这里](./examples/question-answering/)查看如何快速构建智能问答系统
-![](https://tianxin1860.github.io/img/qa.jif)
+
+![qa](https://user-images.githubusercontent.com/40840292/167844657-a9d5a252-1bc3-4a70-9294-4ee02519bae2.gif)
 
 ### 语义检索系统
 

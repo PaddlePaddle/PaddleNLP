@@ -1,13 +1,4 @@
-# ## Task: Question Answering for Game of Thrones
-#
-# Question Answering can be used in a variety of use cases. A very common one:  Using it to navigate through complex
-# knowledge bases or long documents ("search setting").
-#
-# A "knowledge base" could for example be your website, an internal wiki or a collection of financial reports.
-# In this tutorial we will work on a slightly different domain: "Game of Thrones".
-#
-# Let's see how we can use a bunch of Wikipedia articles to answer a variety of questions about the
-# marvellous seven kingdoms.
+### 城市百科知识智能问答系统
 
 import paddle
 import logging
@@ -19,23 +10,6 @@ from pipelines.nodes import ErnieReader, ErnieRanker, DensePassageRetriever
 
 def dense_qa_pipeline():
     logger = logging.getLogger(__name__)
-
-    # ## Document Store
-    #
-    # pipelines finds answers to queries within the documents stored in a `DocumentStore`. The current implementations of
-    # `DocumentStore` include `ElasticsearchDocumentStore`, `FAISSDocumentStore`, `SQLDocumentStore`, and `InMemoryDocumentStore`.
-    #
-    # **Here:** We recommended Elasticsearch as it comes preloaded with features like full-text queries, BM25 retrieval,
-    # and vector storage for text embeddings.
-    # **Alternatives:** If you are unable to setup an Elasticsearch instance, then follow the Tutorial 3
-    # for using SQL/InMemory document stores.
-    # **Hint**:
-    # This tutorial creates a new document store instance with Wikipedia articles on Game of Thrones. However, you can
-    # configure pipelines to work with your existing document stores.
-    #
-    # Start an Elasticsearch server
-    # You can start Elasticsearch on your local machine instance using Docker. If Docker is not readily available in
-    # your environment (e.g. in Colab notebooks), then you can manually download and execute Elasticsearch from source.
 
     faiss_index_path = "faiss_index"
     faiss_document_store = "faiss_document_store.db"
@@ -83,34 +57,16 @@ def dense_qa_pipeline():
         # save index
         document_store.save(faiss_index_path)
 
-    # ### Reader
-    #
-    # A Reader scans the texts returned by retrievers in detail and extracts the k best answers. They are based
-    # on powerful, but slower deep learning models.
-    #
-    # pipelines currently supports Readers based on the frameworks FARM and Transformers.
-    # With both you can either load a local model or one from Hugging Face's model hub (https://huggingface.co/models).
-    # **Here:** a medium sized RoBERTa QA model using a Reader based on
-    # **Alternatives (Reader):** TransformersReader (leveraging the `pipeline` of the Transformers package)
-    # **Alternatives (Models):** e.g. "distilbert-base-uncased-distilled-squad" (fast) or
-    # **Hint:** You can adjust the model to return "no answer possible" with the no_ans_boost. Higher values mean
-    #           the model prefers "no answer possible"
-
     ### Ranker
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=True)
 
     reader = ErnieReader(model_name_or_path="ernie-gram-zh-finetuned-dureader-robust", use_gpu=True, num_processes=1)
 
     # ### Pipeline
-    #
-    # With a pipelines `Pipeline` you can stick together your building blocks to a search pipeline.
-    # Under the hood, `Pipelines` are Directed Acyclic Graphs (DAGs) that you can easily customize for your own use cases.
-    # To speed things up, pipelines also comes with a few predefined Pipelines. One of them is the `ExtractiveQAPipeline` that combines a retriever and a reader to answer our questions.
     from pipelines.pipelines import ExtractiveQAPipeline
 
     pipe = ExtractiveQAPipeline(reader, ranker, retriever)
 
-    ## Voilà! Ask a question!
     pipeline_params = {"Retriever": {"top_k": 50}, "Ranker":{"top_k": 1}, "Reader": {"top_k": 1}}
 
     prediction = pipe.run(query="北京市有多少个行政区？", params=pipeline_params)
