@@ -261,12 +261,14 @@ python run_seq_cls.py \
 # 预测结果
 python deploy/predict_chnsenticorp.py --model_dir=./tmp/chnsenticorp_v2/infer
 ```
-训练完，导出模型之后，可以用于部署，deploy/predict_chnsenticorp.py文件提供了python部署预测示例。运行后预测结果打印如下：
+训练完，导出模型之后，可以用于部署，deploy/predict_chnsenticorp.py文件提供了python部署预测示例。
+运行后预测结果打印如下：
 ```text
 Data: 东西不错，不过有人不太喜欢镜面的，我个人比较喜欢，总之还算满意。   Label: positive
 Data: 房间不错,只是上网速度慢得无法忍受,打开一个网页要等半小时,连邮件都无法收。另前台工作人员服务态度是很好，只是效率有得改善。          Label: positive
 Data: 挺失望的,还不如买一本张爱玲文集呢,以<色戒>命名,可这篇文章仅仅10多页,且无头无尾的,完全比不上里面的任意一篇其它文章.         Label: negative
 ```
+更多关于部署的情况可以参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models#%E6%A8%A1%E5%9E%8B%E9%A2%84%E6%B5%8B)。
 
 ## 参考文献
 - [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/pdf/1904.09223.pdf)
