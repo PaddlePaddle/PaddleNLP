@@ -264,7 +264,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
-        "ernie-3.0-base": {
+        "ernie-3.0-base-zh": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -278,22 +278,7 @@ class ErniePretrainedModel(PretrainedModel):
             "use_task_id": True,
             "vocab_size": 40000
         },
-        "ernie-3.0-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "intermediate_size": 4096,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 2048,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "task_type_vocab_size": 16,
-            "type_vocab_size": 4,
-            "use_task_id": True,
-            "vocab_size": 40000
-        },
-        "ernie-3.0-medium": {
+        "ernie-3.0-medium-zh": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -334,12 +319,10 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_zh_dureader_cross_encoder.pdparams",
             "rocketqa-v1-marco-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa_v1_marco_cross_encoder.pdparams",
-            "ernie-3.0-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base.pdparams",
-            "ernie-3.0-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_large.pdparams",
-            "ernie-3.0-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium.pdparams",
+            "ernie-3.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams",
+            "ernie-3.0-medium-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams",
         }
     }
     base_model_prefix = "ernie"
