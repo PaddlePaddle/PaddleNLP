@@ -506,6 +506,8 @@ from paddlenlp import Taskflow
   [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relations': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relations': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
   ```
 
+  使用**pprint**分行输出，结果更易读：
+
   ```python
   >>> from pprint import pprint
 
@@ -561,6 +563,8 @@ from paddlenlp import Taskflow
   >>> ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')
   [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.998334669586864}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.993496447299993, 'relations': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9994008822614759}]}}]}]
   ```
+
+  使用**pprint**分行输出，结果更易读：
 
   ```python
   >>> from pprint import pprint
