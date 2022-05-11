@@ -78,17 +78,17 @@ class RemBertTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {"rembert": {"do_lower_case": False}, }
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=False,
-            remove_space=True,
-            keep_accents=True,
-            cls_token="[CLS]",
-            unk_token="[UNK]",
-            sep_token="[SEP]",
-            pad_token="[PAD]",
-            mask_token="[MASK]", ):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=False,
+                 remove_space=True,
+                 keep_accents=True,
+                 cls_token="[CLS]",
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 mask_token="[MASK]",
+                 **kwargs):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space

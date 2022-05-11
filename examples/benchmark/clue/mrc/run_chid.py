@@ -47,9 +47,9 @@ def parse_args():
         help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
         "--output_dir",
-        default="best_clue_model",
+        default="best_chid_model",
         type=str,
-        help="The  path of the checkpoints .", )
+        help="The path of the checkpoints .", )
     parser.add_argument(
         "--num_train_epochs",
         default=3,

@@ -90,7 +90,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         self.sp_model = spm.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
