@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 from distutils.util import strtobool
+
+import tqdm
 from paddle.utils.cpp_extension import load
 
 
@@ -37,6 +39,24 @@ def load_custom_ops():
         extra_cxx_cflags=['-DONNX_NAMESPACE=onnx'],
         build_directory=custom_dir, )
     return custom_ops
+
+
+class ProgressBar:
+    def __init__(self):
+        self._bar = None
+        self._last = 0
+
+    def __call__(self, progress: int, total: int):
+        if self._bar is None:
+            bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} "
+            bar_format += "[{elapsed}<{remaining}]"
+            self._bar = tqdm.tqdm(
+                desc="Graph compilation", total=total, bar_format=bar_format)
+        self._bar.update(progress - self._last)
+        self._last = progress
+        if progress == total:
+            self._bar.close()
+            self._bar = None
 
 
 def str_to_bool(val):
