@@ -17,7 +17,7 @@ limitations under the License. */
 namespace {
 std::vector<std::vector<int64_t>>
 InferShape(std::vector<int64_t> x_shape, std::vector<int64_t> y_shape,
-           const int &reduction, const int &ignoreIndex,
+           const int &reduction, const std::string &ignoreIndex,
            const bool &inputIsLogProbability) {
   // 0: sum, 1: mean, 2: none
   if (reduction == 2) {
@@ -43,7 +43,7 @@ std::vector<paddle::Tensor> OpBackward(const paddle::Tensor &x) { return {x}; }
 PD_BUILD_OP(custom_nll_loss)
     .Inputs({"X", "Y"})
     .Outputs({"Out"})
-    .Attrs({"reduction: int", "ignoreIndex: int",
+    .Attrs({"reduction: int", "ignoreIndex: std::string",
             "inputIsLogProbability: bool"})
     .SetInferShapeFn(PD_INFER_SHAPE(InferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(InferDtype))

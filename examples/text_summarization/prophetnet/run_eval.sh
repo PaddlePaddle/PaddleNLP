@@ -4,7 +4,7 @@ if [ $DATASET = cnndm ]
 then
 python generate.py \
     --dataset=cnndm \
-    --vocab_file=./prophetnet.tokenizer \
+    --model_name_or_path=prophetnet-large-uncased \
     --output_path=./generate/cnndm/generate.txt \
     --min_target_length=45 \
     --max_target_length=110 \
@@ -19,7 +19,7 @@ python generate.py \
 else
 python generate.py \
     --dataset=gigaword \
-    --vocab_file=./prophetnet.tokenizer \
+    --model_name_or_path=prophetnet-large-uncased \
     --output_path=./generate/gigaword/generate.txt \
     --min_target_length=1 \
     --max_target_length=200 \

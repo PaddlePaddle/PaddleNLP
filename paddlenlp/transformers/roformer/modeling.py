@@ -16,7 +16,6 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle import tensor
 from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
@@ -30,9 +29,9 @@ __all__ = [
     "RoFormerForSequenceClassification",
     "RoFormerForTokenClassification",
     "RoFormerForQuestionAnswering",
+    'RoFormerForMultipleChoice',
+    "RoFormerForMaskedLM",
 ]
-
-dtype_float = paddle.get_default_dtype()
 
 
 def _convert_attention_mask(attn_mask, dtype):
@@ -42,10 +41,35 @@ def _convert_attention_mask(attn_mask, dtype):
                 paddle.bool, paddle.int8, paddle.int16, paddle.int32,
                 paddle.int64
         ]:
-            attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e9
+            attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e4
         else:
             attn_mask = paddle.cast(attn_mask, dtype)
     return attn_mask
+
+
+class RotaryPositionEmbedding(Layer):
+    def __init__(self, dim, max_position_embeddings=512):
+        super().__init__()
+        inv_freq = 1.0 / (10000**(paddle.arange(
+            0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        t = paddle.arange(
+            max_position_embeddings, dtype=paddle.get_default_dtype())
+        freqs = paddle.matmul(t.unsqueeze(1), inv_freq.unsqueeze(0))
+        self.register_buffer("sin", freqs.sin(), persistable=False)
+        self.register_buffer("cos", freqs.cos(), persistable=False)
+
+    def forward(self, x, offset=0):
+        # x shape [batch_size, num_heads, seqlen, head_dim]
+        seqlen = paddle.shape(x)[-2]
+        sin, cos = (
+            self.sin[offset:offset + seqlen, :],
+            self.cos[offset:offset + seqlen, :], )
+        x1, x2 = x[..., 0::2], x[..., 1::2]
+        # [cos_nθ, -sin_nθ] [x1]
+        # [sin_nθ,  cos_nθ] [x2]
+        # => [x1 * cos_nθ - x2 * sin_nθ, x1 * sin_nθ + x2 * cos_nθ]
+        return paddle.stack(
+            [x1 * cos - x2 * sin, x1 * sin + x2 * cos], axis=-1).flatten(-2, -1)
 
 
 class MultiHeadAttentionWithRotary(Layer):
@@ -56,7 +80,8 @@ class MultiHeadAttentionWithRotary(Layer):
                  kdim=None,
                  vdim=None,
                  need_weights=False,
-                 rotary_value=False):
+                 rotary_value=False,
+                 max_position_embeddings=512):
         super(MultiHeadAttentionWithRotary, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -74,59 +99,8 @@ class MultiHeadAttentionWithRotary(Layer):
         self.k_proj = nn.Linear(self.kdim, embed_dim)
         self.v_proj = nn.Linear(self.vdim, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
-
-    def positional_embedding(self, inputs):
-        seq_len = inputs.shape[1]
-        pos_seq = paddle.arange(0, seq_len, dtype=dtype_float)
-        indices = paddle.arange(0, self.head_dim, 2, dtype=dtype_float)
-        indices = 1 / 10000**(indices / self.head_dim)
-        sinusoid_inp = paddle.einsum("i,d->id", pos_seq, indices)
-        pos_emb = paddle.concat(
-            [paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)], axis=-1)
-        pos_emb = paddle.reshape(pos_emb, (1, 1, seq_len, self.head_dim))
-        pos_emb.stop_gradient = True
-        return pos_emb
-
-    @staticmethod
-    def apply_rotary_position_embeddings(sinusoidal_pos,
-                                         query_layer,
-                                         key_layer,
-                                         value_layer=None):
-        # https://kexue.fm/archives/8265
-        # sin [batch_size, num_heads, sequence_length, embed_size_per_head//2]
-        # cos [batch_size, num_heads, sequence_length, embed_size_per_head//2]
-        sin, cos = paddle.chunk(sinusoidal_pos, 2, axis=-1)
-        # sin [θ0,θ1,θ2......θd/2-1] -> sin_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
-        sin_pos = paddle.reshape(
-            paddle.stack(
-                [sin, sin], axis=-1), sinusoidal_pos.shape)
-        # cos [θ0,θ1,θ2......θd/2-1] -> cos_pos [θ0,θ0,θ1,θ1,θ2,θ2......θd/2-1,θd/2-1]
-        cos_pos = paddle.reshape(
-            paddle.stack(
-                [cos, cos], axis=-1), sinusoidal_pos.shape)
-        # rotate_half_query_layer [-q1,q0,-q3,q2......,-qd-1,qd-2]
-        rotate_half_query_layer = paddle.reshape(
-            paddle.stack(
-                [-query_layer[:, :, :, 1::2], query_layer[:, :, :, 0::2]],
-                axis=-1),
-            query_layer.shape, )
-        query_layer = query_layer * cos_pos + rotate_half_query_layer * sin_pos
-        # rotate_half_key_layer [-k1,k0,-k3,k2......,-kd-1,kd-2]
-        rotate_half_key_layer = paddle.reshape(
-            paddle.stack(
-                [-key_layer[:, :, :, 1::2], key_layer[:, :, :, 0::2]], axis=-1),
-            key_layer.shape, )
-        key_layer = key_layer * cos_pos + rotate_half_key_layer * sin_pos
-        if value_layer is not None:
-            # rotate_half_value_layer [-v1,v0,-v3,v2......,-vd-1,vd-2]
-            rotate_half_value_layer = paddle.reshape(
-                paddle.stack(
-                    [-value_layer[:, :, :, 1::2], value_layer[:, :, :, 0::2]],
-                    axis=-1),
-                value_layer.shape, )
-            value_layer = value_layer * cos_pos + rotate_half_value_layer * sin_pos
-            return query_layer, key_layer, value_layer
-        return query_layer, key_layer
+        self.rotary = RotaryPositionEmbedding(self.head_dim,
+                                              max_position_embeddings)
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
@@ -136,32 +110,29 @@ class MultiHeadAttentionWithRotary(Layer):
         k = self.k_proj(key)
         v = self.v_proj(value)
 
-        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
-        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
-        k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
-        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
-        v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
-        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
+        q = paddle.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
+        q = paddle.transpose(x=q, perm=[0, 2, 1, 3])
+        k = paddle.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
+        k = paddle.transpose(x=k, perm=[0, 2, 1, 3])
+        v = paddle.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
+        v = paddle.transpose(x=v, perm=[0, 2, 1, 3])
 
-        sinusoidal_pos = self.positional_embedding(query)
+        q, k = self.rotary(q), self.rotary(k)
         if self.rotary_value:
-            q, k, v = self.apply_rotary_position_embeddings(sinusoidal_pos, q,
-                                                            k, v)
-        else:
-            q, k = self.apply_rotary_position_embeddings(sinusoidal_pos, q, k)
+            v = self.rotary(v)
 
-        product = tensor.matmul(x=q, y=k, transpose_y=True) * self.scale
+        product = paddle.matmul(x=q, y=k, transpose_y=True) * self.scale
         if attn_mask is not None:
             attn_mask = _convert_attention_mask(attn_mask, product.dtype)
             product = product + attn_mask
 
         weights = F.softmax(product)
         weights = self.dropout(weights)
-        out = tensor.matmul(weights, v)
+        out = paddle.matmul(weights, v)
 
         # combine heads
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        out = paddle.transpose(out, perm=[0, 2, 1, 3])
+        out = paddle.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
         # project to output
         out = self.out_proj(out)
@@ -185,6 +156,7 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
                  act_dropout=None,
                  normalize_before=False,
                  rotary_value=False,
+                 max_position_embeddings=512,
                  **kwargs):
         super().__init__(
             d_model,
@@ -197,7 +169,10 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
             normalize_before=normalize_before)
         self.self_attn = MultiHeadAttentionWithRotary(
             d_model, nhead, dropout=attn_dropout, rotary_value=rotary_value)
-        self._config.update({"rotary_value": rotary_value})
+        self._config.update({
+            "rotary_value": rotary_value,
+            "max_position_embeddings": max_position_embeddings
+        })
 
 
 class RoFormerEmbeddings(Layer):
@@ -233,8 +208,6 @@ class RoFormerEmbeddings(Layer):
 
 
 class RoFormerPooler(Layer):
-    """ """
-
     def __init__(self, hidden_size, pool_act="tanh"):
         super(RoFormerPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -459,7 +432,7 @@ class RoFormerPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
+                    paddle.normal(
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range") else
@@ -521,7 +494,7 @@ class RoFormerModel(RoFormerPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
+                See :meth:`RoFormerPretrainedModel.init_weights()` for how weights are initialized in `RoFormerModel`.
 
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
@@ -569,7 +542,8 @@ class RoFormerModel(RoFormerPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0,
-            rotary_value=rotary_value, )
+            rotary_value=rotary_value,
+            max_position_embeddings=max_position_embeddings)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = RoFormerPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
@@ -653,7 +627,14 @@ class RoFormerModel(RoFormerPretrainedModel):
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2], )
+                axis=[1, 2])
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             token_type_ids=token_type_ids, )
@@ -697,7 +678,7 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
         self.classifier = nn.Linear(self.roformer.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None):
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
         The RoFormerForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -705,6 +686,8 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             input_ids (Tensor):
                 See :class:`RoFormerModel`.
             token_type_ids (Tensor, optional):
+                See :class:`RoFormerModel`.
+            attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
 
         Returns:
@@ -724,8 +707,7 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import RoFormerForQuestionAnswering
-                from paddlenlp.transformers import RoFormerTokenizer
+                from paddlenlp.transformers import RoFormerForQuestionAnswering, RoFormerTokenizer
 
                 tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
                 model = RoFormerForQuestionAnswering.from_pretrained('roformer-chinese-base')
@@ -735,16 +717,16 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                 outputs = model(**inputs)
 
                 start_logits = outputs[0]
-                end_logits  =outputs[1]
+                end_logits = outputs[1]
         """
-        sequence_output, _ = self.roformer(
+        sequence_output = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            attention_mask=None, )
+            attention_mask=attention_mask, )[0]
 
         logits = self.classifier(sequence_output)
-        logits = paddle.transpose(logits, perm=[2, 0, 1])
-        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        start_logits, end_logits = paddle.unstack(x=logits, axis=-1)
 
         return start_logits, end_logits
 
@@ -803,10 +785,10 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.roformer(
+        pooled_output = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            attention_mask=attention_mask, )
+            attention_mask=attention_mask, )[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -867,10 +849,10 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.roformer(
+        sequence_output = self.roformer(
             input_ids,
             token_type_ids=token_type_ids,
-            attention_mask=attention_mask, )
+            attention_mask=attention_mask, )[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -898,15 +880,14 @@ class RoFormerLMPredictionHead(Layer):
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
-            hidden_states = paddle.reshape(hidden_states,
-                                           [-1, hidden_states.shape[-1]])
-            hidden_states = paddle.tensor.gather(hidden_states,
-                                                 masked_positions)
+            hidden_states = paddle.reshape(
+                hidden_states, [-1, paddle.shape(hidden_states)[-1]])
+            hidden_states = paddle.gather(hidden_states, masked_positions)
         # gather masked tokens might be more quick
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = (paddle.tensor.matmul(
+        hidden_states = (paddle.matmul(
             hidden_states, self.decoder_weight, transpose_y=True) +
                          self.decoder_bias)
         return hidden_states
@@ -1035,18 +1016,16 @@ class RoFormerForPretraining(RoFormerPretrainedModel):
                 Its data type should be float32 and its shape is [batch_size, 2].
 
         """
-        with paddle.static.amp.fp16_guard():
-            outputs = self.roformer(
-                input_ids,
-                token_type_ids=token_type_ids,
-                attention_mask=attention_mask, )
-            sequence_output, pooled_output = outputs[:2]
-            prediction_scores, seq_relationship_score = self.cls(
-                sequence_output, pooled_output, masked_positions)
-            return prediction_scores, seq_relationship_score
+        sequence_output, pooled_output = self.roformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask, )
+        prediction_scores, seq_relationship_score = self.cls(
+            sequence_output, pooled_output, masked_positions)
+        return prediction_scores, seq_relationship_score
 
 
-class RoFormerPretrainingCriterion(paddle.nn.Layer):
+class RoFormerPretrainingCriterion(Layer):
     """
     Args:
         vocab_size(int):
@@ -1058,7 +1037,7 @@ class RoFormerPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, vocab_size):
         super(RoFormerPretrainingCriterion, self).__init__()
         # CrossEntropyLoss is expensive since the inner reshape (copy)
-        self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
 
     def forward(
@@ -1094,13 +1073,202 @@ class RoFormerPretrainingCriterion(paddle.nn.Layer):
             Its data type should be float32 and its shape is [1].
 
         """
-        with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(
-                prediction_scores,
-                masked_lm_labels,
-                reduction="none",
-                ignore_index=-1)
-            masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = F.cross_entropy(
-                seq_relationship_score, next_sentence_labels, reduction="none")
+        masked_lm_loss = F.cross_entropy(
+            prediction_scores,
+            masked_lm_labels,
+            reduction="none",
+            ignore_index=-1)
+        masked_lm_loss = masked_lm_loss / masked_lm_scale
+        next_sentence_loss = F.cross_entropy(
+            seq_relationship_score, next_sentence_labels, reduction="none")
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
+
+
+class RoFormerForMultipleChoice(RoFormerPretrainedModel):
+    """
+    RoFormer Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+    
+    Args:
+        roformer (:class:`RoFormerModel`):
+            An instance of RoFormerModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of RoFormer.
+            If None, use the same value as `hidden_dropout_prob` of `RoFormerModel`
+            instance `roformer`. Defaults to None.
+    """
+
+    def __init__(self, roformer, num_choices=2, dropout=None):
+        super(RoFormerForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.roformer = roformer
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.roformer.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.roformer.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The RoFormerForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import RoFormerForMultipleChoice, RoFormerTokenizer
+                from paddlenlp.data import Pad
+
+                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
+                model = RoFormerForMultipleChoice.from_pretrained('roformer-chinese-base', num_choices=2)
+
+                data = [
+                    {
+                        "question": "如何打开ipad屏幕？",
+                        "answer1": "按音量按钮。",
+                        "answer2": "按下锁定按钮。",
+                        "label": 1,
+                    },
+                    {
+                        "question": "如何缩进一些文本？",
+                        "answer1": "在开始写之前留一些空格。",
+                        "answer2": "按空格键。",
+                        "label": 0,
+                    },
+                ]
+
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+
+                inputs = tokenizer(text, text_pair)
+                input_ids = Pad(axis=0, pad_val=tokenizer.pad_token_id)(inputs["input_ids"])
+                token_type_ids = Pad(axis=0, pad_val=tokenizer.pad_token_type_id)(inputs["token_type_ids"])
+
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(input_ids, dtype="int64"),
+                    token_type_ids=paddle.to_tensor(token_type_ids, dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(
+            shape=(-1, paddle.shape(input_ids)[-1]
+                   ))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, paddle.shape(token_type_ids)[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, paddle.shape(attention_mask)[-1]))
+
+        pooled_output = self.roformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask)[1]
+
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
+
+
+class RoFormerOnlyMLMHead(Layer):
+    def __init__(self, embedding_size, hidden_size, vocab_size, activation,
+                 embedding_weights):
+        super().__init__()
+        self.predictions = RoFormerLMPredictionHead(
+            embedding_size,
+            hidden_size=hidden_size,
+            vocab_size=vocab_size,
+            activation=activation,
+            embedding_weights=embedding_weights)
+
+    def forward(self, sequence_output, masked_positions=None):
+        prediction_scores = self.predictions(sequence_output, masked_positions)
+        return prediction_scores
+
+
+class RoFormerForMaskedLM(RoFormerPretrainedModel):
+    """
+    RoFormer Model with a `masked language modeling` head on top.
+
+    Args:
+        roformer (:class:`RoFormerModel`):
+            An instance of :class:`RoFormerModel`.
+
+    """
+
+    def __init__(self, roformer):
+        super(RoFormerForMaskedLM, self).__init__()
+        self.roformer = roformer
+        self.cls = RoFormerOnlyMLMHead(
+            self.roformer.config["embedding_size"],
+            self.roformer.config["hidden_size"],
+            self.roformer.config["vocab_size"],
+            self.roformer.config["hidden_act"],
+            embedding_weights=self.roformer.embeddings.word_embeddings.weight, )
+
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+
+        Args:
+            input_ids (Tensor):
+                See :class:`RoFormerModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`RoFormerModel`.
+            attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+
+        Returns:
+            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
+            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import RoFormerForMaskedLM, RoFormerTokenizer
+
+                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
+                model = RoFormerForMaskedLM.from_pretrained('roformer-chinese-base')
+                
+                inputs = tokenizer("欢迎使用百度飞桨!")
+                inputs = {k:paddle.to_tensor([v], dtype="int64") for (k, v) in inputs.items()}
+
+                logits = model(**inputs)
+                print(logits.shape)
+
+        """
+        sequence_output = self.roformer(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask, )[0]
+
+        prediction_scores = self.cls(sequence_output)
+        return prediction_scores

@@ -29,7 +29,7 @@ from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     Trainer, )
-from paddlenlp.trainer.trainer_utils import get_last_checkpoint
+from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification, )
@@ -37,7 +37,7 @@ from paddlenlp.utils.log import logger
 
 
 @dataclass
-class DataTrainingArguments:
+class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
@@ -184,7 +184,7 @@ def clue_trans_fn(example, tokenizer, args):
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Log model and data config
@@ -288,7 +288,7 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
