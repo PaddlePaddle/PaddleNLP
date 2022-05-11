@@ -13,18 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/integrations.py
 
 import importlib
 import json
 
-from .trainer_callback import ProgressCallback, TrainerCallback  # noqa: E402
-from .trainer_utils import PREFIX_CHECKPOINT_DIR, BestRun, IntervalStrategy  # noqa: E402
+from .trainer_callback import TrainerCallback
+from ..utils.log import logger
 
 
 def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
+
+
+def get_available_reporting_integrations():
+    integrations = []
+    if is_visualdl_available():
+        integrations.append("visualdl")
+
+    return integrations
 
 
 def rewrite_logs(d):

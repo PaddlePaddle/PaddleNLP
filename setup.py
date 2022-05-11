@@ -46,14 +46,14 @@ def get_package_data_files(package, data, package_dir=None):
 setuptools.setup(
     name="paddlenlp",
     version=paddlenlp.__version__,
-    author="PaddlePaddle Speech and Language Team",
-    author_email="paddlesl@baidu.com",
+    author="PaddleNLP Team",
+    author_email="paddlenlp@baidu.com",
     description=long_description,
     long_description=long_description,
     long_description_content_type="text/plain",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('examples*', 'tests*', 'applications*')),
+        where='.', exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*', 'model_zoo*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
