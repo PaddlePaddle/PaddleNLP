@@ -1354,8 +1354,8 @@ def get_ft_para_conf():
 
 
 # @contextmanager
-def enable_ft_para(tensor_para_size=1,
-                   layer_para_size=1,
+def enable_ft_para(tensor_para_size=None,
+                   layer_para_size=None,
                    layer_para_batch_size=1):
     r"""
     Enable model parallel with the given settings in FasterTransformer. Currently only
@@ -1364,9 +1364,11 @@ def enable_ft_para(tensor_para_size=1,
 
     Args:
         tensor_para_size (int, optional): The size for tensor parallel. If it is
-            1, tensor parallel would not be used. Default to 1.
+            1, tensor parallel would not be used. When it is None, tensor parallel
+            size would be set as `world_size / layer_para_size`. Default to None.
         layer_para_size (int, optional): The size for layer parallel. If it is
-            1, layer parallel would not be used. Default to 1.
+            1, layer parallel would not be used. When it is None, it would be set
+            as 1. Default to None.
         layer_para_batch_size (int, optional): The local batch size for pipeline
             parallel. It is suggested to use `batch_size // layer_para_size`.
             Default to 1.

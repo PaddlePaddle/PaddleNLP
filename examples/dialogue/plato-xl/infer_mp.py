@@ -25,7 +25,22 @@ from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransfo
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--use_role",
+        action="store_true",
+        help="Whether to use role embeddings.")
+    parser.add_argument(
+        "--position_style",
+        default="relative",
+        choices=["continuous", "relative"],
+        type=str,
+        help="The type for positional embedding. Default is continuous.")
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size.")
+    parser.add_argument(
+        "--num_return_sequences",
+        default=1,
+        type=int,
+        help="The number of returned sequences for each sample.")
     parser.add_argument(
         "--max_seq_len",
         default=512,
@@ -64,12 +79,8 @@ def parse_args():
     parser.add_argument(
         "--use_fp16",
         action="store_true",
-        help="Whether to use fp16 to predict. Only ")
-    parser.add_argument(
-        "--tensor_para_size",
-        default=1,
-        type=int,
-        help="The size for tensor parallel.")
+        help="Whether to use fp16 to predict. Only available when `use_faster` is True."
+    )
     parser.add_argument(
         "--profile", action="store_true", help="Whether to profile.")
     args = parser.parse_args()
@@ -99,27 +110,17 @@ def profile(batch_size, total_step=50, warmup_step=10, rank=0):
     return _wrapper
 
 
-def profile(batch_size, total_step=50, warmup_step=10, rank=0):
-    def _wrapper(func):
-        def _impl(*args, **kwargs):
-            for i in range(total_step):
-                if i == warmup_step:
-                    paddle.device.cuda.synchronize()
-                    start_time = time.time()
-                out = func(*args, **kwargs)
-            paddle.device.cuda.synchronize()
-            end_time = time.time()
-            if rank is None or get_ft_para_conf().rank == rank:
-                time_interval = end_time - start_time
-                num_batch = total_step - warmup_step
-                print("Latency: %2fs, QPS: %2f" %
-                      (time_interval / num_batch,
-                       num_batch * batch_size / time_interval))
-            return out
-
-        return _impl
-
-    return _wrapper
+def postprocess_response(token_ids, tokenizer):
+    """Post-process the decoded sequence. Truncate from the first <eos>."""
+    eos_pos = len(token_ids)
+    for i, tok_id in enumerate(token_ids):
+        if tok_id == tokenizer.sep_token_id:
+            eos_pos = i
+            break
+    token_ids = token_ids[:eos_pos]
+    tokens = tokenizer.convert_ids_to_tokens(token_ids)
+    tokens = tokenizer.merge_subword(tokens)
+    return tokens
 
 
 def main(args):
@@ -131,10 +132,7 @@ def main(args):
     os.environ["PPFG_QKV_MEM_OPT"] = "1"
     if args.use_fp16:
         paddle.set_default_dtype("float16")
-    enable_ft_para(args.tensor_para_size, args.layer_para_size,
-                   args.batch_size // args.layer_para_size
-                   if args.layer_para_batch_size is None else
-                   args.layer_para_batch_size)
+    enable_ft_para()
     # TODO(guosheng): Maybe device can be set in `enable_ft_para`
     paddle.set_device("gpu:" + str(get_ft_para_conf().rank))
 
@@ -161,31 +159,29 @@ def main(args):
                 return_role_ids=args.use_role,
                 position_style=args.position_style,
                 max_seq_len=args.max_seq_len), inputs))
-    collator = DataCollatorWithPadding(tokenizer, return_tensors=True)
+    collator = DataCollatorWithPadding(tokenizer)
     data = collator(inputs)
 
     outputs, _ = model.generate(
         input_ids=data['input_ids'],
         token_type_ids=data['token_type_ids'],
         position_ids=data['position_ids'],
-        attention_mask=data['attention_mask'],
+        attention_mask=data['attention_mask'].cast("float32"),
         role_ids=data.get('role_ids', None),
         seq_len=data['seq_len'],
         max_length=args.max_out_len,
         min_length=args.min_out_len,
-        decode_strategy=args.decoding_strategy,
+        decode_strategy='sampling',
         top_k=args.topk,
         top_p=args.topp,
-        num_beams=args.num_beams,
         num_return_sequences=args.num_return_sequences,
-        use_fp16_decoding=args.use_fp16_decoding,
-        use_faster=args.faster)
+        use_faster=args.use_faster,
+        use_fp16_decoding=args.use_fp16)
 
     # Only make the first process to output.
     if get_ft_para_conf().rank == 0:
         for i in range(len(outputs)):
-            result = tokenizer.convert_ids_to_string(outputs[i].numpy().tolist(
-            ))
+            result = postprocess_response(outputs[i].numpy(), tokenizer)
             print("Result:", result)
 
 
