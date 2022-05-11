@@ -27,6 +27,21 @@ from urllib.parse import urlencode
 
 import paddle
 
+MODEL_MAP = {
+    "uie-base": {
+        "encoding_model": "ernie-3.0-base-zh",
+        "hidden_size": 768,
+        "url":
+        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams"
+    },
+    "uie-tiny": {
+        "encoding_model": "ernie-3.0-medium-zh",
+        "hidden_size": 768,
+        "url":
+        "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams"
+    },
+}
+
 
 def set_seed(seed):
     paddle.seed(seed)
@@ -108,229 +123,28 @@ def mandarin_asr_api(api_key, secret_key, audio_file, audio_format='wav'):
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader):
+def evaluate(model, metric, data_loader):
     """
     Given a dataset, it evals model and computes the metric.
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
+        metric(obj:`paddle.metric.Metric`): The evaluation metric.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
     """
     model.eval()
-    num_correct = 0
-    num_infer = 0
-    num_label = 0
+    metric.reset()
     for batch in data_loader:
         input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
         start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
                                      pos_ids)
         start_ids = paddle.cast(start_ids, 'float32')
         end_ids = paddle.cast(end_ids, 'float32')
-        res = get_metric(start_prob, end_prob, start_ids, end_ids)
-        num_correct += res[0]
-        num_infer += res[1]
-        num_label += res[2]
-    precision, recall, f1 = get_f1(num_correct, num_infer, num_label)
+        num_correct, num_infer, num_label = metric.compute(start_prob, end_prob,
+                                                           start_ids, end_ids)
+        metric.update(num_correct, num_infer, num_label)
+    precision, recall, f1 = metric.accumulate()
     model.train()
     return precision, recall, f1
-
-
-def get_eval(tokenizer, step, data_loader, model, name):
-    """
-    eval test set
-    """
-    num_correct = 0
-    num_infer = 0
-    num_label = 0
-    fw_gold = open(
-        'output/prediction/' + name + '-gold.' + str(step),
-        'w+',
-        encoding='utf8')
-    fw_pred = open(
-        'output/prediction/' + name + '-pred.' + str(step),
-        'w+',
-        encoding='utf8')
-    for [input_ids, token_type_ids, att_mask, pos_ids, start_ids,
-         end_ids] in data_loader():
-        start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
-                                     pos_ids)
-        start_ids = paddle.cast(start_ids, 'float32')
-        end_ids = paddle.cast(end_ids, 'float32')
-        res = get_metric(start_prob, end_prob, start_ids, end_ids)
-        num_correct += res[0]
-        num_infer += res[1]
-        num_label += res[2]
-        get_result(tokenizer,
-                   input_ids.tolist(),
-                   start_ids.tolist(), end_ids.tolist(), fw_gold)
-        get_result(tokenizer,
-                   input_ids.tolist(),
-                   start_prob.tolist(), end_prob.tolist(), fw_pred)
-    fw_gold.close()
-    fw_pred.close()
-    res = get_f1(num_correct, num_infer, num_label)
-    print('--%s --F1 %.4f --P %.4f (%i / %i) --R %.4f (%i / %i)' %
-          (name, res[2], res[0], num_correct, num_infer, res[1], num_correct,
-           num_label))
-    return res[2]
-
-
-def get_metric(start_prob, end_prob, start_ids, end_ids):
-    """
-    get_metric
-    """
-    pred_start_ids = get_bool_ids_greater_than(start_prob)
-    pred_end_ids = get_bool_ids_greater_than(end_prob)
-    gold_start_ids = get_bool_ids_greater_than(start_ids.tolist())
-    gold_end_ids = get_bool_ids_greater_than(end_ids.tolist())
-
-    num_correct = 0
-    num_infer = 0
-    num_label = 0
-    for predict_start_ids, predict_end_ids, label_start_ids, label_end_ids in zip(
-            pred_start_ids, pred_end_ids, gold_start_ids, gold_end_ids):
-        [_correct, _infer, _label] = eval_span(
-            predict_start_ids, predict_end_ids, label_start_ids, label_end_ids)
-        num_correct += _correct
-        num_infer += _infer
-        num_label += _label
-    return num_correct, num_infer, num_label
-
-
-def get_f1(num_correct, num_infer, num_label):
-    """
-    get p r f1
-    input: 10, 15, 20
-    output: (0.6666666666666666, 0.5, 0.5714285714285715)
-    """
-    if num_infer == 0:
-        precision = 0.0
-    else:
-        precision = num_correct * 1.0 / num_infer
-
-    if num_label == 0:
-        recall = 0.0
-    else:
-        recall = num_correct * 1.0 / num_label
-
-    if num_correct == 0:
-        f1 = 0.0
-    else:
-        f1 = 2 * precision * recall / (precision + recall)
-    return (precision, recall, f1)
-
-
-def get_result(tokenizer, src_ids, start_prob, end_prob, fw):
-    """
-    get_result
-    """
-    start_ids_list = get_bool_ids_greater_than(start_prob)
-    end_ids_list = get_bool_ids_greater_than(end_prob)
-    for start_ids, end_ids, ids in zip(start_ids_list, end_ids_list, src_ids):
-        for i in reversed(range(len(ids))):
-            if ids[i] != 0:
-                ids = ids[:i]
-                break
-        span_list = get_span(start_ids, end_ids)
-        src_words = " ".join(tokenizer.convert_ids_to_tokens(ids))
-        span_words = [
-            " ".join(tokenizer.convert_ids_to_tokens(ids[s[0]:(s[1] + 1)]))
-            for s in span_list
-        ]
-        fw.writelines(src_words + "\n")
-        fw.writelines(json.dumps(span_words, ensure_ascii=False) + "\n\n")
-    return None
-
-
-def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
-    """
-    get idx of the last dim in prob arraies, which is greater than a limitation
-    input: [[0.1, 0.1, 0.2, 0.5, 0.1, 0.3], [0.7, 0.6, 0.1, 0.1, 0.1, 0.1]]
-        0.4
-    output: [[3], [0, 1]]
-    """
-    probs = np.array(probs)
-    dim_len = len(probs.shape)
-    if dim_len > 1:
-        result = []
-        for p in probs:
-            result.append(get_bool_ids_greater_than(p, limit, return_prob))
-        return result
-    else:
-        result = []
-        for i, p in enumerate(probs):
-            if p > limit:
-                if return_prob:
-                    result.append((i, p))
-                else:
-                    result.append(i)
-        return result
-
-
-def get_span(start_ids, end_ids, with_prob=False):
-    """
-    every id can only be used once
-    get span set from position start and end list
-    input: [1, 2, 10] [4, 12]
-    output: set((2, 4), (10, 12))
-    """
-    if with_prob:
-        start_ids = sorted(start_ids, key=lambda x: x[0])
-        end_ids = sorted(end_ids, key=lambda x: x[0])
-    else:
-        start_ids = sorted(start_ids)
-        end_ids = sorted(end_ids)
-
-    start_pointer = 0
-    end_pointer = 0
-    len_start = len(start_ids)
-    len_end = len(end_ids)
-    couple_dict = {}
-    while start_pointer < len_start and end_pointer < len_end:
-        if with_prob:
-            if start_ids[start_pointer][0] == end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer][0] < end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer][0] > end_ids[end_pointer][0]:
-                end_pointer += 1
-                continue
-        else:
-            if start_ids[start_pointer] == end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer] < end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer] > end_ids[end_pointer]:
-                end_pointer += 1
-                continue
-    result = [(couple_dict[end], end) for end in couple_dict]
-    result = set(result)
-    return result
-
-
-def eval_span(predict_start_ids, predict_end_ids, label_start_ids,
-              label_end_ids):
-    """
-    evaluate position extraction (start, end)
-    return num_correct, num_infer, num_label
-    input: [1, 2, 10] [4, 12] [2, 10] [4, 11]
-    output: (1, 2, 2)
-    """
-    pred_set = get_span(predict_start_ids, predict_end_ids)
-    label_set = get_span(label_start_ids, label_end_ids)
-    num_correct = len(pred_set & label_set)
-    num_infer = len(pred_set)
-    num_label = len(label_set)
-    return (num_correct, num_infer, num_label)
 
 
 def convert_example(example, tokenizer, max_seq_len):
@@ -346,6 +160,7 @@ def convert_example(example, tokenizer, max_seq_len):
         text=[example["prompt"]],
         text_pair=[example["content"]],
         stride=len(example["prompt"]),
+        truncation=True,
         max_seq_len=max_seq_len,
         pad_to_max_seq_len=True,
         return_attention_mask=True,
@@ -391,22 +206,84 @@ def map_offset(ori_offset, offset_mapping):
     return -1
 
 
-def reader(data_path):
+def reader(data_path, max_seq_len=512):
     """
     read json
     """
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             json_line = json.loads(line)
-            yield json_line
+            content = json_line['content']
+            prompt = json_line['prompt']
+            # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
+            # It include three summary tokens.
+            if max_seq_len <= len(prompt) + 3:
+                raise ValueError(
+                    "The value of max_seq_len is too small, please set a larger value"
+                )
+            max_content_len = max_seq_len - len(prompt) - 3
+            if len(content) <= max_content_len:
+                yield json_line
+            else:
+                result_list = json_line['result_list']
+                json_lines = []
+                accumulate = 0
+                while True:
+                    cur_result_list = []
 
+                    for result in result_list:
+                        if result['start'] + 1 <= max_content_len < result[
+                                'end']:
+                            max_content_len = result['start']
+                            break
 
-def save_examples(examples, save_path, idxs):
-    with open(save_path, "w", encoding="utf-8") as f:
-        for idx in idxs:
-            for example in examples[idx]:
-                line = json.dumps(example, ensure_ascii=False) + "\n"
-                f.write(line)
+                    cur_content = content[:max_content_len]
+                    res_content = content[max_content_len:]
+
+                    while True:
+                        if len(result_list) == 0:
+                            break
+                        elif result_list[0]['end'] <= max_content_len:
+                            if result_list[0]['end'] > 0:
+                                cur_result = result_list.pop(0)
+                                cur_result_list.append(cur_result)
+                            else:
+                                cur_result_list = [
+                                    result for result in result_list
+                                ]
+                                break
+                        else:
+                            break
+
+                    json_line = {
+                        'content': cur_content,
+                        'result_list': cur_result_list,
+                        'prompt': prompt
+                    }
+                    json_lines.append(json_line)
+
+                    for result in result_list:
+                        if result['end'] <= 0:
+                            break
+                        result['start'] -= max_content_len
+                        result['end'] -= max_content_len
+                    accumulate += max_content_len
+                    max_content_len = max_seq_len - len(prompt) - 3
+                    if len(res_content) == 0:
+                        break
+                    elif len(res_content) < max_content_len:
+                        json_line = {
+                            'content': res_content,
+                            'result_list': result_list,
+                            'prompt': prompt
+                        }
+                        json_lines.append(json_line)
+                        break
+                    else:
+                        content = res_content
+
+                for json_line in json_lines:
+                    yield json_line
 
 
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
@@ -441,16 +318,18 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
     return examples
 
 
-def construct_relation_label_set(entity_name_set, predicate_set):
-    relation_label_set = set()
+def construct_relation_prompt_set(entity_name_set, predicate_set):
+    relation_prompt_set = set()
     for entity_name in entity_name_set:
         for predicate in predicate_set:
-            relation_label = entity_name + "的" + predicate
-            relation_label_set.add(relation_label)
-    return sorted(list(relation_label_set))
+            # The relation prompt is constructed as follows: 
+            # subject + "的" + predicate
+            relation_prompt = entity_name + "的" + predicate
+            relation_prompt_set.add(relation_prompt)
+    return sorted(list(relation_prompt_set))
 
 
-def convert_data_examples(raw_examples, negative_ratio):
+def convert_ext_examples(raw_examples, negative_ratio):
     texts = []
     entity_examples = []
     relation_examples = []
@@ -460,12 +339,27 @@ def convert_data_examples(raw_examples, negative_ratio):
     entity_name_set = []
     predicate_set = []
 
-    print(f"Converting data...")
+    print(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
-            text, relations, entities = items["text"], items[
-                "relations"], items["entities"]
+            entity_id = 0
+            if "data" in items.keys():
+                text = items["data"]
+                entities = []
+                for item in items["label"]:
+                    entity = {
+                        "id": entity_id,
+                        "start_offset": item[0],
+                        "end_offset": item[1],
+                        "label": item[2]
+                    }
+                    entities.append(entity)
+                    entity_id += 1
+                relations = []
+            else:
+                text, relations, entities = items["text"], items[
+                    "relations"], items["entities"]
             texts.append(text)
 
             entity_example = []
@@ -515,26 +409,26 @@ def convert_data_examples(raw_examples, negative_ratio):
                 predicate = relation["type"]
                 subject_id = relation["from_id"]
                 object_id = relation["to_id"]
-                relation_label = entity_map[subject_id][
-                    "name"] + "的" + predicate
+                # The relation prompt is constructed as follows: 
+                # subject + "的" + predicate
+                prompt = entity_map[subject_id]["name"] + "的" + predicate
                 result = {
                     "text": entity_map[object_id]["name"],
                     "start": entity_map[object_id]["start"],
                     "end": entity_map[object_id]["end"]
                 }
-                if relation_label not in relation_example_map.keys():
-                    relation_example_map[relation_label] = {
+                if prompt not in relation_example_map.keys():
+                    relation_example_map[prompt] = {
                         "content": text,
                         "result_list": [result],
-                        "prompt": relation_label
+                        "prompt": prompt
                     }
                 else:
-                    relation_example_map[relation_label]["result_list"].append(
-                        result)
+                    relation_example_map[prompt]["result_list"].append(result)
 
                 if predicate not in predicate_set:
                     predicate_set.append(predicate)
-                relation_prompt.append(relation_label)
+                relation_prompt.append(prompt)
 
             for v in relation_example_map.values():
                 relation_example.append(v)
@@ -547,15 +441,15 @@ def convert_data_examples(raw_examples, negative_ratio):
     entity_examples = add_negative_example(entity_examples, texts,
                                            entity_prompts, entity_label_set,
                                            negative_ratio)
+    if len(predicate_set) != 0:
+        print(f"Constructing relation prompts...")
+        relation_prompt_set = construct_relation_prompt_set(entity_name_set,
+                                                            predicate_set)
 
-    print(f"Constructing relation labels...")
-    relation_label_set = construct_relation_label_set(entity_name_set,
-                                                      predicate_set)
-
-    print(f"Adding negative samples for second stage prompt...")
-    relation_examples = add_negative_example(relation_examples, texts,
-                                             relation_prompts,
-                                             relation_label_set, negative_ratio)
+        print(f"Adding negative samples for second stage prompt...")
+        relation_examples = add_negative_example(
+            relation_examples, texts, relation_prompts, relation_prompt_set,
+            negative_ratio)
     return entity_examples, relation_examples
 
 

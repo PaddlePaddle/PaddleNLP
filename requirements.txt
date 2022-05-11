@@ -4,7 +4,7 @@ colorlog
 colorama
 seqeval
 multiprocess
-datasets
+datasets>=2.0.0
 tqdm
 paddlefsl
 sentencepiece
