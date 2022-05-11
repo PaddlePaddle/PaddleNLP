@@ -22,6 +22,8 @@ import re
 import logging
 import numpy as np
 
+from paddlenlp.transformers.tokenizer_utils_base import TruncationStrategy
+
 from pipelines.data_handler.samples import SampleBasket
 
 
@@ -53,6 +55,7 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
     texts = [d["context"] for d in pre_baskets]
 
     tokenized_docs_batch = tokenizer.batch_encode(texts,
+        truncation = TruncationStrategy.ONLY_SECOND,
         return_special_tokens_mask=True,
         return_attention_mask=True,
         return_offsets_mapping=True,

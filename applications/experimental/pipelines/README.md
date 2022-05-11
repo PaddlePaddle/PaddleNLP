@@ -25,10 +25,9 @@ pip install ./dist/pipelines-0.1.0a0-py3-none-any.whl
 ### 一键体验智能问答应用效果
 ```python
 python ./examples/question-answering/dense_qa_example.py
-
+```
 我们针对中国重点城市的基本信息搭建了百科知识问答小系统，运行上述代码体验效果如下:
 ![](https://tianxin1860.github.io/img/question_answering.png)
-```
 
 ### 讨论组
 - [文心大模型官方主页](https://wenxin.baidu.com/)
