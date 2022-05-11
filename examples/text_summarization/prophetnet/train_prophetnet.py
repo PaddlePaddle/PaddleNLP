@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration, ProphetNetModel
+from paddlenlp.transformers.prophetnet.modeling import ProphetNetForConditionalGeneration
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
 parser = argparse.ArgumentParser()
@@ -19,7 +19,11 @@ parser.add_argument(
     type=str,
     help="Path to tokenizer vocab file. ")
 parser.add_argument(
-    "--pretrained_model_path", default="./model_state.pdparams", type=str)
+    "--model_name_or_path",
+    default="prophetnet-large-uncased",
+    type=str,
+    required=True,
+    help="Path to pre-trained model. ")
 parser.add_argument("--batch_size", default=24, type=int)
 parser.add_argument("--epochs", default=3, type=int)
 parser.add_argument("--lr", default=0.0001, type=float)
@@ -60,7 +64,7 @@ train_dataset = load_dataset(
 dev_dataset = load_dataset(
     read, data_path=[dev_data_src, dev_data_tgt], lazy=False)
 
-t = ProphetNetTokenizer(vocab_file="prophetnet.tokenizer")
+t = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
 
 
 class InverseSquareRootSchedule(paddle.optimizer.lr.LRScheduler):
@@ -153,9 +157,8 @@ output_dir = args.output_dir
 best_valid_loss = None
 start_epoch = 0
 
-model = ProphetNetModel(
-    **ProphetNetModel.pretrained_init_configuration["prophetnet-large-uncased"])
-model = ProphetNetForConditionalGeneration(model)
+model = ProphetNetForConditionalGeneration.from_pretrained(
+    args.model_name_or_path)
 
 lr_scheduler = InverseSquareRootSchedule(warmup_init_lr, lr, warmup_steps)
 
@@ -164,16 +167,6 @@ optimizer = paddle.optimizer.Adam(
     parameters=model.parameters(),
     weight_decay=weight_decay,
     grad_clip=paddle.nn.ClipGradByNorm(clip_norm))
-
-if os.path.exists(output_dir) and len(os.listdir(output_dir)) > 1:
-    ckpt_file_last = os.listdir(output_dir)[-2]
-    ckpt_load = paddle.load(os.path.join(output_dir, ckpt_file_last))
-    best_valid_loss = ckpt_load["best_valid_loss"]
-    start_epoch = ckpt_load["epoch"] + 1
-    optimizer.set_state_dict(ckpt_load["optimizer"])
-    model.load_dict(ckpt_load["model"])
-else:
-    model.load_dict(paddle.load(args.pretrained_model_path))
 
 accumulate_batchs_num = int(32 * 16 / batch_size)
 
@@ -284,37 +277,17 @@ def train():
         best_ckpt_path = os.path.join(output_dir, "model_best.pdparams")
         if best_valid_loss is None:
             best_valid_loss = valid_loss
-            save(best_ckpt_path, {
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "epoch": epoch,
-                "best_valid_loss": best_valid_loss
-            })
+            model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
         else:
             if valid_loss < best_valid_loss:
                 best_valid_loss = valid_loss
-                save(best_ckpt_path, {
-                    "model": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "epoch": epoch,
-                    "best_valid_loss": best_valid_loss
-                })
+                model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
         print("valid loss: %f, best valid loss: %f" %
               (valid_loss, best_valid_loss))
-        ckpt_path = os.path.join(output_dir, "model_%d.pdparams" % epoch)
-        save(ckpt_path, {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "epoch": epoch,
-            "best_valid_loss": best_valid_loss
-        })
-
-
-def save(path, obj):
-    if not os.path.exists(
-            os.path.abspath(os.path.dirname(path) + os.path.sep + ".")):
-        os.makedirs(os.path.abspath(os.path.dirname(path) + os.path.sep + "."))
-    paddle.save(obj, path)
+        model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

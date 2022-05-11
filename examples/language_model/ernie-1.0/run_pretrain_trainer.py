@@ -27,12 +27,12 @@ from dataclasses import dataclass, field
 import numpy as np
 import paddle
 from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearDecayWithWarmup
+from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer.trainer_utils import speed_metrics, get_last_checkpoint
+from paddlenlp.trainer import speed_metrics, get_last_checkpoint
 
 sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
@@ -46,8 +46,31 @@ MODEL_CLASSES = {
 }
 
 
+def add_start_docstrings(*docstr):
+    def docstring_decorator(fn):
+        fn.__doc__ = "".join(docstr) + (fn.__doc__
+                                        if fn.__doc__ is not None else "")
+        return fn
+
+    return docstring_decorator
+
+
 @dataclass
-class DataTrainingArguments:
+@add_start_docstrings(TrainingArguments.__doc__)
+class PreTrainingArguments(TrainingArguments):
+    min_learning_rate: float = field(
+        default=1e-5,
+        metadata={"help": "Minimum learning rate deacyed to."}, )
+    decay_steps: float = field(
+        default=None,
+        metadata={
+            "help":
+            "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+        }, )
+
+
+@dataclass
+class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and evaluating.
     Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
@@ -268,7 +291,7 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataArguments, PreTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     set_seed(training_args)
     paddle.set_device(training_args.device)
@@ -355,6 +378,17 @@ def main():
             loss = lm_loss + sop_loss
             return loss
 
+    # Create the learning_rate sheduler and optimizer
+    if training_args.decay_steps is None:
+        training_args.decay_steps = training_args.max_steps
+    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    lr_scheduler = LinearAnnealingWithWarmupDecay(
+        training_args.learning_rate,
+        training_args.min_learning_rate,
+        warmup_step=warmup_steps,
+        decay_step=training_args.decay_steps)
+
     data_file = get_train_data_file(data_args)
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
@@ -368,6 +402,7 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
+        optimizers=(None, lr_scheduler),
         tokenizer=tokenizer, )
 
     checkpoint = None
@@ -380,7 +415,7 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()

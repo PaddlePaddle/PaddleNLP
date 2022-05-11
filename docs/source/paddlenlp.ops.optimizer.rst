@@ -11,3 +11,4 @@ optimizer
    :maxdepth: 4
 
    paddlenlp.ops.optimizer.adamwdl
+   paddlenlp.ops.optimizer.ema
