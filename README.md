@@ -12,7 +12,9 @@
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
-
+* [2022-05-11] PaddleNLP新增 **300+** [预训练模型权重](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer),
+覆盖[BERT](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/BERT/contents.html) 、[RoBERTa](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/RoBERTa/contents.html) 、
+[GPT](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/GPT/contents.html) 、[T5](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/T5/contents.html) 四类结构主流权重！
 * [2022-03-21] PaddleNLP**一键预测工具**[Taskflow](./docs/model_zoo/taskflow.md)全新升级！🚀欢迎体验更丰富的功能、更便捷的使用方式；新推出适合不同场景的中文分词、命名实体识别模式！
 * [2021-12-28] PaddleNLP新发**语义检索、问答、评论观点抽取和情感倾向分析** [产业化案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications)，🚀快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
@@ -63,7 +65,7 @@ Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语�
 
 ### Transformers API: 强大的预训练模型生态底座
 
-覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
+覆盖 **45+** 个网络结构和 **500+** 个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，RoBERTa，T5等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -97,7 +99,7 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
-请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
+请参考[Transformer 文档](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html) 查看目前支持的预训练模型结构、参数和详细用法。
 
 ### Datasets API: 丰富的中文数据集
 
