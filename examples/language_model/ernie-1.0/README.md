@@ -68,11 +68,11 @@ unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
-python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
+python ../data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
 ```
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
-python -u  create_pretraining_data.py \
+python -u  ../data_tools/create_pretraining_data.py \
     --model_name ernie-1.0 \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
@@ -92,8 +92,8 @@ clue_corpus_small_14g_20220104_idx.npz
 
 ###  开始训练
 
+将制作好的数据`clue_corpus_small_14g_20220104_ids.npy,clue_corpus_small_14g_20220104_idx.npz`移动到input_dir中，即可开始训练。
 这里以8卡训练为例任务脚本为例：
-
 ```
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
