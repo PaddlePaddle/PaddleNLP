@@ -201,9 +201,10 @@ def read_training_instance_based_config(tokenizer,
         dict: instance for training
     """
     task_configs = list(TaskConfig.load_list_from_yaml(config_file))
-    negative_drop_num = 0
 
     for task_config in task_configs:
+        negative_drop_num = 0
+
         train_file = os.path.join(task_config.data_path, "train.json")
         schema_file = os.path.join(task_config.data_path, "record.schema")
         record_schema = RecordSchema.read_from_file(schema_file)
@@ -239,7 +240,7 @@ def read_training_instance_based_config(tokenizer,
 
         if negative_drop_num > 0:
             logger.info(
-                f'Drop negative {negative_drop_num} instance during loading {config_file}.'
+                f'Drop negative {negative_drop_num} instance during loading {train_file}.'
             )
 
 

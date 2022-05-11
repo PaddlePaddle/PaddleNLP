@@ -47,7 +47,6 @@ def parse_args():
         help="Overwrite output directory", )
     parser.add_argument(
         "--logging_dir",
-        required=True,
         type=str,
         help="The output logging directory", )
     parser.add_argument(
@@ -222,7 +221,7 @@ def parse_args():
         raise ValueError(
             "At least one of the \"--do_train\" or \"--do_eval\" should be true."
         )
-    if not (args.do_train or args.output_dir):
+    if args.do_train and not args.output_dir:
         raise ValueError(
             "--output_dir should be given when --do_train is true.")
 
@@ -500,13 +499,13 @@ def main(args):
         logger.info(f"{arg}: {value}")
     logger.info("**********************************************")
 
-    if os.path.exists(args.output_dir
-                      ) and args.do_train and not args.overwrite_output_dir:
-        raise ValueError(
-            f"Output directory ({args.output_dir}) already exists and is not empty. "
-            "Use --overwrite_output_dir to overcome.")
-    else:
-        os.makedirs(args.output_dir, exist_ok=True)
+    if args.do_train and args.output_dir is not None:
+        if os.path.exists(args.output_dir) and not args.overwrite_output_dir:
+            raise ValueError(
+                f"Output directory ({args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome.")
+        else:
+            os.makedirs(args.output_dir, exist_ok=True)
 
     # Set device
     paddle.set_device(args.device)
@@ -527,7 +526,8 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     os.makedirs("caches", exist_ok=True)
-    os.makedirs(args.logging_dir, exist_ok=True)
+    if args.logging_dir is not None:
+        os.makedirs(args.logging_dir, exist_ok=True)
     set_logger(args)
     logger.info(args)
     main(args)

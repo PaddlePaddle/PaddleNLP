@@ -159,7 +159,7 @@ class DynamicSSIGenerator():
 
         return converted_spot_prefix, positive_spot, negative_spot
 
-    def sample_asoc(self, positive, candidates):
+    def sample_asoc(self, positive, candidates=None):
         """ Sample Asoc
 
         Args:
