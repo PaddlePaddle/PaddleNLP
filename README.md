@@ -63,7 +63,7 @@ Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语�
 
 ### Transformers API: 强大的预训练模型生态底座
 
-覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
+覆盖 **45+** 个网络结构和 **500+** 个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，RoBERTa，T5等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -97,7 +97,7 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
-请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
+请参考[Transformer 文档](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html) 查看目前支持的预训练模型结构、参数和详细用法。
 
 ### Datasets API: 丰富的中文数据集
 
