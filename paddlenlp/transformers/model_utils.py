@@ -24,7 +24,7 @@ import paddle
 import numpy as np
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from paddlenlp.utils.downloader import get_path_from_url, download_check, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -387,6 +387,8 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
+        # Logging model download statistics
+        download_check(pretrained_model_name_or_path, cls.__name__)
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
