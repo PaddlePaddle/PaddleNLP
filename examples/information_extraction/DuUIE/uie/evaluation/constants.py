@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 
-
 spot_prompt = '<spot>'
 asoc_prompt = '<asoc>'
 
