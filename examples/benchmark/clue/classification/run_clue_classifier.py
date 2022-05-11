@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import paddle.nn as nn
 from paddle.metric import Accuracy
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -168,8 +168,8 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.eval()
     metric.reset()
     for batch in data_loader:
-        input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids)
+        labels = batch.pop("labels")
+        logits = model(**batch)
         loss = loss_fct(logits, labels)
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -227,9 +227,8 @@ def convert_example(example,
             text_pair=example['sentence2'],
             max_seq_len=max_seq_length)
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], label
-    else:
-        return example['input_ids'], example['token_type_ids']
+        example["labels"] = label
+    return example
 
 
 def do_eval(args):
@@ -255,11 +254,7 @@ def do_eval(args):
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_ds, batch_size=args.batch_size, shuffle=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-    ): fn(samples)
+    batchify_fn = DataCollatorWithPadding(tokenizer)
 
     dev_data_loader = DataLoader(
         dataset=dev_ds,
@@ -282,8 +277,8 @@ def do_eval(args):
     model.eval()
     metric.reset()
     for batch in dev_data_loader:
-        input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids)
+        labels = batch.pop("labels")
+        logits = model(**batch)
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
@@ -323,11 +318,7 @@ def do_train(args):
     dev_batch_sampler = paddle.io.BatchSampler(
         dev_ds, batch_size=args.batch_size, shuffle=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Stack(dtype="int64" if train_ds.label_list else "float32")  # label
-    ): fn(samples)
+    batchify_fn = DataCollatorWithPadding(tokenizer)
 
     train_data_loader = DataLoader(
         dataset=train_ds,
@@ -346,7 +337,8 @@ def do_train(args):
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
 
-    update_model_dropout(model, args.dropout)
+    if args.dropout != 0.1:
+        update_model_dropout(model, args.dropout)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -391,8 +383,8 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
-            input_ids, segment_ids, labels = batch
-            logits = model(input_ids, segment_ids)
+            labels = batch.pop("labels")
+            logits = model(**batch)
             loss = loss_fct(logits, labels)
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
@@ -445,10 +437,7 @@ def do_predict(args):
         max_seq_length=args.max_seq_length,
         is_test=True)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-    ): fn(samples)
+    batchify_fn = DataCollatorWithPadding(tokenizer)
 
     test_ds = test_ds.map(trans_func, lazy=True)
     test_batch_sampler = paddle.io.BatchSampler(
@@ -473,11 +462,8 @@ def do_predict(args):
         os.path.join(args.output_dir, args.task_name + "_predict.json"), 'w')
 
     for step, batch in enumerate(test_data_loader):
-        input_ids, segment_ids = batch
-
         with paddle.no_grad():
-            logits = model(input_ids, segment_ids)
-
+            logits = model(**batch)
         preds = paddle.argmax(logits, axis=1)
         for idx, pred in enumerate(preds):
             j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})

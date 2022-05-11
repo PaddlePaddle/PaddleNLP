@@ -19,3 +19,4 @@ from .rouge import RougeL, RougeLForDuReader, RougeN, Rouge1, Rouge2
 from .glue import AccuracyAndF1, Mcc, PearsonAndSpearman, MultiLabelsMetric
 from .distinct import Distinct
 from .sighan import DetectionF1, CorrectionF1
+from .span import SpanEvaluator

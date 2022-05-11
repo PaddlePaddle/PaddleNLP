@@ -64,6 +64,7 @@ MAPPING_NAMES = OrderedDict([
     ("Reformer", "reformer"),
     ("Roberta", "roberta"),
     ("RoFormer", "roformer"),
+    ("RoFormerv2", "roformerv2"),
     ("Skep", "skep"),
     ("SqueezeBert", "squeezebert"),
     ("TinyBert", "tinybert"),
