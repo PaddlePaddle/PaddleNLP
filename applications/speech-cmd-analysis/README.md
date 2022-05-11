@@ -49,8 +49,15 @@ pip install pydub
 ## 3. 数据准备
 
 本应用来自于语音报销工单信息录入场景，即员工向公司报销部门提出交通费报销的口头申请，在传统场景下，报销审核人员需要人工将语音转换为文字信息，并从中抽取记录报销需要的``时间``、``出发地``、``目的地``和``费用``字段，而在本应用可以端到端的完成这一工作。相应的数据集为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，共50条标注数据，用于信息抽取模型在交通费报销场景下的优化，示例数据如下：
+
 ```json
 {"id": 39, "text": "10月16日高铁从杭州到上海南站车次d5414共48元", "relations": [], "entities": [{"id": 90, "start_offset": 0, "end_offset": 6, "label": "时间"}, {"id": 77, "start_offset": 9, "end_offset": 11, "label": "出发地"}, {"id": 91, "start_offset": 12, "end_offset": 16, "label": "目的地"}, {"id": 92, "start_offset": 24, "end_offset": 26, "label": "费用"}]}
+```
+
+其中抽取的目标（schema）表示为：
+
+```python
+schema = ['出发地', '目的地', '费用', '时间']
 ```
 
 标注数据保存在同一个文本文件中，每条样例占一行且存储为``json``格式，其包含以下字段
@@ -98,9 +105,8 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 
 #### 自定义数据标注
 
-对于不同的应用场景，关键信息的配置多种多样，直接应用通用信息抽取模型的效果可能不够理想。这时可以标注少量场景相关的数据，利用few-shot learning技术来改进特定场景下的信息抽取效果。
+对于不同的应用场景，关键信息的配置多种多样，直接应用通用信息抽取模型的效果可能不够理想。这时可以标注少量场景相关的数据，利用few-shot learning技术来改进特定场景下的信息抽取效果。在本应用场景中，标注数据为[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)。针对其他场景，可使用[doccano](https://github.com/doccano/doccano)平台标注并导出自定义数据。
 
-自定义数据的格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)相同，保存在``./data/``目录下。
 
 ## 4. 模型训练
 
@@ -115,32 +121,31 @@ python audio_to_wav.py --audio_file ./audios_raw/ --save_dir ./audios_wav/
 ├── preprocess.py             # 数据预处理脚本
 ├── finetune.py               # 信息抽取模型 fine-tune 脚本
 ├── model.py                  # 信息抽取模型（UIE）组网脚本
-├── metric.py                 # 信息抽取模型指标计算脚本
 └── utils.py                  # 辅助函数
 ```
 
 #### 数据预处理
 
-准备好符合数据格式要求的自定义数据，放在``./data/data.txt``文件。执行以下脚本，按设置的比例划分数据集，同时构造负样本用于提升模型的学习效果。
+下载[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)，存储在``./data/``目录下。执行以下脚本，按设置的比例划分数据集，同时构造负样本用于提升模型的学习效果。
 
 ```shell
 python preprocess.py \
-    --input_file ./data/data.txt \
+    --input_file ./data/audio-expense-account.jsonl \
     --save_dir ./data/ \
     --negative_ratio 5 \
-    --splits 0.4 0.6
+    --splits 0.2 0.8 0.0 \
+    --seed 1000
 ```
 
 可配置参数包括
 
-- ``input_file``: 原始数据文件名。文件内容应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)的格式一致。
-- ``save_dir``: 训练数据的保存目录。若``splits``为空，则数据存储在``processed_data.txt``文件，若``splits``设置为长度为2的列表，则数据存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
+- ``input_file``: 标注数据文件名。数据格式应与[语音报销工单数据](https://paddlenlp.bj.bcebos.com/datasets/erniekit/speech-cmd-analysis/audio-expense-account.jsonl)一致。
+- ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。若``splits``为空，则数据存储在``train.txt``文件，若``splits``为长度为3的列表，则数据存储在目录下的``train.txt``、``dev.txt``、``test.txt``文件。
 - ``negative_ratio``: 负样本与正样本的比例。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.4, 0.6]表示按照``4:6``的比例将数据划分为训练集和验证集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
+- ``seed``: 随机种子，默认为1000.
 
-#### 预训练模型参数
-
-下载预训练好的[UIE模型](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams)，放在`./uie_model/`目录下。
 
 #### 定制化模型训练
 
@@ -151,44 +156,48 @@ CUDA_VISIBLE_DEVICES=0 python finetune.py \
     --train_path ./data/train.txt \
     --dev_path ./data/dev.txt \
     --save_dir ./checkpoint \
+    --model uie-base \
     --learning_rate 1e-5 \
     --batch_size 16 \
     --max_seq_len 512 \
     --num_epochs 50 \
-    --init_from_ckpt ./uie_model/model_state.pdparams \
     --seed 1000 \
     --logging_steps 10 \
-    --valid_steps 100 \
+    --valid_steps 10 \
     --device gpu
 ```
 
 可配置参数包括
 
-- ``train_path``: 训练集数据文件路径。
-- ``dev_path``: 验证集数据文件路径。
-- ``save_dir``: 保存训练模型的目录。
+- `train_path`: 训练集文件路径。
+- `dev_path`: 验证集文件路径。
+- `save_dir`: 模型存储路径，默认为`./checkpoint`。
 - ``init_from_ckpt``: 可选，模型参数路径，热启动模型训练。默认为None。
-- ``learning_rate``: 模型训练的学习率的大小。
-- ``batch_size``: 每次迭代每张卡上的样本数量。
-- ``max_seq_len``: 最大句子长度，超过该长度将被截断。
-- ``num_epochs``: 训练轮数。
-- ``logging_steps``: 日志打印间隔的step数。
-- ``valid_steps``: 在验证集上进行评估间隔的step数。
-- ``device``: 模型训练使用的设备，可选cpu或gpu。
-- ``seed``: 随机数种子，用于训练过程复现。
+- `learning_rate`: 学习率，默认为1e-5。
+- `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `num_epochs`: 训练轮数，默认为100。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`。
+- `seed`: 随机种子，默认为1000.
+- `logging_steps`: 日志打印的间隔steps数，默认为10。
+- `valid_steps`: evaluate的间隔steps数，默认为100。
+- `device`: 模型训练使用的设备，可选cpu或gpu。
 
 
 ## 5. 模型预测
 
-预测时使用的schema应与finetune阶段训练数据的schema保持一致。在语音报销工单信息录入场景下，首先准备好``.wav``格式的音频文件，然后在BaiduAI开放平台创建语音识别应用以获取API Key和Secret Key，最后加载用场景数据finetune后的模型参数，执行语音指令解析脚本即可抽取报销需要的``时间``、``出发地``、``目的地``和``费用``字段。具体命令如下
+预测时使用的schema应与finetune阶段训练数据的schema保持一致以得到更好的效果。在语音报销工单信息录入场景下，
+- 首先准备好``.wav``格式的音频文件，例如下载[sample.wav](https://bj.bcebos.com/paddlenlp/applications/speech-cmd-analysis/sample.wav)放在``./audios_wav/``目录下。
+- 然后在BaiduAI开放平台创建语音识别应用以获取API Key和Secret Key。
+- 最后加载用场景数据finetune后的模型参数，执行语音指令解析脚本即可抽取报销需要的``时间``、``出发地``、``目的地``和``费用``字段。具体命令如下
 
 ```shell
 python pipeline.py \
     --api_key '4E1BG9lTnlSeIf1NQFlrxxxx' \
     --secret_key '544ca4657ba8002e3dea3ac2f5fxxxxx' \
     --audio_file ./audios_wav/sample.wav \
-    --uie_model ./checkpoint/model_best/model_state.pdparams \
-    --schema ['时间', '出发地', '目的地', '费用']
+    --uie_model ./checkpoint/model_best/ \
+    --schema '时间' '出发地' '目的地' '费用'
 ```
 
 可配置参数包括
