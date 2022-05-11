@@ -20,7 +20,7 @@ python run_seq_cls.py \
 
 2. Token分类
 ```shell
-dataset="peoples_dayily_ner"
+dataset="peoples_daily_ner"
 python run_ner.py \
     --do_train \
     --do_eval \

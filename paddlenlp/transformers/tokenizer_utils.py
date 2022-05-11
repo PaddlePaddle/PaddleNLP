@@ -516,7 +516,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
     - **pretrained_init_configuration** (`Dict[str, Dict[str, Any]]`) -- A dictionary with, as keys, the
         `short-cut-names` of the pretrained models, and as associated values, a dictionary of specific arguments to
         pass to the `__init__` method of the tokenizer class for this pretrained model when loading the tokenizer
-        with the [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`] method.
+        with the [`~tokenizer_utils_base.PretrainedTokenizerBase.from_pretrained`] method.
     - **model_input_names** (`List[str]`) -- A list of inputs expected in the forward pass of the model.
     - **padding_side** (`str`) -- The default value for the side on which the model should have padding applied.
         Should be `'right'` or `'left'`.
