@@ -80,7 +80,7 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
             "roformer_v2_chinese_char_base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roformerv2/roformer_v2_chinese_char_base/vocab.txt",
             "roformer_v2_chinese_char_large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformerv2/roformer-chinese-small/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/roformerv2/roformer_v2_chinese_char_large/vocab.txt",
         }
     }
     pretrained_init_configuration = {
