@@ -42,11 +42,6 @@ def parse_args():
         type=int,
         help="The number of returned sequences for each sample.")
     parser.add_argument(
-        "--max_seq_len",
-        default=512,
-        type=int,
-        help="Maximum input sequence length.")
-    parser.add_argument(
         "--max_out_len",
         default=64,
         type=int,
@@ -124,7 +119,7 @@ def postprocess_response(token_ids, tokenizer):
 
 
 def main(args):
-    # For memory saving:
+    # For memory saving when using FasterGeneration:
     # If environment variable `PPFG_QKV_MEM_OPT` is set and the weights of q/k/v
     # is fused, it will try to delete the original unfused weights. Note the
     # rollback to original model would not be guarantee anymore when the faster
@@ -145,9 +140,10 @@ def main(args):
     model.eval()
 
     history = [
-        "Hi , Becky , what's up ?",
-        "Not much , except that my mother-in-law is driving me up the wall .",
-        "What's the problem ?"
+        "hi , Mary ! What do you usually like to do in your spare time ?",
+        "well , I spend a lot of time watching movies .",
+        "what a confidence ! I always watch a lot of movies , too ."
+        "oh really , Frank ? What kind of movies do you like ?"
     ]
     inputs = [history] * args.batch_size
     inputs = list(
@@ -157,8 +153,7 @@ def main(args):
                 add_start_token_as_response=True,
                 return_length=True,
                 return_role_ids=args.use_role,
-                position_style=args.position_style,
-                max_seq_len=args.max_seq_len), inputs))
+                position_style=args.position_style), inputs))
     collator = DataCollatorWithPadding(tokenizer)
     data = collator(inputs)
 
@@ -166,7 +161,8 @@ def main(args):
         input_ids=data['input_ids'],
         token_type_ids=data['token_type_ids'],
         position_ids=data['position_ids'],
-        attention_mask=data['attention_mask'].cast("float32"),
+        attention_mask=data['attention_mask'].cast(
+            "float32"),  # TODO(guosheng): remove this cast
         role_ids=data.get('role_ids', None),
         seq_len=data['seq_len'],
         max_length=args.max_out_len,

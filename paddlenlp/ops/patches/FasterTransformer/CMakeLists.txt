@@ -273,7 +273,8 @@ endif()
 
 if(BUILD_GPT)
   list(APPEND COMMON_HEADER_DIRS ${NCCL_INCLUDE_DIRS})
-  list(APPEND COMMON_LIB_DIRS /guosheng/tools/nccl_2.8.3-1+cuda10.1_x86_64/lib/)
+  get_filename_component(NCCL_LIB_DIRS ${NCCL_LIBRARIES} DIRECTORY)
+  list(APPEND COMMON_LIB_DIRS ${NCCL_LIB_DIRS})
 endif()
 
 list(APPEND COMMON_HEADER_DIRS ${MPI_INCLUDE_PATH})
