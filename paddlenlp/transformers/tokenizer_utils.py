@@ -1088,6 +1088,24 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         if stride > 0 and second_ids is not None:
             kwargs['batch_text_or_text_pairs'] = batch_text_or_text_pairs
+        else:
+            if return_offsets_mapping:
+                has_pair = False
+                if len(batch_text_or_text_pairs) > 0:
+                    if isinstance(batch_text_or_text_pairs[0], (list, tuple)):
+                        has_pair = True
+                kwargs['texts'] = None
+                kwargs['text_pairs'] = None
+                if has_pair:
+                    kwargs['texts'] = [
+                        text[0] for text in batch_text_or_text_pairs
+                    ]
+                    kwargs['text_pairs'] = [
+                        text[1] for text in batch_text_or_text_pairs
+                    ]
+                else:
+                    kwargs[
+                        'texts'] = [text for text in batch_text_or_text_pairs]
 
         batch_outputs = self._batch_prepare_for_model(
             input_ids,
@@ -1190,7 +1208,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                         token_type_ids = [0] * len(ids) + ([0] * len(pair_ids)
                                                            if pair else [])
                     encoded_inputs['offset_mapping'] = offset_mapping
-
                     # Build output dictionnary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
@@ -1227,6 +1244,12 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                         break
                     offset += min(length, stride)
             else:
+                if return_offsets_mapping:
+                    kwargs['text'] = kwargs['texts'][example_id]
+                    kwargs['text_pair'] = None
+                    if kwargs['text_pairs'] is not None:
+                        kwargs['text_pair'] = kwargs['text_pairs'][example_id]
+
                 encoded_inputs = self.prepare_for_model(
                     first_ids,
                     second_ids,
@@ -1242,6 +1265,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                     return_token_type_ids=return_token_type_ids,
                     return_overflowing_tokens=return_overflowing_tokens,
                     return_special_tokens_mask=return_special_tokens_mask,
+                    return_offsets_mapping=return_offsets_mapping,
                     return_length=return_length,
                     return_tensors=None,  # We convert the whole batch to tensors at the end
                     prepend_batch_axis=False,
