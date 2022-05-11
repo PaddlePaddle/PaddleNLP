@@ -82,6 +82,8 @@ void Tokenizer::EnablePadMethod(Direction direction,
   }
   if (pad_to_multiple_of != nullptr) {
     pad_method_.pad_to_mutiple_of = *pad_to_multiple_of;
+  } else {
+    pad_method_.pad_to_mutiple_of = 0;
   }
 }
 void Tokenizer::DisablePadMethod() { use_padding_ = false; }

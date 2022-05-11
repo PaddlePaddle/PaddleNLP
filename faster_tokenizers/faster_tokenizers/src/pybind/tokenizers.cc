@@ -211,17 +211,24 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                  ToPyObject(pad_method.pad_token_type_id_));
   PyDict_SetItem(
       py_dict, ToPyObject("pad_token"), ToPyObject(pad_method.pad_token_));
-  PyDict_SetItem(py_dict,
-                 ToPyObject("pad_to_mutiple_of"),
-                 ToPyObject(pad_method.pad_to_mutiple_of));
+  if (pad_method.pad_to_mutiple_of > 0) {
+      PyDict_SetItem(py_dict,
+        ToPyObject("pad_to_multiple_of"),
+        ToPyObject(pad_method.pad_to_mutiple_of));
+  } else {
+      Py_INCREF(Py_None);
+      PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
+  }
+  
   PyDict_SetItem(
       py_dict,
       ToPyObject("direction"),
       ToPyObject((pad_method.direction_ == core::Direction::RIGHT) ? "right"
                                                                    : "left"));
   if (pad_method.strategy_ == core::PadStrategy::BATCH_LONGEST) {
+    Py_INCREF(Py_None);
     PyDict_SetItem(
-        py_dict, ToPyObject("strategy"), ToPyObject("batch_longest"));
+        py_dict, ToPyObject("length"), Py_None);
   } else {
     PyDict_SetItem(
         py_dict, ToPyObject("length"), ToPyObject(pad_method.pad_len_));
@@ -450,7 +457,13 @@ static PyObject* EnablePadding(TokenizerObject* self,
   uint* pad_to_multiple_of_ptr = nullptr;
   uint length = 0;
   uint pad_to_multiple_of = 0;
-
+  VLOG(6) << "args_num: " << args_num << ", flag_kwargs: " << flag_kwargs;
+  VLOG(6) << "kw_direction: " << kw_direction;
+  VLOG(6) << "kw_pad_id: " << kw_pad_id;
+  VLOG(6) << "kw_pad_type_id: " << kw_pad_type_id;
+  VLOG(6) << "kw_pad_token: " << kw_pad_token;
+  VLOG(6) << "kw_length: " << kw_length;
+  VLOG(6) << "kw_pad_to_multiple_of: " << kw_pad_to_multiple_of;
   if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)6) {
     if ((args_num == 0 && flag_kwargs && kw_direction) || (args_num >= 1)) {
       direction = CastPyArg2AttrString(kw_direction, 0);
@@ -465,13 +478,17 @@ static PyObject* EnablePadding(TokenizerObject* self,
       pad_token = CastPyArg2AttrString(kw_pad_token, 3);
     }
     if ((args_num <= 4 && flag_kwargs && kw_length) || (args_num >= 5)) {
-      length = CastPyArg2AttrSize_t(kw_length, 4);
-      length_ptr = &length;
+      if (!(kw_length == Py_None)) {
+        length = CastPyArg2AttrSize_t(kw_length, 4);
+        length_ptr = &length;
+      }
     }
     if ((args_num <= 5 && flag_kwargs && kw_pad_to_multiple_of) ||
         (args_num == 6)) {
-      pad_to_multiple_of = CastPyArg2AttrSize_t(kw_pad_to_multiple_of, 5);
-      pad_to_multiple_of_ptr = &pad_to_multiple_of;
+      if (!(kw_pad_to_multiple_of == Py_None)) {
+        pad_to_multiple_of = CastPyArg2AttrSize_t(kw_pad_to_multiple_of, 5);
+        pad_to_multiple_of_ptr = &pad_to_multiple_of;
+      }
     }
   } else {
     std::ostringstream oss;
