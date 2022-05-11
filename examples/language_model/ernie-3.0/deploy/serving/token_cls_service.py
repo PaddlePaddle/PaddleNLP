@@ -17,6 +17,7 @@ from numpy import array
 
 import logging
 import numpy as np
+import json
 
 _LOGGER = logging.getLogger()
 
@@ -64,9 +65,11 @@ class ErnieTokenClsOp(Op):
             data,
             max_length=128,
             padding=True,
+            truncation=True,
             is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
+        # print("input shape:", len(input_ids), len(input_ids[0]))
         token_type_ids = data["token_type_ids"]
         return {
             "input_ids": np.array(
@@ -116,13 +119,12 @@ class ErnieTokenClsOp(Op):
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
-                    "entity": input_data[batch][start:],
+                    "entity": input_data[batch][start:len(token_label) - 1],
                 })
             value.append(items)
         out_dict = {
-            "value": np.array(value),
-            "tokens_label": np.array(
-                tokens_label, dtype="int32")
+            "value": json.dumps(value),
+            "tokens_label": json.dumps(tokens_label)
         }
         # print(out_dict)
         return out_dict, None, ""

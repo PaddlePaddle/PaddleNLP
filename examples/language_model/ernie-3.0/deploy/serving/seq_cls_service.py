@@ -37,7 +37,8 @@ class ErnieSeqClsOp(Op):
         data = [i.decode('utf-8') for i in data]
 
         # tokenizer + pad
-        data = self.tokenizer(data, max_length=128, padding=True)
+        data = self.tokenizer(
+            data, max_length=128, padding=True, truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         # print("input_ids:", input_ids)

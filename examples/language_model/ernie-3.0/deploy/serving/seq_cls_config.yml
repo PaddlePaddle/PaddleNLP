@@ -7,7 +7,7 @@ http_port: 9999
 #worker_num, 最大并发数。
 #当build_dag_each_worker=True时, 框架会创建worker_num个进程，每个进程内构建grpcSever和DAG
 #当build_dag_each_worker=False时，框架会设置主线程grpc线程池的max_workers=worker_num
-worker_num: 4
+worker_num: 1
 
 #build_dag_each_worker, False，框架在进程内创建一条DAG；True，框架会每个进程内创建多个独立的DAG
 build_dag_each_worker: false
@@ -51,7 +51,7 @@ op:
             #use_mkldnn: True
 
             #thread_num
-            thread_num: 2
+            thread_num: 1
 
             #ir_optim
             ir_optim: True
