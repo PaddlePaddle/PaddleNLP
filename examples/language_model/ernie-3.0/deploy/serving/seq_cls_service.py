@@ -50,10 +50,23 @@ class ErnieSeqClsOp(Op):
         }, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
+        """
+        In postprocess stage, assemble data for next op or output.
+        Args:
+            input_data: data returned in preprocess stage, dict(for single predict) or list(for batch predict)
+            fetch_data: data returned in process stage, dict(for single predict) or list(for batch predict)
+            data_id: inner unique id, increase auto
+            log_id: logid, 0 default
+        Returns: 
+            fetch_dict: fetch result must be dict type.
+            prod_errcode: None default, otherwise, product errores occured.
+                          It is handled in the same way as exception.
+            prod_errinfo: "" default
+        """
         result = fetch_dict["linear_75.tmp_1"]
         # np.argpartition
         out_dict = {
-            "index": result.argmax(axis=-1),
+            "label": result.argmax(axis=-1),
             "confidence": result.max(axis=-1)
         }
         return out_dict, None, ""

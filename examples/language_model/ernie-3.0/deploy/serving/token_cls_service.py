@@ -25,6 +25,9 @@ class ErnieTokenClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+        self.labele_names = [
+            'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
+        ]
 
     def get_input_data(self, input_dicts):
         (_, input_dict), = input_dicts.items()
@@ -90,10 +93,6 @@ class ErnieTokenClsOp(Op):
         result = fetch_dict["linear_75.tmp_1"]
         tokens_label = result.argmax(axis=-1).tolist()
         # 获取batch中每个token的实体
-        labele_names = [
-            'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
-        ]
-        # print(tokens_label)
         value = []
         for batch, token_label in enumerate(tokens_label):
             # print("label:", token_label)
@@ -102,18 +101,18 @@ class ErnieTokenClsOp(Op):
             items = []
             for i, label in enumerate(token_label):
                 if label == 0 and start >= 0:
-                    entity = input_data[batch][start:i]
+                    entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
                     items.append({
-                        "pos": [start, i - 1],
+                        "pos": [start, i - 2],
                         "entity": entity,
                         "label": label_name,
                     })
                     start = -1
                 elif label in [1, 3, 5]:
-                    start = i
-                    label_name = labele_names[label][2:]
+                    start = i - 1
+                    label_name = self.labele_names[label][2:]
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],

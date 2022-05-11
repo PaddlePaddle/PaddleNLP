@@ -89,11 +89,11 @@ def test_ner_dataset(client):
             print_ret(eval(ret.value[0]), data)
         labels_index = eval(ret.value[1])
 
+        seq_len = [labels_index.shape[1]] * labels_index.shape[0]
         # calculate metric
         import paddle
         label = paddle.to_tensor(labels[i])
         labels_index = paddle.to_tensor(labels_index)
-        seq_len = [labels_index.shape[1]] * labels_index.shape[0]
 
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             paddle.to_tensor(seq_len), labels_index, label)

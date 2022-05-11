@@ -36,7 +36,7 @@ pip3 install paddlepaddle-gpu
 下载[Erine-3.0模型](TODO)
 
 ### 转换模型
-如果是上述下载或者训练导出的静态图推理模型(含`xx.pdmodel`和‘xx.pdiparams’)，需要转换成serving模型
+如果是链接中下载的部署模型或训练导出的静态图推理模型(含`xx.pdmodel`和`xx.pdiparams`)，需要转换成serving模型
 ```
 # 模型地址根据实际填写即可
 python -m paddle_serving_client.convert --dirname models/erinie-3.0 --model_filename infer.pdmodel --params_filename infer.pdiparams
@@ -58,14 +58,14 @@ serving_server
 ### 修改配置文件
 目录中的`xx_config.yml`文件解释了每一个参数的含义，可以根据实际需要修改其中的配置。比如：
 ```
-#修改模型目录为下载的模型目录或自己的模型目录:
-model_config: no_task_emb/serving_server =>  model_config: erine-3.0-tiny
+# 修改模型目录为下载的模型目录或自己的模型目录:
+model_config: no_task_emb/serving_server =>  model_config: erine-3.0-tiny/serving_server
 
-#修改rpc端口号为9998
+# 修改rpc端口号为9998
 rpc_port: 9998   =>   rpc_port: 9998
 
-#修改处理客户端请求的最大并发进程数为6:
-worker_num: 4    =>   worker_num: 6
+# 修改使用GPU推理为使用CPU推理:
+device_type: 1    =>   device_type: 0
 ```
 
 ### 分类任务
@@ -80,6 +80,11 @@ python seq_cls_service.py
 ```
 python seq_cls_rpc_client.py
 ```
+输出打印如下:
+```
+{'label': array([6, 2]), 'confidence': array([4.9473147, 5.7493963], dtype=float32)}
+acc: 0.5745
+```
 
 ### 实体识别任务
 #### 启动服务
@@ -93,25 +98,25 @@ python token_cls_service.py
 ```
 python seq_cls_rpc_client.py
 ```
-会输出以下打印:
+输出打印如下:
 ```
 input data: 在过去的五年中，致公党在邓小平理论指引下，遵循社会主义初级阶段的基本路线，努力实践致公党十大提出的发挥参政党职能、加强自身建设的基本任务。
 The model detects all entities:
-entity: 公党在   label: ORG   pos: [9, 11]
-entity: 小平理   label: PER   pos: [13, 15]
-entity: 公党十大提   label: ORG   pos: [42, 46]
+entity: 致公党   label: ORG   pos: [8, 10]
+entity: 邓小平   label: PER   pos: [12, 14]
+entity: 致公党十大   label: ORG   pos: [41, 45]
 -----------------------------
 input data: 今年７月１日我国政府恢复对香港行使主权，标志着“一国两制”构想的巨大成功，标志着中国人民在祖国统一大业的道路上迈出了重要的一步。
 The model detects all entities:
-entity: 港行   label: LOC   pos: [14, 15]
-entity: 国人   label: LOC   pos: [41, 42]
+entity: 香港   label: LOC   pos: [13, 14]
+entity: 中国   label: LOC   pos: [40, 41]
 -----------------------------
 input data: ['中', '共', '中', '央', '致', '中', '国', '致', '公', '党', '十', '一', '大', '的', '贺', '词', '各', '位', '代', '表', '、', '各', '位', '同', '志', '：', '在', '中', '国', '致', '公', '党', '第', '十', '一', '次', '全', '国', '代', '表', '大', '会', '隆', '重', '召', '开', '之', '际', '，', '中', '国', '共', '产', '党', '中', '央', '委', '员', '会', '谨', '向', '大', '会', '表', '示', '热', '烈', '的', '祝', '贺', '，', '向', '致', '公', '党', '的', '同', '志', '们', '致', '以', '亲', '切', '的', '问', '候', '！']
 The model detects all entities:
-entity: 共中央致   label: ORG   pos: [1, 4]
-entity: 国致公党十一大的   label: ORG   pos: [6, 13]
-entity: 国致公党第十一次全国代表大会隆   label: ORG   pos: [28, 42]
-entity: 国共产党中央委员会谨   label: ORG   pos: [50, 59]
-entity: 公   label: ORG   pos: [73, 73]
+entity: 中共中央   label: ORG   pos: [0, 3]
+entity: 中国致公党十一大   label: ORG   pos: [5, 12]
+entity: 中国致公党第十一次全国代表大会   label: ORG   pos: [27, 41]
+entity: 中国共产党中央委员会   label: ORG   pos: [49, 58]
+entity: 致   label: ORG   pos: [72, 72]
 -----------------------------
 ```
