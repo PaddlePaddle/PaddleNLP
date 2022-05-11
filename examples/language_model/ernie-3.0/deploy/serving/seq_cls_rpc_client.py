@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-try:
-    from paddle_serving_server.pipeline import PipelineClient
-except ImportError:
-    from paddle_serving_server.pipeline import PipelineClient
+from paddle_serving_server.pipeline import PipelineClient
+
 import numpy as np
 import requests
 import json
@@ -30,7 +28,7 @@ dev_ds = load_dataset('clue', "tnews", splits='dev')
 batches = []
 labels = []
 idx = 0
-batch_size = 2
+batch_size = 32
 while idx < len(dev_ds):
     datas = []
     label = []
@@ -42,11 +40,16 @@ while idx < len(dev_ds):
     batches.append(datas)
     labels.append(np.array(label))
     idx += batch_size
+"""
+# data format
+["文本1", "文本2"]
 
+[b"\xe6\x96\x87\xe6\x9c\xac1", b"\xe6\x96\x87\xe6\x9c\xac2"]      # after encode
+"""
 accuracy = 0
 for i, data in enumerate(batches):
     data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
-    ret = client.predict(feed_dict={"sentence" : data}, fetch=["test"])
+    ret = client.predict(feed_dict={"sentence": data})
     # print("ret:", ret)
     for index, value in zip(ret.key, ret.value):
         if index == "index":
@@ -54,4 +57,4 @@ for i, data in enumerate(batches):
             # print(value, labels[i])
             accuracy += np.sum(labels[i] == value)
             break
-print("acc:", 1.0*accuracy/len(dev_ds))
+print("acc:", 1.0 * accuracy / len(dev_ds))

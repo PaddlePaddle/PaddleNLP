@@ -20,12 +20,13 @@ import numpy as np
 
 _LOGGER = logging.getLogger()
 
-class ErnieOp(Op):
+
+class ErnieSeqClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    def preprocess(self, input_dicts, data_id, log_id):        
+    def preprocess(self, input_dicts, data_id, log_id):
         # convert input format
         (_, input_dict), = input_dicts.items()
         data = input_dict["sentence"]
@@ -34,27 +35,36 @@ class ErnieOp(Op):
         else:
             _LOGGER.error("input value  {}is not supported.".format(data))
         data = [i.decode('utf-8') for i in data]
-        
+
         # tokenizer + pad
         data = self.tokenizer(data, max_length=128, padding=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         # print("input_ids:", input_ids)
         # print("token_type_ids", token_type_ids)
-        return {"input_ids": np.array(input_ids, dtype="int64"), "token_type_ids": np.array(token_type_ids, dtype="int64")}, False, None, ""
+        return {
+            "input_ids": np.array(
+                input_ids, dtype="int64"),
+            "token_type_ids": np.array(
+                token_type_ids, dtype="int64")
+        }, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         result = fetch_dict["linear_75.tmp_1"]
         # np.argpartition
-        out_dict = {"index": result.argmax(axis=-1), "confidence": result.max(axis=-1)}
+        out_dict = {
+            "index": result.argmax(axis=-1),
+            "confidence": result.max(axis=-1)
+        }
         return out_dict, None, ""
 
-class Ernie3Service(WebService):
+
+class ErnieSeqClsService(WebService):
     def get_pipeline_response(self, read_op):
-        return ErnieOp(name="ernie", input_ops=[read_op])
+        return ErnieSeqClsOp(name="seq_cls", input_ops=[read_op])
+
 
 if __name__ == "__main__":
-    ocr_service = Ernie3Service(name="erine3")
-    ocr_service.prepare_pipeline_config("config.yml")
+    ocr_service = ErnieSeqClsService(name="seq_cls")
+    ocr_service.prepare_pipeline_config("seq_cls_config.yml")
     ocr_service.run_service()
-
