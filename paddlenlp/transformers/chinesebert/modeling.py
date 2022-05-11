@@ -414,7 +414,7 @@ class ChineseBertModel(ChineseBertPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 output_hidden_states=False):
-        r'''
+        r"""
         The ChineseBert forward method, overrides the `__call__()` special method.
 
         Args:
@@ -488,16 +488,13 @@ class ChineseBertModel(ChineseBertPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
-
+        """
         if attention_mask is None:
-            attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2], )
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         else:
-            attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                              input_ids.shape)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(
             input_ids=input_ids,

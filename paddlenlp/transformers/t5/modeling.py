@@ -922,8 +922,17 @@ class T5Stack(nn.Layer):
                 self.is_decoder
             ), f"`use_cache` can only be set to `True` if {self} is used as a decoder"
 
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
         if attention_mask is None:
-            attention_mask = paddle.ones(shape=[batch_size, mask_seq_length])
+            extended_attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2])
+        else:
+            extended_attention_mask = self.get_extended_attention_mask(
+                attention_mask, input_shape)
+
         if (self.is_decoder and encoder_attention_mask is None and
                 encoder_hidden_states is not None):
             encoder_seq_length = encoder_hidden_states.shape[1]
@@ -933,11 +942,6 @@ class T5Stack(nn.Layer):
         # initialize caches with `None` if past does not exist
         if cache is None:
             cache = [None] * len(self.block)
-
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
-        # ourselves in which case we just need to make it broadcastable to all heads.
-        extended_attention_mask = self.get_extended_attention_mask(
-            attention_mask, input_shape)
 
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]

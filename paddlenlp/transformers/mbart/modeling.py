@@ -572,14 +572,13 @@ class MBartModel(MBartPretrainedModel):
                                           "specified when generating decoder_input_ids"
             decoder_input_ids = shift_tokens_right(input_ids, self.pad_token_id)
         if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating attention_mask"
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(paddle.get_default_dtype()) * -1e4,
+                axis=[1, 2])
         else:
-            attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                              input_ids.shape)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
+
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
         if use_cache:

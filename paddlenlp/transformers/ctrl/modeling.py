@@ -490,24 +490,12 @@ class CTRLModel(CTRLPreTrainedModel):
                 shape=[-1, seq_len])
 
         # Attention mask.
-        if attention_mask is not None:
-            assert batch_size > 0, "batch_size has to be defined and > 0"
-            attention_mask = attention_mask.reshape(shape=[batch_size, -1])
-            # We create a 3D attention mask from a 2D tensor mask.
-            # Sizes are [batch_size, 1, 1, to_seq_length]
-            # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
-            # this attention mask is more simple than the triangular masking of causal attention
-            # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
-            attention_mask = attention_mask.unsqueeze([1, 2])
-
-            # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-            # masked positions, this operation will create a tensor which is 0.0 for
-            # positions we want to attend and -10000.0 for masked positions.
-            # Since we are adding it to the raw scores before the softmax, this is
-            # effectively the same as removing these entirely.
-            attention_mask = attention_mask.astype(
-                dtype=paddle.get_default_dtype())  # fp16 compatibility
-            attention_mask = (1.0 - attention_mask) * -10000.0
+        if attention_mask is None:
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(shape=[-1, seq_len])

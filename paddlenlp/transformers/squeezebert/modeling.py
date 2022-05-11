@@ -29,18 +29,6 @@ __all__ = [
 ACT2FN = {'gelu': nn.GELU()}
 
 
-def _convert_attention_mask(attention_mask, inputs):
-    if attention_mask.dim() == 3:
-        extended_attention_mask = attention_mask.unsqueeze(1)
-    elif attention_mask.dim() == 2:
-        # extended_attention_mask = attention_mask[:, None, None, :]
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
-    extended_attention_mask = paddle.cast(extended_attention_mask,
-                                          inputs.dtype)  # fp16 compatibility
-    extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-    return extended_attention_mask
-
-
 class SqueezeBertEmbeddings(nn.Layer):
     def __init__(self,
                  vocab_size,
@@ -676,7 +664,12 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
         '''
         input_shape = input_ids.shape
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
+            extended_attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id
+                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2])
+        else:
+            extended_attention_mask = self.get_extended_attention_mask(attention_mask)
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
 
@@ -684,8 +677,7 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids)
-        extended_attention_mask = _convert_attention_mask(attention_mask,
-                                                          embedding_output)
+
         encoder_outputs = self.encoder(
             hidden_states=embedding_output,
             attention_mask=extended_attention_mask,

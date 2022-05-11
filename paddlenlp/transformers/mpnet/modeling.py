@@ -425,6 +425,7 @@ class MPNetModel(MPNetPretrainedModel):
             layer_norm_eps=1e-5,
             pad_token_id=1, ):
         super(MPNetModel, self).__init__()
+        self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.embeddings = MPNetEmbeddings(
             vocab_size,
@@ -448,7 +449,7 @@ class MPNetModel(MPNetPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None):
-        r'''
+        r"""
         The MPNetModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -498,13 +499,13 @@ class MPNetModel(MPNetPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
-        '''
-
+        """
         if attention_mask is None:
-            attention_mask = (input_ids != self.embeddings.padding_idx
-                              ).astype(input_ids.dtype)
-        attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                          input_ids.shape)
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(input_ids, position_ids)
 

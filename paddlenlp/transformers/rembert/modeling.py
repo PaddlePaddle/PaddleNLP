@@ -554,8 +554,8 @@ class RemBertModel(RembertPretrainedModel):
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
-            attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                              input_shape)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
+
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')
 

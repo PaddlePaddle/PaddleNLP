@@ -326,15 +326,14 @@ class TinyBertModel(TinyBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
-
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
                  ).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
-            attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                              input_ids.shape)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
+
         embedding_output = self.embeddings(input_ids, token_type_ids)
         encoded_layer = self.encoder(embedding_output, attention_mask)
         pooled_output = self.pooler(encoded_layer)

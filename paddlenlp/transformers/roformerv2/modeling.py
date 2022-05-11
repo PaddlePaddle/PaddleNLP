@@ -488,15 +488,7 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
                  ).astype(paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
-            if attention_mask.ndim == 2:
-                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(
-                    axis=[1, 2]).astype(paddle.get_default_dtype())
-                attention_mask = (1.0 - attention_mask) * -1e4
-            else:
-                raise ValueError("Currently we only support 2D attention_mask.")
-
-        attention_mask.stop_gradient = True
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(
             input_ids=input_ids, token_type_ids=token_type_ids)

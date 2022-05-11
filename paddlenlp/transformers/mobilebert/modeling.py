@@ -1161,14 +1161,14 @@ class MobileBertModel(MobileBertPretrainedModel):
                 "You have to specify either input_ids or inputs_embeds")
 
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape, dtype=input_ids.dtype)
+            extended_attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        else:
+            extended_attention_mask = self.get_extended_attention_mask(attention_mask)
+
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')
-
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
-        # ourselves in which case we just need to make it broadcastable to all heads.
-        extended_attention_mask = self.get_extended_attention_mask(
-            attention_mask, input_shape)
 
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head

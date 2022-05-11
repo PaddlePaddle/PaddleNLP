@@ -771,15 +771,14 @@ class LukeModel(LukePretrainedModel):
         input_shape = input_ids.shape
 
         batch_size, seq_length = input_shape
-
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                 ).astype(paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
-            attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                              input_ids.shape)
+            attention_mask = self.get_extended_attention_mask(attention_mask)
+
         if entity_ids is not None:
             entity_seq_length = entity_ids.shape[1]
             if entity_attention_mask is None:

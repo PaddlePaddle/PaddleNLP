@@ -337,7 +337,8 @@ class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            attention_mask.stop_gradient = True
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
