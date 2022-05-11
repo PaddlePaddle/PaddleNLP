@@ -93,6 +93,11 @@ def parse_args():
         type=int,
         help="Max answer length for question answering task.")
     parser.add_argument(
+        "--shape_file",
+        default="shape_info.txt",
+        type=int,
+        help="Shape info filename.")
+    parser.add_argument(
         "--use_trt",
         action='store_true',
         help="Whether to use inference engin TensorRT.")
@@ -253,11 +258,12 @@ class Predictor(object):
                 "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
             }
 
-            shape_file = "shape_info.txt"
             if args.collect_shape:
-                config.collect_shape_range_info(shape_file)
+                config.collect_shape_range_info(args.task_name +
+                                                args.shape_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    args.task_name + shape_file, True)
             #config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape,
             #                                  opt_input_shape)
         config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
