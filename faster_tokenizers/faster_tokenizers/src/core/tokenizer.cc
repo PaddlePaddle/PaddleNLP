@@ -245,6 +245,8 @@ void Tokenizer::EncodeBatchStrings(
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
 #ifdef WITH_OMP
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
 #pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
                                                      omp_get_num_threads() > \
                                                                          1)
@@ -283,6 +285,8 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
 #ifdef WITH_OMP
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
 #pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
                                                      omp_get_num_threads() > \
                                                                          1)
