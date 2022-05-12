@@ -96,6 +96,11 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
         ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
         The model to train, evaluate or use for predictions.
+    criterion (`paddle.nn.Layer`，*可选*）：
+        model可能只输出中间结果loggit，如果想对模型的输出做更多的计算，可以添加criterion层。
+
+        The model may only output the loggit, if you want do more computation for the output of model,
+        you can add the criterion Layer.
 
     args（[`TrainingArguments`]，可选）：
         训练时需要用到的参数。将默认使用 [`TrainingArguments`] 初始化。
@@ -146,6 +151,13 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
         (`Callable[[EvalPrediction], Dict]`, *optional*):
         The function that will be used to compute metrics at evaluation. Must take a [`EvalPrediction`] and return
         a dictionary string to metric values.
+
+    callbacks (List of [`TrainerCallback`]，*可选*）：
+        用于自定义训练call列表函数。将这些函数会被添加到默认回调函数列表。
+        如果要删除使用的回调函数，请使用 [`Trainer.remove_callback`] 方法。
+
+        A list of callbacks to customize the training loop. Will add those to the list of default callbacks.
+        If you want to remove one of the default callbacks used, use the [`Trainer.remove_callback`] method.
 
     optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, 可选）：
         一个tuple, 包含要使用Optimizer和LRScheduler。将默认为模型上的 [`AdamW`] 实例

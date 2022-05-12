@@ -113,14 +113,12 @@ class Trainer:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
             The model to train, evaluate or use for predictions.
 
-            <Tip>
-
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
             your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleNLP
             models.
-
-            </Tip>
-
+        criterion(`paddle.nn.Layer`, *optional*):
+            The model may only output the loggit, if you want do more computation for the output of model, you can
+            add the criterion Layer.
         args ([`TrainingArguments`], *optional*):
             The arguments to tweak for training. Will default to a basic instance of [`TrainingArguments`] with the
             `output_dir` set to a directory named *tmp_trainer* in the current directory if not provided.
@@ -141,6 +139,9 @@ class Trainer:
         compute_metrics (`Callable[[EvalPrediction], Dict]`, *optional*):
             The function that will be used to compute metrics at evaluation. Must take a [`EvalPrediction`] and return
             a dictionary string to metric values.
+        callbacks (List of [`TrainerCallback`], *optional*):
+            A list of callbacks to customize the training loop. Will add those to the list of default callbacks.
+            If you want to remove one of the default callbacks used, use the [`Trainer.remove_callback`] method.
         optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*): A tuple
             containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your model
             and a scheduler given by [`get_linear_schedule_with_warmup`] controlled by `args`.
@@ -153,8 +154,6 @@ class Trainer:
           original model. This is the model that should be used for the forward pass. For example, the inner model is
           wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same
           as `self.model`.
-        - **is_in_train** -- Whether or not a model is currently running `train` (e.g. when `evaluate` is called while
-          in `train`)
 
     """
     from .trainer_utils import log_metrics, metrics_format, save_metrics, save_state
