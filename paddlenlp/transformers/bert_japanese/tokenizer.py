@@ -197,8 +197,11 @@ class BertJapaneseTokenizer(BertTokenizer):
 
     def _tokenize(self, text):
         if self.do_word_tokenize:
-            tokens = self.basic_tokenizer.tokenize(
-                text, never_split=self.all_special_tokens)
+            if self.word_tokenizer_type == "mecab":
+                tokens = self.basic_tokenizer.tokenize(text)
+            elif self.word_tokenizer_type == "basic":
+                tokens = self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens)
         else:
             tokens = [text]
 
