@@ -87,7 +87,7 @@ class InferBackend(object):
             import copy
             self.predictor_type = "onnxruntime"
             float_onnx_file = "model.onnx"
-            paddle2onnx.py_program2onnx(
+            paddle2onnx.command.program2onnx(
                 model_dir=model_dir,
                 model_filename=file_name + ".pdmodel",
                 params_filename=file_name + ".pdiparams",
