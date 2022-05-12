@@ -36,22 +36,20 @@ def do_train():
     set_seed(args.seed)
 
     encoding_model = MODEL_MAP[args.model]['encoding_model']
-    hidden_size = MODEL_MAP[args.model]['hidden_size']
-    url = MODEL_MAP[args.model]['url']
+    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
+
+    for key, val in resource_file_urls.items():
+        file_path = os.path.join(args.model, key)
+        if not os.path.exists(file_path):
+            get_path_from_url(val, args.model)
 
     tokenizer = AutoTokenizer.from_pretrained(encoding_model)
-    model = UIE(encoding_model, hidden_size)
+    model = UIE.from_pretrained(args.model)
 
-    if args.init_from_ckpt is not None:
-        pretrained_model_path = args.init_from_ckpt
-    else:
-        pretrained_model_path = os.path.join(args.model, "model_state.pdparams")
-        if not os.path.exists(pretrained_model_path):
-            get_path_from_url(url, args.model)
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        model.set_dict(state_dict)
 
-    state_dict = paddle.load(pretrained_model_path)
-    model.set_dict(state_dict)
-    print("Init from: {}".format(pretrained_model_path))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -121,8 +119,7 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                paddle.save(model.state_dict(), save_param_path)
+                model.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
                 print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
@@ -133,9 +130,7 @@ def do_train():
                     )
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
-                    save_best_param_path = os.path.join(save_dir,
-                                                        "model_state.pdparams")
-                    paddle.save(model.state_dict(), save_best_param_path)
+                    model.save_pretrained(save_dir)
                 tic_train = time.time()
 
 
