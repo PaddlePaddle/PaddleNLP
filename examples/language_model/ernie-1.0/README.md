@@ -1,4 +1,4 @@
-# Ernie-1.0: Enhanced Representation through kNowledge IntEgration
+# Ernie 1.0: Enhanced Representation through kNowledge IntEgration
 
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
@@ -25,16 +25,16 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 │   └── params_static_to_dygraph.py
 ├── finetune    下游任务finetune脚本
 │   ├── config.yml                 训练参数配置文件
-│   ├── question_answering.py      阅读理解任务
-│   ├── sequence_classification.py 序列分类任务
-│   ├── token_classification.py    TOKEN分类任务
+│   ├── question_answering.py      阅读理解任务预处理代码
+│   ├── sequence_classification.py 序列分类任务预处理代码
+│   ├── token_classification.py    TOKEN分类任务预处理代码
 │   ├── README.md       说明文档
 │   ├── run_ner.py      命名实体识别任务运行脚本
 │   ├── run_qa.py       阅读理解任务运行脚本
 │   ├── run_seq_cls.py  序列分类任务运行脚本
 │   └── utils.py
 ├── README.md  说明文档
-├── run_gb512_s1m.sh        训练启动shell脚本
+├── run_gb512_s1m.sh        训练启动shell脚本，batch size 512. max steps 100w
 ├── run_gb512_s1m_static.sh
 ├── run_gb512_s1m_trainer.sh
 ├── run_pretrain.py         训练启动python脚本
@@ -50,7 +50,7 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 
 
 ## 中文预训练
-ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，整体的loss是mlm_loss + nsp_loss。
+ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WWM（Whole Word Mask）方式，对于完整语义单元的Token，会同时进行Mask。整体的训练损失loss是mlm_loss + nsp_loss。
 
 本样例为用户提供了高效的训练流程，支持动态文本mask，自动断点训练重启等功能。
 用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`../data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
@@ -175,14 +175,15 @@ Metrics |   |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc
 ERNIE-1.0 Base | 12L768H | 73.78 |  74.95 | 58.73 | 61.37 | 81.77 | 75.46 | 81.25 | 82.93
 ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.15 | 76.64 | 81.25 | 81.33
 
-注: `ERNIE-1.0 Base`采用的训练配置是batch_size=1024、steps=100w，cluecorpussmall复现版本采用的是batch_size=512、steps=100w。
+注:
+- `ERNIE-1.0 Base`官方预训练参数，采用的训练配置是batch_size=1024、steps=100w，
+- `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
 
-### 为PaddleNLP贡献预训练参数
-PaddleNLP为开发者支持了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+### 预训练模型贡献
+PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
 使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
 
 贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
-
 
 
 ## 下游任务finetune
@@ -261,7 +262,7 @@ python run_seq_cls.py \
 # 预测结果
 python deploy/predict_chnsenticorp.py --model_dir=./tmp/chnsenticorp_v2/infer
 ```
-训练完，导出模型之后，可以用于部署，deploy/predict_chnsenticorp.py文件提供了python部署预测示例。
+训练完，导出模型之后，可以用于部署，`deploy/predict_chnsenticorp.py`文件提供了python部署预测示例。
 运行后预测结果打印如下：
 ```text
 Data: 东西不错，不过有人不太喜欢镜面的，我个人比较喜欢，总之还算满意。   Label: positive
