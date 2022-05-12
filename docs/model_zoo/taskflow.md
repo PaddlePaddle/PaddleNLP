@@ -416,19 +416,11 @@ from paddlenlp import Taskflow
 
   ```python
   >>> from paddlenlp import Taskflow
+  >>> from pprint import pprint
 
   >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
   >>> ie = Taskflow('information_extraction', schema=schema)
-  >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
-  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9907337794563702}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8914310308098763}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8944207860063003}]}]
-  ```
-
-  使用**pprint**分行输出，结果更易读：
-
-  ```python
-  >>> from pprint import pprint
-
-  >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+  >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")) # Better print results using pprint
   [{'时间': [{'end': 6,
             'probability': 0.9907337794563702,
             'start': 0,
@@ -506,29 +498,6 @@ from paddlenlp import Taskflow
   [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relations': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relations': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
   ```
 
-  使用**pprint**分行输出，结果更易读：
-
-  ```python
-  >>> from pprint import pprint
-
-  >>> pprint(ie('个人觉得管理太混乱了，票价太高了'))
-  [{'评价维度': [{'end': 6,
-              'probability': 0.8902372465421919,
-              'relations': {'观点词': [{'end': 9,
-                                    'probability': 0.9993566520321409,
-                                    'start': 7,
-                                    'text': '混乱'}]},
-              'start': 4,
-              'text': '管理'},
-            {'end': 13,
-              'probability': 0.9856116411308662,
-              'relations': {'观点词': [{'end': 15,
-                                    'probability': 0.995628420935013,
-                                    'start': 14,
-                                    'text': '高'}]},
-              'start': 11,
-              'text': '票价'}]}]
-  ```
 
 - 情感倾向分类
 
@@ -560,16 +529,7 @@ from paddlenlp import Taskflow
   ```python
   >>> schema = ['寺庙', {'丈夫': '妻子'}]
   >>> ie.set_schema(schema)
-  >>> ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')
-  [{'寺庙': [{'text': '感业寺', 'start': 9, 'end': 12, 'probability': 0.998334669586864}], '丈夫': [{'text': '李治', 'start': 0, 'end': 2, 'probability': 0.993496447299993, 'relations': {'妻子': [{'text': '武则天', 'start': 13, 'end': 16, 'probability': 0.9994008822614759}]}}]}]
-  ```
-
-  使用**pprint**分行输出，结果更易读：
-
-  ```python
-  >>> from pprint import pprint
-
-  >>> pprint(ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。'))
+  >>> pprint(ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')) # Better print results using pprint
   [{'丈夫': [{'end': 2,
             'probability': 0.993496447299993,
             'relations': {'妻子': [{'end': 16,
