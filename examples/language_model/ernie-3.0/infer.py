@@ -93,6 +93,11 @@ def parse_args():
         type=int,
         help="Max answer length for question answering task.")
     parser.add_argument(
+        "--shape_file",
+        default="shape_info.txt",
+        type=str,
+        help="Shape info filename.")
+    parser.add_argument(
         "--use_trt",
         action='store_true',
         help="Whether to use inference engin TensorRT.")
@@ -102,8 +107,12 @@ def parse_args():
         "--collect_shape",
         action='store_true',
         help="Whether to collect shape info.")
+
     parser.add_argument(
-        "--int8", action='store_true', help="Whether to use int8 inference.")
+        "--precision",
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help="Precision for inference.")
     parser.add_argument(
         "--use_onnxruntime",
         type=distutils.util.strtobool,
@@ -202,22 +211,18 @@ class Predictor(object):
             # set XPU configs accordingly
             config.enable_xpu(100)
         if args.use_trt:
-            if args.int8:
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Int8,
-                    max_batch_size=args.batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
-            else:
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Float32,
-                    max_batch_size=args.batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
+            precision_map = {
+                "int8": inference.PrecisionType.Int8,
+                "fp16": inference.PrecisionType.Half,
+                "fp32": inference.PrecisionType.Float32
+            }
+            config.enable_tensorrt_engine(
+                workspace_size=1 << 30,
+                precision_mode=precision_map[args.precision],
+                max_batch_size=args.batch_size,
+                min_subgraph_size=5,
+                use_static=False,
+                use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
             # Set min/max/opt tensor shape of each trt subgraph input according
@@ -253,11 +258,12 @@ class Predictor(object):
                 "unsqueeze2_0.tmp_0": [opt_batch_size, 1, 1, opt_seq_len]
             }
 
-            shape_file = "shape_info.txt"
             if args.collect_shape:
-                config.collect_shape_range_info(shape_file)
+                config.collect_shape_range_info(args.task_name +
+                                                args.shape_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    args.task_name + args.shape_file, True)
             #config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape,
             #                                  opt_input_shape)
         config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
@@ -351,7 +357,8 @@ class Predictor(object):
                                   num_label_chunks.numpy(),
                                   num_correct_chunks.numpy())
                 res = metric.accumulate()
-                print("task name: %s, acc: %s, " % (args.task_name, res))
+                print("task name: %s, (precision, recall, f1): %s, " %
+                      (args.task_name, res))
             elif args.task_name == "cmrc2018":
                 all_start_logits = []
                 all_end_logits = []
