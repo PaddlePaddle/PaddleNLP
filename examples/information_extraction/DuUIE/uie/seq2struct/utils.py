@@ -143,6 +143,7 @@ def read_func(tokenizer,
     """ Read instance from data_file
 
     Args:
+        tokenizer (PretrainedTokenizer): Tokenizer
         data_file (str): Data filename
         max_source_length (int): Max source length
         is_train (bool): instance from this file whether for training
@@ -193,6 +194,7 @@ def read_training_instance_based_config(tokenizer,
     """Read training instances based on config_file
 
     Args:
+        tokenizer (PretrainedTokenizer): Tokenizer
         config_file (str): Config filename
         max_source_length (int): Max source length
         negative_keep: the ratio of keeping negative instances
@@ -354,9 +356,9 @@ def load_eval_tasks(model, tokenizer, args):
     """ Load evaluation tasks
 
     Args:
-        model (_type_): _description_
-        tokenizer (_type_): _description_
-        args (_type_): _description_
+        model (PretrainedModel): Pretrain Model
+        tokenizer (PretrainedTokenizer): Tokenizer
+        args (Namespace): arguments for loading eval tasks
 
     Returns:
         list(Task): list of evaluation tasks
