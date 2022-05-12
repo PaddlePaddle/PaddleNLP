@@ -171,6 +171,9 @@ public:
   static Tokenizer LoadFromFile(const std::string& json_path);
   static Tokenizer LoadFromStr(const std::string& json_str);
 
+  bool GetUseTruncation() const;
+  bool GetUsePadding() const;
+
 private:
   Encoding EncodeTextToEncoding(const std::vector<uint>& word_idx,
                                 uint type_id,
