@@ -30,7 +30,7 @@ from modeling import (
     BertModel, DeviceScope, IpuBertConfig, IpuBertPretrainingMLMAccAndLoss,
     IpuBertPretrainingMLMHeads, IpuBertPretrainingNSPAccAndLoss,
     IpuBertPretrainingNSPHeads)
-from utils import load_custom_ops, parse_args, ProgressBar
+from utils import load_custom_ops, parse_args, ProgressBar, ProgressFunc
 
 
 def set_seed(seed):
@@ -156,7 +156,7 @@ def create_ipu_strategy(args):
 
     options['enable_engine_caching'] = args.enable_engine_caching
 
-    options['compilation_progress_logger'] = ProgressBar()
+    options['compilation_progress_logger'] = ProgressFunc
 
     ipu_strategy.set_options(options)
 

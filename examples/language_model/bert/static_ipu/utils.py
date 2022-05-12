@@ -59,6 +59,17 @@ class ProgressBar:
             self._bar = None
 
 
+# need to set to 0 when start a new compilation
+g_current_progress = 0
+
+
+def ProgressFunc(progress, total):
+    global g_current_progress
+    if progress != g_current_progress:
+        g_current_progress = progress
+        print(f"Graph compilation: {progress}/{total}")
+
+
 def str_to_bool(val):
     return bool(strtobool(val))
 
