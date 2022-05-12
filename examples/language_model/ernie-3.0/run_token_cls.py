@@ -46,7 +46,6 @@ def parse_args():
         "--output_dir",
         default="best_msra_ner_model",
         type=str,
-        required=True,
         help="The output directory where the model predictions and checkpoints will be written."
     )
     parser.add_argument(
