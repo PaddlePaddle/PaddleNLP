@@ -199,20 +199,18 @@ python finetune.py \
 
 ```shell
 python evaluate.py \
-    --model_path "./checkpoint/model_best/model_state.pdparams" \
+    --model_path "./checkpoint/model_best" \
     --test_path "./data/dev.txt" \
-    --model "uie-base" \
     --batch_size 16 \
     --max_seq_len 512
 ```
 
 可配置参数说明：
 
-- `model_path`: 进行评估的模型权重文件。
+- `model_path`: 进行评估的模型路径，需包含模型权重文件`model_state.pdparams`及`model_config.json`。
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 进行效果评估的模型类型，可选有`uie-base`和`uie-tiny`。
 
 #### 定制模型一键预测
 
