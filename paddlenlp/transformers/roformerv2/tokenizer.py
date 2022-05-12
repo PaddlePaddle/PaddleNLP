@@ -254,7 +254,7 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
         A RoFormerv2 sequence pair mask has the following format:
         ::
 
-            0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
         If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
@@ -273,7 +273,7 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
         return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [0]
+                                                          _sep) * [1]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
