@@ -31,6 +31,7 @@ pretraining_data_prepare/
 
 ```text
 datasets
+h5py
 opencc-python-reimplemented
 nltk
 LAC
