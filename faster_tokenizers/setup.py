@@ -22,9 +22,9 @@ import setuptools
 from setuptools import setup, Distribution, Extension
 
 
-# The information here can also be placed in setup.cfg - better separation of
-# logic and declaration, and simpler if you include description/version in a file.
 class BinaryDistribution(Distribution):
+    # when build the package, it will add
+    # platform name such as "cp37-cp37m-linux_x86_64"
     def has_ext_modules(foo):
         return True
 
