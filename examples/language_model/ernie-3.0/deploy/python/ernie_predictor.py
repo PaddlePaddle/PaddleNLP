@@ -16,6 +16,7 @@ import six
 import os
 import numpy as np
 import paddle
+from multiprocessing import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -194,7 +195,7 @@ class ErniePredictor(object):
             args.set_dynamic_shape = False
             args.batch_size = 32
         if args.device == 'gpu':
-            args.num_threads = 10
+            args.num_threads = cpu_count()
             args.enable_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
