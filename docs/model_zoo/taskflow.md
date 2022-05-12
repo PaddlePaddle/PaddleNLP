@@ -415,8 +415,8 @@ from paddlenlp import Taskflow
   预测：
 
   ```python
-  >>> from paddlenlp import Taskflow
   >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
 
   >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
   >>> ie = Taskflow('information_extraction', schema=schema)
