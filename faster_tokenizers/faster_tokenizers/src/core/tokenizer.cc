@@ -244,9 +244,13 @@ void Tokenizer::EncodeBatchStrings(
     bool add_special_tokens,
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
-  // #ifdef WITH_OMP
-  // #pragma omp parallel for
-  // #endif
+#ifdef WITH_OMP
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
+#pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
+                                                     omp_get_num_threads() > \
+                                                                         1)
+#endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     EncodePairStrings(
         batch_encode_input[i], add_special_tokens, &(*encodings)[i]);
@@ -280,9 +284,13 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
     bool add_special_tokens,
     std::vector<Encoding>* encodings) const {
   encodings->resize(batch_encode_input.size());
-  // #ifdef WITH_OMP
-  // #pragma omp parallel for
-  // #endif
+#ifdef WITH_OMP
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
+#pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
+                                                     omp_get_num_threads() > \
+                                                                         1)
+#endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
@@ -362,13 +370,9 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
 }
 
 
-bool Tokenizer::GetUseTruncation() const {
-  return use_truncation_;
-}
+bool Tokenizer::GetUseTruncation() const { return use_truncation_; }
 
-bool Tokenizer::GetUsePadding() const {
-  return use_padding_;
-}
+bool Tokenizer::GetUsePadding() const { return use_padding_; }
 
 void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
   j = {
