@@ -167,13 +167,9 @@ class ModelArguments:
         })
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={
-            "help":
-            "Path to directory to store the pretrained models downloaded from huggingface.co"
-        }, )
+        metadata={"help": "Path to directory to store the dataset cache."}, )
     export_model_dir: Optional[str] = field(
         default=None,
         metadata={
-            "help":
-            "Path to directory to store the pretrained models downloaded from huggingface.co"
+            "help": "Path to directory to store the exported inference model."
         }, )

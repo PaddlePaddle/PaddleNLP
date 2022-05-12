@@ -11,7 +11,7 @@ DefaultArgs:
     minimum_eval_times: -1
     max_steps: -1
     warmup_steps: 0
-    warmup_ratio: 0.0
+    warmup_ratio: 0.1
     metric: "Accuracy"
 
 # Datasets which used for sequence classfication
