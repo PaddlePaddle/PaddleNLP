@@ -90,7 +90,7 @@ python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_f
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明]()，量化模型的部署指令为  
+如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md)，量化模型的部署指令为  
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int --set_dynamic_shape
