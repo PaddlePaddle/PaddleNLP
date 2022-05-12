@@ -246,18 +246,24 @@ def main():
                 os.path.join(training_args.output_dir, "test_results.pdtensor"),
             )
 
+    # export inference model
     if training_args.do_export:
-        # export inference model
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(
                 shape=[None, None], dtype="int64")  # segment_ids
         ]
-        trainer.export_model(
+
+        if model_args.export_model_dir is None:
+            model_args.export_model_dir = os.path.join(training_args.output_dir,
+                                                       "export")
+        paddlenlp.transformers.export_model(
+            model=trainer.model,
             input_spec=input_spec,
-            load_best_model=True,
-            output_dir=model_args.export_model_dir)
+            path=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

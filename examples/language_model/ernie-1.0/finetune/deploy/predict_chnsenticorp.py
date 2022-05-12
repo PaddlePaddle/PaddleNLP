@@ -60,8 +60,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = model_dir + "/model.pdmodel"
+        params_file = model_dir + "/model.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):

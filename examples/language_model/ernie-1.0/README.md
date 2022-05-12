@@ -260,7 +260,7 @@ python run_seq_cls.py \
     --load_best_model_at_end \
     --save_total_limit 3 \
 # 预测结果
-python deploy/predict_chnsenticorp.py --model_dir=./tmp/chnsenticorp_v2/infer
+python deploy/predict_chnsenticorp.py --model_dir=./tmp/chnsenticorp_v2/export
 ```
 训练完，导出模型之后，可以用于部署，`deploy/predict_chnsenticorp.py`文件提供了python部署预测示例。
 运行后预测结果打印如下：
