@@ -23,18 +23,19 @@ __all__ = ["export_model"]
 
 
 def export_model(
-        model: "PreTrainedModel",
+        model: "PretrainedModel",
         input_spec=None,
         path: Optional[str]=None,
         model_format: Optional[str]="paddle") -> Tuple[List[str], List[str]]:
     """
-    Export a Pytorch or TensorFlow model to an ONNX Intermediate Representation (IR)
+    Export paddle inference model or onnx model.
+    
     Args:
-        model ([`PreTrainedModel`]:
+        model ([`PretrainedModel`]:
             The model to export.
         input_spec (paddle.static.InputSpec, optional):
-            InputSpec describes the signature information of the model input,
-            such as shape , dtype , name. Defaults to None.
+            Describes the input of the saved model’s forward method, which can be described 
+            by InputSpec or example Tensor.  Default None.
         path (Optional[str], optional):
             Output dir to save the exported model. Defaults to None.
         model_format (Optional[str], optional): 
