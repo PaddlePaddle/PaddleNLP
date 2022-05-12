@@ -97,6 +97,7 @@
    paddlenlp.ops <source/paddlenlp.ops>
    paddlenlp.seq2vec <source/paddlenlp.seq2vec>
    paddlenlp.taskflow <source/paddlenlp.taskflow>
+   paddlenlp.trainer <source/paddlenlp.trainer>
    paddlenlp.transformers <source/paddlenlp.transformers>
    paddlenlp.utils <source/paddlenlp.utils>
 
