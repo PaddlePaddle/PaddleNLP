@@ -77,38 +77,55 @@ class UIETask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    resource_files_names = {"model_state": "model_state.pdparams", }
+    encoding_model_map = {
+        "uie-base": "ernie-3.0-base-zh",
+        "uie-tiny": "ernie-3.0-medium-zh",
+        "uie-medical-base": "ernie-3.0-base-zh"
+    }
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json"
+    }
     resource_files_urls = {
         "uie-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
                 "004d7e53f5222349741217fabfb241ac"
             ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
+                "a36c185bfc17a83b6cfef6f98b29c909"
+            ]
         },
         "uie-tiny": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
                 "6248b4897fec78a61ab6da3edf9707fe"
             ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
+                "6f1ee399398d4f218450fbbf5f212b15"
+            ]
         },
         "uie-medical-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
                 "56c2b7d02403f2ede513cedaabc8212a"
             ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
+                "a36c185bfc17a83b6cfef6f98b29c909"
+            ]
         },
     }
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self.set_schema(schema)
-        if model in ["uie-base", "uie-medical-base"]:
-            self._encoding_model = "ernie-3.0-base-zh"
-        elif model == "uie-tiny":
-            self._encoding_model = "ernie-3.0-medium-zh"
-        else:
+        if model not in self.encoding_model_map.keys():
             raise ValueError(
                 "Model should be one of uie-base, uie-tiny and uie-medical-base")
+        self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
         self._get_inference_model()
@@ -147,12 +164,7 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UIE(self._encoding_model, self.kwargs['hidden_size'])
-        model_path = os.path.join(self._task_path, "model_state.pdparams")
-
-        # Load the model parameter for the predict
-        state_dict = paddle.load(model_path)
-        model_instance.set_dict(state_dict)
+        model_instance = UIE.from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 
