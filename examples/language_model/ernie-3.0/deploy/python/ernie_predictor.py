@@ -29,10 +29,7 @@ class InferBackend(object):
                  enable_quantize=False,
                  set_dynamic_shape=False,
                  num_threads=10):
-        file_name = model_path.split('/')[-1]
-        model_dir = model_path[:-1 * len(file_name)]
-        int8_model = self.paddle_quantize_model(
-            model_dir, file_name + ".pdmodel", file_name + ".pdiparams")
+        int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
         if device == 'gpu' and int8_model or use_fp16:
             from paddle import inference
@@ -118,9 +115,8 @@ class InferBackend(object):
         from onnxruntime.quantization import QuantizationMode, quantize_dynamic
         quantize_dynamic(input_float_model, dynamic_quantized_model)
 
-    def paddle_quantize_model(self, model_dir, model_file, params_file):
-        file_name = model_file.split('.')[0]
-        model = paddle.jit.load(model_dir + "/" + file_name)
+    def paddle_quantize_model(self, model_path):
+        model = paddle.jit.load(model_path)
         program = model.program()
         for block in program.blocks:
             for i, op in enumerate(block.ops):
