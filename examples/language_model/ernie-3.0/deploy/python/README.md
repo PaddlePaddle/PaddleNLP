@@ -8,19 +8,20 @@ CPU端的部署请使用如下指令安装所需依赖
 pip install -r requirements_cpu.txt
 ```
 ### GPU端
-在进行GPU部署之前请先确保机器已经安装好CUDA >= 11.04，CuDNN >= 8.2，然后请使用如下指令安装所需依赖
+在进行GPU部署之前请先确保机器已经安装好CUDA >= 11.2，CuDNN >= 8.2，然后请使用如下指令安装所需依赖
 ```
 pip install -r requirements_gpu.txt
 ```
-在计算能力（Compute Capability）大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和PaddleInference-TRT，计算能力（Compute Capability）和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
-1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，简要步骤如下：  
-    (1)下载TensorRT8.4版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
+在计算能力（Compute Capability）大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和Paddle Inference，计算能力（Compute Capability）和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
+1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux端简要步骤如下：  
+    (1)下载TensorRT8.2版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
     (2)解压得到TensorRT-XXX文件夹  
     (3)通过export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH将lib路径加入到LD_LIBRARY_PATH中  
     (4)使用pip install安装TensorRT-XXX/python中对应的tensorrt安装包
-2. PaddleInference-TRT安装步骤如下：  
-    (1)下载对应版本的PaddleInference-TRT，[PaddleInference-TRT下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)  
-    (2)使用pip install安装下载好的PaddleInference-TRT安装包
+2. Paddle Inference的安装请参考：[Paddle Inference的安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux端简要步骤如下：  
+    (1)根据CUDA环境和Python版本下载对应的Paddle Inference预测库，注意须下载支持TensorRT的预测包，如linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[Paddle Inference下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)  
+    (2)使用pip install安装下载好的Paddle Inference安装包
+
 
 ## 使用说明
 如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本

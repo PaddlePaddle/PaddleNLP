@@ -87,27 +87,25 @@ class InferBackend(object):
             import onnxruntime as ort
             import copy
             self.predictor_type = "onnxruntime"
-            float_onnx_file = "model.onnx"
-            paddle2onnx.command.program2onnx(
-                model_dir=model_dir,
-                model_filename=file_name + ".pdmodel",
-                params_filename=file_name + ".pdiparams",
-                save_file=float_onnx_file,
+            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+                model_file=model_path + ".pdmodel",
+                params_file=model_path + ".pdiparams",
                 opset_version=13,
                 enable_onnx_checker=True)
-            dynamic_quantize_onnx_file = copy.copy(float_onnx_file)
+            dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
             if enable_quantize:
-                dynamic_quantize_onnx_file = "dynamic_quantize_model.onnx"
-                self.dynamic_quantize(float_onnx_file,
-                                      dynamic_quantize_onnx_file)
+                float_onnx_file = "model.onnx"
+                with open(float_onnx_file, "wb") as f:
+                    f.write(onnx_model)
+                dynamic_quantize_model = "dynamic_quantize_model.onnx"
+                self.dynamic_quantize(float_onnx_file, dynamic_quantize_model)
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
-            sess_options.optimized_model_filepath = "./optimize_model.onnx"
             sess_options.intra_op_num_threads = num_threads
             sess_options.inter_op_num_threads = num_threads
             self.predictor = ort.InferenceSession(
-                dynamic_quantize_onnx_file,
+                dynamic_quantize_model,
                 sess_options=sess_options,
                 providers=providers)
             input_name1 = self.predictor.get_inputs()[0].name
