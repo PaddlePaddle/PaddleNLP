@@ -50,9 +50,6 @@ def do_train():
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
 
-    state_dict = paddle.load(pretrained_model_path)
-    model.set_dict(state_dict)
-    print("Init from: {}".format(pretrained_model_path))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
