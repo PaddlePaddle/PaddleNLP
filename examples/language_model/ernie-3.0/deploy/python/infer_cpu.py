@@ -1,4 +1,4 @@
-#Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ernie_predictor import *
+import paddle
+import argparse
 from multiprocessing import cpu_count
+from ernie_predictor import ErniePredictor, token_cls_print_ret
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
     # Required parameters
     parser.add_argument(
         "--task_name",
-        default='tnews',
+        default='seq_cls',
         type=str,
-        help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        help="The name of the task to perform predict, selected in: seq_cls and token_cls"
+    )
     parser.add_argument(
         "--model_name_or_path",
         default="ernie-3.0-medium-zh",
@@ -38,25 +39,11 @@ def parse_args():
         required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size for predict.", )
-    parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--perf_warmup_steps",
-        default=20,
-        type=int,
-        help="Warmup steps for performance test.", )
-    parser.add_argument(
-        "--perf",
-        action='store_true',
-        help="Whether to test performance.", )
     parser.add_argument(
         "--enable_quantize",
         action='store_true',
@@ -71,28 +58,24 @@ def parse_args():
 
 
 def main():
-    paddle.seed(42)
     args = parse_args()
 
     args.task_name = args.task_name.lower()
     args.device = 'cpu'
     predictor = ErniePredictor(args)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    dev_ds = load_dataset('clue', args.task_name, splits='dev')
+    if args.task_name == 'seq_cls':
+        text = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
+    elif args.task_name == 'token_cls':
+        text = [
+            "古老的文明，使我们引以为豪，彼此钦佩。",
+            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
+        ]
 
-    trans_func = partial(
-        convert_example,
-        label_list=dev_ds.label_list,
-        tokenizer=tokenizer,
-        is_test=False)
-    dev_ds = dev_ds.map(trans_func, lazy=False)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
-        Stack(dtype="int64" if dev_ds.label_list else "float32")  # label
-    ): fn(samples)
-    outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+    outputs = predictor.predict(text)
+
+    if args.task_name == 'token_cls':
+        token_cls_print_ret(outputs, text)
 
 
 if __name__ == "__main__":

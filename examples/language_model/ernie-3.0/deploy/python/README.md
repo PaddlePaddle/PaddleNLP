@@ -1,14 +1,14 @@
-# Ernie3.0 Python部署指南
+# ERNIE 3.0 Python部署指南
 
 ## 安装
-Ernie3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
+ERNIE 3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
 ### CPU端
 CPU端的部署请使用如下指令安装所需依赖
 ```
 pip install -r requirements_cpu.txt
 ```
 ### GPU端
-在进行GPU部署之前请先确保机器已经安装好CUDA11.04和CUDNN8.2+，然后请使用如下指令安装所需依赖
+在进行GPU部署之前请先确保机器已经安装好CUDA >= 11.04，CuDNN >= 8.2，然后请使用如下指令安装所需依赖
 ```
 pip install -r requirements_gpu.txt
 ```
@@ -27,46 +27,82 @@ pip install -r requirements_gpu.txt
 ### CPU端
 在CPU端，请使用如下指令进行部署
 ```
-python infer_cpu.py --task_name tnews --model_path ./model/infer
+python infer_cpu.py --task_name token_cls --model_path ./ner_model/infer
 ```
-如果在支持avx512_vnni的CPU机器上，比如Intel(R) Xeon(R) Gold 6271C或11代CPU以上机器，可开启enable_quantize开关，无需数据便可对FP32模型进行量化，获得1到2倍的加速效果，具体部署指令如下
+输出打印如下:
 ```
-python infer_cpu.py --task_name tnews --model_path ./model/infer -enable_quantize
-```
-如无法确认是否支持avx512_vnni指令集，可使用如下命令进行查看
-```
-cat /proc/cpuinfo | grep avx512_vnni
+input data: 古老的文明，使我们引以为豪，彼此钦佩。
+The model detects all entities:
+-----------------------------
+input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
+The model detects all entities:
+entity: 玛雅   label: LOC   pos: [2, 3]
+entity: 华夏   label: LOC   pos: [14, 15]
+-----------------------------
 ```
 参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
-|--task_name | 配置任务名称，默认tnews|
-|--model_name_or_path | 模型的路径或者名字|
+|--task_name | 配置任务名称，可选seq_cls和token_cls，默认seq_cls|
+|--model_name_or_path | 模型的路径或者名字，默认ernie-3.0-medium-zh|
 |--model_path | 用于推理的Paddle模型的路径|
-|--batch_size |测试的batch size大小，默认为32|
-|--perf | 是否测试性能，默认关闭 |
+|--max_seq_length |最大序列长度，默认为128|
 |--enable_quantize | 是否使用动态量化进行加速，默认关闭 |
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
+
+**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，当batch size为32，max_seq_length为128时，加速性能相比如下表所示：  
+线程数为1时  
+| 数据集 | FP32模型推理时间 | INT8量化推理时间 | 加速比 |
+|----------|--------------|-------------|-------------|
+| tnews |1026.41|425.89|2.41|
+| msra_ner |3218.55|1442.10|2.23|
+| cmrc2018 |7833.57|3680.89|2.12|
+
+线程为10时  
+| 数据集 | FP32模型推理时间 | INT8量化推理时间 | 加速比 |
+|----------|--------------|-------------|-------------|
+| tnews |105.97|68.48|1.73|
+| msra_ner |392.42|233.42|1.68|
+| cmrc2018 |999.76|599.84|1.67|
+
+
 ### GPU端
 在GPU端，请使用如下指令进行部署
 ```
-python infer_gpu.py --task_name tnews --model_path ./model/infer
+python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer
 ```
-如果需要FP16进行加速，可以开启enable_fp16开关，具体指令为
+输出打印如下:
 ```
-python infer_gpu.py --task_name tnews --model_path ./model/infer --enable_fp16
+input data: 古老的文明，使我们引以为豪，彼此钦佩。
+The model detects all entities:
+-----------------------------
+input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
+The model detects all entities:
+entity: 玛雅   label: LOC   pos: [2, 3]
+entity: 华夏   label: LOC   pos: [14, 15]
+-----------------------------
+```
+如果需要FP16进行加速，可以开启use_fp16开关，具体指令为
+```
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_fp16 --set_dynamic_shape
+# 第二步，开启预测
+python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_fp16
 ```
 如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明]()，量化模型的部署指令为  
 ```
-python infer_gpu.py --task_name tnews --model_path ./quantize_model/int8
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int --set_dynamic_shape
+# 第二步，开启预测
+python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
 ```
 参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
-|--task_name | 配置任务名称，默认tnews|
-|--model_name_or_path | 模型的路径或者名字|
-|--model_path | 配置包含Paddle模型的目录路径|
-|--batch_size |测试的batch size大小，默认为32|
+|--task_name | 配置任务名称，可选seq_cls和token_cls，默认seq_cls|
+|--model_name_or_path | 模型的路径或者名字，默认ernie-3.0-medium-zh|
+|--model_path | 用于推理的Paddle模型的路径|
+|--batch_size |最大可测的batch size，默认为32|
+|--max_seq_length |最大序列长度，默认为128|
 |--use_fp16 | 是否使用FP16进行加速，默认关闭 |
-|--perf | 是否测试性能，默认关闭 |
-|--collect_shape | 配置是否自动配置TensorRT的dynamic shape，开启enable_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shapeinfo.txt后再关闭，默认关闭 |
+|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
