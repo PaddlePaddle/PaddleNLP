@@ -418,7 +418,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                             model_to_save.save_pretrained(output_dir_width)
                     logger.info("eval done total : %s s" %
                                 (time.time() - tic_eval))
-            if global_step >= self.args.num_training_steps:
+            if global_step > self.args.num_training_steps:
                 if best_acc == 0.0:
                     output_dir_width = os.path.join(output_dir, str(width_mult))
                     if not os.path.exists(output_dir_width):
