@@ -17,7 +17,10 @@ import os
 import abc
 import math
 from abc import abstractmethod
+
 import paddle
+from paddle.dataset.common import md5file
+
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
 from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
@@ -137,7 +140,16 @@ class Task(metaclass=abc.ABCMeta):
         """
         inference_model_path = os.path.join(self._task_path, "static",
                                             "inference")
-        if not os.path.exists(inference_model_path + ".pdiparams"):
+        param_updated = False
+        if "model_state" in self.resource_files_urls[self.model].keys():
+            model_param_path = os.path.join(self._task_path,
+                                            "model_state.pdparams")
+            md5 = self.resource_files_urls[self.model]["model_state"][1]
+            if not md5file(model_param_path) == md5:
+                param_updated = True
+
+        if not os.path.exists(inference_model_path +
+                              ".pdiparams") or param_updated:
             with dygraph_mode_guard():
                 self._construct_model(self.model)
                 self._construct_input_spec()
