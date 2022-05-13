@@ -595,7 +595,7 @@ from paddlenlp import Taskflow
 
 #### 定制训练
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie)（标注少量数据进行模型微调）以进一步提升效果。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/linjieccc/PaddleNLP/tree/develop/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
