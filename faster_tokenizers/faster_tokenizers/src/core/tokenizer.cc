@@ -25,6 +25,10 @@ limitations under the License. */
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
 
+#ifdef WITH_OMP
+#include <omp.h>
+#endif
+
 namespace tokenizers {
 namespace core {
 

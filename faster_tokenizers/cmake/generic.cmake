@@ -44,7 +44,7 @@ function(cc_library TARGET_NAME)
       target_link_libraries(${TARGET_NAME} ${cc_library_DEPS})
     endif()
     # For C++ 17 filesystem
-    target_link_libraries(${TARGET_NAME} stdc++fs)
+    # target_link_libraries(${TARGET_NAME} stdc++fs)
 
     # cpplint code style
     foreach(source_file ${cc_library_SRCS})
@@ -57,9 +57,15 @@ function(cc_library TARGET_NAME)
   else(cc_library_SRCS)
     if(cc_library_DEPS)
       list(REMOVE_DUPLICATES cc_library_DEPS)
-
-      generate_dummy_static_lib(LIB_NAME ${TARGET_NAME} FILE_PATH ${target_SRCS} GENERATOR "generic.cmake:cc_library")
-
+      set(dummy_FILE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}_dummy.c")
+      configure_file(${PROJECT_SOURCE_DIR}/cmake/dummy.c.in ${dummy_FILE_PATH} @ONLY)
+      if(cc_library_SHARED OR cc_library_shared) # build *.so
+        add_library(${TARGET_NAME} SHARED ${dummy_FILE_PATH})
+      elseif(cc_library_INTERFACE OR cc_library_interface)
+        generate_dummy_static_lib(LIB_NAME ${TARGET_NAME} FILE_PATH ${dummy_FILE_PATH} GENERATOR "generic.cmake:cc_library")
+      else()
+        add_library(${TARGET_NAME} STATIC ${dummy_FILE_PATH})
+      endif()
       target_link_libraries(${TARGET_NAME} ${cc_library_DEPS})
     else()
       message(FATAL_ERROR "Please specify source files or libraries in cc_library(${TARGET_NAME} ...).")
@@ -119,3 +125,31 @@ function(cc_test TARGET_NAME)
     add_test(NAME ${TARGET_NAME} COMMAND ${CMAKE_COMMAND} -E echo CI skip ${TARGET_NAME}.)
   endif()
 endfunction(cc_test)
+
+# create a dummy source file, then create a static library.
+# LIB_NAME should be the static lib name.
+# FILE_PATH should be the dummy source file path.
+# GENERATOR should be the file name invoke this function.
+# CONTENT should be some helpful info.
+# example: generate_dummy_static_lib(mylib FILE_PATH /path/to/dummy.c GENERATOR mylib.cmake CONTENT "helpful info")
+function(generate_dummy_static_lib)
+  set(options "")
+  set(oneValueArgs LIB_NAME FILE_PATH GENERATOR CONTENT)
+  set(multiValueArgs "")
+  cmake_parse_arguments(dummy "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  if(NOT dummy_LIB_NAME)
+    message(FATAL_ERROR "You must provide a static lib name.")
+  endif()
+  if(NOT dummy_FILE_PATH)
+    set(dummy_FILE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${dummy_LIB_NAME}_dummy.c")
+  endif()
+  if(NOT dummy_GENERATOR)
+    message(FATAL_ERROR "You must provide a generator file name.")
+  endif()
+  if(NOT dummy_CONTENT)
+    set(dummy_CONTENT "${dummy_LIB_NAME}_dummy.c for lib ${dummy_LIB_NAME}")
+  endif()
+
+  configure_file(${PROJECT_SOURCE_DIR}/cmake/dummy.c.in ${dummy_FILE_PATH} @ONLY)
+  add_library(${dummy_LIB_NAME} STATIC ${dummy_FILE_PATH})
+endfunction()
