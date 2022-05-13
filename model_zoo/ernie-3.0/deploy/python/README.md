@@ -1,13 +1,25 @@
 # ERNIE 3.0 Python部署指南
 本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，命名实体识别和分类两大场景下的使用示例。  
-## 环境准备
+- [ERNIE 3.0 Python部署指南](#ERNIE3.0Python部署指南)
+  - [1. 环境准备](#1-环境准备)
+    - [1.1 CPU端](#11-CPU端)
+    - [1.2 GPU端](#12-GPU端)
+  - [2. 命名实体识别模型推理](#2-命名实体识别模型推理)
+    - [2.1 模型获取](#21-模型获取)
+    - [2.2 CPU端推理样例](#22-CPU端推理样例)
+    - [2.3 GPU端推理样例](#23-GPU端推理样例)
+  - [3. 分类模型推理](#3-分类模型推理)
+    - [3.1 模型获取](#31-模型获取)
+    - [3.2 CPU端推理样例](#32-CPU端推理样例)
+    - [3.3 GPU端推理样例](#33-GPU端推理样例)
+## 1. 环境准备
 ERNIE 3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
-### CPU端
+### 1.1 CPU端
 CPU端的部署请使用如下指令安装所需依赖
 ```
 pip install -r requirements_cpu.txt
 ```
-### GPU端
+### 1.2 GPU端
 在进行GPU部署之前请先确保机器已经安装好CUDA >= 11.2，CuDNN >= 8.2，然后请使用如下指令安装所需依赖
 ```
 pip install -r requirements_gpu.txt
@@ -23,15 +35,15 @@ pip install -r requirements_gpu.txt
     (2)使用pip install安装下载好的Paddle Inference安装包
 
 
-## 命名实体识别模型推理
-### 模型获取
+## 2. 命名实体识别模型推理
+### 2.1 模型获取
 用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 命名实体识别模型：
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```
-### CPU端推理样例
+### 2.2 CPU端推理样例
 在CPU端，请使用如下指令进行部署
 ```
 python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
@@ -74,7 +86,7 @@ batch size为32，max_seq_length为128时，推理加速情况如下表所示：
 | cmrc2018 |999.76|599.84|1.67|
 
 
-### GPU端推理样例
+### 2.3 GPU端推理样例
 在GPU端，请使用如下指令进行部署
 ```
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
@@ -116,15 +128,15 @@ infer_gpu.py脚本中的参数说明：
 |--use_fp16 | 是否使用FP16进行加速，默认关闭 |
 |--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
 
-## 分类模型推理
-### 模型获取
+## 3. 分类模型推理
+### 3.1 模型获取
 用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 分类模型模型：
 wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
 unzip tnews_pruned_infer_model.zip
 ```
-### CPU端推理样例
+### 3.2 CPU端推理样例
 在CPU端，请使用如下指令进行部署
 ```
 python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
@@ -141,7 +153,7 @@ label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
 CPU上的INT8加速和命名实体识别模型推理中的命令类似，只需修改task_name为seq_cls，model_path修改为本例中的分类模型，运行结果和FP32的推理结果一致。
-### GPU端推理样例
+### 3.3 GPU端推理样例
 在GPU端，请使用如下指令进行部署
 ```
 python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
