@@ -247,10 +247,10 @@ python evaluate.py \
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
-<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
+<tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
-<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
+<tr><td>uie-tiny<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
+<tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。

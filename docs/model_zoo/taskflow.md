@@ -600,7 +600,7 @@ from paddlenlp import Taskflow
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
-<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>互联网
+<tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
 <tr><td>uie-tiny<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
