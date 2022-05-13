@@ -64,15 +64,15 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 >>> ie = Taskflow('information_extraction', schema=schema)
 >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
 [{'时间': [{'end': 6,
-          'probability': 0.9907337794563702,
+          'probability': 0.9857378532924486,
           'start': 0,
           'text': '2月8日上午'}],
   '赛事名称': [{'end': 23,
-            'probability': 0.8944205558197353,
+            'probability': 0.8503089953268272,
             'start': 6,
             'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
   '选手': [{'end': 31,
-          'probability': 0.8914297225026147,
+          'probability': 0.8981548639781138,
           'start': 28,
           'text': '谷爱凌'}]}]
 ```
@@ -247,10 +247,10 @@ python evaluate.py \
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
-<tr><th row_span='2'><th colspan='2'>互联网<th colspan='2'>医疗<th colspan='2'>金融
+<tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-tiny<td>75.92<td>78.45<td>63.34<td>74.65<td>42.03<td>65.78
-<tr><td>uie-base<td>80.13<td>81.53<td>66.71<td>79.94<td>41.29<td>70.91
+<tr><td>uie-tiny<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
+<tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。

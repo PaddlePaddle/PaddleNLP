@@ -39,14 +39,16 @@ class Task(metaclass=abc.ABCMeta):
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
         self.task = task
-        self.priority_path = priority_path
         self.kwargs = kwargs
+        self._priority_path = priority_path
         self._usage = ""
         # The dygraph model instantce 
         self._model = None
         # The static model instantce
         self._input_spec = None
         self._config = None
+        self._custom_model = False
+        self._param_updated = False
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
         self._home_path = self.kwargs[
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
@@ -54,9 +56,10 @@ class Task(metaclass=abc.ABCMeta):
             'task_flag'] if 'task_flag' in self.kwargs else self.model
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
-        elif self.priority_path:
+            self._custom_model = True
+        elif self._priority_path:
             self._task_path = os.path.join(self._home_path, "taskflow",
-                                           self.priority_path)
+                                           self._priority_path)
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
@@ -106,9 +109,24 @@ class Task(metaclass=abc.ABCMeta):
         """
         for file_id, file_name in self.resource_files_names.items():
             path = os.path.join(self._task_path, file_name)
+            url = self.resource_files_urls[self.model][file_id][0]
+            md5 = self.resource_files_urls[self.model][file_id][1]
+
+            downloaded = True
             if not os.path.exists(path):
-                url = self.resource_files_urls[self.model][file_id]
-                download_file(self._task_path, file_name, url[0], url[1])
+                downloaded = False
+            else:
+                if not self._custom_model:
+                    if os.path.exists(path):
+                        # Check whether the file is updated
+                        if not md5file(path) == md5:
+                            downloaded = False
+                            if file_id == "model_state":
+                                self._param_updated = True
+                    else:
+                        downloaded = False
+            if not downloaded:
+                download_file(self._task_path, file_name, url, md5)
 
     def _prepare_static_mode(self):
         """
@@ -140,16 +158,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         inference_model_path = os.path.join(self._task_path, "static",
                                             "inference")
-        param_updated = False
-        if "model_state" in self.resource_files_urls[self.model].keys():
-            model_param_path = os.path.join(self._task_path,
-                                            "model_state.pdparams")
-            md5 = self.resource_files_urls[self.model]["model_state"][1]
-            if not md5file(model_param_path) == md5:
-                param_updated = True
-
         if not os.path.exists(inference_model_path +
-                              ".pdiparams") or param_updated:
+                              ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
                 self._construct_model(self.model)
                 self._construct_input_spec()
