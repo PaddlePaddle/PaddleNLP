@@ -1,8 +1,8 @@
+# ERNIE 3.0 轻量级模型
 
  **目录**
-
- * [ERNIE 3.0](#ERNIE3.0)
-    * [CLUE Benchmark 精度展示](#CLUE精度)
+    * [模型介绍](#模型介绍)
+    * [模型介绍](#模型效果)
     * [微调](#微调)
     * [模型压缩](#模型压缩)
         * [环境依赖](#环境依赖)
@@ -18,21 +18,28 @@
         * [服务化部署](#服务化部署)
             * [环境依赖](#环境依赖)
 
-<a name="ERNIE3.0"></a>
 
-# ERNIE 3.0
 
-<a name="CLUE精度"></a>
+## 模型介绍
+TBD
+<p align="center">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168254282-e6901f9a-fd9a-4bbd-a5b6-e847b7f90bb4.png">
+</p>
 
-## CLUE Benchmark 精度展示
 
-ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLUE 的各**验证集**上有如下效果：
+## 模型效果
 
+本项目开源 **ERNIE 3.0 _base_*** 和 **ERNIE 3.0 _medium_**两个模型：
+
+- [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
+- [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
+
+在 CLUE **验证集**上评测指标如下表所示：
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px;">Config</span>
+                                <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px;">Model</span>
@@ -551,11 +558,16 @@ TODO 完善数据，结论
 
 <a name="性能"></a>
 
-#### 性能
 
-<a name="CPU性能"></a>
 
 ##### CPU 性能
+
+GPU:
+TBD
+
+CPU:
+TBD
+
 
 |                              | 文本分类 性能 QPS  (seq/s) | NER 性能 QPS  (seq/s)(叶梁) | 阅读理解性能 QPS  (seq/s) |
 | ---------------------------- | -------------------------- | --------------------------- | ------------------------- |
@@ -598,8 +610,16 @@ TODO 完善数据，结论
 
 <a name="服务化部署"></a>
 
+
 ### 服务化部署
+TBD
 
-<a name="环境依赖"></a>
 
-#### 环境依赖
+## Reference
+
+* Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
+
+* Su W, Chen X, Feng S, et al. ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression[J]. arXiv preprint arXiv:2106.02241, 2021.
+
+* Wang S, Sun Y, Xiang Y, et al. ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2112.12731, 2021.
+
