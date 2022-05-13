@@ -14,7 +14,7 @@
 
 import paddle
 import argparse
-from ernie_predictor import ErniePredictor, token_cls_print_ret
+from ernie_predictor import ErniePredictor
 
 
 def parse_args():
@@ -33,7 +33,7 @@ def parse_args():
         help="The directory or name of model.", )
     parser.add_argument(
         "--model_path",
-        default='tnews_quant_models/mse4/int8',
+        default='paddle_model/model',
         type=str,
         required=True,
         help="The path prefix of inference model to be used.", )
@@ -75,9 +75,6 @@ def main():
         ]
 
     outputs = predictor.predict(text)
-
-    if args.task_name == 'token_cls':
-        token_cls_print_ret(outputs, text)
 
 
 if __name__ == "__main__":

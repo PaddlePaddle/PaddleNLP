@@ -150,6 +150,16 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
+def seq_cls_print_ret(infer_result, input_datas):
+    label = infer_result["label"].squeeze().tolist()
+    confidence = infer_result["confidence"].squeeze().tolist()
+    for i, ret in enumerate(infer_result):
+        print("input data:", input_datas[i])
+        print("seq cls result:")
+        print("label:", label[i], "  confidence:", confidence[i])
+        print("-----------------------------")
+
+
 class ErniePredictor(object):
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
@@ -170,12 +180,14 @@ class ErniePredictor(object):
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
             self.postprocess = self.seq_cls_postprocess
+            self.printer = seq_cls_print_ret
         elif args.task_name == 'token_cls':
             self.label_names = [
                 'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
             ]
             self.preprocess = self.token_cls_preprocess
             self.postprocess = self.token_cls_postprocess
+            self.printer = token_cls_print_ret
         else:
             print(
                 "[ErniePredictor]: task_name only support seq_cls and token_cls now."
@@ -314,5 +326,5 @@ class ErniePredictor(object):
         preprocess_result = self.preprocess(input_data)
         infer_result = self.infer(preprocess_result)
         result = self.postprocess(infer_result, input_data)
-
+        self.printer(result, input_data)
         return result

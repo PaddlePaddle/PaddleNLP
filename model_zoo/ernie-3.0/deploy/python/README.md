@@ -1,6 +1,8 @@
 # ERNIE 3.0 Python部署指南
+本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，分类和命名实体识别两大场景下的使用示例。
 
-## 安装
+[toc]
+## 环境准备
 ERNIE 3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
 ### CPU端
 CPU端的部署请使用如下指令安装所需依赖
@@ -23,12 +25,19 @@ pip install -r requirements_gpu.txt
     (2)使用pip install安装下载好的Paddle Inference安装包
 
 
-## 使用说明
-如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本
-### CPU端
+## 命名实体识别模型推理
+### 模型获取
+模型可使用用户自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令下载模型：
+```
+# 命名实体识别模型：
+wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
+unzip msra_ner_pruned_infer_model.zip
+```
+如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本。
+### CPU端推理样例
 在CPU端，请使用如下指令进行部署
 ```
-python infer_cpu.py --task_name token_cls --model_path ./ner_model/infer
+python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
 ```
 输出打印如下:
 ```
@@ -41,7 +50,7 @@ entity: 玛雅   label: LOC   pos: [2, 3]
 entity: 华夏   label: LOC   pos: [14, 15]
 -----------------------------
 ```
-参数说明：
+infer_cpu.py脚本中的参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
 |--task_name | 配置任务名称，可选seq_cls和token_cls，默认为seq_cls|
@@ -68,10 +77,10 @@ batch size为32，max_seq_length为128时，推理加速情况如下表所示：
 | cmrc2018 |999.76|599.84|1.67|
 
 
-### GPU端
+### GPU端推理样例
 在GPU端，请使用如下指令进行部署
 ```
-python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
 ```
 输出打印如下:
 ```
@@ -87,18 +96,19 @@ entity: 华夏   label: LOC   pos: [14, 15]
 如果需要FP16进行加速，可以开启use_fp16开关，具体指令为
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
-python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_fp16 --set_dynamic_shape
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16 --set_dynamic_shape
 # 第二步，开启预测
-python infer_gpu.py --task_name token_cls --model_path ./ner_model/infer --use_fp16
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md)，量化模型的部署指令为  
+如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩API及使用)，量化模型的部署指令为  
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int --set_dynamic_shape
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
 ```
-参数说明：
+输出结果和GPU FP32的运行结果一致。  
+infer_gpu.py脚本中的参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
 |--task_name | 配置任务名称，可选seq_cls和token_cls，默认为seq_cls|
@@ -108,3 +118,47 @@ python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
 |--max_seq_length |最大序列长度，默认为128|
 |--use_fp16 | 是否使用FP16进行加速，默认关闭 |
 |--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
+
+## 分类模型推理
+### 模型获取
+模型可使用用户自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令下载模型：
+```
+# 分类模型模型：
+wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
+unzip tnews_pruned_infer_model.zip
+```
+如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本。
+### CPU端推理样例
+在CPU端，请使用如下指令进行部署
+```
+python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
+```
+输出打印如下:
+```
+input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
+seq cls result:
+label: 6   confidence: 4.563379287719727
+-----------------------------
+input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
+seq cls result:
+label: 2   confidence: 5.694031238555908
+-----------------------------
+```
+CPU上的Int8加速和命名实体识别模型推理中的命令类似，只需修改task_name和model_path。
+### GPU端推理样例
+在GPU端，请使用如下指令进行部署
+```
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
+```
+输出打印如下:
+```
+input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
+seq cls result:
+label: 6   confidence: 4.563379287719727
+-----------------------------
+input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
+seq cls result:
+label: 2   confidence: 5.694031238555908
+-----------------------------
+```
+GPU上的FP16和Int8加速和命名实体识别模型推理中命令类似，只需修改task_name和model_path。
