@@ -595,7 +595,7 @@ from paddlenlp import Taskflow
 
 #### 定制训练
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/linjieccc/PaddleNLP/tree/develop/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -853,8 +853,8 @@ from paddlenlp import Taskflow
 |       `Taskflow("pos_tagging")`                              |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
 |                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
 |              `Taskflow("ner", mode="accurate")`              |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|              `Taskflow("information_extraction", model="uie-base")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`              | [示例](https://github.com/linjieccc/PaddleNLP/tree/develop/model_zoo/uie) |
-|              `Taskflow("information_extraction", model="uie-tiny")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`              | [示例](https://github.com/linjieccc/PaddleNLP/tree/develop/model_zoo/uie) |
+|              `Taskflow("information_extraction", model="uie-base")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie) |
+|              `Taskflow("information_extraction", model="uie-tiny")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie) |
 |     `Taskflow("text_correction", model="ernie-csc")`     |  `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
 |      `Taskflow("dependency_parsing", model="ddparser")`      |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`    | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
 | `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
