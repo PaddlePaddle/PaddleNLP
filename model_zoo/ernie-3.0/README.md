@@ -1,14 +1,20 @@
-# ERNIE 3.0
+# ERNIE 3.0 轻量级模型
 
-## ERNIE 3.0 CLUE Benchmark
+## 模型介绍
 
-ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLUE 的各**验证集**上有如下效果：
+<p align="center">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168254282-e6901f9a-fd9a-4bbd-a5b6-e847b7f90bb4.png">
+</p>
+
+## 模型效果
+
+ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLUE **验证集**上指标如下：
 
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px;">Config</span>
+                                <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px;">Model</span>
@@ -470,10 +476,11 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 压缩后的性能：
 
-GPU
+GPU:
+TBD
 
-
-CPU
+CPU:
+TBD
 
 **压缩 API 使用TIPS：**
 
@@ -485,8 +492,16 @@ CPU
 
 ### 推理部署
 
-needs yl
+TBD
 
 #### Paddle Serving 部署
 
-needs lq
+TBD
+
+## Reference
+
+* Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
+
+* Su W, Chen X, Feng S, et al. ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression[J]. arXiv preprint arXiv:2106.02241, 2021.
+
+* Wang S, Sun Y, Xiang Y, et al. ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2112.12731, 2021.
