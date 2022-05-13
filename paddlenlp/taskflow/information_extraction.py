@@ -31,7 +31,7 @@ usage = r"""
             ie = Taskflow('information_extraction', schema=schema)
             ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
             '''
-            [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9907337794563702}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8914310308098763}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8944207860063003}]}]
+            [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9857378532924486}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.8981548639781138}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8503089953268272}]}]
             '''
 
             # Relation Extraction
@@ -39,7 +39,7 @@ usage = r"""
             ie.set_schema(schema) # Reset schema
             ie("《告别了》是孙耀威在专辑爱的故事里面的歌曲")
             '''
-            [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.7721050787207417, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9996328066160487}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9981007942846247}]}}]}]
+            [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.6296155977145546, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9988381005599081}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9968462078543183}]}}, {'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.2816869478191606, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9951415104192272}]}}]}]
             '''
 
             # Event Extraction
@@ -47,15 +47,15 @@ usage = r"""
             ie.set_schema(schema) # Reset schema
             ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
             '''
-            [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relation': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+            [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9977425555988333, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.998080217831891}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9853299772936026}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.7874012889740385}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.9937974422968665}]}}]}]
             '''
 
             # Opinion Extraction
-            schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
+            schema = [{'评价维度': ['观点词', '情感倾向[正向，负向]']}] # Define the schema for opinion extraction
             ie.set_schema(schema) # Reset schema
-            ie('个人觉得管理太混乱了，票价太高了')
+            ie("地址不错，服务一般，设施陈旧")
             '''
-            [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.8902373594544031, 'relation': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9993566520321409}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9856116411308662, 'relation': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.995628420935013}]}}]}]
+            [{'评价维度': [{'text': '地址', 'start': 0, 'end': 2, 'probability': 0.9888139270606509, 'relations': {'观点词': [{'text': '不错', 'start': 2, 'end': 4, 'probability': 0.9927847072459528}], '情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.998228967796706}]}}, {'text': '设施', 'start': 10, 'end': 12, 'probability': 0.9588297379365116, 'relations': {'观点词': [{'text': '陈旧', 'start': 12, 'end': 14, 'probability': 0.9286753967902683}], '情感倾向[正向，负向]': [{'text': '负向', 'probability': 0.9949389795770394}]}}, {'text': '服务', 'start': 5, 'end': 7, 'probability': 0.9592857070501211, 'relations': {'观点词': [{'text': '一般', 'start': 7, 'end': 9, 'probability': 0.9949359182521675}], '情感倾向[正向，负向]': [{'text': '负向', 'probability': 0.9952498258302498}]}}]}]
             '''
 
             # Sentence-level Sentiment Classification
@@ -63,7 +63,7 @@ usage = r"""
             ie.set_schema(schema) # Reset schema
             ie('这个产品用起来真的很流畅，我非常喜欢')
             '''
-            [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990110458312529}]}]
+            [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990024058203417}]}]
             '''
          """
 
@@ -89,8 +89,8 @@ class UIETask(Task):
     resource_files_urls = {
         "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
-                "004d7e53f5222349741217fabfb241ac"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
+                "aeca0ed2ccf003f4e9c6160363327c9b"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
@@ -99,8 +99,8 @@ class UIETask(Task):
         },
         "uie-tiny": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
-                "6248b4897fec78a61ab6da3edf9707fe"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
+                "15874e4e76d05bc6de64cc69717f172e"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
