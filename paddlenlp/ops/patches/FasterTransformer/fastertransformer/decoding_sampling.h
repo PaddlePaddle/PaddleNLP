@@ -37,6 +37,8 @@ private:
   typedef typename Traits_::DataType DataType_;
   const IAllocator &allocator_;
   struct DecodingSamplingArguments args_;
+  TensorParallelParam t_parallel_param_;
+  LayerParallelParam l_parallel_param_;
 
   const cudaDataType_t computeType_ = Traits_::computeType;
   const cudaDataType_t AType_ = Traits_::AType;
@@ -101,7 +103,10 @@ public:
                    const bool prefix_lm = false,
                    const bool is_mbart = false,
                    const int min_length = 0,
-                   const int inner_coeff = 4)
+                   const int inner_coeff = 4,
+                   const int seed = -1,
+                   const int tensor_para_size = 1,
+                   const int layer_para_size = 1)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -124,6 +129,7 @@ public:
     args_.repeat_penalty_ = repeat_penalty;
 
     args_.min_length_ = min_length;
+    args_.seed_ = seed;
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
@@ -178,6 +184,10 @@ public:
     size_t mem_cache_size =
         (prefix_lm) ? 0 : (args_.batch_size_ * memory_max_seq_len *
                            args_.hidden_units_);  // type T
+    if (tensor_para_size != 1) { // tensor parallel
+      cache_size /= tensor_para_size;
+      mem_cache_size /= tensor_para_size;
+    }
     size_t logits_buf_size =
         args_.batch_size_ * args_.vocab_size_padded_;  // type T
 
@@ -346,6 +356,16 @@ public:
     }
   }
 
+  void set_tensor_parallel_param(const TensorParallelParam param) {
+    t_parallel_param_ = param;
+    decoder_->set_tensor_parallel_param(param);
+  }
+
+  void set_layer_parallel_param(const LayerParallelParam param) {
+    l_parallel_param_ = param;
+    decoder_->set_layer_parallel_param(param);
+  }
+
   void forward_context(const DecoderInitParam<DataType_> *decoder_param,
                        const DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
@@ -356,7 +376,7 @@ public:
 
       const int max_input_len = decoding_params.max_input_len;
 
-      const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
+      const int local_batch_size = ceil(request_batch_size * 1.0 / l_parallel_param_.world_size);
       const int m = local_batch_size * input_len;
       const int h_1 = args_.hidden_units_;
 
@@ -438,7 +458,7 @@ public:
 
       int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
       size_t cache_size = local_batch_size * dummy_decoder_max_seq_len *
-                args_.hidden_units_;
+                          t_parallel_param_.local_hidden_units_;
 
       int in_id, out_id;
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
@@ -571,14 +591,19 @@ public:
       embedding_bias_ptr = padded_embedding_bias;
     }
 
-    size_t cache_size = (args_.prefix_lm_)
-                            ? (args_.batch_size_ *
-                               (args_.seq_len_ + args_.memory_max_seq_len_) *
-                               args_.hidden_units_)
-                            : (args_.batch_size_ * args_.seq_len_ *
-                               args_.hidden_units_);  // type T
+    // TODO(guosheng): move cache offset into for loop for pipeline parallel
+    size_t cache_size =
+        (args_.prefix_lm_) ? (args_.batch_size_ *
+                              (args_.seq_len_ + args_.memory_max_seq_len_) *
+                              t_parallel_param_.local_hidden_units_)
+                           : (args_.batch_size_ * args_.seq_len_ *
+                              t_parallel_param_.local_hidden_units_);  // type T
 
+    const int local_batch = l_parallel_param_.local_batch_size;
     for (uint step = 1; step <= args_.seq_len_; ++step) {
+      // const int ite_num = args_.batch_size_ / local_batch;
+      // for (size_t ite = 0; ite < ite_num; ite++) {
+      // }
       if (args_.normalization_before_) {
         if (args_.prefix_lm_) {
           embeddings_kernel_launcher(from_tensor_[0],
@@ -678,64 +703,66 @@ public:
 
       int from_id, out_id;
       for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        /*
-          For the first layer (layer-0), from_id is 0. We also stored the
-          embedding lookup
-          result in from_tensor_[0]
-        */
-        from_id = layer & 0x1;
-        out_id = 1 - from_id;
+        if (l_parallel_param_.is_valid(layer)) {
+          /*
+             For the first layer (layer-0), from_id is 0. We also stored the
+             embedding lookup
+             result in from_tensor_[0]
+           */
+          from_id = layer & 0x1;
+          out_id = 1 - from_id;
 
-        /*
-          We use one decoder_ object to process multiple decoder layers.
+          /*
+            We use one decoder_ object to process multiple decoder layers.
 
-          At the beginning of each decoder layer, we initialize the decoder
-          object
-          with corresponding weights and decoder_buf_.
+            At the beginning of each decoder layer, we initialize the decoder
+            object
+            with corresponding weights and decoder_buf_.
 
-          The decoder_buf_ is reused.
-        */
-        decoder_->initialize(param[layer], decoder_buf_, cublas_workspace_);
+            The decoder_buf_ is reused.
+          */
+          decoder_->initialize(param[layer], decoder_buf_, cublas_workspace_);
 
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
 #endif
 
-        if (args_.prefix_lm_) {
-          decoder_->forward_v2(from_tensor_[from_id],
-                               nullptr,
-                               K_cache_[0] + layer * cache_size,
-                               V_cache_[0] + layer * cache_size,
-                               nullptr,
-                               nullptr,
-                               nullptr,
-                               from_tensor_[out_id],
-                               step + args_.memory_max_seq_len_,
-                               args_.seq_len_ + args_.memory_max_seq_len_,
-                               false, /* is_cross_attention */
-                               finished_buf_,
-                               args_.memory_max_seq_len_,
-                               decoding_params.memory_sequence_length);
-        } else {
-          decoder_->forward(from_tensor_[from_id],
-                            decoding_params.memory_tensor,
-                            K_cache_[0] + layer * cache_size,
-                            V_cache_[0] + layer * cache_size,
-                            K_mem_cache_[layer],
-                            V_mem_cache_[layer],
-                            decoding_params.memory_sequence_length,
-                            from_tensor_[out_id],
-                            step,
-                            args_.seq_len_,
-                            true, /* is_cross_attention */
-                            finished_buf_);
+          if (args_.prefix_lm_) {
+            decoder_->forward_v2(from_tensor_[from_id],
+                                nullptr,
+                                K_cache_[0] + layer * cache_size,
+                                V_cache_[0] + layer * cache_size,
+                                nullptr,
+                                nullptr,
+                                nullptr,
+                                from_tensor_[out_id],
+                                step + args_.memory_max_seq_len_,
+                                args_.seq_len_ + args_.memory_max_seq_len_,
+                                false, /* is_cross_attention */
+                                finished_buf_,
+                                args_.memory_max_seq_len_,
+                                decoding_params.memory_sequence_length);
+          } else {
+            decoder_->forward(from_tensor_[from_id],
+                              decoding_params.memory_tensor,
+                              K_cache_[0] + layer * cache_size,
+                              V_cache_[0] + layer * cache_size,
+                              K_mem_cache_[layer],
+                              V_mem_cache_[layer],
+                              decoding_params.memory_sequence_length,
+                              from_tensor_[out_id],
+                              step,
+                              args_.seq_len_,
+                              true, /* is_cross_attention */
+                              finished_buf_);
+          }
+
+#ifndef NDEBUG
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
+#endif
         }
-
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
       }
 
       if (step > min_trg_len) {

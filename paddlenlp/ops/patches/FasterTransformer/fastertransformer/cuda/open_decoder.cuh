@@ -30,4 +30,20 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 const int local_head_num,
                                                 cudaStream_t stream);
 
+template <typename T>
+void transpose_general_kernelLauncher(T* dst,
+                                      T* src,
+                                      const int batch_size,
+                                      const int seq_len,
+                                      const int head_num,
+                                      const int size_per_head,
+                                      cudaStream_t stream);
+
+template <typename T>
+__global__ void transpose(T* src,
+                          T* dst,
+                          const int batch_size,
+                          const int seq_len,
+                          const int head_num,
+                          const int size_per_head);
 }
