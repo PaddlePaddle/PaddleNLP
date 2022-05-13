@@ -53,7 +53,7 @@ PaddleNLP中提供了ERNIE-Health训练好的模型参数。该版本为160G医�
 
 - 推荐使用至少4张16G以上显存的GPU进行预训练。
 - 数据量应尽可能接近ERNIE-Health论文中训练数据的量级，以获得好的预训练模型效果。
-- 若资源有限，可以直接使用开源的ERNIE-Health模型进行Fine-tuning，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/biomedical/cblue)。
+- 若资源有限，可以直接使用开源的ERNIE-Health模型进行Fine-tuning，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/cblue)。
 
 #### 单机单卡
 

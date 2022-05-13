@@ -11,7 +11,6 @@
 
 本目录下主要包含一下文件：
 ```
-../data_tools
 ├── create_pretraining_data.py
 ├── dataset_utils.py
 ├── ernie_dataset.py
@@ -163,12 +162,11 @@ python -u  create_pretraining_data.py \
 ```
 
 ### Ernie预训练开始
-得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`examples/language_model/ernie-1.0`。
+得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`model_zoo/ernie-1.0`。
 简单将预处理好的数据，拷贝到data目录，即可开始Ernie模型预训练。
 ```
-cd ../ernie-1.0
 mkdir data
-mv ../data_tools/baike_sample* ./data
+mv ./data_tools/baike_sample* ./data
 sh run_static.sh
 # 建议修改 run_static.sh 中的配置，将max_steps设置小一些。
 ```
