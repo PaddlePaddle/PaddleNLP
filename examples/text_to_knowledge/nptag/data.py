@@ -57,9 +57,9 @@ def convert_example(example,
     tokens = list(example["text"]) + ["是"] + ["[MASK]"] * max_cls_len
     inputs = tokenzier(
         tokens,
+        truncation=True,
         return_length=True,
         is_split_into_words=True,
-        pad_to_max_seq_len=True,
         max_seq_len=max_seq_len)
 
     label_indices = list(
@@ -70,7 +70,7 @@ def convert_example(example,
 
     label_tokens = list(example["label"]) + ["[PAD]"] * (max_cls_len -
                                                          len(example["label"]))
-    labels = np.full([max_seq_len], fill_value=-100, dtype=np.int64)
+    labels = np.full([inputs["seq_len"]], fill_value=-100, dtype=np.int64)
     labels[label_indices] = tokenzier.convert_tokens_to_ids(label_tokens)
     return inputs["input_ids"], inputs["token_type_ids"], labels
 
