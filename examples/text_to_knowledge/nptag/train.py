@@ -86,7 +86,6 @@ def do_train(args):
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
     set_seed(args.seed)
 
     train_ds = load_dataset(
@@ -108,11 +107,8 @@ def do_train(args):
         convert_example, tokenzier=tokenizer, max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # input_ids
-        Pad(axis=0,
-            pad_val=tokenizer.pad_token_type_id,
-            dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
         Pad(axis=0, pad_val=-100, dtype='int64'),  # labels
     ): fn(samples)
 

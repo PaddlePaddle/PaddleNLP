@@ -54,11 +54,8 @@ def do_predict(data,
     ]
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # input_ids
-        Pad(axis=0,
-            pad_val=tokenizer.pad_token_type_id,
-            dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
         Stack(dtype='int64'),  # label_indices
     ): fn(samples)
 
@@ -68,7 +65,6 @@ def do_predict(data,
     all_scores_can = []
     all_preds_can = []
     pred_ids = []
-
     model.eval()
     for batch in batches:
         input_ids, token_type_ids, label_indices = batchify_fn(batch)

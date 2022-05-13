@@ -32,7 +32,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [词性标注](#词性标注)              | `Taskflow("pos_tagging")`        | ✅        | ✅        | ✅        | ✅          | ✅          | 基于百度前沿词法分析工具LAC                            |
 | [命名实体识别](#命名实体识别)      | `Taskflow("ner")`                 | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖最全中文实体标签                                   |
 | [依存句法分析](#依存句法分析)      | `Taskflow("dependency_parsing")`  | ✅        | ✅        | ✅        |            | ✅          | 基于最大规模中文依存句法树库研发的DDParser             |
-| [信息抽取](#信息抽取)           | `Taskflow("information_extraction")`| ✅        | ✅        | ✅        | ✅          | ✅          | 适配多场景的开放域通用信息抽取工具                     |
+| [信息抽取](#信息抽取)           | `Taskflow("information_extraction")`| ✅        | ✅        | ✅        | ✅         | ✅          | 适配多场景的开放域通用信息抽取工具                     |
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
 | [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百度知道2200万对相似句组训练                       |

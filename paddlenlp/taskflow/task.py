@@ -111,6 +111,7 @@ class Task(metaclass=abc.ABCMeta):
             path = os.path.join(self._task_path, file_name)
             url = self.resource_files_urls[self.model][file_id][0]
             md5 = self.resource_files_urls[self.model][file_id][1]
+
             downloaded = True
             if not os.path.exists(path):
                 downloaded = False

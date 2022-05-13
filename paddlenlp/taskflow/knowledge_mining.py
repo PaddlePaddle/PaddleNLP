@@ -697,6 +697,7 @@ class NPTagTask(Task):
                     "token_type_ids"], label_indices
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
+
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
                 ),  # input_ids

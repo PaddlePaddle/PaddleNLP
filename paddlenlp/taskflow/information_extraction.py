@@ -51,11 +51,11 @@ usage = r"""
             '''
 
             # Opinion Extraction
-            schema = [{'评价维度': ['观点词']}] # Define the schema for opinion extraction
+            schema = [{'评价维度': ['观点词', '情感倾向[正向，负向]']}] # Define the schema for opinion extraction
             ie.set_schema(schema) # Reset schema
-            ie('个人觉得管理太混乱了，票价太高了')
+            ie("地址不错，服务一般，设施陈旧")
             '''
-            [{'评价维度': [{'text': '管理', 'start': 4, 'end': 6, 'probability': 0.9108754323872681, 'relations': {'观点词': [{'text': '混乱', 'start': 7, 'end': 9, 'probability': 0.9730234365447359}]}}, {'text': '票价', 'start': 11, 'end': 13, 'probability': 0.9542050183284729, 'relations': {'观点词': [{'text': '高', 'start': 14, 'end': 15, 'probability': 0.969917430929776}]}}]}]
+            [{'评价维度': [{'text': '地址', 'start': 0, 'end': 2, 'probability': 0.9888139270606509, 'relations': {'观点词': [{'text': '不错', 'start': 2, 'end': 4, 'probability': 0.9927847072459528}], '情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.998228967796706}]}}, {'text': '设施', 'start': 10, 'end': 12, 'probability': 0.9588297379365116, 'relations': {'观点词': [{'text': '陈旧', 'start': 12, 'end': 14, 'probability': 0.9286753967902683}], '情感倾向[正向，负向]': [{'text': '负向', 'probability': 0.9949389795770394}]}}, {'text': '服务', 'start': 5, 'end': 7, 'probability': 0.9592857070501211, 'relations': {'观点词': [{'text': '一般', 'start': 7, 'end': 9, 'probability': 0.9949359182521675}], '情感倾向[正向，负向]': [{'text': '负向', 'probability': 0.9952498258302498}]}}]}]
             '''
 
             # Sentence-level Sentiment Classification

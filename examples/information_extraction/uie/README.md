@@ -255,5 +255,6 @@ python evaluate.py \
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
 
+
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
