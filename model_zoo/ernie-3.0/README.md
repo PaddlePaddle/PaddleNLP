@@ -1,15 +1,19 @@
 # ERNIE 3.0 轻量级模型
 
 ## 模型介绍
-
+TBD
 <p align="center">
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168254282-e6901f9a-fd9a-4bbd-a5b6-e847b7f90bb4.png">
 </p>
 
 ## 模型效果
 
-ERNIE 3.0 开源 Base(12L768H) 和 Medium（6L768H) 两个模型，它们在 CLUE **验证集**上指标如下：
+本项目开源 **ERNIE 3.0 _base_*** 和 **ERNIE 3.0 _medium_**两个模型：
 
+- [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
+- [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
+
+在 CLUE **验证集**上评测指标如下表所示：
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
