@@ -52,7 +52,7 @@ wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
-然后使用[data_tools](../data_tools)工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[data_tools](./data_tools)工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name gpt2-en \
