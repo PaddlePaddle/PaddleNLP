@@ -3,7 +3,7 @@ cc_library(pybind_normalizers SRCS normalizers.cc DEPS pybind python json)
 cc_library(pybind_pretokenizers SRCS pretokenizers.cc DEPS pybind python json)
 cc_library(pybind_models SRCS models.cc DEPS pybind python json)
 cc_library(pybind_postprocessors SRCS postprocessors.cc DEPS pybind python core json)
-cc_library(pybind_tokenizers SRCS tokenizers.cc DEPS pybind python pybind_utils json)
+cc_library(pybind_tokenizers SRCS tokenizers.cc DEPS pybind python pybind_utils json extern_boost)
 cc_library(pybind_exception SRCS exception.cc DEPS pybind python)
 cc_library(pybind_core SRCS core.cc DEPS pybind python json)
 cc_library(core_tokenizers SHARED
