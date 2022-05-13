@@ -65,81 +65,81 @@ mpirun -n 4 python infer.py --batch_size 8 --min_out_len 20 --max_out_len 20 --t
 <table>
 <caption>PLATO-XL 高性能推理速度&nbsp;&nbsp;(in ms/batch)</caption>
     <tr style="text-align:center;">
-        <td>batch size</td>
-           <td>K</td>
-           <td>FasterGeneration</br>1卡</br>FP16</td>
-           <td>FasterGeneration</br>4卡</br>FP16</td>
-        <td>多卡并行SpeedUp</td>
+        <td align=center>batch size</td>
+        <td align=center>K</td>
+        <td align=center>FasterGeneration</br>1卡</br>FP16</td>
+        <td align=center>FasterGeneration</br>4卡</br>FP16</td>
+        <td align=center>多卡并行</br>SpeedUp</td>
     </tr>
     <tr style="text-align:center;">
-        <td>1</td>
-           <td>1</td>
-           <td>706.937</td>
-           <td>348.653</td>
-        <td>2.027</td>
+        <td align=center>1</td>
+        <td align=center>1</td>
+        <td align=center>706.937</td>
+        <td align=center>348.653</td>
+        <td align=center>2.027</td>
     </tr>
     <tr style="text-align:center;">
-        <td>1</td>
-           <td>10</td>
-           <td>707.514</td>
-           <td>348.699</td>
-        <td>2.029</td>
+        <td align=center>1</td>
+        <td align=center>10</td>
+        <td align=center>707.514</td>
+        <td align=center>348.699</td>
+        <td align=center>2.029</td>
     </tr>
     <tr style="text-align:center;">
-        <td>4</td>
-           <td>1</td>
-           <td>768.597</td>
-           <td>384.730</td>
-        <td>1.997</td>
+        <td align=center>4</td>
+        <td align=center>1</td>
+        <td align=center>768.597</td>
+        <td align=center>384.730</td>
+        <td align=center>1.997</td>
     </tr>
     <tr style="text-align:center;">
-        <td>4</td>
-           <td>10</td>
-           <td>770.008</td>
-           <td>385.244</td>
-        <td>1.998</td>
+        <td align=center>4</td>
+        <td align=center>10</td>
+        <td align=center>770.008</td>
+        <td align=center>385.244</td>
+        <td align=center>1.998</td>
     </tr>
     <tr style="text-align:center;">
-        <td>8</td>
-           <td>1</td>
-           <td>862.017</td>
-           <td>418.313</td>
-        <td>2.060</td>
+        <td align=center>8</td>
+        <td align=center>1</td>
+        <td align=center>862.017</td>
+        <td align=center>418.313</td>
+        <td align=center>2.060</td>
     </tr>
     <tr style="text-align:center;">
-        <td>8</td>
-           <td>10</td>
-           <td>866.490</td>
-           <td>418.965</td>
-        <td>2.068</td>
+        <td align=center>8</td>
+        <td align=center>10</td>
+        <td align=center>866.490</td>
+        <td align=center>418.965</td>
+        <td align=center>2.068</td>
     </tr>
     <tr style="text-align:center;">
-        <td>16</td>
-           <td>1</td>
-           <td>1016.362</td>
-           <td>486.974</td>
-        <td>2.087</td>
+        <td align=center>16</td>
+        <td align=center>1</td>
+        <td align=center>1016.362</td>
+        <td align=center>486.974</td>
+        <td align=center>2.087</td>
     </tr>
     <tr style="text-align:center;">
-        <td>16</td>
-           <td>10</td>
-           <td>1060.472</td>
-           <td>488.156</td>
-        <td>2.172</td>
+        <td align=center>16</td>
+        <td align=center>10</td>
+        <td align=center>1060.472</td>
+        <td align=center>488.156</td>
+        <td align=center>2.172</td>
     </tr>
     <tr style="text-align:center;">
-        <td>32</td>
-           <td>1</td>
-           <td>1325.700</td>
-           <td>606.770</td>
-        <td>2.184</td>
+        <td align=center>32</td>
+        <td align=center>1</td>
+        <td align=center>1325.700</td>
+        <td align=center>606.770</td>
+        <td align=center>2.184</td>
     </tr>
     <tr style="text-align:center;">
-        <td>32</td>
-           <td>10</td>
-           <td>1326.222</td>
-           <td>608.479</td>
-        <td>2.179</td>
+        <td align=center>32</td>
+        <td align=center>10</td>
+        <td align=center>1326.222</td>
+        <td align=center>608.479</td>
+        <td align=center>2.179</td>
     </tr>
 </table>
 
