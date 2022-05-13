@@ -200,6 +200,9 @@ static int TokenizerPropertiesSetPostProcessor(TokenizerObject* self,
 
 static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                                                void* closure) {
+  if (!self->tokenizer.GetUsePadding()) {
+    Py_RETURN_NONE;
+  }
   auto pad_method = self->tokenizer.GetPadMethod();
   PyObject* py_dict = PyDict_New();
   PyDict_SetItem(py_dict, ToPyObject("pad_id"), ToPyObject(pad_method.pad_id_));
@@ -208,26 +211,36 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                  ToPyObject(pad_method.pad_token_type_id_));
   PyDict_SetItem(
       py_dict, ToPyObject("pad_token"), ToPyObject(pad_method.pad_token_));
-  PyDict_SetItem(py_dict,
-                 ToPyObject("pad_to_mutiple_of"),
-                 ToPyObject(pad_method.pad_to_mutiple_of));
+  if (pad_method.pad_to_mutiple_of > 0) {
+      PyDict_SetItem(py_dict,
+        ToPyObject("pad_to_multiple_of"),
+        ToPyObject(pad_method.pad_to_mutiple_of));
+  } else {
+      Py_INCREF(Py_None);
+      PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
+  }
+  
   PyDict_SetItem(
       py_dict,
       ToPyObject("direction"),
       ToPyObject((pad_method.direction_ == core::Direction::RIGHT) ? "right"
                                                                    : "left"));
   if (pad_method.strategy_ == core::PadStrategy::BATCH_LONGEST) {
+    Py_INCREF(Py_None);
     PyDict_SetItem(
-        py_dict, ToPyObject("pad_strategy"), ToPyObject("batch_longest"));
+        py_dict, ToPyObject("length"), Py_None);
   } else {
     PyDict_SetItem(
-        py_dict, ToPyObject("pad_len"), ToPyObject(pad_method.pad_len_));
+        py_dict, ToPyObject("length"), ToPyObject(pad_method.pad_len_));
   }
   return py_dict;
 }
 
 static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
                                                   void* closure) {
+  if (!self->tokenizer.GetUseTruncation()) {
+    Py_RETURN_NONE;
+  }
   auto trunc_method = self->tokenizer.GetTruncMethod();
   PyObject* py_dict = PyDict_New();
   PyDict_SetItem(
@@ -241,13 +254,13 @@ static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
                                                                      : "left"));
   if (trunc_method.strategy_ == core::TruncStrategy::LONGEST_FIRST) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("longest_first"));
+        py_dict, ToPyObject("strategy"), ToPyObject("longest_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_FIRST) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("only_first"));
+        py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_SECOND) {
     PyDict_SetItem(
-        py_dict, ToPyObject("trunc_strategy"), ToPyObject("only_second"));
+        py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
   }
   return py_dict;
 }
@@ -444,7 +457,13 @@ static PyObject* EnablePadding(TokenizerObject* self,
   uint* pad_to_multiple_of_ptr = nullptr;
   uint length = 0;
   uint pad_to_multiple_of = 0;
-
+  VLOG(6) << "args_num: " << args_num << ", flag_kwargs: " << flag_kwargs;
+  VLOG(6) << "kw_direction: " << kw_direction;
+  VLOG(6) << "kw_pad_id: " << kw_pad_id;
+  VLOG(6) << "kw_pad_type_id: " << kw_pad_type_id;
+  VLOG(6) << "kw_pad_token: " << kw_pad_token;
+  VLOG(6) << "kw_length: " << kw_length;
+  VLOG(6) << "kw_pad_to_multiple_of: " << kw_pad_to_multiple_of;
   if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)6) {
     if ((args_num == 0 && flag_kwargs && kw_direction) || (args_num >= 1)) {
       direction = CastPyArg2AttrString(kw_direction, 0);
@@ -459,13 +478,17 @@ static PyObject* EnablePadding(TokenizerObject* self,
       pad_token = CastPyArg2AttrString(kw_pad_token, 3);
     }
     if ((args_num <= 4 && flag_kwargs && kw_length) || (args_num >= 5)) {
-      length = CastPyArg2AttrSize_t(kw_length, 4);
-      length_ptr = &length;
+      if (!(kw_length == Py_None)) {
+        length = CastPyArg2AttrSize_t(kw_length, 4);
+        length_ptr = &length;
+      }
     }
     if ((args_num <= 5 && flag_kwargs && kw_pad_to_multiple_of) ||
         (args_num == 6)) {
-      pad_to_multiple_of = CastPyArg2AttrSize_t(kw_pad_to_multiple_of, 5);
-      pad_to_multiple_of_ptr = &pad_to_multiple_of;
+      if (!(kw_pad_to_multiple_of == Py_None)) {
+        pad_to_multiple_of = CastPyArg2AttrSize_t(kw_pad_to_multiple_of, 5);
+        pad_to_multiple_of_ptr = &pad_to_multiple_of;
+      }
     }
   } else {
     std::ostringstream oss;
@@ -541,7 +564,7 @@ static PyObject* EnableTruncation(TokenizerObject* self,
   std::string strategy = "longest_first";
   std::string direction = "right";
 
-  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)4) {
+  if (args_num >= (Py_ssize_t)0 && args_num <= (Py_ssize_t)4) {
     max_length = CastPyArg2AttrSize_t(kw_max_length, 0);
     if ((args_num <= 1 && flag_kwargs && kw_stride) || (args_num >= 2)) {
       stride = CastPyArg2AttrSize_t(kw_stride, 1);
@@ -769,24 +792,41 @@ static PyObject* Encode(TokenizerObject* self,
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
 }
 
-// def encode(input, add_special_tokens=True)
+// def encode(input, add_special_tokens=True, is_pretokenized=False)
 static PyObject* EncodeBatch(TokenizerObject* self,
                              PyObject* args,
                              PyObject* kwargs) {
   TOKENIZERS_TRY
   PyObject* kw_input = NULL;
   PyObject* kw_special_tokens = NULL;
+  PyObject* kw_is_pretokenized = NULL;
   bool flag_kwargs = false;
   if (kwargs) flag_kwargs = true;
   static char* kwlist[] = {const_cast<char*>("input"),
                            const_cast<char*>("add_special_tokens"),
+                           const_cast<char*>("is_pretokenized"),
                            NULL};
-  bool flag_ = PyArg_ParseTupleAndKeywords(
-      args, kwargs, "|OO", kwlist, &kw_input, &kw_special_tokens);
+  bool flag_ = PyArg_ParseTupleAndKeywords(args,
+                                           kwargs,
+                                           "|OOO",
+                                           kwlist,
+                                           &kw_input,
+                                           &kw_special_tokens,
+                                           &kw_is_pretokenized);
   bool add_special_tokens = true;
+  bool is_pretokenized = false;
   Py_ssize_t args_num = PyTuple_Size(args);
+  VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
+          << ", flag_: " << flag_;
   std::vector<core::EncodeInput> batch_encode_input;
-  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
+  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)3) {
+    if ((args_num <= 1 && flag_kwargs && kw_special_tokens) ||
+        (args_num >= 2)) {
+      add_special_tokens = CastPyArg2AttrBoolean(kw_special_tokens, 1);
+    }
+    if ((args_num <= 2 && kw_is_pretokenized && flag_kwargs) || args_num == 3) {
+      is_pretokenized = CastPyArg2AttrBoolean(kw_is_pretokenized, 2);
+    }
     if (PyList_Check(kw_input)) {
       Py_ssize_t list_size = PyList_Size(kw_input);
       for (Py_ssize_t i = 0; i < list_size; ++i) {
@@ -796,7 +836,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
           PyObject* text = PyTuple_GetItem(item, 0);
           PyObject* text_pair = PyTuple_GetItem(item, 1);
           // pretokenized
-          if (PyList_Check(text) && PyList_Check(text_pair)) {
+          if (is_pretokenized) {
             Py_ssize_t pretokenized_size = PyList_Size(item);
             std::vector<std::string> text_vec;
             std::vector<std::string> text_pair_vec;
@@ -817,7 +857,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
           }
         } else {
           // Only get text
-          if (PyList_Check(item)) {
+          if (is_pretokenized) {
             Py_ssize_t pretokenized_size = PyList_Size(item);
             std::vector<std::string> str_vec(pretokenized_size);
             for (Py_ssize_t j = 0; j < pretokenized_size; ++j) {
@@ -832,12 +872,8 @@ static PyObject* EncodeBatch(TokenizerObject* self,
       }
     } else {
       std::ostringstream oss;
-      oss << "Expected the input argument, but not pass.";
+      oss << "Expected the type of input argument is list";
       throw std::runtime_error(oss.str());
-    }
-    if ((args_num <= 1 && flag_kwargs && kw_special_tokens) ||
-        (args_num >= 2)) {
-      add_special_tokens = CastPyArg2AttrBoolean(kw_special_tokens, 1);
     }
     std::vector<core::Encoding> result_encodings;
     self->tokenizer.EncodeBatchStrings(

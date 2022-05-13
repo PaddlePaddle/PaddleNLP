@@ -63,7 +63,7 @@ Taskflow旨在提供**开箱即用**的NLP预置任务能力，覆盖自然语�
 
 ### Transformers API: 强大的预训练模型生态底座
 
-覆盖**30**个网络结构和**100**余个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，XLNet，BART等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
+覆盖 **45+** 个网络结构和 **500+** 个预训练模型参数，既包括百度自研的预训练模型如ERNIE系列, PLATO, SKEP等，也涵盖业界主流的中文预训练模型如BERT，GPT，RoBERTa，T5等。使用AutoModel可以下载不同网络结构的预训练模型。欢迎开发者加入贡献更多预训练模型！🤗
 
 ```python
 from paddlenlp.transformers import *
@@ -97,7 +97,7 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
 ```
 
-请参考[Transformer API文档](./docs/model_zoo/transformers.rst)查看目前支持的预训练模型结构、参数和详细用法。
+请参考[Transformer 文档](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html) 查看目前支持的预训练模型结构、参数和详细用法。
 
 ### Datasets API: 丰富的中文数据集
 
@@ -256,7 +256,7 @@ PaddleNLP提供了多粒度、多场景的NLP应用示例，面向动态图模�
 | 模型                                                       | 简介                                                         |
 | :--------------------------------------------------------- | ------------------------------------------------------------ |
 | [MiniLMv2](examples/model_compression/minilmv2)    | 基于[MiniLMv2: Multi-Head Self-Attention Relation Distillation for Compressing Pretrained Transformers](https://arxiv.org/abs/2012.15828)论文策略的实现，是一种通用蒸馏方法。本实例以`bert-base-chinese`为教师模型，利用中文数据进行了通用蒸馏。 |
-| [TinyBERT](./examples/model_compression/tinybert)          | 基于论文[TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)的实现，提供了通用蒸馏和下游任务蒸馏的脚本。本实例利用开源模型`tinybert-6l-768d-v2`初始化，在GLUE的7个数据集上进行下游任务的蒸馏，最终模型参数量缩小1/2，预测速度提升2倍，同时保证模型精度几乎无损，其中精度可达教师模型`bert-base-uncased`的 98.90%。 |
+| [TinyBERT](./model_zoo/tinybert)          | 基于论文[TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)的实现，提供了通用蒸馏和下游任务蒸馏的脚本。本实例利用开源模型`tinybert-6l-768d-v2`初始化，在GLUE的7个数据集上进行下游任务的蒸馏，最终模型参数量缩小1/2，预测速度提升2倍，同时保证模型精度几乎无损，其中精度可达教师模型`bert-base-uncased`的 98.90%。 |
 | [OFA-BERT](./examples/model_compression/ofa/)     | 基于PaddleSlim Once-For-ALL(OFA)策略对BERT在GLUE任务的下游模型进行压缩，在精度无损的情况下可减少33%参数量，达到模型小型化的提速的效果。 |
 | [Distill-LSTM](./examples/model_compression/distill_lstm/) | 基于[Distilling Task-Specific Knowledge from BERT into Simple Neural Networks](https://arxiv.org/abs/1903.12136)论文策略的实现，将BERT中英文分类的下游模型知识通过蒸馏的方式迁移至LSTM的小模型结构中，取得比LSTM单独训练更好的效果。 |
 | [PP-MiniLM](examples/model_compression/pp-minilm) :star2:    | 基于 PaddleSlim 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT-base 的4.2倍，参数量相比减少52%，模型精度在中文语言理解评测基准 CLUE 高0.32。 |
