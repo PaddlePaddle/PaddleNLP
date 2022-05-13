@@ -672,7 +672,6 @@ class NPTagTask(Task):
             'num_workers'] if 'num_workers' in self.kwargs else 0
         lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
-
         # Prompt template: input_text + "是" + "[MASK]" * cls_seq_length
         prompt_template = ["是"] + ["[MASK]"] * self._max_cls_len
 
