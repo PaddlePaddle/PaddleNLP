@@ -523,6 +523,7 @@ def main():
             convert_example,
             label_list=dev_ds.label_list,
             tokenizer=tokenizer,
+            max_seq_length=args.max_seq_length,
             is_test=False)
         dev_ds = dev_ds.map(trans_func, lazy=False)
         batchify_fn = DataCollatorWithPadding(tokenizer)
