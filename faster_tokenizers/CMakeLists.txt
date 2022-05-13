@@ -73,6 +73,9 @@ message(${CMAKE_SOURCE_DIR}/faster_tokenizers/include)
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/faster_tokenizers/include ${CPP_PACKAGE_DIR}/include
     DEPENDS build_cpp_package_dir)
+add_custom_target(remove_pybind_headers ALL
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CPP_PACKAGE_DIR}/include/pybind
+    DEPENDS copy_headers)
 
 # copy library
 add_custom_target(copy_shared_library ALL
