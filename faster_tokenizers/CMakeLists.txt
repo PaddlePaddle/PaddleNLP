@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
 option(WITH_TESTING     "Compile PaddleNLP tokenizers with unit testing"        ON)
+option(WITH_PYTHON      "Compile PaddlePaddle with python interpreter"  ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -53,8 +54,31 @@ include(generic)
 include(third_party)
 
 add_subdirectory(faster_tokenizers)
-add_subdirectory(python)
 
+if(WITH_PYTHON)
+
+add_subdirectory(python)
 add_custom_target(build_tokenizers_bdist_wheel ALL
     COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel
     DEPENDS copy_python_tokenizers)
+
+else(WITH_PYTHON)
+
+set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizers_cpp)
+add_custom_target(build_cpp_package_dir ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include)
+
+message(${CMAKE_SOURCE_DIR}/faster_tokenizers/include)
+# copy headers
+add_custom_target(copy_headers ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/faster_tokenizers/include ${CPP_PACKAGE_DIR}/include
+    DEPENDS build_cpp_package_dir)
+
+# copy library
+add_custom_target(copy_shared_library ALL
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${CPP_PACKAGE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
+    DEPENDS build_cpp_package_dir core_tokenizers)
+
+endif(WITH_PYTHON)
