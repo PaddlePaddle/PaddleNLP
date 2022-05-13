@@ -28,8 +28,8 @@ def dense_qa_pipeline():
         )
     else:
         doc_dir = "data/baike"
-        China_cities_data = "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
-        fetch_archive_from_http(url=China_cities_data, output_dir=doc_dir)
+        city_data = "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
+        fetch_archive_from_http(url=city_data, output_dir=doc_dir)
         dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
 
         if os.path.exists(faiss_index_path):

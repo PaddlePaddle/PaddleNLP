@@ -74,7 +74,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "gpt-cn":
         demo = Demo("gpt-cn", "gpt-cpm-large-cn")
         demo.ask_question_cn("苹果的CEO是谁?")
-        demo.dictation_poetry_cn("举杯邀明月，")
+        demo.ask_question_cn("湖北省的省会在哪里？")
+        demo.ask_question_cn("北京有多少个行政区？")
+        demo.ask_question_cn("安徽省的简称是什么？")
+        demo.ask_question_cn("上海常住人口有多少？")
+        demo.ask_question_cn("长沙的 GDP 总量？")
+        # demo.dictation_poetry_cn("举杯邀明月，")
     else:
         demo = Demo("gpt", "gpt2-medium-en")
         demo.ask_question_en("Who is the CEO of Apple?")
