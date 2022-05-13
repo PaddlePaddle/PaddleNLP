@@ -43,6 +43,7 @@ from visualdl import LogWriter
 
 from args import parse_args
 import sys
+# Used to load data_tools path.
 sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
 
