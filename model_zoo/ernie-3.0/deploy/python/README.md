@@ -1,7 +1,5 @@
 # ERNIE 3.0 Python部署指南
-本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，分类和命名实体识别两大场景下的使用示例。
-
-[toc]
+本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，命名实体识别和分类两大场景下的使用示例。  
 ## 环境准备
 ERNIE 3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
 ### CPU端
@@ -27,13 +25,12 @@ pip install -r requirements_gpu.txt
 
 ## 命名实体识别模型推理
 ### 模型获取
-模型可使用用户自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令下载模型：
+用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 命名实体识别模型：
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```
-如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本。
 ### CPU端推理样例
 在CPU端，请使用如下指令进行部署
 ```
@@ -107,7 +104,7 @@ python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int --s
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
 ```
-输出结果和GPU FP32的运行结果一致。  
+FP16和INT8推理的运行结果和FP32的运行结果一致。  
 infer_gpu.py脚本中的参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
@@ -121,13 +118,12 @@ infer_gpu.py脚本中的参数说明：
 
 ## 分类模型推理
 ### 模型获取
-模型可使用用户自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令下载模型：
+用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 分类模型模型：
 wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
 unzip tnews_pruned_infer_model.zip
 ```
-如果使用CPU，请运行infer_cpu.py进行部署，如果使用gpu，请运行infer_gpu.py进行部署，请根据你的部署设备选择相应的部署脚本。
 ### CPU端推理样例
 在CPU端，请使用如下指令进行部署
 ```
@@ -144,7 +140,7 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-CPU上的Int8加速和命名实体识别模型推理中的命令类似，只需修改task_name和model_path。
+CPU上的INT8加速和命名实体识别模型推理中的命令类似，只需修改task_name为seq_cls，model_path修改为本例中的分类模型，运行结果和FP32的推理结果一致。
 ### GPU端推理样例
 在GPU端，请使用如下指令进行部署
 ```
@@ -161,4 +157,4 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-GPU上的FP16和Int8加速和命名实体识别模型推理中命令类似，只需修改task_name和model_path。
+GPU上的FP16和INT8加速和命名实体识别模型推理中命令类似，只需修改task_name为seq_cls，model_path修改为本例中的分类模型，运行结果和FP32的推理结果一致。
