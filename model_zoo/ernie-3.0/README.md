@@ -1,10 +1,31 @@
 # ERNIE 3.0 轻量级模型
 
+ **目录**
+    * [模型介绍](#模型介绍)
+    * [模型介绍](#模型效果)
+    * [微调](#微调)
+    * [模型压缩](#模型压缩)
+        * [环境依赖](#环境依赖)
+        * [模型压缩 API 使用](#模型压缩API使用)
+        * [压缩效果](#压缩效果)
+            * [精度](#精度)
+            * [性能](#性能)
+                * [CPU 性能](#CPU性能)
+                * [GPU 性能](#CPU性能)
+    * [部署](#部署)
+        * [Python 部署](#Python部署)
+            * [环境依赖](#环境依赖)
+        * [服务化部署](#服务化部署)
+            * [环境依赖](#环境依赖)
+
+
+
 ## 模型介绍
 TBD
 <p align="center">
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168254282-e6901f9a-fd9a-4bbd-a5b6-e847b7f90bb4.png">
 </p>
+
 
 ## 模型效果
 
@@ -368,8 +389,39 @@ TBD
 <br />
 
 
+以下是本范例模型的简要目录结构及说明：
 
-## ERNIE 3.0 模型使用
+
+
+```shell
+.
+├── run_seq_cls.py               # 分类任务的微调脚本
+├── run_token_cls.py             # 命名实体识别任务的微调脚本
+├── run_qa.py                    # 阅读理解任务的微调脚本
+├── compress_seq_cls.py          # 分类任务的压缩脚本
+├── compress_token_cls.py        # 命名实体识别任务的压缩脚本
+├── compress_qa.py               # 阅读理解任务的压缩脚本  
+├── config.yml                   # 压缩配置文件
+├── infer.py                     # 支持CLUE分类、CMRC2018、MSRA_NER 任务的预测脚本
+├── deploy                       # 部署目录
+│ └── python
+│   └── ernie_predictor.py       # TODO
+│   └── infer_cpu.py
+│   └── infer_gpu.py
+│ └── serving
+│   └── seq_cls_rpc_client.py  
+│   └── seq_cls_service.py  
+│   └── seq_cls_config.yml  
+│   └── token_cls_rpc_client.py  
+│   └── token_cls_service.py  
+│   └── token_cls_config.yml  
+└── README.md                    # 文档，本文件
+
+```
+
+<a name="微调"></a>
+
+## 微调
 
 ```python
 
@@ -381,12 +433,13 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 seq_cls_model = AutoModelForSequenceClassificaion.from_pretrained("ernie-3.0-medium-zh")
 
 # 用于命名实体识别任务
-token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh")
+token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-base-zh")
 
 # 用于阅读理解任务
-qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
+qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
 
 ```
+
 ERNIE 3.0 提供了针对分类、命名实体识别、阅读理解三大场景下的微调使用样例，分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
 
 ```shell
@@ -401,17 +454,26 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --do_train
 
 ```
 
-## 模型压缩及推理部署
+<a name="模型压缩"></a>
 
-### 模型压缩 API 及使用
+## 模型压缩
 
-ERNIE 3.0 基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` API 即可一键启动裁剪和量化，并自动保存压缩后的模型。
+<a name="环境依赖"></a>
 
-首先需要安装 paddleslim 包
+### 环境依赖
+
+压缩功能需要安装 paddleslim 包
 
 ```shell
 pip install paddleslim
 ```
+
+<a name="模型压缩API使用"></a>
+
+### 模型压缩 API 使用
+
+ERNIE 3.0 基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` 即可一键启动裁剪和量化，并自动保存压缩后的模型。
+
 
 可以这样使用压缩 API (示例代码只提供了核心调用，如需跑通完整的例子可参考下方完整样例脚本):
 
@@ -433,8 +495,8 @@ compress_config = CompressConfig(quantization_config=PTQConfig(
 trainer.compress(
     data_args.dataset,
     output_dir,
-    pruning=True,
-    quantization=True,
+    pruning=True, # 开启裁剪
+    quantization=True, # 开启量化
     compress_config=compress_config)
 ```
 
@@ -463,29 +525,6 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 ```
 
-
-### 压缩精度
-
-这三类任务使用压缩 API 压缩精度如下：
-
-
-|      | Model                      | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | MSRA_NER          | AVG   |
-| ---- | -------------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------- | ----- |
-| 1    | ERNIE 3.0-Medium           | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.67/87.49 | 93.04/92.68/93.43 | 74.75 |
-| 2    | ERNIE 3.0-Medium量化       |       |       |         |       |       |             |       |             |                   |       |
-| 3    | ERNIE 3.0-Medium裁剪       | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.7  | 65.67/86.55 | 93.10/92.77/93.43 | 74.65 |
-| 4    | ERNIE 3.0-Medium裁剪、量化 |       |       |         |       |       |             |       |             |                   |       |
-
-### 性能提升
-
-压缩后的性能：
-
-GPU:
-TBD
-
-CPU:
-TBD
-
 **压缩 API 使用TIPS：**
 
 1. 压缩 API 提供裁剪和量化两个过程，建议两种都选择，裁剪需要训练，训练时间视下游任务数据量而定且和微调是一个量级的。量化不需要训练，更快；因此也可以只选择量化；
@@ -494,13 +533,87 @@ TBD
 
 3. 模型压缩主要用于推理部署，因此压缩后的模型都是静态图模型，只可用于预测，不能再通过 `from_pretrained` 导入继续训练。
 
-### 推理部署
 
+<a name="压缩效果"></a>
+
+### 压缩效果
+
+<a name="精度"></a>
+
+#### 精度
+
+这三类任务使用压缩 API 压缩精度如下：
+
+| Model                      | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | MSRA_NER:precision/recall/f1/ | AVG   |
+| -------------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------------------- | ----- |
+| ERNIE 3.0-Medium           | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.95/87.15 | 92.65/93.43/93.04             | 74.87 |
+| ERNIE 3.0-Medium+FP16      | 75.32 | 57.45 | 60.22   | 81.16 | 77.22 | 80.59       | 79.73 | 66.95/87.16 | 92.65/93.45/93.05             | 74.63 |
+| ERNIE 3.0-Medium量化       | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 80.47 | 66.32/86.82 | 93.10/92.90/92.70             | 73.97 |
+| ERNIE 3.0-Medium裁剪       | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.55/86.24 | 93.10/93.43/93.27             | 74.65 |
+| ERNIE 3.0-Medium裁剪+FP16  | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 79.67 | 65.39/86.17 | 93.10/93.43/93.27             | 74.43 |
+| ERNIE 3.0-Medium裁剪、量化 | 75.02 | 57.26 |         |       | 77.25 | 78.62       | 79.67 | 65.30/86.03 | 93.17/93.23/93.20             |       |
+
+
+TODO 完善数据，结论
+
+<a name="性能"></a>
+
+
+
+##### CPU 性能
+
+GPU:
 TBD
 
-#### Paddle Serving 部署
-
+CPU:
 TBD
+
+
+|                              | 文本分类 性能 QPS  (seq/s) | NER 性能 QPS  (seq/s)(叶梁) | 阅读理解性能 QPS  (seq/s) |
+| ---------------------------- | -------------------------- | --------------------------- | ------------------------- |
+| ERNIE-3.0-medium + FP32      | 311.95                     | 90.91                       | 33.74                     |
+| ERNIE-3.0-medium+ INT8       | 600.35                     | 141.00                      | 56.51                     |
+| ERNIE-3.0-medium+ 裁剪+FP32  | 408.65                     | 122.13                      | 48.47                     |
+| ERNIE-3.0-medium + 裁减+INT8 | 704.42                     | 215.58                      | 75.23                     |
+
+
+测试环境 & 结论：
+
+<a name="GPU性能"></a>
+
+##### GPU 性能
+
+|                                | 文本分类 性能 QPS (seq/s) | NER 性能 QPS (seq/s) | 阅读理解性能 QPS (seq/s) |
+| ------------------------------ | ------------------------- | -------------------- | ------------------------ |
+| ERNIE-3.0-medium + FP32        | 1123.85                   | 366.75               | 146.84                   |
+| ERNIE-3.0-medium + FP16        | 2672.41                   | 840.11               | 303.43                   |
+| ERNIE-3.0-medium + INT8        | 3226.26                   | 889.33               | 348.84                   |
+| ERNIE-3.0-medium+ 裁减 + FP32  | 1424.01                   | 454.27               | 183.77                   |
+| ERNIE-3.0-medium+ 裁减 + FP16  | 3577.62                   | 1138.77              | 445.71                   |
+| ERNIE-3.0-medium + 裁减 + INT8 | 3635.48                   | 1105.26              | 444.27                   |
+
+
+测试环境 & 结论：
+
+
+<a name="部署"></a>
+
+## 部署
+
+<a name="Python部署"></a>
+
+### Python 部署
+
+<a name="环境依赖"></a>
+
+#### 环境依赖
+
+<a name="服务化部署"></a>
+
+
+### 服务化部署
+TBD
+
 
 ## Reference
 
@@ -509,3 +622,4 @@ TBD
 * Su W, Chen X, Feng S, et al. ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression[J]. arXiv preprint arXiv:2106.02241, 2021.
 
 * Wang S, Sun Y, Xiang Y, et al. ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2112.12731, 2021.
+
