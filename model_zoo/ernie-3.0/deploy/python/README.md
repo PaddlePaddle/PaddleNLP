@@ -69,7 +69,7 @@ infer_cpu.py脚本中的参数说明：
 |--enable_quantize | 是否使用动态量化进行加速，默认关闭 |
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 
-**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[](../../README.md#性能提升)。  
+**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#性能提升)。  
 
 ### 2.3 GPU端推理样例
 在GPU端，请使用如下指令进行部署
