@@ -66,16 +66,30 @@ else(WITH_PYTHON)
 
 set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizers_cpp)
 add_custom_target(build_cpp_package_dir ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include)
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include)
 
-message(${CMAKE_SOURCE_DIR}/faster_tokenizers/include)
-# copy headers
+    # copy headers
 add_custom_target(copy_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/faster_tokenizers/include ${CPP_PACKAGE_DIR}/include
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+    ${CMAKE_SOURCE_DIR}/faster_tokenizers/include ${CPP_PACKAGE_DIR}/include
     DEPENDS build_cpp_package_dir)
+
+add_custom_target(copy_third_party_headers ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+    ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR}
+    ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
+    ${CPP_PACKAGE_DIR}/third_party/include
+    DEPENDS build_cpp_package_dir)
+
+add_custom_target(copy_boost_headers ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+    ${BOOST_INCLUDE_DIR}/boost ${CPP_PACKAGE_DIR}/third_party/include/boost
+    DEPENDS build_cpp_package_dir)
+
 add_custom_target(remove_pybind_headers ALL
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CPP_PACKAGE_DIR}/include/pybind
     DEPENDS copy_headers)
+
 
 # copy library
 add_custom_target(copy_shared_library ALL
