@@ -34,9 +34,6 @@ DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
 DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "30"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "3"))
 
-# Labels for the evaluation
-EVAL_LABELS = os.getenv("EVAL_FILE", str(Path(__file__).parent / "eval_labels_example.csv"))
-
 # Whether the file upload should be enabled or not
 DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 
@@ -63,11 +60,11 @@ def main():
         st.session_state.raw_json = None
 
         # Title
-    st.write("# pipelines 语义检索")
+    st.write("# PaddleNLP语义检索")
     st.markdown(
         """
         基于开源最强 **ERNIE 3.0** 预训练模型和 DuReader 数据集搭建的语义检索系统
-
+    
         您可以输入 query 进行语义检索，例如:
         1. 燃气热水器哪些品牌比较好？
         2. 亚马逊河流的介绍
@@ -111,17 +108,6 @@ def main():
         hs_version = f" <small>(v{pipelines_version()})</small>"
     except Exception:
         pass
-
-    # Load csv into pandas dataframe
-    try:
-        df = pd.read_csv(EVAL_LABELS, sep=";")
-    except Exception:
-        st.error(
-            f"The eval file was not found."
-        )
-        sys.exit(
-            f"The eval file was not found under `{EVAL_LABELS}`."
-        )
 
     # Search bar
     question = st.text_input("", value=st.session_state.question, max_chars=100, on_change=reset_results)
