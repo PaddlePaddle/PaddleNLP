@@ -20,13 +20,21 @@ import multiprocessing
 
 import setuptools
 from setuptools import setup, Distribution, Extension
+from setuptools.command.install import install
 
 
 class BinaryDistribution(Distribution):
     # when build the package, it will add
     # platform name such as "cp37-cp37m-linux_x86_64"
-    def has_ext_modules(foo):
+    def has_ext_modules(self):
         return True
+
+
+class InstallPlatlib(install):
+    def finalize_options(self):
+        install.finalize_options(self)
+        if self.distribution.has_ext_modules():
+            self.install_lib = self.install_platlib
 
 
 if os.name != 'nt':
@@ -59,6 +67,7 @@ setup(
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
+    cmdclass={'install': InstallPlatlib},
     license='Apache 2.0',
     distclass=BinaryDistribution,
     classifiers=[
