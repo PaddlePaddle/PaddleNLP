@@ -17,7 +17,7 @@
            * [环境依赖](#环境依赖)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
-    * [参考文献](#参考文献)
+   * [参考文献](#参考文献)
 
 
 ## 模型介绍
@@ -29,7 +29,7 @@ TBD
 
 ## 模型效果
 
-本项目开源 **ERNIE 3.0 _base_** 和 **ERNIE 3.0 _medium_**两个模型：
+本项目开源 **ERNIE 3.0 _base_** 和 **ERNIE 3.0 _medium_** 两个模型：
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
@@ -558,17 +558,17 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.34 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 65.30/86.03 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**评价指标说明：**其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 accuracy，阅读理解任务 CMRC2018 的评价指标是 EM/f1，计算平均值时取 EM，命名实体识别任务 MSRA_NER 的评价指标是 precision/recall/f1，计算平均值时取 f1 值。
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 accuracy，阅读理解任务 CMRC2018 的评价指标是 EM/f1，计算平均值时取 EM，命名实体识别任务 MSRA_NER 的评价指标是 precision/recall/f1，计算平均值时取 f1 值。
 
-由表可知，`ERNIE 3.0 Medium` 模型经过裁剪和量化后，精度平均下降 0.54, 其中裁剪后下降了 0.21，单独量化精度平均下降 0.77。
+由表可知，`ERNIE 3.0 Medium` 模型经过裁剪和量化后，精度平均下降 0.54，其中裁剪后下降了 0.21，单独量化精度平均下降 0.77。
 
 <a name="性能"></a>
 
 #### 性能
 
-性能测试的环境配置如下：
+性能测试的配置如下：
 
-1. 数据集：TNEWS（分类）、MSRA_NER（NER）、CMRC2018（阅读理解）
+1. 数据集：TNEWS（分类）、MSRA_NER（命名实体识别，下面简称 NER）、CMRC2018（阅读理解）
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
@@ -596,11 +596,11 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 三类任务（分类、NER、阅读理解）经过相同压缩过程后，加速比比较接近。
 
-经过动态量化(onnx)后，加速比分别达到 1.9、1.6、1.7 倍，精度变化分别下降 0.88、0.40、0.72。
+经过动态量化(onnx)后，加速比分别达到 1.9、1.6、1.7 倍，精度分别下降 0.88、0.40、0.72。
 
-裁剪后加速比达到 1.3、1.3、1.4 倍，精度变化分别是：下降 0.14、提升 0.23、下降 1.40。
+裁剪后加速比达到 1.3、1.3、1.4 倍，精度分别：下降 0.14、提升 0.23、下降 1.40。
 
-裁剪+量化后加速比达到 2.3、2.4、2.2 倍，精度变化分别下降 0.76、0.65、3.48。
+裁剪+量化后加速比达到 2.3、2.4、2.2 倍，精度分别下降 0.76、0.65、3.48。
 
 
 <a name="GPU性能"></a>
@@ -621,9 +621,9 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 经过静态离线量化后，加速比分别达到 2.9、2.4、2.4 倍，精度分别下降 0.46、0.34、0.63；
 
-裁剪后加速比达到 1.3、1.2、1.3 倍，精度变化分别是：下降 0.14、提升0.23、下降 1.40；
+裁剪后加速比达到 1.3、1.2、1.3 倍，精度分别：下降 0.14、提升0.23、下降 1.40；
 
-裁剪+量化后加速比达到 3.2、3.0、3.0 倍，精度变化分别是：下降 0.19、提升 0.16、下降 1.65。
+裁剪+量化后加速比达到 3.2、3.0、3.0 倍，精度分别：下降 0.19、提升 0.16、下降 1.65。
 
 
 <a name="部署"></a>
