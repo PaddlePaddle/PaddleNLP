@@ -59,7 +59,6 @@ python setup.py install
 export CUDA_VISIBLE_DEVICES=0
 python examples/question-answering/dense_qa_example.py
 ```
-运行上述命令后，即可在命令行终端看到如下问答系统效果：
 
 ### 3.4 构建 Web 可视化问答系统 
 
@@ -89,7 +88,7 @@ python ./rest_api/setup.py install
 ```
 b. 启动模型服务
 ```bash
-# 指定智能问答系统的 Yaml 配置文件
+# 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
