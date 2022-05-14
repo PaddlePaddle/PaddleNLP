@@ -62,10 +62,52 @@ python examples/question-answering/dense_qa_example.py
 运行上述命令后，即可在命令行终端看到如下问答系统效果：
 
 ### 3.4 构建 Web 可视化问答系统 
-3.4.1
-3.4.2
-3.4.3
 
+整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的问答系统
+
+#### 3.4.1 启动 ANN 服务
+1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/start) 并解压。
+2. 启动 ES 服务
+```bash
+./bin/elasticsearch
+```
+3. 检查确保 ES 服务启动成功
+```bash
+curl http://10.21.226.175:9200/_aliases?pretty=true```
+```
+备注：ES 服务默认开启端口为 9200
+
+#### 3.4.2 文档数据写入 ANN 索引库
+```
+# 以百科城市数据为例建立 ANN 索引库
+python utils/offline_ann.py
+```
+#### 3.4.3 启动 RestAPI 模型服务
+a. 安装 RestAPI 相关依赖
+```bash
+python ./rest_api/setup.py install
+```
+b. 启动模型服务
+```bash
+# 指定智能问答系统的 Yaml 配置文件
+export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
+# 使用端口号 8891 启动模型服务
+python rest_api/application.py 8891
+```
+#### 3.4.4 启动 WebUI
+a. 安装 WebUI 相关依赖
+```bash
+python ./ui/setup.py install
+```
+b. 启动 WebUI
+```bash
+# 配置模型服务地址
+export API_ENDPOINT=http://127.0.0.1:8891
+# 在指定端口 8502 启动 WebUI
+python -m streamlit run ui/webapp_question_answering.py --server.port 8502
+```
+
+到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。 
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
