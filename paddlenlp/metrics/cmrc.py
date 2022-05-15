@@ -20,12 +20,15 @@ import json
 import numpy as np
 import nltk
 
+
 # remove punctuation
 def remove_punctuation(in_str):
     in_str = str(in_str).lower().strip()
-    sp_char = ['-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=',
-               '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、',
-               '「', '」', '（', '）', '－', '～', '『', '』']
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
     out_segs = []
     for char in in_str:
         if char in sp_char:
@@ -38,7 +41,6 @@ def remove_punctuation(in_str):
 def compute_prediction(examples,
                        features,
                        predictions,
-                       version_2_with_negative=False,
                        n_best_size=4,
                        max_answer_length=40,
                        null_score_diff_threshold=0.0):
@@ -59,15 +61,12 @@ def compute_prediction(examples,
             for more information).
         predictions (tuple): The predictions of the model. Should be a tuple
             of two list containing the start logits and the end logits.
-        version_2_with_negative (bool, optional): Whether the dataset contains
-            examples with no answers. Defaults to False.
         n_best_size (int, optional): The total number of candidate predictions
             to generate. Defaults to 20.
         max_answer_length (int, optional): The maximum length of predicted answer.
             Defaults to 20.
         null_score_diff_threshold (float, optional): The threshold used to select
-            the null answer. Only useful when `version_2_with_negative` is True.
-            Defaults to 0.0.
+            the null answer. 
     
     Returns:
         A tuple of three dictionaries containing final selected answer, all n_best 
@@ -160,10 +159,10 @@ def compute_prediction(examples,
                         "start_logit": start_logits[start_index],
                         "end_logit": end_logits[end_index],
                     })
-        if version_2_with_negative:
-            # Add the minimum null prediction
-            prelim_predictions.append(min_null_prediction)
-            null_score = min_null_prediction["score"]
+
+        # Add the minimum null prediction
+        prelim_predictions.append(min_null_prediction)
+        null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
         predictions = sorted(
@@ -171,8 +170,7 @@ def compute_prediction(examples,
             reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
-        if version_2_with_negative and not any(p["offsets"] == (0, 0)
-                                               for p in predictions):
+        if not any(p["offsets"] == (0, 0) for p in predictions):
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
@@ -202,25 +200,20 @@ def compute_prediction(examples,
         for prob, pred in zip(probs, predictions):
             pred["probability"] = prob
 
-        # Pick the best prediction. If the null answer is not possible, this is easy.
-        if not version_2_with_negative:
-            all_predictions[example["id"]] = predictions[0]["text"]
-        else:
-            # Otherwise we first need to find the best non-empty prediction.
-            i = 0
-            while predictions[i]["text"] == "":
-                i += 1
-            best_non_null_pred = predictions[i]
+        i = 0
+        while predictions[i]["text"] == "":
+            i += 1
+        best_non_null_pred = predictions[i]
 
-            # Then we compare to the null prediction using the threshold.
-            score_diff = null_score - best_non_null_pred[
-                "start_logit"] - best_non_null_pred["end_logit"]
-            scores_diff_json[example["id"]] = float(
-                score_diff)  # To be JSON-serializable.
-            if score_diff > null_score_diff_threshold:
-                all_predictions[example["id"]] = ""
-            else:
-                all_predictions[example["id"]] = best_non_null_pred["text"]
+        # Then we compare to the null prediction using the threshold.
+        score_diff = null_score - best_non_null_pred[
+            "start_logit"] - best_non_null_pred["end_logit"]
+        scores_diff_json[example["id"]] = float(
+            score_diff)  # To be JSON-serializable.
+        if score_diff > null_score_diff_threshold:
+            all_predictions[example["id"]] = ""
+        else:
+            all_predictions[example["id"]] = best_non_null_pred["text"]
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [{
@@ -273,13 +266,16 @@ def compute_exact(answers, prediction):
             break
     return em
 
+
 def mixed_segmentation(in_str, rm_punc=False):
     in_str = str(in_str).lower().strip()
     segs_out = []
     temp_str = ""
-    sp_char = ['-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=',
-               '，', '。', '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、',
-               '「', '」', '（', '）', '－', '～', '『', '』']
+    sp_char = [
+        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
+        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
+        '）', '－', '～', '『', '』'
+    ]
     for char in in_str:
         if rm_punc and char in sp_char:
             continue
@@ -299,6 +295,7 @@ def mixed_segmentation(in_str, rm_punc=False):
 
     return segs_out
 
+
 # find longest common string
 def find_lcs(s1, s2):
     m = [[0 for i in range(len(s2) + 1)] for j in range(len(s1) + 1)]
@@ -312,6 +309,7 @@ def find_lcs(s1, s2):
                     mmax = m[i + 1][j + 1]
                     p = i + 1
     return s1[p - mmax:p], mmax
+
 
 def compute_f1(answers, prediction):
     f1_scores = []
@@ -327,6 +325,7 @@ def compute_f1(answers, prediction):
         f1 = (2 * precision * recall) / (precision + recall)
         f1_scores.append(f1)
     return max(f1_scores)
+
 
 def get_raw_scores(examples, preds, is_whitespace_splited=True):
     exact_scores = {}
@@ -350,8 +349,8 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
         # exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
         # f1_scores[qid] = max(
         #     compute_f1(a, a_pred, is_whitespace_splited) for a in gold_answers)
-        exact_scores[qid] = compute_exact(gold_answers,a_pred)
-        f1_scores[qid] = compute_f1(gold_answers,a_pred)
+        exact_scores[qid] = compute_exact(gold_answers, a_pred)
+        f1_scores[qid] = compute_f1(gold_answers, a_pred)
         # print('exact_scores:',exact_scores[qid])
         # print('f1_scores:',f1_scores[qid])
     return exact_scores, f1_scores
@@ -425,10 +424,10 @@ def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs,
 
 
 def cmrc_evaluate(examples,
-                   preds,
-                   na_probs=None,
-                   na_prob_thresh=1.0,
-                   is_whitespace_splited=True):
+                  preds,
+                  na_probs=None,
+                  na_prob_thresh=1.0,
+                  is_whitespace_splited=True):
     '''
     Computes and prints the f1 score and em score of input prediction.
 

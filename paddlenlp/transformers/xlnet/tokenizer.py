@@ -177,9 +177,9 @@ class XLNetTokenizer(PretrainedTokenizer):
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.vocab_file)
 
-
     def preprocess_text(self, inputs):
-        inputs = self.sp_model.decode_pieces(self.sp_model.encode_as_pieces(inputs))
+        inputs = self.sp_model.decode_pieces(
+            self.sp_model.encode_as_pieces(inputs))
         if self.remove_space:
             outputs = " ".join(inputs.strip().split())
         else:
@@ -192,13 +192,14 @@ class XLNetTokenizer(PretrainedTokenizer):
                 [c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
-        outputs = self.sp_model.decode_pieces(self.sp_model.encode_as_pieces(outputs))
+        outputs = self.sp_model.decode_pieces(
+            self.sp_model.encode_as_pieces(outputs))
         return outputs
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
         # print('nizer')
-        
+
         text = self.preprocess_text(text)
         # print('tokenize_text:',text)
         if not sample:
@@ -427,38 +428,25 @@ class XLNetTokenizer(PretrainedTokenizer):
         split_tokens = self.tokenize(text)
         if split_tokens[0] == SENTENCEPIECE_UNDERLINE:
             split_tokens = split_tokens[1:]
-            token_mapping.append((0,0))
+            token_mapping.append((0, 0))
 
         for token in split_tokens:
             if token[0] == SENTENCEPIECE_UNDERLINE:
-                token=token[1:]
+                token = token[1:]
 
             if len(token) == 0:
                 length = 1
             else:
                 length = len(token)
             if text[offset:].find(token) == -1:
-                print ('    text:   ',text,'\n  text[offset]:   ',text[offset:],'\n token   ',token,'\n split_tokens:',split_tokens)
+                print('    text:   ', text, '\n  text[offset]:   ',
+                      text[offset:], '\n token   ', token, '\n split_tokens:',
+                      split_tokens)
             start = text[offset:].index(token) + offset
             end = start + length
 
             token_mapping.append(
-                (char_mapping[start], char_mapping[end - 1] + 1))            
+                (char_mapping[start], char_mapping[end - 1] + 1))
             offset = end
 
         return token_mapping
-    # def get_offset_mapping(self, text):
-    #     text = self.preprocess_text(text)
-    #     # print('mapping_text:',text)
-    #     from sentencepiece import sentencepiece_pb2
-    #     spt = sentencepiece_pb2.SentencePieceText()
-    #     spt.ParseFromString(self.sp_model.encode_as_serialized_proto(text))
-    #     token_mapping = []
-    #     print(spt.pieces)
-    #     for piece in spt.pieces:
-    #         blanklen = 0
-    #         if len(piece.surface.strip())!=0:
-    #             blanklen = (len(piece.surface)-len(piece.surface.lstrip()))
-    #         # print(blanklen)
-    #         token_mapping.append((piece.begin+blanklen, piece.end))
-    #     return token_mapping

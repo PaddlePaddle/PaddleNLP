@@ -31,7 +31,7 @@ import paddlenlp as ppnlp
 
 from paddlenlp.datasets import MapDataset
 from paddlenlp.data import Pad, Stack, Tuple, Dict
-from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, FunnelForQuestionAnswering, FunnelTokenizer,XLNetForQuestionAnswering,XLNetTokenizer
+from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer, ErnieForQuestionAnswering, ErnieTokenizer, FunnelForQuestionAnswering, FunnelTokenizer, XLNetForQuestionAnswering, XLNetTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.cmrc import cmrc_evaluate, compute_prediction
 from datasets import load_dataset
@@ -40,7 +40,7 @@ MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
     "ernie": (ErnieForQuestionAnswering, ErnieTokenizer),
     'funnel': (FunnelForQuestionAnswering, FunnelTokenizer),
-    'xlnet':(XLNetForQuestionAnswering,XLNetTokenizer)
+    'xlnet': (XLNetForQuestionAnswering, XLNetTokenizer)
 }
 
 
@@ -54,7 +54,7 @@ def prepare_train_features(examples, tokenizer, args):
         max_seq_len=args.max_seq_length,
         stride=args.doc_stride,
         return_attention_mask=True)
-    
+
     sample_mapping = tokenized_examples.pop("overflow_to_sample")
     offset_mapping = tokenized_examples.pop("offset_mapping")
     tokenized_examples["start_positions"] = []
@@ -175,7 +175,7 @@ def evaluate(model, data_loader, raw_dataset, args):
 
     all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
         raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
-        args.version_2_with_negative, args.n_best_size, args.max_answer_length,
+        args.n_best_size, args.max_answer_length,
         args.null_score_diff_threshold)
 
     # Can also write all_nbest_json and scores_diff_json files if needed
@@ -183,16 +183,7 @@ def evaluate(model, data_loader, raw_dataset, args):
         writer.write(
             json.dumps(
                 all_predictions, ensure_ascii=False, indent=4) + "\n")
-    # # Can also write all_nbest_json and scores_diff_json files if needed
-    # with open('all_nbest_json.json', "w", encoding='utf-8') as writer:
-    #     writer.write(
-    #         json.dumps(
-    #             all_nbest_json, ensure_ascii=False, indent=4) + "\n")
-    # # Can also write all_nbest_json and scores_diff_json files if needed
-    # with open('scores_diff_json.json', "w", encoding='utf-8') as writer:
-    #     writer.write(
-    #         json.dumps(
-    #             scores_diff_json, ensure_ascii=False, indent=4) + "\n")
+
     cmrc_evaluate(
         examples=[raw_data for raw_data in raw_dataset],
         preds=all_predictions,
@@ -227,13 +218,9 @@ def run(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    if args.version_2_with_negative:
-        train_examples = load_dataset('cmrc2018', split='train')
-        dev_examples = load_dataset('cmrc2018', split='validation')
-        # dev_examples = MapDataset(dev_examples)
-    else:
-        train_examples = load_dataset('squad', split='train')
-        dev_examples = load_dataset('squad', split='validation')
+    train_examples = load_dataset('cmrc2018', split='train')
+    dev_examples = load_dataset('cmrc2018', split='validation')
+
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):

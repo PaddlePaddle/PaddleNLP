@@ -111,11 +111,6 @@ def parse_args():
     parser.add_argument(
         "--verbose", action='store_true', help="Whether to output verbose log.")
     parser.add_argument(
-        "--version_2_with_negative",
-        action='store_true',
-        help="If true, the SQuAD examples contain some that do not have an answer. If using squad v2.0, it should be set true."
-    )
-    parser.add_argument(
         "--do_train", action='store_true', help="Whether to train the model.")
     parser.add_argument(
         "--do_predict", action='store_true', help="Whether to predict.")
