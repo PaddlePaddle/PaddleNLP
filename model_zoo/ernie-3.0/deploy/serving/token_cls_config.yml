@@ -36,11 +36,10 @@ op:
             client_type: local_predictor
 
             #模型路径
-            model_config: /vdb1/home/heliqi/ner_0506/original_model/serving_server
-            # model_config: no_task_emb/serving_server
+            model_config: serving_server
 
             #Fetch结果列表，以client_config中fetch_var的alias_name为准
-            fetch_list: ["linear_75.tmp_1"]
+            fetch_list: ["linear_113.tmp_1"]
             
             # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
             device_type: 1

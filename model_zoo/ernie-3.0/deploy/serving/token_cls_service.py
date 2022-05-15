@@ -26,9 +26,13 @@ class ErnieTokenClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-        self.labele_names = [
+        # The label names of NER models trained by different data sets may be different
+        self.label_names = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
         ]
+        # Output nodes may differ from model to model
+        # You can see the output node name in the conf.prototxt file of serving_server
+        self.fetch_names = ["linear_113.tmp_1", ]
 
     def get_input_data(self, input_dicts):
         (_, input_dict), = input_dicts.items()
@@ -69,7 +73,6 @@ class ErnieTokenClsOp(Op):
             is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
-        # print("input shape:", len(input_ids), len(input_ids[0]))
         token_type_ids = data["token_type_ids"]
         return {
             "input_ids": np.array(
@@ -93,17 +96,16 @@ class ErnieTokenClsOp(Op):
             prod_errinfo: "" default
         """
         input_data = self.get_input_data(input_dicts)
-        result = fetch_dict["linear_75.tmp_1"]
+        result = fetch_dict[self.fetch_names[0]]
         tokens_label = result.argmax(axis=-1).tolist()
         # 获取batch中每个token的实体
         value = []
         for batch, token_label in enumerate(tokens_label):
-            # print("label:", token_label)
             start = -1
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if label == 0 and start >= 0:
+                if self.label_names[label] == "O" and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -113,9 +115,9 @@ class ErnieTokenClsOp(Op):
                         "label": label_name,
                     })
                     start = -1
-                elif label in [1, 3, 5]:
+                elif "B-" in self.label_names[label]:
                     start = i - 1
-                    label_name = self.labele_names[label][2:]
+                    label_name = self.label_names[label][2:]
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
