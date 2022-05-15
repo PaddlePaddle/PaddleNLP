@@ -22,7 +22,6 @@ def print_ret(rets, input_datas):
     for i, ret in enumerate(rets):
         print("input data:", input_datas[i])
         print("The model detects all entities:")
-        print("xxxxxxx ret:", ret)
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
                   "  pos:", iterm["pos"])

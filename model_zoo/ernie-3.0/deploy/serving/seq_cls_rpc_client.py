@@ -26,7 +26,6 @@ def init_client():
 def test_demo(client, data):
     data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
     ret = client.predict(feed_dict={"sentence": data})
-    print(ret)
     out_dict = {}
     for key, value in zip(ret.key, ret.value):
         out_dict[key] = eval(value)

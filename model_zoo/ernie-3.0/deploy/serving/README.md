@@ -1,6 +1,6 @@
 # 基于Paddle Serving的服务化部署
 
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署Ernie3.0新闻分类模型的pipeline在线服务。
+本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署ERNIE 3.0新闻分类和命名实体识别模型的pipeline在线服务。
 
 ## 目录
 - [环境准备](#环境准备)
@@ -20,7 +20,7 @@ pip install paddle_serving_app paddle_serving_clinet
 # CPU server
 pip install paddle_serving_server
 
-# GPU server, 选择跟本地环境一致的指令:
+# GPU server, 选择跟本地环境一致的命令:
 # CUDA10.2 + Cudnn7 + TensorRT6
 pip install paddle-serving-server-gpu==0.8.3.post102 -i https://pypi.tuna.tsinghua.edu.cn/simple
 # CUDA10.1 + TensorRT6
@@ -32,7 +32,8 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
 
 
-### 安装高性能Tokenizer库
+### 安装FasterTokenizer文本处理加速库（可选）
+如果部署环境是Linux，推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
 ```
 pip install faster_tokenizers
 ```
@@ -40,9 +41,9 @@ pip install faster_tokenizers
 
 ## 模型转换
 
-使用PaddleServing做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
+使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
 
-首先，下载Ernie3.0的[inference模型]()
+下载ERNIE 3.0的新闻分类、命名实体识别模型:
 
 ```bash
 # 下载并解压新闻分类模型
@@ -63,7 +64,7 @@ python -m paddle_serving_client.convert --dirname tnews_pruned_infer_model --mod
 # 转换命名实体识别模型
 python -m paddle_serving_client.convert --dirname msra_ner_pruned_infer_model --model_filename float32.pdmodel --params_filename float32.pdiparams
 
-# 可通过指令查参数含义
+# 可通过命令查参数含义
 python -m paddle_serving_client.convert --help
 ```
 转换成功后的目录如下:
@@ -91,7 +92,7 @@ token_cls_service.py      # 命名实体识别任务启动服务端的脚本
 
 
 ### 修改配置文件
-目录中的`xx_config.yml`文件解释了每一个参数的含义，可以根据实际需要修改其中的配置。比如：
+目录中的`seq_cls_config.yml`和`token_cls_config.yml`文件解释了每一个参数的含义，可以根据实际需要修改其中的配置。比如：
 ```
 # 修改模型目录为下载的模型目录或自己的模型目录:
 model_config: no_task_emb/serving_server =>  model_config: erine-3.0-tiny/serving_server
@@ -105,7 +106,7 @@ device_type: 1    =>   device_type: 0
 
 ### 分类任务
 #### 启动服务
-修改好配置文件后，执行下面指令启动服务:
+修改好配置文件后，执行下面命令启动服务:
 ```
 python seq_cls_service.py
 ```
@@ -137,7 +138,7 @@ python seq_cls_rpc_client.py
 
 ### 实体识别任务
 #### 启动服务
-修改好配置文件后，执行下面指令启动服务:
+修改好配置文件后，执行下面命令启动服务:
 ```
 python token_cls_service.py
 ```

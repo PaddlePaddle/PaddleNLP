@@ -26,9 +26,11 @@ class ErnieTokenClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-        self.labele_names = [
+        # 不同数据集训练的NER模型，标签名可能不一样
+        self.label_names = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
         ]
+        # 不同模型的输出节点可能不一致，在serving_server的proto文件中可查看输出节点名字
         self.fetch_names = ["linear_113.tmp_1", ]
 
     def get_input_data(self, input_dicts):
@@ -102,7 +104,7 @@ class ErnieTokenClsOp(Op):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.labele_names[label] == "O" and start >= 0:
+                if self.label_names[label] == "O" and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -112,9 +114,9 @@ class ErnieTokenClsOp(Op):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.labele_names[label]:
+                elif "B-" in self.label_names[label]:
                     start = i - 1
-                    label_name = self.labele_names[label][2:]
+                    label_name = self.label_names[label][2:]
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
