@@ -1,5 +1,5 @@
 set -x
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=0
 
 python -u run_pretrain.py \
     --model_type "gpt"\
@@ -16,7 +16,7 @@ python -u run_pretrain.py \
     --weight_decay 0.01\
     --warmup_rate 0.01\
     --grad_clip 1.0\
-    --logging_freq 10\
+    --logging_freq 1\
     --eval_freq 1000\
     --device "gpu" \
 
