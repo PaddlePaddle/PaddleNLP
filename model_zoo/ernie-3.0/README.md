@@ -628,7 +628,7 @@ TBD
 ### ONNXRuntime 部署
 
 <a name="ONNX导出及部署"></a>
-ONNX导出及部署请参考：[ONNX导出及部署指南](./deploy/paddle2onnx/README.md)  
+ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 ## Reference
 
 * Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
