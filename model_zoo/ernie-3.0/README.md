@@ -420,7 +420,6 @@ TBD
 │ └── paddle2onnx
 │   └── ernie_predictor.py  
 │   └── infer.py
-│   └── requirements.txt
 └── README.md                    # 文档，本文件
 
 ```
