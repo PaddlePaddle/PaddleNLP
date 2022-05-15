@@ -40,13 +40,20 @@
 
 * 2021.12.28 PaddleNLP [release/2.2.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.2) 发布语义检索、问答、评论观点抽取和情感倾向分析 [产业化案例](./applications)，快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
-
-
 ## 特性
 
 PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。具备以下四大特性：
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="18" height="18" /><a href=#特性1-开箱即用的一键预测能力> 开箱即用的一键预测能力 </a>
+- <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="18" height="18" /><a href=#开箱即用的一键预测能力> 开箱即用的一键预测能力 </a>
+
+- <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="18" height="18" /><a href=#优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
+
+- <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="18" height="18" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
+
+- <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="18" height="21" /><a href=#大规模分布式训练与高性能推理能力> 大规模分布式训练与高性能推理能力 </a> 
+
+
+### 开箱即用的一键预测能力
 
 Taskflow旨在提供**开箱即用**的产业级NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
 
@@ -54,7 +61,7 @@ Taskflow旨在提供**开箱即用**的产业级NLP预置任务能力，覆盖�
 
 更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="18" height="18" /><a href=#特性2-优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
+### 优质的中文预训练模型库
 
 - **Transformer 预训练模型**
 
@@ -154,9 +161,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 精选预训练模型示例请参考[Model_Zoo](./model_zoo)。
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="18" height="18" /><a href=#特性3-场景系统技术方案> 产业级端到端NLP系统范例 </a> 
-
-
+### 产业级端到端系统范例
 
 PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推出场景系统技术方案，打通数据标注-模型训练-调优-预测部署全流程。
 
@@ -205,7 +210,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 
 更多请参考[情感分析](./applications/sentiment_analysis)。
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="18" height="21" /><a href=#特性4-大规模分布式训练与高性能推理能力> 大规模分布式训练与高性能推理能力 </a> 
+### 大规模分布式训练与高性能推理能力
 
 - **高性能Transformer类文本分词器：FasterTokenizer**
 
