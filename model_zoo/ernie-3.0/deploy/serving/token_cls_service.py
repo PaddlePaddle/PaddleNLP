@@ -26,11 +26,12 @@ class ErnieTokenClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-        # 不同数据集训练的NER模型，标签名可能不一样
+        # The label names of NER models trained by different data sets may be different
         self.label_names = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
         ]
-        # 不同模型的输出节点可能不一致，在serving_server的proto文件中可查看输出节点名字
+        # Output nodes may differ from model to model
+        # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = ["linear_113.tmp_1", ]
 
     def get_input_data(self, input_dicts):

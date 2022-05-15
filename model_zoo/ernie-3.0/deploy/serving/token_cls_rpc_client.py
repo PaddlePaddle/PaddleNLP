@@ -117,5 +117,4 @@ def test_demo(client):
 
 if __name__ == "__main__":
     client = init_client()
-    # test_demo(client)
-    test_ner_dataset(client)
+    test_demo(client)

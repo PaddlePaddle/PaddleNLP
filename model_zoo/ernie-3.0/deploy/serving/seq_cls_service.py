@@ -25,7 +25,8 @@ class ErnieSeqClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-        # 不同模型的输出节点可能不一致，在serving_server的proto文件中可查看输出节点名字
+        # Output nodes may differ from model to model
+        # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = ["linear_113.tmp_1", ]
 
     def preprocess(self, input_dicts, data_id, log_id):

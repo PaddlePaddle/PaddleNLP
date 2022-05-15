@@ -10,7 +10,7 @@
 ## 环境准备
 需要[准备PaddleNLP的运行环境]()和Paddle Serving的运行环境。
 
-### 安装Paddle Serving，
+### 安装Paddle Serving
 安装指令如下，更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 ```
 # 安装client和serving app，用于向服务发送请求
