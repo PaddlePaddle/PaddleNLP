@@ -37,7 +37,7 @@ pip install -r requirements_gpu.txt
 
 ## 2. 命名实体识别模型推理
 ### 2.1 模型获取
-用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
+用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 命名实体识别模型：
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
@@ -69,7 +69,7 @@ infer_cpu.py脚本中的参数说明：
 |--enable_quantize | 是否使用动态量化进行加速，默认关闭 |
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 
-**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#性能提升)。  
+**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。  
 
 ### 2.3 GPU端推理样例
 在GPU端，请使用如下指令进行部署
@@ -94,7 +94,7 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_m
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩API及使用)，量化模型的部署指令为  
+如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，量化模型的部署指令为  
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8 --set_dynamic_shape
@@ -115,7 +115,7 @@ infer_gpu.py脚本中的参数说明：
 
 ## 3. 分类模型推理
 ### 3.1 模型获取
-用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#ERNIE3.0模型使用)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
+用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的tnews数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
 # 分类模型模型：
 wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
@@ -154,4 +154,4 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-GPU上的FP16和INT8加速和命名实体识别模型推理中命令类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
+GPU上的FP16和INT8加速和命名实体识别模型推理中类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
