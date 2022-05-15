@@ -46,6 +46,7 @@ class InferBackend(object):
 
             if use_fp16:
                 assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
+                print(">>> [InferBackend] FP16 inference ...")
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
                     precision_mode=inference.PrecisionType.Half,
@@ -54,6 +55,7 @@ class InferBackend(object):
                     use_static=False,
                     use_calib_mode=False)
             else:
+                print(">>> [InferBackend] INT8 inference ...")
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
                     precision_mode=inference.PrecisionType.Int8,

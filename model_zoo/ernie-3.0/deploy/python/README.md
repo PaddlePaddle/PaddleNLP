@@ -39,7 +39,7 @@ pip install -r requirements_gpu.txt
 ### 2.1 模型获取
 用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
-# 命名实体识别模型：
+# 获取命名实体识别FP32模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```
@@ -94,12 +94,18 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_m
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，量化模型的部署指令为  
+如果需要进行int8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+```
+# 获取命名实体识别INT8量化模型  
+wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_quant_infer_model.zip
+unzip msra_ner_pruned_quant_infer_model.zip
+```
+量化模型的部署指令为：  
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
-python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8 --set_dynamic_shape
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_quant_infer_model/int8 --set_dynamic_shape
 # 第二步，开启预测
-python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_quant_infer_model/int8
 ```
 FP16和INT8推理的运行结果和FP32的运行结果一致。  
 infer_gpu.py脚本中的参数说明：
@@ -154,4 +160,35 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-GPU上的FP16和INT8加速和命名实体识别模型推理中类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
+如果需要FP16进行加速，可以开启use_fp16开关，具体指令为
+```
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16 --set_dynamic_shape
+# 第二步，开启预测
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16
+```
+运行结果和FP32的推理结果一致。  
+如果需要进行int8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+```
+# 获取命名实体识别INT8量化模型  
+wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_quant_infer_model.zip
+unzip tnews_pruned_quant_infer_model.zip
+```
+量化模型的部署指令为：  
+```
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_quant_infer_model/int8 --set_dynamic_shape
+# 第二步，开启预测
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_quant_infer_model/int8
+```
+输出打印如下:
+```
+input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
+seq cls result:
+label: 6   confidence: 4.563379287719727
+-----------------------------
+input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
+seq cls result:
+label: 2   confidence: 5.694031238555908
+-----------------------------
+```
