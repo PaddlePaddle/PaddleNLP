@@ -242,12 +242,13 @@ class ErniePredictor(object):
         }
 
     def seq_cls_postprocess(self, infer_data, input_data):
-        infer_data = np.array(infer_data)
-        exp_data = np.exp(infer_data)
-        softmax_data = np.exp(infer_data) / np.sum(exp_data, axis=1)
+        logits = np.array(infer_data[0])
+        max_value = np.max(logits, axis=1, keepdims=True)
+        exp_data = np.exp(logits - max_value)
+        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
         out_dict = {
-            "label": softmax_data.argmax(axis=-1),
-            "confidence": softmax_data.max(axis=-1)
+            "label": probs.argmax(axis=-1),
+            "confidence": probs.max(axis=-1)
         }
         return out_dict
 
