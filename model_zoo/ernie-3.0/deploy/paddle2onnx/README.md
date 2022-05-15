@@ -1,5 +1,5 @@
 # ERNIE 3.0 Paddle2ONNX模型转换与部署指南
-本文介绍ERNIE 3.0 模型模型如何转化为ONNX模型，并基于ONNXRuntime引擎预测，本文将以命名实体识别和分类两大场景作为介绍示例。
+本文介绍ERNIE 3.0 模型模型如何转化为ONNX模型，并基于ONNXRuntime引擎部署，本文将以命名实体识别和分类两大场景作为介绍示例。
 - [ERNIE 3.0 Paddle2ONNX模型转换与部署指南](#ERNIE3.0Paddle2ONNX模型转换与部署指南)
   - [1. 环境准备](#1-环境准备)
   - [2. 命名实体识别模型推理](#2-命名实体识别模型推理)
@@ -11,7 +11,7 @@
     - [3.2 模型转换](#32-模型转换)
     - [3.3 ONNXRuntime推理样例](#33-ONNXRuntime推理样例)
 ## 1. 环境准备
-ERNIE 3.0模型转换与ONNXRuntime预测部署依赖Paddle2ONNX，Paddle2ONNX支持将Paddle模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考:[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)  
+ERNIE 3.0模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考:[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)  
 请使用如下命令安装所需依赖:
 ```
 pip install -r requirements.txt
@@ -26,11 +26,11 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_prun
 unzip msra_ner_pruned_infer_model.zip
 ```
 ### 2.2 模型转换
-使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，成功运行以下命令后，将会在当前目录下生成ner_model.onnx文件。
+使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成ner_model.onnx模型文件。
 ```
 paddle2onnx --model_dir msra_ner_pruned_infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file ner_model.onnx --opset_version 13 --enable_onnx_checker True
 ```
-命令参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
+Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
 
 ### 2.3 ONNXRuntime推理样例
 请使用如下命令进行部署
@@ -70,11 +70,11 @@ wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned
 unzip tnews_pruned_infer_model.zip
 ```
 ### 3.2 模型转换
-使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，成功运行以下命令后，将会在当前目录下生成tnews_model.onnx文件。
+使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成tnews_model.onnx模型文件。
 ```
 paddle2onnx --model_dir tnews_pruned_infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file tnews_model.onnx --opset_version 13 --enable_onnx_checker True
 ```
-命令参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
+Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
 
 ### 3.3 ONNXRuntime推理样例
 请使用如下命令进行部署

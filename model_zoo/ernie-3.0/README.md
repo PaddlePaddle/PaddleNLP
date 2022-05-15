@@ -605,6 +605,10 @@ TBD
 <a name="部署"></a>
 
 ## 部署
+飞桨提供多种部署方案，以满足不同场景的部署需求，请根据实际情况进行选择。  
+<p align="center">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/30516196/168466069-e8162235-2f06-4a2d-b78f-d9afd437c620.png">
+</p>
 
 <a name="Python部署"></a>
 
