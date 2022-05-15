@@ -283,7 +283,7 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if label == 0 and start >= 0:
+                if self.label_names[label] == "O" and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -293,7 +293,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif label in [1, 3, 5]:
+                elif "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

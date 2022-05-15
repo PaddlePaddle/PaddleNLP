@@ -17,6 +17,8 @@
            * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
+       * [Paddle2ONNX 部署](#Paddle2ONNX部署)
+           * [ONNX导出及ONNXRuntime部署](#ONNX导出及ONNXRuntime部署)
 
 
 
@@ -415,6 +417,9 @@ TBD
 │   └── token_cls_rpc_client.py  
 │   └── token_cls_service.py  
 │   └── token_cls_config.yml  
+│ └── paddle2onnx
+│   └── ernie_predictor.py  
+│   └── infer.py
 └── README.md                    # 文档，本文件
 
 ```
@@ -599,6 +604,10 @@ TBD
 <a name="部署"></a>
 
 ## 部署
+我们为ERNIE 3.0提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。  
+<p align="center">
+        <img width="700" alt="image" src="https://user-images.githubusercontent.com/30516196/168466069-e8162235-2f06-4a2d-b78f-d9afd437c620.png">
+</p>
 
 <a name="Python部署"></a>
 
@@ -613,7 +622,12 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 ### 服务化部署
 TBD
 
+<a name="Paddle2ONNX部署"></a>
 
+### Paddle2ONNX 部署
+
+<a name="ONNX导出及ONNXRuntime部署"></a>
+ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 ## Reference
 
 * Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
