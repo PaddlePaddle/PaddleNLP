@@ -21,9 +21,20 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
-#include "fastertransformer/cuda/cub/cub.cuh"
+// TODO(guosheng): `HOST` conflict exists in float.h of paddle and mpi.h of mpi
 #include "fusion_unified_decoding_op.h"
 #include "pd_traits.h"
+#ifdef HOST
+#undef HOST
+#endif
+#include "fastertransformer/cuda/cub/cub.cuh"
+#include "fastertransformer/decoding_beamsearch.h"
+#include "fastertransformer/decoding_sampling.h"
+#include "fastertransformer/utils/common.h"
+
+#ifdef BUILD_GPT  // consistent with FasterTransformer
+#include "parallel_utils.h"
+#endif
 
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape) {
@@ -101,7 +112,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const int min_length,
     cublasHandle_t cublas_handle_,
     cublasLtHandle_t cublaslt_handle_,
-    cudaStream_t stream) {
+    cudaStream_t stream,
+    const int tensor_para_size = 1,
+    const int layer_para_size = 1,
+    const int layer_para_batch_size = 1) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2" ||
                      decoding_strategy == "beam_search_v3")
@@ -168,78 +182,117 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.request_input_len = memory_max_seq_len;
   decoding_params.request_output_len = max_seq_len_;
 
+#ifdef BUILD_GPT
+  auto* model_para_desc = ModelParaDescFactory::CreateModelParaDesc(
+      head_num_,
+      size_per_head_,
+      num_layer_,
+      tensor_para_size,
+      layer_para_size,
+      layer_para_batch_size,
+      const_cast<data_t_*>(word_emb.data<data_t_>()));
+  auto& tensor_parallel_param = model_para_desc->tensor_parallel_param;
+  auto& layer_parallel_param = model_para_desc->layer_parallel_param;
+  auto seed = model_para_desc->dist(model_para_desc->gen);
+#else
+  TensorParallelParam tensor_parallel_param;
+  LayerParallelParam layer_parallel_param;
+  tensor_parallel_param.rank = 0;
+  tensor_parallel_param.world_size = 1;
+  tensor_parallel_param.local_head_num_ = head_num_;
+  tensor_parallel_param.local_hidden_units_ = memory_hidden_dim;
+
+  layer_parallel_param.rank = 0;
+  layer_parallel_param.world_size = 1;
+  layer_parallel_param.layers_per_group = num_layer_;
+  layer_parallel_param.local_batch_size = batch_size_;
+  int seed = -1;
+#endif
+
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
-  int inner_coeff = ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim;
+  // Allow python passing partial weights for model parallel.
+  int inner_coeff =
+      (memory_hidden_dim == self_attn_output_weight[0].shape()[0])
+          ? ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim
+          : (ffn_intermediate_weight[0].shape()[1] * tensor_para_size /
+             memory_hidden_dim);
 
-  for (int i = 0; i < num_layer_; i++) {
-    params[i].stream = stream;
-    params[i].cublas_handle = cublas_handle_;
-    params[i].cublaslt_handle = cublaslt_handle_;
+  for (int i = 0; i < self_layernorm_weight.size(); i++) {
+    // Allow python passing weights of all layers or only passing the
+    // corresponding layers to save memory.
+    int layer_idx = self_layernorm_weight.size() != num_layer_
+                        ? layer_parallel_param.rank *
+                                  layer_parallel_param.layers_per_group +
+                              i
+                        : i;
+    params[layer_idx].stream = stream;
+    params[layer_idx].cublas_handle = cublas_handle_;
+    params[layer_idx].cublaslt_handle = cublaslt_handle_;
 
     if (decoding_strategy == "beam_search" ||
         decoding_strategy == "beam_search_v2" ||
         decoding_strategy == "beam_search_v3") {
-      params[i].request_batch_size = batch_size_ * beam_width_;
-      params[i].request_max_mem_seq_len = memory_max_seq_len;
+      params[layer_idx].request_batch_size = batch_size_ * beam_width_;
+      params[layer_idx].request_max_mem_seq_len = memory_max_seq_len;
     } else if (decoding_strategy == "sampling" ||
                decoding_strategy == "topk_sampling" ||
                decoding_strategy == "topp_sampling") {
-      params[i].request_batch_size = batch_size_;
-      params[i].request_max_mem_seq_len = memory_max_seq_len;
+      params[layer_idx].request_batch_size = batch_size_;
+      params[layer_idx].request_max_mem_seq_len = memory_max_seq_len;
     }
 
     // self attn
-    params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
+    params[layer_idx].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
         self_layernorm_weight[i].data<data_t_>());
-    params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(
+    params[layer_idx].self_layernorm.beta = reinterpret_cast<const DataType_*>(
         self_layernorm_bias[i].data<data_t_>());
     // query
-    params[i].self_attention.query_weight.kernel =
+    params[layer_idx].self_attention.query_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_query_weight[i].data<data_t_>());
-    params[i].self_attention.query_weight.bias =
+    params[layer_idx].self_attention.query_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_query_bias[i].data<data_t_>());
     // key
-    params[i].self_attention.key_weight.kernel =
+    params[layer_idx].self_attention.key_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_key_weight[i].data<data_t_>());
-    params[i].self_attention.key_weight.bias =
+    params[layer_idx].self_attention.key_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_key_bias[i].data<data_t_>());
     // value
-    params[i].self_attention.value_weight.kernel =
+    params[layer_idx].self_attention.value_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_value_weight[i].data<data_t_>());
-    params[i].self_attention.value_weight.bias =
+    params[layer_idx].self_attention.value_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_value_bias[i].data<data_t_>());
     // out proj
-    params[i].self_attention.attention_output_weight.kernel =
+    params[layer_idx].self_attention.attention_output_weight.kernel =
         reinterpret_cast<const DataType_*>(
             self_attn_output_weight[i].data<data_t_>());
 
-    params[i].self_attention.attention_output_weight.bias =
+    params[layer_idx].self_attention.attention_output_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_output_bias[i].data<data_t_>());
 
     // ffn
-    params[i].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
         ffn_layernorm_weight[i].data<data_t_>());
-    params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
         ffn_layernorm_bias[i].data<data_t_>());
     // intermediate proj
-    params[i].ffn.intermediate_weight.kernel =
+    params[layer_idx].ffn.intermediate_weight.kernel =
         reinterpret_cast<const DataType_*>(
             ffn_intermediate_weight[i].data<data_t_>());
-    params[i].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
         ffn_intermediate_bias[i].data<data_t_>());
     // out proj
-    params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
+    params[layer_idx].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
         ffn_output_weight[i].data<data_t_>());
-    params[i].ffn.output_weight.bias =
+    params[layer_idx].ffn.output_weight.bias =
         reinterpret_cast<const DataType_*>(ffn_output_bias[i].data<data_t_>());
   }
 
@@ -329,6 +382,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             false,  /*is_mbart*/
             min_length,
             inner_coeff);
+    unified_decoding_beam_search_->set_tensor_parallel_param(
+        tensor_parallel_param);
+    unified_decoding_beam_search_->set_layer_parallel_param(
+        layer_parallel_param);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
     unified_decoding_beam_search_->forward(params, decoding_params);
 
@@ -395,11 +452,17 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         activate,
         pos_bias,
         temperature,
-        1.0,  /*repeat_penalty*/
-        true, /*prefix_lm*/
-        false,  /*is_mbart*/
+        1.0,   /*repeat_penalty*/
+        true,  /*prefix_lm*/
+        false, /*is_mbart*/
         min_length,
-        inner_coeff);
+        inner_coeff,
+        seed,
+        tensor_para_size,
+        layer_para_size);
+    unified_decoding_sampling_->set_tensor_parallel_param(
+        tensor_parallel_param);
+    unified_decoding_sampling_->set_layer_parallel_param(layer_parallel_param);
     unified_decoding_sampling_->forward_context(params, decoding_params);
     unified_decoding_sampling_->forward(params, decoding_params);
 
@@ -477,7 +540,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const bool pos_bias,
     const std::string& hidden_act,
     const bool early_stopping,
-    const int min_length) {
+    const int min_length,
+    const int tensor_para_size = 1,
+    const int layer_para_size = 1,
+    const int layer_para_batch_size = 1) {
   auto stream = input_ids.stream();
   cublasHandle_t cublas_handle_;
   cublasCreate(&cublas_handle_);
@@ -554,7 +620,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           min_length,
           cublas_handle_,
           cublaslt_handle_,
-          stream);
+          stream,
+          tensor_para_size,
+          layer_para_size,
+          layer_para_batch_size);
       break;
     }
     case paddle::DataType::FLOAT32: {
@@ -623,7 +692,10 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           min_length,
           cublas_handle_,
           cublaslt_handle_,
-          stream);
+          stream,
+          tensor_para_size,
+          layer_para_size,
+          layer_para_batch_size);
       break;
     }
     default: {

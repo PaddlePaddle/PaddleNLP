@@ -105,4 +105,4 @@ python main.py --skip_formatting True \
 
 按照以上方法构建完毕预训练数据之后，我们可以按照相应的预训练模型开始垂类预训练。
 
-如[BERT预训练](../bert#执行pre-training)完成继续预训练。
+如[BERT预训练](../../../model_zoo/bert#执行pre-training)完成继续预训练。

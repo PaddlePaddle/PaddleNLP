@@ -39,7 +39,7 @@ TinyBERT蒸馏流程图
 以GLUE的SST-2任务为例，调用BERT fine-tune的训练脚本，配置如下的参数，训练SST-2任务：
 
 ```shell
-cd ../../benchmark/glue/
+cd ../../examples/benchmark/glue/
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
 

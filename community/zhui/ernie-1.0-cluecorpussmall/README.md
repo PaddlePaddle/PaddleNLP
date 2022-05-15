@@ -1,9 +1,9 @@
 # 详细介绍
-本权重为使用PaddleNLP提供的[ERNIE-1.0预训练教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0)，在CLUECorpusSmall 14g数据集上训练得到的权重。
+本权重为使用PaddleNLP提供的[ERNIE-1.0预训练教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0)，在CLUECorpusSmall 14g数据集上训练得到的权重。
 
 本模型结构与ernie-1.0完全相同。使用训练配置`batch_size=512, max_steps=100w`, 训练得到。模型使用方法与原始ernie-1.0权重相同。
 
-预训练全流程参见：https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0/README.md
+预训练全流程参见：https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/README.md
 
 # 使用示例
 

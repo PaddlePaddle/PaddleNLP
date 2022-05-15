@@ -42,8 +42,6 @@ import paddlenlp.ops as ops
 from visualdl import LogWriter
 
 from args import parse_args
-import sys
-sys.path.insert(0, os.path.abspath("../"))
 from data_tools.dataset_utils import build_train_valid_test_datasets
 
 MODEL_CLASSES = {
