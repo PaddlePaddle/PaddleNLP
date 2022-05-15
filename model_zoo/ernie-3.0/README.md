@@ -14,7 +14,7 @@
                * [GPU 性能](#CPU性能)
    * [部署](#部署)
        * [Python 部署](#Python部署)
-           * [环境依赖](#环境依赖)
+           * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
    * [参考文献](#参考文献)
@@ -623,9 +623,8 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 ### Python 部署
 
-<a name="环境依赖"></a>
-
-#### 环境依赖
+<a name="Python部署指南"></a>
+Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
 
