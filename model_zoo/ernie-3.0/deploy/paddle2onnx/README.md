@@ -1,6 +1,6 @@
-# ERNIE 3.0 Paddle2ONNX模型转换与部署指南
+# ERNIE 3.0 Paddle2ONNX模型转换及部署指南
 本文介绍ERNIE 3.0 模型模型如何转化为ONNX模型，并基于ONNXRuntime引擎部署，本文将以命名实体识别和分类两大场景作为介绍示例。
-- [ERNIE 3.0 Paddle2ONNX模型转换与部署指南](#ERNIE3.0Paddle2ONNX模型转换与部署指南)
+- [ERNIE 3.0 Paddle2ONNX模型转换及部署指南](#ERNIE3.0Paddle2ONNX模型转换及部署指南)
   - [1. 环境准备](#1-环境准备)
   - [2. 命名实体识别模型推理](#2-命名实体识别模型推理)
     - [2.1 模型获取](#21-模型获取)
