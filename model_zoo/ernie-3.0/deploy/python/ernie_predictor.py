@@ -26,8 +26,9 @@ class InferBackend(object):
                  batch_size=32,
                  device='cpu',
                  use_fp16=False,
-                 enable_quantize=False,
+                 use_quantize=False,
                  set_dynamic_shape=False,
+                 shape_info_file="shape_info.txt",
                  num_threads=10):
         int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
@@ -46,6 +47,7 @@ class InferBackend(object):
 
             if use_fp16:
                 assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
+                print(">>> [InferBackend] FP16 inference ...")
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
                     precision_mode=inference.PrecisionType.Half,
@@ -54,6 +56,7 @@ class InferBackend(object):
                     use_static=False,
                     use_calib_mode=False)
             else:
+                print(">>> [InferBackend] INT8 inference ...")
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
                     precision_mode=inference.PrecisionType.Int8,
@@ -61,11 +64,11 @@ class InferBackend(object):
                     min_subgraph_size=5,
                     use_static=False,
                     use_calib_mode=False)
-            shape_file = "shape_info.txt"
             if set_dynamic_shape:
-                config.collect_shape_range_info(shape_file)
+                config.collect_shape_range_info(shape_info_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+                config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
+                                                           True)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -91,7 +94,7 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
-            if enable_quantize:
+            if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
@@ -150,6 +153,22 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
+def seq_cls_print_ret(infer_result, input_datas):
+    label_list = [
+        "news_story", "news_culture", "news_entertainment", "news_sports",
+        "news_finance", "news_house", "news_car", "news_edu", "news_tech",
+        "news_military", "news_travel", "news_world", "news_stock",
+        "news_agriculture", "news_game"
+    ]
+    label = infer_result["label"].squeeze().tolist()
+    confidence = infer_result["confidence"].squeeze().tolist()
+    for i, ret in enumerate(infer_result):
+        print("input data:", input_datas[i])
+        print("seq cls result:")
+        print("label:", label_list[label[i]], "  confidence:", confidence[i])
+        print("-----------------------------")
+
+
 class ErniePredictor(object):
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
@@ -170,12 +189,14 @@ class ErniePredictor(object):
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
             self.postprocess = self.seq_cls_postprocess
+            self.printer = seq_cls_print_ret
         elif args.task_name == 'token_cls':
             self.label_names = [
                 'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
             ]
             self.preprocess = self.token_cls_preprocess
             self.postprocess = self.token_cls_postprocess
+            self.printer = token_cls_print_ret
         else:
             print(
                 "[ErniePredictor]: task_name only support seq_cls and token_cls now."
@@ -188,16 +209,18 @@ class ErniePredictor(object):
             args.use_fp16 = False
             args.set_dynamic_shape = False
             args.batch_size = 32
+            args.shape_info_file = None
         if args.device == 'gpu':
             args.num_threads = cpu_count()
-            args.enable_quantize = False
+            args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
             use_fp16=args.use_fp16,
-            enable_quantize=args.enable_quantize,
+            use_quantize=args.use_quantize,
             set_dynamic_shape=args.set_dynamic_shape,
+            shape_info_file=args.shape_info_file,
             num_threads=args.num_threads)
         if args.set_dynamic_shape:
             # If set_dynamic_shape is turned on, all required dynamic shapes will be automatically set according to the batch_size and max_seq_length.
@@ -220,9 +243,11 @@ class ErniePredictor(object):
 
     def seq_cls_postprocess(self, infer_data, input_data):
         infer_data = np.array(infer_data)
+        exp_data = np.exp(infer_data)
+        softmax_data = np.exp(infer_data) / np.sum(exp_data, axis=1)
         out_dict = {
-            "label": infer_data.argmax(axis=-1),
-            "confidence": infer_data.max(axis=-1)
+            "label": softmax_data.argmax(axis=-1),
+            "confidence": softmax_data.max(axis=-1)
         }
         return out_dict
 
@@ -274,7 +299,7 @@ class ErniePredictor(object):
                 items.append({
                     "pos": [start, len(token_label) - 1],
                     "entity": input_data[batch][start:len(token_label) - 1],
-                    "entity": ""
+                    "label": ""
                 })
             value.append(items)
 
@@ -282,24 +307,28 @@ class ErniePredictor(object):
         return out_dict
 
     def set_dynamic_shape(self, max_seq_length, batch_size):
+        # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
-        min_seq_len, max_seq_len, opt_seq_len = 2, args.max_seq_length, 32
+        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
-            [
-                np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64"), np.zeros(
-                        [min_batch_size, min_seq_len], dtype="int64")
-            ],
-            [
-                np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64"), np.zeros(
-                        [max_batch_size, max_seq_len], dtype="int64")
-            ],
-            [
-                np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64"), np.zeros(
-                        [opt_batch_size, opt_seq_len], dtype="int64")
-            ],
+            {
+                "input_ids": np.zeros(
+                    [min_batch_size, min_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [min_batch_size, min_seq_len], dtype="int64")
+            },
+            {
+                "input_ids": np.zeros(
+                    [max_batch_size, max_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [max_batch_size, max_seq_len], dtype="int64")
+            },
+            {
+                "input_ids": np.zeros(
+                    [opt_batch_size, opt_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [opt_batch_size, opt_seq_len], dtype="int64")
+            },
         ]
         for batch in batches:
             self.inference_backend.infer(batch)
@@ -314,5 +343,5 @@ class ErniePredictor(object):
         preprocess_result = self.preprocess(input_data)
         infer_result = self.infer(preprocess_result)
         result = self.postprocess(infer_result, input_data)
-
+        self.printer(result, input_data)
         return result

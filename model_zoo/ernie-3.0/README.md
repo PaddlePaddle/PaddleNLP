@@ -14,7 +14,7 @@
                * [GPU 性能](#CPU性能)
    * [部署](#部署)
        * [Python 部署](#Python部署)
-           * [环境依赖](#环境依赖)
+           * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
 
@@ -604,9 +604,8 @@ TBD
 
 ### Python 部署
 
-<a name="环境依赖"></a>
-
-#### 环境依赖
+<a name="Python部署指南"></a>
+Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
 
@@ -622,4 +621,3 @@ TBD
 * Su W, Chen X, Feng S, et al. ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression[J]. arXiv preprint arXiv:2106.02241, 2021.
 
 * Wang S, Sun Y, Xiang Y, et al. ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2112.12731, 2021.
-
