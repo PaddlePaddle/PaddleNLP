@@ -247,7 +247,7 @@ class ErniePredictor(object):
         exp_data = np.exp(logits - max_value)
         probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
         out_dict = {
-            "label": logits.argmax(axis=-1),
+            "label": probs.argmax(axis=-1),
             "confidence": probs.max(axis=-1)
         }
         return out_dict
