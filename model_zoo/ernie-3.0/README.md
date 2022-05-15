@@ -14,7 +14,7 @@
                * [GPU 性能](#CPU性能)
    * [部署](#部署)
        * [Python 部署](#Python部署)
-           * [环境依赖](#环境依赖)
+           * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
 
@@ -604,7 +604,8 @@ TBD
 
 ### Python 部署
 
-Python端部署请参考：[Python端部署指南](./deploy/python/README.md)
+<a name="Python部署指南"></a>
+Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
 
