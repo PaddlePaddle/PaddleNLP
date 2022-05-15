@@ -81,7 +81,7 @@ if training_args.do_train:
     trainer.log_metrics("train", metrics)
     trainer.save_state()
 ```
-预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0/run_pretrain_trainer.py)版本。
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
 ## Trainer 实例化参数介绍

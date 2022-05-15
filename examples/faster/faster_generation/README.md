@@ -163,7 +163,7 @@ mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 4 --layer_para_size 1
 除了以上示例之外，PaddleNLP的examples中大多使用了`model.generate`的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
 
 - [examples/dialogue/unified_transformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer)
-- [examples/language_model/gpt/faster_gpt](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt)
+- [model_zoo/gpt/faster_gpt](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/faster_gpt)
 - [examples/text_generation/unimo-text](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text)
 - [examples/text_summarization/bart](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart)
 

@@ -24,9 +24,6 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 
-# Used to load data_tools path.
-sys.path.insert(0, "../")
-
 
 def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                                        num_samples, seq_length, seed,

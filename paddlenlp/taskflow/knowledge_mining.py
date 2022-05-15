@@ -498,7 +498,7 @@ class NPTagTask(Task):
     """
 
     resource_files_names = {
-        "model_state": "model_state.pdparms",
+        "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "name_category_map": "name_category_map.json",
     }
@@ -700,8 +700,11 @@ class NPTagTask(Task):
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Stack(dtype='int64'),  # input_ids
-            Stack(dtype='int64'),  # token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # token_type_ids
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 

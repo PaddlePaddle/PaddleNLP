@@ -43,6 +43,13 @@
 namespace fastertransformer {
 
 template <typename T>
+std::vector<T> copy_data(const T *src, size_t num) {
+  std::vector<T> h_tmp(num, 0);
+  cudaMemcpy(h_tmp.data(), src, sizeof(T) * num, cudaMemcpyDeviceToHost);
+  return h_tmp;
+}
+
+template <typename T>
 class DecoderInitParam : public AbstractParam {
 public:
   /* weights for masked_multi_head_attention */
@@ -1894,13 +1901,13 @@ public:
         computeType_,
         cublasAlgo));
 
-    transpose_kernelLauncher(attn_out,
-                             attn_trans_out,
-                             local_batch_size,
-                             seq_len,
-                             t_parallel_param_.local_head_num_,
-                             size_per_head_,
-                             param_.stream);
+    transpose_general_kernelLauncher(attn_out,
+                                     attn_trans_out,
+                                     local_batch_size,
+                                     seq_len,
+                                     t_parallel_param_.local_head_num_,
+                                     size_per_head_,
+                                     param_.stream);
 
     {
       const int k = t_parallel_param_.local_hidden_units_;

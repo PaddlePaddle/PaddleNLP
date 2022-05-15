@@ -27,4 +27,8 @@ endif()
 # Test Tokenizer
 cc_test(test_bert_tokenizer SRCS test_bert_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer)
 
+if(NOT WITH_PYTHON)
+cc_test(test_ernie_faster_tokenizer SRCS test_ernie_faster_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer core_tokenizers)
+endif()
+
 endif()

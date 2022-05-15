@@ -68,7 +68,7 @@ python -c "import nltk; nltk.download('punkt')"
 
 ### 分类任务
 
-分类任务支持多种数据集的评测，目前支持`imdb`, `iflytek`, `thucnews`, `hyp`四个数据集（有关数据集的描述可查看[PaddleNLP文本分类数据集](../../../docs/data_prepare/dataset_list.md)）。可通过参数`dataset`指定具体的数据集，下面以`imdb`为例子运行分类任务。
+分类任务支持多种数据集的评测，目前支持`imdb`, `iflytek`, `thucnews`, `hyp`四个数据集（有关数据集的描述可查看[PaddleNLP文本分类数据集](../../docs/data_prepare/dataset_list.md)）。可通过参数`dataset`指定具体的数据集，下面以`imdb`为例子运行分类任务。
 
 #### 单卡训练
 

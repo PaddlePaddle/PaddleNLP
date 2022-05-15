@@ -53,11 +53,11 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WWM（Whole Word Mask）方式，对于完整语义单元的Token，会同时进行Mask。整体的训练损失loss是mlm_loss + nsp_loss。
 
 本样例为用户提供了高效的训练流程，支持动态文本mask，自动断点训练重启等功能。
-用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`../data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
+用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
 用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
 
 ### 数据准备
-数据下载部分请移步[data_tools](../data_tools/)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
+数据下载部分请参考[data_tools]目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
 解压文件
 ```shell
@@ -68,11 +68,11 @@ unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
-python ../data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
+python data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
 ```
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
-python -u  ../data_tools/create_pretraining_data.py \
+python -u  data_tools/create_pretraining_data.py \
     --model_name ernie-1.0 \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
