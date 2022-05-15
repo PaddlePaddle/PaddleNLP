@@ -17,8 +17,8 @@
            * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
-       * [ONNXRuntime 部署](#ONNXRuntime部署)
-           * [ONNX导出及部署指南](#ONNX导出及部署)
+       * [Paddle2ONNX 部署](#Paddle2ONNX部署)
+           * [ONNX导出及ONNXRuntime部署](#OONNX导出及ONNXRuntime部署)
 
 
 
@@ -622,11 +622,11 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 ### 服务化部署
 TBD
 
-<a name="ONNXRuntime 部署"></a>
+<a name="Paddle2ONNX 部署"></a>
 
-### ONNXRuntime 部署
+### Paddle2ONNX 部署
 
-<a name="ONNX导出及部署"></a>
+<a name="ONNX导出及ONNXRuntime部署"></a>
 ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 ## Reference
 
