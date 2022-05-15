@@ -97,7 +97,7 @@ def init_client():
 
 def test_demo(client):
     text1 = [
-        "古老的文明，使我们引以为豪，彼此钦佩。",
+        "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",
         "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
     ]
     ret = client.predict(feed_dict={"tokens": text1})
@@ -118,4 +118,3 @@ def test_demo(client):
 if __name__ == "__main__":
     client = init_client()
     test_demo(client)
-    # test_ner_dataset(client)
