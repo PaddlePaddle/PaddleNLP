@@ -14,7 +14,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 import os
-from importlib_metadata import functools
+import functools
 import numpy as np
 from functools import partial
 
@@ -322,6 +322,10 @@ def infer_unified_decoding(
         "DecPositionIds": decoder_position_id
     }
 
+    tensor_para_size = get_ft_para_conf().tensor_para_size
+    layer_para_size = get_ft_para_conf().layer_para_size
+    layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
+
     attrs = {
         "decoding_strategy": _decoding_strategy,
         "beam_size": _beam_size,
@@ -343,7 +347,10 @@ def infer_unified_decoding(
         "hidden_act": _hidden_act,
         "rel_len": _rel_len,
         "early_stopping": _early_stopping,
-        "min_length": _min_length
+        "min_length": _min_length,
+        "tensor_para_size": tensor_para_size,
+        "layer_para_size": layer_para_size,
+        "layer_para_batch_size": layer_para_batch_size
     }
 
     output_ids = helper.create_variable(dtype="int32")
@@ -1175,28 +1182,39 @@ class FTParaConf(object):
                  tensor_para_size=None,
                  layer_para_size=None,
                  layer_para_batch_size=1):
-        # Maybe we should import mpi4py later.
-        self.word_size = int(
-            os.environ.get(
-                "MPI_LOCALNRANKS",  # MPICH
-                os.environ.get("OMPI_COMM_WORLD_SIZE", 1)))  # OpenMPI
-        self.rank = int(
-            os.environ.get(
-                "MPI_LOCALRANKID",  # MPICH
-                os.environ.get("OMPI_COMM_WORLD_RANK", 0)))  # OpenMPI
-        if tensor_para_size is None: tensor_para_size = 1
-        if layer_para_size is None:
-            layer_para_size = self.word_size // tensor_para_size
+        self.world_size = self._env2int(
+            [  # MPICH, OpenMPI, IMPI
+                "MPI_LOCALNRANKS", "OMPI_COMM_WORLD_SIZE", "PMI_SIZE",
+                "MV2_COMM_WORLD_SIZE", "WORLD_SIZE"
+            ],
+            1)
+        self.rank = self._env2int(
+            [  # MPICH, OpenMPI, IMPI
+                "MPI_LOCALRANKID", "OMPI_COMM_WORLD_RANK", "PMI_RANK",
+                "MV2_COMM_WORLD_RANK", "RANK"
+            ],
+            0)
+        if layer_para_size is None: layer_para_size = 1
+        if tensor_para_size is None:
+            tensor_para_size = self.world_size // layer_para_size
         self.no_para = tensor_para_size == 1 and layer_para_size == 1
         self.tensor_para_size = tensor_para_size
         self.layer_para_size = layer_para_size
         self.layer_para_batch_size = layer_para_batch_size
 
-        assert self.word_size == tensor_para_size * layer_para_size, (
+        assert self.world_size == tensor_para_size * layer_para_size, (
             "tensor_para_size * layer_para_size must be equal to world_size.")
         self.tensor_para_rank = self.rank % self.tensor_para_size
         self.layer_para_rank = self.rank // self.tensor_para_size
         self.is_partial_model = False
+
+    @staticmethod
+    def _env2int(env_list, default=-1):
+        for e in env_list:
+            val = int(os.environ.get(e, -1))
+            if val >= 0:
+                return val
+        return default
 
     def is_last_group(self):
         r"""
@@ -1336,8 +1354,8 @@ def get_ft_para_conf():
 
 
 # @contextmanager
-def enable_ft_para(tensor_para_size=1,
-                   layer_para_size=1,
+def enable_ft_para(tensor_para_size=None,
+                   layer_para_size=None,
                    layer_para_batch_size=1):
     r"""
     Enable model parallel with the given settings in FasterTransformer. Currently only
@@ -1346,9 +1364,11 @@ def enable_ft_para(tensor_para_size=1,
 
     Args:
         tensor_para_size (int, optional): The size for tensor parallel. If it is
-            1, tensor parallel would not be used. Default to 1.
+            1, tensor parallel would not be used. When it is None, tensor parallel
+            size would be set as `world_size / layer_para_size`. Default to None.
         layer_para_size (int, optional): The size for layer parallel. If it is
-            1, layer parallel would not be used. Default to 1.
+            1, layer parallel would not be used. When it is None, it would be set
+            as 1. Default to None.
         layer_para_batch_size (int, optional): The local batch size for pipeline
             parallel. It is suggested to use `batch_size // layer_para_size`.
             Default to 1.
@@ -1369,6 +1389,11 @@ def enable_ft_para(tensor_para_size=1,
     def layer_init_wrapper(func):
         @functools.wraps(func)
         def _impl(self, *args, **kwargs):
+            init_dict = fn_args_to_dict(func, *((self, ) + args), **kwargs)
+            init_dict.pop("self")
+            assert init_dict["nhead"] % _ft_para_conf.tensor_para_size == 0, (
+                "The number of heads(%d) cannot be evenly divisible by `tensor_para_size`(%d)."
+                % (init_dict["nhead"], _ft_para_conf.tensor_para_size))
             func(self, *args, **kwargs)
             # Reset parameters with corresponding slice.
             for x, attr in [(m, n)
@@ -1428,6 +1453,7 @@ def enable_ft_para(tensor_para_size=1,
 
         return _impl
 
+    # GPT
     layer_init_fn = paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__
     paddlenlp.transformers.gpt.modeling.TransformerDecoderLayer.__init__ = layer_init_wrapper(
         layer_init_fn)
@@ -1439,6 +1465,9 @@ def enable_ft_para(tensor_para_size=1,
     block_state_fn = paddlenlp.transformers.gpt.modeling.GPTModel.state_dict
     paddlenlp.transformers.gpt.modeling.GPTModel.state_dict = block_state_wrapper(
         block_state_fn)
+    # PLATO
+    paddle.nn.TransformerEncoderLayer.__init__ = layer_init_wrapper(
+        paddle.nn.TransformerEncoderLayer.__init__)
     _ft_para_conf.set_partial_model(True)
     # TODO(guosheng): Should we set device here, sometimes we want to create
     # models on CPU first to save memory.
@@ -1577,7 +1606,11 @@ class InferUnifiedDecoding(nn.Layer):
                 logger.warning(
                     "The specified decoding_lib does not exist, and it will be built automatically."
                 )
-            load("FasterTransformer", verbose=True)
+            load(
+                "FasterTransformer"
+                if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                verbose=True,
+                need_parallel=not get_ft_para_conf().no_para)
 
         super(InferUnifiedDecoding, self).__init__()
         for arg, value in locals().items():

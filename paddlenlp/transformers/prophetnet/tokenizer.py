@@ -75,7 +75,17 @@ class ProphetNetTokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = {"vocab_file": "prophetnet.tokenizer"}
-    pretrained_resource_files_map = {}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "prophetnet-large-uncased":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/prophetnet/prophetnet.tokenizer",
+        }
+    }
+    pretrained_init_configuration = {
+        "prophetnet-large-uncased": {
+            "do_lower_case": True
+        },
+    }
 
     def __init__(self,
                  vocab_file,
@@ -88,7 +98,8 @@ class ProphetNetTokenizer(PretrainedTokenizer):
                  cls_token="[CLS]",
                  x_sep_token="[X_SEP]",
                  pad_token="[PAD]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
         self.unique_no_split_tokens = [
             x_sep_token, unk_token, sep_token, bos_token, eos_token, cls_token,
             pad_token, mask_token

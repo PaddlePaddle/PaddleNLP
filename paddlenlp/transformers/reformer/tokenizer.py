@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from ..albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ['ReformerTokenizer']
@@ -76,8 +77,6 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sentencepiece_model_file = sentencepiece_model_file
-
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
 

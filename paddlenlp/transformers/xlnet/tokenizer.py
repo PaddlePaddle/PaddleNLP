@@ -19,7 +19,8 @@ import unicodedata
 from shutil import copyfile
 from typing import List, Optional
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from .. import PretrainedTokenizer
 
 __all__ = ['XLNetTokenizer']
@@ -130,26 +131,25 @@ class XLNetTokenizer(PretrainedTokenizer):
     padding_side = "left"
     pad_token_type_id = 3
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=False,
-            remove_space=True,
-            keep_accents=False,
-            bos_token="<s>",
-            eos_token="</s>",
-            unk_token="<unk>",
-            sep_token="<sep>",
-            pad_token="<pad>",
-            cls_token="<cls>",
-            mask_token="<mask>",
-            additional_special_tokens=["<eop>", "<eod>"], ):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=False,
+                 remove_space=True,
+                 keep_accents=False,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 unk_token="<unk>",
+                 sep_token="<sep>",
+                 pad_token="<pad>",
+                 cls_token="<cls>",
+                 mask_token="<mask>",
+                 additional_special_tokens=["<eop>", "<eod>"],
+                 **kwargs):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.vocab_file = vocab_file
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
 
@@ -171,7 +171,6 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.vocab_file)
 

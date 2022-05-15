@@ -316,7 +316,7 @@ class CBLUE(DatasetBuilder):
         with open(filename, 'r', encoding='utf-8') as f:
             if self.name == 'CMeIE':
                 for line in f.readlines():
-                    data = json.loads(line, encoding='urf-8')
+                    data = json.loads(line)
                     labels = self.get_labels()
                     label_map = dict([(x, i) for i, x in enumerate(labels)])
                     data_list = data.get('spo_list', [])
@@ -353,7 +353,7 @@ class CBLUE(DatasetBuilder):
 
                     yield data
             elif self.name == 'CMeEE':
-                data_list = json.load(f, encoding='utf-8')
+                data_list = json.load(f)
                 for data in data_list:
                     text_len = len(data[input_keys[0]])
                     if data.get('entities', None):
@@ -386,7 +386,7 @@ class CBLUE(DatasetBuilder):
                     data = dict([(k, v) for k, v in zip(data_keys, data)])
                     yield data
             else:
-                data_list = json.load(f, encoding='utf-8')
+                data_list = json.load(f)
                 for data in data_list:
                     if data.get('normalized_result', None):
                         data['labels'] = [

@@ -47,9 +47,9 @@ def parse_args():
         help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
         "--output_dir",
-        default="best_clue_model",
+        default="best_chid_model",
         type=str,
-        help="The  path of the checkpoints .", )
+        help="The path of the checkpoints .", )
     parser.add_argument(
         "--num_train_epochs",
         default=3,
@@ -199,6 +199,9 @@ def evaluate(model, data_loader, do_predict=False):
 
 
 def run(args):
+    if args.do_train:
+        assert args.batch_size % args.gradient_accumulation_steps == 0, \
+            "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     set_seed(args)
 

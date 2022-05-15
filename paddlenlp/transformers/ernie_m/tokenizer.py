@@ -14,7 +14,7 @@
 
 import os
 
-from paddle.utils import try_import
+import sentencepiece as spm
 
 from .. import PretrainedTokenizer
 from ..tokenizer_utils import _is_control, _is_whitespace
@@ -90,9 +90,9 @@ class ErnieMTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
-        mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+                 mask_token="[MASK]",
+                 **kwargs):
+        self.sp_model = spm.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
         self.encoding = encoding

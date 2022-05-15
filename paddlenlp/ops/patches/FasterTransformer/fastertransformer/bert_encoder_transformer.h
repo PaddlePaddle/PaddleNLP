@@ -412,6 +412,7 @@ public:
 
         // allocate buffer
         if (int8_mode_ != 0) {
+#ifdef WITH_INT8
           buf_ = reinterpret_cast<DataType_ *>(
               allocator_->malloc(buf_size_in_byte, false));
           if (buf_ == nullptr)
@@ -445,6 +446,11 @@ public:
                             4 * m * k * sizeof(int32_t) +
                             6 * m * n * sizeof(DataType_));
           tmp_int8_ = (int8_t *)tmp_DataType_;
+#else
+          printf("[ERROR] BERT transformer encoder does not support INT8 in PaddleNLP. \n");
+          exit(-1);
+#endif
+
         } else {
           buf_ = reinterpret_cast<DataType_ *>(
               allocator_->malloc(buf_size_in_byte, false));
@@ -476,12 +482,14 @@ public:
         is_fp16 = 1;
       // check if target algos in map
       if (allow_gemm_test_) {
+        /*
         hasChangedConfig = gemmTest(batch_size_,
                                     from_seq_len_,
                                     head_num_,
                                     size_per_head_,
                                     int8_mode_,
                                     is_fp16);
+        */
       }
 
       // allocate buffer for attention_
@@ -525,10 +533,16 @@ public:
       }
 
       int isConfigExist = -1;
-      if (int8_mode_ != 0)
+      if (int8_mode_ != 0) {
+#ifdef WITH_INT8
         isConfigExist = access(IGEMM_CONFIG, 0);
-      else
+#else
+        printf("[ERROR] BERT transformer encoder does not support INT8 in PaddleNLP. \n");
+        exit(-1);
+#endif
+      } else {
         isConfigExist = access(GEMM_CONFIG, 0);
+      }
       if (isConfigExist == -1) {
         if (!allow_gemm_test_) {
           // printf(
@@ -605,6 +619,7 @@ public:
     cuda::MultiHeadInitParam<DataType_> multi_head_init_param;
 
     if (int8_mode_ != 0) {
+#ifdef WITH_INT8
       int hidden_dim = size_per_head_ * head_num_;
       layer_idx_ = param_.layer_idx;
       layer_num_ = param_.layer_num;
@@ -667,6 +682,10 @@ public:
 
       multi_head_init_param.trt_fused_mha_amax_list =
           scale_list + INT8O_GEMM_NUM;
+#else
+      printf("[ERROR] BERT transformer encoder does not support INT8 in PaddleNLP. \n");
+      exit(-1);
+#endif
     }
 
     multi_head_init_param.from_tensor = param.from_tensor;
@@ -709,6 +728,7 @@ public:
       int n = k;
 
       if (int8_mode_ != 0) {
+#ifdef WITH_INT8
         if (int8_mode_ == 1) {
           cublasLtMM_withAlgo(
               int_buf_,
@@ -947,6 +967,12 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+
+#else  // WITH_INT8
+        printf("[ERROR] BERT transformer encoder does not support INT8 in PaddleNLP. \n");
+        exit(-1);
+#endif  // WITH_INT8
+
       } else {
         cublasMM_cublasLtMM_wrapper(
             param_.cublaslt_handle,

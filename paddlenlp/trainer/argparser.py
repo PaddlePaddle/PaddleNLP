@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is modified from
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/hf_argparser.py
+
 import dataclasses
 import json
 import sys
@@ -25,6 +28,8 @@ from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_typ
 
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
+
+__all__ = ["PdArgumentParser", ]
 
 
 # From https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
