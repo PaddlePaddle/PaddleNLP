@@ -153,11 +153,11 @@ python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: news_car   confidence: 0.9929346442222595
+label: news_car   confidence: 0.5543532371520996
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: news_entertainment   confidence: 0.998711347579956
+label: news_entertainment   confidence: 0.9495906829833984
 -----------------------------
 ```
 和命名实体识别模型推理类似，开启动态量化的命令如下：
@@ -168,11 +168,11 @@ python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: news_car   confidence: 0.9910931587219238
+label: news_car   confidence: 0.5778735876083374
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: news_entertainment   confidence: 0.9977021813392639
+label: news_entertainment   confidence: 0.9206441044807434
 -----------------------------
 ```
 ### 3.3 GPU端推理样例
@@ -184,11 +184,11 @@ python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: news_car   confidence: 0.9929346442222595
+label: news_car   confidence: 0.5543532371520996
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: news_entertainment   confidence: 0.998711347579956
+label: news_entertainment   confidence: 0.9495906829833984
 -----------------------------
 ```
 如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
@@ -202,11 +202,11 @@ python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: news_car   confidence: 0.9929342269897461
+label: news_car   confidence: 0.5536671876907349
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: news_entertainment   confidence: 0.99870365858078
+label: news_entertainment   confidence: 0.9494127035140991
 -----------------------------
 ```
 如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
@@ -226,10 +226,10 @@ python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/i
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: news_car   confidence: 0.9922153353691101
+label: news_car   confidence: 0.5510320067405701
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: news_entertainment   confidence: 0.9986827373504639
+label: news_entertainment   confidence: 0.9432708024978638
 -----------------------------
 ```
