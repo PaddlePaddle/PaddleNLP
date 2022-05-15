@@ -124,7 +124,6 @@ def main(args):
     # model failed if the original weights are deleted.
     os.environ["PPFG_QKV_MEM_OPT"] = "1"
     if args.use_fp16:
-        assert args.use_faster, "Only supports FP16 when using FasterGeneration."
         paddle.set_default_dtype("float16")
     enable_ft_para()
     # TODO(guosheng): Maybe device can be set in `enable_ft_para`
