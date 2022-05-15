@@ -197,7 +197,6 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
-        # print('nizer')
 
         text = self.preprocess_text(text)
         # print('tokenize_text:',text)
