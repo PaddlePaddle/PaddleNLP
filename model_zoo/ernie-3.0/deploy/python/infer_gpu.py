@@ -52,6 +52,11 @@ def parse_args():
         action='store_true',
         help="Whether to automatically set dynamic shape.", )
     parser.add_argument(
+        "--shape_info_file",
+        default="shape_info.txt",
+        type=str,
+        help="The collected dynamic shape info file.", )
+    parser.add_argument(
         "--use_fp16",
         action='store_true',
         help="Whether to use fp16 inference.", )
@@ -68,7 +73,7 @@ def main():
     if args.task_name == 'seq_cls':
         text = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
     elif args.task_name == 'token_cls':
-        text = ["原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。", "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。"]
+        text = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
 
     outputs = predictor.predict(text)
 

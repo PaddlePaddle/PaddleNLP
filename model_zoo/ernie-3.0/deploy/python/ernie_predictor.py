@@ -26,8 +26,9 @@ class InferBackend(object):
                  batch_size=32,
                  device='cpu',
                  use_fp16=False,
-                 enable_quantize=False,
+                 use_quantize=False,
                  set_dynamic_shape=False,
+                 shape_info_file="shape_info.txt",
                  num_threads=10):
         int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
@@ -63,11 +64,11 @@ class InferBackend(object):
                     min_subgraph_size=5,
                     use_static=False,
                     use_calib_mode=False)
-            shape_file = "shape_info.txt"
             if set_dynamic_shape:
-                config.collect_shape_range_info(shape_file)
+                config.collect_shape_range_info(shape_info_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_file, True)
+                config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
+                                                           True)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -93,7 +94,7 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
-            if enable_quantize:
+            if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
@@ -208,16 +209,18 @@ class ErniePredictor(object):
             args.use_fp16 = False
             args.set_dynamic_shape = False
             args.batch_size = 32
+            args.shape_info_file = None
         if args.device == 'gpu':
             args.num_threads = cpu_count()
-            args.enable_quantize = False
+            args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
             use_fp16=args.use_fp16,
-            enable_quantize=args.enable_quantize,
+            use_quantize=args.use_quantize,
             set_dynamic_shape=args.set_dynamic_shape,
+            shape_info_file=args.shape_info_file,
             num_threads=args.num_threads)
         if args.set_dynamic_shape:
             # If set_dynamic_shape is turned on, all required dynamic shapes will be automatically set according to the batch_size and max_seq_length.
@@ -240,9 +243,11 @@ class ErniePredictor(object):
 
     def seq_cls_postprocess(self, infer_data, input_data):
         infer_data = np.array(infer_data)
+        exp_data = np.exp(infer_data)
+        softmax_data = np.exp(infer_data) / np.sum(exp_data, axis=1)
         out_dict = {
-            "label": infer_data.argmax(axis=-1),
-            "confidence": infer_data.max(axis=-1)
+            "label": softmax_data.argmax(axis=-1),
+            "confidence": softmax_data.max(axis=-1)
         }
         return out_dict
 
@@ -294,7 +299,7 @@ class ErniePredictor(object):
                 items.append({
                     "pos": [start, len(token_label) - 1],
                     "entity": input_data[batch][start:len(token_label) - 1],
-                    "entity": ""
+                    "label": ""
                 })
             value.append(items)
 
