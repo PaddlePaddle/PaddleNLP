@@ -205,8 +205,6 @@ class XLNetTokenizer(PretrainedTokenizer):
             pieces = self.sp_model.EncodeAsPieces(text)
         else:
             pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
-        # print(pieces)
-        # print(pieces)
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
