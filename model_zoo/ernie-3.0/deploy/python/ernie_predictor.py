@@ -302,6 +302,7 @@ class ErniePredictor(object):
         return out_dict
 
     def set_dynamic_shape(self, max_seq_length, batch_size):
+        # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
         min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
