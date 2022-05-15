@@ -1,4 +1,4 @@
-# 低门槛搭建智能问答系统
+# 端到端智能问答系统
 
 ## 1. 场景概述
 
@@ -12,18 +12,16 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。 
+本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供基于[Streamlit](https://streamlit.io/) 的 Web 可视化服务。
 
 ### 2.1 系统特色
 
-+ 低门槛
-    + 手把手搭建问答系统
-    + 无需深入了解问答系统技术背景
++ 端到端
+    + 提供包括数据建库、模型服务部署、WebUI 可视化一整套端到端问答系统能力
+    + 多源数据支持: 支持对 Txt、Word、PDF、Image 多源数据进行解析、识别并写入 ANN 数据库
 + 效果好
-    + 依托百度 NLP 领先的语义理解技术
+    + 依托百度领先的NLP技术，包括[ERNIE](https://github.com/PaddlePaddle/ERNIE)语义理解技术与[RocketQA](https://github.com/PaddlePaddle/RocketQA)开放域问答技术
     + 预置领先的深度学习模型
-+ 可视化界面
-	+ 轻松构建可视化问答产品，提供 Web 服务
 
 ## 3. 快速开始: 城市百科知识问答系统搭建
 
@@ -45,9 +43,14 @@ b. 硬件环境：
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 c. 依赖安装：
-```
+```bash
+# 1) 安装 pipelines package
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
+# 2) 安装 RestAPI 相关依赖
+python ./rest_api/setup.py install
+# 3) 安装 Streamlit WebUI 相关依赖
+python ./ui/setup.py install
 ```
 ### 3.2 数据说明
 问答知识库数据是我们爬取了百度百科上对国内重点城市的百科介绍文档。我们将所有文档中的非结构化文本数据抽取出来， 按照段落切分后作为问答系统知识库的数据，一共包含 365 个城市的百科介绍文档、切分后共 1318 个段落。
@@ -62,7 +65,7 @@ python examples/question-answering/dense_qa_example.py
 
 ### 3.4 构建 Web 可视化问答系统 
 
-整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的问答系统
+整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI。接下来我们依次搭建这 3 个服务并串联构成可视化的问答系统
 
 #### 3.4.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/start) 并解压。
@@ -72,7 +75,7 @@ python examples/question-answering/dense_qa_example.py
 ```
 3. 检查确保 ES 服务启动成功
 ```bash
-curl http://10.21.226.175:9200/_aliases?pretty=true```
+curl http://10.21.226.175:9200/_aliases?pretty=true
 ```
 备注：ES 服务默认开启端口为 9200
 
@@ -82,11 +85,6 @@ curl http://10.21.226.175:9200/_aliases?pretty=true```
 python utils/offline_ann.py
 ```
 #### 3.4.3 启动 RestAPI 模型服务
-a. 安装 RestAPI 相关依赖
-```bash
-python ./rest_api/setup.py install
-```
-b. 启动模型服务
 ```bash
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
@@ -94,11 +92,6 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
 python rest_api/application.py 8891
 ```
 #### 3.4.4 启动 WebUI
-a. 安装 WebUI 相关依赖
-```bash
-python ./ui/setup.py install
-```
-b. 启动 WebUI
 ```bash
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
@@ -110,3 +103,13 @@ python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
+
+[2]Y. Qu et al., “[RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering](https://arxiv.org/abs/2010.08191),” arXiv:2010.08191 [cs], May 2021, Accessed: Aug. 16, 2021. [Online]. Available: http://arxiv.org/abs/2010.08191
+
+[3]H. Tang, H. Li, J. Liu, Y. Hong, H. Wu, and H. Wang, “[DuReader_robust: A Chinese Dataset Towards Evaluating Robustness and Generalization of Machine Reading Comprehension in Real-World Applications](https://arxiv.org/pdf/2004.11142.pdf).” arXiv, Jul. 21, 2021. Accessed: May 15, 2022. [Online]. Available: http://arxiv.org/abs/2004.11142
+
+## Acknowledge
+
+我们借鉴了 Deepset.ai [Haystack](https://github.com/deepset-ai/haystack) 优秀的框架设计，在此对[Haystack](https://github.com/deepset-ai/haystack)作者及其开源社区表示感谢。
+
+We learn form the excellent framework design of Deepset.ai [Haystack](https://github.com/deepset-ai/haystack), and we would like to express our thanks to the authors of Haystack and their open source community.
