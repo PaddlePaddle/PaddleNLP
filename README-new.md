@@ -46,24 +46,7 @@
 
 PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。具备以下四大特性：
 
-- <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="18" height="18" /><a href=#特性1-开箱即用的一键预测能力> 开箱即用的一键预测能力 </a>
-- <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="18" height="18" /><a href=#特性2-优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
-- <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="18" height="18" /><a href=#特性3-场景系统技术方案> 场景系统技术方案 </a> 
-- <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="18" height="21" /><a href=#特性4-大规模分布式训练与高性能推理能力> 大规模分布式训练与高性能推理能力 </a> 
-
-
-## 社区交流👬
-
-- 微信扫描二维码并填写问卷之后，加入交流群领取福利
-  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
-  - 10G重磅NLP学习大礼包：
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
-</div>
-
-
-## <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="32" height="32" />  特性1-开箱即用的一键预测能力
+### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="18" height="18" /><a href=#特性1-开箱即用的一键预测能力> 开箱即用的一键预测能力 </a>
 
 Taskflow旨在提供**开箱即用**的产业级NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
 
@@ -71,7 +54,7 @@ Taskflow旨在提供**开箱即用**的产业级NLP预置任务能力，覆盖�
 
 更多使用方法请参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-## <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="32" height="32" />  特性2-优质的中文预训练模型库
+### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="18" height="18" /><a href=#特性2-优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
 
 - **Transformer 预训练模型**
 
@@ -113,7 +96,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 </div></details>
 
-<details><summary>&emsp;Transformer预训练模型适用任务汇总 （可展开详情）</summary><div>
+<details><summary>&emsp;PaddleNLP预训练模型适用任务汇总（可展开详情）</summary><div>
 
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
@@ -171,11 +154,13 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 精选预训练模型示例请参考[Model_Zoo](./model_zoo)。
 
-## <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="32" height="32" />  特性3-场景系统技术方案
+### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="18" height="18" /><a href=#特性3-场景系统技术方案> 产业级端到端NLP系统范例 </a> 
+
+
 
 PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推出场景系统技术方案，打通数据标注-模型训练-调优-预测部署全流程。
 
-- **语音指令解析和关键信息抽取**
+- **智能语音指令解析**
 
 描述：
 
@@ -184,7 +169,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多请参考[语音指令解析和信息抽取案例](./applications/speech_cmd_analysis)。
+更多请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
 
 - **语义检索系统**
 
@@ -195,9 +180,9 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多请参考[语义检索](./applications/neural_search)。
+更多请参考[语义检索系统](./applications/neural_search)。
 
-- **问答系统**
+- **智能问答系统**
 
 描述：
 
@@ -206,7 +191,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多请参考[问答系统](./applications/question_answering)。
+更多请参考[智能问答系统](./applications/question_answering)。
 
 
 - **产品评论维度、观点抽取和细粒度情感分析**
@@ -220,7 +205,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 
 更多请参考[情感分析](./applications/sentiment_analysis)。
 
-## <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="32" height="32" />  特性4-大规模分布式训练与高性能推理能力
+### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="18" height="21" /><a href=#特性4-大规模分布式训练与高性能推理能力> 大规模分布式训练与高性能推理能力 </a> 
 
 - **高性能Transformer类文本分词器：FasterTokenizer**
 
@@ -240,25 +225,15 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 
 更多内容请参考[FasterGeneration文档](./examples/faster/faster_generation)
 
-- **蒸馏、剪裁、量化等级联模型压缩技术**
+## 社区交流👬
 
-PaddleNLP 联合 PaddleSlim 通过模型蒸馏、剪裁、量化等级联模型压缩技术发布中文特色小模型 PP-MiniLM(6L768H) 及压缩方案，保证模型精度的同时模型推理速度达 BERT(12L768H) 的 8.88 倍，参数量相比减少 52%，模型精度在中文语言理解评测基准 CLUE 高 0.62。
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
+  - 10G重磅NLP学习大礼包：
 
-PP-MiniLM 压缩方案以面向预训练模型的任务无关知识蒸馏(Task-agnostic Distillation)技术、裁剪(Pruning)技术、量化(Quantization)技术为核心，使得 PP-MiniLM 又快、又准、又小。
-
-| Model                         | #Params   | #FLOPs    | Speedup (w/o FasterTokenizer) | AFQMC     | TNEWS     | IFLYTEK   | CMNLI     | OCNLI     | CLUEWSC2020 | CSL       | Avg       |
-| ----------------------------- | --------- | --------- | ----------------------------- | --------- | --------- | --------- | --------- | --------- | ----------- | --------- | --------- |
-| BERT-base, Chinese            | 102.3M    | 10.87B    | 1.00x                         | 74.14     | 56.81     | 61.10     | 81.19     | 74.85     | 79.93       | 81.47     | 72.78     |
-| TinyBERT<sub>6,</sub> Chinese | 59.7M     | 5.44B     | 1.90x                         | 72.59     | 55.70     | 57.64     | 79.57     | 73.97     | 76.32       | 80.00     | 70.83     |
-| UER-py RoBERTa L6-H768        | 59.7M     | 5.44B     | 1.90x                         | 69.62     | **66.45** | 59.91     | 76.89     | 71.36     | 71.05       | **82.87** | 71.16     |
-| RBT6, Chinese                 | 59.7M     | 5.44B     | 1.90x                         | 73.93     | 56.63     | 59.79     | 79.28     | 73.12     | 77.30       | 80.80     | 71.55     |
-| ERNIE-Tiny                    | 90.7M     | 4.83B     | 2.22x                         | 71.55     | 58.34     | 61.41     | 76.81     | 71.46     | 72.04       | 79.13     | 70.11     |
-| PP-MiniLM                     | 59.7M     | 5.44B     | 2.15x (1.90x)                 | 74.14     | 57.43     | **61.75** | 81.01     | **76.17** | 86.18       | 79.17     | **73.69** |
-| PP-MiniLM + 裁剪              | **49.1M** | **4.08B** | 2.74x (2.48x)                 | 73.91     | 57.44     | 61.64     | 81.10     | 75.59     | **85.86**   | 78.53     | 73.44     |
-| PP-MiniLM + 量化              | 59.8M     | -         | 7.34x (4.63x)                 | **74.19** | 57.13     | 61.10     | **81.20** | 76.10     | 85.20       | 78.03     | 73.28     |
-| PP-MiniLM + 裁剪 + 量化       | **49.2M** | -         | **8.88x** (5.36x)             | 74.00     | 57.37     | 61.33     | 81.09     | 75.56     | 85.85       | 78.57     | 73.40     |
-
-详情请参考[压缩方案文档](./examples/model_compression/pp-minilm)。
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
+</div>
 
 
 ## 安装
