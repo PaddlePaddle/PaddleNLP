@@ -97,7 +97,7 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_m
 如果需要进行int8量化加速，还需要使用量化脚本对训练的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩API及使用)，量化模型的部署指令为  
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape
-python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int --set_dynamic_shape
+python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8 --set_dynamic_shape
 # 第二步，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./ner_quant_model/int8
 ```
@@ -137,7 +137,7 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-CPU上的INT8加速和命名实体识别模型推理中的命令类似，只需修改task_name为seq_cls，model_path修改为本例中的分类模型，运行结果和FP32的推理结果一致。
+CPU上的INT8加速和命名实体识别模型推理中的命令类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
 ### 3.3 GPU端推理样例
 在GPU端，请使用如下指令进行部署
 ```
@@ -154,4 +154,4 @@ seq cls result:
 label: 2   confidence: 5.694031238555908
 -----------------------------
 ```
-GPU上的FP16和INT8加速和命名实体识别模型推理中命令类似，只需修改task_name为seq_cls，model_path修改为本例中的分类模型，运行结果和FP32的推理结果一致。
+GPU上的FP16和INT8加速和命名实体识别模型推理中命令类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
