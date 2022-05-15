@@ -15,16 +15,17 @@
 ## 1. 环境准备
 ERNIE 3.0的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
 ### 1.1 CPU端
-CPU端的部署请使用如下指令安装所需依赖
+CPU端的部署请使用如下命令安装所需依赖
 ```
 pip install -r requirements_cpu.txt
 ```
 ### 1.2 GPU端
-在进行GPU部署之前请先确保机器已经安装好CUDA >= 11.2，CuDNN >= 8.2，然后请使用如下指令安装所需依赖
+为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖
 ```
 pip install -r requirements_gpu.txt
 ```
-在计算能力（Compute Capability）大于7.0的GPU硬件上，比如T4，如需FP16或者Int8量化推理加速，还需安装TensorRT和Paddle Inference，计算能力（Compute Capability）和精度支持情况请参考：[GPU算力和支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)  
+如需使用半精度（FP16）或量化（INT8）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。同时需额外安装TensorRT和Paddle Inference。  
+更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux端简要步骤如下：  
     (1)下载TensorRT8.2版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
     (2)解压得到TensorRT-XXX文件夹  
@@ -44,19 +45,22 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_prun
 unzip msra_ner_pruned_infer_model.zip
 ```
 ### 2.2 CPU端推理样例
-在CPU端，请使用如下指令进行部署
+在CPU端，请使用如下命令进行部署
 ```
 python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
 ```
 输出打印如下:
 ```
-input data: 古老的文明，使我们引以为豪，彼此钦佩。
-The model detects all entities:
------------------------------
 input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
 The model detects all entities:
 entity: 玛雅   label: LOC   pos: [2, 3]
 entity: 华夏   label: LOC   pos: [14, 15]
+-----------------------------
+input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
+The model detects all entities:
+entity: 北京   label: LOC   pos: [0, 1]
+entity: 重庆   label: LOC   pos: [6, 7]
+entity: 成都   label: LOC   pos: [12, 13]
 -----------------------------
 ```
 infer_cpu.py脚本中的参数说明：
@@ -70,42 +74,63 @@ infer_cpu.py脚本中的参数说明：
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 
 **Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启enable_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。  
-
-### 2.3 GPU端推理样例
-在GPU端，请使用如下指令进行部署
+CPU端，开启动态量化的命令如下：
 ```
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
+python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --enable_quantize
 ```
 输出打印如下:
 ```
-input data: 古老的文明，使我们引以为豪，彼此钦佩。
-The model detects all entities:
------------------------------
 input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
 The model detects all entities:
 entity: 玛雅   label: LOC   pos: [2, 3]
 entity: 华夏   label: LOC   pos: [14, 15]
 -----------------------------
+input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
+The model detects all entities:
+entity: 北京   label: LOC   pos: [0, 1]
+entity: 重庆   label: LOC   pos: [6, 7]
+entity: 成都   label: LOC   pos: [12, 13]
+-----------------------------
 ```
-如果需要FP16进行加速，可以开启use_fp16开关，具体指令为
+
+### 2.3 GPU端推理样例
+在GPU端，请使用如下命令进行部署
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
+```
+输出打印如下:
+```
+input data: 原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。
+The model detects all entities:
+entity: 玛雅   label: LOC   pos: [2, 3]
+entity: 华夏   label: LOC   pos: [14, 15]
+-----------------------------
+input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
+The model detects all entities:
+entity: 北京   label: LOC   pos: [0, 1]
+entity: 重庆   label: LOC   pos: [6, 7]
+entity: 成都   label: LOC   pos: [12, 13]
+-----------------------------
+```
+如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
+```
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成shape_info.txt文件
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16 --set_dynamic_shape
-# 第二步，开启预测
+# 第二步，读取上一步中生成的shape_info.txt文件，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16
 ```
-如果需要进行int8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
 ```
 # 获取命名实体识别INT8量化模型  
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_quant_infer_model.zip
-unzip msra_ner_pruned_quant_infer_model.zip
+wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_quant_infer_model.zip
+unzip msra_ner_quant_infer_model.zip
 ```
-量化模型的部署指令为：  
+量化模型的部署命令为：  
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_quant_infer_model/int8 --set_dynamic_shape
-# 第二步，开启预测
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_quant_infer_model/int8
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成shape_info.txt文件
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --set_dynamic_shape
+# 第二步，读取上一步中生成的shape_info.txt文件，开启预测
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8
 ```
 FP16和INT8推理的运行结果和FP32的运行结果一致。  
 infer_gpu.py脚本中的参数说明：
@@ -117,7 +142,7 @@ infer_gpu.py脚本中的参数说明：
 |--batch_size |最大可测的batch size，默认为32|
 |--max_seq_length |最大序列长度，默认为128|
 |--use_fp16 | 是否使用FP16进行加速，默认关闭 |
-|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行int8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
+|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行INT8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
 
 ## 3. 分类模型推理
 ### 3.1 模型获取
@@ -128,7 +153,7 @@ wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned
 unzip tnews_pruned_infer_model.zip
 ```
 ### 3.2 CPU端推理样例
-在CPU端，请使用如下指令进行部署
+在CPU端，请使用如下命令进行部署
 ```
 python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
 ```
@@ -136,16 +161,30 @@ python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: 6   confidence: 4.563379287719727
+label: news_car   confidence: 4.563379287719727
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: 2   confidence: 5.694031238555908
+label: news_entertainment   confidence: 5.694031238555908
 -----------------------------
 ```
-CPU上的INT8加速和命名实体识别模型推理中的命令类似，只需将命名实体识别模型推理中的运行指令修改task_name为seq_cls，修改model_path为本例中的分类模型，运行结果和FP32的推理结果一致。
+和命名实体识别模型推理类似，开启动态量化的命令如下：
+```
+python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --enable_quantize
+```
+输出打印如下:
+```
+input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
+seq cls result:
+label: news_car   confidence: 4.515341281890869
+-----------------------------
+input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
+seq cls result:
+label: news_entertainment   confidence: 5.355564117431641
+-----------------------------
+```
 ### 3.3 GPU端推理样例
-在GPU端，请使用如下指令进行部署
+在GPU端，请使用如下命令进行部署
 ```
 python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
 ```
@@ -153,42 +192,42 @@ python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: 6   confidence: 4.563379287719727
+label: news_car   confidence: 4.563379287719727
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: 2   confidence: 5.694031238555908
+label: news_entertainment   confidence: 5.694031238555908
 -----------------------------
 ```
-如果需要FP16进行加速，可以开启use_fp16开关，具体指令为
+如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成shape_info.txt文件
 python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16 --set_dynamic_shape
-# 第二步，开启预测
+# 第二步，读取上一步中生成的shape_info.txt文件，开启预测
 python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16
 ```
 运行结果和FP32的推理结果一致。  
-如果需要进行int8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
 ```
 # 获取命名实体识别INT8量化模型  
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_quant_infer_model.zip
-unzip tnews_pruned_quant_infer_model.zip
+wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_quant_infer_model.zip
+unzip tnews_quant_infer_model.zip
 ```
-量化模型的部署指令为：  
+量化模型的部署命令为：  
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_quant_infer_model/int8 --set_dynamic_shape
-# 第二步，开启预测
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_quant_infer_model/int8
+# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成shape_info.txt文件
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/int8 --set_dynamic_shape
+# 第二步，读取上一步中生成的shape_info.txt文件，开启预测
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/int8
 ```
 输出打印如下:
 ```
 input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
 seq cls result:
-label: 6   confidence: 4.563379287719727
+label: news_car   confidence: 4.541630268096924
 -----------------------------
 input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
 seq cls result:
-label: 2   confidence: 5.694031238555908
+label: news_entertainment   confidence: 5.701371192932129
 -----------------------------
 ```

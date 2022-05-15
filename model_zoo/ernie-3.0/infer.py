@@ -59,7 +59,6 @@ def parse_args():
         help="The directory or name of model.")
     parser.add_argument(
         "--model_path",
-        default='paddle_model/model',
         type=str,
         required=True,
         help="The path prefix of inference model to be used.")

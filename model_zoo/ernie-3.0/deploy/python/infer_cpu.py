@@ -34,7 +34,6 @@ def parse_args():
         help="The directory or name of model.", )
     parser.add_argument(
         "--model_path",
-        default='paddle_model/model',
         type=str,
         required=True,
         help="The path prefix of inference model to be used.", )
@@ -67,10 +66,7 @@ def main():
     if args.task_name == 'seq_cls':
         text = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
     elif args.task_name == 'token_cls':
-        text = [
-            "古老的文明，使我们引以为豪，彼此钦佩。",
-            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
-        ]
+        text = ["原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。", "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。"]
 
     outputs = predictor.predict(text)
 

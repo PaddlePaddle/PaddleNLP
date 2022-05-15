@@ -153,12 +153,18 @@ def token_cls_print_ret(infer_result, input_datas):
 
 
 def seq_cls_print_ret(infer_result, input_datas):
+    label_list = [
+        "news_story", "news_culture", "news_entertainment", "news_sports",
+        "news_finance", "news_house", "news_car", "news_edu", "news_tech",
+        "news_military", "news_travel", "news_world", "news_stock",
+        "news_agriculture", "news_game"
+    ]
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i, ret in enumerate(infer_result):
         print("input data:", input_datas[i])
         print("seq cls result:")
-        print("label:", label[i], "  confidence:", confidence[i])
+        print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
 
 
@@ -297,23 +303,26 @@ class ErniePredictor(object):
 
     def set_dynamic_shape(self, max_seq_length, batch_size):
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
-        min_seq_len, max_seq_len, opt_seq_len = 2, args.max_seq_length, 32
+        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
-            [
-                np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64"), np.zeros(
-                        [min_batch_size, min_seq_len], dtype="int64")
-            ],
-            [
-                np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64"), np.zeros(
-                        [max_batch_size, max_seq_len], dtype="int64")
-            ],
-            [
-                np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64"), np.zeros(
-                        [opt_batch_size, opt_seq_len], dtype="int64")
-            ],
+            {
+                "input_ids": np.zeros(
+                    [min_batch_size, min_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [min_batch_size, min_seq_len], dtype="int64")
+            },
+            {
+                "input_ids": np.zeros(
+                    [max_batch_size, max_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [max_batch_size, max_seq_len], dtype="int64")
+            },
+            {
+                "input_ids": np.zeros(
+                    [opt_batch_size, opt_seq_len], dtype="int64"),
+                "token_type_ids": np.zeros(
+                    [opt_batch_size, opt_seq_len], dtype="int64")
+            },
         ]
         for batch in batches:
             self.inference_backend.infer(batch)
