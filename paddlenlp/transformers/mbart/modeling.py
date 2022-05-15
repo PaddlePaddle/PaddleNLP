@@ -193,15 +193,11 @@ class MBartLearnedPositionalEmbedding(Embedding):
     This module learns positional embeddings up to a fixed maximum size.
     """
 
-    def __init__(self, num_embeddings, embedding_dim, padding_idx):
-        assert padding_idx is not None, "`padding_idx` should not be None, but of type int"
+    def __init__(self, num_embeddings, embedding_dim):
         # MBart is set up so that if padding_idx is specified then offset the embedding ids by 2
         # and adjust num_embeddings appropriately. Other models dont have this hack
         self.offset = 2
-        super().__init__(
-            num_embeddings + self.offset,
-            embedding_dim,
-            padding_idx=padding_idx)
+        super().__init__(num_embeddings + self.offset, embedding_dim)
 
     def forward(self, input_ids_shape, past_key_values_length=0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
@@ -239,10 +235,10 @@ class MBartEncoder(MBartPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+            self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
         self.encoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, pad_token_id)
+            max_position_embeddings, d_model)
 
         self.encoder_dropout = nn.Dropout(dropout)
         self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
@@ -322,10 +318,10 @@ class MBartDecoder(MBartPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+            self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
         self.decoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, pad_token_id)
+            max_position_embeddings, d_model)
         self.decoder_dropout = nn.Dropout(dropout)
         self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
 
@@ -489,7 +485,7 @@ class MBartModel(MBartPretrainedModel):
         self.init_std = init_std
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(vocab_size, d_model, pad_token_id)
+        self.shared = nn.Embedding(vocab_size, d_model)
         self.encoder = MBartEncoder(
             self.shared, vocab_size, pad_token_id, d_model, num_encoder_layers,
             encoder_attention_heads, encoder_ffn_dim, dropout,

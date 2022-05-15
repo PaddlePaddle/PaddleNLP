@@ -14,11 +14,11 @@
 
 import paddle
 import argparse
-from paddlenlp.transformers import RoFormerForPretraining, RoFormerTokenizer
+from paddlenlp.transformers import RoFormerForMaskedLM, RoFormerTokenizer
 
 
 def test_mlm(text, model_name):
-    model = RoFormerForPretraining.from_pretrained(model_name)
+    model = RoFormerForMaskedLM.from_pretrained(model_name)
     model.eval()
     tokenizer = RoFormerTokenizer.from_pretrained(model_name)
     tokens = ["[CLS]"]
@@ -34,7 +34,7 @@ def test_mlm(text, model_name):
     input_ids = paddle.to_tensor([input_ids_list])
 
     with paddle.no_grad():
-        pd_outputs = model(input_ids)[0][0]
+        pd_outputs = model(input_ids)[0]
     pd_outputs_sentence = "paddle: "
     for i, id in enumerate(input_ids_list):
         if id == tokenizer.convert_tokens_to_ids(["[MASK]"])[0]:

@@ -498,7 +498,7 @@ class NPTagTask(Task):
     """
 
     resource_files_names = {
-        "model_state": "model_state.pdparms",
+        "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "name_category_map": "name_category_map.json",
     }
@@ -700,8 +700,11 @@ class NPTagTask(Task):
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Stack(dtype='int64'),  # input_ids
-            Stack(dtype='int64'),  # token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # token_type_ids
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 
@@ -746,12 +749,10 @@ class NPTagTask(Task):
 
         for i in range(len(inputs['texts'])):
             cls_label = self._decode(inputs['pred_ids'][i])
-
             result = {
                 'text': inputs['texts'][i],
                 'label': cls_label,
             }
-
             if cls_label not in self._name_dict:
                 scores_can = inputs['all_scores_can'][i]
                 pred_ids_can = inputs['all_preds_can'][i]
@@ -762,11 +763,13 @@ class NPTagTask(Task):
                     if cls_label_can in self._name_dict:
                         result['label'] = cls_label_can
                         break
-                    else:
-                        labels_can = self._tree.search_similar_word(cls_label)
+                else:
+                    labels_can = self._tree.search_similar_word(cls_label)
+                    if len(labels_can) != 0:
                         result['label'] = labels_can[0][0]
-
+                        break
             if self._linking:
-                result['category'] = self._name_dict[result['label']]
+                if result['label'] in self._name_dict:
+                    result['category'] = self._name_dict[result['label']]
             results.append(result)
         return results

@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# This file is modified from
+#  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_callback.py
 """
 Callbacks to use with the Trainer class and customize the training loop.
 """
@@ -24,10 +27,19 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from .trainer_utils import IntervalStrategy, has_length
-from .trainer_args import TrainingArguments
+from .training_args import TrainingArguments
 from paddlenlp.utils.log import logger
 
-# logger = logging.get_logger(__name__)
+__all__ = [
+    "TrainerState",
+    "TrainerControl",
+    "TrainerCallback",
+    "CallbackHandler",
+    "DefaultFlowCallback",
+    "ProgressCallback",
+    "PrinterCallback",
+    "EarlyStoppingCallback",
+]
 
 
 @dataclass
@@ -68,9 +80,6 @@ class TrainerState:
         is_world_process_zero (`bool`, *optional*, defaults to `True`):
             Whether or not this process is the global main process (when training in a distributed fashion on several
             machines, this is only going to be `True` for one process).
-        is_hyper_param_search (`bool`, *optional*, defaults to `False`):
-            Whether we are in the process of a hyper parameter search using Trainer.hyperparameter_search. This will
-            impact the way data will be logged in TensorBoard.
     """
 
     epoch: Optional[float] = None
@@ -83,7 +92,6 @@ class TrainerState:
     best_model_checkpoint: Optional[str] = None
     is_local_process_zero: bool = True
     is_world_process_zero: bool = True
-    is_hyper_param_search: bool = False
     trial_name: str = None
     trial_params: Dict[str, Union[str, float, int, bool]] = None
 
