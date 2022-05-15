@@ -23,10 +23,14 @@ from paddlenlp.transformers import AutoTokenizer
 class InferBackend(object):
     def __init__(self, model_path):
         print(">>> [InferBackend] Creating Engine ...")
-        providers = ['CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider']
         sess_options = ort.SessionOptions()
         self.predictor = ort.InferenceSession(
             model_path, sess_options=sess_options, providers=providers)
+        if "CUDAExecutionProvider" in self.predictor.get_providers():
+            print(">>> [InferBackend] Use GPU to inference ...")
+        else:
+            print(">>> [InferBackend] Use CPU to inference ...")
         input_name1 = self.predictor.get_inputs()[1].name
         input_name2 = self.predictor.get_inputs()[0].name
         self.input_handles = [input_name1, input_name2]
@@ -145,7 +149,7 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if label == 0 and start >= 0:
+                if self.label_names[label] == "O" and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -155,7 +159,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif label in [1, 3, 5]:
+                elif "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

@@ -1,2 +1,0 @@
-onnxruntime
-paddle2onnx
