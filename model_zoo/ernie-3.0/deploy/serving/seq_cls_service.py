@@ -64,11 +64,13 @@ class ErnieSeqClsOp(Op):
                           It is handled in the same way as exception.
             prod_errinfo: "" default
         """
-        result = fetch_dict["linear_75.tmp_1"]
-        # np.argpartition
+        result = fetch_dict["linear_113.tmp_1"]
+        max_value = np.max(result, axis=1, keepdims=True)
+        exp_data = np.exp(result - max_value)
+        softmax_data = exp_data / np.sum(exp_data, axis=1, keepdims=True)
         out_dict = {
             "label": result.argmax(axis=-1),
-            "confidence": result.max(axis=-1)
+            "confidence": softmax_data.max(axis=-1)
         }
         return out_dict, None, ""
 
