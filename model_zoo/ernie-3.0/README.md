@@ -17,8 +17,8 @@
            * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
            * [环境依赖](#环境依赖)
-       * [Paddle2ONNX模型转换及部署](#Paddle2ONNX模型转换及部署)
-           * [Paddle2ONNX模型转换及部署指南](#Paddle2ONNX模型转换及部署)
+       * [Paddle2ONNX转换及部署](#Paddle2ONNX转换及部署)
+           * [Paddle2ONNX转换及部署指南](#Paddle2ONNX转换及部署)
 
 
 
@@ -623,12 +623,12 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 ### 服务化部署
 TBD
 
-<a name="Paddle2ONNX模型转换及部署"></a>
+<a name="Paddle2ONNX转换及部署"></a>
 
-### Paddle2ONNX模型转换及部署
+### Paddle2ONNX转换及部署
 
-<a name="Paddle2ONNX模型转换及部署"></a>
-Paddle2ONNX模型转换及部署请参考：[Paddle2ONNX模型转换及部署指南](./deploy/paddle2onnx/README.md)  
+<a name="Paddle2ONNX转换及部署"></a>
+Paddle2ONNX转换及部署请参考：[Paddle2ONNX转换及部署指南](./deploy/paddle2onnx/README.md)  
 ## Reference
 
 * Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
