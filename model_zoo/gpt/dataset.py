@@ -283,6 +283,7 @@ def create_pretrained_dataset(
         while True:
             try:
                 import data_tools.helpers as helpers
+                break
             except Exception as e:
                 time.sleep(1)
 
