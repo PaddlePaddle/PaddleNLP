@@ -6,7 +6,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 
 
 <p align="center">
-  <img src="../../../docs/imgs/faster_generation.png" width="400" height ="600" />
+  <img src="../docs/imgs/faster_generation.png" width="400" height ="600" />
 </p>
 
 ## Featrues
@@ -15,7 +15,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
 - 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
-- GPT模型支持高性能并行推理，在具备MPI和NCCL的环境中一行代码即可开启使用。
+- GPT、UnifiedTransformer和UNIMO-text模型支持高性能并行推理，在具备MPI和NCCL的环境中一行代码即可开启使用，允许通过多张小显存容量的 GPU 使用百亿大模型，预测速度较单卡也进一步提升。百亿模型四卡并行高性能推理速度达单卡高性能推理速度2+倍。
 
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration对预训练模型和解码策略的支持情况（GPU）。
@@ -47,18 +47,20 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 **BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../../../docs/imgs/bart_perf.png" width="800" height ="400" />
+  <img src="../docs/imgs/bart_perf.png" width="800" height ="400" />
 </p>
 
 **GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../../../docs/imgs/gpt_perf.png" width="800" height ="400" />
+  <img src="../docs/imgs/gpt_perf.png" width="800" height ="400" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/faster/faster_generation/perf)
 
 ## Quick Start
+
+### 高性能推理
 
 为体现FasterGeneration的易用性，我们在`samples`文件夹中内置了几个典型任务示例，下面以基于GPT模型的中文文本续写任务为例：
 
@@ -127,23 +129,14 @@ outputs, _ = model.generate(
 
 关于该函数的详细介绍可以参考API文档[generate](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html)和**Aistudio教程[文本生成任务实战：如何使用PaddleNLP实现各种解码策略](https://aistudio.baidu.com/aistudio/projectdetail/3243711?contributionType=1)。**`samples`文件夹中的其他示例的使用方法相同。
 
-### **GPT 并行推理**
+### 并行推理
 
-对于GPT模型下的文本生成，FasterGeneration除高性能加速外还集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)的模型并行推理能力，支持Tensor Parallel和Layer Parallel（Pipeline Parallel）两种并行策略的组合。关于这两种并行策略的详细介绍请参考[Megatron论文](https://arxiv.org/pdf/2104.04473.pdf)。
+FasterGeneration对GPT、UnifiedTransformer和UNIMO-text模型在高性能推理的基础上还实现了模型并行功能，其中GPT支持Tensor Parallel和Layer Parallel（Pipeline Parallel）两种并行策略的组合，UnifiedTransformer和UNIMO-text支持Tensor Parallel。关于这两种并行策略的详细介绍请参考[Megatron论文](https://arxiv.org/pdf/2104.04473.pdf)。
 
-并行推理当前依赖MPI和NCCL，如需使用GPT高性能并行推理功能，还请先安装依赖。在使用时，相比上面的高性能加速，只需在`from_pretrained`创建加载模型之前加上一行代码，如下所示：
+并行推理当前依赖MPI（[MPICH](https://www.mpich.org)、[OpenMPI](https://www.open-mpi.org)均可）和[NCCL](https://developer.nvidia.com/nccl)，如需使用还请先安装依赖。在使用时，相比上面的单卡高性能加速代码中也只增加了`from_pretrained`创建加载模型之前加上`enable_ft_para()`一行。
+#### GPT 并行推理
 
-```
-enable_ft_para(tensor_para_size=2, layer_para_size=2)
-...
-model = GPTLMHeadModel.from_pretrained(model_name)
-...
-outputs, _ = model.generate(
-    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_faster=True)
-```
-
-完整的使用示例已在`gpt_mp_sample.py`中提供，按照如下方式启动即可：
+GPT高性能并行推理的完整使用示例已在`gpt_mp_sample.py`中提供，按照如下方式启动即可：
 
 ```sh
 mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 4 --layer_para_size 1
@@ -156,7 +149,17 @@ mpirun -n 4 python gpt_mp_sample.py --tensor_para_size 4 --layer_para_size 1
 - `topp` 用于Top-P采样策略，采样时将只从概率最高且累加概率不超过该值的token中采样，默认为1.0。
 - `temperature` 用于调整预测概率分布，默认为1.0，即保持模型原有的预测概率。
 
-使用`gpt-cpm-larg-cn`和默认设置，在V100上4卡Tensor Parallel较单卡高性能预测速度提升约40%。
+使用`gpt-cpm-larg-cn`(2.6B)和默认设置，在V100上4卡Tensor Parallel较单卡高性能预测速度提升约40%。
+
+#### PLATO-XL 并行推理
+
+PLATO-XL百亿对话预训练模型(11B UnifiedTransformer模型)高性能并行推理的完整使用示例已在`plato_xl_sample.py`中提供(当前只支持Tensor Parallel)，按照如下方式启动即可：
+
+```shell
+mpirun -n 4 python plato_xl_sample.py
+```
+
+参数释义基本同上。在V100上4卡Tensor Parallel高性能预测为单卡高性能预测速度的2倍。
 
 ## Generate Examples
 

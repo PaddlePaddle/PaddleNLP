@@ -1,4 +1,4 @@
-# PLATO-XL
+# PLATO-XL: Exploring the Large-scale Pre-training of Dialogue Generation
 
 ## 模型简介
 
@@ -44,7 +44,7 @@ python infer.py --topk 4 --max_out_len 64 --use_faster --use_fp16
 
 ### 多卡并行推理
 
-多卡并行推理当前依赖 MPI 和 NCCL，如需使用还请先安装依赖。安装完成后仍然使用 `infer.py` 来进行预测，相比单卡时不同的只是通过mpi来启动运行，如下：
+多卡并行推理当前依赖 MPI（[MPICH](https://www.mpich.org)、[OpenMPI](https://www.open-mpi.org)均可）和[NCCL](https://developer.nvidia.com/nccl)，如需使用还请先安装依赖。安装完成后仍然使用 `infer.py` 来进行预测，相比单卡时不同的只是通过mpi来启动运行，如下：
 
 ```shell
 mpirun -n 4 python infer.py --topk 4 --max_out_len 64 --use_faster --use_fp16
@@ -145,4 +145,4 @@ mpirun -n 4 python infer.py --batch_size 8 --min_out_len 20 --max_out_len 20 --t
 
 ## Reference
 
-1. Bao S, He H, Wang F, et al. Plato-xl: Exploring the large-scale pre-training of dialogue generation[J]. arXiv preprint arXiv:2109.09519, 2021.
+1. Bao S, He H, Wang F, et al. PLATO-XL: Exploring the Large-scale Pre-training of Dialogue Generation[J]. arXiv preprint arXiv:2109.09519, 2021.
