@@ -1,8 +1,5 @@
 import paddle
 
-import sys
-sys.path.insert(0, '/Users/mcat/Code/paddle/PaddleNLP')
-
 from paddlenlp.transformers.opt.modeling import OPTForCausalLM
 from paddlenlp.transformers.gpt.tokenizer import GPTTokenizer
 
@@ -43,7 +40,7 @@ class Demo:
 
 if __name__ == "__main__":
     demo = Demo(
-        model_name_or_path="/Users/mcat/Code/paddle/paddle-transformers/pretrained/opt-125m",
+        model_name_or_path="opt/opt-125m",
         max_predict_len=128,
         repetition_penalty=1.2
     )
