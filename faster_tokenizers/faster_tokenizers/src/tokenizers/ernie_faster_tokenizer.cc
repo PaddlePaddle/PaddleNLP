@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "tokenizers/ernie_faster_tokenizer.h"
+#include "core/encoding.h"
 #include "models/models.h"
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
