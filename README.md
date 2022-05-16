@@ -15,17 +15,17 @@
 ![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
 ![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
-<h4 align="left">
+<h4 align="center">
   <a href=#特性> 特性 </a> |
   <a href=#安装> 安装 </a> |
-  <a href=#QuickStart> Quick Start </a> |
+  <a href=#QuickStart> 快速开始 </a> |
   <a href=#API文档> API文档 </a> |
   <a href=#社区交流> 社区交流 </a> 
 </h4>
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19直播课，解读通用信息抽取技术UIE和ERNIE 3.0轻量级模型能力，欢迎报名来交流
+* 🔥 2021.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
@@ -44,28 +44,28 @@
 
 PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。具备以下四大特性：
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="18" height="18" /><a href=#开箱即用的一键预测能力> 开箱即用的一键预测能力 </a>
+#### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="18" height="18" /><a href=#优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="18" height="18" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
 
-### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="18" height="21" /><a href=#大规模分布式训练与高性能推理> 大规模分布式训练与高性能推理 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#大规模分布式训练与高性能推理> 大规模分布式训练与高性能推理 </a> 
 
 
-### 开箱即用的一键预测能力
+### 开箱即用的NLP能力
 
-Taskflow旨在提供**开箱即用**的产业级NLP预置任务能力，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的预测性能**。
+Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的推理性能**。
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### 优质的中文预训练模型库
+### 丰富的预训练模型库
 
-#### 丰富的Transformer预训练模型
+#### 业界最全的中文预训练模型
 
-精选 45+ 个网络结构和 500+ 个预训练模型参数，既包括文心NLP大模型的ERNIE、PLATO等，也涵盖业界主流BERT、GPT、RoBERTa、T5等结构。通过AutoModel API一键实现⚡高速下载⚡。
+精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型，既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过AutoModel API一键⚡高速下载⚡。
 
 ```python
 from paddlenlp.transformers import *
@@ -149,18 +149,16 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 可参考[Transformer 文档](/docs/model_zoo/index.rst) 查看目前支持的预训练模型结构、参数和详细用法。
 
-#### 覆盖NLP全场景的应用示例
+#### 全场景覆盖的应用示例
 
-覆盖从学术到产业级的NLP[应用示例](#多场景的应用示例)，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+覆盖从学术到产业的NLP应用示例，涵盖NLP基础技术、NLP系统应用以及拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
 
-精选预训练模型示例可参考[Model Zoo](./model_zoo)。
-
-更多场景示例文档可参考[examples目录](./examples)、[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+精选预训练模型示例可参考[Model Zoo](./model_zoo)，更多场景示例文档可参考[examples目录](./examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
 
 
 ### 产业级端到端系统范例
 
-PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推出场景系统技术方案，打通数据标注-模型训练-调优-预测部署全流程。
+PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP技术产经，提供端到端系统范例，打通数据标注-模型训练-调优-预测部署全流程，持续降低NLP技术产业落地门槛，更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
 
 #### 智能语音指令解析
 
@@ -171,7 +169,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多可参考[智能语音指令解析](./applications/speech_cmd_analysis)。
+更多使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
 
 #### 语义检索系统
 
@@ -182,7 +180,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多可参考[语义检索系统](./applications/neural_search)。
+更多使用说明请参考[语义检索系统](./applications/neural_search)。
 
 #### 智能问答系统
 
@@ -193,8 +191,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-
-更多可参考[智能问答系统](./applications/question_answering)。
+更多使用说明请参考[智能问答系统](./applications/question_answering)。
 
 
 #### 评论观点抽取与情感分析
@@ -206,7 +203,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多可参考[情感分析](./applications/sentiment_analysis)。
+更多使用说明请参考[情感分析](./applications/sentiment_analysis)。
 
 ### 大规模分布式训练与高性能推理
 
@@ -217,7 +214,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多关于千亿模型分布式训练细节可参考[GPT-3](./examples/language_model/gpt-3)
+更多关于千亿模型分布式训练说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
 #### 高性能文本处理库 FasterTokenizers
 
@@ -226,7 +223,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多内容可参考[FasterTokenizer文档](./faster_tokenizers)
+更多内容可参考[FasterTokenizers文档](./faster_tokenizers)。
 
 #### 高性能生成加速组件 FasterGeneration
 
@@ -235,7 +232,7 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
 </div>
 
 
-更多内容可参考[FasterGeneration文档](./faster_generation)
+更多内容可参考[FasterGeneration文档](./faster_generation)。
 
 ## 社区交流👬
 
@@ -302,7 +299,7 @@ from paddlenlp.transformers import ErniePretrainedModel，AutoTokenizer
 
 完整微调代码，可参考[UIE微调](./model_zoo/uie/)
 
-更多内容可参考：[多场景示例](./docs/model_zoo/examples.md)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+更多内容可参考：[多场景示例](./examples)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
 
 ## API文档
