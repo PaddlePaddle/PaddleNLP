@@ -267,16 +267,16 @@ pip install --upgrade paddlenlp
 
 - 一键预测
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果，以情感分析任务为例：
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果：
 
 ```python
-from pprint import pprint
-from paddlenlp import Taskflow
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
-ie = Taskflow('information_extraction', schema=schema)
-pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
->>> [{'时间': [{'end': 6,
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+[{'时间': [{'end': 6,
           'probability': 0.9857378532924486,
           'start': 0,
           'text': '2月8日上午'}],
@@ -292,13 +292,7 @@ pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中�
 
 - 定制训练
 
-如果对一键预测效果不满意，也可以进行模型微调，这里对UIE模型进行微调，以进一步提升命名实体识别的准确率：
-
-```python
-from paddlenlp.transformers import ErniePretrainedModel，AutoTokenizer
-```
-
-完整微调代码，可参考[UIE微调](./model_zoo/uie/)
+如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
 更多内容可参考：[多场景示例](./examples)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
