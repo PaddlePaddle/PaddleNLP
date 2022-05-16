@@ -66,7 +66,7 @@ TokenClassification:
 
 # Datasets which used for question answersing
 QuestionAnswering:
-    cmrc2018:
+    clue cmrc2018:
         learning_rate: 0.00003
         num_train_epochs: 8
         batch_size: 24
