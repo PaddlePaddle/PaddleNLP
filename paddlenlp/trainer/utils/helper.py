@@ -13,12 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is modified from 
+# This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
+from typing import Any, Optional
+
+import numpy as np
 import paddle
 import paddle.distributed as dist
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+__all__ = [
+    "distributed_concat",
+    "paddle_pad_and_concatenate",
+    "nested_concat",
+    "nested_detach",
+    "nested_numpify",
+    "nested_truncate",
+]
 
 
 def distributed_concat(tensor: Any,
@@ -59,6 +70,22 @@ def paddle_pad_and_concatenate(tensor1, tensor2, padding_index=-100):
 
     result[:tensor1.shape[0], :tensor1.shape[1]] = tensor1
     result[tensor1.shape[0]:, :tensor2.shape[1]] = tensor2
+    return result
+
+
+def numpy_pad_and_concatenate(array1, array2, padding_index=-100):
+    """Concatenates `array1` and `array2` on first axis, applying padding on the second if necessary."""
+    if len(array1.shape) == 1 or array1.shape[1] == array2.shape[1]:
+        return np.concatenate((array1, array2), axis=0)
+
+    # Let's figure out the new shape
+    new_shape = (array1.shape[0] + array2.shape[0], max(
+        array1.shape[1], array2.shape[1])) + array1.shape[2:]
+
+    # Now let's fill the result tensor
+    result = np.full_like(array1, padding_index, shape=new_shape)
+    result[:array1.shape[0], :array1.shape[1]] = array1
+    result[array1.shape[0]:, :array2.shape[1]] = array2
     return result
 
 

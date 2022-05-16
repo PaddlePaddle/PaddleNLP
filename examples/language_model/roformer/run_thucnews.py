@@ -186,7 +186,7 @@ def convert_example(example,
         label = example['label']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    example = tokenizer(example['text'], max_seq_len=max_seq_length)
+    example = tokenizer(example['text'], max_length=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
