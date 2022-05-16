@@ -20,6 +20,15 @@ if(NOT DEFINED FASTER_TOKENIZER_LIB)
   message(FATAL_ERROR "please set FASTER_TOKENIZER_LIB with -DFASTER_TOKENIZER_LIB=/path/to/faster_tokenizer_cpp")
 endif()
 
+# Download ernie vocab for demo
+set(ERNIE_VOCAB_PATH ${CMAKE_CURRENT_BINARY_DIR}/ernie_vocab.txt)
+if (EXISTS ${ERNIE_VOCAB_PATH})
+message("The ${ERNIE_VOCAB_PATH} exists already.")
+else()
+file(DOWNLOAD "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt" ${ERNIE_VOCAB_PATH} SHOW_PROGRESS)
+message("Already download the vocab.txt of ernie to ${CMAKE_CURRENT_BINARY_DIR} for demo.")
+endif()
+
 # Include all necessary headers path
 include_directories("${FASTER_TOKENIZER_LIB}/include"
                     "${FASTER_TOKENIZER_LIB}/third_party/include")
