@@ -598,8 +598,8 @@ def print_scores(scores, etype):
 
     print("\n\n{:20} {:20} {:20} {:20} {:20} {:20}".format("", *turns))
     counts = [scores[turn]['count'] for turn in turns]
-    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format("count",
-                                                                 *counts))
+    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format("count", *
+                                                                 counts))
 
     if etype in ["all", "exec"]:
         print(

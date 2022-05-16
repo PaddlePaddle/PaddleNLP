@@ -190,7 +190,8 @@ class PreProcessor(BasePreProcessor):
 
     def _process_batch(self, documents: List[dict], **kwargs) -> List[dict]:
         nested_docs = [
-            self._process_single(d, **kwargs) for d in tqdm(
+            self._process_single(d, **kwargs)
+            for d in tqdm(
                 documents, unit="docs")
         ]
         return [d for x in nested_docs for d in x]

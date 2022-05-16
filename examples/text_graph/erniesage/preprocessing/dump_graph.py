@@ -141,7 +141,8 @@ def dump_graph(config):
 def dump_node_feat(config):
     log.info("Dump node feat starting...")
     id2str = [
-        line.strip("\n").split("\t")[-1] for line in io.open(
+        line.strip("\n").split("\t")[-1]
+        for line in io.open(
             os.path.join(config.graph_work_path, "terms.txt"),
             encoding=config.encoding)
     ]

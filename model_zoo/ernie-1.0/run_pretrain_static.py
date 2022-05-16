@@ -242,8 +242,8 @@ def get_train_data_file(args):
     else:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and
-                "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
 

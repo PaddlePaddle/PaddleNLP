@@ -214,8 +214,9 @@ class DynamicSSIGenerator():
         prefix = list()
 
         if ordered_prompt:
-            candidate_sorted = sorted([(candidate, index) for index, candidate
-                                       in enumerate(candidates)])
+            candidate_sorted = sorted(
+                [(candidate, index)
+                 for index, candidate in enumerate(candidates)])
             index_list = [index for _, index in candidate_sorted]
         else:
             index_list = np.random.permutation(len(candidates)).tolist()

@@ -1031,10 +1031,12 @@ class REDecoder(nn.Layer):
         for b in range(batch_size):
             if len(entities[b]["start"]) <= 2:
                 entities[b] = {"end": [1, 1], "label": [0, 0], "start": [0, 0]}
-            all_possible_relations = set(
-                [(i, j) for i in range(len(entities[b]["label"]))
-                 for j in range(len(entities[b]["label"])) if
-                 entities[b]["label"][i] == 1 and entities[b]["label"][j] == 2])
+            all_possible_relations = set([
+                (i, j)
+                for i in range(len(entities[b]["label"]))
+                for j in range(len(entities[b]["label"]))
+                if entities[b]["label"][i] == 1 and entities[b]["label"][j] == 2
+            ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
             positive_relations = set(

@@ -251,13 +251,15 @@ def beam_search_with_oracle_column(model, inputs, preproc_item, beam_size,
 
     col_queue = list(
         reversed([
-            val for val in model.decoder.ast_wrapper.
-            find_all_descendants_of_type(root_node, "column")
+            val
+            for val in model.decoder.ast_wrapper.find_all_descendants_of_type(
+                root_node, "column")
         ]))
     tab_queue = list(
         reversed([
-            val for val in model.decoder.ast_wrapper.
-            find_all_descendants_of_type(root_node, "table")
+            val
+            for val in model.decoder.ast_wrapper.find_all_descendants_of_type(
+                root_node, "table")
         ]))
     col_queue_copy = col_queue[:]
     tab_queue_copy = tab_queue[:]

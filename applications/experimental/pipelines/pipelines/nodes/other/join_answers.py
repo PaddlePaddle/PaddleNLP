@@ -61,7 +61,8 @@ class JoinAnswers(BaseComponent):
 
         if self.join_mode == "concatenate":
             concatenated_answers = [
-                answer for cur_reader_result in reader_results
+                answer
+                for cur_reader_result in reader_results
                 for answer in cur_reader_result
             ]
             concatenated_answers = sorted(
@@ -95,7 +96,8 @@ class JoinAnswers(BaseComponent):
 
         return sorted(
             [
-                answer for cur_reader_result in reader_results
+                answer
+                for cur_reader_result in reader_results
                 for answer in cur_reader_result
             ],
             reverse=True)

@@ -787,7 +787,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             for label in labels
         ]
         duplicate_ids: list = [
-            label.id for label in self._get_duplicate_labels(
+            label.id
+            for label in self._get_duplicate_labels(
                 label_list, index=index)
         ]
         if len(duplicate_ids) > 0:

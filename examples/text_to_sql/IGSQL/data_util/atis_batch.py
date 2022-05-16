@@ -67,13 +67,15 @@ class UtteranceItem():
 
     def original_gold_queries(self):
         return [
-            q[0] for q in self.interaction.utterances[self.utterance_index]
+            q[0]
+            for q in self.interaction.utterances[self.utterance_index]
             .all_gold_queries
         ]
 
     def gold_tables(self):
         return [
-            q[1] for q in self.interaction.utterances[self.utterance_index]
+            q[1]
+            for q in self.interaction.utterances[self.utterance_index]
             .all_gold_queries
         ]
 

@@ -356,9 +356,10 @@ def do_train(args):
                         paddle.distributed.all_gather(loss_list[k],
                                                       local_loss[k])
                     if paddle.distributed.get_rank() == 0:
-                        tmp_loss = dict([(k, float((paddle.stack(loss_list[
-                            k]).sum() / len(loss_list[k])).numpy())) for k in
-                                         ['loss', 'gen', 'rtd', 'mts', 'csp']])
+                        tmp_loss = dict(
+                            [(k, float((paddle.stack(loss_list[k]).sum() / len(
+                                loss_list[k])).numpy()))
+                             for k in ['loss', 'gen', 'rtd', 'mts', 'csp']])
                         log_str = (
                             'global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, '
                             'avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, '
