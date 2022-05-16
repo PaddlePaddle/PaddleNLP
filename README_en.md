@@ -28,16 +28,16 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** Light-weight model. Welcome to join us.
+* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model. Welcome to join us!
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
   </div>
 
-* 🔥 2022.5.16 PaddleNLP [release/2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)
+* 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
 
-  * Release [ERNIE 3.0](./model_zoo/ernie-3.0) which achieve SOTA result on CLUE benchmark. Release [ERNIE-Health](./model_zoo/ernie-health), the SOTA pretrained model on CBLUE benchmark; Release PLATO-XL with FasterGeneration, which can do parallel inference for 11B large-scale model.
-  * Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
+  * 🔥Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on CLUE benchmark. Release [ERNIE-Health](./model_zoo/ernie-health), a biomedical SOTA pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE); Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
+  * 🔥Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
 
 ## Features
 
@@ -146,18 +146,18 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 </div></details>
 
-For more pretrained model usage, please refer to [Transformer 文档](/docs/model_zoo/index.rst).
+For more pretrained model usage, please refer to [Transformer API Docs](./docs/model_zoo/index.rst).
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
+PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
 
-精选预训练模型示例可参考[Model Zoo](./model_zoo)，更多场景示例文档可参考[examples目录](./examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
+Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource. 
 
 
 ### Industrial End-to-end System Cases
 
-PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP技术产经，提供端到端系统范例，打通数据标注-模型训练-调优-预测部署全流程，持续降低NLP技术产业落地门槛，更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
+We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-valuePaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP技术场景，提供端到端系统范例，打通数据标注-模型训练-调优-预测部署全流程，持续降低NLP技术产业落地门槛. For more details industial cases please refer to [Applications](./applications)。
 
 #### Speech Command Analysis
 
@@ -192,9 +192,9 @@ We provide question answering pipeline which can support FAQ system, Document-le
 For more details please refer to [Question Answering](./applications/question_answering)。
 
 
-#### Review Extraction and Sentiment Analysis
+#### Opinion Extraction and Sentiment Analysis
 
-基于情感知识增强预训练模型SKEP，针对产品评论进行评价维度和观点抽取，以及细粒度的情感分析。
+We build an opinion extraction system for product review and fine-grained sentiment analysis based on [SKEP](https://arxiv.org/abs/2005.05635) Model.
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="400">
@@ -205,7 +205,7 @@ For more details please refer to [Sentiment Analysis](./applications/sentiment_a
 
 ### High Performance Distributed Training and Inference
 
-#### PaddlePaddle 4D Hybrid Distributed Training
+#### Fleet API: 4D Hybrid Distributed Training
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" height="400" width="500">

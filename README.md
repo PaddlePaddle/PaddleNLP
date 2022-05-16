@@ -35,14 +35,12 @@
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
   </div>
 
-* 🔥 2022.5.16 PaddleNLP [release/2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)
+* 🔥 2022.5.16 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
 
-  * 新增文心大模型 [ERNIE 3.0](./model_zoo/ernie-3.0)，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增超大规模百亿（11B）开放域对话预训练模型 PLATO-XL（英文），并提供FasterGeneration高性能GPU加速，相比上版本推理速度加速2.7倍。
+  * 开源文心大模型 [ERNIE 3.0](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
   * 通用信息抽取技术 [UIE](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
 
-* 2022.3.21 PaddleNLP [release/2.2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.5) 一键预测工具[Taskflow](./docs/model_zoo/taskflow.md)全新升级！欢迎体验更丰富的功能、更便捷的使用方式；新推出适合不同场景的中文分词、命名实体识别模式！
-
-* 2021.12.28 PaddleNLP [release/2.2.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.2) 发布语义检索、问答、评论观点抽取和情感倾向分析 [产业化案例](./applications)，快速搭建系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 2022.12.12 PaddleNLP v2.2发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业化案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 ## 特性
 
@@ -162,7 +160,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 ### 产业级端到端系统范例
 
-PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP技术产经，提供端到端系统范例，打通数据标注-模型训练-调优-预测部署全流程，持续降低NLP技术产业落地门槛，更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
+PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP场景，提供了端到端系统范例，打通数据标注-模型训练-模型调优-预测部署全流程，持续降低NLP技术产业落地门槛。更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
 
 #### 智能语音指令解析
 
@@ -220,23 +218,23 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
-#### 高性能文本处理库 FasterTokenizers
+#### FasterTokenizers：高性能文本处理库⚡
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="500">
 </div>
 
 
-更多内容可参考[FasterTokenizers文档](./faster_tokenizers)。
+针对预训练模型的高性能C++ Tokenizer实现，更多使用说明可参考[FasterTokenizers文档](./faster_tokenizers)。
 
-#### 高性能生成加速组件 FasterGeneration
+#### FasterGeneration：高性能生成加速组件⚡
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="500">
 </div>
 
 
-更多内容可参考[FasterGeneration文档](./faster_generation)。
+针对大模型生成的加速利器，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
 
 ## 社区交流👬
 
