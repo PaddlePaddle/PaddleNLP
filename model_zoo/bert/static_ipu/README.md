@@ -6,15 +6,18 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 ## File Structure
 
-| File              | Description                                                        |
-| ----------------- | ------------------------------------------------------------------ |
-| `README.md`       | How to run the model.                                              |
-| `run_pretrain.py` | The algorithm script to run pretraining tasks (phase1 and phase2). |
-| `run_squad.py`    | The algorithm script to run SQuAD finetune and validation task.    |
-| `modeling.py`     | The algorithm script to build the Bert-Base model.                 |
-| `dataset_ipu.py`  | The algorithm script to load input data in pretraining.            |
-| `custom_ops/`     | The folder contains custom ops that will be used.                  |
-| `scripts/`        | The folder contains scripts for model running.                     |
+| File                      | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `README.md`               | How to run the model.                                                           |
+| `run_pretrain.py`         | The algorithm script to run pretraining tasks (phase1 and phase2).              |
+| `run_pretrain_trainer.py` | The algorithm script to run pretraining tasks with trainer (phase1 and phase2). |
+| `run_squad.py`            | The algorithm script to run SQuAD finetune and validation task.                 |
+| `run_squad_trainer.py`    | The algorithm script to run SQuAD finetune and validation task with trainer.    |
+| `modeling.py`             | The algorithm script to build the Bert-Base model.                              |
+| `args.py`                 | The parser arguments for trainer version.                                       |
+| `dataset_ipu.py`          | The algorithm script to load input data in pretraining.                         |
+| `custom_ops/`             | The folder contains custom ops that will be used.                               |
+| `scripts/`                | The folder contains scripts for model running.                                  |
 
 ## Dataset
 
@@ -123,6 +126,9 @@ bash scripts/pod16/run_pretrain.sh
 # pod4
 # takes about 11.3 * 4 hours
 bash scripts/pod4/run_pretrain.sh
+
+# trainer pod16
+bash scripts/pod16/run_pretrain_trainer.sh
 ```
 
 - Run pretraining phase2 (sequence_length = 384)
@@ -135,6 +141,9 @@ bash scripts/pod16/run_pretrain_phase2.sh
 # pod4
 # takes about 3 * 4 hours
 bash scripts/pod4/run_pretrain_phase2.sh
+
+# trainer pod16
+bash scripts/pod16/run_pretrain_phase2_trainer.sh
 ```
 
 - Run SQuAD finetune task
@@ -145,6 +154,9 @@ bash scripts/pod16/run_squad.sh
 
 # pod4
 bash scripts/pod4/run_squad.sh
+
+# trainer pod16
+bash scripts/pod16/run_squad_trainer.sh
 ```
 
 - Run SQuAD validation
@@ -155,14 +167,20 @@ bash scripts/pod16/run_squad_infer.sh
 
 # pod4
 bash scripts/pod4/run_squad_infer.sh
+
+# trainer pod16
+bash scripts/pod16/run_squad_infer_trainer.sh
 ```
 
 #### Parameters
 
+- `model_name` The name of model to use.
 - `task` The type of the NLP model.
 - `input_files` The directory of the input data.
 - `output_dir` The directory of the trained models.
 - `is_training` Training or inference.
+- `encoder_start_ipu` First ipu which contain encoder layers.
+- `layers_per_ipu` The number of layers put on one ipu.
 - `seq_len` The sequence length.
 - `vocab_size` Size of the vocabulary.
 - `max_predictions_per_seq` The max number of the masked token each sentence.
