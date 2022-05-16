@@ -4,9 +4,9 @@ components:    # define all the building-blocks for Pipeline
   - name: DocumentStore
     type: ElasticsearchDocumentStore  # consider using MilvusDocumentStore or WeaviateDocumentStore for scaling to large number of documents
     params:
-      host: 10.21.226.175
+      host: localhost
       index: baike_cities
-      port: 8200
+      port: 9200
   - name: Retriever
     type: DensePassageRetriever
     params:

@@ -4,7 +4,7 @@ components:    # define all the building-blocks for Pipeline
   - name: DocumentStore
     type: ElasticsearchDocumentStore  # consider using MilvusDocumentStore or WeaviateDocumentStore for scaling to large number of documents
     params:
-      host: 10.21.226.175
+      host: localhost
       index: dureader_robust_query_encoder
   - name: Retriever
     type: DensePassageRetriever

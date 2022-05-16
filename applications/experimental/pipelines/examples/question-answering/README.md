@@ -75,7 +75,7 @@ python examples/question-answering/dense_qa_example.py
 ```
 3. 检查确保 ES 服务启动成功
 ```bash
-curl http://10.21.226.175:9200/_aliases?pretty=true
+curl http://localhost:9200/_aliases?pretty=true
 ```
 备注：ES 服务默认开启端口为 9200
 

@@ -22,7 +22,7 @@ from time import sleep
 from uuid import uuid4
 import streamlit as st
 
-API_ENDPOINT = os.getenv("API_ENDPOINT", "http://10.21.226.175:8891")
+API_ENDPOINT = os.getenv("API_ENDPOINT")
 STATUS = "initialized"
 HS_VERSION = "hs_version"
 DOC_REQUEST = "query"

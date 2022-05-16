@@ -6,8 +6,8 @@ from pipelines.nodes import DensePassageRetriever, ErnieRanker
 
 def semantic_search_tutorial():
     document_store = ElasticsearchDocumentStore(
-        host="10.21.226.175",
-        port="8200",
+        host="localhost",
+        port="9200",
         username="",
         password="",
         index="dureader_robust_query_encoder")
