@@ -201,6 +201,9 @@ def train():
                     finally_question_res_for_backward = paddle.dot(sub_question_output, grad_for_each_question)
                     finally_context_res_for_backward = paddle.dot(sub_context_ouput, grad_for_each_context)
 
+                    finally_question_res_for_backward = finally_question_res_for_backward * (1/8.)
+                    finally_context_res_for_backward = finally_context_res_for_backward * (1/8.)
+
                     finally_question_res_for_backward.backward(retain_graph=True)
                     finally_context_res_for_backward.backward(retain_graph=True)
 
