@@ -4,9 +4,6 @@
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
 </p>
 
-
-
-
 ------------------------------------------------------------------------------------------
 
 [![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
@@ -78,7 +75,7 @@ electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
-<details><summary>&emsp;对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验（可展开详情）</summary><div>
+对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
 
 ```python
 import paddle
@@ -100,7 +97,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 </div></details>
 
-<details><summary>&emsp;PaddleNLP预训练模型适用任务汇总（可展开详情）</summary><div>
+<details><summary>&emsp;PaddleNLP预训练模型适用任务汇总（点击展开详情）</summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
