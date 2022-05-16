@@ -370,9 +370,8 @@ class SchemaInteractionATISModel(ATISModel):
         ]
 
         new_schema_states = [
-            schema_state + residual_schema_state
-            for schema_state, residual_schema_state in zip(
-                schema_states, residual_schema_states)
+            schema_state + residual_schema_state for schema_state,
+            residual_schema_state in zip(schema_states, residual_schema_states)
         ]
 
         return new_schema_states

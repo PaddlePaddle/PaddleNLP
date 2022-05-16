@@ -175,9 +175,8 @@ class LSTMEncoder(nn.Layer):
         if self.dropout:
             enc_output = self.dropout(enc_output)
 
-        enc_final_state = [
-            [h, c] for h, c in zip(enc_final_state[0], enc_final_state[1])
-        ]
+        enc_final_state = [[h, c] for h, c in
+                           zip(enc_final_state[0], enc_final_state[1])]
         return enc_output, enc_final_state
 
 

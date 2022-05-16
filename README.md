@@ -24,7 +24,7 @@
   <a href=#安装> 安装 </a> |
   <a href=#QuickStart> 快速开始 </a> |
   <a href=#API文档> API文档 </a> |
-  <a href=#社区交流> 社区交流 </a> 
+  <a href=#社区交流> 社区交流 </a>
 </h4>
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
@@ -48,11 +48,11 @@ PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本�
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a>
 
 
 ### 开箱即用的NLP能力
@@ -303,7 +303,7 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 
 - 支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；
 - 灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；
-- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。    
+- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。  
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
 

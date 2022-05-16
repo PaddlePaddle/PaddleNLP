@@ -614,8 +614,8 @@ def main():
         input_files = [
             os.path.join(args.input_file, f)
             for f in os.listdir(args.input_file)
-            if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith(
-                '.txt'))
+            if (os.path.isfile(os.path.join(args.input_file, f)) and
+                f.endswith('.txt'))
         ]
     else:
         raise ValueError("{} is not a valid path".format(args.input_file))

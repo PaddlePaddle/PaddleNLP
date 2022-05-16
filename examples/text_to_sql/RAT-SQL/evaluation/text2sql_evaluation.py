@@ -1099,13 +1099,11 @@ def eval_where(pred, gold, value_match=True):
     Returns:
     """
     pred_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
+        unit for unit in sorted(
             pred['where'][::2], key=lambda x: [str(i) for i in x])
     ])
     gold_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
+        unit for unit in sorted(
             gold['where'][::2], key=lambda x: [str(i) for i in x])
     ])
     gold_wo_agg = [unit[2] for unit in gold_conds]
@@ -1158,13 +1156,11 @@ def eval_having(pred, gold, value_match=True):
         return [1, 1, 0]
 
     pred_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
+        unit for unit in sorted(
             pred['having'][::2], key=lambda x: [str(i) for i in x])
     ])
     gold_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
+        unit for unit in sorted(
             gold['having'][::2], key=lambda x: [str(i) for i in x])
     ])
 

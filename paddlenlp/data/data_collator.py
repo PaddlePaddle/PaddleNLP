@@ -247,8 +247,8 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
 
     def paddle_call(self, features):
         label_name = "label" if "label" in features[0].keys() else "labels"
-        labels = [feature[label_name] for feature in features
-                  ] if label_name in features[0].keys() else None
+        labels = [feature[label_name] for feature in
+                  features] if label_name in features[0].keys() else None
         batch = self.tokenizer.pad(
             features,
             padding=self.padding,
@@ -281,8 +281,8 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
 
     def numpy_call(self, features):
         label_name = "label" if "label" in features[0].keys() else "labels"
-        labels = [feature[label_name] for feature in features
-                  ] if label_name in features[0].keys() else None
+        labels = [feature[label_name] for feature in
+                  features] if label_name in features[0].keys() else None
         batch = self.tokenizer.pad(
             features,
             padding=self.padding,
@@ -357,8 +357,8 @@ class DataCollatorForSeq2Seq:
     def __call__(self, features, return_tensors=None):
         if return_tensors is None:
             return_tensors = self.return_tensors
-        labels = [feature["labels"] for feature in features
-                  ] if "labels" in features[0].keys() else None
+        labels = [feature["labels"] for feature in
+                  features] if "labels" in features[0].keys() else None
         # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
         # same length to return tensors.
         if labels is not None:

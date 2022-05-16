@@ -27,21 +27,18 @@ def compute_align_loss(model, desc_enc, example):
     root_node = example.tree
     rel_cols = list(
         reversed([
-            val
-            for val in model.ast_wrapper.find_all_descendants_of_type(root_node,
-                                                                      'column')
+            val for val in model.ast_wrapper.find_all_descendants_of_type(
+                root_node, 'column')
         ]))
     rel_tabs = list(
         reversed([
-            val
-            for val in model.ast_wrapper.find_all_descendants_of_type(root_node,
-                                                                      'table')
+            val for val in model.ast_wrapper.find_all_descendants_of_type(
+                root_node, 'table')
         ]))
     rel_vals = np.abs(
         list(
             reversed([
-                val
-                for val in model.ast_wrapper.find_all_descendants_of_type(
+                val for val in model.ast_wrapper.find_all_descendants_of_type(
                     root_node, 'value')
             ])))
 

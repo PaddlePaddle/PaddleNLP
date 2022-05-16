@@ -35,8 +35,8 @@ class MedicalCorpus(paddle.io.Dataset):
         # Get all prefix of .npy/.npz files in the current and next-level directories.
         files = [
             os.path.join(data_path, f) for f in os.listdir(data_path)
-            if (os.path.isfile(os.path.join(data_path, f)) and '_idx.npz' in
-                str(f))
+            if (os.path.isfile(os.path.join(data_path, f)) and
+                '_idx.npz' in str(f))
         ]
         files = [x.replace('_idx.npz', '') for x in files]
         return files

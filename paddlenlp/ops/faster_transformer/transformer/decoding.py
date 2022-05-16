@@ -819,8 +819,8 @@ def convert_params(faster_model,
                         attr += "_"
                     setattr(faster_model, attr, params["slf_q_bias"][-1])
                     for key in [
-                            f"slf_{m}_{n}"
-                            for m in ("k", "v") for n in ("weight", "bias")
+                            f"slf_{m}_{n}" for m in ("k", "v")
+                            for n in ("weight", "bias")
                     ]:
                         params[key].append((dummy_tensor, True
                                             if key.endswith("bias") else False))
@@ -1396,8 +1396,7 @@ def enable_ft_para(tensor_para_size=None,
                 % (init_dict["nhead"], _ft_para_conf.tensor_para_size))
             func(self, *args, **kwargs)
             # Reset parameters with corresponding slice.
-            for x, attr in [(m, n)
-                            for m in ("q", "k", "v")
+            for x, attr in [(m, n) for m in ("q", "k", "v")
                             for n in ("weight", "bias")]:
                 reset_param(getattr(self.self_attn, x + "_proj"), attr, 1)
             reset_param(self.self_attn.out_proj, "weight", 0)

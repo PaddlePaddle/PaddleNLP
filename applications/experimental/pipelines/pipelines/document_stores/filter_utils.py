@@ -170,9 +170,8 @@ class LogicalFilterClause(ABC):
         """
 
         range_conditions = [
-            cond["range"]
-            for cond in filter(lambda condition: "range" in condition,
-                               conditions)
+            cond["range"] for cond in
+            filter(lambda condition: "range" in condition, conditions)
         ]
         if range_conditions:
             conditions = [

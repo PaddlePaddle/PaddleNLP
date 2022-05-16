@@ -735,9 +735,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if hasattr(self, "do_lower_case") and self.do_lower_case:
             # convert non-special tokens to lowercase
             escaped_special_toks = [
-                re.escape(s_tok)
-                for s_tok in (self.unique_no_split_tokens +
-                              self.all_special_tokens)
+                re.escape(s_tok) for s_tok in
+                (self.unique_no_split_tokens + self.all_special_tokens)
             ]
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
             text = re.sub(

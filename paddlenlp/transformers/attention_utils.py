@@ -70,9 +70,8 @@ def create_bigbird_rand_mask_idx(num_layers, query_length, key_length,
         if right_key_block_idx >= num_key_blocks:
             num_fill_blocks = right_key_block_idx - num_key_blocks + 1
             illegal_blocks_idx.extend([
-                i
-                for i in range(num_global_blocks, num_global_blocks +
-                               num_fill_blocks)
+                i for i in range(num_global_blocks,
+                                 num_global_blocks + num_fill_blocks)
             ])
 
         illegal_blocks_idx = set(illegal_blocks_idx)

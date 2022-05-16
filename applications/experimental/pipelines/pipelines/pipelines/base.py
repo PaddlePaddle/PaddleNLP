@@ -648,8 +648,8 @@ class Pipeline(BasePipeline):
         current_node_edges = self.graph.edges(node_id, data=True)
         next_nodes = [
             next_node for _, next_node, data in current_node_edges
-            if not stream_id or data["label"] == stream_id or stream_id ==
-            "output_all"
+            if not stream_id or data["label"] == stream_id or
+            stream_id == "output_all"
         ]
         return next_nodes
 

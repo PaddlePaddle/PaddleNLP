@@ -134,9 +134,8 @@ def export_feedback(context_size: int=100_000,
         # Filter out the labels where the passage is correct but answer is wrong (in SQuAD this matches
         # neither a "positive example" nor a negative "is_impossible" one)
         labels = [
-            l for l in labels
-            if not (l.is_correct_document is True and l.is_correct_answer is
-                    False)
+            l for l in labels if
+            not (l.is_correct_document is True and l.is_correct_answer is False)
         ]
 
     export_data = []
