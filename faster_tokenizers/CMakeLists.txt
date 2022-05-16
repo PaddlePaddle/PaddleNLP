@@ -30,7 +30,7 @@ ENDIF(WIN32)
 # For OpenMP
 find_package(OpenMP)
 if (OPENMP_FOUND)
-    add_compile_definitions(WITH_OMP)
+    add_definitions(-DWITH_OMP)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
@@ -93,7 +93,7 @@ add_custom_target(remove_pybind_headers ALL
 
 # copy library
 add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/tokenizers/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
     DEPENDS build_cpp_package_dir core_tokenizers)

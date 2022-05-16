@@ -9,6 +9,18 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath='$ORIGIN'
 
 if (WITH_PYTHON)
 add_subdirectory(pybind)
+cc_library(core_tokenizers SHARED
+           SRCS pybind/pybind.cc tokenizers/ernie_faster_tokenizer.cc
+           DEPS pybind python pybind_normalizers pybind_utils
+                pybind_pretokenizers pybind_models
+                pybind_postprocessors pybind_tokenizers pybind_exception
+                pybind_core normalizers pretokenizers core models
+                tokenizer added_vocabulary postprocessors json)
+set_target_properties(core_tokenizers PROPERTIES PREFIX "")
 else(WITH_PYTHON)
-add_subdirectory(tokenizers)
+# add_subdirectory(tokenizers)
+cc_library(core_tokenizers SHARED
+           SRCS tokenizers/ernie_faster_tokenizer.cc
+           DEPS normalizers pretokenizers models
+                postprocessors core added_vocabulary tokenizer json)
 endif(WITH_PYTHON)

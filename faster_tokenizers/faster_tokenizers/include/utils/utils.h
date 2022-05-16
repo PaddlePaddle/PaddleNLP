@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 
@@ -24,6 +25,13 @@ inline void GetVocabFromFiles(const std::string& files,
                               std::unordered_map<std::string, uint>* vocab) {
   const static std::string WHITESPACE = " \n\r\t\f\v";
   std::ifstream fin(files);
+  if (!fin.good()) {
+    std::cerr << "The vocab file " << files
+              << " seems to be unable to access"
+                 " or non-exists, please check again. "
+              << std::endl;
+    return;
+  }
   vocab->clear();
   int i = 0;
   constexpr int MAX_BUFFER_SIZE = 256;

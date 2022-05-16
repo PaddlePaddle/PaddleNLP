@@ -21,16 +21,33 @@ from paddlenlp.transformers import AutoTokenizer
 
 
 class InferBackend(object):
-    def __init__(self, model_path):
+    def __init__(self, model_path, use_fp16):
         print(">>> [InferBackend] Creating Engine ...")
         providers = ['CUDAExecutionProvider']
         sess_options = ort.SessionOptions()
-        self.predictor = ort.InferenceSession(
+        predictor = ort.InferenceSession(
             model_path, sess_options=sess_options, providers=providers)
-        if "CUDAExecutionProvider" in self.predictor.get_providers():
+        if "CUDAExecutionProvider" in predictor.get_providers():
             print(">>> [InferBackend] Use GPU to inference ...")
+            if use_fp16:
+                from onnxconverter_common import float16
+                import onnx
+                print(">>> [InferBackend] Use FP16 to inference ...")
+                fp16_model = "fp16_model.onnx"
+                onnx_model = onnx.load_model(model_path)
+                trans_model = float16.convert_float_to_float16(
+                    onnx_model, keep_io_types=True)
+                onnx.save_model(trans_model, fp16_model)
+                sess_options = ort.SessionOptions()
+                predictor = ort.InferenceSession(
+                    fp16_model, sess_options=sess_options, providers=providers)
         else:
             print(">>> [InferBackend] Use CPU to inference ...")
+            if use_fp16:
+                print(
+                    ">>> [InferBackend] use_fp16 only takes effect when deploying on gpu ..."
+                )
+        self.predictor = predictor
         input_name1 = self.predictor.get_inputs()[1].name
         input_name2 = self.predictor.get_inputs()[0].name
         self.input_handles = [input_name1, input_name2]
@@ -91,7 +108,7 @@ class ErniePredictor(object):
             exit(0)
 
         self.max_seq_length = args.max_seq_length
-        self.inference_backend = InferBackend(args.model_path)
+        self.inference_backend = InferBackend(args.model_path, args.use_fp16)
 
     def seq_cls_preprocess(self, input_data: list):
         data = input_data
