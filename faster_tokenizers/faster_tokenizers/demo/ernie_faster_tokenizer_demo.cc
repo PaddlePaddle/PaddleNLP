@@ -24,18 +24,18 @@ int main() {
   // case 1: tokenize a single string
   std::cout << "case 1: Tokenize a single string" << std::endl;
   tokenizers::core::Encoding encoding;
-  tokenizer.EncodePairStrings(
+  tokenizers::core::EncodeInput single_string =
       "商赢环球股份有限公司关于延期回复上海证券交易所对"
-      "公司2017年年度报告的事后审核问询函的公告",
-      &encoding);
+      "公司2017年年度报告的事后审核问询函的公告";
+  tokenizer.EncodePairStrings(single_string, &encoding);
   std::cout << encoding.DebugString() << std::endl;
 
   // case 2: tokenize a pair of strings
   std::cout << "case 2: Tokenize a pair of strings" << std::endl;
-  tokenizer.EncodePairStrings(
+  tokenizers::core::EncodeInput pair_string =
       std::pair<std::string, std::string>{"蚂蚁借呗等额还款可以换成先息后本吗",
-                                          "借呗有先息到期还本吗"},
-      &encoding);
+                                          "借呗有先息到期还本吗"};
+  tokenizer.EncodePairStrings(pair_string, &encoding);
   std::cout << encoding.DebugString() << std::endl;
 
   // case 3: Tokenize a batch of single strings
