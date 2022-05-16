@@ -55,13 +55,15 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 
 PaddleNLP Taskflow API 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
-## 社区交流
+## 社区交流👬
 
-微信扫描下方二维码加入官方交流群，与各行各业开发者充分交流，期待你的加入⬇️
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
+  - 10G重磅NLP学习大礼包：
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
-</div>
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+  </div>
 
 ## 详细使用
 
