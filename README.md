@@ -167,9 +167,8 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 集成了业界领先的语音识别（Automatic Speech Recognition, ASR）、信息抽取（Information Extraction, IE）等技术，打造智能一体化的语音指令系统，广泛应用于智能语音填单、智能语音交互、智能语音检索、手机APP语音唤醒等场景，提高人机交互效率。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168412618-04897a47-79c9-4fe7-a054-5dc1f6a1f75c.png" width="500">
+    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="500">
 </div>
-
 
 更多使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
 
