@@ -134,24 +134,24 @@ public:
                           OffsetType offset_type,
                           Encoding* encodings) const;
   void EncodePairStrings(const EncodeInput& encode_input,
-                         bool add_special_tokens,
-                         Encoding* encodings) const;
+                         Encoding* encodings,
+                         bool add_special_tokens = true) const;
   void EncodePairStringsCharOffsets(const EncodeInput& encode_input,
-                                    bool add_special_tokens,
-                                    Encoding* encodings) const;
+                                    Encoding* encodings,
+                                    bool add_special_tokens = true) const;
   void PostProcess(Encoding* encoding,
                    Encoding* pair_encoding,
                    bool add_special_tokens,
                    Encoding* result_encoding) const;
 
   void EncodeBatchStrings(const std::vector<EncodeInput>& batch_encode_input,
-                          bool add_special_tokens,
-                          std::vector<Encoding>* encodings) const;
+                          std::vector<Encoding>* encodings,
+                          bool add_special_tokens = true) const;
 
   void EncodeBatchStringsCharOffsets(
       const std::vector<EncodeInput>& batch_encode_input,
-      bool add_special_tokens,
-      std::vector<Encoding>* encodings) const;
+      std::vector<Encoding>* encodings,
+      bool add_special_tokens = true) const;
 
   // Encode single text which is already pretokenized.
   void EncodeSingleText(const std::vector<std::string>& pretokenized_texts,

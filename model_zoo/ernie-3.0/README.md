@@ -16,7 +16,6 @@
        * [Python 部署](#Python部署)
            * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
-           * [环境依赖](#环境依赖)
        * [Paddle2ONNX 部署](#Paddle2ONNX部署)
            * [ONNX导出及ONNXRuntime部署](#ONNX导出及ONNXRuntime部署)
    * [参考文献](#参考文献)
@@ -577,7 +576,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM (Exact Match) / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
 
 由表可知，`ERNIE 3.0-Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
 
@@ -587,24 +586,25 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 性能测试的配置如下：
 
-1. 数据集：TNEWS（分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
+1. 数据集：TNEWS（文本分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
-3. CPU信息：Intel(R) Xeon(R) Gold 6271C CPU
+3. CPU 信息：Intel(R) Xeon(R) Gold 6271C CPU
 
 4. PaddlePaddle 版本：2.3
 
 5. PaddleNLP 版本：2.3
 
-6. 性能数据单位是 QPS，QPS 测试方法：设置足够大的 batch size，将显存占满，然后固定为该 batch_size 进行测试。QPS = batch_size / mean_time
+6. 性能数据单位是 QPS，QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
 
-7. 精度数据单位：文本分类是 Accuracy，序列标注 是 F1-Score，阅读理解是 EM
+7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 EM (Exact Match)
 
 <a name="CPU性能"></a>
 
 ##### CPU 性能
 
+测试环境及说明如上，测试 CPU 性能时，线程数设置为12。
 
 |                            | TNEWS 性能   | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER精度 | CMRC2018性能 | CMRC2018 精度 |
 | -------------------------- | ------------ | ------------ | ------------- | ------------ | ------------ | ------------- |
@@ -652,12 +652,14 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 ### 服务化部署
 
+服务化部署请参考：[服务化部署指南](./deploy/serving/README.md)
+
 <a name="Paddle2ONNX部署"></a>
 
 ### Paddle2ONNX 部署
 
 <a name="ONNX导出及ONNXRuntime部署"></a>
-ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
+ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 
 
 <a name="参考文献"></a>

@@ -42,9 +42,9 @@ TEST(tokenizer, ernie_faster_tokenizer) {
   std::string vocab_file = "ernie_vocab.txt";
   tokenizers_impl::ErnieFasterTokenizer ernie_faster_tokenizer(vocab_file);
   std::vector<core::Encoding> encodings(2);
-  ernie_faster_tokenizer.EncodePairStrings("今天天气真好", true, &encodings[0]);
+  ernie_faster_tokenizer.EncodePairStrings("今天天气真好", &encodings[0]);
   ernie_faster_tokenizer.EncodePairStrings(
-      "don't know how this missed award nominations.", true, &encodings[1]);
+      "don't know how this missed award nominations.", &encodings[1]);
   std::vector<std::vector<std::string>> expected_tokens = {
       {"[CLS]", "今", "天", "天", "气", "真", "好", "[SEP]"},
       {"[CLS]",
