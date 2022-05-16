@@ -268,12 +268,13 @@ def create_pretrained_dataset(
 
     while True:
         try:
-            from data_tools.dataset_utils import compile_helper
+            from data_tools.helpers import helpers
             break
         except Exception as e:
             if local_rank == 0:
                 start_time = time.time()
                 print('> compiling dataset index builder ...')
+                from data_tools.dataset_utils import compile_helper
                 compile_helper()
                 print(
                     '>>> done with dataset index builder. Compilation time: {:.3f} '
