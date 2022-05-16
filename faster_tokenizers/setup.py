@@ -48,10 +48,18 @@ else:
         ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll"]
     }
 
+
+def get_version():
+    import sys
+    sys.path.append('python/')
+    import faster_tokenizers
+    return faster_tokenizers.__version__
+
+
 long_description = "PaddleNLP Faster Tokenizer Library written in C++ "
 setup(
     name="faster_tokenizers",
-    version="0.1.0",
+    version=get_version(),
     author="PaddlePaddle Speech and Language Team",
     author_email="paddlesl@baidu.com",
     description=long_description,
