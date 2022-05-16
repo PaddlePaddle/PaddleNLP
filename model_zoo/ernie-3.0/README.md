@@ -574,22 +574,12 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium裁剪、量化 | 75.02 | 57.26 |         |       | 77.25 | 78.62       | 79.67 | 65.30/86.03 | 93.17/93.23/93.20             |       |
 
 
-TODO 完善数据，结论
-
 <a name="性能"></a>
-
 
 
 ##### CPU 性能
 
-GPU:
-TBD
-
-CPU:
-TBD
-
-
-|                              | 文本分类 性能 QPS  (seq/s) | NER 性能 QPS  (seq/s)(叶梁) | 阅读理解性能 QPS  (seq/s) |
+|                              | 文本分类 性能 QPS  (seq/s) | NER 性能 QPS  (seq/s) | 阅读理解性能 QPS  (seq/s) |
 | ---------------------------- | -------------------------- | --------------------------- | ------------------------- |
 | ERNIE-3.0-medium + FP32      | 311.95                     | 90.91                       | 33.74                     |
 | ERNIE-3.0-medium+ INT8       | 600.35                     | 141.00                      | 56.51                     |
@@ -597,7 +587,6 @@ TBD
 | ERNIE-3.0-medium + 裁减+INT8 | 704.42                     | 215.58                      | 75.23                     |
 
 
-测试环境 & 结论：
 
 <a name="GPU性能"></a>
 
@@ -611,9 +600,6 @@ TBD
 | ERNIE-3.0-medium+ 裁减 + FP32  | 1424.01                   | 454.27               | 183.77                   |
 | ERNIE-3.0-medium+ 裁减 + FP16  | 3577.62                   | 1138.77              | 445.71                   |
 | ERNIE-3.0-medium + 裁减 + INT8 | 3635.48                   | 1105.26              | 444.27                   |
-
-
-测试环境 & 结论：
 
 
 <a name="部署"></a>
@@ -635,7 +621,6 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 
 ### 服务化部署
-TBD
 
 <a name="Paddle2ONNX部署"></a>
 
