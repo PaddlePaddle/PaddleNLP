@@ -587,19 +587,19 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 性能测试的配置如下：
 
-1. 数据集：TNEWS（分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
+1. 数据集：TNEWS（文本分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
-3. CPU信息：Intel(R) Xeon(R) Gold 6271C CPU
+3. CPU信息：Intel(R) Xeon(R) Gold 6271C CPU，线程数 12
 
 4. PaddlePaddle 版本：2.3
 
 5. PaddleNLP 版本：2.3
 
-6. 性能数据单位是 QPS，QPS 测试方法：设置足够大的 batch size，将显存占满，然后固定为该 batch_size 进行测试。QPS = batch_size / mean_time
+6. 性能数据单位是 QPS，QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
 
-7. 精度数据单位：文本分类是 Accuracy，序列标注 是 F1-Score，阅读理解是 EM
+7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 EM
 
 <a name="CPU性能"></a>
 
@@ -652,12 +652,14 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 ### 服务化部署
 
+服务化部署请参考：[服务化部署指南])(./deploy/serving/README.md)
+
 <a name="Paddle2ONNX部署"></a>
 
 ### Paddle2ONNX 部署
 
 <a name="ONNX导出及ONNXRuntime部署"></a>
-ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
+ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 
 
 <a name="参考文献"></a>
