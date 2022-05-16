@@ -16,7 +16,7 @@ IF(WIN32)
 # TODO(zhoushunjie): Need to upgrade windows
 ELSE(WIN32)
 add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/pybind/${TOKENIZER_CORE_NAME}.so ${TOKENIZER_DST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/${TOKENIZER_CORE_NAME}.so ${TOKENIZER_DST_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${TOKENIZER_DST_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${TOKENIZER_DST_DIR}
     DEPENDS copy_python_tokenizers)

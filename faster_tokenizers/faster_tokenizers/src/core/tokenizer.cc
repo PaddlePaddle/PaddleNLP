@@ -225,8 +225,8 @@ void Tokenizer::PostProcess(Encoding* encoding,
 }
 
 void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
-                                  bool add_special_tokens,
-                                  Encoding* encodings) const {
+                                  Encoding* encodings,
+                                  bool add_special_tokens) const {
   Encoding encoding;
   if (encode_input.type() == typeid(InputString)) {
     const auto& input_string = boost::get<InputString>(encode_input);
@@ -245,19 +245,21 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
 
 void Tokenizer::EncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
-    bool add_special_tokens,
-    std::vector<Encoding>* encodings) const {
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens) const {
   encodings->resize(batch_encode_input.size());
 #ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
+// tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the
+// workload estimation.
 #pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
                                                      omp_get_num_threads() > \
                                                                          1)
 #endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     EncodePairStrings(
-        batch_encode_input[i], add_special_tokens, &(*encodings)[i]);
+        batch_encode_input[i], &(*encodings)[i], add_special_tokens);
   }
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
@@ -265,8 +267,8 @@ void Tokenizer::EncodeBatchStrings(
 }
 
 void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
-                                             bool add_special_tokens,
-                                             Encoding* encodings) const {
+                                             Encoding* encodings,
+                                             bool add_special_tokens) const {
   const auto& input_string = boost::get<InputString>(&encode_input);
   const auto& input_string_pair =
       boost::get<std::pair<InputString, InputString>>(&encode_input);
@@ -285,12 +287,14 @@ void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
 
 void Tokenizer::EncodeBatchStringsCharOffsets(
     const std::vector<EncodeInput>& batch_encode_input,
-    bool add_special_tokens,
-    std::vector<Encoding>* encodings) const {
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens) const {
   encodings->resize(batch_encode_input.size());
 #ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the workload estimation.
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
+// tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the
+// workload estimation.
 #pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
                                                      omp_get_num_threads() > \
                                                                          1)
@@ -298,7 +302,7 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
   for (int i = 0; i < batch_encode_input.size(); ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
-        batch_encode_input[i], add_special_tokens, &encoding);
+        batch_encode_input[i], &encoding, add_special_tokens);
     (*encodings)[i] = std::move(encoding);
   }
   if (use_padding_) {

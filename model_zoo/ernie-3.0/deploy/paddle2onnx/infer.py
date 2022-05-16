@@ -42,6 +42,11 @@ def parse_args():
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
+    parser.add_argument(
+        "--use_fp16",
+        action='store_true',
+        help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
+    )
     args = parser.parse_args()
     return args
 
