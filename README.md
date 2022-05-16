@@ -29,7 +29,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
+* 🔥 2022.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
