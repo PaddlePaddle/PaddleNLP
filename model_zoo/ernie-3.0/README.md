@@ -538,9 +538,21 @@ trainer.compress(
 - `output_dir`：裁剪、量化后的模型保存目录
 - `pruning`：是否裁剪，默认为`True`
 - `quantization`：是否量化，默认为 `True`
-- `compress_config`：压缩配置，目前支持 `DynabertConfig` 裁剪配置类和 `PTQConfig` 量化配置类的实例。使用`DynabertConfig`可以配置裁剪比例、裁剪后导出模型的文件名前缀，`PTQConfig` 支持传入量化策略列表（例如`hist`、`KL`、`mse`等）、量化使用的校准数据的样本数、待量化的模型目录（当不裁剪时如不提供，则会对`model`导出部署模型后再进行量化）、待量化模型的文件名前缀、量化后模型的文件名前缀。
+- `compress_config`：压缩配置，需要分别传入裁剪和量化的配置实例。目前裁剪和量化分别仅支持`DynabertConfig`和`PTQConfig`类。当默认参数不满足需求时，可通过传入参数对压缩过程进行特殊配置：
 
-本项目 还提供了压缩 API 在文本分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+其中，`DynabertConfig`中可以传的参数有：
+- `width_mult_list`：裁剪宽度保留的比例，对 6 层模型推荐 `3/4` ，对 12 层模型推荐 `2/3`，表示对 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例。默认是 `3/4`
+- `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
+
+`PTQConfig`中可以传的参数有：
+- `algo_list`：量化策略列表，目前支持 `KL`, `abs_max`, `min_max`, `avg`, `hist`和`mse`，不同的策略计算量化比例因子的方法不同。建议传入多种策略，可批量得到由多种策略产出的多个量化模型，从中选择最优模型。推荐`hist`, `mse`, `KL`，默认是`["hist"]`
+- `batch_size_list`：校准样本数，默认是 `[4]`。并非越大越好，也是一个超参数，建议传入多种校准样本数，可从多个量化模型中选择最优模型。
+- `input_dir`：待量化模型的目录。如果是 `None`，当不启用裁剪时，表示待量化的模型是 `Trainer` 初始化的模型；当启用裁剪时，表示待量化的模型是裁剪后导出的模型。默认是`None`
+- `input_filename_prefix`：待量化模型文件名前缀，默认是 `"float32"`
+- `output_filename_prefix`：导出的量化模型文件名后缀，默认是`"int8"`
+
+
+本项目还提供了压缩 API 在文本分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
 # 文本分类任务

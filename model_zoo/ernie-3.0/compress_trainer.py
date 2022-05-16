@@ -84,7 +84,7 @@ class PTQConfig:
                 Defaults to `["hist"]`.
             batch_size_list (list of int):
                 Number of calibration samples.
-                Defaults to `4`.
+                Defaults to `[4]`.
             input_dir (str):
                 Directory name of model to be quantized.
                 Defaults to `None`.
@@ -93,7 +93,7 @@ class PTQConfig:
                 Defaults to `"float32"`.
             output_filename_prefix (str):
                 Prefix of model filename after quantization.
-                Defaults to `"float32"`.
+                Defaults to `"int8"`.
         """
         self.compress_type = "ptq"
         self.algo_list = algo_list
