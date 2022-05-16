@@ -84,7 +84,8 @@ infer.py脚本中的参数说明：
 |--model_name_or_path | 模型的路径或者名字，默认为ernie-3.0-medium-zh|
 |--model_path | 用于推理的ONNX模型的路径|
 |--max_seq_length |最大序列长度，默认为128|
-|--use_fp16 |是否开启FP16进行推理，默认关闭，请GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0时才可开启，否则不会带来加速效果|
+|--use_fp16 |是否开启FP16进行推理，默认关闭，请GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0时才可开启，否则不会带来加速效果|  
+
 **Note**：在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0时才可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。
 
 ## 3. 分类模型推理
