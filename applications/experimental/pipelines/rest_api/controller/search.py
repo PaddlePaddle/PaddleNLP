@@ -94,8 +94,9 @@ def _process_request(pipeline, request) -> Dict[str, Any]:
         if "filters" in params[key].keys():
             params[key]["filters"] = _format_filters(params[key]["filters"])
 
-    result = pipeline.run(
-        query=request.query, params=params, debug=request.debug)
+    result = pipeline.run(query=request.query,
+                          params=params,
+                          debug=request.debug)
 
     # Ensure answers and documents exist, even if they're empty lists
     if not "documents" in result:

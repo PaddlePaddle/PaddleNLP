@@ -89,8 +89,8 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
             question_tokenids = tokenized_q["input_ids"]
 
             # Fake offset_mapping
-            question_offsets = [(i, i + 1) for i in range(
-                len(question_tokenids))]
+            question_offsets = [(i, i + 1)
+                                for i in range(len(question_tokenids))]
 
             # question start_of_words_batch
             # Fake question_sow

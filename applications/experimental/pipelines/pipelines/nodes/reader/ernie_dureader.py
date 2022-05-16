@@ -501,8 +501,8 @@ class ErnieReader(BaseReader):
         # The answer positions that end position less than start position shuold be mask
         pos_mask_tensor = paddle.tensor.triu(
             (paddle.ones(
-                (max_seq_len, max_seq_len), dtype=paddle.get_default_dtype()) *
-             -888),
+                (max_seq_len, max_seq_len),
+                dtype=paddle.get_default_dtype()) * -888),
             diagonal=1)
         pos_mask_tensor = paddle.transpose(pos_mask_tensor, perm=[1, 0])
 

@@ -110,8 +110,8 @@ class ErnieRanker(BaseRanker):
         tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
         with paddle.no_grad():
-            similarity_scores = self.transformer_model.matching(**
-                                                                tensors).numpy()
+            similarity_scores = self.transformer_model.matching(
+                **tensors).numpy()
 
         for doc, rank_score in zip(documents, similarity_scores):
             doc.rank_score = rank_score

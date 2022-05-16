@@ -91,8 +91,8 @@ class BaseComponent:
                     component_params[key] = cls.load_from_pipeline_config(
                         pipeline_config, value)
 
-            component_instance = cls.load_from_args(component_config["type"], **
-                                                    component_params)
+            component_instance = cls.load_from_args(component_config["type"],
+                                                    **component_params)
         else:
             component_instance = cls.load_from_args(component_name)
         return component_instance
