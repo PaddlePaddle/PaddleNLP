@@ -415,22 +415,25 @@
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本  
 ├── config.yml                   # 压缩配置文件
-├── infer.py                     # 支持 CLUE 分类、CMRC2018、MSRA_NER 任务的预测脚本
+├── infer.py                     # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
 ├── deploy                       # 部署目录
 │ └── python
 │   └── ernie_predictor.py
 │   └── infer_cpu.py
 │   └── infer_gpu.py
+│   └── README.md
 │ └── serving
 │   └── seq_cls_rpc_client.py  
 │   └── seq_cls_service.py  
 │   └── seq_cls_config.yml  
 │   └── token_cls_rpc_client.py  
 │   └── token_cls_service.py  
-│   └── token_cls_config.yml  
+│   └── token_cls_config.yml
+│   └── README.md
 │ └── paddle2onnx
 │   └── ernie_predictor.py  
 │   └── infer.py
+│   └── README.md
 └── README.md                    # 文档，本文件
 
 ```
@@ -478,12 +481,11 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --do_train
 
 ### 环境依赖
 
-压缩功能需要安装 paddleslim 包
+使用裁剪功能需要安装 paddleslim 包
 
 ```shell
 pip install paddleslim
 ```
-
 
 <a name="压缩效果"></a>
 
@@ -524,19 +526,19 @@ trainer.compress(
 ```
 由于压缩 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型压缩来说必要传入的参数如下：
 
-- `model`：BERT、ERNIE 等模型，是在下文 `task_name` 任务中微调后的模型
-- `data_collator`：三类任务均可使用 PaddleNLP 预定义好的[DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 Pad 等操作。使用方法参考本项目中代码即可
-- `train_dataset`：裁剪训练需要使用的训练数据
-- `eval_dataset`：裁剪训练使用的评估数据，量化使用的校准数据
-- `tokenizer`：模型`model`对应的 tokenizer
+- `model`：ERNIE、BERT 等模型，是在 `task_name` 任务中微调后的模型。以分类模型为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 来获取
+- `data_collator`：三类任务均可使用 PaddleNLP 预定义好的[DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考本项目中代码即可
+- `train_dataset`：裁剪训练需要使用的训练集
+- `eval_dataset`：裁剪训练使用的评估集，也是量化使用的校准数据
+- `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取
 
 然后可以直接调用 `compress` 启动压缩，其中 `compress` 的参数释义如下：
 
-- `task_name`：任务名，例如 TNEWS、MSRA_NER、CMRC2018等
-- `output_dir`：压缩后模型的保存目录（包含裁剪、量化）
-- `pruning`：是否裁剪，默认为 True
-- `quantization`：是否量化，默认为 True
-- `compress_config`：压缩配置，目前支持 `DynabertConfig` 裁剪配置类和 `PTQConfig` 量化配置类，前者可以配置裁剪比例、裁剪后导出模型的文件名前缀，后者支持传入量化策略列表（例如`hist`、 `KL`、 `mse`等）、量化使用的校准数据的样本数、待量化的模型目录、待量化模型的文件名前缀、量化后模型的文件名前缀。
+- `task_name`：任务名，例如 `tnews`、`msra_ner`、`clue cmrc2018`等
+- `output_dir`：裁剪、量化后的模型保存目录
+- `pruning`：是否裁剪，默认为`True`
+- `quantization`：是否量化，默认为 `True`
+- `compress_config`：压缩配置，目前支持 `DynabertConfig` 裁剪配置类和 `PTQConfig` 量化配置类的实例。使用`DynabertConfig`可以配置裁剪比例、裁剪后导出模型的文件名前缀，`PTQConfig` 支持传入量化策略列表（例如`hist`、`KL`、`mse`等）、量化使用的校准数据的样本数、待量化的模型目录（当不裁剪时如不提供，则会对`model`导出部署模型后再进行量化）、待量化模型的文件名前缀、量化后模型的文件名前缀。
 
 本项目 还提供了压缩 API 在文本分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
@@ -590,7 +592,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM (Exact Match) / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CLUE CMRC2018 的评价指标是 EM (Exact Match) / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
 
 由表可知，`ERNIE 3.0-Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
 
@@ -600,7 +602,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 性能测试的配置如下：
 
-1. 数据集：TNEWS（文本分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
+1. 数据集：TNEWS（文本分类）、MSRA_NER（序列标注）、CLUE CMRC2018（阅读理解）
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
