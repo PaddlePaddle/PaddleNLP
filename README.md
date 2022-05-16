@@ -254,9 +254,9 @@ PaddleNLP针对信息抽取、语义检索、问答、情感倾向分析，推�
   - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
   - 10G重磅NLP学习大礼包：
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
-</div>
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+  </div>
 
 
 
