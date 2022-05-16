@@ -117,13 +117,14 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         'knowledge': "[KNOW]",
         'recommend': "[RECO]",
     }
+    padding_side = "left"
 
     def __init__(self,
                  vocab_file,
                  sentencepiece_model_file,
                  do_lower_case=False,
                  unk_token="[UNK]",
-                 pad_token="[PAD]",
+                 pad_token="[UNK]",
                  cls_token="[CLS]",
                  sep_token="[SEP]",
                  mask_token="[MASK]",
@@ -146,7 +147,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             sep_token,
             mask_token=mask_token)
 
-        # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
+        # if the sentencepiece_model_file is not exists, just the default sentence-piece model
         if os.path.isfile(sentencepiece_model_file):
             self.spm_model.Load(sentencepiece_model_file)
 
@@ -388,7 +389,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def save_resources(self, save_directory):
-        # Rewrite the :meth:`save_resources` method of superclass to save 
+        # Rewrite the :meth:`save_resources` method of superclass to save
         # related resources under `save_directory`.
         for name, file_name in self.resource_files_names.items():
             src_path = getattr(self, name)
@@ -417,7 +418,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                         bos_token=None,
                         eos_token=None,
                         **kwargs):
-        # Rewrite the :meth:`load_vocabulary` method of superclass to deal with 
+        # Rewrite the :meth:`load_vocabulary` method of superclass to deal with
         # the inconsistency of the vocabulary format.
         token_to_idx = UnifiedTransformerTokenizer.read_file(filepath)
         vocab = Vocab.from_dict(
@@ -700,8 +701,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         sequence_length = len(encoded_inputs["input_ids"])
         assert sequence_length <= max_seq_len
 
-        # Considering that the logits at the last time step in the API of 
-        # generative task are taken to generate the next token. In order to 
+        # Considering that the logits at the last time step in the API of
+        # generative task are taken to generate the next token. In order to
         # avoid the last time step being a pad, so take padding on the left.
         pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
         if pad_length > 0:

@@ -347,15 +347,18 @@ class ErnieGenPretrainedModel(object):
         else:
             init_kwargs = init_configuration
 
-        # import pdb; pdb.set_trace()
-        if not os.path.exists(resolved_resource_files[file_id]):
-            raise ValueError('pretrain dir not found: %s' %
-                             resolved_resource_files[file_id])
+        # position args are stored in kwargs, maybe better not include
+        init_args = init_kwargs.pop("init_args", [{}])[0]
+        if len(init_args) == 0:
+            init_args = init_kwargs
 
         name_prefix = kwargs.pop('name', None)
-        model = cls(init_kwargs, name=name_prefix)
+        init_kwargs.pop('name', None)
+        init_args.pop('name', None)
 
-        weight_path = list(resolved_resource_files.values())[0]
+        model = cls(init_args, name=name_prefix)
+
+        weight_path = resolved_resource_files["model_state"]
         logger.info('loading pretrained model from %s' % weight_path)
 
         if os.path.exists(weight_path):

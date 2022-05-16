@@ -5,7 +5,7 @@ if [ "$DATASET" == cnndm ]
 then
 python train_prophetnet.py \
     --dataset=cnndm \
-    --pretrained_model_path=./model_state.pdparams \
+    --model_name_or_path=prophetnet-large-uncased \
     --batch_size=4 \
     --epochs=4 \
     --lr=0.0001 \
@@ -17,7 +17,7 @@ python train_prophetnet.py \
 else
 python train_prophetnet.py \
     --dataset=gigaword \
-    --pretrained_model_path=./model_state.pdparams \
+    --model_name_or_path=prophetnet-large-uncased \
     --batch_size=16 \
     --epochs=6 \
     --lr=0.0001 \
