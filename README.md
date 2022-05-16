@@ -267,7 +267,7 @@ pip install --upgrade paddlenlp
 
 - 一键预测
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果，以情感分析任务为例：
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果，以信息抽取————命名实体识别任务为例：
 
 ```python
 from pprint import pprint
