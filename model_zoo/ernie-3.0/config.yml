@@ -68,7 +68,7 @@ TokenClassification:
 QuestionAnswering:
     cmrc2018:
         learning_rate: 0.00003
-        num_train_epochs: 4
+        num_train_epochs: 8
         batch_size: 24
         max_seq_length: 512
 
