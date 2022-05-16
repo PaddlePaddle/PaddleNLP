@@ -93,7 +93,7 @@ add_custom_target(remove_pybind_headers ALL
 
 # copy library
 add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/tokenizers/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
     DEPENDS build_cpp_package_dir core_tokenizers)
