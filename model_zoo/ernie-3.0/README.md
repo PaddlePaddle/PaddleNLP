@@ -2,14 +2,14 @@
 
  **目录**
    * [模型介绍](#模型介绍)
-   * [模型介绍](#模型效果)
+   * [模型效果](#模型效果)
    * [微调](#微调)
    * [模型压缩](#模型压缩)
        * [环境依赖](#环境依赖)
        * [模型压缩 API 使用](#模型压缩API使用)
        * [压缩效果](#压缩效果)
-           * [精度](#精度)
-           * [性能](#性能)
+           * [精度测试](#精度测试)
+           * [性能测试](#性能测试)
                * [CPU 性能](#CPU性能)
                * [GPU 性能](#CPU性能)
    * [部署](#部署)
@@ -19,14 +19,13 @@
            * [环境依赖](#环境依赖)
        * [Paddle2ONNX 部署](#Paddle2ONNX部署)
            * [ONNX导出及ONNXRuntime部署](#ONNX导出及ONNXRuntime部署)
-
-
+   * [参考文献](#参考文献)
 
 ## 模型介绍
 
 本次开源的模型是在文心大模型ERNIE 3.0基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与ERNIE 2.0保持一致，相比ERNIE 2.0具有更强的中文效果。
 
-相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9) 
+相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9)
 
 
 ### 在线蒸馏技术
@@ -46,7 +45,7 @@
 
 ## 模型效果
 
-本项目开源 **ERNIE 3.0 _base_*** 和 **ERNIE 3.0 _medium_**两个模型：
+本项目开源 **ERNIE 3.0 _Base_** 和 **ERNIE 3.0 _Medium_** 两个模型：
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
@@ -413,13 +412,13 @@
 ```shell
 .
 ├── run_seq_cls.py               # 分类任务的微调脚本
-├── run_token_cls.py             # 命名实体识别任务的微调脚本
+├── run_token_cls.py             # 序列标注任务的微调脚本
 ├── run_qa.py                    # 阅读理解任务的微调脚本
 ├── compress_seq_cls.py          # 分类任务的压缩脚本
-├── compress_token_cls.py        # 命名实体识别任务的压缩脚本
+├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本  
 ├── config.yml                   # 压缩配置文件
-├── infer.py                     # 支持CLUE分类、CMRC2018、MSRA_NER 任务的预测脚本
+├── infer.py                     # 支持 CLUE 分类、CMRC2018、MSRA_NER 任务的预测脚本
 ├── deploy                       # 部署目录
 │ └── python
 │   └── ernie_predictor.py       # TODO
@@ -452,7 +451,7 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 # 用于分类任务
 seq_cls_model = AutoModelForSequenceClassificaion.from_pretrained("ernie-3.0-medium-zh")
 
-# 用于命名实体识别任务
+# 用于序列标注任务
 token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-base-zh")
 
 # 用于阅读理解任务
@@ -460,13 +459,13 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
 
 ```
 
-ERNIE 3.0 提供了针对分类、命名实体识别、阅读理解三大场景下的微调使用样例，分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
+ERNIE 3.0 提供了针对分类、序列标注、阅读理解三大场景下的微调使用样例，可分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
 
 ```shell
 # 分类任务
 python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-base-zh --do_train
 
-# 命名实体识别任务
+# 序列标注任务
 python run_token_cls.py --task_name msra_ner  --model_name_or_path ernie-3.0-medium-zh --do_train
 
 # 阅读理解任务
@@ -487,6 +486,12 @@ python run_qa.py --model_name_or_path ernie-3.0-medium-zh --do_train
 ```shell
 pip install paddleslim
 ```
+
+
+<a name="压缩效果"></a>
+
+### 压缩 效果
+
 
 <a name="模型压缩API使用"></a>
 
@@ -520,13 +525,13 @@ trainer.compress(
     compress_config=compress_config)
 ```
 
-并且，ERNIE 3.0 还提供了压缩 API 在分类、命名实体识别、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+并且，ERNIE 3.0 还提供了压缩 API 在分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
 # 分类任务
 python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
 
-# 命名实体识别任务
+# 序列标注任务
 python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER  --output_dir ./
 
 # 阅读理解任务
@@ -547,60 +552,84 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 **压缩 API 使用TIPS：**
 
-1. 压缩 API 提供裁剪和量化两个过程，建议两种都选择，裁剪需要训练，训练时间视下游任务数据量而定且和微调是一个量级的。量化不需要训练，更快；因此也可以只选择量化；
+1. 压缩 API 提供裁剪和量化两个过程，如果硬件支持量化模型的部署，建议两种都选择。目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级的。静态离线量化不需要训练，更快，加速比比裁剪更明显，但是单独量化精度下降可能也更多；
 
 2. 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `batch_size`、`learning_rate`、`epoch`、`max_seq_length` 等超参进行 grid search；
 
-3. 模型压缩主要用于推理部署，因此压缩后的模型都是静态图模型，只可用于预测，不能再通过 `from_pretrained` 导入继续训练。
-
+3. 模型压缩主要用于推理部署，因此压缩后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
 <a name="压缩效果"></a>
 
 ### 压缩效果
 
-<a name="精度"></a>
+<a name="精度测试"></a>
 
-#### 精度
+#### 精度测试
 
-这三类任务使用压缩 API 压缩精度如下：
+本案例中我们对 ERNIE 3.0-Medium 模型在三类任务上微调后的模型使用压缩 API 进行压缩。压缩后精度如下：
 
-| Model                      | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | MSRA_NER:precision/recall/f1/ | AVG   |
-| -------------------------- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------------------- | ----- |
-| ERNIE 3.0-Medium           | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.95/87.15 | 92.65/93.43/93.04             | 74.87 |
-| ERNIE 3.0-Medium+FP16      | 75.32 | 57.45 | 60.22   | 81.16 | 77.22 | 80.59       | 79.73 | 66.95/87.16 | 92.65/93.45/93.05             | 74.63 |
-| ERNIE 3.0-Medium量化       | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 80.47 | 66.32/86.82 | 93.10/92.90/92.70             | 73.97 |
-| ERNIE 3.0-Medium裁剪       | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.55/86.24 | 93.10/93.43/93.27             | 74.65 |
-| ERNIE 3.0-Medium裁剪+FP16  | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 79.67 | 65.39/86.17 | 93.10/93.43/93.27             | 74.43 |
-| ERNIE 3.0-Medium裁剪、量化 | 75.02 | 57.26 |         |       | 77.25 | 78.62       | 79.67 | 65.30/86.03 | 93.17/93.23/93.20             |       |
+| Model                           | AVG   | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | MSRA_NER          |
+| ------------------------------- | ----- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------- |
+| ERNIE 3.0-Medium                | 74.87 | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.95/87.15 | 92.65/93.43/93.04 |
+| ERNIE 3.0-Medium+FP16           | 74.87 | 75.32 | 57.45 | 60.22   | 81.16 | 77.22 | 80.59       | 81.90 | 66.95/87.16 | 92.65/93.45/93.05 |
+| ERNIE 3.0-Medium+裁剪+FP32      | 74.70 | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.92/86.43 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+裁剪+FP16      | 74.71 | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 81.73 | 65.89/86.44 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
+| ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
 
-<a name="性能"></a>
+由表可知，`ERNIE 3.0-Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
 
+<a name="性能测试"></a>
+
+#### 性能测试
+
+性能测试的配置如下：
+
+1. 数据集：TNEWS（分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
+
+2. 计算卡：T4、CUDA11.2、CuDNN8.2
+
+3. CPU信息：Intel(R) Xeon(R) Gold 6271C CPU
+
+4. PaddlePaddle 版本：2.3
+
+5. PaddleNLP 版本：2.3
+
+6. 性能数据单位是 QPS，QPS 测试方法：设置足够大的 batch size，将显存占满，然后固定为该 batch_size 进行测试。QPS = batch_size / mean_time
+
+7. 精度数据单位：文本分类是 Accuracy，序列标注 是 F1-Score，阅读理解是 EM
+
+<a name="CPU性能"></a>
 
 ##### CPU 性能
 
-|                              | 文本分类 性能 QPS  (seq/s) | NER 性能 QPS  (seq/s) | 阅读理解性能 QPS  (seq/s) |
-| ---------------------------- | -------------------------- | --------------------------- | ------------------------- |
-| ERNIE-3.0-medium + FP32      | 311.95                     | 90.91                       | 33.74                     |
-| ERNIE-3.0-medium+ INT8       | 600.35                     | 141.00                      | 56.51                     |
-| ERNIE-3.0-medium+ 裁剪+FP32  | 408.65                     | 122.13                      | 48.47                     |
-| ERNIE-3.0-medium + 裁减+INT8 | 704.42                     | 215.58                      | 75.23                     |
+| TNEWS 性能                 | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER精度 | CMRC2018性能 | CMRC2018 精度 |
+| -------------------------- | ------------ | ------------- | ------------ | ------------ | ------------- | ------------ |
+| ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45         | 90.91(1.0x)  | 93.04        | 33.74(1.0x)   | 66.95        |
+| ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88)  | 141.00(1.6x) | 92.64(-0.40) | 56.51(1.7x)   | 66.23(-0.72) |
+| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14)  | 122.13(1.3x) | 93.27(+0.23) | 48.47(1.4x)   | 65.55(-1.40) |
+| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76)  | 215.58(2.4x) | 92.39(-0.65) | 75.23(2.2x)   | 63.47(-3.48) |
 
+
+三类任务（分类、NER、阅读理解）经过相同压缩过程后，加速比达到 2.3 左右。
 
 
 <a name="GPU性能"></a>
 
 ##### GPU 性能
 
-|                                | 文本分类 性能 QPS (seq/s) | NER 性能 QPS (seq/s) | 阅读理解性能 QPS (seq/s) |
-| ------------------------------ | ------------------------- | -------------------- | ------------------------ |
-| ERNIE-3.0-medium + FP32        | 1123.85                   | 366.75               | 146.84                   |
-| ERNIE-3.0-medium + FP16        | 2672.41                   | 840.11               | 303.43                   |
-| ERNIE-3.0-medium + INT8        | 3226.26                   | 889.33               | 348.84                   |
-| ERNIE-3.0-medium+ 裁减 + FP32  | 1424.01                   | 454.27               | 183.77                   |
-| ERNIE-3.0-medium+ 裁减 + FP16  | 3577.62                   | 1138.77              | 445.71                   |
-| ERNIE-3.0-medium + 裁减 + INT8 | 3635.48                   | 1105.26              | 444.27                   |
+|                            | 文本分类 性能 | 文本分类精度 | NER 性能      | NER精度      | 阅读理解性能 | 阅读理解精度 |
+| -------------------------- | ------------- | ------------ | ------------- | ------------ | ------------ | ------------ |
+| ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04        | 146.84(1.0x) | 66.95        |
+| ERNIE 3.0-Medium+FP16      | 2672.41(2.4x) | 57.45(0.00)  | 840.11(2.3x)  | 93.05(0.01)  | 303.43(2.1x) | 66.95(0.00)  |
+| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34) | 348.84(2.4x) | 66.32(-0.63) |
+| ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23) | 183.77(1.3x) | 65.92(-1.03) |
+| ERNIE 3.0-Medium+裁剪+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23) | 445.71(3.0x) | 65.89(-1.06) |
+| ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16) | 444.27(3.0x) | 66.17(-0.78) |
 
+三类任务（分类、序列标注、阅读理解）经过裁剪 +。量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在0.5以内（0.46）。
 
 <a name="部署"></a>
 
@@ -619,7 +648,6 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
 
-
 ### 服务化部署
 
 <a name="Paddle2ONNX部署"></a>
@@ -628,7 +656,11 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="ONNX导出及ONNXRuntime部署"></a>
 ONNX导出及ONNXRuntime部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
-## Reference
+
+
+<a name="参考文献"></a>
+
+## 参考文献
 
 * Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
 
