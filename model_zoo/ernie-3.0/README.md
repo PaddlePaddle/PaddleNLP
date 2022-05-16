@@ -396,10 +396,10 @@ TBD
 ```shell
 .
 ├── run_seq_cls.py               # 分类任务的微调脚本
-├── run_token_cls.py             # 命名实体识别任务的微调脚本
+├── run_token_cls.py             # 序列标注任务的微调脚本
 ├── run_qa.py                    # 阅读理解任务的微调脚本
 ├── compress_seq_cls.py          # 分类任务的压缩脚本
-├── compress_token_cls.py        # 命名实体识别任务的压缩脚本
+├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本  
 ├── config.yml                   # 压缩配置文件
 ├── infer.py                     # 支持 CLUE 分类、CMRC2018、MSRA_NER 任务的预测脚本
@@ -432,7 +432,7 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 # 用于分类任务
 seq_cls_model = AutoModelForSequenceClassificaion.from_pretrained("ernie-3.0-medium-zh")
 
-# 用于命名实体识别任务
+# 用于序列标注任务
 token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-base-zh")
 
 # 用于阅读理解任务
@@ -440,13 +440,13 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
 
 ```
 
-ERNIE 3.0 提供了针对分类、命名实体识别、阅读理解三大场景下的微调使用样例，可分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
+ERNIE 3.0 提供了针对分类、序列标注、阅读理解三大场景下的微调使用样例，可分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
 
 ```shell
 # 分类任务
 python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-base-zh --do_train
 
-# 命名实体识别任务
+# 序列标注任务
 python run_token_cls.py --task_name msra_ner  --model_name_or_path ernie-3.0-medium-zh --do_train
 
 # 阅读理解任务
@@ -506,13 +506,13 @@ trainer.compress(
     compress_config=compress_config)
 ```
 
-并且，ERNIE 3.0 还提供了压缩 API 在分类、命名实体识别、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+并且，ERNIE 3.0 还提供了压缩 API 在分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
 # 分类任务
 python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
 
-# 命名实体识别任务
+# 序列标注任务
 python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER  --output_dir ./
 
 # 阅读理解任务
@@ -537,7 +537,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 2. 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `batch_size`、`learning_rate`、`epoch`、`max_seq_length` 等超参进行 grid search；
 
-3. 模型压缩主要用于推理部署，因此压缩后的模型都是静态图模型，只可用于预测，不能再通过 `from_pretrained` 导入继续训练。
+3. 模型压缩主要用于推理部署，因此压缩后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
 <a name="压缩效果"></a>
 
@@ -547,7 +547,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 #### 精度测试
 
-本案例中我们对 ERNIE 3.0 Medium 模型在三类任务上微调后的模型使用压缩 API 进行压缩。压缩后精度如下：
+本案例中我们对 ERNIE 3.0-Medium 模型在三类任务上微调后的模型使用压缩 API 进行压缩。压缩后精度如下：
 
 | Model                           | AVG   | AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL   | CMRC2018    | MSRA_NER          |
 | ------------------------------- | ----- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------- |
@@ -558,9 +558,9 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 accuracy，阅读理解任务 CMRC2018 的评价指标是 EM/f1，计算平均值时取 EM，命名实体识别任务 MSRA_NER 的评价指标是 precision/recall/f1，计算平均值时取 f1 值。
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
 
-由表可知，`ERNIE 3.0 Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
+由表可知，`ERNIE 3.0-Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
 
 <a name="性能测试"></a>
 
@@ -568,7 +568,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 性能测试的配置如下：
 
-1. 数据集：TNEWS（分类）、MSRA_NER（命名实体识别，下面简称 NER）、CMRC2018（阅读理解）
+1. 数据集：TNEWS（分类）、MSRA_NER（序列标注）、CMRC2018（阅读理解）
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
@@ -580,20 +580,18 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 6. 性能数据单位是 QPS，QPS 测试方法：设置足够大的 batch size，将显存占满，然后固定为该 batch_size 进行测试。QPS = batch_size / mean_time
 
-7. 精度数据单位 NER 是 f1 值,
+7. 精度数据单位：文本分类是 Accuracy，序列标注 是 F1-Score，阅读理解是 EM
 
 <a name="CPU性能"></a>
 
 ##### CPU 性能
 
-线程数12，有以下测试数据：
-
-|                            | 分类性能     | 分类精度     | NER 性能     | NER精度      | 阅读理解性能 | 阅读理解精度 |
-| -------------------------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ |
-| ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45        | 90.91(1.0x)  | 93.04        | 33.74(1.0x)  | 66.95        |
-| ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88) | 141.00(1.6x) | 92.64(-0.40) | 56.51(1.7x)  | 66.23(-0.72) |
-| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x) | 93.27(+0.23) | 48.47(1.4x)  | 65.55(-1.40) |
-| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x) | 92.39(-0.65) | 75.23(2.2x)  | 63.47(-3.48) |
+| TNEWS 性能                 | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER精度 | CMRC2018性能 | CMRC2018 精度 |
+| -------------------------- | ------------ | ------------- | ------------ | ------------ | ------------- | ------------ |
+| ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45         | 90.91(1.0x)  | 93.04        | 33.74(1.0x)   | 66.95        |
+| ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88)  | 141.00(1.6x) | 92.64(-0.40) | 56.51(1.7x)   | 66.23(-0.72) |
+| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14)  | 122.13(1.3x) | 93.27(+0.23) | 48.47(1.4x)   | 65.55(-1.40) |
+| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76)  | 215.58(2.4x) | 92.39(-0.65) | 75.23(2.2x)   | 63.47(-3.48) |
 
 
 三类任务（分类、NER、阅读理解）经过相同压缩过程后，加速比达到 2.3 左右。
@@ -613,7 +611,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16) | 444.27(3.0x) | 66.17(-0.78) |
 
 
-三类任务（分类、NER、阅读理解）经过裁剪、量化后加速比均达到 3 倍左右，所有任务上平均精度降低 0.46。
+三类任务（分类、序列标注、阅读理解）经过裁剪 +。量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在0.5以内（0.46）。
 
 <a name="部署"></a>
 

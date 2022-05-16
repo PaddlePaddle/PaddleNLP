@@ -485,7 +485,6 @@ def do_predict(args):
         pred = paddle.argmax(logits, axis=1).numpy().tolist()
         preds += pred
     for idx, pred in enumerate(preds):
-        # import pdb; pdb.set_trace()
         j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
         f.write(j + "\n")
 
