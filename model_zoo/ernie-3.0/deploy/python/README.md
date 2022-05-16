@@ -1,10 +1,10 @@
 # ERNIE 3.0 Python部署指南
-本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，命名实体识别和分类两大场景下的使用示例。  
+本文介绍ERNIE 3.0 Python端的部署，包括部署环境的准备，序列标注和分类两大场景下的使用示例。
 - [ERNIE 3.0 Python部署指南](#ERNIE3.0Python部署指南)
   - [1. 环境准备](#1-环境准备)
     - [1.1 CPU端](#11-CPU端)
     - [1.2 GPU端](#12-GPU端)
-  - [2. 命名实体识别模型推理](#2-命名实体识别模型推理)
+  - [2. 序列标注模型推理](#2-序列标注模型推理)
     - [2.1 模型获取](#21-模型获取)
     - [2.2 CPU端推理样例](#22-CPU端推理样例)
     - [2.3 GPU端推理样例](#23-GPU端推理样例)
@@ -36,11 +36,11 @@ pip install -r requirements_gpu.txt
     (2)使用pip install安装下载好的Paddle Inference安装包
 
 
-## 2. 命名实体识别模型推理
+## 2. 序列标注模型推理
 ### 2.1 模型获取
 用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
-# 获取命名实体识别FP32模型
+# 获取序列标注FP32模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```
@@ -112,7 +112,7 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_m
 ```
 如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
 ```
-# 获取命名实体识别INT8量化模型  
+# 获取序列标注INT8量化模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_quant_infer_model.zip
 unzip msra_ner_quant_infer_model.zip
 ```
@@ -160,7 +160,7 @@ seq cls result:
 label: news_entertainment   confidence: 0.9495906829833984
 -----------------------------
 ```
-和命名实体识别模型推理类似，开启动态量化的命令如下：
+和序列标注模型推理类似，开启动态量化的命令如下：
 ```
 python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_quantize
 ```
@@ -211,7 +211,7 @@ label: news_entertainment   confidence: 0.9494127035140991
 ```
 如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
 ```
-# 获取命名实体识别INT8量化模型  
+# 获取序列标注INT8量化模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_quant_infer_model.zip
 unzip tnews_quant_infer_model.zip
 ```
