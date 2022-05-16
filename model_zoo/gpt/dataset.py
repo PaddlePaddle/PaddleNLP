@@ -266,18 +266,20 @@ def create_pretrained_dataset(
         data_holders=None,
         pipeline_mode=False, ):
 
-    if local_rank == 0:
-        start_time = time.time()
-        print('> compiling dataset index builder ...')
-        sys.path.append(
-            os.path.abspath(
-                os.path.join(os.path.dirname(__file__), os.pardir)))
-        from data_tools.dataset_utils import compile_helper
-        compile_helper()
-        print(
-            '>>> done with dataset index builder. Compilation time: {:.3f} '
-            'seconds'.format(time.time() - start_time),
-            flush=True)
+    while True:
+        try:
+            from data_tools.dataset_utils import compile_helper
+            break
+        except Exception as e:
+            if local_rank == 0:
+                start_time = time.time()
+                print('> compiling dataset index builder ...')
+                compile_helper()
+                print(
+                    '>>> done with dataset index builder. Compilation time: {:.3f} '
+                    'seconds'.format(time.time() - start_time),
+                    flush=True)
+            time.sleep(1)
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
