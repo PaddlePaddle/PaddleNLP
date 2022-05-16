@@ -35,12 +35,12 @@
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
   </div>
 
-* 🔥 2022.5.16 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
+* 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
 
-  * 开源文心大模型 [ERNIE 3.0](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
-  * 通用信息抽取技术 [UIE](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
+  * 开源文心大模型 [**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
+  * 通用信息抽取技术 [**UIE**](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
 
-* 2022.12.12 PaddleNLP v2.2发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业化案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 ## 特性
 
@@ -313,10 +313,6 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
 
-
-## 版本更新
-
-更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
 
 ## Citation
 

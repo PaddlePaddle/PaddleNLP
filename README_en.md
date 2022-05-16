@@ -275,10 +275,6 @@ pip install --upgrade paddlenlp
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-## ChangeLog
-
-For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
-
 ## Citation
 
 If you find PaddleNLP useful in your research, please consider cite
