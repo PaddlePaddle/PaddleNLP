@@ -15,6 +15,7 @@ limitations under the License. */
 
 #include <string>
 #include <unordered_map>
+#include "core/encoding.h"
 #include "core/tokenizer.h"
 
 namespace tokenizers {
