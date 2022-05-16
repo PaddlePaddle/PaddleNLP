@@ -590,7 +590,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 2. 计算卡：T4、CUDA11.2、CuDNN8.2
 
-3. CPU信息：Intel(R) Xeon(R) Gold 6271C CPU，线程数 12
+3. CPU 信息：Intel(R) Xeon(R) Gold 6271C CPU
 
 4. PaddlePaddle 版本：2.3
 
@@ -598,12 +598,13 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 6. 性能数据单位是 QPS，QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
 
-7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 EM
+7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 Exact Match
 
 <a name="CPU性能"></a>
 
 ##### CPU 性能
 
+测试环境及说明如上，测试 CPU 性能时，线程数设置为12。
 
 |                            | TNEWS 性能   | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER精度 | CMRC2018性能 | CMRC2018 精度 |
 | -------------------------- | ------------ | ------------ | ------------- | ------------ | ------------ | ------------- |
