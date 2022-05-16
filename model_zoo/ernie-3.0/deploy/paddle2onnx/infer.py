@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import paddle
-import argparse
 from ernie_predictor import ErniePredictor
+import argparse
 
 
 def parse_args():
@@ -37,37 +37,17 @@ def parse_args():
         required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size for predict.", )
-    parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--set_dynamic_shape",
-        action='store_true',
-        help="Whether to automatically set dynamic shape.", )
-    parser.add_argument(
-        "--shape_info_file",
-        default="shape_info.txt",
-        type=str,
-        help="The collected dynamic shape info file.", )
-    parser.add_argument(
-        "--use_fp16",
-        action='store_true',
-        help="Whether to use fp16 inference.", )
     args = parser.parse_args()
     return args
 
 
 def main():
     args = parse_args()
-    args.task_name = args.task_name.lower()
-    args.device = 'gpu'
     predictor = ErniePredictor(args)
 
     if args.task_name == 'seq_cls':

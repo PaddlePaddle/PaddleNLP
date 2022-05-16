@@ -53,7 +53,9 @@ setuptools.setup(
     long_description_content_type="text/plain",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*', 'model_zoo*')),
+        where='.',
+        exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*',
+                 'faster_generation*', 'model_zoo*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',

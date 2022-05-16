@@ -15,7 +15,7 @@
 import paddle
 import argparse
 from multiprocessing import cpu_count
-from ernie_predictor import ErniePredictor, token_cls_print_ret
+from ernie_predictor import ErniePredictor
 
 
 def parse_args():
@@ -34,7 +34,6 @@ def parse_args():
         help="The directory or name of model.", )
     parser.add_argument(
         "--model_path",
-        default='tnews_quant_models/mse4/int8',
         type=str,
         required=True,
         help="The path prefix of inference model to be used.", )
@@ -45,9 +44,9 @@ def parse_args():
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument(
-        "--enable_quantize",
+        "--use_quantize",
         action='store_true',
-        help="Whether to enable quantization for acceleration.", )
+        help="Whether to use quantization for acceleration.", )
     parser.add_argument(
         "--num_threads",
         default=cpu_count(),
@@ -67,15 +66,9 @@ def main():
     if args.task_name == 'seq_cls':
         text = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
     elif args.task_name == 'token_cls':
-        text = [
-            "古老的文明，使我们引以为豪，彼此钦佩。",
-            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
-        ]
+        text = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
 
     outputs = predictor.predict(text)
-
-    if args.task_name == 'token_cls':
-        token_cls_print_ret(outputs, text)
 
 
 if __name__ == "__main__":
