@@ -1401,7 +1401,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 pair=False) and self.verbose:
             if not self.deprecation_warnings.get("max_len_single_sentence",
                                                  False):
-                logger.warning(
+                warnings.warn(
                     "Setting 'max_len_single_sentence' is now deprecated. "
                     "This value is automatically set up.")
             self.deprecation_warnings["max_len_single_sentence"] = True
@@ -1417,7 +1417,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 pair=True) and self.verbose:
             if not self.deprecation_warnings.get("max_len_sentences_pair",
                                                  False):
-                logger.warning(
+                warnings.warn(
                     "Setting 'max_len_sentences_pair' is now deprecated. "
                     "This value is automatically set up.")
             self.deprecation_warnings["max_len_sentences_pair"] = True
@@ -1871,7 +1871,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if verbose:
                 if not self.deprecation_warnings.get(
                         "Truncation-not-explicitly-activated", False):
-                    logger.warning(
+                    warnings.warn(
                         "Truncation was not explicitly activated but `max_length` is provided a specific value, "
                         "please use `truncation=True` to explicitly truncate examples to max length. "
                         "Defaulting to 'longest_first' truncation strategy. "
@@ -1950,7 +1950,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     if verbose:
                         if not self.deprecation_warnings.get(
                                 "Asking-to-pad-to-max_length", False):
-                            logger.warning(
+                            warnings.warn(
                                 "Asking to pad to max_length but no maximum length is provided and the model has no predefined maximum length. "
                                 "Default to no padding.")
                         self.deprecation_warnings[
@@ -1964,7 +1964,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     if verbose:
                         if not self.deprecation_warnings.get(
                                 "Asking-to-truncate-to-max_length", False):
-                            logger.warning(
+                            warnings.warn(
                                 "Asking to truncate to max_length but no maximum length is provided and the model has no predefined maximum length. "
                                 "Default to no truncation.")
                         self.deprecation_warnings[
@@ -2887,7 +2887,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     )
                 logger.error(error_msg)
         elif truncation_strategy == TruncationStrategy.LONGEST_FIRST:
-            logger.warning(
+            warnings.warn(
                 f"Be aware, overflowing tokens are not returned for the setting you have chosen,"
                 f" i.e. sequence pairs with the '{TruncationStrategy.LONGEST_FIRST.value}' "
                 f"truncation strategy. So the returned list will always be empty even if some "
@@ -3186,7 +3186,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if not self.deprecation_warnings.get(
                     "sequence-length-is-longer-than-the-specified-maximum",
                     False):
-                logger.warning(
+                warnings.warn(
                     "Token indices sequence length is longer than the specified maximum sequence length "
                     f"for this model ({len(ids)} > {self.model_max_length}). Running this sequence through the model "
                     "will result in indexing errors")

@@ -23,7 +23,7 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Stack, Tuple
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 
 from data import convert_example, create_dataloader, read_custom_data
@@ -108,9 +108,9 @@ def do_train(args):
         convert_example, tokenzier=tokenizer, max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(dtype='int64'),  # input_ids
-        Stack(dtype='int64'),  # token_type_ids
-        Stack(dtype='int64'),  # labels
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=-100, dtype='int64'),  # labels
     ): fn(samples)
 
     train_data_loader = create_dataloader(

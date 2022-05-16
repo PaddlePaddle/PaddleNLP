@@ -55,7 +55,7 @@ setuptools.setup(
     packages=setuptools.find_packages(
         where='.',
         exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*',
-                 'model_zoo*')),
+                 'faster_generation*', 'model_zoo*')),
     package_data={
         'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
