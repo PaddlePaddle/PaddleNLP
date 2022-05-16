@@ -576,7 +576,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 | ERNIE 3.0-Medium+裁剪+量化+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+量化+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
+**评价指标说明：** 其中 CLUE 分类任务（AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL）的评价指标是 Accuracy，阅读理解任务 CMRC2018 的评价指标是 EM (Exact Match) / F1-Score，计算平均值时取 EM，序列标注任务 MSRA_NER 的评价指标是 Precision/Recall/F1-Score，计算平均值时取 F1-Score。
 
 由表可知，`ERNIE 3.0-Medium` 模型经过裁剪和量化后，精度平均下降 0.46，其中裁剪后下降了 0.17，单独量化精度平均下降 0.77。
 
@@ -598,7 +598,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 6. 性能数据单位是 QPS，QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
 
-7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 Exact Match
+7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 EM (Exact Match)
 
 <a name="CPU性能"></a>
 
