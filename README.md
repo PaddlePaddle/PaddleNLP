@@ -46,11 +46,11 @@ PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本�
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#优质的中文预训练模型库> 优质的中文预训练模型库 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a> 
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#大规模分布式训练与高性能推理> 大规模分布式训练与高性能推理 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a> 
 
 
 ### 开箱即用的NLP能力
@@ -61,7 +61,7 @@ Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自�
 
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### 丰富的预训练模型库
+### 丰富完备的中文模型库
 
 #### 业界最全的中文预训练模型
 
@@ -205,16 +205,16 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 更多使用说明请参考[情感分析](./applications/sentiment_analysis)。
 
-### 大规模分布式训练与高性能推理
+### 高性能分布式训练与推理
 
-#### 飞桨4D混合并行训练
+#### 飞桨4D混合并行分布式训练技术
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" height="400" width="500">
 </div>
 
 
-更多关于千亿模型分布式训练说明可参考[GPT-3](./examples/language_model/gpt-3)。
+更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
 #### 高性能文本处理库 FasterTokenizers
 
