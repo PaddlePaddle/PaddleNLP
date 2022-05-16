@@ -163,6 +163,154 @@ class OPTLearnedPositionalEmbedding(nn.Embedding):
             name=self._name,
         )
 
+# Copied from transformers.models.bart.modeling_bart.BartAttention with Bart->OPT
+class OPTAttention(nn.Layer):
+    """Multi-headed attention from 'Attention Is All You Need' paper"""
+
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        dropout: float = 0.0,
+        is_decoder: bool = False,
+        bias: bool = True,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.dropout = dropout
+        self.head_dim = embed_dim // num_heads
+
+        if (self.head_dim * num_heads) != self.embed_dim:
+            raise ValueError(
+                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
+                f" and `num_heads`: {num_heads})."
+            )
+        self.scaling = self.head_dim ** -0.5
+        self.is_decoder = is_decoder
+        
+        self.k_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
+        self.v_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
+        self.q_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
+        
+        self.init_weight()
+
+    def _shape(self, tensor, seq_len: int, bsz: int):
+        return tensor.reshape(bsz, seq_len, self.num_heads, self.head_dim).transpose([0, 2, 1])
+
+    def forward(
+        self,
+        hidden_states,
+        key_value_states = None,
+        past_key_value = None,
+        attention_mask = None,
+        layer_head_mask = None,
+        output_attentions: bool = False,
+    ):
+        """Input shape: Batch x Time x Channel"""
+
+        # if key_value_states are provided this layer is used as a cross-attention layer
+        # for the decoder
+        is_cross_attention = key_value_states is not None
+
+        bsz, tgt_len, _ = hidden_states.shape
+
+        # get query proj
+        query_states = self.q_proj(hidden_states) * self.scaling
+        # get key, value proj
+        if is_cross_attention and past_key_value is not None:
+            # reuse k,v, cross_attentions
+            key_states = past_key_value[0]
+            value_states = past_key_value[1]
+        elif is_cross_attention:
+            # cross_attentions
+            key_states = self._shape(self.k_proj(key_value_states), -1, bsz)
+            value_states = self._shape(self.v_proj(key_value_states), -1, bsz)
+        elif past_key_value is not None:
+            # reuse k, v, self_attention
+            key_states = self._shape(self.k_proj(hidden_states), -1, bsz)
+            value_states = self._shape(self.v_proj(hidden_states), -1, bsz)
+            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
+        else:
+            # self_attention
+            key_states = self._shape(self.k_proj(hidden_states), -1, bsz)
+            value_states = self._shape(self.v_proj(hidden_states), -1, bsz)
+
+        if self.is_decoder:
+            # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+            # Further calls to cross_attention layer can then reuse all cross-attention
+            # key/value_states (first "if" case)
+            # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+            # all previous decoder key/value_states. Further calls to uni-directional self-attention
+            # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
+            # if encoder bi-directional self-attention `past_key_value` is always `None`
+            past_key_value = (key_states, value_states)
+
+        proj_shape = (bsz * self.num_heads, -1, self.head_dim)
+        query_states = self._shape(query_states, tgt_len, bsz).reshape(*proj_shape)
+        key_states = key_states.reshape(*proj_shape)
+        value_states = value_states.reshape(*proj_shape)
+
+        src_len = key_states.shape[1]
+        attn_weights = paddle.bmm(query_states, key_states.transpose([0, 1, 2]))
+
+        if attn_weights.shape != (bsz * self.num_heads, tgt_len, src_len):
+            raise ValueError(
+                f"Attention weights should be of size {(bsz * self.num_heads, tgt_len, src_len)}, but is"
+                f" {attn_weights.shape}"
+            )
+
+        if attention_mask is not None:
+            if attention_mask.shape != (bsz, 1, tgt_len, src_len):
+                raise ValueError(
+                    f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.shape}"
+                )
+            attn_weights = attn_weights.reshape(bsz, self.num_heads, tgt_len, src_len) + attention_mask
+            attn_weights = attn_weights.reshape(bsz * self.num_heads, tgt_len, src_len)
+
+        attn_weights = F.softmax(attn_weights, axis=-1)
+
+        if layer_head_mask is not None:
+            if layer_head_mask.shape != (self.num_heads,):
+                raise ValueError(
+                    f"Head mask for a single layer should be of size {(self.num_heads,)}, but is"
+                    f" {layer_head_mask.shape}"
+                )
+            attn_weights = layer_head_mask.reshape(1, -1, 1, 1) * attn_weights.reshape(bsz, self.num_heads, tgt_len, src_len)
+            attn_weights = attn_weights.reshape(bsz * self.num_heads, tgt_len, src_len)
+
+        if output_attentions:
+            # this operation is a bit awkward, but it's required to
+            # make sure that attn_weights keeps its gradient.
+            # In order to do so, attn_weights have to be reshaped
+            # twice and have to be reused in the following
+            attn_weights_reshaped = attn_weights.reshape(bsz, self.num_heads, tgt_len, src_len)
+            attn_weights = attn_weights_reshaped.reshape(bsz * self.num_heads, tgt_len, src_len)
+        else:
+            attn_weights_reshaped = None
+
+        attn_probs = F.dropout(attn_weights, p=self.dropout, training=self.training)
+
+        attn_output = paddle.bmm(attn_probs, value_states)
+
+        if attn_output.shape != (bsz * self.num_heads, tgt_len, self.head_dim):
+            raise ValueError(
+                f"`attn_output` should be of size {(bsz, self.num_heads, tgt_len, self.head_dim)}, but is"
+                f" {attn_output.shape}"
+            )
+
+        attn_output = attn_output.reshape(bsz, self.num_heads, tgt_len, self.head_dim)
+        attn_output = attn_output.transpose(1, 2)
+
+        # Use the `embed_dim` from the config (stored in the class) rather than `hidden_state` because `attn_output` can be
+        # partitioned aross GPUs when using tensor-parallelism.
+        attn_output = attn_output.reshape(bsz, tgt_len, self.embed_dim)
+
+        attn_output = self.out_proj(attn_output)
+
+        return attn_output, attn_weights_reshaped, past_key_value
 
 class OPTDecoderLayer(nn.Layer):
     """
@@ -191,11 +339,11 @@ class OPTDecoderLayer(nn.Layer):
         super().__init__()
         self.embed_dim = embed_dim
 
-        self.self_attn = MultiHeadAttention(
+        self.self_attn = OPTAttention(
             embed_dim=self.embed_dim,
             num_heads=num_attention_heads,
             dropout=attention_dropout,
-            need_weights=True
+            is_decoder=True,
         )
         self.do_layer_norm_before = do_layer_norm_before
         self.dropout = dropout
@@ -212,7 +360,6 @@ class OPTDecoderLayer(nn.Layer):
         self,
         hidden_states,
         attention_mask = None,
-        # TODO: layer head mask
         layer_head_mask = None,
         output_attentions = False,
         use_cache = False,
@@ -240,10 +387,12 @@ class OPTDecoderLayer(nn.Layer):
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
-        # TODO: past key-value to be tested
-        hidden_states, self_attn_weights = self.self_attn(
-            query=hidden_states,
-            attn_mask=attention_mask,
+        hidden_states, self_attn_weights, presente_key_value = self.self_attn(
+            hidden_states=hidden_states,
+            past_key_value=past_key_value,
+            attention_mask=attention_mask,
+            layer_head_mask=layer_head_mask,
+            output_attentions=output_attentions,
         )
 
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
@@ -255,7 +404,8 @@ class OPTDecoderLayer(nn.Layer):
 
         # Fully Connected
         hidden_states_shape = hidden_states.shape
-        hidden_states = hidden_states.reshape(shape=[-1, hidden_states.shape[-1]])
+        hidden_states = hidden_states.reshape(shape=[-1, hidden_states_shape[-1]])
+        
         residual = hidden_states
 
         # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
@@ -278,12 +428,14 @@ class OPTDecoderLayer(nn.Layer):
 
         if output_attentions:
             outputs += (self_attn_weights,)
+        
+        if use_cache:
+            outputs += (presente_key_value,)
 
         return outputs
 
 
 class OPTPreTrainedModel(PretrainedModel):
-    # TODO: 合适起作用
     base_model_prefix = "opt"
     # TODO: to check if support gradient checkpoint
     supports_gradient_checkpointing = True
@@ -421,11 +573,8 @@ class OPTDecoder(OPTPreTrainedModel):
         ) for _ in range(num_hidden_layers)])
 
         self.gradient_checkpointing = False
-        
-        # TODO: paddle 中是否有post init功能
-        # Initialize weights and apply final processing
 
-        # self.post_init()
+        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -593,6 +742,7 @@ class OPTDecoder(OPTPreTrainedModel):
 
                     return custom_forward
 
+                # TODO: use paddle checkpoint
                 layer_outputs = torch.utils.checkpoint.checkpoint(
                     create_custom_forward(decoder_layer),
                     hidden_states,
@@ -622,21 +772,13 @@ class OPTDecoder(OPTPreTrainedModel):
         if self.project_out is not None:
             hidden_states = self.project_out(hidden_states)
 
-        # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
         next_cache = next_decoder_cache if use_cache else None
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
-        
-        # TODO: what's the output structure of paddlenlp
-        return {
-            "last_hidden_state": hidden_states,
-            "past_key_values": next_cache,
-            "hidden_states": all_hidden_states,
-            "attentions": all_self_attns,
-        }
+        return hidden_states, next_cache, all_hidden_states, all_self_attns
 
 
 @register_base_model
@@ -689,8 +831,7 @@ class OPTModel(OPTPreTrainedModel):
         )
 
         # Initialize weights and apply final processing
-        # TODO: post init
-        # self.post_init()
+        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.decoder.embed_tokens
@@ -713,7 +854,15 @@ class OPTModel(OPTPreTrainedModel):
         output_hidden_states = None,
         return_dict = None,
     ):
-
+        """forward         input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        """
         output_attentions = output_attentions or self.decoder.config["output_attentions"]
         output_hidden_states = output_hidden_states or self.decoder.config["output_hidden_states"]
         
@@ -736,13 +885,12 @@ class OPTModel(OPTPreTrainedModel):
         if not return_dict:
             return decoder_outputs
 
-        return decoder_outputs
-        # return BaseModelOutputWithPast(
-        #     last_hidden_state=decoder_outputs.last_hidden_state,
-        #     past_key_values=decoder_outputs.past_key_values,
-        #     hidden_states=decoder_outputs.hidden_states,
-        #     attentions=decoder_outputs.attentions,
-        # )
+        return dict(
+            last_hidden_state=decoder_outputs["last_hidden_state"],
+            past_key_values=decoder_outputs["past_key_values"],
+            hidden_states=decoder_outputs["hidden_states"],
+            attentions=decoder_outputs["attentions"],
+        )
 
 
 class OPTForCausalLM(OPTPreTrainedModel):
@@ -849,7 +997,6 @@ class OPTForCausalLM(OPTPreTrainedModel):
 
         ```python
         >>> from transformers import OPTTokenizer, OPTForCausalLM
-        # this needs fixing
 
         >>> tokenizer = OPTTokenizer.from_pretrained("patrickvonplaten/opt_gpt2_tokenizer")
         >>> model = OPTForCausalLM.from_pretrained("ArthurZ/opt-350m")
@@ -886,20 +1033,11 @@ class OPTForCausalLM(OPTPreTrainedModel):
             return_dict=return_dict,
         )
 
-
-    # def forward(self, hidden_states, masked_positions=None):
-    #     if masked_positions is not None:
-    #         hidden_states = paddle.reshape(
-    #             hidden_states, [-1, paddle.shape(hidden_states)[-1]])
-    #         hidden_states = paddle.gather(hidden_states, masked_positions)
-    #     # gather masked tokens might be more quick
-    #     hidden_states = self.transform(hidden_states)
-    #     hidden_states = self.activation(hidden_states)
-    #     hidden_states = self.layer_norm(hidden_states)
-
-        logits = paddle.matmul(outputs[0], self.lm_head_weight, transpose_y=True)
-        
-        # logits = self.lm_head(outputs[0])
+        if return_dict:
+            hidden_states = outputs['hidden_states']
+        else:
+            hidden_states = outputs[0]
+        logits = paddle.matmul(hidden_states, self.lm_head_weight, transpose_y=True)
 
         loss = None
         if labels is not None:
@@ -910,11 +1048,13 @@ class OPTForCausalLM(OPTPreTrainedModel):
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
+
         return {
             "loss": loss,
             "logits": logits,
-            # TODO: 从其它模块借鉴
-            "hidden_states": outputs.hidden_states,
+            "past_key_values": outputs["past_key_values"],
+            "hidden_states": outputs["hidden_states"],
+            "attentions": outputs["attentions"],
         }
 
     def prepare_inputs_for_generation(self, input_ids, past=None, attention_mask=None, use_cache=None, **kwargs):
