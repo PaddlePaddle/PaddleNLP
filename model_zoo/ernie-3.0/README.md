@@ -404,9 +404,7 @@
 <br />
 
 
-以下是本范例模型的简要目录结构及说明：
-
-
+以下是本项目目录结构及说明：
 
 ```shell
 .
@@ -420,7 +418,7 @@
 ├── infer.py                     # 支持 CLUE 分类、CMRC2018、MSRA_NER 任务的预测脚本
 ├── deploy                       # 部署目录
 │ └── python
-│   └── ernie_predictor.py       # TODO
+│   └── ernie_predictor.py
 │   └── infer_cpu.py
 │   └── infer_gpu.py
 │ └── serving
@@ -458,7 +456,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
 
 ```
 
-ERNIE 3.0 提供了针对分类、序列标注、阅读理解三大场景下的微调使用样例，可分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
+本项目提供了针对分类、序列标注、阅读理解三大场景下的微调使用样例，可分别参考 `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py` 三个脚本，启动方式如下：
 
 ```shell
 # 分类任务
@@ -496,7 +494,7 @@ pip install paddleslim
 
 ### 模型压缩 API 使用
 
-ERNIE 3.0 基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` 即可一键启动裁剪和量化，并自动保存压缩后的模型。
+本项目基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` 即可一键启动裁剪和量化，并自动保存压缩后的模型。
 
 
 可以这样使用压缩 API (示例代码只提供了核心调用，如需跑通完整的例子可参考下方完整样例脚本):
@@ -514,7 +512,8 @@ trainer = Trainer(
 output_dir = os.path.join(model_args.model_name_or_path, "compress")
 
 compress_config = CompressConfig(quantization_config=PTQConfig(
-    algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
+        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]),
+        DynabertConfig(width_mul_ist=[3/4]))
 
 trainer.compress(
     data_args.dataset,
@@ -523,18 +522,33 @@ trainer.compress(
     quantization=True, # 开启量化
     compress_config=compress_config)
 ```
+由于压缩 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型压缩来说必要传入的参数如下：
 
-并且，ERNIE 3.0 还提供了压缩 API 在分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+- `model`：BERT、ERNIE 等模型，是在下文 `task_name` 任务中微调后的模型
+- `data_collator`：三类任务均可使用 PaddleNLP 预定义好的[DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 Pad 等操作。使用方法参考本项目中代码即可
+- `train_dataset`：裁剪训练需要使用的训练数据
+- `eval_dataset`：裁剪训练使用的评估数据，量化使用的校准数据
+- `tokenizer`：模型`model`对应的 tokenizer
+
+然后可以直接调用 `compress` 启动压缩，其中 `compress` 的参数释义如下：
+
+- `task_name`：任务名，例如 TNEWS、MSRA_NER、CMRC2018等
+- `output_dir`：压缩后模型的保存目录（包含裁剪、量化）
+- `pruning`：是否裁剪，默认为 True
+- `quantization`：是否量化，默认为 True
+- `compress_config`：压缩配置，目前支持 `DynabertConfig` 裁剪配置类和 `PTQConfig` 量化配置类，前者可以配置裁剪比例、裁剪后导出模型的文件名前缀，后者支持传入量化策略列表（例如`hist`、 `KL`、 `mse`等）、量化使用的校准数据的样本数、待量化的模型目录、待量化模型的文件名前缀、量化后模型的文件名前缀。
+
+本项目 还提供了压缩 API 在文本分类、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
-# 分类任务
+# 文本分类任务
 python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
 
 # 序列标注任务
 python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER  --output_dir ./
 
 # 阅读理解任务
-python compress_seq_cls.py --dataset "cmrc2018"  --model_name_or_path best_models/CMRC2018  --output_dir ./
+python compress_seq_cls.py --dataset "clue cmrc2018"  --model_name_or_path best_models/CMRC2018  --output_dir ./
 ```
 
 测试模型压缩后的精度：
@@ -551,7 +565,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 **压缩 API 使用TIPS：**
 
-1. 压缩 API 提供裁剪和量化两个过程，如果硬件支持量化模型的部署，建议两种都选择。目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级的。静态离线量化不需要训练，更快，加速比比裁剪更明显，但是单独量化精度下降可能也更多；
+1. 压缩 API 提供裁剪和量化两个功能，如果硬件支持量化模型的部署，建议裁剪和量化都选择。目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级。量化则不需要训练，更快，量化的加速比比裁剪更明显，但是单独量化精度下降可能也更多；
 
 2. 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `batch_size`、`learning_rate`、`epoch`、`max_seq_length` 等超参进行 grid search；
 
@@ -596,7 +610,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 5. PaddleNLP 版本：2.3
 
-6. 性能数据单位是 QPS，QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
+6. 性能数据单位是 QPS。QPS 测试方法：固定 batch size 为 32，测试运行时间 total_time，计算 QPS = total_samples / total_time
 
 7. 精度数据单位：文本分类是 Accuracy，序列标注是 F1-Score，阅读理解是 EM (Exact Match)
 
@@ -606,12 +620,12 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 测试环境及说明如上，测试 CPU 性能时，线程数设置为12。
 
-|                            | TNEWS 性能   | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER精度 | CMRC2018性能 | CMRC2018 精度 |
-| -------------------------- | ------------ | ------------ | ------------- | ------------ | ------------ | ------------- |
-| ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45        | 90.91(1.0x)   | 93.04        | 33.74(1.0x)  | 66.95         |
-| ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88) | 141.00(1.6x)  | 92.64(-0.40) | 56.51(1.7x)  | 66.23(-0.72)  |
-| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23) | 48.47(1.4x)  | 65.55(-1.40)  |
-| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65) | 75.23(2.2x)  | 63.47(-3.48)  |
+|                            | TNEWS 性能   | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER 精度 | CMRC2018 性能 | CMRC2018 精度 |
+| -------------------------- | ------------ | ------------ | ------------- | ------------- | ------------- | ------------- |
+| ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45        | 90.91(1.0x)   | 93.04         | 33.74(1.0x)   | 66.95         |
+| ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88) | 141.00(1.6x)  | 92.64(-0.40)  | 56.51(1.7x)   | 66.23(-0.72)  |
+| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23)  | 48.47(1.4x)   | 65.55(-1.40)  |
+| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
 
 
 三类任务（分类、序列标注、阅读理解）经过相同压缩过程后，加速比达到 2.3 左右。
@@ -621,14 +635,14 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 ##### GPU 性能
 
-|                            | 文本分类 性能 | 文本分类精度 | 序列标注性能  | 序列标注精度 | 阅读理解性能 | 阅读理解精度 |
-| -------------------------- | ------------- | ------------ | ------------- | ------------ | ------------ | ------------ |
-| ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04        | 146.84(1.0x) | 66.95        |
-| ERNIE 3.0-Medium+FP16      | 2672.41(2.4x) | 57.45(0.00)  | 840.11(2.3x)  | 93.05(0.01)  | 303.43(2.1x) | 66.95(0.00)  |
-| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34) | 348.84(2.4x) | 66.32(-0.63  |
-| ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23) | 183.77(1.3x) | 65.92(-1.03) |
-| ERNIE 3.0-Medium+裁剪+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23) | 445.71(3.0x) | 65.89(-1.06) |
-| ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16) | 444.27(3.0x) | 66.17(-0.78) |
+|                            | TNEWS 性能    | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER 精度 | CMRC2018 性能 | CMRC2018 精度 |
+| -------------------------- | ------------- | ------------ | ------------- | ------------- | ------------- | ------------- |
+| ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04         | 146.84(1.0x)  | 66.95         |
+| ERNIE 3.0-Medium+FP16      | 2672.41(2.4x) | 57.45(0.00)  | 840.11(2.3x)  | 93.05(0.01)   | 303.43(2.1x)  | 66.95(0.00)   |
+| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63   |
+| ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
+| ERNIE 3.0-Medium+裁剪+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23)  | 445.71(3.0x)  | 65.89(-1.06)  |
+| ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
 
 三类任务（分类、序列标注、阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5以内（0.46）。
