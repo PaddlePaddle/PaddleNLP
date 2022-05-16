@@ -11,7 +11,7 @@
     - [3.2 模型转换](#32-模型转换)
     - [3.3 ONNXRuntime推理样例](#33-ONNXRuntime推理样例)
 ## 1. 环境准备
-ERNIE 3.0模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考:[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)  
+ERNIE 3.0模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)  
 如果基于CPU部署，请使用如下命令安装所需依赖:  
 ```
 python -m pip install onnxruntime
@@ -34,7 +34,7 @@ unzip msra_ner_pruned_infer_model.zip
 ```
 paddle2onnx --model_dir msra_ner_pruned_infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file ner_model.onnx --opset_version 13 --enable_onnx_checker True
 ```
-Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
+Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX#参数选项)
 
 ### 2.3 ONNXRuntime推理样例
 请使用如下命令进行部署
@@ -78,7 +78,7 @@ unzip tnews_pruned_infer_model.zip
 ```
 paddle2onnx --model_dir tnews_pruned_infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file tnews_model.onnx --opset_version 13 --enable_onnx_checker True
 ```
-Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX)
+Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX#参数选项)
 
 ### 3.3 ONNXRuntime推理样例
 请使用如下命令进行部署
