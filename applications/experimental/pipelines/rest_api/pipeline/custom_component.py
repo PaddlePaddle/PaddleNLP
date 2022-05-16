@@ -7,7 +7,6 @@ can be used in a Pipeline YAML configuration.
 The classes for the Custom Components must be defined in this file.
 """
 
-
 from pipelines.nodes.base import BaseComponent
 
 

@@ -6,13 +6,13 @@ from pathlib import Path
 
 from pipelines.nodes.file_converter import BaseConverter, DocxToTextConverter, PDFToTextConverter, TextConverter
 
-
 logger = logging.getLogger(__name__)
 
 
-def convert_files_to_dicts(
-    dir_path: str, clean_func: Optional[Callable] = None, split_paragraphs: bool = False, encoding: Optional[str] = None
-) -> List[dict]:
+def convert_files_to_dicts(dir_path: str,
+                           clean_func: Optional[Callable]=None,
+                           split_paragraphs: bool=False,
+                           encoding: Optional[str]=None) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
     Document Store.
@@ -36,8 +36,8 @@ def convert_files_to_dicts(
         elif not path.is_dir():
             logger.warning(
                 "Skipped file {0} as type {1} is not supported here. "
-                "See pipelines.file_converter for support of more file types".format(path, file_suffix)
-            )
+                "See pipelines.file_converter for support of more file types".
+                format(path, file_suffix))
 
     # No need to initialize converter if file type not present
     for file_suffix in suffix2paths.keys():
@@ -54,9 +54,11 @@ def convert_files_to_dicts(
             if encoding is None and suffix == ".pdf":
                 encoding = "Latin1"
             logger.info("Converting {}".format(path))
-            document = suffix2converter[suffix].convert(file_path=path, meta=None, encoding=encoding,)[
-                0
-            ]  # PDFToTextConverter, TextConverter, and DocxToTextConverter return a list containing a single dict
+            document = suffix2converter[suffix].convert(
+                file_path=path,
+                meta=None,
+                encoding=encoding,
+            )[0]  # PDFToTextConverter, TextConverter, and DocxToTextConverter return a list containing a single dict
             text = document["content"]
 
             if clean_func:
@@ -66,20 +68,24 @@ def convert_files_to_dicts(
                 for para in text.split("\n"):
                     if not para.strip():  # skip empty paragraphs
                         continue
-                    documents.append({"content": para, "meta": {"name": path.name}})
+                    documents.append({
+                        "content": para,
+                        "meta": {
+                            "name": path.name
+                        }
+                    })
             else:
                 documents.append({"content": text, "meta": {"name": path.name}})
-                
+
     return documents
 
 
 def tika_convert_files_to_dicts(
-    dir_path: str,
-    clean_func: Optional[Callable] = None,
-    split_paragraphs: bool = False,
-    merge_short: bool = True,
-    merge_lowercase: bool = True,
-) -> List[dict]:
+        dir_path: str,
+        clean_func: Optional[Callable]=None,
+        split_paragraphs: bool=False,
+        merge_short: bool=True,
+        merge_lowercase: bool=True, ) -> List[dict]:
     """
     Convert all files(.txt, .pdf) in the sub-directories of the given path to Python dicts that can be written to a
     Document Store.
@@ -93,7 +99,9 @@ def tika_convert_files_to_dicts(
     try:
         from pipelines.nodes.file_converter import TikaConverter
     except Exception as ex:
-        logger.error("Tika not installed. Please install tika and try again. Error: {}".format(ex))
+        logger.error(
+            "Tika not installed. Please install tika and try again. Error: {}".
+            format(ex))
         raise ex
     converter = TikaConverter()
     paths = [p for p in Path(dir_path).glob("**/*")]
@@ -107,15 +115,15 @@ def tika_convert_files_to_dicts(
         elif not path.is_dir():
             logger.warning(
                 "Skipped file {0} as type {1} is not supported here. "
-                "See pipelines.file_converter for support of more file types".format(path, file_suffix)
-            )
+                "See pipelines.file_converter for support of more file types".
+                format(path, file_suffix))
 
     documents = []
     for path in file_paths:
         logger.info("Converting {}".format(path))
-        document = converter.convert(path)[
-            0
-        ]  # PDFToTextConverter, TextConverter, and DocxToTextConverter return a list containing a single dict
+        document = converter.convert(
+            path
+        )[0]  # PDFToTextConverter, TextConverter, and DocxToTextConverter return a list containing a single dict
         meta = document["meta"] or {}
         meta["name"] = path.name
         text = document["content"]
@@ -143,18 +151,23 @@ def tika_convert_files_to_dicts(
                             continue
 
                         # this paragraph is less than 10 characters or 2 words
-                        para_is_short = len(para) < 10 or len(re.findall(r"\s+", para)) < 2
+                        para_is_short = len(para) < 10 or len(
+                            re.findall(r"\s+", para)) < 2
                         # this paragraph starts with a lower case and last paragraph does not end with a punctuation
-                        para_is_lowercase = (
-                            para and para[0].islower() and last_para and last_para[-1] not in r'.?!"\'\]\)'
-                        )
+                        para_is_lowercase = (para and para[0].islower() and
+                                             last_para and
+                                             last_para[-1] not in r'.?!"\'\]\)')
 
                         # merge paragraphs to improve qa
-                        if (merge_short and para_is_short) or (merge_lowercase and para_is_lowercase):
+                        if (merge_short and para_is_short) or (
+                                merge_lowercase and para_is_lowercase):
                             last_para += " " + para
                         else:
                             if last_para:
-                                documents.append({"content": last_para, "meta": meta})
+                                documents.append({
+                                    "content": last_para,
+                                    "meta": meta
+                                })
                             last_para = para
                     # don't forget the last one
                     if last_para:

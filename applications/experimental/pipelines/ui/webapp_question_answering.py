@@ -24,13 +24,14 @@ from annotated_text import annotation
 from markdown import markdown
 from ui.utils import pipelines_is_ready, query, send_feedback, upload_doc, pipelines_version, get_backlink
 
-
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
-DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP", "中国的首都在哪里?")
+DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
+                                        "中国的首都在哪里?")
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
 
 # Sliders
-DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "50"))
+DEFAULT_DOCS_FROM_RETRIEVER = int(
+    os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "50"))
 DEFAULT_DOCS_FROM_RANKER = int(os.getenv("DEFAULT_DOCS_FROM_RANKER", "1"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "1"))
 
@@ -44,8 +45,11 @@ def set_state_if_absent(key, value):
 
 
 def main():
-    
-    st.set_page_config(page_title="PaddleNLP 智能问答", page_icon="https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
+
+    st.set_page_config(
+        page_title="PaddleNLP 智能问答",
+        page_icon="https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png"
+    )
 
     # Persistent state
     set_state_if_absent("question", DEFAULT_QUESTION_AT_STARTUP)
@@ -70,8 +74,7 @@ def main():
         max_value=50,
         value=DEFAULT_DOCS_FROM_RETRIEVER,
         step=1,
-        on_change=reset_results,
-    )
+        on_change=reset_results, )
 
     top_k_ranker = st.sidebar.slider(
         "最大排序数量",
@@ -79,8 +82,7 @@ def main():
         max_value=50,
         value=DEFAULT_DOCS_FROM_RANKER,
         step=1,
-        on_change=reset_results,
-    )
+        on_change=reset_results, )
 
     top_k_reader = st.sidebar.slider(
         "最大的答案的数量",
@@ -88,13 +90,13 @@ def main():
         max_value=50,
         value=DEFAULT_NUMBER_OF_ANSWERS,
         step=1,
-        on_change=reset_results,
-    )
+        on_change=reset_results, )
 
     # File upload block
     if not DISABLE_FILE_UPLOAD:
         st.sidebar.write("## 文件上传:")
-        data_files = st.sidebar.file_uploader("", type=["pdf", "txt", "docx", "png"], accept_multiple_files=True)
+        data_files = st.sidebar.file_uploader(
+            "", type=["pdf", "txt", "docx", "png"], accept_multiple_files=True)
         for data_file in data_files:
             # Upload file
             if data_file:
@@ -107,10 +109,16 @@ def main():
         pass
 
     # Search bar
-    question = st.text_input("", value=st.session_state.question, max_chars=100, on_change=reset_results)
+    question = st.text_input(
+        "",
+        value=st.session_state.question,
+        max_chars=100,
+        on_change=reset_results)
     col1, col2 = st.columns(2)
-    col1.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
-    col2.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    col1.markdown(
+        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    col2.markdown(
+        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
 
     # Run button
     run_pressed = col1.button("运行")
@@ -120,7 +128,7 @@ def main():
         reset_results()
         new_row = df.sample(1)
         while (
-            new_row["Question Text"].values[0] == st.session_state.question
+                new_row["Question Text"].values[0] == st.session_state.question
         ):  # Avoid picking the same question twice (the change is not visible on the UI)
             new_row = df.sample(1)
         st.session_state.question = new_row["Question Text"].values[0]
@@ -132,9 +140,8 @@ def main():
 
     st.session_state.random_question_requested = False
 
-    run_query = (
-        run_pressed or question != st.session_state.question
-    ) and not st.session_state.random_question_requested
+    run_query = (run_pressed or question != st.session_state.question
+                 ) and not st.session_state.random_question_requested
 
     # Check the connection
     with st.spinner("⌛️ &nbsp;&nbsp; pipelines is starting..."):
@@ -149,22 +156,29 @@ def main():
         st.session_state.question = question
 
         with st.spinner(
-            "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
-            "Do you want to optimize speed or accuracy? \n"
-        ):
+                "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
+                "Do you want to optimize speed or accuracy? \n"):
             try:
                 st.session_state.results, st.session_state.raw_json = query(
-                    question, top_k_reader=top_k_reader, top_k_ranker=top_k_ranker, top_k_retriever=top_k_retriever
-                )
+                    question,
+                    top_k_reader=top_k_reader,
+                    top_k_ranker=top_k_ranker,
+                    top_k_retriever=top_k_retriever)
             except JSONDecodeError as je:
-                st.error("👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?")
+                st.error(
+                    "👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?"
+                )
                 return
             except Exception as e:
                 logging.exception(e)
-                if "The server is busy processing requests" in str(e) or "503" in str(e):
-                    st.error("🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later.")
+                if "The server is busy processing requests" in str(
+                        e) or "503" in str(e):
+                    st.error(
+                        "🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later."
+                    )
                 else:
-                    st.error("🐞 &nbsp;&nbsp; An error occurred during the request.")
+                    st.error(
+                        "🐞 &nbsp;&nbsp; An error occurred during the request.")
                 return
 
     if st.session_state.results:
@@ -178,17 +192,20 @@ def main():
                 end_idx = start_idx + len(answer)
                 # Hack due to this bug: https://github.com/streamlit/streamlit/issues/3190
                 st.write(
-                    markdown(context[:start_idx] + str(annotation(answer, "ANSWER", "#8ef")) + context[end_idx:]),
-                    unsafe_allow_html=True,
-                )
+                    markdown(context[:start_idx] + str(
+                        annotation(answer, "ANSWER", "#8ef")) + context[
+                            end_idx:]),
+                    unsafe_allow_html=True, )
                 source = ""
                 url, title = get_backlink(result)
                 if url and title:
                     source = f"[{result['document']['meta']['title']}]({result['document']['meta']['url']})"
                 else:
                     source = f"{result['source']}"
-                st.markdown(f"**Relevance:** {result['relevance']} -  **Source:** {source}")
-            elif(result["context"] is None):
+                st.markdown(
+                    f"**Relevance:** {result['relevance']} -  **Source:** {source}"
+                )
+            elif (result["context"] is None):
                 continue
             else:
 
@@ -199,8 +216,7 @@ def main():
                 st.write(
                     #markdown(context[:start_idx] + str(annotation(answer, "ANSWER", "#8ef")) + context[end_idx:]),
                     markdown(context),
-                    unsafe_allow_html=True,
-                )
+                    unsafe_allow_html=True, )
                 st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")

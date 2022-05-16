@@ -18,7 +18,6 @@ from typing import Union, Optional, List
 import logging
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,7 +26,11 @@ class Sample:
     the human readable clear_text. Over the course of data preprocessing, this object is populated
     with tokenized and featurized versions of the data."""
 
-    def __init__(self, id: str, clear_text: dict, tokenized: Optional[dict] = None, features: Optional[dict] = None):
+    def __init__(self,
+                 id: str,
+                 clear_text: dict,
+                 tokenized: Optional[dict]=None,
+                 features: Optional[dict]=None):
         """
         :param id: The unique id of the sample
         :param clear_text: A dictionary containing various human readable fields (e.g. text, label).
@@ -42,12 +45,13 @@ class Sample:
     def __str__(self):
 
         if self.clear_text:
-            clear_text_str = "\n \t".join([k + ": " + str(v) for k, v in self.clear_text.items()])
+            clear_text_str = "\n \t".join(
+                [k + ": " + str(v) for k, v in self.clear_text.items()])
             if len(clear_text_str) > 3000:
                 clear_text_str = (
-                    clear_text_str[:3_000] + f"\nTHE REST IS TOO LONG TO DISPLAY. "
-                    f"Remaining chars :{len(clear_text_str)-3_000}"
-                )
+                    clear_text_str[:3_000] +
+                    f"\nTHE REST IS TOO LONG TO DISPLAY. "
+                    f"Remaining chars :{len(clear_text_str)-3_000}")
         else:
             clear_text_str = "None"
 
@@ -56,26 +60,25 @@ class Sample:
                 features = self.features[0]
             else:
                 features = self.features
-            feature_str = "\n \t".join([k + ": " + str(v) for k, v in features.items()])
+            feature_str = "\n \t".join(
+                [k + ": " + str(v) for k, v in features.items()])
         else:
             feature_str = "None"
 
         if self.tokenized:
-            tokenized_str = "\n \t".join([k + ": " + str(v) for k, v in self.tokenized.items()])
+            tokenized_str = "\n \t".join(
+                [k + ": " + str(v) for k, v in self.tokenized.items()])
             if len(tokenized_str) > 3000:
-                tokenized_str = (
-                    tokenized_str[:3_000] + f"\nTHE REST IS TOO LONG TO DISPLAY. "
-                    f"Remaining chars: {len(tokenized_str)-3_000}"
-                )
+                tokenized_str = (tokenized_str[:3_000] +
+                                 f"\nTHE REST IS TOO LONG TO DISPLAY. "
+                                 f"Remaining chars: {len(tokenized_str)-3_000}")
         else:
             tokenized_str = "None"
-        s = (
-            f"ID: {self.id}\n"
-            f"Clear Text: \n \t{clear_text_str}\n"
-            f"Tokenized: \n \t{tokenized_str}\n"
-            f"Features: \n \t{feature_str}\n"
-            "_____________________________________________________"
-        )
+        s = (f"ID: {self.id}\n"
+             f"Clear Text: \n \t{clear_text_str}\n"
+             f"Tokenized: \n \t{tokenized_str}\n"
+             f"Features: \n \t{feature_str}\n"
+             "_____________________________________________________")
         return s
 
 
@@ -85,12 +88,11 @@ class SampleBasket:
     pairs."""
 
     def __init__(
-        self,
-        id_internal: Optional[Union[int, str]],
-        raw: dict,
-        id_external: str = None,
-        samples: Optional[List[Sample]] = None,
-    ):
+            self,
+            id_internal: Optional[Union[int, str]],
+            raw: dict,
+            id_external: str=None,
+            samples: Optional[List[Sample]]=None, ):
         """
         :param id_internal: A unique identifying id. Used for identification within pipelines.
         :param external_id: Used for identification outside of pipelines. E.g. if another framework wants to pass along its own id with the results.
@@ -116,7 +118,8 @@ def process_answers(answers, doc_offsets, passage_start_c, passage_start_t):
         else:
             answer_start_c = answer["answer_start"]
         answer_end_c = answer_start_c + answer_len_c - 1
-        answer_start_t = offset_to_token_idx_vecorized(doc_offsets, answer_start_c)
+        answer_start_t = offset_to_token_idx_vecorized(doc_offsets,
+                                                       answer_start_c)
         answer_end_t = offset_to_token_idx_vecorized(doc_offsets, answer_end_c)
 
         # TODO: Perform check that answer can be recovered from document?
@@ -127,7 +130,11 @@ def process_answers(answers, doc_offsets, passage_start_c, passage_start_t):
         answer_start_t -= passage_start_t
         answer_end_t -= passage_start_t
 
-        curr_answer_clear = {"text": answer_text, "start_c": answer_start_c, "end_c": answer_end_c}
+        curr_answer_clear = {
+            "text": answer_text,
+            "start_c": answer_start_c,
+            "end_c": answer_end_c
+        }
         curr_answer_tokenized = {
             "start_t": answer_start_t,
             "end_t": answer_end_t,
@@ -186,7 +193,8 @@ def offset_to_token_idx(token_offsets, ch_idx) -> Optional[int]:
     """Returns the idx of the token at the given character idx"""
     n_tokens = len(token_offsets)
     for i in range(n_tokens):
-        if (i + 1 == n_tokens) or (token_offsets[i] <= ch_idx < token_offsets[i + 1]):
+        if (i + 1 == n_tokens) or (
+                token_offsets[i] <= ch_idx < token_offsets[i + 1]):
             return i
     return None
 

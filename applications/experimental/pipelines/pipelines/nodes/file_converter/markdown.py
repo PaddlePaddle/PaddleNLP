@@ -28,19 +28,17 @@ except (ImportError, ModuleNotFoundError) as ie:
 
 from pipelines.nodes.file_converter import BaseConverter
 
-
 logger = logging.getLogger(__name__)
 
 
 class MarkdownConverter(BaseConverter):
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "utf-8",
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]]=None,
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]="utf-8", ) -> List[Dict[str, Any]]:
         """
         Reads text from a txt file and executes optional preprocessing steps.
 

@@ -26,7 +26,6 @@ from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.pipelines import Pipeline
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -74,7 +73,7 @@ class BaseStandardPipeline(ABC):
         """
         self.pipeline.set_node(name, component)
 
-    def draw(self, path: Path = Path("pipeline.png")):
+    def draw(self, path: Path=Path("pipeline.png")):
         """
         Create a Graphviz visualization of the pipeline.
 
@@ -82,7 +81,7 @@ class BaseStandardPipeline(ABC):
         """
         self.pipeline.draw(path)
 
-    def save_to_yaml(self, path: Path, return_defaults: bool = False):
+    def save_to_yaml(self, path: Path, return_defaults: bool=False):
         """
         Save a YAML configuration for the Pipeline that can be used with `Pipeline.load_from_yaml()`.
 
@@ -92,7 +91,10 @@ class BaseStandardPipeline(ABC):
         return self.pipeline.save_to_yaml(path, return_defaults)
 
     @classmethod
-    def load_from_yaml(cls, path: Path, pipeline_name: Optional[str] = None, overwrite_with_env_variables: bool = True):
+    def load_from_yaml(cls,
+                       path: Path,
+                       pipeline_name: Optional[str]=None,
+                       overwrite_with_env_variables: bool=True):
         """
         Load Pipeline from a YAML file defining the individual components and how they're tied together to form
         a Pipeline. A single YAML can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -138,7 +140,8 @@ class BaseStandardPipeline(ABC):
         standard_pipeline_object = cls.__new__(
             cls
         )  # necessary because we can't call __init__ as we can't provide parameters
-        standard_pipeline_object.pipeline = Pipeline.load_from_yaml(path, pipeline_name, overwrite_with_env_variables)
+        standard_pipeline_object.pipeline = Pipeline.load_from_yaml(
+            path, pipeline_name, overwrite_with_env_variables)
         return standard_pipeline_object
 
     def get_nodes_by_class(self, class_type) -> List[Any]:
@@ -163,23 +166,33 @@ class BaseStandardPipeline(ABC):
         """
         return self.pipeline.get_document_store()
 
+
 class ExtractiveQAPipeline(BaseStandardPipeline):
     """
     Pipeline for Extractive Question Answering.
     """
 
-    def __init__(self, reader: BaseReader, ranker:BaseRanker, retriever: BaseRetriever):
+    def __init__(self,
+                 reader: BaseReader,
+                 ranker: BaseRanker,
+                 retriever: BaseRetriever):
         """
         :param reader: Reader instance
         :param retriever: Retriever instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-        self.pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-        self.pipeline.add_node(component=reader, name="Reader", inputs=["Ranker"])
+        self.pipeline.add_node(
+            component=retriever, name="Retriever", inputs=["Query"])
+        self.pipeline.add_node(
+            component=ranker, name="Ranker", inputs=["Retriever"])
+        self.pipeline.add_node(
+            component=reader, name="Reader", inputs=["Ranker"])
         self.metrics_filter = {"Retriever": ["recall_single_hit"]}
 
-    def run(self, query: str, params: Optional[dict] = None, debug: Optional[bool] = None):
+    def run(self,
+            query: str,
+            params: Optional[dict]=None,
+            debug: Optional[bool]=None):
         """
         :param query: The search query string.
         :param params: Params for the `retriever` and `reader`. For instance,
@@ -199,16 +212,23 @@ class SemanticSearchPipeline(BaseStandardPipeline):
     Pipeline for semantic search.
     """
 
-    def __init__(self, retriever: BaseRetriever, ranker: Optional[BaseRanker] = None):
+    def __init__(self,
+                 retriever: BaseRetriever,
+                 ranker: Optional[BaseRanker]=None):
         """
         :param retriever: Retriever instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
+        self.pipeline.add_node(
+            component=retriever, name="Retriever", inputs=["Query"])
         if ranker:
-            self.pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
+            self.pipeline.add_node(
+                component=ranker, name="Ranker", inputs=["Retriever"])
 
-    def run(self, query: str, params: Optional[dict] = None, debug: Optional[bool] = None):
+    def run(self,
+            query: str,
+            params: Optional[dict]=None,
+            debug: Optional[bool]=None):
         """
         :param query: the query string.
         :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}

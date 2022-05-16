@@ -63,7 +63,7 @@ export CUDA_VISIBLE_DEVICES=0
 python examples/question-answering/dense_qa_example.py
 ```
 
-### 3.4 构建 Web 可视化问答系统 
+### 3.4 构建 Web 可视化问答系统
 
 整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI。接下来我们依次搭建这 3 个服务并串联构成可视化的问答系统
 
@@ -99,7 +99,7 @@ export API_ENDPOINT=http://127.0.0.1:8891
 python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 ```
 
-到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。 
+到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137

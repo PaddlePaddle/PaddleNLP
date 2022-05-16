@@ -17,7 +17,6 @@ from typing import List, Any, Optional, Tuple, Union, Dict
 import logging
 from abc import ABC
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,18 +40,17 @@ class QACandidate:
     """
 
     def __init__(
-        self,
-        answer_type: str,
-        score: float,
-        offset_answer_start: int,
-        offset_answer_end: int,
-        offset_unit: str,
-        aggregation_level: str,
-        probability: Optional[float] = None,
-        n_passages_in_doc: Optional[int] = None,
-        passage_id: Optional[str] = None,
-        confidence: Optional[float] = None,
-    ):
+            self,
+            answer_type: str,
+            score: float,
+            offset_answer_start: int,
+            offset_answer_end: int,
+            offset_unit: str,
+            aggregation_level: str,
+            probability: Optional[float]=None,
+            n_passages_in_doc: Optional[int]=None,
+            passage_id: Optional[str]=None,
+            confidence: Optional[float]=None, ):
         """
         :param answer_type: The category that this answer falls into e.g. "no_answer", "yes", "no" or "span"
         :param score: The score representing the model's confidence of this answer
@@ -100,13 +98,15 @@ class QACandidate:
         self.meta = None
 
     def set_context_window(self, context_window_size: int, clear_text: str):
-        window_str, start_ch, end_ch = self._create_context_window(context_window_size, clear_text)
+        window_str, start_ch, end_ch = self._create_context_window(
+            context_window_size, clear_text)
         self.context_window = window_str
         self.offset_context_window_start = start_ch
         self.offset_context_window_end = end_ch
 
     def set_answer_string(self, token_offsets: List[int], document_text: str):
-        pred_str, self.offset_answer_start, self.offset_answer_end = self._span_to_string(token_offsets, document_text)
+        pred_str, self.offset_answer_start, self.offset_answer_end = self._span_to_string(
+            token_offsets, document_text)
         self.offset_unit = "char"
         self._add_answer(pred_str)
 
@@ -135,7 +135,8 @@ class QACandidate:
                     f"({self.offset_answer_start}, {self.offset_answer_end}) with a span answer. "
                 )
 
-    def _create_context_window(self, context_window_size: int, clear_text: str) -> Tuple[str, int, int]:
+    def _create_context_window(self, context_window_size: int,
+                               clear_text: str) -> Tuple[str, int, int]:
         """
         Extract from the clear_text a window that contains the answer and (usually) some amount of text on either
         side of the answer. Useful for cases where the answer and its surrounding context needs to be
@@ -170,7 +171,8 @@ class QACandidate:
         window_str = clear_text[window_start_ch:window_end_ch]
         return window_str, window_start_ch, window_end_ch
 
-    def _span_to_string(self, token_offsets: List[int], clear_text: str) -> Tuple[str, int, int]:
+    def _span_to_string(self, token_offsets: List[int],
+                        clear_text: str) -> Tuple[str, int, int]:
         """
         Generates a string answer span using self.offset_answer_start and self.offset_answer_end. If the candidate
         is a no answer, an empty string is returned
@@ -232,7 +234,10 @@ class QACandidate:
         self.aggregation_level = "document"
 
     def to_list(self) -> List[Optional[Union[str, int, float]]]:
-        return [self.answer, self.offset_answer_start, self.offset_answer_end, self.score, self.passage_id]
+        return [
+            self.answer, self.offset_answer_start, self.offset_answer_end,
+            self.score, self.passage_id
+        ]
 
 
 class QAPred(Pred):
@@ -243,18 +248,17 @@ class QAPred(Pred):
     """
 
     def __init__(
-        self,
-        id: str,
-        prediction: List[QACandidate],
-        context: str,
-        question: str,
-        token_offsets: List[int],
-        context_window_size: int,
-        aggregation_level: str,
-        no_answer_gap: float,
-        ground_truth_answer: str = None,
-        answer_types: List[str] = [],
-    ):
+            self,
+            id: str,
+            prediction: List[QACandidate],
+            context: str,
+            question: str,
+            token_offsets: List[int],
+            context_window_size: int,
+            aggregation_level: str,
+            no_answer_gap: float,
+            ground_truth_answer: str=None,
+            answer_types: List[str]=[], ):
         """
         :param id: The id of the passage or document
         :param prediction: A list of QACandidate objects for the given question and document
@@ -278,7 +282,8 @@ class QAPred(Pred):
         self.n_passages = self.prediction[0].n_passages_in_doc
         for qa_candidate in self.prediction:
             qa_candidate.set_answer_string(token_offsets, self.context)
-            qa_candidate.set_context_window(self.context_window_size, self.context)
+            qa_candidate.set_context_window(self.context_window_size,
+                                            self.context)
 
     def to_json(self, squad=False) -> Dict:
         """
@@ -289,15 +294,14 @@ class QAPred(Pred):
         answers = self._answers_to_json(self.id, squad)
         ret = {
             "task": "qa",
-            "predictions": [
-                {
-                    "question": self.question,
-                    "id": self.id,
-                    "ground_truth": self.ground_truth_answer,
-                    "answers": answers,
-                    "no_ans_gap": self.no_answer_gap,  # Add no_ans_gap to current no_ans_boost for switching top prediction
-                }
-            ],
+            "predictions": [{
+                "question": self.question,
+                "id": self.id,
+                "ground_truth": self.ground_truth_answer,
+                "answers": answers,
+                "no_ans_gap": self.
+                no_answer_gap,  # Add no_ans_gap to current no_ans_boost for switching top prediction
+            }],
         }
         if squad:
             del ret["predictions"][0]["id"]  # type: ignore
@@ -326,7 +330,8 @@ class QAPred(Pred):
                 "offset_answer_start": qa_candidate.offset_answer_start,
                 "offset_answer_end": qa_candidate.offset_answer_end,
                 "context": qa_candidate.context_window,
-                "offset_context_start": qa_candidate.offset_context_window_start,
+                "offset_context_start":
+                qa_candidate.offset_context_window_start,
                 "offset_context_end": qa_candidate.offset_context_window_end,
                 "document_id": ext_id,
             }

@@ -2,7 +2,6 @@ from setuptools import setup, find_packages
 import logging
 from pathlib import Path
 
-
 VERSION = "0.0.1a0"
 
 setup(
@@ -35,5 +34,4 @@ setup(
         "uvicorn<1",
         "gunicorn<21",
         "python-multipart<1",  # optional FastAPI dependency for form data
-    ],
-)
+    ], )

@@ -33,17 +33,24 @@ class BaseReader(BaseComponent):
     query_time = 0
 
     @abstractmethod
-    def predict(self, query: str, documents: List[Document], top_k: Optional[int] = None):
+    def predict(self,
+                query: str,
+                documents: List[Document],
+                top_k: Optional[int]=None):
         pass
 
     @abstractmethod
-    def predict_batch(self, query_doc_list: List[dict], top_k: Optional[int] = None, batch_size: Optional[int] = None):
+    def predict_batch(self,
+                      query_doc_list: List[dict],
+                      top_k: Optional[int]=None,
+                      batch_size: Optional[int]=None):
         pass
 
     @staticmethod
     def _calc_no_answer(
-        no_ans_gaps: Sequence[float], best_score_answer: float, use_confidence_scores: bool = True
-    ) -> Tuple[Answer, float]:
+            no_ans_gaps: Sequence[float],
+            best_score_answer: float,
+            use_confidence_scores: bool=True) -> Tuple[Answer, float]:
         # "no answer" scores and positive answers scores are difficult to compare, because
         # + a positive answer score is related to one specific document
         # - a "no answer" score is related to all input documents
@@ -65,14 +72,15 @@ class BaseReader(BaseComponent):
             answer="",
             type="extractive",
             score=float(expit(np.asarray(no_ans_score) / 8))
-            if use_confidence_scores
-            else no_ans_score,  # just a pseudo prob for now or old score,
+            if use_confidence_scores else
+            no_ans_score,  # just a pseudo prob for now or old score,
             context=None,
-            offsets_in_context=[Span(start=0, end=0)],
-            offsets_in_document=[Span(start=0, end=0)],
+            offsets_in_context=[Span(
+                start=0, end=0)],
+            offsets_in_document=[Span(
+                start=0, end=0)],
             document_id=None,
-            meta=None,
-        )
+            meta=None, )
 
         return no_ans_prediction, max_no_ans_gap
 
@@ -91,7 +99,11 @@ class BaseReader(BaseComponent):
         answer.meta.update(meta_from_doc)
         return answer
 
-    def run(self, query: str, documents: List[Document], top_k: Optional[int] = None, add_isolated_node_eval: bool = False):  # type: ignore
+    def run(self,
+            query: str,
+            documents: List[Document],
+            top_k: Optional[int]=None,
+            add_isolated_node_eval: bool=False):  # type: ignore
         self.query_count += 1
         if documents:
             predict = self.timing(self.predict, "query_time")
@@ -101,12 +113,14 @@ class BaseReader(BaseComponent):
 
         # Add corresponding document_name and more meta data, if an answer contains the document_id
         results["answers"] = [
-            BaseReader.add_doc_meta_data_to_answer(documents=documents, answer=answer) for answer in results["answers"]
+            BaseReader.add_doc_meta_data_to_answer(
+                documents=documents, answer=answer)
+            for answer in results["answers"]
         ]
 
         return results, "output_1"
 
-    def run_batch(self, query_doc_list: List[Dict], top_k: Optional[int] = None):
+    def run_batch(self, query_doc_list: List[Dict], top_k: Optional[int]=None):
         """A unoptimized implementation of running Reader queries in batch"""
         self.query_count += len(query_doc_list)
         results = []

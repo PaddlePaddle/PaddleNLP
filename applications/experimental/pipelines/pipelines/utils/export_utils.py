@@ -9,11 +9,12 @@ from collections import defaultdict
 from pipelines.schema import Document, Answer
 from pipelines.document_stores.sql import DocumentORM
 
-
 logger = logging.getLogger(__name__)
 
 
-def print_answers(results: dict, details: str = "all", max_text_len: Optional[int] = None):
+def print_answers(results: dict,
+                  details: str="all",
+                  max_text_len: Optional[int]=None):
     """
     Utility function to print results of pipelines pipelines
     :param results: Results from a pipeline
@@ -23,14 +24,16 @@ def print_answers(results: dict, details: str = "all", max_text_len: Optional[in
     :return: None
     """
     # Defines the fields to keep in the Answer for each detail level
-    fields_to_keep_by_level = {"minimum": ["answer", "context"], "medium": ["answer", "context", "score"]}
+    fields_to_keep_by_level = {
+        "minimum": ["answer", "context"],
+        "medium": ["answer", "context", "score"]
+    }
 
     if not "answers" in results.keys():
         raise ValueError(
             "The results object does not seem to come from a Reader: "
             f"it does not contain the 'answers' key, but only: {results.keys()}.  "
-            "Try print_documents or print_questions."
-        )
+            "Try print_documents or print_questions.")
 
     if "query" in results.keys():
         print(f"\nQuery: {results['query']}\nAnswers:")
@@ -52,7 +55,9 @@ def print_answers(results: dict, details: str = "all", max_text_len: Optional[in
         filtered_answers = answers
     else:
         valid_values = ", ".join(fields_to_keep_by_level.keys()) + " and 'all'"
-        logging.warn(f"print_answers received details='{details}', which was not understood. ")
+        logging.warn(
+            f"print_answers received details='{details}', which was not understood. "
+        )
         logging.warn(f"Valid values are {valid_values}. Using 'all'.")
         filtered_answers = answers
 
@@ -65,9 +70,10 @@ def print_answers(results: dict, details: str = "all", max_text_len: Optional[in
     pp.pprint(filtered_answers)
 
 
-def print_documents(
-    results: dict, max_text_len: Optional[int] = None, print_name: bool = True, print_meta: bool = False
-):
+def print_documents(results: dict,
+                    max_text_len: Optional[int]=None,
+                    print_name: bool=True,
+                    print_meta: bool=False):
     """
     Utility that prints a compressed representation of the documents returned by a pipeline.
     :param max_text_lenght: shorten the document's content to a maximum number of chars. if None, does not cut.
@@ -83,13 +89,13 @@ def print_documents(
             "This results object does not contain `Document` objects under the `documents` key. "
             "Please make sure the last node of your pipeline makes proper use of the "
             "new pipelines primitive objects, and if you're using pipelines nodes/pipelines only, "
-            "please report this as a bug."
-        )
+            "please report this as a bug.")
 
     for doc in results["documents"]:
         content = doc.content
         if max_text_len:
-            content = doc.content[:max_text_len] + ("..." if len(doc.content) > max_text_len else "")
+            content = doc.content[:max_text_len] + ("..." if len(doc.content) >
+                                                    max_text_len else "")
         results = {"content": content}
         if print_name:
             results["name"] = doc.meta.get("name", None)
@@ -122,8 +128,7 @@ def print_questions(results: dict):
                         "key of the generated question/answer pairs. "
                         "Please make sure the last node of your pipeline makes proper use of the "
                         "new pipelines primitive objects, and if you're using pipelines nodes/pipelines only, "
-                        "please report this as a bug."
-                    )
+                        "please report this as a bug.")
                 print(f"      A: {answer.answer}")
 
     else:
@@ -131,8 +136,7 @@ def print_questions(results: dict):
             "This object does not seem to be the output "
             "of a question generating pipeline: does not contain neither "
             f"'generated_questions' nor 'results', but only: {results.keys()}. "
-            " Try `print_answers` or `print_documents`."
-        )
+            " Try `print_answers` or `print_documents`.")
 
 
 def export_answers_to_csv(agg_results: list, output_file):
@@ -146,7 +150,8 @@ def export_answers_to_csv(agg_results: list, output_file):
         agg_results = [agg_results]
 
     assert "query" in agg_results[0], f"Wrong format used for {agg_results[0]}"
-    assert "answers" in agg_results[0], f"Wrong format used for {agg_results[0]}"
+    assert "answers" in agg_results[
+        0], f"Wrong format used for {agg_results[0]}"
 
     data = {}  # type: Dict[str, List[Any]]
     data["query"] = []
@@ -186,25 +191,28 @@ def convert_labels_to_squad(labels_file: str):
         for label in labels:
             doc = DocumentORM.query.get(label["document_id"])
 
-            assert doc.content[label["start_offset"] : label["end_offset"]] == label["selected_text"]
+            assert doc.content[label["start_offset"]:label[
+                "end_offset"]] == label["selected_text"]
 
-            qas.append(
-                {
-                    "question": label["question"],
-                    "id": label["id"],
-                    "question_id": label["question_id"],
-                    "answers": [
-                        {
-                            "text": label["selected_text"],
-                            "answer_start": label["start_offset"],
-                            "labeller_id": label["labeler_id"],
-                        }
-                    ],
-                    "is_impossible": False,
-                }
-            )
+            qas.append({
+                "question": label["question"],
+                "id": label["id"],
+                "question_id": label["question_id"],
+                "answers": [{
+                    "text": label["selected_text"],
+                    "answer_start": label["start_offset"],
+                    "labeller_id": label["labeler_id"],
+                }],
+                "is_impossible": False,
+            })
 
-        squad_format_label = {"paragraphs": [{"qas": qas, "context": doc.content, "document_id": document_id}]}
+        squad_format_label = {
+            "paragraphs": [{
+                "qas": qas,
+                "context": doc.content,
+                "document_id": document_id
+            }]
+        }
 
         labels_in_squad_format["data"].append(squad_format_label)
 

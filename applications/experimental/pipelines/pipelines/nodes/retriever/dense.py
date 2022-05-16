@@ -30,7 +30,6 @@ from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.data_handler.processor import TextSimilarityProcessor
 from pipelines.utils.common_utils import initialize_device_settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,20 +39,21 @@ class DensePassageRetriever(BaseRetriever):
     """
 
     def __init__(
-        self,
-        document_store: BaseDocumentStore,
-        query_embedding_model: Union[Path, str] = "rocketqa-zh-dureader-query-encoder",
-        passage_embedding_model: Union[Path, str] = "rocketqa-zh-dureader-para-encoder",
-        model_version: Optional[str] = None,
-        max_seq_len_query: int = 64,
-        max_seq_len_passage: int = 256,
-        top_k: int = 10,
-        use_gpu: bool = True,
-        batch_size: int = 16,
-        embed_title: bool = True,
-        similarity_function: str = "dot_product",
-        progress_bar: bool = True,
-    ):
+            self,
+            document_store: BaseDocumentStore,
+            query_embedding_model: Union[
+                Path, str]="rocketqa-zh-dureader-query-encoder",
+            passage_embedding_model: Union[
+                Path, str]="rocketqa-zh-dureader-para-encoder",
+            model_version: Optional[str]=None,
+            max_seq_len_query: int=64,
+            max_seq_len_passage: int=256,
+            top_k: int=10,
+            use_gpu: bool=True,
+            batch_size: int=16,
+            embed_title: bool=True,
+            similarity_function: str="dot_product",
+            progress_bar: bool=True, ):
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
 
@@ -106,13 +106,15 @@ class DensePassageRetriever(BaseRetriever):
             batch_size=batch_size,
             embed_title=embed_title,
             similarity_function=similarity_function,
-            progress_bar=progress_bar,
-        )
+            progress_bar=progress_bar, )
 
-        self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
+        self.devices, _ = initialize_device_settings(
+            use_cuda=use_gpu, multi_gpu=True)
 
         if batch_size < len(self.devices):
-            logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
+            logger.warning(
+                "Batch size is less than the number of devices. All gpus will not be utilized."
+            )
 
         self.document_store = document_store
         self.batch_size = batch_size
@@ -121,20 +123,21 @@ class DensePassageRetriever(BaseRetriever):
 
         if document_store is None:
             logger.warning(
-                "DensePassageRetriever initialized without a document store. "
-            )
+                "DensePassageRetriever initialized without a document store. ")
         elif document_store.similarity != "dot_product":
             logger.warning(
                 f"You are using a Dense Passage Retriever model with the {document_store.similarity} function. "
                 "We recommend you use dot_product instead. "
-                "This can be set when initializing the DocumentStore"
-            )
+                "This can be set when initializing the DocumentStore")
 
         # Init & Load Encoders
         #self.query_encoder = ppnlp.transformers.ErnieDualEncoder.from_pretrained(query_embedding_model)
-        self.ernie_dual_encoder = ppnlp.transformers.ErnieDualEncoder(query_embedding_model, passage_embedding_model)
-        self.query_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(query_embedding_model)
-        self.passage_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(passage_embedding_model)
+        self.ernie_dual_encoder = ppnlp.transformers.ErnieDualEncoder(
+            query_embedding_model, passage_embedding_model)
+        self.query_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+            query_embedding_model)
+        self.passage_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+            passage_embedding_model)
 
         self.processor = TextSimilarityProcessor(
             query_tokenizer=self.query_tokenizer,
@@ -145,17 +148,15 @@ class DensePassageRetriever(BaseRetriever):
             metric="text_similarity_metric",
             embed_title=embed_title,
             num_hard_negatives=0,
-            num_positives=1,
-        )
+            num_positives=1, )
 
     def retrieve(
-        self,
-        query: str,
-        filters: dict = None,
-        top_k: Optional[int] = None,
-        index: str = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> List[Document]:
+            self,
+            query: str,
+            filters: dict=None,
+            top_k: Optional[int]=None,
+            index: str=None,
+            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents
         that are most relevant to the query.
@@ -168,15 +169,21 @@ class DensePassageRetriever(BaseRetriever):
         if top_k is None:
             top_k = self.top_k
         if not self.document_store:
-            logger.error("Cannot perform retrieve() since DensePassageRetriever initialized with document_store=None")
+            logger.error(
+                "Cannot perform retrieve() since DensePassageRetriever initialized with document_store=None"
+            )
             return []
         if index is None:
             index = self.document_store.index
-        
+
         query_emb = self.embed_queries(texts=[query])
         documents = self.document_store.query_by_embedding(
-            query_emb=query_emb[0], top_k=top_k, filters=filters, index=index, headers=headers, return_embedding=False
-        )
+            query_emb=query_emb[0],
+            top_k=top_k,
+            filters=filters,
+            index=index,
+            headers=headers,
+            return_embedding=False)
         return documents
 
     def _get_predictions(self, dicts):
@@ -198,12 +205,11 @@ class DensePassageRetriever(BaseRetriever):
         """
 
         dataset, tensor_names, _, baskets = self.processor.dataset_from_dicts(
-            dicts, indices=[i for i in range(len(dicts))], return_baskets=True
-        )
+            dicts, indices=[i for i in range(len(dicts))], return_baskets=True)
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id), # input_ids
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id), # token_type_ids
+            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id),  # input_ids
+            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id),  # token_type_ids
         ): [data for data in fn(samples)]
 
         batch_sampler = paddle.io.BatchSampler(
@@ -216,7 +222,7 @@ class DensePassageRetriever(BaseRetriever):
             return_list=True)
 
         all_embeddings = {"query": [], "passages": []}
-        
+
         # Todo(tianxin04): ErnieDualEncoder subclass nn.Module,
         self.ernie_dual_encoder.eval()
 
@@ -227,28 +233,29 @@ class DensePassageRetriever(BaseRetriever):
             disable_tqdm = not self.progress_bar
 
         with tqdm(
-            total=len(data_loader) * self.batch_size,
-            unit=" Docs",
-            desc=f"Create embeddings",
-            position=1,
-            leave=False,
-            disable=disable_tqdm,
-        ) as progress_bar:
+                total=len(data_loader) * self.batch_size,
+                unit=" Docs",
+                desc=f"Create embeddings",
+                position=1,
+                leave=False,
+                disable=disable_tqdm, ) as progress_bar:
             for batch in data_loader:
                 input_ids, token_type_ids = batch
                 #input_ids, token_type_ids, label_ids = batch
                 with paddle.no_grad():
                     cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
-                        input_ids=input_ids,
-                        token_type_ids=token_type_ids)
+                        input_ids=input_ids, token_type_ids=token_type_ids)
                     if "query" in dicts[0]:
-                        all_embeddings["query"].append(cls_embeddings.cpu().numpy())
+                        all_embeddings["query"].append(cls_embeddings.cpu()
+                                                       .numpy())
                     if "passages" in dicts[0]:
-                        all_embeddings["passages"].append(cls_embeddings.cpu().numpy())
+                        all_embeddings["passages"].append(cls_embeddings.cpu()
+                                                          .numpy())
                 progress_bar.update(self.batch_size)
 
         if all_embeddings["passages"]:
-            all_embeddings["passages"] = np.concatenate(all_embeddings["passages"])
+            all_embeddings["passages"] = np.concatenate(all_embeddings[
+                "passages"])
         if all_embeddings["query"]:
             all_embeddings["query"] = np.concatenate(all_embeddings["query"])
         return all_embeddings
@@ -278,19 +285,15 @@ class DensePassageRetriever(BaseRetriever):
             )
             self.processor.num_hard_negatives = 0
 
-        passages = [
-            {
-                "passages": [
-                    {
-                        "title": d.meta["name"] if d.meta and "name" in d.meta else "",
-                        "text": d.content,
-                        "label": d.meta["label"] if d.meta and "label" in d.meta else "positive",
-                        "external_id": d.id,
-                    }
-                ]
-            }
-            for d in docs
-        ]
+        passages = [{
+            "passages": [{
+                "title": d.meta["name"] if d.meta and "name" in d.meta else "",
+                "text": d.content,
+                "label": d.meta["label"]
+                if d.meta and "label" in d.meta else "positive",
+                "external_id": d.id,
+            }]
+        } for d in docs]
         embeddings = self._get_predictions(passages)["passages"]
 
         return embeddings

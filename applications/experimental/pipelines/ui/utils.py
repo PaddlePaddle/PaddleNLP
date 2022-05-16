@@ -22,7 +22,6 @@ from time import sleep
 from uuid import uuid4
 import streamlit as st
 
-
 API_ENDPOINT = os.getenv("API_ENDPOINT", "http://10.21.226.175:8891")
 STATUS = "initialized"
 HS_VERSION = "hs_version"
@@ -54,14 +53,26 @@ def pipelines_version():
     return requests.get(url, timeout=0.1).json()["hs_version"]
 
 
-def query(query, filters={}, top_k_reader=5, top_k_ranker=5, top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+def query(query, filters={}, top_k_reader=5, top_k_ranker=5,
+          top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Send a query to the REST API and parse the answer.
     Returns both a ready-to-use representation of the results and the raw JSON.
     """
 
     url = f"{API_ENDPOINT}/{DOC_REQUEST}"
-    params = {"filters": filters, "Retriever": {"top_k": top_k_retriever}, "Ranker": {"top_k": top_k_ranker}, "Reader": {"top_k": top_k_reader}}
+    params = {
+        "filters": filters,
+        "Retriever": {
+            "top_k": top_k_retriever
+        },
+        "Ranker": {
+            "top_k": top_k_ranker
+        },
+        "Reader": {
+            "top_k": top_k_reader
+        }
+    }
     req = {"query": query, "params": params}
     response_raw = requests.post(url, json=req)
 
@@ -77,37 +88,48 @@ def query(query, filters={}, top_k_reader=5, top_k_ranker=5, top_k_retriever=5) 
     answers = response["answers"]
     for answer in answers:
         if answer.get("answer", None):
-            results.append(
-                {
-                    "context": "..." + answer["context"] + "...",
-                    "answer": answer.get("answer", None),
-                    "source": answer["meta"]["name"],
-                    "relevance": round(answer["score"] * 100, 2),
-                    "document": [doc for doc in response["documents"] if doc["id"] == answer["document_id"]][0],
-                    "offset_start_in_doc": answer["offsets_in_document"][0]["start"],
-                    "_raw": answer,
-                }
-            )
+            results.append({
+                "context": "..." + answer["context"] + "...",
+                "answer": answer.get("answer", None),
+                "source": answer["meta"]["name"],
+                "relevance": round(answer["score"] * 100, 2),
+                "document": [
+                    doc for doc in response["documents"]
+                    if doc["id"] == answer["document_id"]
+                ][0],
+                "offset_start_in_doc":
+                answer["offsets_in_document"][0]["start"],
+                "_raw": answer,
+            })
         else:
-            results.append(
-                {
-                    "context": None,
-                    "answer": None,
-                    "document": None,
-                    "relevance": round(answer["score"] * 100, 2),
-                    "_raw": answer,
-                }
-            )
+            results.append({
+                "context": None,
+                "answer": None,
+                "document": None,
+                "relevance": round(answer["score"] * 100, 2),
+                "_raw": answer,
+            })
     return results, response
 
-def semantic_search(query, filters={}, top_k_reader=5, top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+
+def semantic_search(
+        query, filters={}, top_k_reader=5,
+        top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Send a query to the REST API and parse the answer.
     Returns both a ready-to-use representation of the results and the raw JSON.
     """
 
     url = f"{API_ENDPOINT}/{DOC_REQUEST}"
-    params = {"filters": filters, "Retriever": {"top_k": top_k_retriever}, "Ranker": {"top_k": top_k_reader}}
+    params = {
+        "filters": filters,
+        "Retriever": {
+            "top_k": top_k_retriever
+        },
+        "Ranker": {
+            "top_k": top_k_reader
+        }
+    }
     req = {"query": query, "params": params}
     response_raw = requests.post(url, json=req)
 
@@ -122,17 +144,16 @@ def semantic_search(query, filters={}, top_k_reader=5, top_k_retriever=5) -> Tup
     results = []
     answers = response["documents"]
     for answer in answers:
-       results.append(
-                {
-                    "context": answer["content"],
-                    "source": answer["meta"]["name"],
-                    "relevance": round(answer["score"] * 100, 2),
-                }
-            )
+        results.append({
+            "context": answer["content"],
+            "source": answer["meta"]["name"],
+            "relevance": round(answer["score"] * 100, 2),
+        })
     return results, response
 
 
-def send_feedback(query, answer_obj, is_correct_answer, is_correct_document, document) -> None:
+def send_feedback(query, answer_obj, is_correct_answer, is_correct_document,
+                  document) -> None:
     """
     Send a feedback (label) to the REST API
     """
@@ -147,7 +168,9 @@ def send_feedback(query, answer_obj, is_correct_answer, is_correct_document, doc
     }
     response_raw = requests.post(url, json=req)
     if response_raw.status_code >= 400:
-        raise ValueError(f"An error was returned [code {response_raw.status_code}]: {response_raw.json()}")
+        raise ValueError(
+            f"An error was returned [code {response_raw.status_code}]: {response_raw.json()}"
+        )
 
 
 def upload_doc(file):
@@ -163,6 +186,7 @@ def get_backlink(result) -> Tuple[Optional[str], Optional[str]]:
         if isinstance(doc, dict):
             if doc.get("meta", None):
                 if isinstance(doc["meta"], dict):
-                    if doc["meta"].get("url", None) and doc["meta"].get("title", None):
+                    if doc["meta"].get("url", None) and doc["meta"].get("title",
+                                                                        None):
                         return doc["meta"]["url"], doc["meta"]["title"]
     return None, None

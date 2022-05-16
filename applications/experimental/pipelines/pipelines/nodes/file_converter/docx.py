@@ -21,19 +21,17 @@ import docx
 
 from pipelines.nodes.file_converter import BaseConverter
 
-
 logger = logging.getLogger(__name__)
 
 
 class DocxToTextConverter(BaseConverter):
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]]=None,
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]=None, ) -> List[Dict[str, Any]]:
         """
         Extract text from a .docx file.
         Note: As docx doesn't contain "page" information, we actually extract and return a list of paragraphs here.
@@ -58,13 +56,17 @@ class DocxToTextConverter(BaseConverter):
         if valid_languages is None:
             valid_languages = self.valid_languages
         if remove_numeric_tables is True:
-            raise Exception("'remove_numeric_tables' is not supported by DocxToTextConverter.")
+            raise Exception(
+                "'remove_numeric_tables' is not supported by DocxToTextConverter."
+            )
         if valid_languages is True:
-            raise Exception("Language validation using 'valid_languages' is not supported by DocxToTextConverter.")
+            raise Exception(
+                "Language validation using 'valid_languages' is not supported by DocxToTextConverter."
+            )
 
         file = docx.Document(file_path)  # Creating word reader object.
         paragraphs = [para.text for para in file.paragraphs]
-        documents=[]
+        documents = []
         for page in paragraphs:
             document = {"content": page, "content_type": "text", "meta": meta}
             documents.append(document)

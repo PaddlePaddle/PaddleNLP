@@ -30,10 +30,9 @@ class BaseConverter(BaseComponent):
     outgoing_edges = 1
 
     def __init__(
-        self,
-        remove_numeric_tables: bool = False,
-        valid_languages: Optional[List[str]] = None,
-    ):
+            self,
+            remove_numeric_tables: bool=False,
+            valid_languages: Optional[List[str]]=None, ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
                                       The tabular structures in documents might be noise for the reader model if it
@@ -48,20 +47,21 @@ class BaseConverter(BaseComponent):
         """
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.set_config(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
 
         self.remove_numeric_tables = remove_numeric_tables
         self.valid_languages = valid_languages
 
     @abstractmethod
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]],
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "utf-8",
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]],
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]="utf-8", ) -> List[Dict[str, Any]]:
         """
         Convert a file to a dictionary containing the text and any associated meta data.
 
@@ -84,7 +84,9 @@ class BaseConverter(BaseComponent):
         """
         pass
 
-    def validate_language(self, text: str, valid_languages: Optional[List[str]] = None) -> bool:
+    def validate_language(self,
+                          text: str,
+                          valid_languages: Optional[List[str]]=None) -> bool:
         """
         Validate if the language of the text is one of valid languages.
         """
@@ -102,11 +104,12 @@ class BaseConverter(BaseComponent):
         return lang in valid_languages
 
     def run(  # type: ignore
-        self,
-        file_paths: Union[Path, List[Path]],  # type: ignore
-        meta: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None,  # type: ignore
-        remove_numeric_tables: Optional[bool] = None,  # type: ignore
-        valid_languages: Optional[List[str]] = None,  # type: ignore
+            self,
+            file_paths: Union[Path, List[Path]],  # type: ignore
+            meta: Optional[Union[Dict[str, str], List[Dict[
+                str, str]]]]=None,  # type: ignore
+            remove_numeric_tables: Optional[bool]=None,  # type: ignore
+            valid_languages: Optional[List[str]]=None,  # type: ignore
     ):
 
         if isinstance(file_paths, Path):
@@ -118,11 +121,10 @@ class BaseConverter(BaseComponent):
         documents: list = []
         for file_path, file_meta in zip(file_paths, meta):
             for doc in self.convert(
-                file_path=file_path,
-                meta=file_meta,
-                remove_numeric_tables=remove_numeric_tables,
-                valid_languages=valid_languages,
-            ):
+                    file_path=file_path,
+                    meta=file_meta,
+                    remove_numeric_tables=remove_numeric_tables,
+                    valid_languages=valid_languages, ):
                 documents.append(doc)
 
         result = {"documents": documents}

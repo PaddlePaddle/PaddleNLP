@@ -29,16 +29,14 @@ except (ImportError, ModuleNotFoundError) as ie:
 
 from pipelines.nodes.file_converter import BaseConverter
 
-
 logger = logging.getLogger(__name__)
 
 
 class ImageToTextConverter(BaseConverter):
     def __init__(
-        self,
-        remove_numeric_tables: bool = False,
-        valid_languages: Optional[List[str]] = ["eng"],
-    ):
+            self,
+            remove_numeric_tables: bool=False,
+            valid_languages: Optional[List[str]]=["eng"], ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
                                       The tabular structures in documents might be noise for the reader model if it
@@ -55,18 +53,21 @@ class ImageToTextConverter(BaseConverter):
         """
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
-        self.recognize = PaddleOCR(use_angle_cls=True, lang='ch') 
-        super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.set_config(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
+        self.recognize = PaddleOCR(use_angle_cls=True, lang='ch')
+        super().__init__(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
 
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "utf-8",
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]]=None,
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]="utf-8", ) -> List[Dict[str, Any]]:
         """
         Extract text from image file using the pytesseract library (https://github.com/madmaze/pytesseract)
 
@@ -96,11 +97,14 @@ class ImageToTextConverter(BaseConverter):
             cleaned_lines = []
             for line in lines:
                 words = line.split()
-                digits = [word for word in words if any(i.isdigit() for i in word)]
+                digits = [
+                    word for word in words if any(i.isdigit() for i in word)
+                ]
 
                 # remove lines having > 40% of words as digits AND not ending with a period(.)
                 if remove_numeric_tables:
-                    if words and len(digits) / len(words) > 0.4 and not line.strip().endswith("."):
+                    if words and len(digits) / len(
+                            words) > 0.4 and not line.strip().endswith("."):
                         logger.debug(f"Removing line '{line}' from file")
                         continue
                 cleaned_lines.append(line)
@@ -111,15 +115,14 @@ class ImageToTextConverter(BaseConverter):
             if not self.validate_language(document_text, valid_languages):
                 logger.warning(
                     f"The language for image is not one of {valid_languages}. The file may not have "
-                    f"been decoded in the correct text format."
-                )
-        documents=[]
+                    f"been decoded in the correct text format.")
+        documents = []
         for page in cleaned_pages:
             document = {"content": page, "meta": meta}
             documents.append(document)
         return documents
 
-    def _image_to_text(self,img_path) -> List[str]:
+    def _image_to_text(self, img_path) -> List[str]:
         """
         Extract text from image path.
 

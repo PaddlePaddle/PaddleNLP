@@ -19,19 +19,19 @@ from pipelines.utils.import_utils import safe_import
 from pipelines.document_stores.base import BaseDocumentStore, BaseKnowledgeGraph, KeywordDocumentStore
 
 ElasticsearchDocumentStore = safe_import(
-    "pipelines.document_stores.elasticsearch", "ElasticsearchDocumentStore", "elasticsearch"
-)
+    "pipelines.document_stores.elasticsearch", "ElasticsearchDocumentStore",
+    "elasticsearch")
 OpenDistroElasticsearchDocumentStore = safe_import(
-    "pipelines.document_stores.elasticsearch", "OpenDistroElasticsearchDocumentStore", "elasticsearch"
-)
-OpenSearchDocumentStore = safe_import(
-    "pipelines.document_stores.elasticsearch", "OpenSearchDocumentStore", "elasticsearch"
-)
+    "pipelines.document_stores.elasticsearch",
+    "OpenDistroElasticsearchDocumentStore", "elasticsearch")
+OpenSearchDocumentStore = safe_import("pipelines.document_stores.elasticsearch",
+                                      "OpenSearchDocumentStore",
+                                      "elasticsearch")
 
-FAISSDocumentStore = safe_import("pipelines.document_stores.faiss", "FAISSDocumentStore", "faiss")
+FAISSDocumentStore = safe_import("pipelines.document_stores.faiss",
+                                 "FAISSDocumentStore", "faiss")
 
 from pipelines.document_stores.utils import (
     eval_data_from_json,
     eval_data_from_jsonl,
-    es_index_to_document_store,
-)
+    es_index_to_document_store, )

@@ -24,16 +24,14 @@ import pdfplumber
 
 from pipelines.nodes.file_converter import BaseConverter, ImageToTextConverter
 
-
 logger = logging.getLogger(__name__)
 
 
 class PDFToTextConverter(BaseConverter):
     def __init__(
-        self,
-        remove_numeric_tables: bool = False,
-        valid_languages: Optional[List[str]] = None,
-    ):
+            self,
+            remove_numeric_tables: bool=False,
+            valid_languages: Optional[List[str]]=None, ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
                                       The tabular structures in documents might be noise for the reader model if it
@@ -47,7 +45,9 @@ class PDFToTextConverter(BaseConverter):
                                 in garbled text.
         """
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.set_config(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
 
         verify_installation = subprocess.run(["pdftotext -v"], shell=True)
         if verify_installation.returncode == 127:
@@ -62,19 +62,19 @@ class PDFToTextConverter(BaseConverter):
                    brew install xpdf
                    
                    You can find more details here: https://www.xpdfreader.com
-                """
-            )
+                """)
 
-        super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        super().__init__(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
 
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "Latin1",
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]]=None,
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]="Latin1", ) -> List[Dict[str, Any]]:
         """
         Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
 
@@ -104,7 +104,7 @@ class PDFToTextConverter(BaseConverter):
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
             valid_languages = self.valid_languages
-        
+
         cleaned_pages = []
         for page in pages:
             # pdftotext tool provides an option to retain the original physical layout of a PDF page. This behaviour
@@ -121,11 +121,14 @@ class PDFToTextConverter(BaseConverter):
             cleaned_lines = []
             for line in lines:
                 words = line.split()
-                digits = [word for word in words if any(i.isdigit() for i in word)]
+                digits = [
+                    word for word in words if any(i.isdigit() for i in word)
+                ]
 
                 # remove lines having > 40% of words as digits AND not ending with a period(.)
                 if remove_numeric_tables:
-                    if words and len(digits) / len(words) > 0.4 and not line.strip().endswith("."):
+                    if words and len(digits) / len(
+                            words) > 0.4 and not line.strip().endswith("."):
                         logger.debug(f"Removing line '{line}' from {file_path}")
                         continue
                 cleaned_lines.append(line)
@@ -136,17 +139,18 @@ class PDFToTextConverter(BaseConverter):
             if not self.validate_language(document_text, valid_languages):
                 logger.warning(
                     f"The language for {file_path} is not one of {valid_languages}. The file may not have "
-                    f"been decoded in the correct text format."
-                )
+                    f"been decoded in the correct text format.")
 
-        documents=[]
+        documents = []
         for page in cleaned_pages:
             document = {"content": page, "content_type": "text", "meta": meta}
             documents.append(document)
         return documents
-        
 
-    def _read_pdf(self, file_path: Path, layout: bool, encoding: Optional[str] = "Latin1") -> List[str]:
+    def _read_pdf(self,
+                  file_path: Path,
+                  layout: bool,
+                  encoding: Optional[str]="Latin1") -> List[str]:
         """
         Extract pages from the pdf file at file_path.
 
@@ -155,20 +159,18 @@ class PDFToTextConverter(BaseConverter):
                        the content stream order.
         """
         pdf = pdfplumber.open(file_path)
-        page_text=[]
+        page_text = []
         for page in pdf.pages:
-            paragraphs=page.extract_text()
+            paragraphs = page.extract_text()
             page_text.append(paragraphs)
         return page_text
-        
 
 
 class PDFToTextOCRConverter(BaseConverter):
     def __init__(
-        self,
-        remove_numeric_tables: bool = False,
-        valid_languages: Optional[List[str]] = ["eng"],
-    ):
+            self,
+            remove_numeric_tables: bool=False,
+            valid_languages: Optional[List[str]]=["eng"], ):
         """
         Extract text from image file using the pytesseract library (https://github.com/madmaze/pytesseract)
 
@@ -184,20 +186,24 @@ class PDFToTextOCRConverter(BaseConverter):
                                 in garbled text.
         """
         # init image to text instance
-        self.image_2_text = ImageToTextConverter(remove_numeric_tables, valid_languages)
+        self.image_2_text = ImageToTextConverter(remove_numeric_tables,
+                                                 valid_languages)
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
-        super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.set_config(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
+        super().__init__(
+            remove_numeric_tables=remove_numeric_tables,
+            valid_languages=valid_languages)
 
     def convert(
-        self,
-        file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
-        remove_numeric_tables: Optional[bool] = None,
-        valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "utf-8",
-    ) -> List[Dict[str, Any]]:
+            self,
+            file_path: Path,
+            meta: Optional[Dict[str, str]]=None,
+            remove_numeric_tables: Optional[bool]=None,
+            valid_languages: Optional[List[str]]=None,
+            encoding: Optional[str]="utf-8", ) -> List[Dict[str, Any]]:
         """
         Convert a file to a dictionary containing the text and any associated meta data.
 
@@ -222,9 +228,12 @@ class PDFToTextOCRConverter(BaseConverter):
         try:
             images = convert_from_path(file_path)
             for image in images:
-                temp_img = tempfile.NamedTemporaryFile(dir=os.path.dirname(os.path.realpath(__file__)), suffix=".jpeg")
+                temp_img = tempfile.NamedTemporaryFile(
+                    dir=os.path.dirname(os.path.realpath(__file__)),
+                    suffix=".jpeg")
                 image.save(temp_img.name)
-                pages.append(self.image_2_text.convert(temp_img.name)[0]["content"])
+                pages.append(
+                    self.image_2_text.convert(temp_img.name)[0]["content"])
         except Exception as exception:
             logger.error(f"File {file_path} has an error \n {exception}")
 

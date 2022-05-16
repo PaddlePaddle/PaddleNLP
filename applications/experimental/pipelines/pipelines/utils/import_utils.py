@@ -8,7 +8,6 @@ import logging
 import importlib
 from pathlib import Path
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +29,9 @@ def safe_import(import_path: str, classname: str, dep_group: str):
     return classs
 
 
-def _missing_dependency_stub_factory(classname: str, dep_group: str, import_error: Exception):
+def _missing_dependency_stub_factory(classname: str,
+                                     dep_group: str,
+                                     import_error: Exception):
     """
     Create custom versions of MissingDependency using the given parameters.
     See `safe_import()`
@@ -38,7 +39,8 @@ def _missing_dependency_stub_factory(classname: str, dep_group: str, import_erro
 
     class MissingDependency:
         def __init__(self, *args, **kwargs):
-            _optional_component_not_installed(classname, dep_group, import_error)
+            _optional_component_not_installed(classname, dep_group,
+                                              import_error)
 
         def __getattr__(self, *a, **k):
             return None
@@ -46,7 +48,9 @@ def _missing_dependency_stub_factory(classname: str, dep_group: str, import_erro
     return MissingDependency
 
 
-def _optional_component_not_installed(component: str, dep_group: str, source_error: Exception):
+def _optional_component_not_installed(component: str,
+                                      dep_group: str,
+                                      source_error: Exception):
     raise ImportError(
         f"Failed to import '{component}', "
         "which is an optional component in pipelines.\n"
@@ -55,7 +59,9 @@ def _optional_component_not_installed(component: str, dep_group: str, source_err
     ) from source_error
 
 
-def fetch_archive_from_http(url: str, output_dir: str, proxies: Optional[dict] = None) -> bool:
+def fetch_archive_from_http(url: str,
+                            output_dir: str,
+                            proxies: Optional[dict]=None) -> bool:
     """
     Fetch an archive (zip or tar.gz) from a url via http and extract content to an output directory.
 
@@ -71,7 +77,9 @@ def fetch_archive_from_http(url: str, output_dir: str, proxies: Optional[dict] =
 
     is_not_empty = len(list(Path(path).rglob("*"))) > 0
     if is_not_empty:
-        logger.info(f"Found data stored in `{output_dir}`. Delete this first if you really want to fetch new data.")
+        logger.info(
+            f"Found data stored in `{output_dir}`. Delete this first if you really want to fetch new data."
+        )
         return False
     else:
         logger.info(f"Fetching from {url} to `{output_dir}`")
@@ -83,12 +91,13 @@ def fetch_archive_from_http(url: str, output_dir: str, proxies: Optional[dict] =
             zip_archive = zipfile.ZipFile(io.BytesIO(request_data.content))
             zip_archive.extractall(output_dir)
         elif archive_extension in ["gz", "bz2", "xz"]:
-            tar_archive = tarfile.open(fileobj=io.BytesIO(request_data.content), mode="r|*")
+            tar_archive = tarfile.open(
+                fileobj=io.BytesIO(request_data.content), mode="r|*")
             tar_archive.extractall(output_dir)
         else:
             logger.warning(
                 "Skipped url {0} as file type is not supported here. "
-                "See pipelines documentation for support of more file types".format(url)
-            )
+                "See pipelines documentation for support of more file types".
+                format(url))
 
         return True

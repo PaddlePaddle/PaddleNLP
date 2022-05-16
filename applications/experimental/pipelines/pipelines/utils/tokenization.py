@@ -26,12 +26,11 @@ from paddlenlp.transformers.tokenizer_utils_base import TruncationStrategy
 
 from pipelines.data_handler.samples import SampleBasket
 
-
 logger = logging.getLogger(__name__)
-
 
 # Special characters used by the different tokenizers to indicate start of word / whitespace
 SPECIAL_TOKENIZER_CHARS = r"^(##|Ġ|▁)"
+
 
 def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
     """
@@ -54,8 +53,9 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
     # tokenized_docs_batch.keys(): dict_keys(['input_ids', 'attention_mask', 'special_tokens_mask', 'offset_mapping'])
     texts = [d["context"] for d in pre_baskets]
 
-    tokenized_docs_batch = tokenizer.batch_encode(texts,
-        truncation = TruncationStrategy.ONLY_SECOND,
+    tokenized_docs_batch = tokenizer.batch_encode(
+        texts,
+        truncation=TruncationStrategy.ONLY_SECOND,
         return_special_tokens_mask=True,
         return_attention_mask=True,
         return_offsets_mapping=True,
@@ -77,7 +77,8 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
         # Tokenize questions one by one
         for i_q, q in enumerate(d["qas"]):
             question_text = q["question"]
-            tokenized_q = tokenizer.encode(question_text,
+            tokenized_q = tokenizer.encode(
+                question_text,
                 return_special_tokens_mask=True,
                 return_attention_mask=True,
                 return_offsets_mapping=True,
@@ -88,7 +89,8 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
             question_tokenids = tokenized_q["input_ids"]
 
             # Fake offset_mapping
-            question_offsets = [(i, i+1)  for i in range(len(question_tokenids))]
+            question_offsets = [(i, i + 1) for i in range(
+                len(question_tokenids))]
 
             # question start_of_words_batch
             # Fake question_sow
@@ -114,10 +116,17 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
             # TODO add only during debug mode (need to create debug mode)
             # raw["document_tokens_strings"] = tokenized_docs_batch.encodings[i_doc].tokens
             # raw["question_tokens_strings"] = tokenized_q.encodings[0].tokens
-            raw["document_tokens_strings"] = tokenizer.convert_ids_to_tokens(tokenized_docs_batch["input_ids"][i_doc])
-            raw["question_tokens_strings"] = tokenizer.convert_ids_to_tokens(question_tokenids)
+            raw["document_tokens_strings"] = tokenizer.convert_ids_to_tokens(
+                tokenized_docs_batch["input_ids"][i_doc])
+            raw["question_tokens_strings"] = tokenizer.convert_ids_to_tokens(
+                question_tokenids)
 
-            baskets.append(SampleBasket(raw=raw, id_internal=internal_id, id_external=external_id, samples=None))
+            baskets.append(
+                SampleBasket(
+                    raw=raw,
+                    id_internal=internal_id,
+                    id_external=external_id,
+                    samples=None))
     return baskets
 
 

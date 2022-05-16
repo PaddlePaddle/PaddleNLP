@@ -29,7 +29,9 @@ class RequestLimiter:
     def run(self):
         acquired = self.semaphore.acquire(blocking=False)
         if not acquired:
-            raise HTTPException(status_code=503, detail="The server is busy processing requests.")
+            raise HTTPException(
+                status_code=503,
+                detail="The server is busy processing requests.")
         try:
             yield acquired
         finally:
@@ -48,8 +50,8 @@ def as_form(cls: Type[BaseModel]):
         inspect.Parameter(
             field.alias,
             inspect.Parameter.POSITIONAL_ONLY,
-            default=(Form(field.default) if not field.required else Form(...)),
-        )
+            default=(Form(field.default)
+                     if not field.required else Form(...)), )
         for field in cls.__fields__.values()
     ]
 

@@ -31,7 +31,8 @@ setuptools.setup(
     long_description_content_type="text/plain",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('examples*', 'tests*', 'docs*', 'ui*', 'rest_api*')),
+        where='.',
+        exclude=('examples*', 'tests*', 'docs*', 'ui*', 'rest_api*')),
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
     python_requires='>=3.7',
