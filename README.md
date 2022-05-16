@@ -24,7 +24,7 @@
   <a href=#安装> 安装 </a> |
   <a href=#QuickStart> 快速开始 </a> |
   <a href=#API文档> API文档 </a> |
-  <a href=#社区交流> 社区交流 </a> 
+  <a href=#社区交流> 社区交流 </a>
 </h4>
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
@@ -48,11 +48,11 @@ PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本�
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a>
 
 
 ### 开箱即用的NLP能力
@@ -267,16 +267,16 @@ pip install --upgrade paddlenlp
 
 - 一键预测
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果，以情感分析任务为例：
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果：
 
 ```python
-from pprint import pprint
-from paddlenlp import Taskflow
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
-ie = Taskflow('information_extraction', schema=schema)
-pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
->>> [{'时间': [{'end': 6,
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+[{'时间': [{'end': 6,
           'probability': 0.9857378532924486,
           'start': 0,
           'text': '2月8日上午'}],
@@ -292,13 +292,7 @@ pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中�
 
 - 定制训练
 
-如果对一键预测效果不满意，也可以进行模型微调，这里对UIE模型进行微调，以进一步提升命名实体识别的准确率：
-
-```python
-from paddlenlp.transformers import ErniePretrainedModel，AutoTokenizer
-```
-
-完整微调代码，可参考[UIE微调](./model_zoo/uie/)
+如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
 更多内容可参考：[多场景示例](./examples)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
@@ -309,7 +303,7 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 
 - 支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；
 - 灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；
-- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。    
+- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。  
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
 
