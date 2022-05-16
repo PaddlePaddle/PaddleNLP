@@ -166,6 +166,8 @@ def do_train():
             all_labels = []
             all_CUDA_rnd_state = []
             all_global_rnd_state = []
+            all_query=[]
+            all_title=[]
 
             for sub_batch in sub_batchs:
 
@@ -187,7 +189,7 @@ def do_train():
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
                         #all_global_rnd_state.append(sub_global_rnd_state)
 
-                        sub_cosine_sim, sub_label = model(
+                        sub_cosine_sim, sub_label,query_embedding,title_embedding = model(
                             query_input_ids=sub_query_input_ids,
                             title_input_ids=sub_title_input_ids,
                             query_token_type_ids=sub_query_token_type_ids,
@@ -195,8 +197,21 @@ def do_train():
 
                         all_reps.append(sub_cosine_sim)
                         all_labels.append(sub_label)
+                        all_title.append(title_embedding)
+                        all_query.append(query_embedding)
 
                 model_reps = paddle.concat(all_reps, axis=0)
+
+                model_title = paddle.concat(all_title)
+                model_query = paddle.concat(all_query)
+
+                model_title = model_title.detach()
+                
+                model_query = model_query.detach()
+
+                model_query.stop_gtadient = False
+
+                model_title.stop_gradient = False
 
                 model_reps.stop_gradient = False
 

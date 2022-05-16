@@ -118,4 +118,4 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
 
         #loss = F.cross_entropy(input=cosine_sim, label=labels)
 
-        return cosine_sim,labels,
+        return cosine_sim,labels,query_cls_embedding,title_cls_embedding

@@ -19,6 +19,8 @@ global global_step
 global save_steps
 global save_direc
 
+"""上面这些拿进来就行"""
+
 global_step = 0
 
 data_path = "./biencoder-nq-train.json"
@@ -210,10 +212,16 @@ def train():
                 optimizer.step()
                 optimizer.clear_grad()
                 all_CUDA_rnd_state = []
-
                 global_step = global_step + 1
-
                 batch_data = []
+
+
+        EPOCH = str(epoch)
+        model.question_encoder.save_pretrained('./question_model'/{EPOCH})
+        model.context_encoder.save_pretrained('./context_model'/{EPOCH})
+
+
+
 
 
 """if (global_step % save_steps == 0):

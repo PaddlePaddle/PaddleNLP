@@ -3,7 +3,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 class BiEncoder(nn.Layer):
-    def __init__(self,question_encoder,context_encoder,dropout,output_emb_size,state=None):
+    def __init__(self,question_encoder,context_encoder,dropout,output_emb_size = 768,state=None):
         super(BiEncoder, self).__init__()
         self.state = state
         if self.state == None:
@@ -13,7 +13,7 @@ class BiEncoder(nn.Layer):
             self.question_encoder = question_encoder
         elif self.state == "FORCONTEXT":
             self.context_encoder = context_encoder
-        self.dropout = self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
+        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
         weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
         self.emb_reduce_linear = paddle.nn.Linear(
             768, output_emb_size, weight_attr=weight_attr)

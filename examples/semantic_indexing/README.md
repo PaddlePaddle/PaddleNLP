@@ -78,7 +78,7 @@
 以我们提供的语义相似度训练数据为例，通过如下命令，指定 GPU 0,1,2,3 卡, 基于 In-batch negatives 策略开始训练模型
 
 ```
-python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+python -u -m paddle.distributed.launch --gpus "0" \
     train_batch_neg.py \
     --device gpu \
     --save_dir ./checkpoints/ \
@@ -144,7 +144,7 @@ python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "${checkpoints_params_file}" \
+        --params_path "./temp10/model_state.pdparams" \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -178,7 +178,7 @@ python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
 接下来，运行如下命令进行效果评估，产出 R@10 和 R@50 指标:
 ```
   python -u evaluate.py \
-        --similar_pair_file "semantic_similar_pair.tsv" \
+        --similar_text_pair "semantic_similar_pair.tsv" \
         --recall_result_file "./recall_result_dir/recall_result.txt" \
         --recall_num 50
 ```
