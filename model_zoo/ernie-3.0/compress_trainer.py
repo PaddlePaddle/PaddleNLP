@@ -51,6 +51,16 @@ class DynabertConfig:
     def __init__(self,
                  width_mult_list=[3 / 4],
                  output_filename_prefix="float32"):
+        """
+        Pruning class config of DynaBERT stratedy.
+        Args:
+            width_mult_list (list of float):
+                Width mult list for DynaBERT.
+                Defaults to `[3/4]`.
+            output_filename_prefix (str):
+                Prefix of pruned model's filename. 
+                Defaults to `float32`.
+        """
         self.compress_type = "dynabert"
         self.width_mult_list = width_mult_list
         self.output_filename_prefix = output_filename_prefix
@@ -63,6 +73,28 @@ class PTQConfig:
                  input_dir=None,
                  input_filename_prefix="float32",
                  output_filename_prefix="int8"):
+        """
+        Quantization class config of Post-Training method.
+        Args:
+            algo_list (list of str):
+                Algorithm name list of `PostTrainingQuantization`. Each
+                algorithm would be performed to input model. Supported
+                algorithms are `KL`, `abs_max`, `min_max`, `avg`, `hist`
+                and `mse`.
+                Defaults to `["hist"]`.
+            batch_size_list (list of int):
+                Number of calibration samples.
+                Defaults to `[4]`.
+            input_dir (str):
+                Directory name of model to be quantized.
+                Defaults to `None`.
+            input_filename_prefix (str):
+                Prefix of model filename after quantization.
+                Defaults to `"float32"`.
+            output_filename_prefix (str):
+                Prefix of model filename after quantization.
+                Defaults to `"int8"`.
+        """
         self.compress_type = "ptq"
         self.algo_list = algo_list
         self.batch_size_list = batch_size_list
@@ -75,6 +107,20 @@ class CompressConfig:
     def __init__(self,
                  prune_config=DynabertConfig(),
                  quantization_config=PTQConfig()):
+        """
+        Model compression Config class. It accepts Hyperparameters of
+        pruning and quantization.
+        Args:
+            prune_config (`DynabertConfig`):
+                Accepts Hyperparameters of pruning. More prune strategies would
+                be supported in the future.
+                Defaults to `DynabertConfig()`.
+            quantization_config (`PTQConfig`):
+                Accepts Hyperparameters of pruning. More quantization methods
+                would be supported in the future.
+                Defaults to `PTQConfig()`.
+
+        """
         assert isinstance(prune_config, (DynabertConfig)), \
            "`prune_config` should be an instance of `DynabertConfig`."
         assert isinstance(quantization_config, (PTQConfig)), \
@@ -92,7 +138,23 @@ def compress(self,
     """
     Supports pruning and quantization. If both are needed, pruning would be
     performed before quantizaton.
+    Args:
+        task_name (str):
+            Task name. For example: tnews, msra_ner.
+        output_dir (str):
+            Directory name of Pruning or quantized models.
+        pruning (bool):
+            Whether to prune.
+            Defaults to `True`.
+        quantization (bool):
+            Whether to quantize.
+            Defaults to `True`.
+        compress_config (`CompressConfig`):
+            Compress config instance to pass parameters for pruning or
+            quantization.
+            Defaults to `CompressConfig()`.
     """
+    task_name = task_name.lower()
     if pruning:
         try_import_paddleslim()
         self.prune(task_name, output_dir, compress_config.prune_config)
@@ -121,7 +183,7 @@ def compress(self,
 
 def prune(self, task_name, output_dir, prune_config=DynabertConfig()):
     """
-    Supports DynaBERT strategy.
+    Supports DynaBERT strategy now.
     """
     assert isinstance(prune_config, (DynabertConfig)), \
         "`prune_config` should be an instance of `DynabertConfig`."
@@ -150,7 +212,7 @@ def _dynabert(self, task_name, model, output_dir, dynabert_config):
     train_dataloader = self.get_train_dataloader()
 
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-    if task_name == "cmrc2018":
+    if "cmrc2018" in task_name:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
         ofa_model, teacher_model = _dynabert_init(
@@ -266,7 +328,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
         all_end_logits = []
         metric.reset()
         for batch in data_loader:
-            if task_name == "cmrc2018":
+            if "cmrc2018" in task_name:
                 input_ids, token_type_ids = batch['input_ids'], batch[
                     'token_type_ids']
                 logits = model(
@@ -301,7 +363,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 else:
                     correct = metric.compute(logits, labels)
                     metric.update(correct)
-        if task_name == "cmrc2018":
+        if "cmrc2018" in task_name:
             n_best_size = 20
             max_answer_length = 50
             all_predictions, _, _ = compute_prediction(
@@ -357,7 +419,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
 
         for step, batch in enumerate(train_dataloader):
             global_step += 1
-            if task_name == "cmrc2018":
+            if "cmrc2018" in task_name:
                 input_ids, token_type_ids, start_positions, end_positions = batch[
                     'input_ids'], batch['token_type_ids'], batch[
                         'start_positions'], batch['end_positions']
@@ -372,7 +434,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 logits, teacher_logits = ofa_model(
                     input_ids, token_type_ids, attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
-                if task_name == "cmrc2018":
+                if "cmrc2018" in task_name:
                     logit_loss = (soft_cross_entropy(logits[0], teacher_logits[0].detach()) \
                                 + \
                                 soft_cross_entropy(logits[1], teacher_logits[1].detach()))/2
@@ -393,7 +455,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                            self.args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if task_name != "cmrc2018" and global_step % self.args.save_steps == 0:
+            if "cmrc2018" not in task_name and global_step % self.args.save_steps == 0:
                 tic_eval = time.time()
 
                 evaluate(
@@ -430,7 +492,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 logger.info("Best acc: %.4f" % (best_acc))
                 return ofa_model
 
-        if task_name == "cmrc2018":
+        if "cmrc2018" in task_name:
             tic_eval = time.time()
             evaluate(teacher_model, criterion, eval_dataloader, width_mult=100)
             logger.info("eval done total : %s s" % (time.time() - tic_eval))
@@ -467,8 +529,7 @@ def _dynabert_export(task_name, ofa_model, dynabert_config, output_dir):
         model_dir = os.path.join(output_dir, str(width_mult))
         state_dict = paddle.load(
             os.path.join(model_dir, "model_state.pdparams"))
-        # TODO: Supports more tasks.
-        if task_name == "cmrc2018":
+        if "cmrc2018" in task_name:
             origin_model = AutoModelForQuestionAnswering.from_pretrained(
                 model_dir)
         elif task_name == "msra_ner":
@@ -522,7 +583,6 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
         post_training_quantization = PostTrainingQuantization(
             executor=exe,
             batch_generator=_batch_generator_func,
-            # data_loader=data_loader,
             model_dir=input_dir,
             model_filename=quantization_config.input_filename_prefix +
             ".pdmodel",
@@ -532,7 +592,6 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
             batch_nums=1,
             scope=None,
             algo=algo,
-            # round_type='round',
             hist_percent=0.9999,
             bias_correction=False,
             quantizable_op_type=['matmul', 'matmul_v2'],
@@ -541,7 +600,7 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
             activation_bits=8,
             activation_quantize_type='range_abs_max',
             weight_quantize_type='channel_wise_abs_max',
-            # onnx_format=True,
+            onnx_format=True,
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
@@ -613,17 +672,29 @@ def compute_neuron_head_importance(task_name,
                                    intermediate_name='linear1',
                                    output_name='linear2'):
     """
-    Compute the importance of multi-head attention and feed-forward  neuron in each transformer layer.
+    Compute the importance of multi-head attention and feed-forward  neuron in
+    each transformer layer.
 
     Args:
-        task_name(str): task name.
-        model(paddle.nn.Layer): the instance of transformer model.
-        data_loader(DataLoader): An iterable data loader is used for evaluate. An instance of `paddle.io.Dataloader`.
-        num_layers(int): number of transformer layers.
-        num_heads(int): number of heads in each multi-head attention.
-        loss_fct(Loss|optional): loss function can be a `paddle.nn.Layer` instance. Default: `nn.loss.CrossEntropyLoss()`.
-        intermediate_name(str|optional): the name of intermediate `Linear` layer in feed-forward. Default: `linear1`.
-        output_name(str|optional): the name of output `Linear` layer in feed-forward. Default: `linear2`.
+        task_name (str):
+            Task name.
+        model(paddle.nn.Layer):
+            The instance of transformer model.
+        data_loader (DataLoader):
+            An iterable data loader is used for evaluate. An instance of
+            `paddle.io.Dataloader`.
+        num_layers (int):
+            Number of transformer layers.
+        num_heads (int):
+            Number of heads in each multi-head attention.
+        loss_fct (Loss|optional):
+            Loss function can be a `paddle.nn.Layer` instance. Default: `nn.loss.CrossEntropyLoss()`.
+        intermediate_name (str|optional):
+            The name of intermediate `Linear` layer in feed-forward.
+            Defaults to `linear1`.
+        output_name (str|optional):
+            The name of output `Linear` layer in feed-forward.
+            Defaults to `linear2`.
     """
     head_importance = paddle.zeros(
         shape=[num_layers, num_heads], dtype='float32')
@@ -649,12 +720,12 @@ def compute_neuron_head_importance(task_name,
     for w in intermediate_weight:
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype='float32'))
 
-    if task_name.lower() != 'mnli':
+    if task_name.lower() != 'glue mnli':
         data_loader = (data_loader, )
     for data in data_loader:
         for batch in data:
             if isinstance(batch, dict):
-                if task_name == "cmrc2018":
+                if "cmrc2018" in task_name:
                     input_ids, segment_ids, start_positions, end_positions = batch[
                         'input_ids'], batch['token_type_ids'], batch[
                             'start_positions'], batch['end_positions']
@@ -665,7 +736,7 @@ def compute_neuron_head_importance(task_name,
                 input_ids, segment_ids, labels = batch
             logits = model(
                 input_ids, segment_ids, attention_mask=[None, head_mask])
-            if task_name == "cmrc2018":
+            if "cmrc2018" in task_name:
                 start_logits, end_logits = logits
                 loss = (loss_fct(start_logits, start_positions) + loss_fct(
                     end_logits, end_positions)) / 2
