@@ -23,9 +23,24 @@
 
 
 ## 模型介绍
-TBD
+
+本次开源的模型是在文心大模型ERNIE 3.0基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与ERNIE 2.0保持一致，相比ERNIE 2.0具有更强的中文效果。
+
+相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9) 
+
+
+### 在线蒸馏技术
+
+在线蒸馏技术在模型学习的过程中周期性地将知识信号传递给若干个学生模型同时训练，从而在蒸馏阶段一次性产出多种尺寸的学生模型。相对传统蒸馏技术，该技术极大节省了因大模型额外蒸馏计算以及多个学生的重复知识传递带来的算力消耗。
+
+这种新颖的蒸馏方式利用了文心大模型的规模优势，在蒸馏完成后保证了学生模型的效果和尺寸丰富性，方便不同性能需求的应用场景使用。此外，由于文心大模型的模型尺寸与学生模型差距巨大，模型蒸馏难度极大甚至容易失效。为此，通过引入了助教模型进行蒸馏的技术，利用助教作为知识传递的桥梁以缩短学生模型和大模型表达空间相距过大的问题，从而促进蒸馏效率的提升。
+
+更多技术细节可以参考论文：
+- [ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression](https://arxiv.org/abs/2106.02241)
+- [ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/abs/2112.12731)
+
 <p align="center">
-        <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168254282-e6901f9a-fd9a-4bbd-a5b6-e847b7f90bb4.png">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168516904-3fff73e0-010d-4bef-adc1-4d7c97a9c6ff.png" title="ERNIE 3.0 Online Distillation">
 </p>
 
 
