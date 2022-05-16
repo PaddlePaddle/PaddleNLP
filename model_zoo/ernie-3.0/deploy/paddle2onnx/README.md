@@ -1,8 +1,8 @@
 # ERNIE 3.0 ONNX导出及部署指南
-本文介绍ERNIE 3.0 模型模型如何转化为ONNX模型，并基于ONNXRuntime引擎部署，本文将以命名实体识别和分类两大场景作为介绍示例。
+本文介绍ERNIE 3.0 模型模型如何转化为ONNX模型，并基于ONNXRuntime引擎部署，本文将以序列标注和分类两大场景作为介绍示例。
 - [ERNIE 3.0 ONNX导出及部署指南](#ERNIE3.0ONNX导出及部署指南)
   - [1. 环境准备](#1-环境准备)
-  - [2. 命名实体识别模型推理](#2-命名实体识别模型推理)
+  - [2. 序列标注模型推理](#2-序列标注模型推理)
     - [2.1 模型获取](#21-模型获取)
     - [2.2 模型转换](#22-模型转换)
     - [2.3 ONNXRuntime推理样例](#23-ONNXRuntime推理样例)
@@ -21,11 +21,11 @@ python -m pip install onnxruntime
 python -m pip install onnxruntime-gpu onnx onnxconverter-common
 ```
 
-## 2. 命名实体识别模型推理
+## 2. 序列标注模型推理
 ### 2.1 模型获取
 用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的msra_ner数据集训练的ERNIE 3.0模型，请执行如下命令获取模型：
 ```
-# 获取命名实体识别FP32模型
+# 获取序列标注FP32模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```

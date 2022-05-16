@@ -212,14 +212,14 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
   PyDict_SetItem(
       py_dict, ToPyObject("pad_token"), ToPyObject(pad_method.pad_token_));
   if (pad_method.pad_to_mutiple_of > 0) {
-      PyDict_SetItem(py_dict,
-        ToPyObject("pad_to_multiple_of"),
-        ToPyObject(pad_method.pad_to_mutiple_of));
+    PyDict_SetItem(py_dict,
+                   ToPyObject("pad_to_multiple_of"),
+                   ToPyObject(pad_method.pad_to_mutiple_of));
   } else {
-      Py_INCREF(Py_None);
-      PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
+    Py_INCREF(Py_None);
+    PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
   }
-  
+
   PyDict_SetItem(
       py_dict,
       ToPyObject("direction"),
@@ -227,8 +227,7 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                                                                    : "left"));
   if (pad_method.strategy_ == core::PadStrategy::BATCH_LONGEST) {
     Py_INCREF(Py_None);
-    PyDict_SetItem(
-        py_dict, ToPyObject("length"), Py_None);
+    PyDict_SetItem(py_dict, ToPyObject("length"), Py_None);
   } else {
     PyDict_SetItem(
         py_dict, ToPyObject("length"), ToPyObject(pad_method.pad_len_));
@@ -256,11 +255,9 @@ static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
     PyDict_SetItem(
         py_dict, ToPyObject("strategy"), ToPyObject("longest_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_FIRST) {
-    PyDict_SetItem(
-        py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
+    PyDict_SetItem(py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_SECOND) {
-    PyDict_SetItem(
-        py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
+    PyDict_SetItem(py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
   }
   return py_dict;
 }
@@ -877,7 +874,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
     }
     std::vector<core::Encoding> result_encodings;
     self->tokenizer.EncodeBatchStrings(
-        batch_encode_input, add_special_tokens, &result_encodings);
+        batch_encode_input, &result_encodings, add_special_tokens);
     py::object py_obj = py::cast(result_encodings);
     py_obj.inc_ref();
     return py_obj.ptr();
