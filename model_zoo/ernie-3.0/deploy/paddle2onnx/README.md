@@ -57,7 +57,7 @@ entity: 詹姆斯   label: PER   pos: [6, 8]
 entity: 姚明   label: PER   pos: [10, 11]
 -----------------------------
 ```
-在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上，可以使用如下命令开启ONNXRuntime的FP16进行加速推理：
+在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上，可以使用如下命令开启ONNXRuntime的FP16进行推理加速：
 ```
 python infer.py --task_name token_cls --model_path ner_model.onnx --use_fp16
 ```
