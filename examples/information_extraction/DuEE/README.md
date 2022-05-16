@@ -51,8 +51,8 @@ f1_score = (2 * P * R) / (P + R)，其中
 
 ### 快速复现基线Step1：数据预处理并加载
 
-从比赛官网下载数据集，解压存放于data/DuEE-Fin目录下，将原始数据预处理成序列标注格式数据。
-处理之后的数据同样放在data/DuEE-Fin下，触发词识别数据文件存放在data/DuEE-Fin/role下，论元角色识别数据文件存放在data/DuEE-Fin/trigger下。
+从比赛官网下载数据集，逐层解压存放于data/DuEE-fin目录下，运行以下脚本将原始数据预处理成序列标注格式数据。
+处理之后的数据放在data/DuEE-Fin下，触发词识别数据文件存放在data/DuEE-Fin/role下，论元角色识别数据文件存放在data/DuEE-Fin/trigger下。
 枚举分类数据存放在data/DuEE-Fin/enum下。
 
 ```

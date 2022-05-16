@@ -18,7 +18,7 @@ Fine-tuning 使用GLUE数据，这部分Paddle已提供，在执行Fine-tuning �
 
 
 ## **模型预训练**
-模型预训练过程可参考[Electra的README](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/electra/README.md)
+模型预训练过程可参考[Electra的README](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/electra/README.md)
 
 ## **Fine-tuning**
 
