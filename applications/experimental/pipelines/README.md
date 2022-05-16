@@ -8,13 +8,16 @@
 ### 智能问答系统
 我们针对中国重点城市的基本信息搭建了百科知识智能问答系统, 您可以根据实际需求基于自己的业务数据快速搭智能问答系统。[点击这里](./examples/question-answering/)快速构建端到端智能问答系统。
 
-![PaddleNLP_QA](https://user-images.githubusercontent.com/6829601/168563453-e3e58bd8-5d4f-4061-a2b5-9ebb2293ea8d.gif)
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
+</div>
 
 ### 语义检索系统
 我们针对[DuReader](https://github.com/baidu/DuReader)数据集搭建了语义检索系统, 您可以根据实际需求基于自己的业务数据快速搭语义检索系统。[点击这里](./examples/semantic-search/)快速构建端到端语义检索系统。
 
-![PaddleNLP语义检索](https://user-images.githubusercontent.com/6829601/168564087-758b5587-ec46-4a93-b8e7-5fdfbd5bcc94.gif)
-
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="500">
+</div>
 
 ## Acknowledge
 
