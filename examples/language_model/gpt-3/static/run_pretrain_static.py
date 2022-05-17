@@ -400,6 +400,7 @@ def do_train(args):
     tic_train = time.time()
     epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
+    step = 0
     while True:
         fetchs = []
         if topo.is_last:
@@ -498,7 +499,6 @@ def do_train(args):
             epoch += 1
         else:  # for pipeline, use noniterable dataloader
             train_data_loader.start()
-            step = 0
             try:
                 train_reader_cost += time.time() - reader_start
                 train_start = time.time()
@@ -562,6 +562,8 @@ def do_train(args):
             except paddle.fluid.core.EOFException:
                 train_data_loader.reset()
                 epoch += 1
+                step = 0
+                global_step = 0
 
 
 if __name__ == "__main__":
