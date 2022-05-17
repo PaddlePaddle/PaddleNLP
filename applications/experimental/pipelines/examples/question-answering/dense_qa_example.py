@@ -18,13 +18,13 @@ parser.add_argument("--retriever_batch_size", default=16, type=int, help="The ba
 args = parser.parse_args()
 # yapf: enable
 
+
 def dense_qa_pipeline():
 
     use_gpu = True if args.device == 'gpu' else False
 
     faiss_document_store = "faiss_document_store.db"
-    if os.path.exists(args.index_name) and os.path.exists(
-            faiss_document_store):
+    if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
         # connect to existed FAISS Index
         document_store = FAISSDocumentStore.load(args.index_name)
         retriever = DensePassageRetriever(
@@ -69,7 +69,8 @@ def dense_qa_pipeline():
 
     ### Ranker
     ranker = ErnieRanker(
-        model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
+        model_name_or_path="rocketqa-zh-dureader-cross-encoder",
+        use_gpu=use_gpu)
 
     reader = ErnieReader(
         model_name_or_path="ernie-gram-zh-finetuned-dureader-robust",
