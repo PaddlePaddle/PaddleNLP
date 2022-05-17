@@ -180,7 +180,7 @@ python finetune.py \
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`、`uie-tiny`和`uie-medical-base`，默认为`uie-base`。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
@@ -192,6 +192,7 @@ python finetune.py \
 | :---: | :--------: |
 | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
 | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
+| `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
 
 #### 模型评估
 
@@ -211,6 +212,7 @@ python evaluate.py \
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `model`: 选择所使用的模型，可选有`uie-base`、`uie-tiny`和`uie-medical-base`，默认为`uie-base`。
 
 #### 定制模型一键预测
 

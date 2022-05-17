@@ -23,7 +23,7 @@
   <a href=#Installation> Installation </a> |
   <a href=#QuickStart> Quick Start </a> |
   <a href=#APIReference> API Reference </a> |
-  <a href=#Community> Community </a> 
+  <a href=#Community> Community </a>
 </h4>
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
@@ -45,11 +45,11 @@ PaddleNLP is an easy-to-use and high performance NLP library with awesome pre-tr
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#Off-the-shelf NLP Pre-built Task> Off-the-shelf NLP Pre-built Task </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#Awesome Chinese Pre-trained Model Zoo> Awesome Chinese Pre-trained Model Zoo </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#Awesome Chinese Pre-trained Model Zoo> Awesome Chinese Pre-trained Model Zoo </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#Industrial End-to-end NLP System> Industrial End-to-end NLP System </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#Industrial End-to-end NLP System> Industrial End-to-end NLP System </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#High Performance Distributed Training and Infernece> High Performance Distributed Training and Infernece </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#High Performance Distributed Training and Infernece> High Performance Distributed Training and Infernece </a>
 
 
 ### Off-the-shelf NLP Pre-built Task
@@ -64,7 +64,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)。
 
 #### Comprehensive Chinese Transformer Models
 
-We provide 45+ network architectures and over 500+ pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel API to **⚡FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP! 
+We provide 45+ network architectures and over 500+ pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel API to **⚡FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
 ```python
 from paddlenlp.transformers import *
@@ -152,7 +152,7 @@ For more pretrained model usage, please refer to [Transformer API Docs](./docs/m
 
 PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
 
-Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource. 
+Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
 
 ### Industrial End-to-end System Cases
@@ -161,7 +161,7 @@ We provide high value scenarios including information extraction, semantic retri
 
 #### Speech Command Analysis
 
-Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios. 
+Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios.
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168412618-04897a47-79c9-4fe7-a054-5dc1f6a1f75c.png" width="500">

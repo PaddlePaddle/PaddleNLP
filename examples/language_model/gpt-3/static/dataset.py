@@ -282,6 +282,15 @@ def create_pretrained_dataset(
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
 
+    if device_world_size > 1 and local_rank != 0:
+        while True:
+            try:
+                import data_tools.helpers as helpers
+                break
+            except Exception as e:
+                print("> wait for helpers to be compiled!")
+                time.sleep(1)
+
     logger.info(
         "The distributed run, total device num:{}, distinct dataflow num:{}.".
         format(device_world_size, data_world_size))
@@ -349,7 +358,8 @@ def create_pretrained_dataset(
 
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
-            data_loader.set_batch_generator(data_gen, places)
+            data_loader.set_sample_generator(
+                data_gen, batch_size=args.micro_batch_size, places=places)
         else:
             data_loader = DataLoader(
                 dataset=dataset,
