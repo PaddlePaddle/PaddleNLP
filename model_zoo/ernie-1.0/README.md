@@ -1,4 +1,4 @@
-# Ernie 1.0: Enhanced Representation through kNowledge IntEgration
+# ERNIE: Enhanced Representation through kNowledge IntEgration
 
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
