@@ -559,7 +559,7 @@ def do_train(args):
             reader_start = time.time()
         except paddle.fluid.core.EOFException:
             train_data_loader.reset()
-        epoch += 1
+            epoch += 1
 
 
 if __name__ == "__main__":
