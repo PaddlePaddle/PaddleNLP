@@ -150,13 +150,6 @@ def do_generation(args):
         sharding_degree=args.sharding_degree,
         mp_degree=args.mp_degree)
 
-    is_first = False
-    is_last = False
-    if topo.pp_info.rank == 0:
-        is_first = True
-    if topo.pp_info.rank == (topo.pp_info.size - 1):
-        is_last = True
-
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
@@ -207,7 +200,6 @@ def do_generation(args):
                 model.eval()
                 ins = {v.name: v for v in feeds}
                 preds = model(ins)
-
 
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)

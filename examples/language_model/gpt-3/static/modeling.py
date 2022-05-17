@@ -999,10 +999,8 @@ class GPTForGeneration(GPTPretrainedModel):
             layers.increment(x=step_idx, value=1.0, in_place=True)
             layers.array_write(placehold_ids, i=step_idx, array=ids)
 
-            ######### GPT forward #########
             logits, cached_kvs = self.model(
                 pre_ids, use_cache=True, cache=cached_kvs)
-            ######### GPT forward #########
    
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)

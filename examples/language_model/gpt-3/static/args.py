@@ -292,7 +292,6 @@ def parse_args(MODEL_CLASSES):
          type=int,
          default=1,
          help="The hyper-parameter in beam search.")
-
     parser.add_argument(
         "--save_inference_model_then_exist",
         type=bool,
