@@ -246,9 +246,9 @@ To connect with other users and contributors, welcome to join our [Slack channel
 
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
-</div>
+ <div align="center">
+ <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+ </div>
 
 ## Installation
 
