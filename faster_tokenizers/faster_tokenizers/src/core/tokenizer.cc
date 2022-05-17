@@ -391,7 +391,7 @@ void Tokenizer::Decode(const std::vector<uint>& token_ids,
   std::string token;
   for (int i = 0; i < token_ids.size(); ++i) {
     added_vocabulary_.IdToToken(token_ids[i], model_.get(), &token);
-    if (added_vocabulary_.IsSpecialToken(token)) {
+    if (!added_vocabulary_.IsSpecialToken(token)) {
       tokens.push_back(token);
     }
   }

@@ -65,6 +65,7 @@ public:
         normalizer_(nullptr),
         pretokenizer_(nullptr),
         post_processor_(nullptr),
+        decoder_(nullptr),
         use_padding_(true),
         use_truncation_(true) {}
   template <typename ModelType>
@@ -73,6 +74,7 @@ public:
         normalizer_(nullptr),
         pretokenizer_(nullptr),
         post_processor_(nullptr),
+        decoder_(nullptr),
         use_padding_(true),
         use_truncation_(true) {}
 
