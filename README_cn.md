@@ -27,7 +27,7 @@
   <a href=#社区交流> 社区交流 </a>
 </h4>
 
-**PaddleNLP**是一款简单易用且功能强大的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**端到端地满足开发者灵活定制的需求。
+**PaddleNLP**是一款简单易用且功能强大的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者灵活定制的需求。
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
@@ -56,7 +56,7 @@
 #### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a>
 
 
-### 开箱即用的NLP工具集
+### 开箱即用的NLP工具集 📦
 
 Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的推理性能**。
 
@@ -195,7 +195,6 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 更多使用说明请参考[智能问答系统](./applications/question_answering)。
 
-
 #### 评论观点抽取与情感分析
 
 基于情感知识增强预训练模型SKEP，针对产品评论进行评价维度和观点抽取，以及细粒度的情感分析。
@@ -266,9 +265,9 @@ pip install --upgrade paddlenlp
 
 这里以信息抽取-命名实体识别任务，UIE模型为例，来说明如何快速使用PaddleNLP:
 
-- 一键预测
+### 一键预测
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果：
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可得到预测结果：
 
 ```python
 >>> from pprint import pprint
@@ -291,11 +290,11 @@ PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练
           'text': '谷爱凌'}]}]
 ```
 
-- 定制训练
+### 定制训练
 
 如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
-更多内容可参考：[多场景示例](./examples)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+更多内容可参考：[精选模型库](./model_zoo)、[NLP多场景示例](./examples)、[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
 
 ## API文档
