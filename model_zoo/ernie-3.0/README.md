@@ -361,40 +361,40 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px"><b>Tinybert<sub>6</sub> ,Chinese</b></span>
+                        <span style="font-size:18px">Tinybert<sub>6</sub> ,Chinese</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>69.58</b></span>
+                          <span style="font-size:18px">69.58</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>72.22</b></span>
+                          <span style="font-size:18px">72.22</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>55.70</b></span>
+                          <span style="font-size:18px">55.70</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>54.48</b></span>
+                          <span style="font-size:18px">54.48</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>79.12</b></span>
+                          <span style="font-size:18px">79.12</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>74.07</b></span>
+                          <span style="font-size:18px">74.07</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>77.63</b></span>
+                          <span style="font-size:18px">77.63</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>80.17</b></span>
+                          <span style="font-size:18px">80.17</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>62.63/83.72</b></span>
+                          <span style="font-size:18px">62.63/83.72</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>77.64</b></span>
+                          <span style="font-size:18px">77.64</span>
                         </td>  
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>62.11</b></span>
+                          <span style="font-size:18px">62.11</span>
                         </td>
                 </tr>
                 <tr>
