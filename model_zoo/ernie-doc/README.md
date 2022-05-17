@@ -1,4 +1,4 @@
-# ERNIE-Doc
+# ERNIE-Doc: A Retrospective Long-Document Modeling Transformer
 
 * [模型简介](#模型简介)
 * [快速开始](#快速开始)

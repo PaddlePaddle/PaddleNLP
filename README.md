@@ -24,23 +24,23 @@
   <a href=#安装> 安装 </a> |
   <a href=#QuickStart> 快速开始 </a> |
   <a href=#API文档> API文档 </a> |
-  <a href=#社区交流> 社区交流 </a> 
+  <a href=#社区交流> 社区交流 </a>
 </h4>
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
+* 🔥 2022.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
   </div>
 
-* 🔥 2022.5.16 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
+* 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
 
-  * 开源文心大模型 [ERNIE 3.0](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
-  * 通用信息抽取技术 [UIE](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
+  * 开源文心大模型 [**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
+  * 通用信息抽取技术 [**UIE**](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
 
-* 2022.12.12 PaddleNLP v2.2发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业化案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 ## 特性
 
@@ -48,11 +48,11 @@ PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本�
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a> 
+#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a>
 
 
 ### 开箱即用的NLP能力
@@ -167,9 +167,8 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 集成了业界领先的语音识别（Automatic Speech Recognition, ASR）、信息抽取（Information Extraction, IE）等技术，打造智能一体化的语音指令系统，广泛应用于智能语音填单、智能语音交互、智能语音检索、手机APP语音唤醒等场景，提高人机交互效率。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168412618-04897a47-79c9-4fe7-a054-5dc1f6a1f75c.png" width="500">
+    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="500">
 </div>
-
 
 更多使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
 
@@ -268,16 +267,16 @@ pip install --upgrade paddlenlp
 
 - 一键预测
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果，以情感分析任务为例：
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据，即可得到预测结果：
 
 ```python
-from pprint import pprint
-from paddlenlp import Taskflow
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
-ie = Taskflow('information_extraction', schema=schema)
-pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
->>> [{'时间': [{'end': 6,
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+[{'时间': [{'end': 6,
           'probability': 0.9857378532924486,
           'start': 0,
           'text': '2月8日上午'}],
@@ -293,13 +292,7 @@ pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中�
 
 - 定制训练
 
-如果对一键预测效果不满意，也可以进行模型微调，这里对UIE模型进行微调，以进一步提升命名实体识别的准确率：
-
-```python
-from paddlenlp.transformers import ErniePretrainedModel，AutoTokenizer
-```
-
-完整微调代码，可参考[UIE微调](./model_zoo/uie/)
+如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
 更多内容可参考：[多场景示例](./examples)，[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
 
@@ -310,14 +303,10 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 
 - 支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；
 - 灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；
-- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。    
+- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。  
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
 
-
-## 版本更新
-
-更多版本更新说明请查看[ChangeLog](./docs/changelog.md)
 
 ## Citation
 
