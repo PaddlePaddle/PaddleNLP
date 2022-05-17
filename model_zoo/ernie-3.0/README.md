@@ -399,7 +399,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">Roformer-v2-small</span>
+                        <span style="font-size:18px">RoFormerV2 Small</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">68.52</span>

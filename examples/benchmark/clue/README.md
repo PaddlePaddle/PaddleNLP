@@ -398,7 +398,7 @@
                         </td>
                 </tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">Roformer-v2-small</span>
+                        <span style="font-size:18px">RoFormerV2 Small</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">68.52</span>
@@ -510,7 +510,7 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | Bert-Base-Chinese             | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Medium-zh           | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
 | TinyBERT<sub>6</sub> ,Chinese | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 3e-5,24 | 2e-5,24       |
-| Roformer-v2-small             | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
+| RoFormerV2 Small             | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
 | RBT6, Chinese                 | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
 
 
