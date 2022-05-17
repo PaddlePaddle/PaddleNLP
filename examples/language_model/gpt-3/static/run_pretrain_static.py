@@ -408,6 +408,8 @@ def do_train(args):
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
+        # Note: for pipeline mode, validation and test are not supported, so
+        # both valid_data_loader and test_data_loader are None.
         valid_data_loader = None if args.pp_degree > 1 else valid_data_loader()
         test_data_loader = None if args.pp_degree > 1 else test_data_loader()
 
@@ -557,6 +559,10 @@ def do_train(args):
                     model.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     tic_train = time.time()
+
+                if global_step >= args.max_steps:
+                    del train_data_loader
+                    return
 
                 reader_start = time.time()
             except paddle.fluid.core.EOFException:
