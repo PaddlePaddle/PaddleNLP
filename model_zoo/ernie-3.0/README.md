@@ -399,40 +399,40 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px"><b>Roformer-v2-small</b></span>
+                        <span style="font-size:18px">Roformer-v2-small</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>68.52</b></span>
+                          <span style="font-size:18px">68.52</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>72.47</b></span>
+                          <span style="font-size:18px">72.47</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>56.53</b></span>
+                          <span style="font-size:18px">56.53</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>60.72</b></span>
+                          <span style="font-size:18px">60.72</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>76.37</b></span>
+                          <span style="font-size:18px">76.37</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>72.95</b></span>
+                          <span style="font-size:18px">72.95</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>75.00</b></span>
+                          <span style="font-size:18px">75.00</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>81.07</b></span>
+                          <span style="font-size:18px">81.07</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>62.97/83.64</b></span>
+                          <span style="font-size:18px">62.97/83.64</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>67.66</b></span>
+                          <span style="font-size:18px">67.66</span>
                         </td>  
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>59.41</b></span>
+                          <span style="font-size:18px">59.41</span>
                         </td>
                 </tr>
                 <tr>
