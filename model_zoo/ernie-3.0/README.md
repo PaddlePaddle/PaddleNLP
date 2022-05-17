@@ -170,7 +170,7 @@
                 </tr>
                <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">Mengzi-Bert-Base</span>
+                                <span style="font-size:18px">Mengzi-BERT-Base</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">74.69</span>
@@ -321,7 +321,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=2 align=center> 6L768H </td>
+                       <td rowspan=4 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -357,6 +357,82 @@
                         </td>  
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>69.73</b></span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">69.58</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.22</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">55.70</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">54.48</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">79.12</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">74.07</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.63</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">80.17</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.63/83.72</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.64</span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.11</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">RoFormerV2 Small</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">68.52</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.47</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">56.53</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">60.72</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">76.37</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.95</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">75.00</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">81.07</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.97/83.64</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">67.66</span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px">59.41</span>
                         </td>
                 </tr>
                 <tr>
