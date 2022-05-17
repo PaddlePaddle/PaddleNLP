@@ -384,9 +384,9 @@ def run(args):
             preds = paddle.argmax(logits, axis=1).numpy().tolist()
             for pred in preds:
                 result[str(idx)] = pred
-                idx += 1
                 j = json.dumps({"id": idx, "label": pred})
                 f.write(j + "\n")
+                idx += 1
 
 
 def print_arguments(args):

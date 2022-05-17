@@ -516,7 +516,7 @@ def run(args):
         idx = 623377
         preds = evaluate(model, test_data_loader, do_predict=True)
         for pred in preds:
-            result["#idiom" + str(idx)] = pred
+            result["#idiom" + str(idx) + "#"] = pred
             idx += 1
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
