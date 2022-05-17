@@ -25,7 +25,7 @@ MODEL_MAP = {
         "encoding_model": "ernie-3.0-base-zh",
         "resource_file_urls": {
             "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
         }
@@ -34,7 +34,7 @@ MODEL_MAP = {
         "encoding_model": "ernie-3.0-medium-zh",
         "resource_file_urls": {
             "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
         }
