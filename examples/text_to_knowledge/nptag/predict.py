@@ -17,7 +17,7 @@ import argparse
 
 import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data

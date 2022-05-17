@@ -39,6 +39,15 @@ MODEL_MAP = {
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
         }
     },
+    "uie-medical-base": {
+        "encoding_model": "ernie-3.0-medium-zh",
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
+        }
+    },
 }
 
 
@@ -277,7 +286,8 @@ def convert_ext_examples(raw_examples, negative_ratio):
             entity_id = 0
             if "data" in items.keys():
                 relation_mode = False
-                if "entities" in items["label"].keys():
+                if isinstance(items["label"],
+                              dict) and "entities" in items["label"].keys():
                     relation_mode = True
                 text = items["data"]
                 entities = []
