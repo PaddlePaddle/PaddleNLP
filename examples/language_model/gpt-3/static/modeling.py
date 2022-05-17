@@ -753,8 +753,6 @@ class GPTModel(GPTPretrainedModel):
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        #### since use incubate.softmax_mask_fuse_upper_triangle,
-        ### following code is not used
         causal_mask = paddle.tensor.triu(
             paddle.ones((paddle.shape(input_ids)[-1],
                          paddle.shape(input_ids)[-1])) * -1e4,
@@ -960,7 +958,8 @@ class GPTForGeneration(GPTPretrainedModel):
                 cache=None):
         """
         Args:
-            inputs (dict): include src_ids, pos_ids, input_mask. max_dec_len is optional.
+            inputs (dict): include src_ids.
+                pos_ids, input_mask and max_dec_len are optional.
         """
         ######### forward context #########
         input_ids = inputs['src_ids']
