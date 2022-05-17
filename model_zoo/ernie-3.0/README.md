@@ -764,6 +764,12 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指�
 
 <a name="参考文献"></a>
 
+### 更多详细教程请参考AI Studio：
+[【快速上手ERNIE 3.0】中文情感分析实战](https://aistudio.baidu.com/aistudio/projectdetail/3955163)
+[【快速上手ERNIE 3.0】法律文本多标签分类实战](https://aistudio.baidu.com/aistudio/projectdetail/3996601)
+[【快速上手ERNIE 3.0】中文语义匹配实战](https://aistudio.baidu.com/aistudio/projectdetail/3986803)
+[【快速上手ERNIE 3.0】MSRA序列标注实战](https://aistudio.baidu.com/aistudio/projectdetail/3989073)
+
 ## 参考文献
 
 * Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.
