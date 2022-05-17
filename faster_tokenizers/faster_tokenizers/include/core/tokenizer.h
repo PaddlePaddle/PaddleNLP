@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 #include <memory>  // For shared_ptr
+#include <vector>
 
 #include "boost/variant.hpp"
 #include "core/added_vocabulary.h"
@@ -44,7 +45,7 @@ namespace postprocessors {
 class PostProcessor;
 }  // postprocessors
 
-namespace decoders{
+namespace decoders {
 class Decoder;
 };
 
@@ -184,6 +185,14 @@ public:
 
   bool GetUseTruncation() const;
   bool GetUsePadding() const;
+
+  // Decode: From tokens to a complete string
+  void Decode(const std::vector<uint>& token_ids,
+              std::string* result,
+              bool skip_special_tokens = true) const;
+  void DecodeBatch(const std::vector<std::vector<uint>>& batch_token_ids,
+                   std::vector<std::string>* results,
+                   bool skip_special_tokens = true) const;
 
 private:
   Encoding EncodeTextToEncoding(const std::vector<uint>& word_idx,

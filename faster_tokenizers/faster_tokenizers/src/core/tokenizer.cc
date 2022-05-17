@@ -20,11 +20,11 @@ limitations under the License. */
 #include "core/encoding.h"
 #include "core/tokenizer.h"
 
+#include "decoders/decoders.h"
 #include "models/models.h"
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
-#include "decoders/decoders.h"
 
 #ifdef WITH_OMP
 #include <omp.h>
@@ -103,13 +103,9 @@ postprocessors::PostProcessor* Tokenizer::GetPostProcessorPtr() const {
   return post_processor_.get();
 }
 
-void Tokenizer::ReleaseDecoder() {
-  decoder_ = nullptr;
-}
+void Tokenizer::ReleaseDecoder() { decoder_ = nullptr; }
 
-decoders::Decoder* Tokenizer::GetDecoderPtr() const {
-  return decoder_.get();
-}
+decoders::Decoder* Tokenizer::GetDecoderPtr() const { return decoder_.get(); }
 
 Vocab Tokenizer::GetVocab(bool with_added_vocabulary) const {
   auto vocab = model_->GetVocab();
@@ -131,19 +127,20 @@ size_t Tokenizer::GetVocabSize(bool with_added_vocabulary) const {
 }
 
 size_t Tokenizer::AddTokens(const std::vector<AddedToken>& tokens) {
-  return added_vocabulary_.AddTokens(tokens, *model_, normalizer_.get());
+  return added_vocabulary_.AddTokens(tokens, model_.get(), normalizer_.get());
 }
 
 size_t Tokenizer::AddSpecialTokens(const std::vector<AddedToken>& tokens) {
-  return added_vocabulary_.AddSpecialTokens(tokens, *model_, normalizer_.get());
+  return added_vocabulary_.AddSpecialTokens(
+      tokens, model_.get(), normalizer_.get());
 }
 
 bool Tokenizer::TokenToId(const std::string& token, uint* id) const {
-  return added_vocabulary_.TokenToId(token, *model_, id);
+  return added_vocabulary_.TokenToId(token, model_.get(), id);
 }
 
 bool Tokenizer::IdToToken(uint id, std::string* token) const {
-  return added_vocabulary_.IdToToken(id, *model_, token);
+  return added_vocabulary_.IdToToken(id, model_.get(), token);
 }
 
 bool Tokenizer::DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
@@ -386,6 +383,47 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
   return tokenizer;
 }
 
+void Tokenizer::Decode(const std::vector<uint>& token_ids,
+                       std::string* result,
+                       bool skip_special_tokens) const {
+  // Get tokens
+  std::vector<std::string> tokens;
+  std::string token;
+  for (int i = 0; i < token_ids.size(); ++i) {
+    added_vocabulary_.IdToToken(token_ids[i], model_.get(), &token);
+    if (added_vocabulary_.IsSpecialToken(token)) {
+      tokens.push_back(token);
+    }
+  }
+  if (decoder_ != nullptr) {
+    (*decoder_)(tokens, result);
+  } else {
+    for (int i = 0; i < tokens.size(); ++i) {
+      if (i > 0) {
+        *result += " ";
+      }
+      *result += tokens[i];
+    }
+  }
+}
+
+void Tokenizer::DecodeBatch(
+    const std::vector<std::vector<uint>>& batch_token_ids,
+    std::vector<std::string>* results,
+    bool skip_special_tokens) const {
+  results->resize(batch_token_ids.size());
+#ifdef WITH_OMP
+// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
+// tokenization.
+// Use workload to determine whether create omp threads. Need to optimize the
+// workload estimation.
+#pragma omp parallel for if (batch_token_ids.size() >= 4 && \
+                                                  omp_get_num_threads() > 1)
+#endif
+  for (int i = 0; i < batch_token_ids.size(); ++i) {
+    Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
+  }
+}
 
 bool Tokenizer::GetUseTruncation() const { return use_truncation_; }
 
@@ -442,10 +480,9 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
 
   j["decoder"] = nullptr;
   if (tokenizer.decoder_ != nullptr) {
-    if (typeid(*tokenizer.decoder_.get()) ==
-        typeid(decoders::WordPiece)) {
-      j["decoder"] = *dynamic_cast<decoders::WordPiece*>(
-          tokenizer.decoder_.get());
+    if (typeid(*tokenizer.decoder_.get()) == typeid(decoders::WordPiece)) {
+      j["decoder"] =
+          *dynamic_cast<decoders::WordPiece*>(tokenizer.decoder_.get());
     }
   }
 }
