@@ -12,7 +12,7 @@ rm -rf main_sharding*
 task_name="gpt-mp-sharding"
 rm -rf output/$task_name/log
 
-python -u  -m paddle.distributed.fleet.launch \
+python3.7 -u  -m paddle.distributed.fleet.launch \
     --gpus "4,5,6,7" \
     --log_dir "output/$task_name/log" run_pretrain_static.py \
     --model_type "gpt" \
@@ -22,7 +22,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --max_seq_len 1024 \
     --micro_batch_size 8 \
     --global_batch_size 16 \
-    --sharding_degree 2\
+    --sharding_degree 2 \
     --mp_degree 2 \
     --dp_degree 1 \
     --pp_degree 1 \

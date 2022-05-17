@@ -23,12 +23,9 @@ python3.7 -u  -m paddle.distributed.fleet.launch \
     --mp_degree 1 \
     --dp_degree 1 \
     --pp_degree 1 \
-    --use_sharding true \
-    --use_amp true \
-    --amp_level "O1" \
-    --logging_freq 1\
     --max_dec_len 20 \
     --decoding_strategy 'topk_sampling' \
     --topp 0.9 \
-    --save_inference_model_then_exist  true \
-    --device "gpu"
+    --save_inference_model_then_exist true \
+    --device "gpu" 
+

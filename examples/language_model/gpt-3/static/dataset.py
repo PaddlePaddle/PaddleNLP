@@ -256,18 +256,17 @@ def get_train_valid_test_split_(splits_string, size):
     return splits_index
 
 
-def create_pretrained_dataset(
-        args,
-        input_path,
-        local_rank,
-        data_world_rank,
-        data_world_size,
-        eos_id,
-        worker_init=None,
-        max_seq_len=1024,
-        places=None,
-        data_holders=None,
-        pipeline_mode=False):
+def create_pretrained_dataset(args,
+                              input_path,
+                              local_rank,
+                              data_world_rank,
+                              data_world_size,
+                              eos_id,
+                              worker_init=None,
+                              max_seq_len=1024,
+                              places=None,
+                              data_holders=None,
+                              pipeline_mode=False):
 
     if local_rank == 0:
         start_time = time.time()
@@ -341,17 +340,19 @@ def create_pretrained_dataset(
             drop_last=True)
 
         if pipeline_mode:
+
             def data_gen():
                 for data in dataset:
                     yield tuple(
                         [np.expand_dims(
                             np.array(x), axis=0) for x in data])
+
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
             data_loader.set_batch_generator(data_gen, places)
         else:
             stacks = (Stack(), ) * len(data_holders)
-            collate_fn=Tuple(*stacks)
+            collate_fn = Tuple(*stacks)
             data_loader = DataLoader(
                 dataset=dataset,
                 places=places,

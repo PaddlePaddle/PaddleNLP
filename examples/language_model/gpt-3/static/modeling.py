@@ -29,9 +29,7 @@ from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
 
 __all__ = [
-    'GPTModel',
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
+    'GPTModel', 'GPTForPretraining', 'GPTPretrainingCriterion',
     'GPTForGeneration'
 ]
 
@@ -897,8 +895,8 @@ class GPTForGeneration(GPTPretrainedModel):
     def TopKSampling(self, probs):
         topk_probs, _ = paddle.topk(probs, self.topk)
         ge_cond = paddle.cast(
-            paddle.greater_equal(
-                probs, paddle.unsqueeze(topk_probs[:, -1], [1])),
+            paddle.greater_equal(probs,
+                                 paddle.unsqueeze(topk_probs[:, -1], [1])),
             "float32")
         old_probs = probs
         probs = probs * ge_cond / paddle.sum(topk_probs, axis=-1, keepdim=True)
@@ -910,20 +908,17 @@ class GPTForGeneration(GPTPretrainedModel):
         sorted_probs, sorted_idx = layers.argsort(probs, descending=True)
         cum_sorted_probs = layers.cumsum(sorted_probs, axis=1, exclusive=True)
         lt_cond = paddle.cast(
-            paddle.less_than(
-                cum_sorted_probs,
-                layers.fill_constant_batch_size_like(
-                    cum_sorted_probs,
-                    cum_sorted_probs.shape,
-                    cum_sorted_probs.dtype,
-                    self.topp)),"float32")
+            paddle.less_than(cum_sorted_probs,
+                             layers.fill_constant_batch_size_like(
+                                 cum_sorted_probs, cum_sorted_probs.shape,
+                                 cum_sorted_probs.dtype, self.topp)), "float32")
         old_probs = probs
         candidate_probs = sorted_probs * lt_cond
-        probs = candidate_probs / layers.reduce_sum(candidate_probs,
-                dim=-1, keep_dim=True)
+        probs = candidate_probs / layers.reduce_sum(
+            candidate_probs, dim=-1, keep_dim=True)
         sampling_ids = layers.sampling_id(probs, dtype="int")
         sampling_ids = paddle.index_sample(sorted_idx,
-                paddle.unsqueeze(sampling_ids, [1]))
+                                           paddle.unsqueeze(sampling_ids, [1]))
         sampling_ids = layers.squeeze(sampling_ids, [1])
         probs = old_probs
         return probs, sampling_ids
@@ -952,10 +947,7 @@ class GPTForGeneration(GPTPretrainedModel):
         else:
             return logits
 
-    def forward(self,
-                inputs,
-                use_cache=False,
-                cache=None):
+    def forward(self, inputs, use_cache=False, cache=None):
         """
         Args:
             inputs (dict): include src_ids.
@@ -964,7 +956,8 @@ class GPTForGeneration(GPTPretrainedModel):
         ######### forward context #########
         input_ids = inputs['src_ids']
         position_ids = inputs['pos_ids'] if 'pos_ids' in inputs else None
-        attention_mask = inputs['input_mask'] if 'input_mask' in inputs else None
+        attention_mask = inputs[
+            'input_mask'] if 'input_mask' in inputs else None
         logits, cached_kvs = self.model(
             input_ids, position_ids, attention_mask, use_cache=True)
         next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
@@ -981,14 +974,15 @@ class GPTForGeneration(GPTPretrainedModel):
             shape=[1], value=0, dtype='int64', force_cpu=True)
 
         placehold_ids = layers.fill_constant_batch_size_like(
-                            input=inputs["src_ids"],
-                            value=0,
-                            shape=[-1, 1],
-                            dtype=next_id.dtype)
+            input=inputs["src_ids"],
+            value=0,
+            shape=[-1, 1],
+            dtype=next_id.dtype)
         ids = layers.array_write(next_id, step_idx)
 
         if 'max_dec_len' in inputs:
-            max_len = paddle.tensor.creation._memcpy(max_len, place=paddle.CPUPlace())
+            max_len = paddle.tensor.creation._memcpy(
+                max_len, place=paddle.CPUPlace())
         cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
         cond = paddle.less_than(step_idx, max_len)
 
@@ -1001,7 +995,7 @@ class GPTForGeneration(GPTPretrainedModel):
 
             logits, cached_kvs = self.model(
                 pre_ids, use_cache=True, cache=cached_kvs)
-   
+
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)
 
@@ -1017,9 +1011,12 @@ class GPTForGeneration(GPTPretrainedModel):
             selected_ids = paddle.unsqueeze(sampling_ids, -1)
             layers.array_write(selected_ids, i=step_idx, array=ids)
 
-            length_cond = paddle.less_than(x=step_idx, y=max_len, name="length_cond")
-            finish_cond = paddle.logical_not(paddle.is_empty(x=selected_ids), name="finish_cond")
-            paddle.logical_and(x=length_cond, y=finish_cond, out=cond, name="logical_and_cond")
+            length_cond = paddle.less_than(
+                x=step_idx, y=max_len, name="length_cond")
+            finish_cond = paddle.logical_not(
+                paddle.is_empty(x=selected_ids), name="finish_cond")
+            paddle.logical_and(
+                x=length_cond, y=finish_cond, out=cond, name="logical_and_cond")
 
             paddle.assign(layers.cast(cond, dtype='bool'), cond)
 

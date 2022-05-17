@@ -60,15 +60,20 @@ device_id = int(os.environ.get('FLAGS_selected_gpus', 0))
 
 # yapf: enable.
 
+
 def create_data_holder(args):
     shapes = [[-1, -1], [-1, args.max_seq_len], [-1, args.max_seq_len]]
     dtypes = [int_type, 'float32', int_type]
     #names = ['src_ids', 'input_mask', 'pos_ids']  # three inputs
     names = ['src_ids']  # one input
 
-    inputs = [paddle.static.data(name=names[i], shape=shapes[i],
-        dtype=dtypes[i]) for i in range(len(names))]
+    inputs = [
+        paddle.static.data(
+            name=names[i], shape=shapes[i], dtype=dtypes[i])
+        for i in range(len(names))
+    ]
     return inputs
+
 
 def debug_program(name, program):
     with open("{}.txt.{}".format(name, device_id), 'w') as f:
@@ -85,8 +90,7 @@ def get_data_file(args):
     if len(files) == 0:
         logger.warning(
             "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! \
-            Try to found old compatible xxx_ids.npz file."
-        )
+            Try to found old compatible xxx_ids.npz file.")
     else:
         return files
     files = [
@@ -105,16 +109,13 @@ def init_static_with_params(model, dygraph_params, topo, prog=None):
         prog = paddle.static.default_main_program()
     paddle.static.set_program_state(prog, static_params)
 
+
 def do_generation(args):
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
 
     strategy = fleet.DistributedStrategy()
-    strategy.hybrid_configs = {
-        "dp_degree": 1,
-        "mp_degree": 2,
-        "pp_degree": 1
-    }
+    strategy.hybrid_configs = {"dp_degree": 1, "mp_degree": 2, "pp_degree": 1}
     fleet.init(is_collective=True, strategy=strategy)
 
     group = paddle.distributed.init_parallel_env()
@@ -187,14 +188,14 @@ def do_generation(args):
                     model_config[
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
-                    model = guard(f'gpu:{args.pp_degree -1}')(
-                        GPTForGeneration)(guard(f'gpu:0')(GPTModel)(**model_config),
-                                max_length=args.max_dec_len,
-                                decoding_strategy=args.decoding_strategy,
-                                temperature=args.temperature,
-                                top_k=args.topk,
-                                top_p=args.topp,
-                                eos_id=eos_id)
+                    model = GPTForGeneration(
+                        GPTModel(**model_config),
+                        max_length=args.max_dec_len,
+                        decoding_strategy=args.decoding_strategy,
+                        temperature=args.temperature,
+                        top_k=args.topk,
+                        top_p=args.topp,
+                        eos_id=eos_id)
                 else:
                     logger.error("No checkpoint load.")
                 model.eval()
@@ -239,14 +240,13 @@ def do_generation(args):
     t.set(np.array(ids).reshape(1, -1).astype('int64'), place)
 
     batch = {'src_ids': t}
-    ret = exe.run(main_program,
-                  feed=batch,
-                  fetch_list=fetchs)
+    ret = exe.run(main_program, feed=batch, fetch_list=fetchs)
     ret = np.array(ret[0])
     ret = [int(x) for x in ret.reshape([-1])]
     ret_str = tokenizer.convert_ids_to_string(ret)
 
-    out = "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer: %s"%(question, ret_str)
+    out = "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer: %s" % (
+        question, ret_str)
     logger.info(out)
     ##################
 
@@ -256,16 +256,16 @@ def do_generation(args):
             break
 
     if args.save_inference_model_then_exist:
-        save_inference_model_dir = f'inference_model_pp{args.pp_degree}mp{args.mp_degree}'
+        save_inference_model_dir = 'inference_model_pp{pp_degree}mp{mp_degree}'.format(
+            pp_degree=args.pp_degree, mp_degree=args.mp_degree)
         inference_save_path = os.path.join(save_inference_model_dir,
-            'rank_' + str(fleet.worker_index()), 'step_' + str(0))
-        print("saving inference models to {}".format(inference_save_path), fetchs)
+                                           'rank_' + str(fleet.worker_index()),
+                                           'step_' + str(0))
+        print("saving inference models to {}".format(inference_save_path),
+              fetchs)
         paddle.static.save_inference_model(
-            inference_save_path, 
-            feeds,
-            fetchs,
-            exe,
-            program=main_program)
+            inference_save_path, feeds, fetchs, exe, program=main_program)
+
 
 if __name__ == '__main__':
     args = parse_args(MODEL_CLASSES)
