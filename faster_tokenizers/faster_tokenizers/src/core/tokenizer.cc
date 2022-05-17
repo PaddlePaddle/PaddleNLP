@@ -24,6 +24,7 @@ limitations under the License. */
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
+#include "decoders/decoders.h"
 
 #ifdef WITH_OMP
 #include <omp.h>
@@ -100,6 +101,14 @@ void Tokenizer::ReleasePostProcessor() { post_processor_ = nullptr; }
 
 postprocessors::PostProcessor* Tokenizer::GetPostProcessorPtr() const {
   return post_processor_.get();
+}
+
+void Tokenizer::ReleaseDecoder() {
+  decoder_ = nullptr;
+}
+
+decoders::Decoder* Tokenizer::GetDecoderPtr() const {
+  return decoder_.get();
 }
 
 Vocab Tokenizer::GetVocab(bool with_added_vocabulary) const {
@@ -430,6 +439,15 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
           tokenizer.post_processor_.get());
     }
   }
+
+  j["decoder"] = nullptr;
+  if (tokenizer.decoder_ != nullptr) {
+    if (typeid(*tokenizer.decoder_.get()) ==
+        typeid(decoders::WordPiece)) {
+      j["decoder"] = *dynamic_cast<decoders::WordPiece*>(
+          tokenizer.decoder_.get());
+    }
+  }
 }
 
 void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
@@ -534,5 +552,6 @@ template void Tokenizer::SetModel(const models::WordPiece&);
 template void Tokenizer::SetPostProcessor(
     const postprocessors::BertPostProcessor&);
 
+template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
 }  // core
 }  // tokenizers

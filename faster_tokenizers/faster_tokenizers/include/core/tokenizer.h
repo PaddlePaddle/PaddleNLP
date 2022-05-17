@@ -44,6 +44,10 @@ namespace postprocessors {
 class PostProcessor;
 }  // postprocessors
 
+namespace decoders{
+class Decoder;
+};
+
 namespace core {
 
 class AddedVocabulary;
@@ -85,6 +89,26 @@ public:
   void ReleasePreTokenizer();
   pretokenizers::PreTokenizer* GetPreTokenizer() const;
 
+  template <typename ModelType>
+  void SetModel(const ModelType& model) {
+    model_ = std::make_shared<ModelType>(model);
+  }
+  models::Model* GetModelPtr() const;
+
+  template <typename PostProcessorType>
+  void SetPostProcessor(const PostProcessorType& post_processor) {
+    post_processor_ = std::make_shared<PostProcessorType>(post_processor);
+  }
+  void ReleasePostProcessor();
+  postprocessors::PostProcessor* GetPostProcessorPtr() const;
+
+  template <typename DecoderType>
+  void SetDecoder(const DecoderType& decoder) {
+    decoder_ = std::make_shared<DecoderType>(decoder);
+  }
+  void ReleaseDecoder();
+  decoders::Decoder* GetDecoderPtr() const;
+
   void SetTruncMethod(const TruncMethod& trunc_method);
   void DisableTruncMethod();
   void EnableTruncMethod(size_t max_len,
@@ -102,19 +126,6 @@ public:
                        uint* length,
                        uint* pad_to_multiple_of);
   PadMethod GetPadMethod() const;
-
-  template <typename ModelType>
-  void SetModel(const ModelType& model) {
-    model_ = std::make_shared<ModelType>(model);
-  }
-  models::Model* GetModelPtr() const;
-
-  template <typename PostProcessorType>
-  void SetPostProcessor(const PostProcessorType& post_processor) {
-    post_processor_ = std::make_shared<PostProcessorType>(post_processor);
-  }
-  void ReleasePostProcessor();
-  postprocessors::PostProcessor* GetPostProcessorPtr() const;
 
   Vocab GetVocab(bool with_added_vocabulary = true) const;
   size_t GetVocabSize(bool with_added_vocabulary = true) const;
@@ -183,10 +194,12 @@ private:
   std::shared_ptr<normalizers::Normalizer> normalizer_;
   std::shared_ptr<pretokenizers::PreTokenizer> pretokenizer_;
   std::shared_ptr<models::Model> model_;
+  std::shared_ptr<postprocessors::PostProcessor> post_processor_;
+  std::shared_ptr<decoders::Decoder> decoder_;
+
   TruncMethod trunc_method_;
   PadMethod pad_method_;
   AddedVocabulary added_vocabulary_;
-  std::shared_ptr<postprocessors::PostProcessor> post_processor_;
   bool use_truncation_;
   bool use_padding_;
   // TODO(zhoushunjie): Implement Decoder later.
