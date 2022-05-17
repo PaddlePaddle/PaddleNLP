@@ -285,6 +285,7 @@ def create_pretrained_dataset(
                 import data_tools.helpers as helpers
                 break
             except Exception as e:
+                print("> wait for helpers to be compiled!")
                 time.sleep(1)
 
     logger.info(
