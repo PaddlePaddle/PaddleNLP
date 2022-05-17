@@ -20,10 +20,9 @@ from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'TinyBertModel',
-    'TinyBertPretrainedModel',
-    'TinyBertForPretraining',
-    'TinyBertForSequenceClassification',
+    'TinyBertModel', 'TinyBertPretrainedModel', 'TinyBertForPretraining',
+    'TinyBertForSequenceClassification', 'TinyBertForQuestionAnswering',
+    'TinyBertForMultipleChoice'
 ]
 
 
@@ -162,7 +161,7 @@ class TinyBertPretrainedModel(PretrainedModel):
 @register_base_model
 class TinyBertModel(TinyBertPretrainedModel):
     """
-    The bare TinyBert Model transformer outputting raw hidden-states.
+    The bare TinyBERT Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
@@ -459,3 +458,137 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         logits = self.classifier(self.activation(pooled_output))
         return logits
+
+
+class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
+    """
+    TinyBert Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD.
+
+    Args:
+        tinybert (`TinyBertModel`): 
+            An instance of `TinyBertModel`.
+    """
+
+    def __init__(self, tinybert):
+        super(TinyBertForQuestionAnswering, self).__init__()
+        self.tinybert = tinybert  # allow tinybert to be config
+        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 2)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`TinyBertModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`TinyBertModel`.
+
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import TinyBertForQuestionAnswering, TinyBertTokenizer
+
+                tokenizer = TinyBertTokenizer.from_pretrained('tinybert-6l-768d-zh')
+                model = TinyBertForQuestionAnswering.from_pretrained('tinybert-6l-768d-zh')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+
+        sequence_output, _ = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask)
+
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
+
+
+class TinyBertForMultipleChoice(TinyBertPretrainedModel):
+    """
+    TinyBERT Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+    
+    Args:
+        tinybert (:class:`TinyBertModel`):
+            An instance of TinyBertModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Tinybert.
+            If None, use the same value as `hidden_dropout_prob` of `TinyBertModel`
+            instance `tinybert`. Defaults to None.
+    """
+
+    def __init__(self, tinybert, num_choices=2, dropout=None):
+        super(TinyBertForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.tinybert = tinybert
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.tinybert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        r"""
+        The TinyBertForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, token_type_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask)
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits

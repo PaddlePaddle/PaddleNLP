@@ -303,6 +303,7 @@ def do_train(args):
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,
+                max_seq_len=args.max_seq_len,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.

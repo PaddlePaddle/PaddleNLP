@@ -291,7 +291,7 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     if [[ ${model_name} =~ gpt* ]]; then
-        cd ../examples/language_model/data_tools/
+        cd ../examples/language_model/gpt/data_tools/
         sed -i "s/python3/python/g" Makefile
         sed -i "s/python-config/python3.7m-config/g" Makefile
         cd -
