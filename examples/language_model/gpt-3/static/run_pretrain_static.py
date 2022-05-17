@@ -535,6 +535,7 @@ def do_train(args):
                 tic_train = time.time()
                 train_reader_cost = 0.0
                 train_run_cost = 0.0
+                step += 1
 
             if args.check_accuracy:
                 if global_step >= args.max_steps:
