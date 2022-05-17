@@ -321,7 +321,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=3 align=center> 6L768H </td>
+                       <td rowspan=4 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -361,7 +361,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                                <span style="font-size:18px"><b>Tinybert-6l-768d-zh</b></span>
+                        <span style="font-size:18px"><b>Tinybert<sub>6</sub> ,Chinese</b></span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>69.58</b></span>
@@ -373,7 +373,7 @@
                           <span style="font-size:18px"><b>55.70</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>54.487</b></span>
+                          <span style="font-size:18px"><b>54.48</b></span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>79.12</b></span>
@@ -395,6 +395,44 @@
                         </td>  
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>62.11</b></span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px"><b>Roformer-v2-small</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>68.52</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>72.47</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>56.53</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>60.72</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>76.37</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>72.95</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>75.00</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>81.07</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>62.97/83.64</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>67.66</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>59.41</b></span>
                         </td>
                 </tr>
                 <tr>
