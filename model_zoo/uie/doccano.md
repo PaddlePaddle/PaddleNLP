@@ -24,7 +24,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
 
 #### 2.1 抽取式任务项目创建
 
-创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation L=labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
+创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation Labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>

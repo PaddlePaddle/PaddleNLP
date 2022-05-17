@@ -25,7 +25,7 @@ MODEL_MAP = {
         "encoding_model": "ernie-3.0-base-zh",
         "resource_file_urls": {
             "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
         }
@@ -34,9 +34,18 @@ MODEL_MAP = {
         "encoding_model": "ernie-3.0-medium-zh",
         "resource_file_urls": {
             "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
+        }
+    },
+    "uie-medical-base": {
+        "encoding_model": "ernie-3.0-medium-zh",
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
         }
     },
 }
@@ -276,17 +285,32 @@ def convert_ext_examples(raw_examples, negative_ratio):
             items = json.loads(line)
             entity_id = 0
             if "data" in items.keys():
+                relation_mode = False
+                if isinstance(items["label"],
+                              dict) and "entities" in items["label"].keys():
+                    relation_mode = True
                 text = items["data"]
                 entities = []
-                for item in items["label"]:
-                    entity = {
-                        "id": entity_id,
-                        "start_offset": item[0],
-                        "end_offset": item[1],
-                        "label": item[2]
-                    }
-                    entities.append(entity)
-                    entity_id += 1
+                if not relation_mode:
+                    for item in items["label"]:
+                        entity = {
+                            "id": entity_id,
+                            "start_offset": item[0],
+                            "end_offset": item[1],
+                            "label": item[2]
+                        }
+                        entities.append(entity)
+                        entity_id += 1
+                else:
+                    for item in items["label"]["entities"]:
+                        entity = {
+                            "id": entity_id,
+                            "start_offset": item["start_offset"],
+                            "end_offset": item["end_offset"],
+                            "label": item["label"]
+                        }
+                        entities.append(entity)
+                        entity_id += 1
                 relations = []
             else:
                 text, relations, entities = items["text"], items[
