@@ -22,9 +22,9 @@
 <h4 align="center">
   <a href=#特性> 特性 </a> |
   <a href=#安装> 安装 </a> |
-  <a href=#QuickStart> 快速开始 </a> |
-  <a href=#API文档> API文档 </a> |
-  <a href=#社区交流> 社区交流 </a>
+  <a href=#快速开始> 快速开始 </a> |
+  <a href=#api文档> API文档 </a> |
+  <a href=#👬-社区交流> 社区交流 </a>
 </h4>
 
 **PaddleNLP**是一款简单易用且功能强大的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者灵活定制的需求。
@@ -47,16 +47,16 @@
 
 ## 特性
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP工具集> 开箱即用的NLP工具集 </a>
+#### <a href=#📦-开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a>
+#### <a href=#🤗-丰富完备的中文模型库> 🤗 丰富完备的中文模型库 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454721-0ac49e17-22db-4074-ba20-940365daf9f6.png" width="20" height="20" /><a href=#产业级端到端系统范例> 产业级端到端系统范例 </a>
+#### <a href=#🎛️-产业级端到端系统范例> 🎛️ 产业级端到端系统范例 </a>
 
-#### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a>
+#### <a href=#🚀-高性能分布式训练与推理> 🚀 高性能分布式训练与推理 </a>
 
 
-### 开箱即用的NLP工具集 📦
+### 📦 开箱即用的NLP工具集
 
 Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的推理性能**。
 
@@ -64,9 +64,9 @@ Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自�
 
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### 丰富完备的中文模型库
+### 🤗 丰富完备的中文模型库
 
-#### 业界最全的中文预训练模型
+#### 🀄️业界最全的中文预训练模型
 
 精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型，既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过AutoModel API一键⚡高速下载⚡。
 
@@ -103,7 +103,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 </div></details>
 
-<details><summary>&emsp;PaddleNLP预训练模型适用任务汇总（点击展开详情）</summary><div>
+<details><summary> PaddleNLP预训练模型适用任务汇总（**点击展开详情**）</summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
@@ -159,7 +159,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 精选预训练模型示例可参考[Model Zoo](./model_zoo)，更多场景示例文档可参考[examples目录](./examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
 
 
-### 产业级端到端系统范例
+### 🎛️ 产业级端到端系统范例
 
 PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP场景，提供了端到端系统范例，打通数据标注-模型训练-模型调优-预测部署全流程，持续降低NLP技术产业落地门槛。更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
 
@@ -206,7 +206,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 更多使用说明请参考[情感分析](./applications/sentiment_analysis)。
 
-### 高性能分布式训练与推理
+### 🚀 高性能分布式训练与推理
 
 #### 飞桨4D混合并行分布式训练技术
 
@@ -235,7 +235,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 针对大模型生成的加速利器，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
 
-## 社区交流👬
+## 👬 社区交流
 
 - 微信扫描二维码并填写问卷之后，加入交流群领取福利
   - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
@@ -261,7 +261,7 @@ pip install --upgrade paddlenlp
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
 
-## QuickStart
+## 快速开始
 
 这里以信息抽取-命名实体识别任务，UIE模型为例，来说明如何快速使用PaddleNLP:
 
