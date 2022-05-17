@@ -13,7 +13,7 @@
         <tbody>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px;">Config</span>
+                                <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px;">Model</span>
@@ -321,7 +321,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=2 align=center> 6L768H </td>
+                       <td rowspan=3 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
                         </td>
@@ -359,6 +359,43 @@
                           <span style="font-size:18px"><b>69.73</b></span>
                         </td>
                 </tr>
+                <tr>
+                        <td style="text-align:center">
+                        <span style="font-size:18px"><b>Tinybert-6l-768d-zh</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>69.58</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>72.22</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>55.70</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>54.487</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>79.12</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>74.07</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>77.63</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>80.17</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>62.63/83.72</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>77.64</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>62.11</b></span>
+                        </td>
                 <tr>
                         <td style="text-align:center">
                                 <span style="font-size:18px">RBT6, Chinese</span>
@@ -402,7 +439,7 @@
 <br />
 
 
-AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
+AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM (Exact Match)/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
 
 其中前 7 项属于分类任务，后面 3 项属于阅读理解任务，这两种任务的训练过程在下面将会分开介绍。
 
@@ -434,10 +471,11 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | RoBERTa-wwm-ext       | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
 | Bert-Base-Chinese     | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Medium-zh   | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
+| Tinybert-6l-768d-zh   | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 6,3e-5  | 6,2e-5        |
 | RBT6, Chinese         | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
 
 
-其中，`ERNIE 3.0-Base`、`ERNIE 3.0-Medium`、`ERNIE-Gram-zh`、`ERNIE-1.0` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base`、`RBT6, Chinese`、`Mengzi-Bert-Base`、`ERNIE-Gram-zh`、`ERNIE-1.0` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE-1.0` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`RBT6, Chinese`、`Mengzi-Bert-Base`、`ERNIE-Gram-zh`、`ERNIE-1.0` 、`Tinybert-6l-768d-zh`在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 
 ## 一键复现模型效果

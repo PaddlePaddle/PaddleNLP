@@ -321,7 +321,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=2 align=center> 6L768H </td>
+                       <td rowspan=3 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -357,6 +357,44 @@
                         </td>  
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>69.73</b></span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                                <span style="font-size:18px"><b>Tinybert-6l-768d-zh</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>69.58</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>72.22</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>55.70</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>54.487</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>79.12</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>74.07</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>77.63</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>80.17</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>62.63/83.72</b></span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>77.64</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px"><b>62.11</b></span>
                         </td>
                 </tr>
                 <tr>
