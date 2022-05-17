@@ -25,9 +25,9 @@ def semantic_search_tutorial():
             use_gpu=True,
             embed_title=False, )
     else:
-        doc_dir = "data/baike"
-        city_data = "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
-        fetch_archive_from_http(url=city_data, output_dir=doc_dir)
+        doc_dir = "data/dureader_robust_processed"
+        dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_robust_processed.zip"
+        fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
         dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
 
         if os.path.exists(faiss_index_path):
@@ -45,7 +45,7 @@ def semantic_search_tutorial():
             passage_embedding_model="rocketqa-zh-dureader-query-encoder",
             max_seq_len_query=64,
             max_seq_len_passage=256,
-            batch_size=16,
+            batch_size=8,
             use_gpu=True,
             embed_title=False, )
 
@@ -76,13 +76,14 @@ def semantic_search_tutorial():
 
     ## ask question.
     prediction = pipe.run(
-        query="北京有多少个行政区？",
+        query="亚马逊河流的介绍",
         params={"Retriever": {
             "top_k": 50
         },
                 "Ranker": {
                     "top_k": 5
                 }})
+
     print(prediction)
 
 
