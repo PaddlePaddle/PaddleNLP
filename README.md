@@ -27,6 +27,9 @@
   <a href=#社区交流> 社区交流 </a> 
 </h4>
 
+**PaddleNLP**是功能强大的自然语言处理开发库，聚合了业界**优质的中文预训练模型**并提供**开箱即用**的开发体验，多场景的模型库既包含学术前沿技术，也包含**端到端产业级系统案例**，依托飞桨分布式技术和推理部署工具链，可大幅提升模型迭代和部署效率，持续加速NLP产业落地效率。
+
+
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
 * 🔥 2022.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
@@ -42,11 +45,11 @@
 
 * 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
+
+
 ## 特性
 
-PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。具备以下四大特性：
-
-#### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP能力> 开箱即用的NLP能力 </a>
+#### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#开箱即用的NLP工具集> 开箱即用的NLP工具集 </a>
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454751-f111d8b4-a16a-4e36-b9de-3af8a2f00714.png" width="20" height="20" /><a href=#丰富完备的中文模型库> 丰富完备的中文模型库 </a> 
 
@@ -55,7 +58,7 @@ PaddleNLP是飞桨自然语言处理开发库，旨在提升开发者在文本�
 #### <img src="https://user-images.githubusercontent.com/11793384/168454587-8b5a0f63-3d4b-4339-be47-f3ad7ef9e16c.png" width="20" height="20" /><a href=#高性能分布式训练与推理> 高性能分布式训练与推理 </a> 
 
 
-### 开箱即用的NLP能力
+### 开箱即用的NLP工具集
 
 Taskflow提供丰富的**开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**产业级的效果**与**极致的推理性能**。
 
