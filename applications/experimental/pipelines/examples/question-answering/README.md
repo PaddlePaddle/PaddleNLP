@@ -56,11 +56,16 @@ python ./ui/setup.py install
 问答知识库数据是我们爬取了百度百科上对国内重点城市的百科介绍文档。我们将所有文档中的非结构化文本数据抽取出来， 按照段落切分后作为问答系统知识库的数据，一共包含 365 个城市的百科介绍文档、切分后共 1318 个段落。
 
 ### 3.3 一键体验问答系统
-我们预置了搭建城市百科知识问答系统的代码示例，您可以通过如下命令快速体验问答系统的效果
-```
+我们预置了搭建城市百科知识问答系统的代码示例，您可以通过如下命令快速体验问答系统的效果。
+
+
+```bash
+# 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/question-answering/dense_qa_example.py
+python examples/question-answering/dense_qa_example.py --device gpu
+# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
+python examples/question-answering/dense_qa_example.py --device cpu
 ```
 
 ### 3.4 构建 Web 可视化问答系统

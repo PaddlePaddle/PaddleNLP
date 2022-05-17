@@ -62,10 +62,13 @@ python ./ui/setup.py install
 
 ### 3.3 一键体验语义检索系统
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
-```
+```bash
+# 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py
+python examples/semantic-search/semantic_search_example.py --gpu
+# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
+python examples/question-answering/dense_qa_example.py --device cpu
 ```
 
 ### 3.4 构建 Web 可视化语义检索系统
