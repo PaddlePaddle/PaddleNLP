@@ -358,7 +358,8 @@ def create_pretrained_dataset(
 
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
-            data_loader.set_batch_generator(data_gen, places)
+            data_loader.set_sample_generator(
+                data_gen, batch_size=args.micro_batch_size, places=places)
         else:
             data_loader = DataLoader(
                 dataset=dataset,
