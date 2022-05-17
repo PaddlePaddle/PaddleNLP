@@ -20,6 +20,7 @@ from functools import partial
 import distutils.util
 import numpy as np
 import onnxruntime as ort
+from multiprocessing import cpu_count
 
 import paddle
 from paddle import inference
@@ -114,7 +115,7 @@ def parse_args():
         help="Precision for inference.")
     parser.add_argument(
         "--num_threads",
-        default=12,
+        default=cpu_count(),
         type=int,
         help="num_threads for cpu.", )
     parser.add_argument(

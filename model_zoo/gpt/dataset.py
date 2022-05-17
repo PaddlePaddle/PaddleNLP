@@ -269,9 +269,6 @@ def create_pretrained_dataset(
     if local_rank == 0:
         start_time = time.time()
         print('> compiling dataset index builder ...')
-        sys.path.append(
-            os.path.abspath(
-                os.path.join(os.path.dirname(__file__), os.pardir)))
         from data_tools.dataset_utils import compile_helper
         compile_helper()
         print(
@@ -281,6 +278,14 @@ def create_pretrained_dataset(
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
+
+    if device_world_size > 1 and local_rank != 0:
+        while True:
+            try:
+                import data_tools.helpers as helpers
+                break
+            except Exception as e:
+                time.sleep(1)
 
     logger.info(
         "The distributed run, total device num:{}, distinct dataflow num:{}.".

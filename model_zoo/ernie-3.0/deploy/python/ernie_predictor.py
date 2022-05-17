@@ -184,7 +184,8 @@ class ErniePredictor(object):
             exit(0)
 
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name_or_path, use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
