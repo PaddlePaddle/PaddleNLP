@@ -161,7 +161,7 @@ class TinyBertPretrainedModel(PretrainedModel):
 @register_base_model
 class TinyBertModel(TinyBertPretrainedModel):
     """
-    The bare TinyBert Model transformer outputting raw hidden-states.
+    The bare TinyBERT Model transformer outputting raw hidden-states.
 
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.

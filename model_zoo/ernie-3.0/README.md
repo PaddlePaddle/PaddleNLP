@@ -361,7 +361,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">Tinybert<sub>6</sub>, Chinese</span>
+                        <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">69.58</span>
