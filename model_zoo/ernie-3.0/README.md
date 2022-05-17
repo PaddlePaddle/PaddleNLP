@@ -14,10 +14,8 @@
                * [GPU 性能](#CPU性能)
    * [部署](#部署)
        * [Python 部署](#Python部署)
-           * [Python部署指南](#Python部署指南)
        * [服务化部署](#服务化部署)
        * [Paddle2ONNX 部署](#Paddle2ONNX部署)
-           * [ONNX导出及ONNXRuntime部署](#ONNX导出及ONNXRuntime部署)
    * [参考文献](#参考文献)
 
 ## 模型介绍
@@ -673,7 +671,6 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 ### Python 部署
 
-<a name="Python部署指南"></a>
 Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
@@ -686,7 +683,6 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 ### Paddle2ONNX 部署
 
-<a name="ONNX导出及ONNXRuntime部署"></a>
 ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
 
 
