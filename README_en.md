@@ -1,4 +1,4 @@
-简体中文 | [English](./README_en.md)
+[简体中文](./README_cn.md) | English
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
@@ -26,6 +26,8 @@
   <a href=#Community> Community </a>
 </h4>
 
+**PaddleNLP** is an easy-to-use and powerful NLP library with awesome pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
+
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
 * 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model. Welcome to join us!
@@ -40,8 +42,6 @@
   * 🔥Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
 
 ## Features
-
-PaddleNLP is an easy-to-use and high performance NLP library with awesome pre-trained Transformer models, supporting wide-range of NLP tasks from research to industrial applications.
 
 #### <img src="https://user-images.githubusercontent.com/11793384/168454776-2075cc68-9402-4b0b-8723-5be0a315ddc3.png" width="20" height="20" /><a href=#Off-the-shelf NLP Pre-built Task> Off-the-shelf NLP Pre-built Task </a>
 
