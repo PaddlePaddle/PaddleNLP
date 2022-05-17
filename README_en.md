@@ -23,7 +23,7 @@
   <a href=#installation> Installation </a> |
   <a href=#quick-start> Quick Start </a> |
   <a href=#api-reference> API Reference </a> |
-  <a href=#👬-community> Community </a>
+  <a href=#community> Community </a>
 </h4>
 
 **PaddleNLP** is an easy-to-use and powerful NLP library with awesome pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
@@ -43,16 +43,16 @@
 
 ## Features
 
-#### <a href=#📦-off-the-shelf-nlp-pre-built-task> 📦 Off-the-shelf NLP Pre-built Task </a>
+#### <a href=#off-the-shelf-nlp-pre-built-task> 📦 Off-the-shelf NLP Pre-built Task </a>
 
-#### <a href=#🤗-awesome-chinese-pre-trained-model-zoo> 🤗 Awesome Chinese Pre-trained Model Zoo </a>
+#### <a href=#awesome-chinese-pre-trained-model-zoo> 🤗 Awesome Chinese Pre-trained Model Zoo </a>
 
-#### <a href=#🎛️-industrial-end-to-end-system-cases> 🎛️ Industrial End-to-end System Cases </a>
+#### <a href=#industrial-end-to-end-system-cases> 🎛️ Industrial End-to-end System Cases </a>
 
-#### <a href=#🚀-high-performance-distributed-training-and-inference> 🚀 High Performance Distributed Training and Inference </a>
+#### <a href=#high-performance-distributed-training-and-inference> 🚀 High Performance Distributed Training and Inference </a>
 
 
-### 📦 Off-the-shelf NLP Pre-built Task 
+### Off-the-shelf NLP Pre-built Task 
 
 Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
 
@@ -60,7 +60,7 @@ Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG s
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
-### 🤗 Awesome Chinese Pre-trained Model Zoo 
+### Awesome Chinese Pre-trained Model Zoo
 
 #### 🀄 Comprehensive Chinese Transformer Models  
 
@@ -69,7 +69,7 @@ We provide 45+ network architectures and over 500+ pretrained models. Not only i
 ```python
 from paddlenlp.transformers import *
 
-ernie = AutoModel.from_pretrained('ernie-3.0-base-zh')
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 bert = AutoModel.from_pretrained('bert-wwm-chinese')
 albert = AutoModel.from_pretrained('albert-chinese-tiny')
 roberta = AutoModel.from_pretrained('roberta-wwm-ext')
@@ -97,7 +97,11 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-3.0-medium-zh')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 ```
 
-</div></details>
+#### Wide-range NLP Task Support
+
+PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+
+Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
 <details><summary>&emsp;PaddleNLP Transformer model summary, click to show more detials </summary><div>
 
@@ -148,22 +152,14 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 For more pretrained model usage, please refer to [Transformer API Docs](./docs/model_zoo/index.rst).
 
-#### Wide-range NLP Task Support
-
-PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
-
-Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
-
-
-### 🎛️ Industrial End-to-end System Cases
+### Industrial End-to-end System Cases
 
 We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
 
 For more details industial cases please refer to [Applications](./applications).
 
 
-#### Neural Search System
-
+#### 🧠 Neural Search System
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="500">
@@ -172,7 +168,7 @@ For more details industial cases please refer to [Applications](./applications).
 
 For more details please refer to [Neural Search](./applications/neural_search).
 
-#### Question Answering System
+#### ❓ Question Answering System
 
 We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [RocketQA](https://github.com/PaddlePaddle/RocketQA) technique.
 
@@ -184,7 +180,7 @@ We provide question answering pipeline which can support FAQ system, Document-le
 For more details please refer to [Question Answering](./applications/question_answering).
 
 
-#### Opinion Extraction and Sentiment Analysis
+#### 💌 Opinion Extraction and Sentiment Analysis
 
 We build an opinion extraction system for product review and fine-grained sentiment analysis based on [SKEP](https://arxiv.org/abs/2005.05635) Model.
 
@@ -195,7 +191,7 @@ We build an opinion extraction system for product review and fine-grained sentim
 
 For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
 
-#### Speech Command Analysis
+#### 🎤 Speech Command Analysis
 
 Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios.
 
@@ -206,9 +202,9 @@ Integrated ASR Model, Information Extraction, we provide a speech command analys
 
 For more details please refer to [Speech Command Analysis](./applications/speech_cmd_analysis).
 
-### 🚀 High Performance Distributed Training and Inference
+### High Performance Distributed Training and Inference
 
-#### ⚡ Fleet API: 4D Hybrid Distributed Training
+#### 🚀 Fleet API: 4D Hybrid Distributed Training
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" height="400" width="500">
@@ -235,7 +231,7 @@ For more usage please refer to [FasterTokenizers](./faster_tokenizers).
 
 For more usage please refer to [FasterGeneration](./faster_generation).
 
-## 👬 Community 
+## Community 
 
 ### Special Interest Group (SIG)
 
