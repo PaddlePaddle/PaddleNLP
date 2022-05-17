@@ -148,7 +148,7 @@ def _num_tokens(documents, lens):
 
 
 def _num_epochs(tokens_per_epoch, seq_length, num_samples):
-    """Based on number of samples and sequence lenght, calculate how many
+    """Based on number of samples and sequence length, calculate how many
     epochs will be needed."""
     num_epochs = 0
     total_tokens = 0
@@ -267,7 +267,7 @@ def create_pretrained_dataset(
         max_seq_len=1024,
         places=None,
         data_holders=None,
-        pipeline_mode=False, ):
+        pipeline_mode=False):
 
     if local_rank == 0:
         start_time = time.time()
@@ -330,7 +330,8 @@ def create_pretrained_dataset(
             sample_lens=sample_lens,
             eos_id=eos_id,
             seed=args.seed,
-            use_pure_fp16=args.use_amp and args.amp_level == "O2")
+            use_pure_fp16=args.use_amp and args.amp_level == "O2",
+            data_holders=data_holders)
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
@@ -340,17 +341,17 @@ def create_pretrained_dataset(
             drop_last=True)
 
         if pipeline_mode:
-
             def data_gen():
                 for data in dataset:
                     yield tuple(
                         [np.expand_dims(
                             np.array(x), axis=0) for x in data])
-
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
             data_loader.set_batch_generator(data_gen, places)
         else:
+            stacks = (Stack(), ) * len(data_holders)
+            collate_fn=Tuple(*stacks)
             data_loader = DataLoader(
                 dataset=dataset,
                 places=places,
@@ -358,7 +359,7 @@ def create_pretrained_dataset(
                 batch_sampler=batch_sampler,
                 num_workers=1,
                 worker_init_fn=worker_init,
-                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack()),
+                collate_fn=collate_fn,
                 return_list=False)
         return data_loader
 
@@ -391,7 +392,8 @@ class GPTDataset(paddle.io.Dataset):
                  name="gpt",
                  max_seq_len=1024,
                  seed=1234,
-                 use_pure_fp16=False):
+                 use_pure_fp16=False,
+                 data_holders=None):
         self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
@@ -400,6 +402,7 @@ class GPTDataset(paddle.io.Dataset):
         self.sample_lens = sample_lens
         self.micro_batch_size = micro_batch_size
         self.use_pure_fp16 = use_pure_fp16
+        self.data_holders = data_holders
 
         if documents is None:
             document_ids = np.arange(0, self.sample_lens.shape[0])
@@ -425,10 +428,17 @@ class GPTDataset(paddle.io.Dataset):
         else:
             loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
-        position_ids = np.arange(0, seq_length, dtype="int64")
 
+        position_ids = np.arange(0, seq_length, dtype="int64")
         labels = np.array(labels, dtype="int64")
-        return [tokens, loss_mask, position_ids, labels]
+        if len(self.data_holders) == 4:
+            return [tokens, loss_mask, position_ids, labels]
+        elif len(self.data_holders) == 3:
+            return [tokens, loss_mask, position_ids]
+        else:
+            assert len(self.data_holders) == 1, \
+                "length of daat_holders should be 4, 3 or 1"
+            return [tokens]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f,
                                     offset_l):
