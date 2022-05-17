@@ -59,7 +59,7 @@ python ./ui/setup.py install
 我们预置了搭建城市百科知识问答系统的代码示例，您可以通过如下命令快速体验问答系统的效果。
 
 
-```
+```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
