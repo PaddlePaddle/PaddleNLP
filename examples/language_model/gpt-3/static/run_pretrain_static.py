@@ -550,9 +550,10 @@ def do_train(args):
                     output_dir = os.path.join(args.output_dir,
                                               "model_%d" % global_step)
                     logger.debug("saving models to {}".format(output_dir))
-                    save_persistables(exe,
-                                      os.path.join(output_dir, "static_vars"),
-                                      main_program)
+                    save_persistables(
+                        exe,
+                        os.path.join(output_dir, "static_vars"),
+                        main_program._pipeline_opt['section_program'])
                     if global_step <= args.save_steps:
                         model.init_config["init_args"][0].init_config.pop(
                             "topo", None)
@@ -561,6 +562,7 @@ def do_train(args):
                     tic_train = time.time()
 
                 if global_step >= args.max_steps:
+                    train_data_loader.reset()
                     del train_data_loader
                     return
 
