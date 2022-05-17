@@ -19,10 +19,23 @@ import sys
 import multiprocessing
 
 import setuptools
-from setuptools import setup
+from setuptools import setup, Distribution, Extension
+from setuptools.command.install import install
 
-# The information here can also be placed in setup.cfg - better separation of
-# logic and declaration, and simpler if you include description/version in a file.
+
+class BinaryDistribution(Distribution):
+    # when build the package, it will add
+    # platform name such as "cp37-cp37m-linux_x86_64"
+    def has_ext_modules(self):
+        return True
+
+
+class InstallPlatlib(install):
+    def finalize_options(self):
+        install.finalize_options(self)
+        if self.distribution.has_ext_modules():
+            self.install_lib = self.install_platlib
+
 
 if os.name != 'nt':
     package_data = {
@@ -35,10 +48,18 @@ else:
         ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll"]
     }
 
+
+def get_version():
+    import sys
+    sys.path.append('python/')
+    import faster_tokenizers
+    return faster_tokenizers.__version__
+
+
 long_description = "PaddleNLP Faster Tokenizer Library written in C++ "
 setup(
     name="faster_tokenizers",
-    version="0.0.1",
+    version=get_version(),
     author="PaddlePaddle Speech and Language Team",
     author_email="paddlesl@baidu.com",
     description=long_description,
@@ -54,4 +75,19 @@ setup(
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
-    license='Apache 2.0', )
+    cmdclass={'install': InstallPlatlib},
+    license='Apache 2.0',
+    distclass=BinaryDistribution,
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Operating System :: OS Independent',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: C++',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+    ], )

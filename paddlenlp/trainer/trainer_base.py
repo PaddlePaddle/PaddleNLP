@@ -113,14 +113,12 @@ class Trainer:
         model ([`PretrainedModel`] or `paddle.nn.Layer`, *optional*):
             The model to train, evaluate or use for predictions.
 
-            <Tip>
-
             [`Trainer`] is optimized to work with the [`PretrainedModel`] provided by the library. You can still use
             your own models defined as `paddle.nn.Layer` as long as they work the same way as the PaddleNLP
             models.
-
-            </Tip>
-
+        criterion(`paddle.nn.Layer`, *optional*):
+            The model may only output the loggit, if you want do more computation for the output of model, you can
+            add the criterion Layer.
         args ([`TrainingArguments`], *optional*):
             The arguments to tweak for training. Will default to a basic instance of [`TrainingArguments`] with the
             `output_dir` set to a directory named *tmp_trainer* in the current directory if not provided.
@@ -141,6 +139,9 @@ class Trainer:
         compute_metrics (`Callable[[EvalPrediction], Dict]`, *optional*):
             The function that will be used to compute metrics at evaluation. Must take a [`EvalPrediction`] and return
             a dictionary string to metric values.
+        callbacks (List of [`TrainerCallback`], *optional*):
+            A list of callbacks to customize the training loop. Will add those to the list of default callbacks.
+            If you want to remove one of the default callbacks used, use the [`Trainer.remove_callback`] method.
         optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*): A tuple
             containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your model
             and a scheduler given by [`get_linear_schedule_with_warmup`] controlled by `args`.
@@ -153,8 +154,6 @@ class Trainer:
           original model. This is the model that should be used for the forward pass. For example, the inner model is
           wrapped in `paddle.DataParallel`. If model hasn't been wrapped, then `self.model_wrapped` is the same
           as `self.model`.
-        - **is_in_train** -- Whether or not a model is currently running `train` (e.g. when `evaluate` is called while
-          in `train`)
 
     """
     from .trainer_utils import log_metrics, metrics_format, save_metrics, save_state
@@ -284,11 +283,58 @@ class Trainer:
         """
         self.callback_handler.remove_callback(callback)
 
+    def load_state_dict_from_checkpoint(self, resume_from_checkpoint=None):
+        """load state_dict from_checkpoint, Only load model state dict.
+
+        Args:
+            resume_from_checkpoint (`str` or `bool`, *optional*):
+                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
+                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
+                of [`Trainer`]. Only load model state dict.
+        """
+        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(
+                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                )
+
+        if resume_from_checkpoint is not None:
+            if not os.path.isfile(
+                    os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
+                raise ValueError(
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            # We load the model state dict on the CPU to avoid an OOM error.
+            state_dict = paddle.load(
+                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            # If the model is on the GPU, it still works!
+            self._set_state_dict_in_model(state_dict)
+
+            # release memory
+            del state_dict
+
     def train(
             self,
             resume_from_checkpoint: Optional[Union[str, bool]]=None,
             ignore_keys_for_eval: Optional[List[str]]=None, ):
-
+        """
+        Main training entry point.
+        
+        Args:
+            resume_from_checkpoint (`str` or `bool`, *optional*):
+                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
+                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
+                of [`Trainer`]. If present, training will resume from the model/optimizer/scheduler states loaded here.
+            ignore_keys_for_eval (`List[str]`, *optional*)
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions for evaluation during the training.
+        """
         args = self.args
         self.is_in_train = True
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
@@ -309,7 +355,7 @@ class Trainer:
 
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-            # We load the model state dict on the CPU to avoid an OOM error.
+            # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
                 os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
             # If the model is on the GPU, it still works!
@@ -1018,69 +1064,6 @@ class Trainer:
 
         if self.args.should_save:
             self._save(output_dir)
-
-    def export_model(self,
-                     input_spec=None,
-                     load_best_model=False,
-                     output_dir: Optional[str]=None,
-                     model_format: Optional[str]="paddle"):
-        """ Export paddle inference model or onnx model.
-
-        Args:
-            input_spec (paddle.static.InputSpec, optional): InputSpec describes the signature information of the model input,
-                such as shape , dtype , name. Defaults to None.
-            load_best_model (bool, optional): Load best model. Defaults to False.
-            output_dir (Optional[str], optional): Output dir to save the exported model. Defaults to None.
-            model_format (Optional[str], optional): Export model format. There are two options: paddle or onnx, defaults to paddle.
-        """
-
-        if output_dir is None:
-            output_dir = self.args.output_dir
-
-        if load_best_model and self.state.best_model_checkpoint is not None:
-            if self.args.local_rank != -1:
-                dist.barrier()
-
-            logger.info(
-                f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
-            )
-
-            best_model_path = os.path.join(self.state.best_model_checkpoint,
-                                           WEIGHTS_NAME)
-            if os.path.exists(best_model_path):
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path)
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-            else:
-                logger.warning(
-                    f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
-                    "on multiple nodes, you should activate `--save_on_each_node`."
-                )
-
-        model = unwrap_model(self.model)
-        model.eval()
-
-        model_format = model_format.lower()
-        if model_format == "paddle":
-            # Convert to static graph with specific input description
-            model = paddle.jit.to_static(model, input_spec=input_spec)
-
-            # Save in static graph model.
-            save_path = os.path.join(output_dir, "inference", "infer")
-            logger.info("Exporting inference model to %s" % save_path)
-            paddle.jit.save(model, save_path)
-            logger.info("Inference model exported.")
-        elif model_format == "onnx":
-            # Export ONNX model.
-            save_path = os.path.join(output_dir, "onnx", "model")
-            logger.info("Exporting ONNX model to %s" % save_path)
-            paddle.onnx.export(model, save_path, input_spec=input_spec)
-            logger.info("ONNX model exported.")
-        else:
-            logger.info(
-                "This export format is not supported, please select paddle or onnx!"
-            )
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"

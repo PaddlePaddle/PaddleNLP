@@ -65,7 +65,7 @@ class DatasetTuple:
     def __init__(self, splits):
         self.identifier_map, identifiers = self._gen_identifier_map(splits)
         self.tuple_cls = namedtuple('datasets', identifiers)
-        self.tuple = self.tuple_cls(* [None for _ in splits])
+        self.tuple = self.tuple_cls(*[None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):

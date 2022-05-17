@@ -19,7 +19,11 @@ import numpy as np
 from utils import decoding, concate_aspect_and_opinion, save_examples, save_dict
 
 
-def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_shuffle=True):
+def doccano2SA(doccano_file,
+               save_ext_dir,
+               save_cls_dir,
+               splits=[0.8, 0.9],
+               is_shuffle=True):
     """
         @Description: Consvert doccano file to data format which is suitable to input to this Application.
         @Param doccano_file: The annotated file exported from doccano labeling platform.
@@ -30,22 +34,25 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
     """
     if not os.path.exists(doccano_file):
         raise ValueError("Please input the correct path of doccano file.")
-    
+
     if not os.path.exists(save_ext_dir):
         os.makedirs(save_ext_dir)
-    
+
     if not os.path.exists(save_cls_dir):
         os.makedirs(save_cls_dir)
-    
+
     if len(splits) != 0 and len(splits) != 2:
         raise ValueError("Only []/ len(splits)==2 accepted for splits.")
 
-    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0 or splits[1] >= 1.0 or splits[0]<=0. or splits[1]<=0):
-        raise ValueError("Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0].")
+    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0 or
+                   splits[1] >= 1.0 or splits[0] <= 0. or splits[1] <= 0):
+        raise ValueError(
+            "Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0]."
+        )
 
     def label_ext_with_label_term(ext_label, start, end, tag):
 
-        if tag == "Opinion":                
+        if tag == "Opinion":
             b_tag = "B-Opinion"
             i_tag = "I-Opinion"
         else:
@@ -53,7 +60,7 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
             i_tag = "I-Aspect"
 
         ext_label[start] = b_tag
-        for i in range(start+1, end):
+        for i in range(start + 1, end):
             ext_label[i] = i_tag
 
     ext_examples, cls_examples = [], []
@@ -91,7 +98,6 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
         ext_idx = np.random.permutation(ext_idx)
         cls_idx = np.random.permutation(cls_idx)
 
-
     if len(splits) == 0:
         # save ext data
         save_ext_path = os.path.join(save_ext_dir, "doccano.txt")
@@ -101,10 +107,11 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
         save_cls_path = os.path.join(save_cls_dir, "doccano.txt")
         save_examples(cls_examples, save_cls_path, cls_idx)
         print(f"\ncls: save data to {save_cls_path}.")
-    
+
     else:
         # save ext data
-        eth1, eth2 = int(len(ext_examples)*splits[0]), int(len(ext_examples)*splits[1])
+        eth1, eth2 = int(len(ext_examples) * splits[0]), int(
+            len(ext_examples) * splits[1])
         save_ext_train_path = os.path.join(save_ext_dir, "train.txt")
         save_ext_dev_path = os.path.join(save_ext_dir, "dev.txt")
         save_ext_test_path = os.path.join(save_ext_dir, "test.txt")
@@ -116,7 +123,8 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
         print(f"ext: save test data to {save_ext_test_path}.")
 
         # save cls data
-        cth1, cth2 = int(len(cls_examples)*splits[0]), int(len(cls_examples)*splits[1])
+        cth1, cth2 = int(len(cls_examples) * splits[0]), int(
+            len(cls_examples) * splits[1])
         save_cls_train_path = os.path.join(save_cls_dir, "train.txt")
         save_cls_dev_path = os.path.join(save_cls_dir, "dev.txt")
         save_cls_test_path = os.path.join(save_cls_dir, "test.txt")
@@ -134,14 +142,29 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
     save_dict(cls_dict_path, "cls")
     print(f"\next: save dict to {ext_dict_path}.")
     print(f"cls: save dict to {cls_dict_path}.")
-    
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--doccano_file", type=str, default="./data/doccano.json", help="The doccano file exported from doccano platform.")
-    parser.add_argument("--save_ext_dir", type=str, default="./data/ext_data1", help="The path of ext data that you wanna save.")
-    parser.add_argument("--save_cls_dir", type=str, default="./data/cls_data1", help="The path of cls data that you wanna save.")
+    parser.add_argument(
+        "--doccano_file",
+        type=str,
+        default="./data/doccano.json",
+        help="The doccano file exported from doccano platform.")
+    parser.add_argument(
+        "--save_ext_dir",
+        type=str,
+        default="./data/ext_data1",
+        help="The path of ext data that you wanna save.")
+    parser.add_argument(
+        "--save_cls_dir",
+        type=str,
+        default="./data/cls_data1",
+        help="The path of cls data that you wanna save.")
     args = parser.parse_args()
 
-    doccano2SA(args.doccano_file, args.save_ext_dir, args.save_cls_dir, is_shuffle=True)
-
+    doccano2SA(
+        args.doccano_file,
+        args.save_ext_dir,
+        args.save_cls_dir,
+        is_shuffle=True)

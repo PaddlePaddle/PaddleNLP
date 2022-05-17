@@ -388,7 +388,7 @@ class PretrainedModel(Layer, GenerationMixin):
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
         # Logging model download statistics
-        download_check(pretrained_model_name_or_path, cls.__name__)
+        download_check(pretrained_model_name_or_path, "from_pretrained")
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding

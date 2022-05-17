@@ -38,7 +38,7 @@ from visualdl import LogWriter
 
 # Used to load the data_tools path, should import before dataset
 filepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(filepath, "../../"))
+sys.path.insert(0, os.path.join(filepath, "../"))
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
