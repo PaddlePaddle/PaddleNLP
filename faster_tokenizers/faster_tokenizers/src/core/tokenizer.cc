@@ -555,6 +555,16 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
       tokens[i] = added_token_with_id.added_token_;
     }
     tokenizer.AddSpecialTokens(tokens);
+
+    const auto& decoder = j.at("decoder");
+    if (!decoder.is_null()) {
+      if (decoder.at("type") == "WordPiece") {
+        decoders::WordPiece wordpiece_decoder;
+        decoder.get_to(wordpiece_decoder);
+        tokenizer.SetDecoder(wordpiece_decoder);
+      }
+    }
+
   } catch (nlohmann::json::out_of_range& e) {
     VLOG(0) << e.what();
   }

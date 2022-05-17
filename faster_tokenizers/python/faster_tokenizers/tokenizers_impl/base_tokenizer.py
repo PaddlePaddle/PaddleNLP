@@ -100,6 +100,22 @@ class BaseFasterTokenizer:
         return self._tokenizer.encode_batch(inputs, add_special_tokens,
                                             is_pretokenized)
 
+    def decode(self, ids, skip_special_tokens=True) -> str:
+        if ids is None:
+            raise ValueError(
+                "None input is not valid. Should be a list of integers.")
+
+        return self._tokenizer.decode(
+            ids, skip_special_tokens=skip_special_tokens)
+
+    def decode_batch(self, sequences, skip_special_tokens=True) -> str:
+        if sequences is None:
+            raise ValueError(
+                "None input is not valid. Should be list of list of integers.")
+
+        return self._tokenizer.decode_batch(
+            sequences, skip_special_tokens=skip_special_tokens)
+
     def token_to_id(self, token):
         return self._tokenizer.token_to_id(token)
 
@@ -140,6 +156,14 @@ class BaseFasterTokenizer:
     @postprocessor.setter
     def postprocessor(self, postprocessor):
         self._tokenizer.postprocessor = postprocessor
+
+    @property
+    def decoder(self):
+        return self._tokenizer.decoder
+
+    @decoder.setter
+    def decoder(self, decoder):
+        self._tokenizer.decoder = decoder
 
     def save(self, path, pretty=True):
         self._tokenizer.save(path, pretty)
