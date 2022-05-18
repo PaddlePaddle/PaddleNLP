@@ -32,19 +32,19 @@
 
 UIE不限定行业领域和抽取目标，图片示例（来自直播PPT里的零样本行业示例）
 
-#### 实体抽取
+- 实体抽取
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/168991620-4925a493-9034-4e46-a869-182341c3cf5c.png height=300 hspace='10'/>
 </div>
 
-#### 关系抽取
+- 关系抽取
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/168986213-e1fb11c6-9551-4c11-8a1e-766004bdfa95.png height=200 hspace='10'/>
 </div>
 
-#### 情感分析
+- 情感分析
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/168986336-c44ddb7a-760a-4597-aad9-78428e0fd35d.png height=200 hspace='10'/>
