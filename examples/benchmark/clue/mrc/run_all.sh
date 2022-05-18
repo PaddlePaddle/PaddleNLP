@@ -1,0 +1,60 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+task_name=$1
+MODEL_DIR=$2
+cards=$3
+
+
+if [ ${task_name} == 'chid' ]
+then
+
+for bs in 6 8
+    do
+    for lr in 1e-5 2e-5 3e-5
+        do
+        bash run_chid.sh ${MODEL_DIR} $bs $lr 2 ${cards}
+    done
+done
+fi
+
+
+if [ ${task_name} == 'cmrc2018' ]
+then 
+
+for bs in 16 12
+do
+    for lr in  1e-5 2e-5 3e-5
+    do
+        bash run_cmrc.sh ${MODEL_DIR} $bs $lr ${cards}
+    done
+done
+fi
+
+if [ ${task_name} == 'c3' ]
+then
+grd=3
+for bs in 6 8:
+do
+    for lr in 1e-5 2e-5 3e-5
+    do
+        if [ $bs == 6]
+        then
+        grd=4
+        fi
+        bash run_c3.sh  ${MODEL_DIR} ${bs} ${lr} ${cards} ${grd}
+    done
+done
+fi
