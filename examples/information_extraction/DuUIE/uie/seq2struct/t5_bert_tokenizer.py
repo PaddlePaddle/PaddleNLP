@@ -40,7 +40,6 @@ class T5BertTokenizer(BertTokenizer):
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
             **kwargs, )
-
         if space_token not in self._additional_special_tokens:
             self._additional_special_tokens += [space_token]
 
