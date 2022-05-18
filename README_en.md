@@ -1,4 +1,4 @@
-[简体中文](./README_cn.md) | English
+[简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
@@ -26,9 +26,9 @@
   <a href=#community> Community </a>
 </h4>
 
-**PaddleNLP** is an easy-to-use and powerful NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
+**PaddleNLP** is an *easy-to-use* and *powerful* NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
 
-## News  <img src="./docs/imgs/news_icon.png" width="40"/>
+## News 📢
 
 * 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
 
@@ -104,7 +104,7 @@ PaddleNLP provides rich examples covering mainstream NLP task to help developers
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
-<details><summary> PaddleNLP Transformer model summary, (**click to show the table**) </summary><div>
+<details><summary> PaddleNLP Transformer model summary (<b>click to show details</b>) </summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
