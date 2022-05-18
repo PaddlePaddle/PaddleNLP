@@ -14,7 +14,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
     --output_emb_size 256 \
 	--train_set_file "./recall/train_unsupervised.csv" \
 	--test_set_file "./recall/dev.csv" 
-	--model_name_or_path "ernie-1.0"
+	--model_name_or_path "ernie-1.0-base-zh"
 
 # simcse cpu
 # python 	train.py \
@@ -31,7 +31,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 #     --output_emb_size 256 \
 # 	--train_set_file "./recall/train_unsupervised.csv" \
 # 	--test_set_file "./recall/dev.csv" 
-# 	--model_name_or_path "ernie-1.0"
+# 	--model_name_or_path "ernie-1.0-base-zh"
 
 # post training + simcse
 # python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
