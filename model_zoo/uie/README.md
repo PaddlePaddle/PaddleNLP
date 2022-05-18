@@ -30,24 +30,36 @@
 
 ## 2. 应用示例
 
-UIE不限定行业领域和抽取目标，图片示例（来自直播PPT里的零样本行业示例）
+UIE不限定行业领域和抽取目标：
 
-- 实体抽取
+- 医疗场景-专病结构化
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/168991620-4925a493-9034-4e46-a869-182341c3cf5c.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/169017581-93c8ee44-856d-4d17-970c-b6138d10f8bc.png height=200 hspace='10'/>
 </div>
 
-- 关系抽取
+- 法律场景-判决书抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/168986213-e1fb11c6-9551-4c11-8a1e-766004bdfa95.png height=200 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/169017863-442c50f1-bfd4-47d0-8d95-8b1d53cfba3c.png height=200 hspace='10'/>
 </div>
 
-- 情感分析
+- 金融场景-收入证明、招股书抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/168986336-c44ddb7a-760a-4597-aad9-78428e0fd35d.png height=200 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/169017982-e521ddf6-d233-41f3-974e-6f40f8f2edbc.png height=200 hspace='10'/>
+</div>
+
+- 公安场景-事故报告抽取
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/169018340-31efc1bf-f54d-43f7-b62a-8f7ce9bf0536.png height=200 hspace='10'/>
+</div>
+
+- 旅游场景-宣传册、手册抽取
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/169018113-c937eb0b-9fd7-4ecc-8615-bcdde2dac81d.png height=200 hspace='10'/>
 </div>
 
 <a name="开箱即用"></a>
@@ -288,27 +300,27 @@ UIE不限定行业领域和抽取目标，图片示例（来自直播PPT里的�
   预测：
 
   ```python
-  >>> schema = ['法院', {'原告': ['委托代理人', '法定代表人']}, {'被告': ['委托代理人', '法定代表人']}]
+  >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
   >>> ie.set_schema(schema)
-  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 示例律师事务所律师 。")) # Better print results using pprint
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。")) # Better print results using pprint
   [{'原告': [{'end': 37,
-            'probability': 0.9949547034861439,
+            'probability': 0.9955972637653154,
             'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.8006135007334549,
+                                    'probability': 0.9835957661618089,
                                     'start': 44,
                                     'text': '李四'}]},
             'start': 35,
             'text': '张三'}],
     '法院': [{'end': 10,
-            'probability': 0.9194856611929936,
+            'probability': 0.9245885500450299,
             'start': 0,
             'text': '北京市海淀区人民法院'}],
     '被告': [{'end': 67,
-            'probability': 0.8574464259107089,
-            'relations': {'委托代理人': [{'end': 92,
-                                    'probability': 0.6996806814169787,
-                                    'start': 90,
-                                    'text': '赵六'}]},
+            'probability': 0.9033652934762237,
+            'relations': {'委托代理人': [{'end': 46,
+                                    'probability': 0.3863244074945271,
+                                    'start': 44,
+                                    'text': '李四'}]},
             'start': 64,
             'text': 'B公司'}]}]
   ```
