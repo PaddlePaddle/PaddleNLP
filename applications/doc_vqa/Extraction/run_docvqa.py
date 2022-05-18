@@ -20,6 +20,7 @@ from model import LayoutXLMForTokenClassification_with_CRF
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters

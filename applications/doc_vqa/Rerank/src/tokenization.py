@@ -25,6 +25,7 @@ import collections
 import unicodedata
 from io import open
 
+
 def convert_to_unicode(text):
     """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
     if six.PY3:

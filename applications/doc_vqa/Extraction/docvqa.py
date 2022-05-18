@@ -12,6 +12,7 @@ from paddle.io import Dataset
 
 sys.path.insert(0, "../")
 
+
 class DocVQAExample(object):
     def __init__(self,
                  q_id,
