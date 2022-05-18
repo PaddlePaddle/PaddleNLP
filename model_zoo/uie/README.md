@@ -27,7 +27,7 @@
 
 #### 通用信息抽取比赛
 
-为了进一步探索通用信息抽取的边界，我们举办了CCKS 2022 千言通用信息抽取竞赛评测（2022/03/30 - 2022/07/31）。
+为了进一步探索通用信息抽取的边界，我们举办了**CCKS 2022 千言通用信息抽取竞赛评测**（2022/03/30 - 2022/07/31）。
 
 - [报名链接](https://aistudio.baidu.com/aistudio/competition/detail/161/0/introduction)
 - [基线代码](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/DuUIE)
