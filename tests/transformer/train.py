@@ -20,7 +20,7 @@ sys.path.append(
             os.path.dirname(__file__), os.pardir, os.pardir, "examples",
             "machine_translation", "transformer")))
 import reader
-from util.record import AverageStatistical
+from tls.record import AverageStatistical
 
 paddle.set_default_dtype("float64")
 
