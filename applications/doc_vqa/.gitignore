@@ -1,3 +1,4 @@
+OCR_process/*.json
 *.png
 answers/*
 checkpoints/*
