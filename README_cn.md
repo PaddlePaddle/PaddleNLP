@@ -31,7 +31,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2022.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
+* 🔥 2022.5.18-19 B站[飞桨直播课](https://space.bilibili.com/476867757)，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流。
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
@@ -58,7 +58,7 @@
 
 ### 开箱即用的NLP工具集
 
-Taskflow提供丰富的**📦开箱即用 **的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**💪产业级的效果**与**⚡️极致的推理性能**。
+Taskflow提供丰富的 **📦开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供 **💪产业级的效果** 与 **⚡️极致的推理性能**。
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -192,7 +192,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 更多使用说明请参考[情感分析](./applications/sentiment_analysis)。
 
-#### 🎤 智能语音指令解析
+#### 🎙️ 智能语音指令解析
 
 集成了业界领先的语音识别（Automatic Speech Recognition, ASR）、信息抽取（Information Extraction, IE）等技术，打造智能一体化的语音指令系统，广泛应用于智能语音填单、智能语音交互、智能语音检索、手机APP语音唤醒等场景，提高人机交互效率。
 
