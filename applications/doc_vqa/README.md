@@ -19,7 +19,7 @@
 #### 环境要求
 
 - paddlepaddle >= 2.2.0
-- paddlenlp >= 2.3.0
+- paddlenlp
 
 安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。
 
