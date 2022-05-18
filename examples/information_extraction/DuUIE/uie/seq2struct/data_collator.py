@@ -114,11 +114,10 @@ class DynamicSSIGenerator():
         """
         schema_ordered_dict = OrderedDict()
         for name in schema_name_list:
-            # tokenizer.encode("人物")
-            encoded_name = tokenizer.encode(name)
-            # {'input_ids': [8, 122, 1]}
-            #   -> [8, 122]
-            schema_ordered_dict[name] = encoded_name["input_ids"][:-1:]
+            # tokenizer.encode("人物") -> [8, 122]
+            encoded_name = tokenizer.encode(
+                name, add_special_tokens=False, return_token_type_ids=None)
+            schema_ordered_dict[name] = encoded_name["input_ids"]
         return schema_ordered_dict
 
     @staticmethod

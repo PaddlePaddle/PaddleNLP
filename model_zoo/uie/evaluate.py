@@ -52,7 +52,6 @@ def evaluate(model, metric, data_loader):
 
 def do_eval():
     encoding_model = MODEL_MAP[args.model]['encoding_model']
-    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
 
     tokenizer = AutoTokenizer.from_pretrained(encoding_model)
     model = UIE.from_pretrained(args.model_path)
@@ -82,9 +81,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
-    parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
+    parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medical-base"], type=str, default="uie-base", help="Specify the pretrained model.")
 
     args = parser.parse_args()
     # yapf: enable

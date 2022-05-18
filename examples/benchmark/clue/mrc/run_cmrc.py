@@ -181,9 +181,9 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
 
     mode = 'validation' if do_eval else 'test'
     if do_eval:
-        filename = 'prediction_validation.json'
+        filename = os.path.join(args.output_dir, 'prediction_validation.json')
     else:
-        filename = 'cmrc2018_predict.json'
+        filename = os.path.join(args.output_dir, 'cmrc2018_predict.json')
     with open(filename, "w", encoding='utf-8') as writer:
         writer.write(
             json.dumps(
@@ -228,7 +228,7 @@ def run(args):
     set_seed(args)
 
     train_examples, dev_examples, test_examples = load_dataset(
-        'cmrc2018', split=["train", "validation", "test"])
+        'clue', 'cmrc2018', split=["train", "validation", "test"])
 
     column_names = train_examples.column_names
     if rank == 0:

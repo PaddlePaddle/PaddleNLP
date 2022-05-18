@@ -17,6 +17,7 @@ limitations under the License. */
 #include <Python.h>
 
 #include "core/tokenizer.h"
+#include "decoders/decoders.h"
 #include "glog/logging.h"
 #include "models/wordpiece.h"
 #include "normalizers/normalizers.h"
@@ -212,14 +213,14 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
   PyDict_SetItem(
       py_dict, ToPyObject("pad_token"), ToPyObject(pad_method.pad_token_));
   if (pad_method.pad_to_mutiple_of > 0) {
-      PyDict_SetItem(py_dict,
-        ToPyObject("pad_to_multiple_of"),
-        ToPyObject(pad_method.pad_to_mutiple_of));
+    PyDict_SetItem(py_dict,
+                   ToPyObject("pad_to_multiple_of"),
+                   ToPyObject(pad_method.pad_to_mutiple_of));
   } else {
-      Py_INCREF(Py_None);
-      PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
+    Py_INCREF(Py_None);
+    PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);
   }
-  
+
   PyDict_SetItem(
       py_dict,
       ToPyObject("direction"),
@@ -227,8 +228,7 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                                                                    : "left"));
   if (pad_method.strategy_ == core::PadStrategy::BATCH_LONGEST) {
     Py_INCREF(Py_None);
-    PyDict_SetItem(
-        py_dict, ToPyObject("length"), Py_None);
+    PyDict_SetItem(py_dict, ToPyObject("length"), Py_None);
   } else {
     PyDict_SetItem(
         py_dict, ToPyObject("length"), ToPyObject(pad_method.pad_len_));
@@ -256,13 +256,37 @@ static PyObject* TokenizerPropertiesGetTruncation(TokenizerObject* self,
     PyDict_SetItem(
         py_dict, ToPyObject("strategy"), ToPyObject("longest_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_FIRST) {
-    PyDict_SetItem(
-        py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
+    PyDict_SetItem(py_dict, ToPyObject("strategy"), ToPyObject("only_first"));
   } else if (trunc_method.strategy_ == core::TruncStrategy::ONLY_SECOND) {
-    PyDict_SetItem(
-        py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
+    PyDict_SetItem(py_dict, ToPyObject("strategy"), ToPyObject("only_second"));
   }
   return py_dict;
+}
+
+static PyObject* TokenizerPropertiesGetDecoder(TokenizerObject* self,
+                                               void* closure) {
+  py::object py_obj = py::cast(self->tokenizer.GetDecoderPtr());
+  py_obj.inc_ref();
+  return py_obj.ptr();
+}
+
+static int TokenizerPropertiesSetDecoder(TokenizerObject* self,
+                                         PyObject* value,
+                                         void* closure) {
+  TOKENIZERS_TRY
+  py::handle py_obj(value);
+  int ret = 0;
+  if (pybind11::type::of(py_obj).is(py::type::of<decoders::WordPiece>())) {
+    const auto& decoder = py_obj.cast<const decoders::WordPiece&>();
+    self->tokenizer.SetDecoder(decoder);
+  } else if (py_obj.is(py::none())) {
+    self->tokenizer.ReleaseDecoder();
+  } else {
+    ret = 1;
+    throw std::runtime_error("Need to assign the object of Decoder");
+  }
+  return ret;
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NEG
 }
 
 struct PyGetSetDef tokenizer_variable_properties[] = {
@@ -294,6 +318,11 @@ struct PyGetSetDef tokenizer_variable_properties[] = {
     {"truncation",
      (getter)TokenizerPropertiesGetTruncation,
      nullptr,
+     nullptr,
+     nullptr},
+    {"decoder",
+     (getter)TokenizerPropertiesGetDecoder,
+     (setter)TokenizerPropertiesSetDecoder,
      nullptr,
      nullptr},
     {nullptr, nullptr, nullptr, nullptr, nullptr}};
@@ -877,7 +906,7 @@ static PyObject* EncodeBatch(TokenizerObject* self,
     }
     std::vector<core::Encoding> result_encodings;
     self->tokenizer.EncodeBatchStrings(
-        batch_encode_input, add_special_tokens, &result_encodings);
+        batch_encode_input, &result_encodings, add_special_tokens);
     py::object py_obj = py::cast(result_encodings);
     py_obj.inc_ref();
     return py_obj.ptr();
@@ -1078,6 +1107,93 @@ static PyObject* FromFile(TokenizerObject* self,
   TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
 }
 
+// def decode(self, ids, skip_special_tokens=True):
+static PyObject* Decode(TokenizerObject* self,
+                        PyObject* args,
+                        PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_ids = NULL;
+  PyObject* kw_skip_special_tokens = NULL;
+  bool flag_kwargs = false;
+  if (kwargs) flag_kwargs = true;
+  static char* kwlist[] = {
+      const_cast<char*>("ids"), const_cast<char*>("skip_special_tokens"), NULL};
+  bool flag_ = PyArg_ParseTupleAndKeywords(
+      args, kwargs, "|OO", kwlist, &kw_ids, &kw_skip_special_tokens);
+  bool skip_special_tokens = true;
+  Py_ssize_t args_num = PyTuple_Size(args);
+  VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
+          << ", flag_: " << flag_;
+  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
+    if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
+      skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
+    }
+    auto ids = CastPyArg2VectorOfInt<uint>(kw_ids, 0);
+    std::string result;
+    self->tokenizer.Decode(ids, &result, skip_special_tokens);
+    return ToPyObject(result);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
+// def decode_batch(self, sequences, skip_special_tokens=True):
+static PyObject* DecodeBatch(TokenizerObject* self,
+                             PyObject* args,
+                             PyObject* kwargs) {
+  TOKENIZERS_TRY
+  PyObject* kw_sequences = NULL;
+  PyObject* kw_skip_special_tokens = NULL;
+  bool flag_kwargs = false;
+  if (kwargs) flag_kwargs = true;
+  static char* kwlist[] = {const_cast<char*>("sequences"),
+                           const_cast<char*>("skip_special_tokens"),
+                           NULL};
+  bool flag_ = PyArg_ParseTupleAndKeywords(
+      args, kwargs, "|OO", kwlist, &kw_sequences, &kw_skip_special_tokens);
+  bool skip_special_tokens = true;
+  Py_ssize_t args_num = PyTuple_Size(args);
+  VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
+          << ", flag_: " << flag_;
+  if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
+    if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
+      skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
+    }
+    std::vector<std::vector<uint>> batch_ids;
+    PyObject* item = nullptr;
+    if (PyTuple_Check(kw_sequences)) {
+      Py_ssize_t len = PyTuple_Size(kw_sequences);
+      for (Py_ssize_t i = 0; i < len; i++) {
+        item = PyTuple_GetItem(kw_sequences, i);
+        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint>(item, 0));
+      }
+    } else if (PyList_Check(kw_sequences)) {
+      Py_ssize_t len = PyList_Size(kw_sequences);
+      for (Py_ssize_t i = 0; i < len; i++) {
+        item = PyList_GetItem(kw_sequences, i);
+        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint>(item, 0));
+      }
+    } else {
+      std::ostringstream oss;
+      oss << "Args sequences need to be int of list or tuple";
+      throw std::runtime_error(oss.str());
+    }
+    std::vector<std::string> result;
+    self->tokenizer.DecodeBatch(batch_ids, &result, skip_special_tokens);
+    return ToPyObject(result);
+  } else {
+    std::ostringstream oss;
+    oss << "Expected number of arguments is from 1 to 2, but recive "
+        << args_num;
+    throw std::runtime_error(oss.str());
+  }
+  TOKENIZERS_CATCH_AND_THROW_RETURN_NULL
+}
+
 PyMethodDef tokenizer_variable_methods[] = {
     {"add_special_tokens",
      (PyCFunction)(void (*)(void))AddSpecialTokens,
@@ -1117,6 +1233,14 @@ PyMethodDef tokenizer_variable_methods[] = {
      NULL},
     {"encode_batch",
      (PyCFunction)(void (*)(void))EncodeBatch,
+     METH_VARARGS | METH_KEYWORDS,
+     NULL},
+    {"decode",
+     (PyCFunction)(void (*)(void))Decode,
+     METH_VARARGS | METH_KEYWORDS,
+     NULL},
+    {"decode_batch",
+     (PyCFunction)(void (*)(void))DecodeBatch,
      METH_VARARGS | METH_KEYWORDS,
      NULL},
     {"id_to_token",

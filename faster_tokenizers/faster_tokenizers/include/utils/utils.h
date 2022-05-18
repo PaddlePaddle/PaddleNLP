@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 
@@ -24,6 +25,13 @@ inline void GetVocabFromFiles(const std::string& files,
                               std::unordered_map<std::string, uint>* vocab) {
   const static std::string WHITESPACE = " \n\r\t\f\v";
   std::ifstream fin(files);
+  if (!fin.good()) {
+    std::cerr << "The vocab file " << files
+              << " seems to be unable to access"
+                 " or non-exists, please check again. "
+              << std::endl;
+    return;
+  }
   vocab->clear();
   int i = 0;
   constexpr int MAX_BUFFER_SIZE = 256;
@@ -41,6 +49,27 @@ inline void GetVocabFromFiles(const std::string& files,
     if (word_str != "") {
       (*vocab)[word_str] = i++;
     }
+  }
+}
+
+inline bool StringReplace(std::string* str,
+                          const std::string& from,
+                          const std::string& to) {
+  size_t start_pos = str->find(from);
+  if (start_pos == std::string::npos) return false;
+  str->replace(start_pos, from.length(), to);
+  return true;
+}
+
+inline void StringReplaceAll(std::string* str,
+                             const std::string& from,
+                             const std::string& to) {
+  if (from.empty()) return;
+  size_t start_pos = 0;
+  while ((start_pos = str->find(from, start_pos)) != std::string::npos) {
+    str->replace(start_pos, from.length(), to);
+    start_pos += to.length();  // In case 'to' contains 'from', like replacing
+                               // 'x' with 'yx'
   }
 }
 

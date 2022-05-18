@@ -516,3 +516,35 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             self.backend_tokenizer.save(tokenizer_file)
             file_names = file_names + (tokenizer_file, )
         return file_names
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        """
+        Converts a sequence of tokens in a single string. The most simple way to do it is `" ".join(tokens)` but we
+        often want to remove sub-word tokenization artifacts at the same time.
+
+        Args:
+            tokens (`List[str]`): The token to join in a string.
+
+        Returns:
+            `str`: The joined tokens.
+        """
+        return self.backend_tokenizer.decoder.decode(tokens)
+
+    def _decode(self,
+                token_ids: Union[int, List[int]],
+                skip_special_tokens: bool=False,
+                clean_up_tokenization_spaces: bool=True,
+                **kwargs) -> str:
+        self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer",
+                                                       False)
+
+        if isinstance(token_ids, int):
+            token_ids = [token_ids]
+        text = self._tokenizer.decode(
+            token_ids, skip_special_tokens=skip_special_tokens)
+
+        if clean_up_tokenization_spaces:
+            clean_text = self.clean_up_tokenization(text)
+            return clean_text
+        else:
+            return text
