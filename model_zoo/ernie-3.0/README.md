@@ -476,7 +476,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">UER-py/Chinese-RoBERTa (L6-H768)</span>
+                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">66.67</span>

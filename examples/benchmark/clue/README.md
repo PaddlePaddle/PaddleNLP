@@ -474,7 +474,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">UER-py/Chinese-RoBERTa (L6-H768)</span>
+                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">66.67</span>
@@ -550,10 +550,10 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | TinyBERT<sub>6</sub> ,Chinese    | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 3e-5,24 | 2e-5,24       |
 | RoFormerV2 Small                 | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
 | HLF/RBT6, Chinese                | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
-| UER-py/Chinese-RoBERTa (L6-H768) | 2e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 5e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
+| UER/Chinese-RoBERTa (L6-H768) | 2e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 5e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
 
 
-其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0` 、`TinyBERT6, Chinese`、`UER-py/Chinese-RoBERTa (L6-H768)` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 
 ## 一键复现模型效果
