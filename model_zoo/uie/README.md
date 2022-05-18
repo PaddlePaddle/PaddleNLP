@@ -11,11 +11,10 @@
 
 ## 1. 模型简介
 
-[Universal Information Extraction (UIE)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键信息抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
+[Universal Information Extraction (UIE)](https://arxiv.org/pdf/2203.12277.pdf)：百度提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于Prompt的信息抽取多任务统一建模方式，通过大规模多任务预训练学习的通用抽取能力，可以实现不限定行业领域和抽取目标，零样本快速冷启动。针对复杂抽取需求，标注少量数据微调可完成任务适配，大大降低标注门槛和成本。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
-    <p>图1 模型结构图 <p/>
 </div>
 
 #### UIE的优势
@@ -26,28 +25,33 @@
 
 - **效果领先**：开放域信息抽取在多种场景，多种任务上，均有不俗的表现。
 
+#### CCKS 2022 通用信息抽取比赛
+
+为了进一步探索通用信息抽取的边界，我们举办了CCKS 2022 千言通用信息抽取竞赛评测（2022/03/30 - 2022/07/31）。
+
+- [报名链接](https://aistudio.baidu.com/aistudio/competition/detail/161/0/introduction)
+- [基线代码](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/DuUIE)
+
 <a name="应用场景"></a>
 
-## 2. 应用场景
+## 2. UIEPrompt统一建模示例
 
-UIE可以从自然语言文本中，抽取出结构化的关键字段信息，以下是UIE在医疗、金融等领域的应用示例。
-
-#### 医疗
-
-在医疗场景下，医生需要从病历中快速重要信息以便分析病人病情，UIE可将专病信息进行结构化处理，快速抽取病历内容中的检查内容、炎症部位、结节大小等信息，大幅提升医务人员对患者的诊断效率以及准确率，协助医务人员高效诊断病情。
+#### 实体抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166708474-8f05bdba-143f-4d11-8bd5-8ce26ab7c987.png height=300 hspace='10'/>
-    <p>图2 医疗场景示例<p/>
+    <img src=https://user-images.githubusercontent.com/40840292/168986057-7990188c-a1b0-424b-8add-8a017a8893f7.png height=300 hspace='10'/>
 </div>
 
-#### 金融
-
-在金融场景下，工作人员想要整理一份资产评估证明，UIE可以根据抽取内容自定义抽取目标，大幅提升工作人员的工作效率及准确率，协助工作人员对数据进行整理和调研。
+#### 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166708694-e2671e29-3c02-4e29-9823-9fbdfd117eb6.png height=400 hspace='10'/>
-    <p>图3 金融场景示例<p/>
+    <img src=https://user-images.githubusercontent.com/40840292/168986213-e1fb11c6-9551-4c11-8a1e-766004bdfa95.png height=200 hspace='10'/>
+</div>
+
+#### 情感分析
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/168986336-c44ddb7a-760a-4597-aad9-78428e0fd35d.png height=200 hspace='10'/>
 </div>
 
 <a name="开箱即用"></a>
@@ -60,21 +64,37 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 
->>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for entity extraction
 >>> ie = Taskflow('information_extraction', schema=schema)
->>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
-[{'时间': [{'end': 6,
-          'probability': 0.9857378532924486,
-          'start': 0,
-          'text': '2月8日上午'}],
-  '赛事名称': [{'end': 23,
-            'probability': 0.8503089953268272,
-            'start': 6,
-            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
-  '选手': [{'end': 31,
-          'probability': 0.8981548639781138,
-          'start': 28,
-          'text': '谷爱凌'}]}]
+>>> pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
+[{'竞赛名称': [{'end': 13,
+            'probability': 0.7825402622754041,
+            'relations': {'主办方': [{'end': 22,
+                                  'probability': 0.8421710521379353,
+                                  'start': 14,
+                                  'text': '中国中文信息学会'},
+                                  {'end': 30,
+                                  'probability': 0.7580801847701935,
+                                  'start': 23,
+                                  'text': '中国计算机学会'}],
+                          '已举办次数': [{'end': 82,
+                                    'probability': 0.4671295049136148,
+                                    'start': 80,
+                                    'text': '4届'}],
+                          '承办方': [{'end': 39,
+                                  'probability': 0.8292706618236352,
+                                  'start': 35,
+                                  'text': '百度公司'},
+                                  {'end': 72,
+                                  'probability': 0.6193477885474685,
+                                  'start': 56,
+                                  'text': '中国计算机学会自然语言处理专委会'},
+                                  {'end': 55,
+                                  'probability': 0.7000497331473241,
+                                  'start': 40,
+                                  'text': '中国中文信息学会评测工作委员会'}]},
+            'start': 0,
+            'text': '2022语言与智能技术竞赛'}]}]
 ```
 
 更多不同任务的使用方法请参考[Taskflow信息抽取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E4%BF%A1%E6%81%AF%E6%8A%BD%E5%8F%96)
