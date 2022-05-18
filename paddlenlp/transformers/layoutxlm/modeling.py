@@ -721,7 +721,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         return embeddings
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
-        if image is not None: 
+        if image is not None:
             visual_embeddings = self.visual_proj(
                 self.visual(image.astype(paddle.float32)))
         position_embeddings = self.embeddings.position_embeddings(position_ids)
