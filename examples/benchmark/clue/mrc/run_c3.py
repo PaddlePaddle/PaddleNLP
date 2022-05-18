@@ -77,6 +77,12 @@ def parse_args():
         type=float,
         help="Linear warmup proportion over total steps.")
     parser.add_argument(
+        "--max_steps",
+        default=-1,
+        type=int,
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+    )
+    parser.add_argument(
         "--adam_epsilon",
         default=1e-6,
         type=float,
@@ -288,11 +294,16 @@ def run(args):
             batch_sampler=dev_batch_sampler,
             collate_fn=batchify_fn,
             return_list=True)
+
         num_training_steps = int(
-            len(train_data_loader) * args.num_train_epochs /
-            args.gradient_accumulation_steps)
+            args.max_steps /
+            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+                len(train_data_loader) * args.num_train_epochs /
+                args.gradient_accumulation_steps)
+
+        warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
         lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps, 0)
+                                             num_training_steps, warmup)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -384,9 +395,9 @@ def run(args):
             preds = paddle.argmax(logits, axis=1).numpy().tolist()
             for pred in preds:
                 result[str(idx)] = pred
-                idx += 1
                 j = json.dumps({"id": idx, "label": pred})
                 f.write(j + "\n")
+                idx += 1
 
 
 def print_arguments(args):

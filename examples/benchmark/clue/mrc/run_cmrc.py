@@ -92,6 +92,12 @@ def parse_args():
         help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
+        "--warmup_steps",
+        default=0,
+        type=int,
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
+    )
+    parser.add_argument(
         "--warmup_proportion",
         default=0.1,
         type=float,
@@ -401,8 +407,9 @@ def run(args):
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_proportion)
+        warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps, warmup)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
