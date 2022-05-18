@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 #include <memory>  // For shared_ptr
+#include <vector>
 
 #include "boost/variant.hpp"
 #include "core/added_vocabulary.h"
@@ -44,6 +45,10 @@ namespace postprocessors {
 class PostProcessor;
 }  // postprocessors
 
+namespace decoders {
+class Decoder;
+};
+
 namespace core {
 
 class AddedVocabulary;
@@ -60,6 +65,7 @@ public:
         normalizer_(nullptr),
         pretokenizer_(nullptr),
         post_processor_(nullptr),
+        decoder_(nullptr),
         use_padding_(true),
         use_truncation_(true) {}
   template <typename ModelType>
@@ -68,6 +74,7 @@ public:
         normalizer_(nullptr),
         pretokenizer_(nullptr),
         post_processor_(nullptr),
+        decoder_(nullptr),
         use_padding_(true),
         use_truncation_(true) {}
 
@@ -84,6 +91,26 @@ public:
   }
   void ReleasePreTokenizer();
   pretokenizers::PreTokenizer* GetPreTokenizer() const;
+
+  template <typename ModelType>
+  void SetModel(const ModelType& model) {
+    model_ = std::make_shared<ModelType>(model);
+  }
+  models::Model* GetModelPtr() const;
+
+  template <typename PostProcessorType>
+  void SetPostProcessor(const PostProcessorType& post_processor) {
+    post_processor_ = std::make_shared<PostProcessorType>(post_processor);
+  }
+  void ReleasePostProcessor();
+  postprocessors::PostProcessor* GetPostProcessorPtr() const;
+
+  template <typename DecoderType>
+  void SetDecoder(const DecoderType& decoder) {
+    decoder_ = std::make_shared<DecoderType>(decoder);
+  }
+  void ReleaseDecoder();
+  decoders::Decoder* GetDecoderPtr() const;
 
   void SetTruncMethod(const TruncMethod& trunc_method);
   void DisableTruncMethod();
@@ -102,19 +129,6 @@ public:
                        uint* length,
                        uint* pad_to_multiple_of);
   PadMethod GetPadMethod() const;
-
-  template <typename ModelType>
-  void SetModel(const ModelType& model) {
-    model_ = std::make_shared<ModelType>(model);
-  }
-  models::Model* GetModelPtr() const;
-
-  template <typename PostProcessorType>
-  void SetPostProcessor(const PostProcessorType& post_processor) {
-    post_processor_ = std::make_shared<PostProcessorType>(post_processor);
-  }
-  void ReleasePostProcessor();
-  postprocessors::PostProcessor* GetPostProcessorPtr() const;
 
   Vocab GetVocab(bool with_added_vocabulary = true) const;
   size_t GetVocabSize(bool with_added_vocabulary = true) const;
@@ -174,6 +188,14 @@ public:
   bool GetUseTruncation() const;
   bool GetUsePadding() const;
 
+  // Decode: From tokens to a complete string
+  void Decode(const std::vector<uint>& token_ids,
+              std::string* result,
+              bool skip_special_tokens = true) const;
+  void DecodeBatch(const std::vector<std::vector<uint>>& batch_token_ids,
+                   std::vector<std::string>* results,
+                   bool skip_special_tokens = true) const;
+
 private:
   Encoding EncodeTextToEncoding(const std::vector<uint>& word_idx,
                                 uint type_id,
@@ -183,10 +205,12 @@ private:
   std::shared_ptr<normalizers::Normalizer> normalizer_;
   std::shared_ptr<pretokenizers::PreTokenizer> pretokenizer_;
   std::shared_ptr<models::Model> model_;
+  std::shared_ptr<postprocessors::PostProcessor> post_processor_;
+  std::shared_ptr<decoders::Decoder> decoder_;
+
   TruncMethod trunc_method_;
   PadMethod pad_method_;
   AddedVocabulary added_vocabulary_;
-  std::shared_ptr<postprocessors::PostProcessor> post_processor_;
   bool use_truncation_;
   bool use_padding_;
   // TODO(zhoushunjie): Implement Decoder later.

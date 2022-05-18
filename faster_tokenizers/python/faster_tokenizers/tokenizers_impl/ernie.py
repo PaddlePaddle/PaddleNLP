@@ -18,6 +18,7 @@ from faster_tokenizers.normalizers import BertNormalizer
 from faster_tokenizers.pretokenizers import BertPreTokenizer
 from faster_tokenizers.models import WordPiece
 from faster_tokenizers.postprocessors import BertPostProcessor
+from faster_tokenizers import decoders
 from faster_tokenizers import Tokenizer
 
 __all__ = ['ErnieFasterTokenizer']
@@ -78,6 +79,7 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
             tokenizer.postprocessor = BertPostProcessor(
                 (str(sep_token), sep_token_id), (str(cls_token), cls_token_id))
 
+        tokenizer.decoder = decoders.WordPiece(prefix=wordpieces_prefix)
         if max_sequence_len == None:
             tokenizer.disable_truncation()
         else:
