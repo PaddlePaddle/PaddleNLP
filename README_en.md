@@ -30,7 +30,7 @@
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](). Welcome to join us!
+* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
@@ -40,7 +40,7 @@
   * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support *NER*, *Relation Extraction*, *Event Extraction* and *Sentiment Analysis* simultaneously.
   * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
   * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
-  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fastest parallel inference with 11B model for open domain chatbot.
+  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with ⚡**FasterGeneration**⚡, the *11B open-domain SOTA chatbot model* can be deployed on multi-GPU and do parallel inference easily.
 
 ## Features
 
@@ -192,7 +192,7 @@ We build an opinion extraction system for product review and fine-grained sentim
 
 For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
 
-#### 🎤 Speech Command Analysis
+#### 🎙️ Speech Command Analysis
 
 Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios.
 
