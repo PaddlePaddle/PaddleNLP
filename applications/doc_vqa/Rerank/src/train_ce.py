@@ -223,12 +223,6 @@ def main(args):
         train_exe = None
 
     test_exe = exe
-#    if args.do_val or args.do_test:
-#        if args.use_multi_gpu_test:
-#            test_exe = fluid.ParallelExecutor(
-#                use_cuda=args.use_cuda,
-#                main_program=test_prog,
-#                share_vars_from=train_exe)
 
     current_epoch = 0
     steps = 0
@@ -243,7 +237,6 @@ def main(args):
         while True:
             try:
                 steps += 1
-#                log.info("step: %d" % steps)
     
                 if fleet.worker_index() != 0:
                     train_exe.run(fetch_list=[], program=train_program)
@@ -289,7 +282,6 @@ def main(args):
                                              "step_" + str(steps))
                     fluid.io.save_persistables(exe, save_path, fleet._origin_program)
     
-#                if steps % args.validation_steps == 0 or last_epoch != current_epoch:
                 if steps % args.validation_steps == 0:
                     # evaluate dev set
                     if args.do_val:
@@ -318,8 +310,6 @@ def main(args):
 
     # final eval on test set
     if args.do_test:
-        # predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
-        #                 current_epoch, steps)
         predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars)
 
     # final eval on dianostic, hack for glue-ax

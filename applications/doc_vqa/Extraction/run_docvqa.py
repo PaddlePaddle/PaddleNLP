@@ -17,9 +17,6 @@ from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
 from model import LayoutXLMForTokenClassification_with_CRF
 from docvqa import DocVQA
 
-
-# Todo: delete the following line after the release of v2.2
-#sys.path.insert(0, "../../../")
 logger = logging.getLogger(__name__)
 
 
@@ -177,7 +174,6 @@ def main(args):
     for epoch_id in range(args.num_train_epochs):
         print('epoch id:{}'.format(epoch_id))
         for step, batch in enumerate(train_dataloader):
-            # print('step:{}'.format(step))
             model.train()
             input_ids, input_mask, segment_ids, bboxes, labels = batch
             if input_ids.shape[0] != args.per_gpu_train_batch_size:
@@ -330,13 +326,9 @@ def decode(tokenizer, res):
         if len(''.join(text_label)) > 10:
             all_f1.append(f1)
     if len(all_f1)>0:
-        # print(len(all_f1))
         print("F1: ", sum(all_f1) / len(all_f1))
     
     assert len(text_res) == len(save_f1)
-    # with open('decode_text.txt', 'w', encoding='utf8') as f:
-    #     for item, f1 in zip(text_res, save_f1):
-    #         f.write(item[0] + '\tlabel:' + item[1] + '\tpredict:' + item[2] + '\t' + str(f1) + '\n')
     return text_res
 
 
@@ -413,9 +405,7 @@ def evaluate(args,
             line_json['predict_answer'] = line_text[2]
             all_boxes = line_res[3]
             label_bbox_index, predict_bbox_index = line_text[3], line_text[4]
-            # the bboxes for the label and predict answers
             label_bboxes, predict_bboxes = [], []
-            # for i in range(all_boxes.shape[0]):
             for i in range(len(line_label['bboxes'])):
                 if i in label_bbox_index:
                     label_bboxes.append(line_label['bboxes'][i])

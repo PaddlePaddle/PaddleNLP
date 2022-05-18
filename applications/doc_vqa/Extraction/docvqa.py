@@ -9,9 +9,8 @@ from paddle.io import Dataset
 from tqdm import tqdm
 import collections
 
-sys.path.insert(0, "../../../")
+sys.path.insert(0, "../")
 
-# __all__ = ["XFUN"]
 
 class DocVQAExample(object):
     def __init__(self, q_id,
@@ -141,9 +140,7 @@ class DocVQA(Dataset):
         features = []
         total = len(examples)
         for (example_index, example) in enumerate(examples):
-            # print ("Load {:.3f}%% Examples".format(example_index / total * 100))
             query_tokens = tokenizer.tokenize(example.question)
-            # print('query_tokens: {}'.format(query_tokens))
             if len(query_tokens) > max_query_length:
                 query_tokens = query_tokens[0:max_query_length]
 
@@ -174,9 +171,6 @@ class DocVQA(Dataset):
                 # start_offset += min(length, doc_stride)
                 start_offset += length
 
-            #TODO Remove later
-            #if len(doc_spans)>1:
-            #          continue
             spans_input_ids = []
             spans_input_mask = []
             spans_segment_ids = []
@@ -189,7 +183,6 @@ class DocVQA(Dataset):
                 boxes_tokens = []
                 token_is_max_context = {}
                 segment_ids = []
-                # p_index = []
                 tokens.append(start_token)
                 boxes_tokens.append(cls_token_box)
                 segment_ids.append(0)
@@ -252,7 +245,6 @@ class DocVQA(Dataset):
                 tokens = []
                 boxes_tokens = []
                 segment_ids = []
-                # p_index = []
                 tokens.append(start_token)
                 boxes_tokens.append(cls_token_box)
                 segment_ids.append(0)
@@ -282,26 +274,18 @@ class DocVQA(Dataset):
                 spans_input_mask.append(input_mask)
                 spans_segment_ids.append(segment_ids)
                 spans_boxes_tokens.append(boxes_tokens)
-                # spans_p_index.append(p_index)
 
             # padding labels
             labels = example.labels
             sep_id = tokenizer.convert_tokens_to_ids(end_token)
             labels = ["O"] * (spans_input_ids[0].index(sep_id) + 1) + labels
-            # print('spans_input_ids: {}'.format(spans_input_ids[0]))
-            # print('labels:{}'.format(labels))
             if len(labels) > 512:
                 labels = labels[:512]
             
             if len(labels)<512:
                 labels += ["O"] * (512 - len(labels))
             assert len(spans_input_ids[0]) == len(labels)
-            # if len(labels) > (max_tokens_for_doc*max_span_num):
-            #     labels = labels[0:max_tokens_for_doc*max_span_num]
-            # else:
-            #     labels += ["O"] * (max_tokens_for_doc*max_span_num-len(labels))
 
-            # labels += ["O"] * (max_doc_length - max_tokens_for_doc*max_span_num)
             label_ids = []
             for lid, l in enumerate(labels):
                 if l not in label_map:
@@ -329,7 +313,6 @@ class DocVQA(Dataset):
         """Creates examples for the training and dev sets."""
         examples = []
         for sample in tqdm(data, total=len(data)):
-            # sample = list(sample.values())[0]
             q_id = sample["id"]
             image = sample["id"] # No Use
             question = sample["question"]
@@ -338,7 +321,6 @@ class DocVQA(Dataset):
             answer = sample['answer']
             # only for the first label
             labels = sample['labels'][:480]
-            # labels = ['O'] * 480
 
             x_min, y_min = min(doc_boxes, key=lambda x: x[0])[0], min(doc_boxes, key=lambda x: x[2])[2]
             x_max, y_max = max(doc_boxes, key=lambda x: x[1])[1], max(doc_boxes, key=lambda x: x[3])[3]

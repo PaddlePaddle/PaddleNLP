@@ -5,12 +5,13 @@ import numpy as np
 import re
 import time
 import sys
-from multiprocessing import  Process, Queue
+from multiprocessing import Process, Queue
 
 sys.path.insert(0, "../Extraction")
 
 from paddlenlp.transformers import LayoutXLMTokenizer
 tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
+
 
 def get_all_chars(tokenizer):
     all_chr = []
@@ -24,6 +25,7 @@ def get_all_chars(tokenizer):
             all_chr.append(i)
     return all_chr
 
+
 def merge_bbox(tok_bboxes):
     min_gx = min([box[0] for box in tok_bboxes])
     max_gx = max([box[1] for box in tok_bboxes])
@@ -36,10 +38,10 @@ def merge_bbox(tok_bboxes):
     for box in tok_bboxes:
         x_min, x_max, y_min, y_max = box
         height_m += y_max - y_min
-        width_m += x_max -x_min
+        width_m += x_max - x_min
     height_m = height_m / len(tok_bboxes)
-    # width_m = width_m / len(tok_bboxes)
-    if (height_g - height_m) < 0.5*height_m and width_g - width_m < 0.1*width_m:
+    if (height_g - height_m
+        ) < 0.5 * height_m and width_g - width_m < 0.1 * width_m:
         return False, [min_gx, max_gx, min_gy, max_gy]
     else:
         return True, tok_bboxes[0]
@@ -51,7 +53,7 @@ def xlm_parse(new_paragraphs, ocr_index, tokenizer, q):
     doc_tokens, doc_bboxes = [], []
     all_ans_tokens = []
     all_chr = get_all_chars(tokenizer)
-    
+
     try:
         new_tokens, new_token_boxes = [], []
         for item in ocr_res:
@@ -89,20 +91,20 @@ def xlm_parse(new_paragraphs, ocr_index, tokenizer, q):
                         tok_len = 1
                     else:
                         for j in range(i, len(span_text)):
-                            if span_text[j].lower() == span_tokens[tid+1][0]:
+                            if span_text[j].lower() == span_tokens[tid + 1][0]:
                                 break
                         tok_len = j - i
             elif ord(span_text[i]) in all_chr:
                 if tid + 1 == len(span_tokens):
                     tok_len = 1
-                elif "°" in tok and "C" in span_tokens[tid+1]:
+                elif "°" in tok and "C" in span_tokens[tid + 1]:
                     tok_len = len(tok) - 1
                     if tok_len == 0:
                         doc_bboxes.append(span_bbox[i])
                         continue
                 elif span_text[i] == "ⅱ":
                     if tok == "ii":
-                        if span_text[i+1] != "i":
+                        if span_text[i + 1] != "i":
                             tok_len = len(tok) - 1
                         else:
                             tok_len = len(tok)
@@ -111,26 +113,31 @@ def xlm_parse(new_paragraphs, ocr_index, tokenizer, q):
                         if tok_len == 0:
                             doc_bboxes.append(span_bbox[i])
                             continue
-                elif "m" in tok and "2" == span_tokens[tid+1][0]:
+                elif "m" in tok and "2" == span_tokens[tid + 1][0]:
                     tok_len = len(tok) - 1
                     if tok_len == 0:
                         doc_bboxes.append(span_bbox[i])
                         continue
-                elif ord(span_text[i+1]) in all_chr:
+                elif ord(span_text[i + 1]) in all_chr:
                     tok_len = 1
                 else:
                     for j in range(i, len(span_text)):
-                        if span_text[j].lower() == span_tokens[tid+1][0]:
+                        if span_text[j].lower() == span_tokens[tid + 1][0]:
                             break
-                        if span_text[j].lower() == "，" and span_tokens[tid+1][0] == ",":
+                        if span_text[j].lower() == "，" and span_tokens[tid + 1][
+                                0] == ",":
                             break
-                        if span_text[j].lower() == "；" and span_tokens[tid+1][0] == ";":
+                        if span_text[j].lower() == "；" and span_tokens[tid + 1][
+                                0] == ";":
                             break
-                        if span_text[j].lower() == "）" and span_tokens[tid+1][0] == ")":
+                        if span_text[j].lower() == "）" and span_tokens[tid + 1][
+                                0] == ")":
                             break
-                        if span_text[j].lower() == "（" and span_tokens[tid+1][0] == "(":
+                        if span_text[j].lower() == "（" and span_tokens[tid + 1][
+                                0] == "(":
                             break
-                        if span_text[j].lower() == "￥" and span_tokens[tid+1][0] == "¥":
+                        if span_text[j].lower() == "￥" and span_tokens[tid + 1][
+                                0] == "¥":
                             break
 
                     tok_len = j - i
@@ -138,37 +145,35 @@ def xlm_parse(new_paragraphs, ocr_index, tokenizer, q):
             else:
                 if "�" == span_text[i]:
                     tok_len = len(tok) + 1
-                elif tok=="......" and "…" in span_text[i:i+6]:
+                elif tok == "......" and "…" in span_text[i:i + 6]:
                     tok_len = len(tok) - 2
-                elif "ⅱ" in span_text[i+len(tok)-1]:
+                elif "ⅱ" in span_text[i + len(tok) - 1]:
                     if tok == "i":
                         tok_len = 1
 
                     else:
                         tok_len = len(tok) - 1
-                elif "°" in tok and "C" in span_tokens[tid+1]:
+                elif "°" in tok and "C" in span_tokens[tid + 1]:
                     tok_len = len(tok) - 1
                 else:
                     tok_len = len(tok)
-            # print (tok, span_text[i:i+tok_len])
-            assert i+tok_len <= len(span_bbox)
-            tok_bboxes = span_bbox[i:i+tok_len]
+            assert i + tok_len <= len(span_bbox)
+            tok_bboxes = span_bbox[i:i + tok_len]
             _, merged_bbox = merge_bbox(tok_bboxes)
-                
+
             doc_bboxes.append(merged_bbox)
-            i = i + tok_len    
+            i = i + tok_len
     except:
         print('Error')
         span_tokens = ['▁'] * 512
-        doc_bboxes = [[0,0,0,0]] * 512
+        doc_bboxes = [[0, 0, 0, 0]] * 512
         all_ans_tokens = ['']
 
-    # labels += [span_type for tid in range(len(span_tokens))]
     labels = ['O'] * len(span_tokens)
-    
-    # assert len(doc_tokens) == len(doc_bboxes) and len(labels) == len(doc_tokens)
-    q.put((ocr_index, [span_tokens, doc_bboxes, all_ans_tokens, labels]), block=False )
-    # print(xlm_res.keys())
+
+    q.put((ocr_index, [span_tokens, doc_bboxes, all_ans_tokens, labels]),
+          block=False)
+
 
 def tokenize_ocr_res(ocr_reses):
     '''
@@ -212,7 +217,8 @@ def tokenize_ocr_res(ocr_reses):
                 tok_y_max = y_max
 
                 shift = tok_x_max
-                new_token_boxes.append([round(tok_x_min), round(tok_x_max), tok_y_min, tok_y_max])
+                new_token_boxes.append(
+                    [round(tok_x_min), round(tok_x_max), tok_y_min, tok_y_max])
                 new_tokens.append(char)
             new_paragraph.append({
                 "text": para["text"],
@@ -232,17 +238,24 @@ def process_multi_page(ocr_reses):
             page_id = int(para['page_id'])
             if page_id < min_page_id:
                 min_page_id = page_id
-            xmin, xmax, ymin, ymax = [para['bbox'][0][0], para['bbox'][1][0], para['bbox'][0][1], para['bbox'][2][1]]
-        
+            xmin, xmax, ymin, ymax = [
+                para['bbox'][0][0], para['bbox'][1][0], para['bbox'][0][1],
+                para['bbox'][2][1]
+            ]
+
             if ymax > max_page_height:
                 max_page_height = ymax
 
         for para in ocr_res:
-            para['bbox'][0][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][1][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][2][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][3][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            
+            para['bbox'][0][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][1][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][2][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][3][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+
     return min_page_id, max_page_height
 
 
@@ -256,8 +269,11 @@ def process_input(ocr_reses, tokenizer, save_path):
             page_id = int(para['page_id'])
             if page_id < min_page_id:
                 min_page_id = page_id
-            xmin, xmax, ymin, ymax = [para['bbox'][0][0], para['bbox'][1][0], para['bbox'][0][1], para['bbox'][2][1]]
-        
+            xmin, xmax, ymin, ymax = [
+                para['bbox'][0][0], para['bbox'][1][0], para['bbox'][0][1],
+                para['bbox'][2][1]
+            ]
+
             if ymax > max_page_height:
                 max_page_height = ymax
 
@@ -266,25 +282,26 @@ def process_input(ocr_reses, tokenizer, save_path):
         max_height_list.append(max_page_height)
 
         for para in ocr_res:
-            para['bbox'][0][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][1][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][2][1] += max_page_height * (int(para['page_id']) - min_page_id)
-            para['bbox'][3][1] += max_page_height * (int(para['page_id']) - min_page_id)
-    # min_page_id, max_page_height = process_multi_page(ocr_reses[:max_num])
+            para['bbox'][0][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][1][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][2][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
+            para['bbox'][3][1] += max_page_height * (
+                int(para['page_id']) - min_page_id)
     begin_time = time.time()
     new_paragraphs = tokenize_ocr_res(ocr_reses[:max_num])
-    # print('tokenizer ocr time: {}'.format(time.time() - begin_time))
-    # tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
     begin_time = time.time()
     input_examples = []
     process_list = []
-    begin_time=time.time()
+    begin_time = time.time()
     q = Queue()
     for i in range(max_num):
-        p = Process(target=xlm_parse,args=(new_paragraphs, i, tokenizer, q))
+        p = Process(target=xlm_parse, args=(new_paragraphs, i, tokenizer, q))
         p.start()
         process_list.append(p)
-    
+
     xlm_res = {}
     for p in process_list:
         ocr_index, content = q.get()
@@ -293,9 +310,8 @@ def process_input(ocr_reses, tokenizer, save_path):
         doc_tokens, doc_bboxes, all_ans_tokens, labels = xlm_res[i]
         doc_tokens.insert(0, '▁')
         doc_bboxes.insert(0, doc_bboxes[0])
-        # example2 = json.load(open('test_52.json', 'r', encoding='utf8'))
         example = {
-            "id" : "71f5c6e586e230a231bfee7cd3194efc",
+            "id": "71f5c6e586e230a231bfee7cd3194efc",
             "question": "",
             "image_id": "71f5c6e586e230a231bfee7cd3194efc",
             "url": "",
@@ -304,13 +320,11 @@ def process_input(ocr_reses, tokenizer, save_path):
             "answer": [""],
             "labels": labels
         }
-        # example = json.load(open('test.json', 'r', encoding='utf8'))
-        # print(example)
+
         input_examples.append(example)
-    
+
     for p in process_list:
         p.join()
-    # print(input_examples[0])
 
     with open(save_path, 'w', encoding='utf8') as f:
         for line in input_examples:
@@ -319,24 +333,27 @@ def process_input(ocr_reses, tokenizer, save_path):
 
     return input_examples, min_page_num_list, max_height_list
 
+
 def ocr_preprocess(img_dir):
     ocr = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=True)
     lines = []
-    num=len(os.listdir(img_dir))
+    num = len(os.listdir(img_dir))
     for i in range(1, num + 1):
-        filename=os.path.join(img_dir, f"demo_{i}.png")
+        filename = os.path.join(img_dir, f"demo_{i}.png")
         ocr_result = ocr.ocr(filename, cls=True)
         ocr_line = []
         for line in ocr_result:
-            ocr_line.append({"text": line[1][0], "bbox":line[0], "page_id":"1".zfill(5)})
+            ocr_line.append({
+                "text": line[1][0],
+                "bbox": line[0],
+                "page_id": "1".zfill(5)
+            })
         lines.append(ocr_line)
     return lines
+
 
 if __name__ == '__main__':
     img_dir = "./demo_pics"
     save_path = "./demo_ocr_res.json"
     ocr_reses = ocr_preprocess(img_dir)
     process_input(ocr_reses, tokenizer, save_path)
-    
-
-
