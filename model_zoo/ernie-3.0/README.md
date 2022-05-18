@@ -322,7 +322,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=4 align=center> 6L768H </td>
+                       <td rowspan=5 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -358,6 +358,44 @@
                         </td>  
                         <td style="text-align:center">
                           <span style="font-size:18px"><b>69.73</b></span>
+                        </td>
+                </tr>
+                <tr>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">HLF/RBT6, Chinese</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">69.74</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">73.15</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">56.62</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.68</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">79.26</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">73.15</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">75.00</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">80.04</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">62.26/84.72</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">78.26</span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.93</span>
                         </td>
                 </tr>
                 <tr>
@@ -437,41 +475,41 @@
                         </td>
                 </tr>
                 <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">RBT6, Chinese</span>
+                <td style="text-align:center">
+                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">69.74</span>
+                          <span style="font-size:18px">66.67</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
+                          <span style="font-size:18px">70.13</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">56.62</span>
+                          <span style="font-size:18px">56.41</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">59.68</span>
+                          <span style="font-size:18px">59.79</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">79.26</span>
+                          <span style="font-size:18px">77.38</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
+                          <span style="font-size:18px">71.86</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">75.00</span>
+                          <span style="font-size:18px">69.41</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">80.04</span>
+                          <span style="font-size:18px">76.73</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">62.26/84.72</span>
+                          <span style="font-size:18px">53.22/75.03</span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">78.26</span>
-                        </td>  
+                          <span style="font-size:18px">77.00</span>
+                        </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">59.93</span>
+                          <span style="font-size:18px">54.77</span>
                         </td>
                 </tr>
         <tbody>
