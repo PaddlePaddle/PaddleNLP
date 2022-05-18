@@ -18,7 +18,7 @@ import argparse
 
 import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmTokenizer
 
 sys.path.append('./')
@@ -85,8 +85,8 @@ class Predictor(object):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Stack(dtype='int64'),  # input_ids
-            Stack(dtype='int64'),  # token_type_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 

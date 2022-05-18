@@ -1,4 +1,4 @@
-[简体中文](./README_cn.md) | English
+简体中文 | [English](./README_en.md)
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
@@ -18,53 +18,57 @@
     <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
 </p>
 
+
 <h4 align="center">
-  <a href=#features> Features </a> |
-  <a href=#installation> Installation </a> |
-  <a href=#quick-start> Quick Start </a> |
-  <a href=#api-reference> API Reference </a> |
-  <a href=#community> Community </a>
+  <a href=#特性> 特性 </a> |
+  <a href=#安装> 安装 </a> |
+  <a href=#快速开始> 快速开始 </a> |
+  <a href=#api文档> API文档 </a> |
+  <a href=#社区交流> 社区交流 </a>
 </h4>
 
-**PaddleNLP** is an easy-to-use and powerful NLP library with awesome pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
+**PaddleNLP**是一款简单易用且功能强大的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者灵活定制的需求。
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model. Welcome to join us!
+* 🔥 2022.5.18-19直播课，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
   </div>
 
-* 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
+* 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
 
-  * 🔥Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on CLUE benchmark. Release [ERNIE-Health](./model_zoo/ernie-health), a biomedical SOTA pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE); Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
-  * 🔥Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
+  * 开源文心大模型 [**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在CLUE Benchmark上实现同规模模型中文最佳效果；新增中文医疗领域预训练模型 [ERNIE-Health](./model_zoo/ernie-health)；新增大规模百亿开放域对话预训练模型 PLATO-XL (11B)，并提供FasterGeneration高性能并行GPU加速⚡。
+  * 通用信息抽取技术 [**UIE**](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务；
 
-## Features
-
-#### <a href=#off-the-shelf-nlp-pre-built-task> 📦 Off-the-shelf NLP Pre-built Task </a>
-
-#### <a href=#awesome-chinese-pre-trained-model-zoo> 🤗 Awesome Chinese Pre-trained Model Zoo </a>
-
-#### <a href=#industrial-end-to-end-system-cases> 🎛️ Industrial End-to-end System Cases </a>
-
-#### <a href=#high-performance-distributed-training-and-inference> 🚀 High Performance Distributed Training and Inference </a>
+* 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 
-### Off-the-shelf NLP Pre-built Task 
+## 特性
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+#### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
+
+#### <a href=#丰富完备的中文模型库> 🤗 丰富完备的中文模型库 </a>
+
+#### <a href=#产业级端到端系统范例> 🎛️ 产业级端到端系统范例 </a>
+
+#### <a href=#高性能分布式训练与推理> 🚀 高性能分布式训练与推理 </a>
+
+
+### 开箱即用的NLP工具集
+
+Taskflow提供丰富的**📦开箱即用 **的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**💪产业级的效果**与**⚡️极致的推理性能**。
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
-For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
+更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
-### Awesome Chinese Pre-trained Model Zoo
+### 丰富完备的中文模型库
 
-#### 🀄 Comprehensive Chinese Transformer Models  
+#### 🀄 业界最全的中文预训练模型 
 
-We provide 45+ network architectures and over 500+ pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel API to **⚡FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
+精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型，既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过AutoModel API一键⚡高速下载⚡。
 
 ```python
 from paddlenlp.transformers import *
@@ -77,33 +81,35 @@ electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
-Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
+对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
 
 ```python
 import paddle
 from paddlenlp.transformers import *
 
 tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
-text = tokenizer('natural language processing')
+text = tokenizer('自然语言处理')
 
-# Semantic Representation
+# 语义表示
 model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# Text Classificaiton and Matching
+# 文本分类 & 句对匹配
 model = AutoModelForSequenceClassification.from_pretrained('ernie-3.0-medium-zh')
-# Sequence Labeling
+# 序列标注
 model = AutoModelForTokenClassification.from_pretrained('ernie-3.0-medium-zh')
-# Question Answering
+# 问答
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 ```
 
-#### Wide-range NLP Task Support
 
-PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
 
-Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
+#### 全场景覆盖的应用示例
 
-<details><summary>&emsp;PaddleNLP Transformer model summary, click to show more detials </summary><div>
+覆盖从学术到产业的NLP应用示例，涵盖NLP基础技术、NLP系统应用以及拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+
+精选预训练模型示例可参考[Model Zoo](./model_zoo)，更多场景示例文档可参考[examples目录](./examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
+
+<details><summary> PaddleNLP预训练模型适用任务汇总（**点击展开详情**）</summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
@@ -150,166 +156,160 @@ Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/
 
 </div></details>
 
-For more pretrained model usage, please refer to [Transformer API Docs](./docs/model_zoo/index.rst).
+可参考[Transformer 文档](/docs/model_zoo/index.rst) 查看目前支持的预训练模型结构、参数和详细用法。
 
-### Industrial End-to-end System Cases
+### 产业级端到端系统范例
 
-We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
+PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP场景，提供了端到端系统范例，打通数据标注-模型训练-模型调优-预测部署全流程，持续降低NLP技术产业落地门槛。更多详细的系统级产业范例使用说明请参考[Applications](./applications)。
 
-For more details industial cases please refer to [Applications](./applications).
+#### 🧠 语义检索系统 
 
-
-#### 🧠 Neural Search System
+针对无监督数据、有监督数据等多种数据情况，结合SimCSE、In-batch Negatives、ERNIE-Gram单塔模型等，推出前沿的语义检索方案，包含召回、排序环节，打通训练、调优、高效向量检索引擎建库和查询全流程。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="500">
 </div>
 
 
-For more details please refer to [Neural Search](./applications/neural_search).
+更多使用说明请参考[语义检索系统](./applications/neural_search)。
 
-#### ❓ Question Answering System
+#### ❓ 智能问答系统 
 
-We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [RocketQA](https://github.com/PaddlePaddle/RocketQA) technique.
+推出基于语义检索技术的问答系统，支持FAQ问答、说明书问答等多种业务场景。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering).
+更多使用说明请参考[智能问答系统](./applications/question_answering)。
 
+#### 💌 评论观点抽取与情感分析
 
-#### 💌 Opinion Extraction and Sentiment Analysis
-
-We build an opinion extraction system for product review and fine-grained sentiment analysis based on [SKEP](https://arxiv.org/abs/2005.05635) Model.
+基于情感知识增强预训练模型SKEP，针对产品评论进行评价维度和观点抽取，以及细粒度的情感分析。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="400">
 </div>
 
+更多使用说明请参考[情感分析](./applications/sentiment_analysis)。
 
-For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
+#### 🎤 智能语音指令解析
 
-#### 🎤 Speech Command Analysis
-
-Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios.
+集成了业界领先的语音识别（Automatic Speech Recognition, ASR）、信息抽取（Information Extraction, IE）等技术，打造智能一体化的语音指令系统，广泛应用于智能语音填单、智能语音交互、智能语音检索、手机APP语音唤醒等场景，提高人机交互效率。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168412618-04897a47-79c9-4fe7-a054-5dc1f6a1f75c.png" width="500">
+    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="500">
 </div>
 
+更多使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
 
-For more details please refer to [Speech Command Analysis](./applications/speech_cmd_analysis).
+### 高性能分布式训练与推理
 
-### High Performance Distributed Training and Inference
-
-#### 🚀 Fleet API: 4D Hybrid Distributed Training
+#### 🚀 飞桨4D混合并行分布式训练技术
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" height="400" width="500">
 </div>
 
 
-For more super large-scale model training details please refer to [GPT-3](./examples/language_model/gpt-3).
+更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
-#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+#### ⚡ FasterTokenizers：高性能文本处理库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="500">
 </div>
 
 
-For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+针对预训练模型的高性能C++ Tokenizer实现，更多使用说明可参考[FasterTokenizers文档](./faster_tokenizers)。
 
-#### ⚡ FasterGeneration: High Perforance Generation Utilities
+#### ⚡️ FasterGeneration：高性能生成加速组件⚡
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="500">
 </div>
 
 
-For more usage please refer to [FasterGeneration](./faster_generation).
+针对大模型生成的加速利器，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
 
-## Community 
+## 社区交流
 
-### Special Interest Group (SIG)
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
+  - 10G重磅NLP学习大礼包：
 
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+  </div>
 
-### Slack
 
-To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+## 安装
 
-### WeChat
+### 环境依赖
 
-Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
+- python >= 3.6
+- paddlepaddle >= 2.2
 
- <div align="center">
- <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
- </div>
+### pip安装
 
-## Installation
-
-### Prerequisites
-
-* python >= 3.6
-* paddlepaddle >= 2.2
-
-More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
-
-### Python pip Installation
-
-```
+```shell
 pip install --upgrade paddlenlp
 ```
 
-## Quick Start
+更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
 
-**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+## 快速开始
+
+这里以信息抽取-命名实体识别任务，UIE模型为例，来说明如何快速使用PaddleNLP:
+
+### 一键预测
+
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可得到预测结果：
 
 ```python
-from paddlenlp import Taskflow
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-# Chinese Word Segmentation
-seg = Taskflow("word_segmentation")
-seg("第十四届全运会在西安举办")
->>> ['第十四届', '全运会', '在', '西安', '举办']
-
-# POS Tagging
-tag = Taskflow("pos_tagging")
-tag("第十四届全运会在西安举办")
->>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
-
-# Named Entity Recognition
-ner = Taskflow("ner")
-ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
->>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
-
-# Dependency Parsing
-ddp = Taskflow("dependency_parsing")
-ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
->>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
-
-# Sentiment Analysis
-senta = Taskflow("sentiment_analysis")
-senta("这个产品用起来真的很流畅，我非常喜欢")
->>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
+>>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+>>> ie = Taskflow('information_extraction', schema=schema)
+>>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
+[{'时间': [{'end': 6,
+          'probability': 0.9857378532924486,
+          'start': 0,
+          'text': '2月8日上午'}],
+  '赛事名称': [{'end': 23,
+            'probability': 0.8503089953268272,
+            'start': 6,
+            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+  '选手': [{'end': 31,
+          'probability': 0.8981548639781138,
+          'start': 28,
+          'text': '谷爱凌'}]}]
 ```
 
-## API Reference
+### 定制训练
 
-- [Transformer API](./docs/model_zoo/transformers.rst)
-- [Data API](./docs/data.md)
-- [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/model_zoo/embeddings.md)
-- [Metrics API](./docs/metrics.md)
+如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
-Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
+更多内容可参考：[精选模型库](./model_zoo)、[NLP多场景示例](./examples)、[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+
+
+## API文档
+
+PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的效率：
+
+- 支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)；
+- 灵活高效地完成数据预处理的[Data API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)；
+- 提供500+预训练模型的[Transformers API](./docs/model_zoo/transformers.rst)。  
+
+更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
+
 
 ## Citation
 
-If you find PaddleNLP useful in your research, please consider cite
+如果PaddleNLP对您的研究有帮助，欢迎引用
+
 ```
 @misc{=paddlenlp,
     title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
@@ -321,8 +321,8 @@ If you find PaddleNLP useful in your research, please consider cite
 
 ## Acknowledge
 
-We have borrowed from Hugging Face's [Transformer](https://github.com/huggingface/transformers)🤗 excellent design on pretrained models usage, and we would like to express our gratitude to the authors of Hugging Face and its open source community.
+我们借鉴了Hugging Face的[Transformers](https://github.com/huggingface/transformers)🤗关于预训练模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
 
 ## License
 
-PaddleNLP is provided under the [Apache-2.0 License](./LICENSE).
+PaddleNLP遵循[Apache-2.0开源协议](./LICENSE)。
