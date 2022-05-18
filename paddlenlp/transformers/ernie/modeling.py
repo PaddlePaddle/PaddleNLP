@@ -312,6 +312,9 @@ class ErniePretrainedModel(PretrainedModel):
         "model_state": {
             "ernie-1.0":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "ernie-1.0-large":
+            # "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie-1.0-large-dp16-gb1024-phase2-0507-110w.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie-1.0-large-dp16-gb1024-phase2-0511-60w.pdparams",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-en":
