@@ -298,9 +298,10 @@ class LayoutXLMSelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + [
+        new_x_shape = list(x.shape[:-1]) + [
             self.num_attention_heads, self.attention_head_size
         ]
+
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
 
@@ -347,8 +348,10 @@ class LayoutXLMSelfAttention(nn.Layer):
             attention_scores += rel_pos
         if self.has_spatial_attention_bias:
             attention_scores += rel_2d_pos
+        bool_attention_mask = attention_mask.astype(paddle.bool)
+        bool_attention_mask.stop_gradient = True
         attention_scores = paddle.where(
-            attention_mask.astype(paddle.bool).expand_as(attention_scores),
+            bool_attention_mask.expand_as(attention_scores),
             paddle.ones_like(attention_scores) * float("-inf"),
             attention_scores)
         attention_probs = F.softmax(attention_scores, axis=-1)
@@ -357,7 +360,7 @@ class LayoutXLMSelfAttention(nn.Layer):
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = context_layer.shape[:-2] + [
+        new_context_layer_shape = list(context_layer.shape[:-2]) + [
             self.all_head_size
         ]
         context_layer = context_layer.reshape(new_context_layer_shape)
@@ -396,8 +399,8 @@ class LayoutXLMAttention(nn.Layer):
             rel_pos=rel_pos,
             rel_2d_pos=rel_2d_pos, )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
+        # add attentions if we output them
+        outputs = [attention_output, ] + list(self_outputs[1:])
         return outputs
 
 
@@ -601,7 +604,7 @@ class LayoutXLMLayer(nn.Layer):
 
         layer_output = self.feed_forward_chunk(attention_output)
 
-        outputs = (layer_output, ) + outputs
+        outputs = [layer_output, ] + list(outputs)
 
         return outputs
 
@@ -772,13 +775,14 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1, ).reshape([-1, bbox.shape[-1]])
-        visual_bbox = visual_bbox.expand([final_shape[0], -1, -1])
+        visual_bbox = visual_bbox.expand(
+            [final_shape[0], visual_bbox.shape[0], -1])
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
+            attention_mask = paddle.ones(paddle.to_tensor(input_shape))
 
-        visual_attention_mask = paddle.ones(visual_shape)
+        visual_attention_mask = paddle.ones(paddle.to_tensor(visual_shape))
 
         attention_mask = attention_mask.astype(visual_attention_mask.dtype)
 
@@ -786,7 +790,8 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
             [attention_mask, visual_attention_mask], axis=1)
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
+            token_type_ids = paddle.zeros(
+                paddle.to_tensor(input_shape), dtype=paddle.int64)
 
         if position_ids is None:
             seq_length = input_shape[1]
@@ -794,12 +799,12 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
             position_ids = position_ids.expand_as(input_ids)
 
         visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], -1])
+            [input_shape[0], visual_shape[1]])
         final_position_ids = paddle.concat(
             [position_ids, visual_position_ids], axis=1)
 
         if bbox is None:
-            bbox = paddle.zeros(input_shape + [4])
+            bbox = paddle.zeros(paddle.to_tensor(input_shape + [4]))
 
         text_layout_emb = self._calc_text_embeddings(
             input_ids=input_ids,
