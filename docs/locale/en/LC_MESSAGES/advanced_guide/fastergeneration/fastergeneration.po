@@ -49,7 +49,7 @@ msgstr ""
 msgid ""
 "解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 "
 "**8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence "
-"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/perf>`_"
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf>`_"
 " 。"
 msgstr ""
 
@@ -73,7 +73,7 @@ msgstr ""
 #: ../advanced_guide/fastergeneration/fastergeneration.rst:26
 msgid ""
 "如果是第一次执行，PaddleNLP会启动即时编译（ `JIT Compile "
-"<https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/07_new_op/new_custom_op_cn.html"
+"<https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/new_op/new_custom_op_cn.html#jit-compile"
 "#jit-compile>`_ ）自动编译高性能解码算子。"
 msgstr ""
 
