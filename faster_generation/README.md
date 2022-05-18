@@ -56,7 +56,7 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
   <img src="../docs/imgs/gpt_perf.png" width="800" height ="400" />
 </p>
 
-更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/faster/faster_generation/perf)
+更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf)
 
 ## Quick Start
 
