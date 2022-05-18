@@ -478,8 +478,8 @@ from paddlenlp import Taskflow
   ```text
   {
     '竞赛名称': [
-      '主办方', 
-      '承办方', 
+      '主办方',
+      '承办方',
       '已举办次数'
     ]
   }
@@ -530,9 +530,9 @@ from paddlenlp import Taskflow
   ```text
   {
     '地震触发词': [
-      '地震强度', 
-      '时间', 
-      '震中位置', 
+      '地震强度',
+      '时间',
+      '震中位置',
       '震源深度'
     ]
   }
@@ -558,7 +558,7 @@ from paddlenlp import Taskflow
   ```text
   {
     '评价维度': [
-      '观点词', 
+      '观点词',
       '情感倾向[正向，负向]'
     ]
   }
@@ -591,7 +591,6 @@ from paddlenlp import Taskflow
               'start': 0,
               'text': '店面'}]}]
   ```
-
 
 - 情感倾向分类
 
