@@ -14,7 +14,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name/log" \
     run_pretrain.py \
     --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
+    --model_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_len 512 \
