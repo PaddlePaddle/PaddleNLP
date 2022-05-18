@@ -172,7 +172,12 @@ def evaluate(exe,
         return ret
 
     test_pyreader.start()
-    total_cost, total_acc, total_num_seqs, total_label_pos_num, total_pred_pos_num, total_correct_num = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    total_cost = 0.0
+    total_acc = 0.0
+    total_num_seqs = 0.0
+    total_label_pos_num = 0.0
+    total_pred_pos_num = 0.0
+    total_correct_num = 0.0
     qids, labels, scores, preds = [], [], [], []
     time_begin = time.time()
 
