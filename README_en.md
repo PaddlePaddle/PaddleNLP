@@ -30,7 +30,7 @@
 
 ## News 📢
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
+* 🔥 2022.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
