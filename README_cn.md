@@ -292,7 +292,7 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 - 提供500+预训练模型的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。  
 - 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
 
-更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.data.html)。
+更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。
 
 ## 社区交流
 
