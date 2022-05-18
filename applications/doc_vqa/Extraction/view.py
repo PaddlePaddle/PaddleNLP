@@ -38,7 +38,6 @@ def highlight_img(source_img_path, output_img_path):
     bbox = [0, width - 1, 0, height - 1]
     _highlight_bbox(image, bbox)
     cv2.imwrite(output_img_path, image)
-    # import pdb; pdb.set_trace()
 
 
 if __name__ == '__main__':
