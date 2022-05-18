@@ -37,8 +37,8 @@
   </div>
 
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-  * 🔥 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support *NER*, *Relation Extraction*, *Event Extraction* and *Sentiment Anlaysis* simultaneously.
-  * 🔥 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/).
+  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support *NER*, *Relation Extraction*, *Event Extraction* and *Sentiment Analysis* simultaneously.
+  * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
   * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
   * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fastest parallel inference with 11B model for open domain chatbot.
 
@@ -55,7 +55,7 @@
 
 ### Out-of-Box NLP Toolset
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -171,14 +171,14 @@ For more details please refer to [Neural Search](./applications/neural_search).
 
 #### ❓ Question Answering System
 
-We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [RocketQA](https://github.com/PaddlePaddle/RocketQA) technique.
+We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [🚀RocketQA](https://github.com/PaddlePaddle/RocketQA).
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="400">
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering).
+For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/doc_vqa).
 
 
 #### 💌 Opinion Extraction and Sentiment Analysis
