@@ -127,20 +127,20 @@ size_t Tokenizer::GetVocabSize(bool with_added_vocabulary) const {
 }
 
 size_t Tokenizer::AddTokens(const std::vector<AddedToken>& tokens) {
-  return added_vocabulary_.AddTokens(tokens, model_.get(), normalizer_.get());
+  return added_vocabulary_.AddTokens(tokens, *model_, normalizer_.get());
 }
 
 size_t Tokenizer::AddSpecialTokens(const std::vector<AddedToken>& tokens) {
   return added_vocabulary_.AddSpecialTokens(
-      tokens, model_.get(), normalizer_.get());
+      tokens, *model_, normalizer_.get());
 }
 
 bool Tokenizer::TokenToId(const std::string& token, uint* id) const {
-  return added_vocabulary_.TokenToId(token, model_.get(), id);
+  return added_vocabulary_.TokenToId(token, *model_, id);
 }
 
 bool Tokenizer::IdToToken(uint id, std::string* token) const {
-  return added_vocabulary_.IdToToken(id, model_.get(), token);
+  return added_vocabulary_.IdToToken(id, *model_, token);
 }
 
 bool Tokenizer::DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
@@ -390,7 +390,7 @@ void Tokenizer::Decode(const std::vector<uint>& token_ids,
   std::vector<std::string> tokens;
   std::string token;
   for (int i = 0; i < token_ids.size(); ++i) {
-    added_vocabulary_.IdToToken(token_ids[i], model_.get(), &token);
+    IdToToken(token_ids[i], &token);
     if (!added_vocabulary_.IsSpecialToken(token) || !skip_special_tokens) {
       tokens.push_back(token);
     }

@@ -133,23 +133,23 @@ core::Vocab AddedVocabulary::GetVocab() const { return vocab_; }
 core::Vocab& AddedVocabulary::GetMutableVocab() { return vocab_; }
 
 bool AddedVocabulary::TokenToId(const std::string& token,
-                                const models::Model* model,
+                                const models::Model& model,
                                 uint* id) const {
   if (vocab_.find(token) != vocab_.end()) {
     *id = vocab_.at(token);
     return true;
   }
-  return model->TokenToId(token, id);
+  return model.TokenToId(token, id);
 }
 
 bool AddedVocabulary::IdToToken(uint id,
-                                const models::Model* model,
+                                const models::Model& model,
                                 std::string* token) const {
   if (vocab_reversed_.find(id) != vocab_reversed_.end()) {
     *token = vocab_reversed_.at(id).GetContent();
     return true;
   }
-  return model->IdToToken(id, token);
+  return model.IdToToken(id, token);
 }
 
 bool AddedVocabulary::IsSpecialToken(const std::string& token) const {
@@ -158,13 +158,13 @@ bool AddedVocabulary::IsSpecialToken(const std::string& token) const {
 
 size_t AddedVocabulary::AddSpecialTokens(
     const std::vector<AddedToken>& tokens,
-    const models::Model* model,
+    const models::Model& model,
     const normalizers::Normalizer* normalizers) {
   return AddTokens(tokens, model, normalizers);
 }
 
 size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
-                                  const models::Model* model,
+                                  const models::Model& model,
                                   const normalizers::Normalizer* normalizers) {
   for (const auto& token : tokens) {
     if (token.GetIsSpecial() && !token.GetContent().empty() &&
@@ -183,7 +183,7 @@ size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
     if (TokenToId(token.GetContent(), model, &id)) {
       ignored_tokens_num += 1;
     } else {
-      uint new_id = model->GetVocabSize() + GetLen();
+      uint new_id = model.GetVocabSize() + GetLen();
       vocab_[token.GetContent()] = new_id;
       if (special_tokens_set_.count(token.GetContent()) == 0) {
         added_tokens_.push_back(token);
@@ -196,7 +196,7 @@ size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
   return tokens.size() - ignored_tokens_num;
 }
 void AddedVocabulary::RefreshAddedTokens(
-    const models::Model* model, const normalizers::Normalizer* normalizers) {
+    const models::Model& model, const normalizers::Normalizer* normalizers) {
   using TokenAndId = std::pair<AddedToken, uint>;
   std::vector<TokenAndId> normalized, non_normalized;
   for (const auto& tokens : {special_tokens_, added_tokens_}) {

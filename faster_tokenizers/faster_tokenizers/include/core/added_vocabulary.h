@@ -97,17 +97,17 @@ public:
   core::Vocab& GetMutableVocab();
   core::Vocab GetVocab() const;
   bool TokenToId(const std::string& token,
-                 const models::Model* model,
+                 const models::Model& model,
                  uint* id) const;
-  bool IdToToken(uint id, const models::Model* model, std::string* token) const;
+  bool IdToToken(uint id, const models::Model& model, std::string* token) const;
   bool IsSpecialToken(const std::string& token) const;
   size_t AddSpecialTokens(const std::vector<AddedToken>& tokens,
-                          const models::Model* model,
+                          const models::Model& model,
                           const normalizers::Normalizer* normalizers);
   size_t AddTokens(const std::vector<AddedToken>& tokens,
-                   const models::Model* model,
+                   const models::Model& model,
                    const normalizers::Normalizer* normalizers);
-  void RefreshAddedTokens(const models::Model* model,
+  void RefreshAddedTokens(const models::Model& model,
                           const normalizers::Normalizer* normalizers);
   bool FindMatch(const std::string& sequence,
                  const MatchSet& pattern,
