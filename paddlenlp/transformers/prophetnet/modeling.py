@@ -21,7 +21,7 @@ from paddle.nn import Layer
 from typing import Optional, Tuple
 
 import paddlenlp
-from .. import PretrainedModel
+from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ProphetNetModel', 'ProphetNetPretrainedModel', 'ProphetNetEncoder',
@@ -141,7 +141,7 @@ class ProphetNetPretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
     """
-    model_config_file = ""
+    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "prophetnet-large-uncased": {
             "activation_dropout": 0.1,
@@ -178,7 +178,12 @@ class ProphetNetPretrainedModel(PretrainedModel):
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {}
+    pretrained_resource_files_map = {
+        "model_state": {
+            "prophetnet-large-uncased":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/prophetnet/prophetnet-large-uncased.pdparams"
+        }
+    }
     base_model_prefix = "prophetnet"
 
     def init_weights(self, layer):
@@ -1207,6 +1212,7 @@ class ProphetNetDecoder(ProphetNetPretrainedModel):
             dtype=hidden_states.dtype)
 
 
+@register_base_model
 class ProphetNetModel(ProphetNetPretrainedModel):
     def __init__(self,
                  vocab_size,

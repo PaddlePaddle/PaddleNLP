@@ -408,6 +408,7 @@ public:
 
         // allocate buffer
         if (int8_mode_ != 0) {
+#ifdef WITH_INT8
           buf_ = reinterpret_cast<DataType_ *>(
               allocator_->malloc(buf_size_in_byte, false));
           if (buf_ == nullptr)
@@ -441,6 +442,10 @@ public:
                             4 * m * k * sizeof(int32_t) +
                             6 * m * n * sizeof(DataType_));
           tmp_int8_ = (int8_t *)tmp_DataType_;
+#else
+      printf("[ERROR] Standard transformer does not support INT8. \n");
+      exit(-1);
+#endif
         } else {
           buf_ = reinterpret_cast<DataType_ *>(
               allocator_->malloc(buf_size_in_byte, false));
@@ -474,12 +479,14 @@ public:
         is_fp16 = 1;
       // check if target algos in map
       if (allow_gemm_test_) {
+        /*
         hasChangedConfig = gemmTest(batch_size_,
                                     from_seq_len_,
                                     head_num_,
                                     size_per_head_,
                                     int8_mode_,
                                     is_fp16);
+        */
       }
 
       // allocate buffer for attention_
@@ -525,10 +532,16 @@ public:
 
 
       int isConfigExist = -1;
-      if (int8_mode_ != 0)
+      if (int8_mode_ != 0) {
+#ifdef WITH_INT8
         isConfigExist = access(IGEMM_CONFIG, 0);
-      else
+#else
+      printf("[ERROR] Standard transformer does not support INT8. \n");
+      exit(-1);
+#endif
+      } else {
         isConfigExist = access(GEMM_CONFIG, 0);
+      }
       if (isConfigExist == -1) {
         if (!allow_gemm_test_) {
           // printf(
