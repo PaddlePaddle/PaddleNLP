@@ -17,7 +17,7 @@ import time
 import paddle
 import psutil
 
-from util.benchmark_utils import PaddleInferBenchmark
+from tls.benchmark_utils import PaddleInferBenchmark
 
 import paddle
 if paddle.is_compiled_with_cuda():

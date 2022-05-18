@@ -122,7 +122,7 @@ model = paddlenlp.transformers.SkepForSequenceClassification.from_pretrained(
 tokenizer = paddlenlp.transformers.SkepTokenizer.from_pretrained(
     "skep_ernie_1.0_large_ch")
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
+更多预训练模型，参考[transformers](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
