@@ -2,9 +2,9 @@
 
 ## 1. 项目说明
 
-**文档视觉问答**是在问答领域的一项新的探索，与传统文本问答不同的是，可深度解析非结构化文档中排版复杂的图文/图表内容，直接定位问题答案。
+**文档视觉问答**是在问答领域的一项新的探索，其要求文档智能模型在文档中抽取能够回答文档相关问题的答案，需要模型在抽取和理解文档中文本信息的同时，还能充分利用文档的布局、字体、颜色等视觉信息，这比单一模态的信息抽取任务更具挑战性。
 
-本项目将针对**汽车说明书问答**实现视觉问答，即在用户提供汽车说明书后，针对用户提出的一些相关问题，从汽车说明书中寻找答案并进行回答。
+本项目将针对**汽车说明书**实现视觉问答，即在用户提供汽车说明书后，针对用户提出的一些相关问题，从汽车说明书中寻找答案并进行回答。
 
 #### 场景痛点
 - 构建问题库方面：需投入大量人力整理常见问题库；固定的问题库难以覆盖灵活多变的提问；
@@ -42,7 +42,7 @@
 
 ## 4. OCR模块
 
-本实验提供的汽车说明书图片可点击[这里](https://paddlenlp.bj.bcebos.com/images/applications/automobile.tar.gz)进行下载，下载后解压放至 `./OCR_process/demo_pics` 目录下，然后通过如下命令，使用 PaddleOCR 进行图片文档解析。
+本项目提供的汽车说明书图片可点击[这里](https://paddlenlp.bj.bcebos.com/images/applications/automobile.tar.gz)进行下载，下载后解压放至 `./OCR_process/demo_pics` 目录下，然后通过如下命令，使用 PaddleOCR 进行图片文档解析。
 
 ```shell
 cd OCR_process/
@@ -53,11 +53,14 @@ cd ..
 解析后的结果存放至 `./OCR_process/demo_ocr_res.json` 中。
 
 ## 5. 排序模块
-本模块将基于使用 [Dureader retrieval](https://arxiv.org/abs/2203.10232) 数据集训练的排序模型 base_model 基础上，然后使用本项目提供的140条汽车说明书相关的训练样本进一步微调。
 
-其中，base_model可点击[这里](https://paddlenlp.bj.bcebos.com/models/base_ranker.tar.gz)下载，将下载后的模型文件解压后可获得模型目录 `base_model`，将其放至 `./Rerank/checkpoints` 目录下；和汽车说明书相关的训练数据可点击[这里](https://paddlenlp.bj.bcebos.com/data/automobile_rerank_train.tsv)下载，下载后将其重命名为 `train.tsv` ，存放至 `./Rerank/data/` 目录下。
+本项目提供了140条汽车说明书相关的训练样本，用于排序模型的训练， 同时也提供了一个预先训练好的基线模型 base_model。 本模块可以使用 base_model 在汽车说明书训练样本上进一步微调。 
 
-排序模型可使用如下代码进行训练：
+其中，汽车说明书的训练集可点击[这里](https://paddlenlp.bj.bcebos.com/data/automobile_rerank_train.tsv) 进行下载，下载后将其重命名为 `train.tsv` ，存放至 `./Rerank/data/` 目录下。
+
+同时，base_model 是 [Dureader retrieval](https://arxiv.org/abs/2203.10232) 数据集训练的排序模型， 可点击[这里](https://paddlenlp.bj.bcebos.com/models/base_ranker.tar.gz) 进行下载，解压后可获得包含模型的目录 `base_model`，将其放至 `./Rerank/checkpoints` 目录下。
+
+可使用如下代码进行训练：
 
 ```shell
 cd Rerank
@@ -70,7 +73,7 @@ cd ..
 
 ```shell
 cd Rerank
-bash run_test.sh NFC咋开门
+bash run_test.sh 后备箱怎么开
 cd ..
 ```
 
@@ -78,16 +81,17 @@ cd ..
 
 
 ## 5. 跨模态阅读理解模块
-本模块将使用PaddleNLP提供的LayoutXLM模型进行视觉问答任务，主要是从排序模型输出评分最高的图片中，结合用户问题，抽取相应的答案。
 
-本模块将基于使用 [Dureader VIS](https://aclanthology.org/2022.findings-acl.105.pdf) 数据集训练的跨模态阅读理解模型 base_model 基础上，然后使用本项目提供的28条汽车说明书相关的训练样本进一步微调。
+本项目提供了28条汽车说明书相关的训练样本，用于跨模态阅读理解模型的训练， 同时也提供了一个预先训练好的基线模型 base_model。 本模块可以使用 base_model 在汽车说明书训练样本上进一步微调，增强模型对汽车说明书领域的理解。 
 
-其中，base_model可点击[这里](https://paddlenlp.bj.bcebos.com/models/base_mrc.tar.gz)下载，将下载后的模型文件解压后可获得模型目录 `base_model`，将其放至 `./Extraction/checkpoints` 目录下；和汽车说明书相关的训练数据可点击[这里](https://paddlenlp.bj.bcebos.com/data/automobile_mrc_train.json)下载，下载后将其重命名为 `train.json`，存放至 `./Extraction/data/` 目录下。
+其中，汽车说明书的阅读理解训练集可点击[这里](https://paddlenlp.bj.bcebos.com/data/automobile_mrc_train.json) 进行下载，下载后将其重命名为 `train.json`，存放至 `./Extraction/data/` 目录下。
 
-排序模型可使用如下代码进行训练：
+同时，base_model 是 [Dureader VIS](https://aclanthology.org/2022.findings-acl.105.pdf) 数据集训练的跨模态阅读理解模型， 可点击[这里](https://paddlenlp.bj.bcebos.com/models/base_mrc.tar.gz) 进行下载，解压后可获得包含模型的目录 `base_model`，将其放至 `./Extraction/checkpoints` 目录下。
+
+可使用如下代码进行训练：
 
 ```shell
-cd Rerank
+cd Extraction
 bash run_train.sh
 cd ..
 ```
@@ -95,8 +99,8 @@ cd ..
 在模型训练完成后，可将模型重命名为 `layoutxlm` 存放至 `./checkpoints/` 目录下，接下来便可以使用如下命令，根据给定的汽车说明书相关问题，从得分最高的汽车说明书图片中抽取答案。代码如下：
 
 ```shell
-cd Rerank
-bash run_test.sh NFC咋开门
+cd Extraction
+bash run_test.sh 后备箱怎么开
 cd ..
 ```
 
@@ -106,11 +110,12 @@ cd ..
 本项目提供了全流程预测的功能，可通过如下命令进行一键式预测：
 
 ```shell
-bash run_test.sh NFC咋开门
+bash run_test.sh 后备箱怎么开
 ```
+
 其中，后一项参数为用户问题，最终结果将会保存至 `./answer.png` 中。
 
-**备注**：在运行命令前，请确保已使用第3节介绍的命令对将原始的汽车说明书图片进行文档解析。
+**备注**：在运行命令前，请确保已使用第3节介绍的命令对原始汽车说明书图片完成了文档解析。
 
 
 下图展示了用户提问的三个问题："后备箱怎么开"，"钥匙怎么充电" 和 "NFC解锁注意事项"， 可以看到，本项目的汽车说明书问答系统能够精准地找到答案并进行高亮显示。
