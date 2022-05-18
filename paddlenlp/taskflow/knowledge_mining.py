@@ -689,7 +689,6 @@ class NPTagTask(Task):
                     tokens,
                     return_length=True,
                     is_split_into_words=True,
-                    pad_to_max_seq_len=True,
                     max_seq_len=self._max_seq_len)
                 label_indices = list(
                     range(tokenized_output["seq_len"] - 1 - self._max_cls_len,
