@@ -38,7 +38,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 	--learning_rate 1E-4 \
 	--epochs 10 \
 	--max_seq_length 512 \
-	--language_model "ernie-1.0" \
+	--language_model "ernie-1.0-base-zh" \
     --rdrop_coef 0 \
 ```
 参数含义说明
