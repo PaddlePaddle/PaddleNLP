@@ -322,7 +322,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=4 align=center> 6L768H </td>
+                       <td rowspan=5 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -472,6 +472,44 @@
                         </td>  
                         <td style="text-align:center">
                                 <span style="font-size:18px">59.93</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">UER-py RoBERTa L6-H768</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">66.67</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">70.13</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">56.41</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">59.79</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.38</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">71.86</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">69.41</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">76.73</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">53.22/75.03</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.00</span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px">54.77</span>
                         </td>
                 </tr>
         <tbody>
