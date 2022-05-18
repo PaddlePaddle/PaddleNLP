@@ -91,7 +91,7 @@ test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
 ```python
 from paddlenlp.transformers import ErnieForTokenClassification
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+model = ErnieForTokenClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(label_map))
 ```
 
 同时，对于枚举分类数据采用的是基于ERNIE的文本分类模型，枚举角色类型为环节。模型原理图如下：
@@ -106,7 +106,7 @@ model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len
 **同样地，PaddleNLP提供了ERNIE预训练模型常用文本分类模型，可以通过指定模型名字完成一键加载**：
 
 ```python
-model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+model = ErnieForSequenceClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(label_map))
 ```
 
 ### 快速复现基线Step3：数据处理
@@ -117,7 +117,7 @@ model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=
 ```python
 from paddlenlp.transformers import ErnieTokenizer
 
-tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0-base-zh")
 ```
 
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。

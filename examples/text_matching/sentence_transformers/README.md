@@ -93,8 +93,8 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 ```python
 # 使用 ERNIE 预训练模型
 # ernie-1.0
-model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0-base-zh')
+tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0-base-zh')
 
 # ernie-tiny
 # model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-tiny')

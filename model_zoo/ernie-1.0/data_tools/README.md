@@ -102,7 +102,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --model_name MODEL_NAME
                         What model to use.
-                        必须设置，如：ernie-1.0, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst
+                        必须设置，如：ernie-1.0-base-zh, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst
   --tokenizer_name {ErnieTokenizer,BertTokenizer,GPTTokenizer,GPTChineseTokenizer}
                         What type of tokenizer to use.
                         模型对应的tokenizer, 目前暂时只支持 Ernie，Bert，GPT
@@ -150,7 +150,7 @@ common config:
 通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0 \
+    --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path baike_sample.jsonl \
     --split_sentences\
@@ -219,7 +219,7 @@ python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0 \
+    --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
     --split_sentences\

@@ -78,7 +78,10 @@ class ErnieTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
+            # Deprecated, alias for ernie-1.0-base-zh
             "ernie-1.0":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
@@ -114,6 +117,9 @@ class ErnieTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-1.0": {
+            "do_lower_case": True
+        },
+        "ernie-1.0-base-zh": {
             "do_lower_case": True
         },
         "ernie-tiny": {
