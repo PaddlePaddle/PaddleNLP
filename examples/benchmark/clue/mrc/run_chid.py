@@ -66,16 +66,22 @@ def parse_args():
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
-        "--warmup_steps",
-        default=0,
+        "--max_steps",
+        default=-1,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
         "--warmup_proportion",
         default=0.1,
         type=float,
         help="Linear warmup proportion over total steps.")
+    parser.add_argument(
+        "--warmup_steps",
+        default=0,
+        type=int,
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
+    )
     parser.add_argument(
         "--adam_epsilon",
         default=1e-6,
@@ -431,10 +437,14 @@ def run(args):
             return_list=True)
 
         num_training_steps = int(
-            len(train_data_loader) * args.num_train_epochs /
-            args.gradient_accumulation_steps)
+            args.max_steps /
+            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+                len(train_data_loader) * args.num_train_epochs /
+                args.gradient_accumulation_steps)
+
+        warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
         lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps, 0)
+                                             num_training_steps, warmup)
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
         decay_params = [
@@ -516,17 +526,13 @@ def run(args):
         idx = 623377
         preds = evaluate(model, test_data_loader, do_predict=True)
         for pred in preds:
-            result["#idiom" + str(idx)] = pred
+            result["#idiom" + str(idx) + "#"] = pred
             idx += 1
         if not os.path.exists(args.output_dir):
             os.makedirs(args.output_dir)
-        with open(
-                os.path.join(args.output_dir, 'chid11_predict.json'),
-                "w",
-                encoding='utf-8') as writer:
-            writer.write(
-                json.dumps(
-                    result, ensure_ascii=False, indent=4) + "\n")
+        with open(os.path.join(args.output_dir, 'chid11_predict.json'),
+                  "w") as writer:
+            json.dump(result, writer, indent=2)
 
 
 def print_arguments(args):
