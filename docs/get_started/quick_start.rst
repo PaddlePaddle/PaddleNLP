@@ -25,7 +25,7 @@
 
 .. code-block::
 
-    >>> MODEL_NAME = "ernie-1.0"
+    >>> MODEL_NAME = "ernie-1.0-base-zh"
     >>> ernie_model = paddlenlp.transformers.ErnieModel.from_pretrained(MODEL_NAME)
     
 加载预训练模型ERNIE用于文本分类任务的Fine-tune网络，只需指定想要使用的模型名称和文本分类的类别数即可完成网络定义。

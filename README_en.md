@@ -37,10 +37,10 @@
   </div>
 
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-  * 🔥 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
+  * 🔥 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support *NER*, *Relation Extraction*, *Event Extraction* and *Sentiment Anlaysis* simultaneously.
   * 🔥 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/).
-  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a SOTA biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
-  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
+  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
+  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fastest parallel inference with 11B model for open domain chatbot.
 
 ## Features
 
@@ -212,7 +212,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 </div>
 
 
-For more super large-scale model training details please refer to [GPT-3](./examples/language_model/gpt-3).
+For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
 
 #### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
 
@@ -220,8 +220,11 @@ For more super large-scale model training details please refer to [GPT-3](./exam
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
 </div>
 
+```python
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+```
 
-For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
 
 #### ⚡ FasterGeneration: High Perforance Generation Utilities
 
@@ -229,8 +232,15 @@ For more usage please refer to [FasterTokenizers](./faster_tokenizers).
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
 </div>
 
+```python
+model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
+...
+outputs, _ = model.generate(
+    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
+    use_faster=True)
+```
 
-For more usage please refer to [FasterGeneration](./faster_generation).
+Set `use_faster=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FasterGeneration](./faster_generation).
 
 
 ## Installation
@@ -283,13 +293,11 @@ senta("这个产品用起来真的很流畅，我非常喜欢")
 
 ## API Reference
 
-- [Transformer API](./docs/model_zoo/transformers.rst)
-- [Data API](./docs/data.md)
-- [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/model_zoo/embeddings.md)
-- [Metrics API](./docs/metrics.md)
+- Support [luge.ai](https://www.luge.ai/) dataset loading and compatible with Hugging Face [Datasets](https://huggingface.co/datasets). For more details please refer to [Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html).
+- Using Hugging Face style API to load 500+ selected transformer models and download with fast speed. For more information please refer to [Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html).
+- One-line of code to load pre-trained word embedding. For more usage please refer to [Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html).
 
-Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
+Please find all PaddleNLP API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
 ## Community
 
