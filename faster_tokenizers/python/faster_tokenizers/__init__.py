@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from typing import Tuple, Union, Tuple, List
 
@@ -33,6 +33,6 @@ EncodeInput = Union[TextEncodeInput, PreTokenizedEncodeInput]
 from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
                               TruncMethod, OffsetType, Direction, TruncStrategy,
                               PadStrategy)
-from .core_tokenizers import models, normalizers, pretokenizers, postprocessors
+from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
 
 from .tokenizers_impl import ErnieFasterTokenizer

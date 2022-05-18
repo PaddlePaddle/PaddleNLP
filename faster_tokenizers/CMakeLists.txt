@@ -98,4 +98,8 @@ add_custom_target(copy_shared_library ALL
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
     DEPENDS build_cpp_package_dir core_tokenizers)
 
+add_custom_target(create_commit_id_file ALL
+    COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${CPP_PACKAGE_DIR}/commit.log
+    DEPENDS copy_shared_library)
 endif(WITH_PYTHON)
+    
