@@ -1,4 +1,4 @@
-简体中文 | [English](./README_en.md)
+**简体中文**🀄 | [English🌎](./README_en.md)
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
@@ -27,9 +27,9 @@
   <a href=#社区交流> 社区交流 </a>
 </h4>
 
-**PaddleNLP**是一款简单易用且功能强大的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者灵活定制的需求。
+**PaddleNLP**是一款*简单易用*且*功能强大*的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
-## News  <img src="./docs/imgs/news_icon.png" width="40"/>
+## News 📢
 
 * 🔥 2022.5.18-19 B站[飞桨直播课](https://space.bilibili.com/476867757)，解读通用信息抽取技术**UIE**和**ERNIE 3.0**轻量级模型能力，欢迎报名来交流。
 
@@ -68,7 +68,7 @@ Taskflow提供丰富的 **📦开箱即用**的产业级NLP预置模型，覆盖
 
 #### 🀄 业界最全的中文预训练模型
 
-精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型，既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过AutoModel API一键⚡高速下载⚡。
+精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型：既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过`AutoModel` API一键⚡**高速下载**⚡。
 
 ```python
 from paddlenlp.transformers import *
@@ -107,7 +107,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 精选预训练模型示例可参考[Model Zoo](./model_zoo)，更多场景示例文档可参考[examples目录](./examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
 
-<details><summary> PaddleNLP预训练模型适用任务汇总（**点击展开详情**）</summary><div>
+<details><summary> PaddleNLP预训练模型适用任务汇总（<b>点击展开详情</b>）</summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
