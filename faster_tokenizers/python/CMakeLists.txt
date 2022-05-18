@@ -21,3 +21,7 @@ add_custom_target(copy_shared_library ALL
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${TOKENIZER_DST_DIR}
     DEPENDS copy_python_tokenizers)
 ENDIF()
+
+add_custom_target(create_commit_id_file ALL
+    COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${TOKENIZER_DST_DIR}/commit.log
+    DEPENDS copy_python_tokenizers)

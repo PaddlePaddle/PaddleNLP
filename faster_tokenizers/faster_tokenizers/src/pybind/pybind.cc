@@ -17,6 +17,7 @@ limitations under the License. */
 #include <pybind11/stl_bind.h>
 
 #include "pybind/core.h"
+#include "pybind/decoders.h"
 #include "pybind/models.h"
 #include "pybind/normalizers.h"
 #include "pybind/postprocessors.h"
@@ -40,6 +41,8 @@ PYBIND11_MODULE(core_tokenizers, m) {
   BindTokenizers(&m);
   // 6. Bind core
   BindCore(&m);
+  // 7. Bind decoder submodule
+  BindDecoders(&m);
 }
 
 }  // pybind
