@@ -34,33 +34,23 @@ UIE不限定行业领域和抽取目标：
 
 - 医疗场景-专病结构化
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/169017581-93c8ee44-856d-4d17-970c-b6138d10f8bc.png height=200 hspace='10'/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169017581-93c8ee44-856d-4d17-970c-b6138d10f8bc.png)
 
 - 法律场景-判决书抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/169017863-442c50f1-bfd4-47d0-8d95-8b1d53cfba3c.png height=200 hspace='10'/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169017863-442c50f1-bfd4-47d0-8d95-8b1d53cfba3c.png)
 
 - 金融场景-收入证明、招股书抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/169017982-e521ddf6-d233-41f3-974e-6f40f8f2edbc.png height=200 hspace='10'/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169017982-e521ddf6-d233-41f3-974e-6f40f8f2edbc.png)
 
 - 公安场景-事故报告抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/169018340-31efc1bf-f54d-43f7-b62a-8f7ce9bf0536.png height=200 hspace='10'/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169018340-31efc1bf-f54d-43f7-b62a-8f7ce9bf0536.png)
 
 - 旅游场景-宣传册、手册抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/169018113-c937eb0b-9fd7-4ecc-8615-bcdde2dac81d.png height=200 hspace='10'/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169018113-c937eb0b-9fd7-4ecc-8615-bcdde2dac81d.png)
 
 <a name="开箱即用"></a>
 
