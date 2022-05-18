@@ -17,7 +17,7 @@
 
 from typing import Dict, List, Tuple
 
-from faster_tokenizers import Tokenizer, normalizers, pretokenizers, postprocessors
+from faster_tokenizers import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
 from faster_tokenizers.models import WordPiece
 
 
@@ -57,6 +57,8 @@ class BertConverter(Converter):
 
         tokenizer.postprocessor = postprocessors.BertPostProcessor(
             (str(sep_token), sep_token_id), (str(cls_token), cls_token_id))
+
+        tokenizer.decoder = decoders.WordPiece(prefix="##")
         return tokenizer
 
 

@@ -1125,7 +1125,7 @@ static PyObject* Decode(TokenizerObject* self,
   VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
           << ", flag_: " << flag_;
   if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
-    if (args_num == (Py_ssize_t)2) {
+    if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
       skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
     }
     auto ids = CastPyArg2VectorOfInt<uint>(kw_ids, 0);
@@ -1160,7 +1160,7 @@ static PyObject* DecodeBatch(TokenizerObject* self,
   VLOG(6) << " args_num: " << args_num << ", flag_kwargs: " << flag_kwargs
           << ", flag_: " << flag_;
   if (args_num >= (Py_ssize_t)1 && args_num <= (Py_ssize_t)2) {
-    if (args_num == (Py_ssize_t)2) {
+    if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
       skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
     }
     std::vector<std::vector<uint>> batch_ids;
