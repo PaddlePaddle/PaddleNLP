@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import re
 import argparse
 import json
 import multiprocessing
@@ -21,9 +20,6 @@ import sys
 import time
 import shutil
 from functools import partial
-
-import numpy as np
-from tqdm import tqdm
 
 
 def get_args():
@@ -47,8 +43,8 @@ def get_args():
         '--doc_spliter',
         type=str,
         default='',
-        help="Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank."
-    )
+        help="Spliter between documents. We will strip the line, "
+        "if you use blank line to split doc, leave it blank.")
     parser.add_argument(
         '--min_doc_length',
         type=int,

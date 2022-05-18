@@ -14,31 +14,19 @@
 
 import random
 import argparse
-import sys
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import (
-    GPTLMHeadModel,
-    GPTTokenizer,
-    GPTChineseTokenizer, )
+from paddlenlp.transformers import (GPTLMHeadModel, GPTTokenizer)
 
-# Used to load data_tools path.
-sys.path.insert(0, "./data_tools")
-
-from tokenizer import _GPT2BPETokenizer
-
-MODEL_CLASSES = {
-    "gpt2-en": (GPTLMHeadModel, GPTTokenizer),
-    "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
-}
+MODEL_CLASSES = {"gpt2": (GPTLMHeadModel, GPTTokenizer), }
 
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         '--model_type',
-        default='gpt2-en',
+        default='gpt2',
         type=str,
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()))
@@ -67,8 +55,8 @@ def parse_args():
         '--top_k',
         type=int,
         default=5,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
-    )
+        help='The number of highest probability vocabulary tokens '
+        'to keep for top-k sampling.')
     parser.add_argument(
         '--temperature',
         type=float,
@@ -98,8 +86,8 @@ def parse_args():
         '--early_stopping',
         type=eval,
         default=False,
-        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
-    )
+        help='Whether to stop the beam search when at least `num_beams` sentences '
+        'are finished per batch or not.')
     parser.add_argument(
         '--min_dec_len',
         type=int,
@@ -160,13 +148,13 @@ def main(args, input_text):
             format(MODEL_CLASSES.keys(), args.model_type))
 
     model = model_class.from_pretrained(args.model_name_or_path)
-    tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
+    tokenizer = tokenizer_class(args.vocab_file, args.merge_file)
     model.eval()
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len,
                                               model.max_position_embeddings)
 
-    input_ids = tokenizer.tokenize(input_text)
+    input_ids = tokenizer(input_text)['input_ids']
     if len(input_ids) == 0:
         input_ids = None
     else:
@@ -191,9 +179,9 @@ def main(args, input_text):
         print("*" * 10 + " GENERATED SEQUENCE {} ".format(i) + "*" * 10)
         generated_ids = generated_ids.numpy().tolist()
         # Decode text
-        text = tokenizer.detokenize(generated_ids)
+        generated_text = tokenizer.convert_ids_to_string(generated_ids)
         # Add the prompt at the beginning of the sequence.
-        sequence = input_text + text
+        sequence = input_text + generated_text
         generated_sequences.append(sequence)
         print(sequence)
 

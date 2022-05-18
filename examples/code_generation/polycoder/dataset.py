@@ -47,6 +47,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     tokens_per_epoch = _num_tokens(documents, sizes)
     print(f'tokens_per_epoch: {tokens_per_epoch}')
     num_epochs = _num_epochs(tokens_per_epoch, seq_length, num_samples)
+    print(
+        f'name:{name}, tokens_per_epoch: {tokens_per_epoch}, num_epochs:{num_epochs}'
+    )
     # Rng state
     np_rng = np.random.RandomState(seed=seed)
 

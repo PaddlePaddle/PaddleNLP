@@ -14,7 +14,6 @@
 
 import os
 import io
-import re
 import argparse
 import json
 import multiprocessing
@@ -23,14 +22,7 @@ import time
 
 import numpy as np
 from tqdm import tqdm
-
-from tokenizer import _GPT2BPETokenizer
-
-try:
-    import nltk
-    nltk_available = True
-except ImportError:
-    nltk_available = False
+from paddlenlp.transformers import GPTTokenizer
 
 
 def get_args():
@@ -58,36 +50,6 @@ def get_args():
         default='text',
         help='For JSON format. Space separate listed of keys to extract from json'
     )
-    group.add_argument(
-        '--split_sentences',
-        action='store_true',
-        help='Split documents into sentences.')
-
-    group = parser.add_argument_group(title='chinese words')
-    group.add_argument(
-        '--chinese',
-        action='store_true',
-        help="Is corpus need words segmentation step for chinese words.")
-    group.add_argument(
-        '--cn_whole_word_segment',
-        action='store_true',
-        help="Is corpus need words segmentation step for chinese words WWM.")
-    group.add_argument(
-        '--cn_seg_func',
-        type=str,
-        default='jieba',
-        choices=['lac', 'seg', 'jieba'],
-        help='Words segment function for chinese words.')
-    group.add_argument(
-        '--cn_splited',
-        action='store_true',
-        help="Is chinese corpus is splited in to words.")
-    group.add_argument(
-        '--cn_split_dimer',
-        type=str,
-        default=' ',
-        help="Split dimer between chinese words.")
-
     group = parser.add_argument_group(title='common config')
     group.add_argument(
         '--append_eos',
@@ -117,118 +79,9 @@ def get_args():
     return args
 
 
-def lexical_analysis_fn():
-    from LAC import LAC
-    lac = LAC(mode="lac")
-
-    def process(line):
-        words, _ = lac.run(line)
-        return words
-
-    return process
-
-
-def chinese_segmentation_fn():
-    from LAC import LAC
-    lac_cws = LAC(mode='seg')
-
-    def process(line):
-        words = lac.run(line)
-        return words
-
-    return process
-
-
-def jieba_segmentation_fn():
-    import jieba
-
-    def process(line):
-        words = jieba.cut(line)
-        return list(words)
-
-    return process
-
-
-CHINESE_SEG_FUNC = {
-    'lac': lexical_analysis_fn(),
-    'seg': chinese_segmentation_fn(),
-    'jieba': jieba_segmentation_fn(),
-}
-
-
-def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
-    """
-    Do whole word mask on Chinese word.
-    First, we do Chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
-    Then, we add the '##' mark on chinese characters which are in the middle of Chinese words.
-    And if the tokens are not chinese characters, we just exploit the results of WordPiece tokenization as words.
-    Such as, 
-         - text line : 通过利用mercer核，将样本从输入空间映射到高维特征空间，使原来没有显现的特征突现出来，取得了很好的图像分割效果。
-         - the input tokens (after WordPiece): 
-            ['通', '过', '利', '用', 'me', '##rc', '##er', '核', '，', '将', '样', '本', '从', '输', '入', '空', '间', '映', 
-            '射', '到', '高', '维', '特', '征', '空', '间', '，', '使', '原', '来', '没', '有', '显', '现', '的', '特', '征', 
-            '突', '现', '出', '来', '，', '取', '得', '了', '很', '好', '的', '图', '像', '分', '割', '效', '果', '。']
-        - the Chinese words (after Chinese word segmentation like jieba)
-            ['通过', '利用', 'mercer', '核', '，', '将', '样本', '从', '输入', '空间', '映射', '到', '高维', '特征', 
-            '空间', '，', '使', '原来', '没有', '显现', '的', '特征', '突现', '出来', '，', '取得', '了', '很', '好', 
-            '的', '图像', '分割', '效果', '。']
-        - the output whole word mask tokens:
-            ['通', '##过', '利', '##用', 'me', '##rc', '##er', '核', '，', '将', '样', '##本', '从', '输', '##入', 
-            '空', '##间', '映', '##射', '到', '高', '##维', '特', '##征', '空', '##间', '，', '使', '原', '##来', 
-            '没', '##有', '显', '##现', '的', '特', '##征', '突', '##现', '出', '##来', '，', '取', '##得', '了', 
-            '很', '好', '的', '图', '##像', '分', '##割', '效', '##果', '。']
-
-    Args:
-        tokens(list(str)): The sequence of tokens, which are from the WordPiece tokenization.
-        words(list(str)): The sequence of Chinese words.
-        max_word_length(int, optional): 
-            The maximum chinese character in Chinese words. It avoids too long Chinese word to be masked.
-            Defaults as 4.
-
-    Returns:
-         new_tokens(list(str)): The new token will be done with whole word masking strategy.
-
-    """
-
-    new_tokens = []
-    # opt for long document
-    words_set = set(words)
-    i = 0
-    while i < len(tokens):
-        # non-chinese character, then do word piece 
-        if len(re.findall('[\u4E00-\u9FA5]', tokens[i])) == 0:
-            new_tokens.append(tokens[i])
-            i += 1
-            continue
-
-        # add "##" mark on the middel tokens of Chinese words
-        # such as ["通过", "利用"] -> ["通", "##过"， "利", "##用"] 
-        has_add = False
-        for length in range(max_word_length, 0, -1):
-            if i + length > len(tokens):
-                continue
-            if ''.join(tokens[i:i + length]) in words_set:
-                new_tokens.append(tokens[i])
-                for l in range(1, length):
-                    new_tokens.append('##' + tokens[i + l])
-                i += length
-                has_add = True
-                break
-
-        if not has_add:
-            new_tokens.append(tokens[i])
-            i += 1
-    return new_tokens
-
-
 class IdentitySplitter(object):
     def tokenize(self, *text):
         return text
-
-
-class NewlineSplitter():
-    def tokenize(self, text):
-        return text.split("\n")
 
 
 class Converter(object):
@@ -236,38 +89,16 @@ class Converter(object):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = _GPT2BPETokenizer(self.args.vocab_file,
-                                                self.args.merge_file)
-        # Split document to sentence.
-        if self.args.split_sentences:
-            if self.args.chinese:
-                Converter.splitter = NewlineSplitter()
-            else:
-                if not nltk_available:
-                    print("NLTK is not available to split sentences.")
-                    exit()
-                splitter = nltk.load("tokenizers/punkt/english.pickle")
-                Converter.splitter = splitter
-        else:
-            Converter.splitter = IdentitySplitter()
-
-        # Split sentence whole words mask for chinese 
-        if self.args.cn_whole_word_segment:
-            if self.args.cn_splited:
-                Converter.segment_func = lambda text: text.split(self.args.cn_split_dimer)
-            else:
-                Converter.segment_func = CHINESE_SEG_FUNC[self.args.cn_seg_func]
-            Converter.whole_word_mask = get_whole_word_mask_tokens
-        else:
-            Converter.segment_func = lambda x: x
-            Converter.whole_word_mask = lambda x, y: x
+        Converter.tokenizer = GPTTokenizer(self.args.vocab_file,
+                                           self.args.merge_file)
 
         def process(text):
-            words = Converter.segment_func(text)
-            tokens = Converter.tokenizer.tokenize("".join(words))
+            tokens = Converter.tokenizer.tokenize(text)
+            tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)
             return tokens
 
         Converter.process = process
+        Converter.splitter = IdentitySplitter()
 
     def encode(self, json_line):
         text = json.loads(json_line)[self.args.json_key]
@@ -296,7 +127,7 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
+    sample_tokenizer = GPTTokenizer(args.vocab_file, args.merge_file)
     print(f"Vocab size: {sample_tokenizer.vocab_size}")
     print(f"Output prefix: {args.output_prefix}")
     if sample_tokenizer.vocab_size < 2**16 - 1:

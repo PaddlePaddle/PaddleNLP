@@ -44,7 +44,6 @@ DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5, DSET_TYPE_ERNIE]
 def compile_helper():
     """Compile helper function ar runtime. Make sure this
     is invoked on a single process."""
-    import os
     import subprocess
     path = os.path.abspath(os.path.dirname(__file__))
     ret = subprocess.run(['make', '-C', path])
@@ -57,7 +56,7 @@ def compile_helper():
 class BlendableDataset(paddle.io.Dataset):
     """
     The BlendableDataset is a wrapper which used to mix different dataset.
-    
+
     The input is a list of dataset and corresponding weights for each dataset.
     """
 
@@ -114,7 +113,6 @@ class BlendableDataset(paddle.io.Dataset):
 
 def get_datasets_weights_and_num_samples(data_prefix,
                                          train_valid_test_num_samples):
-
     # The data prefix should be in the format of:
     #   weight-1, data-prefix-1, weight-2, data-prefix-2, ..
     assert len(data_prefix) % 2 == 0
@@ -260,7 +258,7 @@ def get_a_and_b_segments(sample, np_rng):
 
 def truncate_segments(tokens_a, tokens_b, len_a, len_b, max_num_tokens, np_rng):
     """Truncates a pair of sequences to a maximum sequence length."""
-    #print(len_a, len_b, max_num_tokens)
+    # print(len_a, len_b, max_num_tokens)
     assert len_a > 0
     if len_a + len_b <= max_num_tokens:
         return False
@@ -418,7 +416,8 @@ def create_masked_lm_predictions(tokens,
         if not cand_index_set:
             continue
         # Note(mingdachen):
-        # Skip current piece if they are covered in lm masking or previous ngrams.
+        # Skip current piece if they are covered in lm masking or previous
+        # ngrams.
         for index_set in cand_index_set[0]:
             for index in index_set:
                 if index in covered_indexes:
@@ -501,7 +500,8 @@ def create_masked_lm_predictions(tokens,
             if not cand_index_set:
                 continue
             # Note(mingdachen):
-            # Skip current piece if they are covered in lm masking or previous ngrams.
+            # Skip current piece if they are covered in lm masking or previous
+            # ngrams.
             for index_set in cand_index_set[0]:
                 for index in index_set:
                     if index in covered_indexes or index in select_indexes:
@@ -602,7 +602,6 @@ def build_train_valid_test_datasets(data_prefix,
                                     binary_head=False,
                                     max_seq_length_dec=None,
                                     dataset_type='standard_bert'):
-
     if len(data_prefix) == 1:
         return _build_train_valid_test_datasets(
             data_prefix[0],
@@ -679,7 +678,6 @@ def _build_train_valid_test_datasets(data_prefix,
                                      binary_head,
                                      max_seq_length_dec,
                                      dataset_type='standard_bert'):
-
     if dataset_type not in DSET_TYPES:
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
@@ -752,7 +750,8 @@ def _build_train_valid_test_datasets(data_prefix,
             elif dataset_type == DSET_TYPE_ERNIE:
                 dataset = ErnieDataset(
                     indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,  #ErnieTokenizer.from_pretrained("ernie-1.0"),
+                    tokenizer=tokenizer,
+                    # ErnieTokenizer.from_pretrained("ernie-1.0"),
                     masked_lm_prob=masked_lm_prob,
                     short_seq_prob=short_seq_prob,
                     binary_head=binary_head,
@@ -776,7 +775,6 @@ def _build_train_valid_test_datasets(data_prefix,
 
 
 def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
-
     print_rank_0(' > building dataset index ...')
 
     start_time = time.time()
@@ -853,7 +851,7 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     # Build the indexed mapping if not exist.
 
     if local_rank == 0 and \
-       not os.path.isfile(indexmap_filename):
+            not os.path.isfile(indexmap_filename):
         print(' > WARNING: could not find index map file {}, building '
               'the indices on rank 0 ...'.format(indexmap_filename))
 

@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
 import random
 import time
-import sys
 
 import numpy as np
 import paddle
 from visualdl import LogWriter
 from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
+from paddlenlp.transformers import GPTTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils import profiler
 from paddlenlp.ops import Topology
@@ -31,17 +28,8 @@ from paddlenlp.ops import Topology
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
-from paddle.distributed import fleet
 
-# Used to load data_tools path.
-sys.path.insert(0, "./data_tools")
-
-from tokenizer import _GPT2BPETokenizer
-
-MODEL_CLASSES = {
-    "gpt": (GPTForPretraining, GPTTokenizer),
-    "gpt-cn": (GPTForPretraining, GPTChineseTokenizer),
-}
+MODEL_CLASSES = {"gpt": (GPTForPretraining, GPTTokenizer)}
 
 
 def set_seed(args):
@@ -56,7 +44,7 @@ def set_seed(args):
 
 def generate(texts, model, tokenizer, args):
     for i, text in enumerate(texts):
-        input_ids = tokenizer.tokenize(text)
+        input_ids = tokenizer(text)['input_ids']
         if len(input_ids) == 0:
             input_ids = None
         else:
@@ -77,7 +65,7 @@ def generate(texts, model, tokenizer, args):
             early_stopping=args.early_stopping,
             num_return_sequences=args.num_return_sequences)
         generated_ids = ids.numpy()[0].tolist()
-        generated_text = tokenizer.detokenize(generated_ids)
+        generated_text = tokenizer.convert_ids_to_string(generated_ids)
         print("*" * 10 + " GENERATED SEQUENCE {} ".format(i) + "*" * 10)
         print(
             f'input text: {text}, generated_ids: {generated_ids}, generated text: {generated_text}'
@@ -137,8 +125,8 @@ def get_train_data_file(args):
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
         logger.warning(
-            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! Try to found old compatible xxx_ids.npz file."
-        )
+            "Not found dataset with name of xxx_ids.npy and xxx_idx.npz! "
+            "Try to found old compatible xxx_ids.npz file.")
     else:
         return files
 
@@ -169,10 +157,9 @@ def do_train(args):
     default_global_tokens_num = default_global_batch_size * args.max_seq_len
 
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
+    tokenizer = tokenizer_class(args.vocab_file, args.merge_file)
 
     test_texts = read_file(args.test_file)
-    print(test_texts)
 
     # Define log writer
     log_writer_path = os.path.join(
@@ -258,8 +245,7 @@ def do_train(args):
     epoch = 0
     tic_train = time.time()
     while True:
-        files = get_train_data_file(args)
-        files.sort()
+        files = sorted(get_train_data_file(args))
         num_files = len(files)
         for f_id in range(num_files):
             data_file = files[f_id]
@@ -268,7 +254,8 @@ def do_train(args):
                 local_rank=local_rank,
                 data_world_size=topo.data_info.size,
                 data_world_rank=topo.data_info.rank,
-                eos_id=tokenizer.eod_id)
+                max_seq_len=args.max_seq_len,
+                eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
@@ -319,8 +306,11 @@ def do_train(args):
                         train_reader_cost + train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        %
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, "
+                        "avg_reader_cost: %.5f sec, "
+                        "avg_batch_cost: %.5f sec, "
+                        "speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, "
+                        "learning rate: %.5e" %
                         (global_step, epoch, step, loss_numpy, avg_reader_cost,
                          1. / speed, speed, speed * default_global_tokens_num,
                          speed * default_global_tokens_num / worker_num,
@@ -340,7 +330,8 @@ def do_train(args):
                         continue
 
                 if global_step % args.eval_freq == 0:
-                    # Since the valid data broardcast to all devices, we do evaluate on all device.
+                    # Since the valid data broardcast to all devices, we do
+                    # evaluate on all device.
                     run_evaluate(valid_data_loader, model, criterion,
                                  args.eval_iters, log_writer, global_step,
                                  epoch, tokenizer, test_texts, args, "valid")

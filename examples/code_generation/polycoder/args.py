@@ -89,7 +89,8 @@ def parse_args(MODEL_CLASSES):
         "--global_batch_size",
         default=None,
         type=int,
-        help="Global batch size for all training process. None for not check the size is valid. If we only use data parallelism, it should be device_num * micro_batch_size."
+        help="Global batch size for all training process. None for not check the size is valid. "
+        "If we only use data parallelism, it should be device_num * micro_batch_size."
     )
 
     # Default training config
@@ -124,14 +125,14 @@ def parse_args(MODEL_CLASSES):
         "--adam_beta1",
         default=0.9,
         type=float,
-        help="The beta1 for Adam optimizer. The exponential decay rate for the 1st moment estimates."
-    )
+        help="The beta1 for Adam optimizer. The exponential decay "
+        "rate for the 1st moment estimates.")
     parser.add_argument(
         "--adam_beta2",
         default=0.999,
         type=float,
-        help="The bate2 for Adam optimizer. The exponential decay rate for the 2nd moment estimates."
-    )
+        help="The bate2 for Adam optimizer. The exponential decay "
+        "rate for the 2nd moment estimates.")
     parser.add_argument(
         "--adam_epsilon",
         default=1e-8,
@@ -153,8 +154,8 @@ def parse_args(MODEL_CLASSES):
         "--decay_steps",
         default=360000,
         type=int,
-        help="The steps use to control the learing rate. If the step > decay_steps, will use the min_lr."
-    )
+        help="The steps use to control the learing rate. "
+        "If the step > decay_steps, will use the min_lr.")
     parser.add_argument(
         "--logging_freq",
         type=int,
@@ -222,8 +223,8 @@ def parse_args(MODEL_CLASSES):
         type=str2bool,
         nargs='?',
         const=True,
-        help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
-    )
+        help="Whether to enable the addto strategy for gradient "
+        "accumulation or not. This is only used for AMP training.")
     parser.add_argument(
         "--scale_loss",
         type=float,
@@ -266,8 +267,8 @@ def parse_args(MODEL_CLASSES):
         '--profiler_options',
         type=str,
         default=None,
-        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
-    )
+        help='The option of profiler, which should be in format '
+        '\"key1=value1;key2=value2;key3=value3\".')
     # generation
     parser.add_argument(
         '--test_file',
@@ -309,8 +310,8 @@ def parse_args(MODEL_CLASSES):
         '--early_stopping',
         type=eval,
         default=False,
-        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
-    )
+        help='Whether to stop the beam search when at least `num_beams` '
+        'sentences are finished per batch or not.')
     parser.add_argument(
         '--min_dec_len',
         type=int,
