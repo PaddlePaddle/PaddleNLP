@@ -26,33 +26,34 @@
   <a href=#community> Community </a>
 </h4>
 
-**PaddleNLP** is an easy-to-use and powerful NLP library with awesome pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
+**PaddleNLP** is an easy-to-use and powerful NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
 
 ## News  <img src="./docs/imgs/news_icon.png" width="40"/>
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model. Welcome to join us!
+* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](). Welcome to join us!
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
   </div>
 
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-
-  * 🔥Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on CLUE benchmark. Release [ERNIE-Health](./model_zoo/ernie-health), a biomedical SOTA pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE); Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
-  * 🔥Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
+  * 🔥 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
+  * 🔥 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/).
+  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a SOTA biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
+  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
 
 ## Features
 
-#### <a href=#off-the-shelf-nlp-pre-built-task> 📦 Off-the-shelf NLP Pre-built Task </a>
+#### <a href=#out-of-box-nlp-toolset> 📦 Out-of-Box NLP Toolset </a>
 
-#### <a href=#awesome-chinese-pre-trained-model-zoo> 🤗 Awesome Chinese Pre-trained Model Zoo </a>
+#### <a href=#awesome-chinese-model-zoo> 🤗 Awesome Chinese Model Zoo </a>
 
-#### <a href=#industrial-end-to-end-system-cases> 🎛️ Industrial End-to-end System Cases </a>
+#### <a href=#industrial-end-to-end-system> 🎛️ Industrial End-to-end System </a>
 
 #### <a href=#high-performance-distributed-training-and-inference> 🚀 High Performance Distributed Training and Inference </a>
 
 
-### Off-the-shelf NLP Pre-built Task 
+### Out-of-Box NLP Toolset
 
 Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
 
@@ -60,11 +61,11 @@ Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG s
 
 For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
-### Awesome Chinese Pre-trained Model Zoo
+### Awesome Chinese Model Zoo
 
 #### 🀄 Comprehensive Chinese Transformer Models  
 
-We provide 45+ network architectures and over 500+ pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel API to **⚡FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
+We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
 ```python
 from paddlenlp.transformers import *
@@ -99,11 +100,11 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
-<details><summary>&emsp;PaddleNLP Transformer model summary, click to show more detials </summary><div>
+<details><summary> PaddleNLP Transformer model summary, (**click to show the table**) </summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
@@ -152,7 +153,7 @@ Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/
 
 For more pretrained model usage, please refer to [Transformer API Docs](./docs/model_zoo/index.rst).
 
-### Industrial End-to-end System Cases
+### Industrial End-to-end System
 
 We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
 
@@ -162,7 +163,7 @@ For more details industial cases please refer to [Applications](./applications).
 #### 🧠 Neural Search System
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="400">
 </div>
 
 
@@ -173,7 +174,7 @@ For more details please refer to [Neural Search](./applications/neural_search).
 We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [RocketQA](https://github.com/PaddlePaddle/RocketQA) technique.
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="400">
 </div>
 
 
@@ -185,7 +186,7 @@ For more details please refer to [Question Answering](./applications/question_an
 We build an opinion extraction system for product review and fine-grained sentiment analysis based on [SKEP](https://arxiv.org/abs/2005.05635) Model.
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="400">
+    <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="300">
 </div>
 
 
@@ -207,7 +208,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 #### 🚀 Fleet API: 4D Hybrid Distributed Training
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" height="400" width="500">
+    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
 </div>
 
 
@@ -216,7 +217,7 @@ For more super large-scale model training details please refer to [GPT-3](./exam
 #### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="500">
+    <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
 </div>
 
 
@@ -225,29 +226,12 @@ For more usage please refer to [FasterTokenizers](./faster_tokenizers).
 #### ⚡ FasterGeneration: High Perforance Generation Utilities
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
 </div>
 
 
 For more usage please refer to [FasterGeneration](./faster_generation).
 
-## Community 
-
-### Special Interest Group (SIG)
-
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
-
-### Slack
-
-To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
-
-### WeChat
-
-Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
-
- <div align="center">
- <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
- </div>
 
 ## Installation
 
@@ -306,6 +290,24 @@ senta("这个产品用起来真的很流畅，我非常喜欢")
 - [Metrics API](./docs/metrics.md)
 
 Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
+
+## Community
+
+### Special Interest Group (SIG)
+
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+
+### Slack
+
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+
+### WeChat
+
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
+
+ <div align="center">
+ <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+ </div>
 
 ## Citation
 
