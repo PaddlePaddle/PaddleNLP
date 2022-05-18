@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+import copy
 from typing import List, Dict
 from collections import defaultdict
 import yaml
 import json
 import os
-
 from uie.evaluation.sel2record import RecordSchema, merge_schema
 
 
@@ -13,17 +13,19 @@ def load_definition_schema_file(filename):
     """Load schema file in Yaml
     读取 YAML 定义的 Schema 文件
     """
-    return yaml.load(open(filename), Loader=yaml.FullLoader)
+    return yaml.load(open(filename, encoding='utf8'), Loader=yaml.FullLoader)
 
 
 def load_jsonlines_file(filename):
     """Load Data file in JSONLINE
     读取 JSONLINE 文件
     """
-    return [json.loads(line) for line in open(filename)]
+    return [json.loads(line) for line in open(filename, encoding='utf8')]
 
 
 def convert_entity_schema(entity_schema):
+    """ Convert entity schmea to record schema
+    """
     spots = list()
     asocs = list()
     spot_asoc_map = dict()
@@ -34,6 +36,8 @@ def convert_entity_schema(entity_schema):
 
 
 def convert_entity_relation_schema(entity_schema, relation_schema):
+    """ Convert entity and relation chmea to record schema
+    """
     spots = list()
     asocs = list()
     spot_asoc_map = dict()
@@ -51,6 +55,8 @@ def convert_entity_relation_schema(entity_schema, relation_schema):
 
 
 def convert_event_schema(schema):
+    """ Convert event schmea to record schema
+    """
     spots = list()
     asocs = set()
     spot_asoc_map = dict()
@@ -68,13 +74,16 @@ def dump_schema(output_folder, schema_dict):
         os.makedirs(output_folder)
 
     for schema_name, schema in schema_dict.items():
-        with open(f"{output_folder}/{schema_name}.schema", 'w') as output:
+        schema_file = f"{output_folder}/{schema_name}.schema"
+        with open(schema_file, 'w', encoding='utf8') as output:
             for element in schema:
                 output.write(json.dumps(element, ensure_ascii=False) + '\n')
 
 
 def main_entity_relation(schema_file, schema_name, instances, output_folder):
-    schema = yaml.load(open(schema_file), Loader=yaml.FullLoader)
+    schema = yaml.load(
+        open(
+            schema_file, encoding='utf8'), Loader=yaml.FullLoader)
     entity_schema = convert_entity_schema(schema.get('实体', {}))
     relation_schema = convert_entity_relation_schema(
         schema.get('实体', {}), schema.get('关系', {}))
@@ -88,7 +97,7 @@ def main_entity_relation(schema_file, schema_name, instances, output_folder):
             'record': relation_schema,
         })
 
-    with open(f"{output_folder}/test.json", 'w') as output:
+    with open(f"{output_folder}/test.json", 'w', encoding='utf8') as output:
         for instance in instances:
             if instance['schema'] == schema_name:
                 output.write(json.dumps(instance, ensure_ascii=False) + '\n')
@@ -96,7 +105,9 @@ def main_entity_relation(schema_file, schema_name, instances, output_folder):
 
 
 def main_event(schema_file, schema_name, instances, output_folder):
-    schema = yaml.load(open(schema_file), Loader=yaml.FullLoader)
+    schema = yaml.load(
+        open(
+            schema_file, encoding='utf8'), Loader=yaml.FullLoader)
     event_schema = convert_event_schema(schema.get('事件', {}))
     dump_schema(
         output_folder=output_folder,
@@ -107,7 +118,7 @@ def main_event(schema_file, schema_name, instances, output_folder):
             'record': event_schema,
         })
 
-    with open(f"{output_folder}/test.json", 'w') as output:
+    with open(f"{output_folder}/test.json", 'w', encoding='utf8') as output:
         for instance in instances:
             if instance['schema'] == schema_name:
                 output.write(json.dumps(instance, ensure_ascii=False) + '\n')
@@ -124,7 +135,9 @@ def main_seprate_event(schema_file, schema_name, instances, output_folder):
         if schema_name == instance['schema']:
             valid_instances += [instance]
 
-    schema = yaml.load(open(schema_file), Loader=yaml.FullLoader)
+    schema = yaml.load(
+        open(
+            schema_file, encoding='utf8'), Loader=yaml.FullLoader)
     _, _, event_map = convert_event_schema(schema.get('事件', {}))
 
     for event in event_map:
@@ -142,7 +155,9 @@ def main_seprate_event(schema_file, schema_name, instances, output_folder):
                 }],
             })
 
-        with open(f"{subevent_output_folder}/test.json", 'w') as output:
+        with open(
+                f"{subevent_output_folder}/test.json", 'w',
+                encoding='utf8') as output:
             for instance in valid_instances:
                 output.write(json.dumps(instance, ensure_ascii=False) + '\n')
     return event_map.keys()
@@ -221,7 +236,7 @@ def split_test(options):
     test_file = options.data_file
     schema_folder = options.schema_folder
     output_folder = options.output_folder
-    instances = [json.loads(line) for line in open(test_file)]
+    instances = [json.loads(line) for line in open(test_file, encoding='utf8')]
     main_entity_relation(
         os.path.join(schema_folder, "人生信息.yaml"), "人生信息", instances,
         os.path.join(output_folder, "人生信息"))
@@ -270,7 +285,7 @@ def merge_test(options):
                 to_sumbit_instances[instance_id] = instance
 
     print(f"To submit instances number: {len(to_sumbit_instances)}")
-    with open(submit_filename, 'w') as output:
+    with open(submit_filename, 'w', encoding='utf8') as output:
         for instance in to_sumbit_instances.values():
             output.write(json.dumps(instance, ensure_ascii=False) + '\n')
 
@@ -346,9 +361,9 @@ def annonote_graph(entities: List[Dict]=[],
 
 
 def add_spot_asoc_to_single_file(filename):
-    instances = [json.loads(line) for line in open(filename)]
+    instances = [json.loads(line) for line in open(filename, encoding='utf8')]
     print(f'Add spot asoc to {filename} ...')
-    with open(filename, 'w') as output:
+    with open(filename, 'w', encoding='utf8') as output:
         for instance in instances:
             spots, asocs, spot_asoc_instance = annonote_graph(
                 entities=instance['entity'],
@@ -365,8 +380,6 @@ def add_spot_asoc_to_single_file(filename):
 
 def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
 
-    train_instances = list()
-    val_instances = list()
     schema_list = list()
 
     for task_folder in os.listdir(data_folder):
@@ -389,40 +402,31 @@ def convert_duuie_to_spotasoc(data_folder, ignore_datasets):
 
         schema_list += [record_schema]
 
-        for line in open(os.path.join(data_folder, task_folder, 'train.json')):
+        for line in open(
+                os.path.join(data_folder, task_folder, 'train.json'),
+                encoding='utf8'):
             new_instance = json.loads(line)
             # 添加任务中所有的 Spot 类别
             new_instance['spot'] = record_schema.type_list
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
-            train_instances += [new_instance]
 
-        for line in open(os.path.join(data_folder, task_folder, 'val.json')):
+        for line in open(
+                os.path.join(data_folder, task_folder, 'val.json'),
+                encoding='utf8'):
             new_instance = json.loads(line)
             # 添加任务中所有的 Spot 类别
             new_instance['spot'] = record_schema.type_list
             # 添加任务中所有的 Asoc 类别
             new_instance['asoc'] = record_schema.role_list
-            val_instances += [new_instance]
 
     # 融合不同任务的 Schema
     multi_schema = merge_schema(schema_list)
-    dump_instances(train_instances, os.path.join(data_folder, 'train.json'))
-    dump_instances(val_instances, os.path.join(data_folder, 'val.json'))
     multi_schema.write_to_file(os.path.join(data_folder, 'record.schema'))
 
 
-def add_spotasoc_to_train(options):
-    """ Add spot asoc annotation
-    添加 spot asoc 标注信息
-    """
-    import shutil
-    shutil.copytree(options.train_data, options.output_folder)
-    convert_duuie_to_spotasoc(options.output_folder, options.ignore_datasets)
-
-
 def dump_instances(instances, output_filename):
-    with open(output_filename, 'w') as output:
+    with open(output_filename, 'w', encoding='utf8') as output:
         for instance in instances:
             output.write(json.dumps(instance, ensure_ascii=False) + '\n')
 
@@ -468,49 +472,149 @@ def filter_event(data_folder, event_types, output_folder):
     dump_event_schema(event_types, output_folder)
     for split in ['train', 'val']:
         filename = os.path.join(data_folder, f"{split}.json")
-        instances = [json.loads(line.strip()) for line in open(filename)]
+        instances = [
+            json.loads(line.strip()) for line in open(
+                filename, encoding='utf8')
+        ]
         new_instances = filter_event_in_instance(
             instances, required_event_types=event_types)
         dump_instances(new_instances,
                        os.path.join(output_folder, f"{split}.json"))
 
 
-def preprocess_event():
+def preprocess_event(data_folder, schema_folder):
     """ Preprocessing event dataset for CCKS 2022
     针对 CCKS 2022 竞赛数据进行预处理
     """
-
     # Filter event annotation in raw data, only keep the required event in CCKS 2022
     # 对事件数据进行预处理，过滤除 `灾害意外` 和 `体育竞赛` 外的事件标注
     for schema in ['灾害意外', '体育竞赛']:
         print(f'Building {schema} dataset ...')
-        data_folder = os.path.join('data', 'duuie', 'DUEE')
-        schema_file = os.path.join('data', 'seen_schema', f'{schema}.yaml')
-        output_folder = os.path.join('data', 'duuie', schema)
+        duee_folder = os.path.join(data_folder, 'DUEE')
+        schema_file = os.path.join(schema_folder, f'{schema}.yaml')
+        output_folder = os.path.join(data_folder, schema)
         schema = load_definition_schema_file(schema_file)
         filter_event(
-            data_folder=data_folder,
+            data_folder=duee_folder,
             event_types=schema['事件'],
             output_folder=output_folder, )
 
     for schema in ['金融信息']:
         print(f'Building {schema} dataset ...')
-        data_folder = os.path.join('data', 'duuie', 'DUEE_FIN_LITE')
-        schema_file = os.path.join('data', 'seen_schema', f'{schema}.yaml')
-        output_folder = os.path.join('data', 'duuie', schema)
+        duee_fin_folder = os.path.join(data_folder, 'DUEE_FIN_LITE')
+        schema_file = os.path.join(schema_folder, f'{schema}.yaml')
+        output_folder = os.path.join(data_folder, schema)
         schema = load_definition_schema_file(schema_file)
         # 依据不同事件类别将多事件抽取分割成多个单事件类型抽取
         # Separate multi-type extraction to multiple single-type extraction
         for event_type in schema['事件']:
             filter_event(
-                data_folder=data_folder,
+                data_folder=duee_fin_folder,
                 event_types={event_type: schema['事件'][event_type]},
                 output_folder=output_folder + '_' + event_type, )
 
 
+def merge_instance(instance_list):
+    """Merge instances with same text but different annotation
+    合并文本相同标记不同的实例
+    """
+
+    def all_equal(_x):
+        for __x in _x:
+            if __x != _x[0]:
+                return False
+        return True
+
+    def entity_key(_x):
+        return (tuple(_x['offset']), _x['type'])
+
+    def relation_key(_x):
+        return (
+            tuple(_x['type']),
+            tuple(_x['args'][0]['offset']),
+            _x['args'][0]['type'],
+            tuple(_x['args'][1]['offset']),
+            _x['args'][1]['type'], )
+
+    def event_key(_x):
+        return (tuple(_x['offset']), _x['type'])
+
+    assert all_equal([x['text'] for x in instance_list])
+
+    element_dict = {
+        'entity': dict(),
+        'relation': dict(),
+        'event': dict(),
+    }
+    instance_id_list = list()
+    for x in instance_list:
+        instance_id_list += [x['id']]
+        for entity in x.get('entity', list()):
+            element_dict['entity'][entity_key(entity)] = entity
+        for relation in x.get('relation', list()):
+            element_dict['relation'][relation_key(relation)] = relation
+        for event in x.get('event', list()):
+            element_dict['event'][event_key(event)] = event
+
+    return {
+        'id': '-'.join(instance_id_list),
+        'text': instance_list[0]['text'],
+        'tokens': instance_list[0]['tokens'],
+        'entity': list(element_dict['entity'].values()),
+        'relation': list(element_dict['relation'].values()),
+        'event': list(element_dict['event'].values())
+    }
+
+
+def preprocess_duie(data_folder):
+    life_folder = os.path.join(data_folder, 'DUIE_LIFE_SPO')
+    org_folder = os.path.join(data_folder, 'DUIE_ORG_SPO')
+    life_train_instances = load_jsonlines_file(f"{life_folder}/train.json")
+    org_train_instances = load_jsonlines_file(f"{org_folder}/train.json")
+    life_relation = RecordSchema.read_from_file(
+        f"{life_folder}/record.schema").role_list
+    org_relation = RecordSchema.read_from_file(
+        f"{org_folder}/record.schema").role_list
+
+    instance_dict = defaultdict(list)
+    for instance in life_train_instances + org_train_instances:
+        instance_dict[instance['text']] += [instance]
+
+    for text in instance_dict:
+        instance_dict[text] = merge_instance(instance_dict[text])
+
+    with open(f"{life_folder}/train.json", 'w') as output:
+        for instance in instance_dict.values():
+            new_instance = copy.deepcopy(instance)
+            new_instance['relation'] = list(
+                filter(lambda x: x['type'] in life_relation, instance[
+                    'relation']))
+            output.write(json.dumps(new_instance) + '\n')
+
+    with open(f"{org_folder}/train.json", 'w') as output:
+        for instance in instance_dict.values():
+            new_instance = copy.deepcopy(instance)
+            new_instance['relation'] = list(
+                filter(lambda x: x['type'] in org_relation, instance[
+                    'relation']))
+            output.write(json.dumps(new_instance) + '\n')
+
+
 def preprocess(options):
-    preprocess_event()
-    add_spotasoc_to_train(options)
+    """ Preprocessing event dataset for CCKS 2022
+    针对 CCKS 2022 竞赛数据进行预处理
+    """
+    import shutil
+    shutil.rmtree(options.output_folder) if os.path.exists(
+        options.output_folder) else None
+    shutil.copytree(options.train_data, options.output_folder)
+
+    preprocess_duie(data_folder=options.output_folder)
+    preprocess_event(
+        data_folder=options.output_folder, schema_folder=options.schema_folder)
+    convert_duuie_to_spotasoc(
+        data_folder=options.output_folder,
+        ignore_datasets=options.ignore_datasets)
 
 
 if __name__ == "__main__":
@@ -530,7 +634,12 @@ if __name__ == "__main__":
     parser_t.add_argument(
         '--ignore_datasets',
         default=['DUEE', 'DUEE_FIN_LITE'],
+        nargs='+',
         help='Ignore dataset in `output_folder` for training')
+    parser_t.add_argument(
+        '--schema_folder',
+        default='data/seen_schema',
+        help='Path for seen schema folder')
     parser_t.set_defaults(func=preprocess)
 
     parser_a = subparsers.add_parser(

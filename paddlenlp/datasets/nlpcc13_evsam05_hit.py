@@ -84,7 +84,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
 
         for i, line in enumerate(lines):
             if not line:
-                values = list(zip(* [j.split('\t') for j in lines[start:i]]))
+                values = list(zip(*[j.split('\t') for j in lines[start:i]]))
                 if split == "test":
                     ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
                 else:

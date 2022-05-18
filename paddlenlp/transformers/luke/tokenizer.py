@@ -172,12 +172,14 @@ class LukeTokenizer(RobertaBPETokenizer):
                  sep_token="</s>",
                  pad_token="<pad>",
                  cls_token="<s>",
-                 mask_token="<mask>"):
+                 mask_token="<mask>",
+                 **kwargs):
 
         with open(vocab_file, encoding="utf-8") as vocab_handle:
             self.encoder = json.load(vocab_handle)
         with open(entity_file, encoding='utf-8') as entity_vocab_handle:
             self.entity_vocab = json.load(entity_vocab_handle)
+        self.decoder = {v: k for k, v in self.encoder.items()}
         self.sep_token, self.sep_token_id = sep_token, self.encoder[sep_token]
         self.cls_token, self.cls_token_id = cls_token, self.encoder[cls_token]
         self.pad_token, self.pad_token_id = pad_token, self.encoder[pad_token]
@@ -185,7 +187,6 @@ class LukeTokenizer(RobertaBPETokenizer):
         self._all_special_tokens = [
             unk_token, sep_token, pad_token, cls_token, mask_token
         ]
-        self.decoder = {v: k for k, v in self.encoder.items()}
         self.errors = 'replace'  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}

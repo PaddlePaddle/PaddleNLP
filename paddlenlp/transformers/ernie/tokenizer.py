@@ -78,7 +78,10 @@ class ErnieTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
+            # Deprecated, alias for ernie-1.0-base-zh
             "ernie-1.0":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
@@ -106,16 +109,17 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
             "rocketqa-v1-marco-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "ernie-3.0-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_vocab.txt",
-            "ernie-3.0-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_large_vocab.txt",
-            "ernie-3.0-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_vocab.txt",
+            "ernie-3.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "ernie-3.0-medium-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
         }
     }
     pretrained_init_configuration = {
         "ernie-1.0": {
+            "do_lower_case": True
+        },
+        "ernie-1.0-base-zh": {
             "do_lower_case": True
         },
         "ernie-tiny": {
@@ -160,13 +164,10 @@ class ErnieTokenizer(PretrainedTokenizer):
         "rocketqa-v1-marco-cross-encoder": {
             "do_lower_case": True
         },
-        "ernie-3.0-base": {
+        "ernie-3.0-base-zh": {
             "do_lower_case": True
         },
-        "ernie-3.0-large": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-medium": {
+        "ernie-3.0-medium-zh": {
             "do_lower_case": True
         },
     }
