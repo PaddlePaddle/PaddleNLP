@@ -442,14 +442,6 @@ python finetune.py \
 - `valid_steps`: evaluate的间隔steps数，默认100。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 
-模型选择：
-
-| 模型 |  结构  |
-| :---: | :--------: |
-| `uie-tiny`| 6-layers, 768-hidden, 12-heads |
-| `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
-| `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
-
 #### 模型评估
 
 通过运行以下命令进行模型评估：
