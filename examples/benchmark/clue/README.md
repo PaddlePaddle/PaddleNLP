@@ -360,6 +360,44 @@
                         </td>
                 </tr>
                 <tr>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">RBT6, Chinese</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">69.74</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">73.15</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">56.62</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.68</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">79.26</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">73.15</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">75.00</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">80.04</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">62.26/84.72</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">78.26</span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.93</span>
+                        </td>
+                </tr>
+                <tr>
                 <td style="text-align:center">
                         <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
                         </td>
@@ -432,44 +470,6 @@
                         </td>  
                         <td style="text-align:center">
                           <span style="font-size:18px">59.41</span>
-                        </td>
-                </tr>
-                <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">RBT6, Chinese</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">69.74</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">56.62</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.68</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">79.26</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">80.04</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.26/84.72</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">78.26</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.93</span>
                         </td>
                 </tr>
         <tbody>
