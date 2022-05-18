@@ -18,7 +18,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-
 import six
 import os
 import sys
@@ -27,11 +26,13 @@ import logging
 
 import paddle.fluid as fluid
 
-
 log = logging.getLogger(__name__)
 
+
 def prepare_logger(logger, debug=False, save_to_file=None):
-    formatter = logging.Formatter(fmt='[%(levelname)s] %(asctime)s [%(filename)12s:%(lineno)5d]:\t%(message)s')
+    formatter = logging.Formatter(
+        fmt='[%(levelname)s] %(asctime)s [%(filename)12s:%(lineno)5d]:\t%(message)s'
+    )
     console_hdl = logging.StreamHandler()
     console_hdl.setFormatter(formatter)
     logger.addHandler(console_hdl)
@@ -53,7 +54,8 @@ class ArgumentGroup(object):
     def __init__(self, parser, title, des):
         self._group = parser.add_argument_group(title=title, description=des)
 
-    def add_arg(self, name, type, default, help, positional_arg=False, **kwargs):
+    def add_arg(self, name, type, default, help, positional_arg=False,
+                **kwargs):
         prefix = "" if positional_arg else "--"
         type = str2bool if type == bool else type
         self._group.add_argument(

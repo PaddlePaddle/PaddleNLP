@@ -30,7 +30,6 @@ from collections import namedtuple
 import tokenization
 from batching import pad_batch_data
 
-
 log = logging.getLogger(__name__)
 
 if six.PY3:
@@ -48,6 +47,7 @@ def csv_reader(fd, delimiter='\t', trainer_id=0, trainer_num=1):
                     yield slots,
                 else:
                     yield slots
+
     return gen()
 
 
@@ -229,8 +229,8 @@ class BaseReader(object):
             yield self._pad_batch_records(batch_records)
 
     def get_num_examples(self, input_file):
-#        examples = self._read_tsv(input_file)
-#        return len(examples)
+        #        examples = self._read_tsv(input_file)
+        #        return len(examples)
         return self.num_examples
 
     def data_generator(self,
@@ -244,10 +244,14 @@ class BaseReader(object):
                        phase=None):
 
         if phase == 'train':
-#            examples = examples[trainer_id: (len(examples) //trainer_num) * trainer_num : trainer_num]
-            self.num_examples_per_node = self.total_num // trainer_num 
+            #            examples = examples[trainer_id: (len(examples) //trainer_num) * trainer_num : trainer_num]
+            self.num_examples_per_node = self.total_num // trainer_num
             self.num_examples = self.num_examples_per_node * trainer_num
-            examples = self._read_tsv(input_file, trainer_id=trainer_id, trainer_num=trainer_num, num_examples=self.num_examples_per_node)
+            examples = self._read_tsv(
+                input_file,
+                trainer_id=trainer_id,
+                trainer_num=trainer_num,
+                num_examples=self.num_examples_per_node)
             log.info('apply sharding %d/%d' % (trainer_id, trainer_num))
         else:
             examples = self._read_tsv(input_file)
@@ -269,6 +273,7 @@ class BaseReader(object):
                         for batch in all_dev_batches:
                             yield batch
                         all_dev_batches = []
+
         def f():
             try:
                 for i in wrapper():
@@ -276,15 +281,22 @@ class BaseReader(object):
             except Exception as e:
                 import traceback
                 traceback.print_exc()
+
         return f
 
 
 class ClassifyReader(BaseReader):
-    def _read_tsv(self, input_file, quotechar=None, trainer_id=0, trainer_num=1, num_examples=0):
+    def _read_tsv(self,
+                  input_file,
+                  quotechar=None,
+                  trainer_id=0,
+                  trainer_num=1,
+                  num_examples=0):
         """Reads a tab separated value file."""
         with open(input_file, 'r', encoding='utf8') as f:
-            reader = csv_reader(f, trainer_id=trainer_id, trainer_num=trainer_num)
-#            headers = next(reader)
+            reader = csv_reader(
+                f, trainer_id=trainer_id, trainer_num=trainer_num)
+            #            headers = next(reader)
             headers = 'query\ttitle\tpara\tlabel'.split('\t')
             text_indices = [
                 index for index, h in enumerate(headers) if h != "label"
@@ -340,4 +352,3 @@ class ClassifyReader(BaseReader):
             return_list += [batch_labels, batch_qids]
 
         return return_list
-

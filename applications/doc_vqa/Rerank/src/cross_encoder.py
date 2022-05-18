@@ -31,6 +31,7 @@ from model.ernie import ErnieModel
 
 log = logging.getLogger(__name__)
 
+
 def create_model(args,
                  pyreader_name,
                  ernie_config,
@@ -64,9 +65,9 @@ def create_model(args,
         cls_feats = ernie.get_pooled_output()
         if not is_noise:
             cls_feats = fluid.layers.dropout(
-            x=cls_feats,
-            dropout_prob=0.1,
-            dropout_implementation="upscale_in_train")
+                x=cls_feats,
+                dropout_prob=0.1,
+                dropout_implementation="upscale_in_train")
         logits = fluid.layers.fc(
             input=cls_feats,
             size=args.num_labels,
@@ -76,7 +77,6 @@ def create_model(args,
             bias_attr=fluid.ParamAttr(
                 name=task_name + "_cls_out_b",
                 initializer=fluid.initializer.Constant(0.)))
-
         """
         if is_prediction:
             probs = fluid.layers.softmax(logits)
@@ -105,18 +105,19 @@ def create_model(args,
         }
         return graph_vars
 
-
     if not is_prediction:
         graph_vars = _model(is_noise=True)
         old_loss = graph_vars["loss"]
-        token_emb = fluid.default_main_program().global_block().var("word_embedding")
+        token_emb = fluid.default_main_program().global_block().var(
+            "word_embedding")
         # print(token_emb)
         token_emb.stop_gradient = False
         token_gradient = fluid.gradients(old_loss, token_emb)[0]
         token_gradient.stop_gradient = False
         epsilon = 1e-8
         norm = (fluid.layers.sqrt(
-            fluid.layers.reduce_sum(fluid.layers.square(token_gradient)) + epsilon))
+            fluid.layers.reduce_sum(fluid.layers.square(token_gradient)) +
+            epsilon))
         gp = (0.01 * token_gradient) / norm
         gp.stop_gradient = True
         fluid.layers.assign(token_emb + gp, token_emb)
@@ -147,6 +148,7 @@ def evaluate_mrr(preds):
             correct = True
 
     return total_mrr / qnum
+
 
 def evaluate(exe,
              test_program,
@@ -295,11 +297,7 @@ def simple_accuracy(preds, labels):
     return (preds == labels).mean()
 
 
-def predict(exe,
-            test_program,
-            test_pyreader,
-            graph_vars,
-            dev_count=1):
+def predict(exe, test_program, test_pyreader, graph_vars, dev_count=1):
     test_pyreader.start()
     qids, scores, probs = [], [], []
     preds = []

@@ -19,10 +19,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-
 import numpy as np
 import paddle.fluid as fluid
 from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+
 
 def linear_warmup_decay(learning_rate, warmup_steps, num_train_steps):
     """ Applies linear warmup of learning rate from 0 and decay to 0."""
@@ -79,7 +79,8 @@ def optimization(loss,
             raise ValueError("Unkown learning rate scheduler, should be "
                              "'noam_decay' or 'linear_warmup_decay'")
         if use_lamb:
-            optimizer = fluid.optimizer.LambOptimizer(learning_rate=scheduled_lr)
+            optimizer = fluid.optimizer.LambOptimizer(
+                learning_rate=scheduled_lr)
         else:
             optimizer = fluid.optimizer.Adam(learning_rate=scheduled_lr)
     else:
@@ -90,7 +91,8 @@ def optimization(loss,
             dtype='float32',
             persistable=True)
         if use_lamb:
-            optimizer = fluid.optimizer.LambOptimizer(learning_rate=scheduled_lr)
+            optimizer = fluid.optimizer.LambOptimizer(
+                learning_rate=scheduled_lr)
         else:
             optimizer = fluid.optimizer.Adam(learning_rate=scheduled_lr)
         optimizer._learning_rate_map[fluid.default_main_program(
@@ -116,7 +118,8 @@ def optimization(loss,
 
     if dist_strategy is not None:
         # use fleet api
-        optimizer = fleet.distributed_optimizer(optimizer, strategy=dist_strategy)
+        optimizer = fleet.distributed_optimizer(
+            optimizer, strategy=dist_strategy)
 
     _, param_grads = optimizer.minimize(loss)
 
@@ -130,4 +133,4 @@ def optimization(loss,
                     param.name] * weight_decay * scheduled_lr
                 fluid.layers.assign(output=param, input=updated_param)
 
-    return scheduled_lr 
+    return scheduled_lr

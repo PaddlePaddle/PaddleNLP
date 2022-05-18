@@ -21,6 +21,7 @@ import numpy as np
 
 from six.moves import xrange
 
+
 def pad_batch_data(insts,
                    pad_idx=0,
                    return_pos=False,

@@ -27,7 +27,6 @@ import time
 import logging
 import multiprocessing
 
-
 # NOTE(paddle-dev): All of these flags should be
 # set before `import paddle`. Otherwise, it would
 # not take any effect.
@@ -49,9 +48,9 @@ from finetune_args import parser
 from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
 import paddle.fluid.incubate.fleet.base.role_maker as role_maker
 
-
 args = parser.parse_args()
 log = logging.getLogger()
+
 
 def main(args):
     ernie_config = ErnieConfig(args.ernie_config_path)
@@ -157,12 +156,12 @@ def main(args):
                     startup_prog=startup_prog,
                     weight_decay=args.weight_decay,
                     scheduler=args.lr_scheduler,
-            use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
-		    incr_every_n_steps=args.incr_every_n_steps,
-		    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
-		    incr_ratio=args.incr_ratio,
-		    decr_ratio=args.decr_ratio,
-            dist_strategy = dist_strategy)
+                    use_dynamic_loss_scaling=args.use_dynamic_loss_scaling,
+                    incr_every_n_steps=args.incr_every_n_steps,
+                    decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
+                    incr_ratio=args.incr_ratio,
+                    decr_ratio=args.decr_ratio,
+                    dist_strategy=dist_strategy)
 
         if args.verbose:
             if args.in_tokens:
@@ -173,7 +172,7 @@ def main(args):
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
                     program=train_program, batch_size=args.batch_size)
             log.info("Theoretical memory usage in training: %.3f - %.3f %s" %
-                  (lower_mem, upper_mem, unit))
+                     (lower_mem, upper_mem, unit))
 
     if args.do_val or args.do_test:
         test_prog = fluid.Program()
@@ -199,22 +198,15 @@ def main(args):
                 "both are set! Only arg 'init_checkpoint' is made valid.")
         if args.init_checkpoint:
             init_checkpoint(
-                exe,
-                args.init_checkpoint,
-                main_program=startup_prog)
+                exe, args.init_checkpoint, main_program=startup_prog)
         elif args.init_pretraining_params:
             init_pretraining_params(
-                exe,
-                args.init_pretraining_params,
-                main_program=startup_prog)
+                exe, args.init_pretraining_params, main_program=startup_prog)
     elif args.do_val or args.do_test:
         if not args.init_checkpoint:
             raise ValueError("args 'init_checkpoint' should be set if"
                              "only doing validation or testing!")
-        init_checkpoint(
-            exe,
-            args.init_checkpoint,
-            main_program=startup_prog)
+        init_checkpoint(exe, args.init_checkpoint, main_program=startup_prog)
 
     if args.do_train:
         train_exe = exe
@@ -237,14 +229,14 @@ def main(args):
         while True:
             try:
                 steps += 1
-    
+
                 if fleet.worker_index() != 0:
                     train_exe.run(fetch_list=[], program=train_program)
                     continue
-    
+
                 if steps % args.skip_steps != 0:
                     train_exe.run(fetch_list=[], program=train_program)
-    
+
                 else:
                     outputs = evaluate(
                         train_exe,
@@ -253,7 +245,7 @@ def main(args):
                         graph_vars,
                         "train",
                         metric=args.metric)
-    
+
                     if args.verbose:
                         verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
                         )
@@ -261,45 +253,47 @@ def main(args):
                             outputs["learning_rate"]
                             if warmup_steps > 0 else args.learning_rate)
                         log.info(verbose)
-    
+
                     current_example, current_epoch = reader.get_train_progress()
                     time_end = time.time()
                     used_time = time_end - time_begin
-    
+
                     log.info(
                         "epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
                         "ave acc: %f, speed: %f steps/s" %
-                        (current_epoch, current_example * dev_count, num_train_examples,
-                         steps, outputs["loss"], outputs["accuracy"],
-                         args.skip_steps / used_time))
+                        (current_epoch, current_example * dev_count,
+                         num_train_examples, steps, outputs["loss"],
+                         outputs["accuracy"], args.skip_steps / used_time))
                     ce_info.append(
                         [outputs["loss"], outputs["accuracy"], used_time])
 
                     time_begin = time.time()
-    
+
                 if steps % args.save_steps == 0:
                     save_path = os.path.join(args.checkpoints,
                                              "step_" + str(steps))
-                    fluid.io.save_persistables(exe, save_path, fleet._origin_program)
-    
+                    fluid.io.save_persistables(exe, save_path,
+                                               fleet._origin_program)
+
                 if steps % args.validation_steps == 0:
                     # evaluate dev set
                     if args.do_val:
                         evaluate_wrapper(args, reader, exe, test_prog,
                                          test_pyreader, graph_vars,
                                          current_epoch, steps)
-    
+
                     if args.do_test:
                         predict_wrapper(args, reader, exe, test_prog,
                                         test_pyreader, graph_vars,
                                         current_epoch, steps)
-    
+
                 if last_epoch != current_epoch:
                     last_epoch = current_epoch
-    
+
             except fluid.core.EOFException:
                 save_path = os.path.join(args.checkpoints, "step_" + str(steps))
-                fluid.io.save_persistables(exe, save_path, fleet._origin_program)
+                fluid.io.save_persistables(exe, save_path,
+                                           fleet._origin_program)
                 train_pyreader.reset()
                 break
 
@@ -323,11 +317,8 @@ def main(args):
                 shuffle=False))
 
         log.info("Final diagnostic")
-        qids, preds, probs = predict(
-            test_exe,
-            test_prog,
-            test_pyreader,
-            graph_vars)
+        qids, preds, probs = predict(test_exe, test_prog, test_pyreader,
+                                     graph_vars)
         assert len(qids) == len(preds), '{} v.s. {}'.format(
             len(qids), len(preds))
         with open(args.diagnostic_save, 'w') as f:
@@ -361,8 +352,14 @@ def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
             ds, epoch, steps))
 
 
-def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
-                    epoch=None, steps=None):
+def predict_wrapper(args,
+                    reader,
+                    exe,
+                    test_prog,
+                    test_pyreader,
+                    graph_vars,
+                    epoch=None,
+                    steps=None):
     test_sets = args.test_set.split(',')
     save_dirs = args.test_save.split(',')
     assert len(test_sets) == len(save_dirs)
@@ -376,24 +373,18 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
                 dev_count=1,
                 shuffle=False))
 
-        
         if epoch is not None or steps is not None:
             save_path = save_f + '.' + str(epoch) + '.' + str(steps)
         else:
             save_path = save_f
         log.info("testing {}, save to {}".format(test_f, save_path))
-        qids, preds, probs = predict(
-            exe,
-            test_prog,
-            test_pyreader,
-            graph_vars)
+        qids, preds, probs = predict(exe, test_prog, test_pyreader, graph_vars)
 
         save_dir = os.path.dirname(save_path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         else:
             log.warning('save dir exsits: %s, will skip saving' % save_dir)
-
 
         with open(save_path, 'w') as f:
             for p in probs:

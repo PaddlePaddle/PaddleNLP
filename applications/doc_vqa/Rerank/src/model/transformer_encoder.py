@@ -339,6 +339,9 @@ def encoder(enc_input,
         checkpoints.append(cp)
         enc_input = enc_output
     enc_output = pre_process_layer(
-        enc_output, preprocess_cmd, prepostprocess_dropout, name=model_name+"post_encoder")
+        enc_output,
+        preprocess_cmd,
+        prepostprocess_dropout,
+        name=model_name + "post_encoder")
 
     return enc_output, checkpoints

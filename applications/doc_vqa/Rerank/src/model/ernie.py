@@ -29,6 +29,7 @@ from model.transformer_encoder import encoder, pre_process_layer
 
 log = logging.getLogger(__name__)
 
+
 class ErnieConfig(object):
     def __init__(self, config_path):
         self._config_dict = self._parse(config_path)
@@ -97,18 +98,19 @@ class ErnieModel(object):
         self._param_initializer = fluid.initializer.TruncatedNormal(
             scale=config['initializer_range'])
 
-        self._build_model(model_name, src_ids, position_ids, sentence_ids, task_ids,
-                          input_mask)
+        self._build_model(model_name, src_ids, position_ids, sentence_ids,
+                          task_ids, input_mask)
 
-    def _build_model(self, model_name, src_ids, position_ids, sentence_ids, task_ids,
-                     input_mask):
+    def _build_model(self, model_name, src_ids, position_ids, sentence_ids,
+                     task_ids, input_mask):
         # padding id in vocabulary must be set to 0
         emb_out = fluid.layers.embedding(
             input=src_ids,
             size=[self._voc_size, self._emb_size],
             dtype=self._emb_dtype,
             param_attr=fluid.ParamAttr(
-                name=model_name + self._word_emb_name, initializer=self._param_initializer),
+                name=model_name + self._word_emb_name,
+                initializer=self._param_initializer),
             is_sparse=False)
 
         position_emb_out = fluid.layers.embedding(
@@ -116,14 +118,16 @@ class ErnieModel(object):
             size=[self._max_position_seq_len, self._emb_size],
             dtype=self._emb_dtype,
             param_attr=fluid.ParamAttr(
-                name=model_name + self._pos_emb_name, initializer=self._param_initializer))
+                name=model_name + self._pos_emb_name,
+                initializer=self._param_initializer))
 
         sent_emb_out = fluid.layers.embedding(
             sentence_ids,
             size=[self._sent_types, self._emb_size],
             dtype=self._emb_dtype,
             param_attr=fluid.ParamAttr(
-                name=model_name + self._sent_emb_name, initializer=self._param_initializer))
+                name=model_name + self._sent_emb_name,
+                initializer=self._param_initializer))
 
         emb_out = emb_out + position_emb_out
         emb_out = emb_out + sent_emb_out
@@ -140,7 +144,10 @@ class ErnieModel(object):
             emb_out = emb_out + task_emb_out
 
         emb_out = pre_process_layer(
-            emb_out, 'nd', self._prepostprocess_dropout, name=model_name + 'pre_encoder')
+            emb_out,
+            'nd',
+            self._prepostprocess_dropout,
+            name=model_name + 'pre_encoder')
 
         self_attn_mask = fluid.layers.matmul(
             x=input_mask, y=input_mask, transpose_y=True)
@@ -168,7 +175,7 @@ class ErnieModel(object):
             postprocess_cmd="dan",
             param_initializer=self._param_initializer,
             model_name=model_name,
-            name=model_name+'encoder')
+            name=model_name + 'encoder')
 
     def get_sequence_output(self):
         return self._enc_out
@@ -259,13 +266,12 @@ class ErnieModel(object):
         return mean_mask_lm_loss
 
     def get_task_output(self, task, task_labels):
-        task_fc_out = fluid.layers.fc(
-            input=self.next_sent_feat,
-            size=task["num_labels"],
-            param_attr=fluid.ParamAttr(
-                name=task["task_name"] + "_fc.w_0",
-                initializer=self._param_initializer),
-            bias_attr=task["task_name"] + "_fc.b_0")
+        task_fc_out = fluid.layers.fc(input=self.next_sent_feat,
+                                      size=task["num_labels"],
+                                      param_attr=fluid.ParamAttr(
+                                          name=task["task_name"] + "_fc.w_0",
+                                          initializer=self._param_initializer),
+                                      bias_attr=task["task_name"] + "_fc.b_0")
         task_loss, task_softmax = fluid.layers.softmax_with_cross_entropy(
             logits=task_fc_out, label=task_labels, return_softmax=True)
         task_acc = fluid.layers.accuracy(input=task_softmax, label=task_labels)
