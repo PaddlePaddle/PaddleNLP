@@ -23,8 +23,8 @@ import six
 import ast
 import copy
 import logging
-
 import numpy as np
+
 import paddle.fluid as fluid
 
 log = logging.getLogger(__name__)

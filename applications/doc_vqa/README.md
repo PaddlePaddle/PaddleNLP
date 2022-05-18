@@ -20,14 +20,14 @@
 
 - paddlepaddle >= 2.2.0
 - paddlenlp
+- paddleocr >= 2.5
 
 安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。
 
 
 ## 3. 整体流程
 
-简而言之，**汽车说明书问答**是针对用户提出的汽车相关问题，通过模型计算在汽车说明书中找出对应的答案，并返回给用户。
-
+简而言之，汽车说明书问答系统针对用户提出的汽车使用相关问题，智能化地在汽车说明书中找出对应答案，并返回给用户。总体来看，汽车说明书问答包括如下 3 个模块:
 
 - **OCR模块**   
 本项目提供了包含10张图片的汽车说明书，为方便后续处理，首先需要通过 PaddleOCR 对汽车说明书进行识别，记录汽车说明书上的文字和文字布局信息， 以方便后续使用计算机视觉和自然语言处理方面的技术进行问答任务。

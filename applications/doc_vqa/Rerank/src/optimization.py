@@ -20,6 +20,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import numpy as np
+
 import paddle.fluid as fluid
 from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
 

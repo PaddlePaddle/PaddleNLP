@@ -22,8 +22,9 @@ from __future__ import absolute_import
 import json
 import six
 import logging
-import paddle.fluid as fluid
 from io import open
+
+import paddle.fluid as fluid
 
 from model.transformer_encoder import encoder, pre_process_layer
 

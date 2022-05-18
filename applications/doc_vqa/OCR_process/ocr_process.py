@@ -1,15 +1,15 @@
 import os
-import json
-from paddleocr import PaddleOCR
-import numpy as np
 import re
-import time
 import sys
+import json
+import time
+import numpy as np
 from multiprocessing import Process, Queue
 
-sys.path.insert(0, "../Extraction")
-
+from paddleocr import PaddleOCR
 from paddlenlp.transformers import LayoutXLMTokenizer
+
+sys.path.insert(0, "../Extraction")
 tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
 
 

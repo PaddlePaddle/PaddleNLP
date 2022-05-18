@@ -1,3 +1,5 @@
+export CUDA_VISIBLE_DEVICES=0
+
 QUESTION=$1
 
 # Question: NFC咋开门

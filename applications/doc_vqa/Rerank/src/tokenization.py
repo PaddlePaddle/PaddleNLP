@@ -20,12 +20,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-from io import open
-
+import six
 import collections
 import unicodedata
-import six
-
+from io import open
 
 def convert_to_unicode(text):
     """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""

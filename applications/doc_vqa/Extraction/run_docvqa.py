@@ -1,24 +1,24 @@
-import sys
 import os
-import random
+import sys
 import copy
-import logging
-from collections import OrderedDict, Counter
 import json
+import random
+import logging
 import warnings
-warnings.filterwarnings("ignore")
-
 import argparse
+import numpy as np
+from collections import OrderedDict, Counter
+
 import paddle
 from paddle.static import InputSpec
 from paddle.jit import to_static
-import numpy as np
 from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
-from model import LayoutXLMForTokenClassification_with_CRF
+
 from docvqa import DocVQA
+from model import LayoutXLMForTokenClassification_with_CRF
 
+warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
-
 
 def parse_args():
     parser = argparse.ArgumentParser()

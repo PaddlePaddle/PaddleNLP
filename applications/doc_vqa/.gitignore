@@ -1,3 +1,4 @@
+*.png
 answers/*
 checkpoints/*
 __pycache__/*

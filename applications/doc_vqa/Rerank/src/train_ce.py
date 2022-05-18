@@ -19,12 +19,11 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import warnings
-warnings.filterwarnings("ignore")
 
 import os
 import time
 import logging
+import warnings
 import multiprocessing
 
 # NOTE(paddle-dev): All of these flags should be
@@ -32,10 +31,12 @@ import multiprocessing
 # not take any effect.
 os.environ['FLAGS_eager_delete_tensor_gb'] = '0'  # enable gc
 
-import paddle.fluid as fluid
 import paddle
+import paddle.fluid as fluid
 if hasattr(paddle, 'enable_static'):
     paddle.enable_static()
+from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
+import paddle.fluid.incubate.fleet.base.role_maker as role_maker
 
 import reader_ce as reader_ce
 from model.ernie import ErnieConfig
@@ -45,9 +46,7 @@ from utils.args import print_arguments, check_cuda, prepare_logger
 from utils.init import init_pretraining_params, init_checkpoint
 from finetune_args import parser
 
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
-import paddle.fluid.incubate.fleet.base.role_maker as role_maker
-
+warnings.filterwarnings("ignore")
 args = parser.parse_args()
 log = logging.getLogger()
 

@@ -1,16 +1,16 @@
-import sys
-import json
 import os
 import cv2
-import numpy as np
-import paddle
+import sys
+import json
 import copy
-from paddle.io import Dataset
-from tqdm import tqdm
 import collections
+import numpy as np
+from tqdm import tqdm
+
+import paddle
+from paddle.io import Dataset
 
 sys.path.insert(0, "../")
-
 
 class DocVQAExample(object):
     def __init__(self,

@@ -22,9 +22,9 @@ from __future__ import absolute_import
 import time
 import logging
 import numpy as np
-
-from scipy.stats import pearsonr, spearmanr
 from six.moves import xrange
+from scipy.stats import pearsonr, spearmanr
+
 import paddle.fluid as fluid
 
 from model.ernie import ErnieModel
