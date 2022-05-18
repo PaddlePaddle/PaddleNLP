@@ -102,7 +102,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --model_name MODEL_NAME
                         What model to use.
-                        必须设置，如：ernie-1.0-base-zh, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst
+                        必须设置，如：ernie-1.0-base-zh, 可以参考已有的模型名称 https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer
   --tokenizer_name {ErnieTokenizer,BertTokenizer,GPTTokenizer,GPTChineseTokenizer}
                         What type of tokenizer to use.
                         模型对应的tokenizer, 目前暂时只支持 Ernie，Bert，GPT
