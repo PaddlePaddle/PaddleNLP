@@ -11,7 +11,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/tests/
 ```
 
-#准备数据
+# 准备数据
 
 ```shell
 bash test_tipc/static/hybrid_parallelism/gpt/benchmark_common/prepare.sh
