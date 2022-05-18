@@ -362,7 +362,7 @@
                 </tr>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">RBT6, Chinese</span>
+                                <span style="font-size:18px">HLF/RBT6, Chinese</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">69.74</span>
@@ -476,7 +476,7 @@
                 </tr>
                 <tr>
                 <td style="text-align:center">
-                        <span style="font-size:18px">UER-py RoBERTa L6-H768</span>
+                        <span style="font-size:18px">UER-py/Chinese-RoBERTa (L6-H768)</span>
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">66.67</span>
