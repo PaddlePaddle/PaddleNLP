@@ -68,7 +68,7 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 python samples/gpt_sample.py
 ```
 
-如果是第一次执行，PaddleNLP会启动即时编译（[JIT Compile](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/07_new_op/new_custom_op_cn.html#jit-compile)）自动编译高性能解码算子。
+如果是第一次执行，PaddleNLP会启动即时编译（[JIT Compile](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/new_op/new_custom_op_cn.html#jit-compile)）自动编译高性能解码算子。
 
 ```sh
 ...
