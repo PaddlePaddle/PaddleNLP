@@ -75,7 +75,7 @@ def main(args):
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO
-        if paddle.distributed.get_rank() == 0 else logging.WARN,)
+        if paddle.distributed.get_rank() == 0 else logging.WARN, )
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
@@ -89,25 +89,29 @@ def main(args):
         paddle.distributed.init_parallel_env()
 
     tokenizer = LayoutXLMTokenizer.from_pretrained(args.model_name_or_path)
-    
+
     if args.do_test:
-        model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(args.init_checkpoint)
-        evaluate(args,
+        model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(
+            args.init_checkpoint)
+        evaluate(
+            args,
             model,
             tokenizer,
             label2id_map,
             id2label_map,
-            pad_token_label_id, global_step=0)
+            pad_token_label_id,
+            global_step=0)
         exit(0)
-    
+
     if args.init_checkpoint:
         logger.info('Init checkpoint from {}'.format(args.init_checkpoint))
-        model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(args.init_checkpoint)
+        model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(
+            args.init_checkpoint)
     else:
         base_model = LayoutXLMModel.from_pretrained(args.model_name_or_path)
         model = LayoutXLMForTokenClassification_with_CRF(
             base_model, num_classes=len(label2id_map), dropout=None)
-    
+
     # dist mode
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -178,7 +182,13 @@ def main(args):
             input_ids, input_mask, segment_ids, bboxes, labels = batch
             if input_ids.shape[0] != args.per_gpu_train_batch_size:
                 continue
-            outputs = model(input_ids=input_ids, bbox=bboxes, attention_mask=input_mask, token_type_ids=segment_ids, labels=labels, is_train=True)
+            outputs = model(
+                input_ids=input_ids,
+                bbox=bboxes,
+                attention_mask=input_mask,
+                token_type_ids=segment_ids,
+                labels=labels,
+                is_train=True)
             # model outputs are always tuple in ppnlp (see doc)
             loss = outputs[0]
             loss = loss.mean()
@@ -186,8 +196,8 @@ def main(args):
                 logger.info(
                     "[epoch {}/{}][iter: {}/{}] lr: {:.5f}, train loss: {:.5f}, ".
                     format(epoch_id, args.num_train_epochs, step,
-                        len(train_dataloader),
-                        lr_scheduler.get_lr(), loss.numpy()[0]))
+                           len(train_dataloader),
+                           lr_scheduler.get_lr(), loss.numpy()[0]))
 
             loss.backward()
             tr_loss += loss.item()
@@ -256,6 +266,7 @@ def _tokenize_chinese_chars(text):
 
     return output
 
+
 def fast_f1(text1, text2):
     common_char = Counter(text1) & Counter(text2)
     len_seq1 = len(text1)
@@ -267,15 +278,16 @@ def fast_f1(text1, text2):
     recall = 1.0 * len_common / len_seq1
     return (2.0 * precision * recall) / (precision + recall)
 
+
 def _normalize(in_str):
     """
     normalize the input unicode string
     """
     in_str = in_str.lower()
     sp_char = [
-        u':', u'_', u'`', u'，', u'。', u'：', u'？', u'！', u'(', u')',
-        u'“', u'”', u'；', u'’', u'《', u'》', u'……', u'·', u'、', u',',
-        u'「', u'」', u'（', u'）', u'－', u'～', u'『', u'』', '|'
+        u':', u'_', u'`', u'，', u'。', u'：', u'？', u'！', u'(', u')', u'“', u'”',
+        u'；', u'’', u'《', u'》', u'……', u'·', u'、', u',', u'「', u'」', u'（', u'）',
+        u'－', u'～', u'『', u'』', '|'
     ]
     out_segs = []
     for char in in_str:
@@ -285,6 +297,7 @@ def _normalize(in_str):
             out_segs.append(char)
     return ''.join(out_segs)
 
+
 def calc_f1_score(answer, prediction):
     f1_scores = []
     ans_segs = _tokenize_chinese_chars(_normalize(answer))
@@ -292,14 +305,17 @@ def calc_f1_score(answer, prediction):
     f1 = fast_f1(prediction_segs, ans_segs)
     return f1
 
+
 def decode(tokenizer, res):
     sep_id = tokenizer._convert_token_to_id("</s>")
     text_res = []
     all_f1 = []
     save_f1 = []
     for i in range(len(res)):
-        input_ids, label_ids, predict_ids, bbox  = res[i]
-        remove_pos = len(' '.join([str(x) for x in input_ids]).split('2 6 ')[0].strip(' ').split(' ')) + 2  # remove the question bbox and sep bbox
+        input_ids, label_ids, predict_ids, bbox = res[i]
+        remove_pos = len(' '.join([str(x) for x in input_ids]).split('2 6 ')[0]
+                         .strip(' ').split(
+                             ' ')) + 2  # remove the question bbox and sep bbox
         start_pos = input_ids.index(sep_id)
         query_text = []
         for idx in range(1, start_pos):
@@ -310,24 +326,29 @@ def decode(tokenizer, res):
         text_label, text_predict = [], []
         label_bbox_index, predict_bbox_index = [], []
         for idx in range(start_pos + 1, len(input_ids)):
-            input_id, label_id, predict_id = input_ids[idx], label_ids[idx], predict_ids[idx]
-            
+            input_id, label_id, predict_id = input_ids[idx], label_ids[
+                idx], predict_ids[idx]
+
             if label_id in [1, 2, 3]:
                 text_label.append(tokenizer._convert_id_to_token(int(input_id)))
                 label_bbox_index.append(idx - remove_pos + 1)
             if predict_id in [1, 2, 3]:
-                text_predict.append(tokenizer._convert_id_to_token(int(input_id)))
+                text_predict.append(
+                    tokenizer._convert_id_to_token(int(input_id)))
                 predict_bbox_index.append(idx - remove_pos + 1)
-        text_res.append([''.join(query_text), ''.join(text_label), ''.join(text_predict), label_bbox_index, predict_bbox_index])
-    
+        text_res.append([
+            ''.join(query_text), ''.join(text_label), ''.join(text_predict),
+            label_bbox_index, predict_bbox_index
+        ])
+
         f1 = calc_f1_score(''.join(text_label), ''.join(text_predict))
         save_f1.append(f1)
 
         if len(''.join(text_label)) > 10:
             all_f1.append(f1)
-    if len(all_f1)>0:
+    if len(all_f1) > 0:
         print("F1: ", sum(all_f1) / len(all_f1))
-    
+
     assert len(text_res) == len(save_f1)
     return text_res
 
@@ -338,7 +359,7 @@ def evaluate(args,
              label2id_map,
              id2label_map,
              pad_token_label_id,
-             prefix="", 
+             prefix="",
              global_step=0):
     eval_dataset = DocVQA(
         args,
@@ -377,26 +398,41 @@ def evaluate(args,
 
             if input_ids.shape[0] != args.eval_batch_size:
                 continue
-            outputs = model(input_ids=input_ids, bbox=bboxes, attention_mask=input_mask, token_type_ids=segment_ids, labels=labels, is_train=False)
+            outputs = model(
+                input_ids=input_ids,
+                bbox=bboxes,
+                attention_mask=input_mask,
+                token_type_ids=segment_ids,
+                labels=labels,
+                is_train=False)
             labels = labels.numpy()
             crf_decode = outputs[1].numpy()
             bboxes = bboxes.squeeze().numpy()
             input_ids = input_ids.squeeze(axis=1).numpy()
-            
+
             for index in range(input_ids.shape[0]):
-                res.append([list(input_ids[index]), list(labels[index]), list(crf_decode[index]), bboxes[index]])
-    
+                res.append([
+                    list(input_ids[index]), list(labels[index]),
+                    list(crf_decode[index]), bboxes[index]
+                ])
+
     origin_inputs = []
     with open(args.test_file, 'r', encoding='utf8') as f:
         for line in f:
             line = json.loads(line.strip())
-            origin_inputs.append({'id': line['id'], 'question': line['question'], 'bboxes':line['document_bbox'], 'img_id':line['img_id']})
+            origin_inputs.append({
+                'id': line['id'],
+                'question': line['question'],
+                'bboxes': line['document_bbox'],
+                'img_id': line['img_id']
+            })
 
     text_res = decode(tokenizer, res)
 
     save_path = 'data/decode_res.json'
     with open(save_path, 'w', encoding='utf8') as f:
-        for line_res, line_text, line_label in zip(res, text_res, origin_inputs):
+        for line_res, line_text, line_label in zip(res, text_res,
+                                                   origin_inputs):
             line_json = {}
             line_json['id'] = line_label['id']
             line_json['img_id'] = line_label['img_id']
@@ -415,6 +451,7 @@ def evaluate(args,
             line_json['predict_bboxes'] = predict_bboxes
             json.dump(line_json, f, ensure_ascii=False)
             f.write('\n')
+
 
 def print_arguments(args):
     """print arguments"""

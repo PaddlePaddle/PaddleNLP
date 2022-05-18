@@ -4,11 +4,12 @@ import numpy as np
 
 
 def view_ocr_result(img_path, bboxes, opath):
-	image = cv2.imread(img_path)
-	for char_bbox in bboxes:
-		x_min, x_max, y_min, y_max = char_bbox
-		cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 255), 1)
-	cv2.imwrite(opath, image)
+    image = cv2.imread(img_path)
+    for char_bbox in bboxes:
+        x_min, x_max, y_min, y_max = char_bbox
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 255), 1)
+    cv2.imwrite(opath, image)
+
 
 def _highlight_bbox(img, bbox):
     x = bbox[0]
@@ -39,6 +40,7 @@ def highlight_img(source_img_path, output_img_path):
     cv2.imwrite(output_img_path, image)
     # import pdb; pdb.set_trace()
 
+
 if __name__ == '__main__':
     res_path = "./data/decode_res.json"
     result = {}
@@ -46,7 +48,7 @@ if __name__ == '__main__':
         line = f.readline()
         result = json.loads(line.strip())
 
-    img_path ='../OCR_process/demo_pics/demo_{}.png'.format(result["img_id"])
+    img_path = '../OCR_process/demo_pics/demo_{}.png'.format(result["img_id"])
     img_save_path = "../answer.png"
     highlight_ans(img_path, img_save_path, result['predict_bboxes'])
     print("extraction result has been saved to answer.png")

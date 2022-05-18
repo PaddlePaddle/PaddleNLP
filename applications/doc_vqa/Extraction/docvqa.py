@@ -13,13 +13,14 @@ sys.path.insert(0, "../")
 
 
 class DocVQAExample(object):
-    def __init__(self, q_id,
-            question,
-            doc_tokens,
-            doc_boxes = [],
-            answer=None,
-            labels=None,
-            image=None):
+    def __init__(self,
+                 q_id,
+                 question,
+                 doc_tokens,
+                 doc_boxes=[],
+                 answer=None,
+                 labels=None,
+                 image=None):
         self.q_id = q_id
         self.question = question
         self.doc_tokens = doc_tokens
@@ -31,17 +32,18 @@ class DocVQAExample(object):
 
 class DocVQAFeatures(object):
     """A single set of features of data."""
+
     def __init__(self,
-            unique_id,
-            q_id,
-            example_index,
-            input_ids,
-            input_mask,
-            segment_ids,
-            p_index=None,
-            image=None,
-            boxes=None,
-            label=None):
+                 unique_id,
+                 q_id,
+                 example_index,
+                 input_ids,
+                 input_mask,
+                 segment_ids,
+                 p_index=None,
+                 image=None,
+                 boxes=None,
+                 label=None):
         self.unique_id = unique_id
         self.q_id = q_id
         self.example_index = example_index
@@ -52,6 +54,7 @@ class DocVQAFeatures(object):
         self.p_index = p_index
         self.image = image
         self.label = label
+
 
 class DocVQA(Dataset):
     def __init__(self,
@@ -75,7 +78,7 @@ class DocVQA(Dataset):
         self.return_attention_mask = return_attention_mask
         self.max_seq_len = max_seq_len
         self.sample_list = None
-        self.args = args 
+        self.args = args
 
         if self.pad_token_label_id is None:
             self.pad_token_label_id = paddle.nn.CrossEntropyLoss().ignore_index
@@ -83,7 +86,7 @@ class DocVQA(Dataset):
         self.entities_labels = {'HEADER': 0, 'QUESTION': 1, 'ANSWER': 2}
         self.encode_inputs = []
         self.docvqa_inputs = self.docvqa_input()
-    
+
     def check_is_max_context(self, doc_spans, cur_span_index, position):
         """Check if this is the 'max context' doc span for the token."""
 
@@ -113,20 +116,24 @@ class DocVQA(Dataset):
                 continue
             num_left_context = position - doc_span.start
             num_right_context = end - position
-            score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
+            score = min(num_left_context,
+                        num_right_context) + 0.01 * doc_span.length
             if best_score is None or score > best_score:
                 best_score = score
             best_span_index = span_index
-        
+
         return cur_span_index == best_span_index
 
-    def convert_examples_to_features(self, examples, tokenizer, max_seq_length,
-                                    max_span_num,
-                                    max_doc_length,
-                                    max_query_length,
-                                    task=None,
-                                    label_list=None,
-                                    output_mode=None):
+    def convert_examples_to_features(self,
+                                     examples,
+                                     tokenizer,
+                                     max_seq_length,
+                                     max_span_num,
+                                     max_doc_length,
+                                     max_query_length,
+                                     task=None,
+                                     label_list=None,
+                                     output_mode=None):
 
         label_map = {label: i for i, label in enumerate(label_list)}
         if "[CLS]" in self.tokenizer.get_vocab():
@@ -147,10 +154,10 @@ class DocVQA(Dataset):
             all_doc_tokens = example.doc_tokens
             all_doc_boxes_tokens = example.doc_boxes
 
-            cls_token_box=[0, 0, 0, 0]
-            sep_token_box=[1000, 1000, 1000, 1000]
-            pad_token_box=[0, 0, 0, 0]
-            ques_token_box=[0, 0, 0, 0]
+            cls_token_box = [0, 0, 0, 0]
+            sep_token_box = [1000, 1000, 1000, 1000]
+            pad_token_box = [0, 0, 0, 0]
+            ques_token_box = [0, 0, 0, 0]
 
             # The -3 accounts for [CLS], [SEP] and [SEP]
             max_tokens_for_doc = max_seq_length - len(query_tokens) - 3
@@ -198,7 +205,8 @@ class DocVQA(Dataset):
                 p_index.append(0)
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    is_max_context = self.check_is_max_context(doc_spans, doc_span_index, split_token_index)
+                    is_max_context = self.check_is_max_context(
+                        doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[len(tokens)] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     boxes_tokens.append(all_doc_boxes_tokens[split_token_index])
@@ -240,7 +248,7 @@ class DocVQA(Dataset):
                 spans_input_mask = spans_input_mask[0:max_span_num]
                 spans_segment_ids = spans_segment_ids[0:max_span_num]
                 spans_boxes_tokens = spans_boxes_tokens[0:max_span_num]
-                p_index = p_index[0:512*max_span_num]
+                p_index = p_index[0:512 * max_span_num]
             while len(spans_input_ids) < max_span_num:
                 tokens = []
                 boxes_tokens = []
@@ -281,8 +289,8 @@ class DocVQA(Dataset):
             labels = ["O"] * (spans_input_ids[0].index(sep_id) + 1) + labels
             if len(labels) > 512:
                 labels = labels[:512]
-            
-            if len(labels)<512:
+
+            if len(labels) < 512:
                 labels += ["O"] * (512 - len(labels))
             assert len(spans_input_ids[0]) == len(labels)
 
@@ -291,20 +299,19 @@ class DocVQA(Dataset):
                 if l not in label_map:
                     label_ids.append(0)
                 else:
-                    label_ids.append(label_map[l]) 
-                         
+                    label_ids.append(label_map[l])
+
             feature = DocVQAFeatures(
-                        unique_id=unique_id,
-                        q_id=example.q_id,
-                        example_index=example_index,
-                        input_ids=spans_input_ids,
-                        input_mask=spans_input_mask,
-                        segment_ids=spans_segment_ids,
-                        boxes=spans_boxes_tokens,
-                        p_index=p_index,
-                        image=example.image,
-                        label=label_ids,
-                        )
+                unique_id=unique_id,
+                q_id=example.q_id,
+                example_index=example_index,
+                input_ids=spans_input_ids,
+                input_mask=spans_input_mask,
+                segment_ids=spans_segment_ids,
+                boxes=spans_boxes_tokens,
+                p_index=p_index,
+                image=example.image,
+                label=label_ids, )
             features.append(feature)
             unique_id += 1
         return features
@@ -314,7 +321,7 @@ class DocVQA(Dataset):
         examples = []
         for sample in tqdm(data, total=len(data)):
             q_id = sample["id"]
-            image = sample["id"] # No Use
+            image = sample["id"]  # No Use
             question = sample["question"]
             doc_tokens = sample["document"]
             doc_boxes = sample["document_bbox"]
@@ -322,8 +329,10 @@ class DocVQA(Dataset):
             # only for the first label
             labels = sample['labels'][:480]
 
-            x_min, y_min = min(doc_boxes, key=lambda x: x[0])[0], min(doc_boxes, key=lambda x: x[2])[2]
-            x_max, y_max = max(doc_boxes, key=lambda x: x[1])[1], max(doc_boxes, key=lambda x: x[3])[3]
+            x_min, y_min = min(doc_boxes, key=lambda x: x[0])[0], min(
+                doc_boxes, key=lambda x: x[2])[2]
+            x_max, y_max = max(doc_boxes, key=lambda x: x[1])[1], max(
+                doc_boxes, key=lambda x: x[3])[3]
             width = x_max - x_min
             height = y_max - y_min
 
@@ -334,42 +343,37 @@ class DocVQA(Dataset):
                 scale_x = 1000 / max(width, height)
                 scale_y = 1000 / max(width, height)
 
-            scaled_doc_boxes = [ [
-                round((b[0] - x_min) * scale_x),
-                round((b[2] - y_min) * scale_y),
-                round((b[1] - x_min) * scale_x),
+            scaled_doc_boxes = [[
+                round((b[0] - x_min) * scale_x), round(
+                    (b[2] - y_min) * scale_y), round((b[1] - x_min) * scale_x),
                 round((b[3] - y_min) * scale_y)
-                ] for b in doc_boxes]
+            ] for b in doc_boxes]
 
-            
             for box, oribox in zip(scaled_doc_boxes, doc_boxes):
                 if box[0] < 0:
-                    print (box, oribox)
-                if box[2] - box[0] <0:
-                    print (box, oribox)
-                if box[3] - box[1] <0:
-                    print (box, oribox)
+                    print(box, oribox)
+                if box[2] - box[0] < 0:
+                    print(box, oribox)
+                if box[3] - box[1] < 0:
+                    print(box, oribox)
                 for pos in box:
                     if pos > 1000:
-                        print (width, height, box, oribox)
-            
+                        print(width, height, box, oribox)
+
             example = DocVQAExample(
-                        q_id=q_id,
-                        image=image,
-                        question=question,
-                        doc_tokens=doc_tokens,
-                        doc_boxes=scaled_doc_boxes,
-                        answer=answer,
-                        labels=labels
-                        )
+                q_id=q_id,
+                image=image,
+                question=question,
+                doc_tokens=doc_tokens,
+                doc_boxes=scaled_doc_boxes,
+                answer=answer,
+                labels=labels)
             examples.append(example)
         return examples
 
     def get_label_maps_docvqa(self):
 
-        labels = [
-            "O", "I-ans", "B-ans", "E-ans"
-        ]
+        labels = ["O", "I-ans", "B-ans", "E-ans"]
         label2id_map = {label: idx for idx, label in enumerate(labels)}
         return label2id_map
 
@@ -384,7 +388,7 @@ class DocVQA(Dataset):
             for index, line in enumerate(f):
                 data.append(json.loads(line.strip()))
 
-             # read the examples from train/test xlm files
+            # read the examples from train/test xlm files
             examples = self.create_examples(data)
 
         # should be configured
@@ -393,7 +397,8 @@ class DocVQA(Dataset):
         max_doc_length = 512
         max_span_num = 1
         features = self.convert_examples_to_features(
-            examples, self.tokenizer,
+            examples,
+            self.tokenizer,
             max_seq_length=max_length,
             max_doc_length=max_doc_length,
             max_span_num=max_span_num,
@@ -401,18 +406,28 @@ class DocVQA(Dataset):
             label_list=["O", "I-ans", "B-ans", "E-ans"],
             output_mode=None)
 
-        all_input_ids = paddle.to_tensor([f.input_ids for f in features], dtype="int64")
-        all_input_mask = paddle.to_tensor([f.input_mask for f in features], dtype="int64")
-        all_segment_ids = paddle.to_tensor([f.segment_ids for f in features], dtype="int64")
-        all_bboxes = paddle.to_tensor([f.boxes for f in features], dtype="int64")
-        all_p_index = paddle.to_tensor([f.p_index for f in features], dtype="int64")
-        all_labels = paddle.to_tensor([f.label for f in features], dtype="int64")
-        self.sample_list = [np.array(all_input_ids), np.array(all_input_mask), np.array(all_segment_ids), np.array(all_bboxes), np.array(all_labels)]
-    
+        all_input_ids = paddle.to_tensor(
+            [f.input_ids for f in features], dtype="int64")
+        all_input_mask = paddle.to_tensor(
+            [f.input_mask for f in features], dtype="int64")
+        all_segment_ids = paddle.to_tensor(
+            [f.segment_ids for f in features], dtype="int64")
+        all_bboxes = paddle.to_tensor(
+            [f.boxes for f in features], dtype="int64")
+        all_p_index = paddle.to_tensor(
+            [f.p_index for f in features], dtype="int64")
+        all_labels = paddle.to_tensor(
+            [f.label for f in features], dtype="int64")
+        self.sample_list = [
+            np.array(all_input_ids), np.array(all_input_mask),
+            np.array(all_segment_ids), np.array(all_bboxes),
+            np.array(all_labels)
+        ]
+
     def __getitem__(self, idx):
-        return self.sample_list[0][idx], self.sample_list[1][idx], self.sample_list[2][idx], self.sample_list[3][idx], self.sample_list[4][idx]
+        return self.sample_list[0][idx], self.sample_list[1][
+            idx], self.sample_list[2][idx], self.sample_list[3][
+                idx], self.sample_list[4][idx]
 
     def __len__(self, ):
         return self.sample_list[0].shape[0]
-
-    
