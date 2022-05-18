@@ -36,12 +36,12 @@
 
 ## 2. 应用示例
 
-以下是UIEPrompt统一建模示例：
+以下是UIE的Prompt统一建模示例：
 
 #### 实体抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/168986057-7990188c-a1b0-424b-8add-8a017a8893f7.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/168991620-4925a493-9034-4e46-a869-182341c3cf5c.png height=300 hspace='10'/>
 </div>
 
 #### 关系抽取
