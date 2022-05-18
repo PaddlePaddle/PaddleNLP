@@ -16,7 +16,7 @@
 MODEL_DIR=$1
 
 task_name=chid
-cards="4,5,6,7"
+cards="0,1,2,3"
 nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
 
 task_name=c3
