@@ -144,5 +144,16 @@ python -u  -m paddle.distributed.fleet.launch \
 
 除了上述混合并行策略外，飞桨还支持重计算、offload、混合精度等策略，来减少显存占用、加速训练。更多具体内容可以参考稿件:[飞桨分布式训练又推新品，4D混合并行可训千亿级AI模型](https://baijiahao.baidu.com/s?id=1697085717806202673)。
 
+### 飞桨超大模型部署
+
+飞桨超大模型部署工具：
+
+- Paddle Fleet: 飞桨训练自适应并行技术，同样适应于超大模型部署，针对推理硬件自适应切分
+- Paddle Inference: 支持模型并行、流水线并行、混合并行策略，经过极致优化，性能领先
+- Paddle Serving: 支持服务化部署，支持自动Batch、容错调度、服务监控、负载均衡
+- Paddle Slim: 支持超大模型量化、稀疏压缩
+
+具体部署示例参考[GPT-3超大模型部署教程](deploy)
+
 ### 参考文献
 - [Language Models are Few-Shot Learners](https://arxiv.org/pdf/2005.14165.pdf)
