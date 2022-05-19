@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test training benchmark for a model.
-# Usage：bash benchmark/run_benchmark.sh ${model_item} ${fp_item} ${mp_degree} ${pp_degree} ${dp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num}
+# Usage：bash benchmark/run_benchmark.sh ${model_item} ${fp_item} ${mp_degree} ${pp_degree} ${dp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num} ${use_sharding}
 function _set_params(){
     model_item=${1:-"model_item"}   # (必选) 模型 item
     fp_item=${2:-"fp32"}            # (必选) fp32|fp16
@@ -18,6 +18,7 @@ function _set_params(){
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     max_iter=${10:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    use_sharding=${11:-"true"}               # （可选) 是否使用ShardingOptimizer
     num_workers=0                  # (可选)
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
@@ -62,7 +63,7 @@ function _train(){
         use_fp16_cmd="--use_amp true"
     fi
 
-    data_path="./data/"
+    data_path="./train_data/"
 
     train_cmd="${add_options} \
                --micro_batch_size=${micro_batch_size} \
@@ -95,42 +96,53 @@ function _train(){
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python -u ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
         ;;
     DP2-MP1-PP1)  echo "run run_mode: DP2-MP1-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     DP1-MP4-PP1)  echo "run run_mode: DP1-MP4-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     DP1-MP1-PP4)  echo "run run_mode: DP1-MP1-PP4"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=3
 	;;
     DP2-MP4-PP1)  echo "run run_mode: DP2-MP4-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     DP2-MP2-PP2)  echo "run run_mode: DP2-MP2-PP2"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=7
 	;;
     DP2-MP8-PP2)  echo "run run_mode: DP2-MP8-PP2"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     DP1-MP8-PP4)  echo "run run_mode: DP1-MP8-PP4"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     DP4-MP8-PP1)  echo "run run_mode: DP4-MP8-PP1"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
-              ${static_scripts}/run_pretrain_static.py ${train_cmd}"
+              run_pretrain_static.py ${train_cmd}"
+        workerlog_id=0
 	;;
     *) echo "choose run_mode "; exit 1;
     esac
+    cd ../examples/language_model/gpt-3/static/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     timeout 15m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
@@ -141,13 +153,13 @@ function _train(){
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
         rm ${log_file}
-        cp mylog/workerlog.0 ${log_file}
+        cp mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 
-xport PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
-source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+#source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-# _train       # 如果只产出训练log,不解析,可取消注释
+#_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
