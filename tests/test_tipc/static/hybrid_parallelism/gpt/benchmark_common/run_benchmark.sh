@@ -70,7 +70,7 @@ function _train(){
                --micro_batch_size=${micro_batch_size} \
                --global_batch_size=${global_batch_size} \
                --model_type="gpt" \
-               --model_name_or_path="gpt2-en" \
+               --model_name_or_path="gpt2-medium-en" \
                --input_dir=${data_path} \
                --output_dir=${OUTPUT_PATH} \
                --dp_degree=${dp_degree} \
