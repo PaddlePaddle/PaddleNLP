@@ -910,8 +910,11 @@ class GPTForGeneration(GPTPretrainedModel):
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
         if topo is not None and topo.mp_info.size > 1:
+            hybrid_groups = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hybrid_groups.get_model_parallel_group()
+
             input_parallel = paddle.distributed.collective._c_identity(
-                lm_output, group=None)
+                lm_output, group=model_parallel_group)
 
             logits = paddle.matmul(
                 input_parallel, logit_weights, transpose_y=True)
@@ -919,8 +922,8 @@ class GPTForGeneration(GPTPretrainedModel):
             if parallel_output:
                 return logits
 
-            # TODO(qinqing): collective._c_concat is not support in static graph now
-            return paddle.distributed.collective._c_concat(logits, group=None)
+            return paddle.distributed.collective._c_concat(
+                logits, group=model_parallel_group)
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
             return logits
