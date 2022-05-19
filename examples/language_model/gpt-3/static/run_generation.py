@@ -114,11 +114,26 @@ def do_generation(args):
     # Initialize the paddle and paddle fleet execute environment
     paddle.enable_static()
 
+    assert args.dp_degree == 1, "Data parallel is not supported in inference"
+    assert args.sharding_degree == 1, "Sharding parallel is temporarily not supported in inference"
+    assert args.pp_degree == 1, "Pipeline parallel will be supported later"
+
+    if args.mp_degree == 1:
+        args.mp_degree = paddle.distributed.get_world_size()
+    else:
+        assert args.mp_degree == paddle.distributed.get_world_size(), \
+            "If mp_degree is specified, the size must be the same as world_size"
+
     strategy = fleet.DistributedStrategy()
-    strategy.hybrid_configs = {"dp_degree": 1, "mp_degree": 2, "pp_degree": 1}
+    strategy.tensor_parallel = True
+    strategy.tensor_parallel_configs = {
+        "tensor_parallel_degree": args.mp_degree
+    }
+
     fleet.init(is_collective=True, strategy=strategy)
 
-    group = paddle.distributed.init_parallel_env()
+    # temp use dynamic init, use HybridParallelInferenceHelper in future?
+    paddle.distributed.init_parallel_env()
 
     # Create the random seed for the worker
     random.seed(args.seed)
