@@ -160,7 +160,6 @@ def parse_args(MODEL_CLASSES):
         type=int,
         default=10,
         help="Evaluate the model use X steps data.")
-
     # Config for 4D Parallelism
     parser.add_argument(
         "--use_sharding",
@@ -258,6 +257,46 @@ def parse_args(MODEL_CLASSES):
         default=None,
         help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
+    parser.add_argument(
+        "--max_dec_len",
+        type=int,
+        default=20,
+        help="The maximum length of decoded sequence.", )
+    parser.add_argument(
+        "--decoding_strategy",
+        type=str,
+        default="topk_sampling",
+        choices=["topk_sampling", "topp_sampling", "sampling"],
+        help="The decoding strategy, not support beam_search now!", )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.,
+        help="The temperature in each generation step.")
+    # top-k sampling
+    parser.add_argument(
+        "--topk",
+        type=int,
+        default=10,
+        help="The hyper-parameter in top-k sampling..")
+    # top-p sampling
+    parser.add_argument(
+        "--topp",
+        type=float,
+        default=0.9,
+        help="The hyper-parameter in top-p sampling.")
+    # beam search
+    parser.add_argument(
+        "--beam_size",
+        type=int,
+        default=1,
+        help="The hyper-parameter in beam search.")
+    parser.add_argument(
+        "--save_inference_model_then_exist",
+        type=bool,
+        default=False,
+        help="save_inference_model_then_exist")
+
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 
