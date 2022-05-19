@@ -47,7 +47,7 @@ struct WordPiece : public Model {
       size_t max_input_chars_per_word = 100,
       const std::string& continuing_subword_prefix = "##");
 
-private:
+protected:
   core::Vocab vocab_;
   core::VocabReversed vocab_reversed_;
   std::string unk_token_;
@@ -77,5 +77,5 @@ struct WordPieceFactory {
   void GetVocabFromFiles(const std::string& files);
 };
 
-}  // model
+}  // models
 }  // tokenizers

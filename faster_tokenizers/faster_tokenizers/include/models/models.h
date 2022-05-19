@@ -14,5 +14,6 @@ limitations under the License. */
 
 #pragma once
 
+#include "models/faster_wordpiece.h"
 #include "models/model.h"
 #include "models/wordpiece.h"
