@@ -36,7 +36,9 @@ PyObject* ToPyObject(const std::vector<size_t>& value);
 PyObject* ToPyObject(const std::vector<float>& value);
 PyObject* ToPyObject(const std::vector<double>& value);
 PyObject* ToPyObject(const std::vector<std::vector<size_t>>& value);
+PyObject* ToPyObject(const std::vector<std::string>& value);
 
+bool PyObject_CheckLongOrConvertToLong(PyObject** obj);
 bool CastPyArg2AttrBoolean(PyObject* obj, ssize_t arg_pos);
 std::string CastPyArg2AttrString(PyObject* obj, ssize_t arg_pos);
 int CastPyArg2AttrInt(PyObject* obj, ssize_t arg_pos);
@@ -45,5 +47,54 @@ size_t CastPyArg2AttrSize_t(PyObject* obj, ssize_t arg_pos);
 float CastPyArg2AttrFloat(PyObject* obj, ssize_t arg_pos);
 std::vector<std::string> CastPyArg2VectorOfStr(PyObject* obj, size_t arg_pos);
 
+template <typename T>
+std::vector<T> CastPyArg2VectorOfInt(PyObject* obj, size_t arg_pos) {
+  std::vector<T> result;
+  if (PyList_Check(obj)) {
+    Py_ssize_t len = PyList_Size(obj);
+    PyObject* item = nullptr;
+    for (Py_ssize_t i = 0; i < len; i++) {
+      item = PyList_GetItem(obj, i);
+      if (PyObject_CheckLongOrConvertToLong(&item)) {
+        result.emplace_back(static_cast<T>(PyLong_AsLong(item)));
+      } else {
+        std::ostringstream oss;
+        oss << "argument (position " << arg_pos + 1
+            << "must be list of int, but got "
+            << reinterpret_cast<PyTypeObject*>(item->ob_type)->tp_name
+            << " at pos " << i;
+        throw oss.str();
+        return {};
+      }
+    }
+  } else if (PyTuple_Check(obj)) {
+    Py_ssize_t len = PyTuple_Size(obj);
+    PyObject* item = nullptr;
+    for (Py_ssize_t i = 0; i < len; i++) {
+      item = PyTuple_GetItem(obj, i);
+      if (PyObject_CheckLongOrConvertToLong(&item)) {
+        result.emplace_back(static_cast<T>(PyLong_AsLong(item)));
+      } else {
+        std::ostringstream oss;
+        oss << "argument (position " << arg_pos + 1
+            << "must be list of int, but got "
+            << reinterpret_cast<PyTypeObject*>(item->ob_type)->tp_name
+            << " at pos " << i;
+        throw oss.str();
+        return {};
+      }
+    }
+  } else if (obj == Py_None) {
+    return {};
+  } else {
+    std::ostringstream oss;
+    oss << "argument (position " << arg_pos + 1
+        << "must be list or tuple, but got "
+        << reinterpret_cast<PyTypeObject*>(obj->ob_type)->tp_name;
+    throw oss.str();
+    return {};
+  }
+  return result;
+}
 }  // pybind
 }  // tokenizers

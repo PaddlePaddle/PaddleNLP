@@ -1,0 +1,8 @@
+datasets
+h5py
+multiprocess
+numpy
+paddlenlp
+scipy
+wandb
+tqdm

@@ -55,7 +55,7 @@ class AddedToken:
 
 
 @dataclass
-class EncodingFast:
+class FasterEncoding:
     """This is dummy class reserved for fast tokenizer"""
 
     pass
@@ -197,14 +197,14 @@ class BatchEncoding(UserDict):
     def __init__(
             self,
             data: Optional[Dict[str, Any]]=None,
-            encoding: Optional[Union[EncodingFast, Sequence[
-                EncodingFast]]]=None,
+            encoding: Optional[Union[FasterEncoding, Sequence[
+                FasterEncoding]]]=None,
             tensor_type: Union[None, str]=None,
             prepend_batch_axis: bool=False,
             n_sequences: Optional[int]=None, ):
         super().__init__(data)
 
-        if isinstance(encoding, EncodingFast):
+        if isinstance(encoding, FasterEncoding):
             encoding = [encoding]
 
         self._encodings = encoding
@@ -229,12 +229,12 @@ class BatchEncoding(UserDict):
     @property
     def is_fast(self) -> bool:
         """
-        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedTokenizerFast`]
+        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedFasterTokenizer`]
         or not.
         """
         return self._encodings is not None
 
-    def __getitem__(self, item: Union[int, str]) -> Union[Any, EncodingFast]:
+    def __getitem__(self, item: Union[int, str]) -> Union[Any, FasterEncoding]:
         """
         If the key is a string, returns the value of the dict associated to `key` ('input_ids', 'attention_mask',
         etc.).
@@ -281,9 +281,9 @@ class BatchEncoding(UserDict):
     # not yet supported
 
     @property
-    def encodings(self) -> Optional[List[EncodingFast]]:
+    def encodings(self) -> Optional[List[FasterEncoding]]:
         """
-        `Optional[List[EncodingFast]]`: The list all encodings from the tokenization process. Returns `None` if
+        `Optional[List[FasterEncoding]]`: The list all encodings from the tokenization process. Returns `None` if
         the input was tokenized through Python (i.e., not a fast) tokenizer.
         """
         return self._encodings
@@ -543,8 +543,8 @@ class BatchEncoding(UserDict):
         else:
             batch_index = 0
             token_index = batch_or_token_index
-        return CharSpan(*(self._encodings[batch_index].token_to_chars(
-            token_index)))
+        return CharSpan(*(
+            self._encodings[batch_index].token_to_chars(token_index)))
 
     def char_to_token(self,
                       batch_or_char_index: int,
@@ -1280,7 +1280,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         - **pretrained_init_configuration** (`Dict[str, Dict[str, Any]]`) -- A dictionary with, as keys, the
             `short-cut-names` of the pretrained models, and as associated values, a dictionary of specific arguments to
             pass to the `__init__` method of the tokenizer class for this pretrained model when loading the tokenizer
-            with the [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`] method.
+            with the [`~tokenizer_utils_base.PretrainedTokenizerBase.from_pretrained`] method.
         - **model_input_names** (`List[str]`) -- A list of inputs expected in the forward pass of the model.
         - **padding_side** (`str`) -- The default value for the side on which the model should have padding applied.
             Should be `'right'` or `'left'`.
@@ -1290,7 +1290,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     Args:
         model_max_length (`int`, *optional*):
             The maximum length (in number of tokens) for the inputs to the transformer model. When the tokenizer is
-            loaded with [`~tokenizer_utils_base.PreTrainedTokenizerBase.from_pretrained`], this will be set to the
+            loaded with [`~tokenizer_utils_base.PretrainedTokenizerBase.from_pretrained`], this will be set to the
             value stored for the associated model in `max_model_input_sizes` (see above). If no value is provided, will
             default to VERY_LARGE_INTEGER (`int(1e30)`).
         padding_side (`str`, *optional*):
@@ -1401,7 +1401,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 pair=False) and self.verbose:
             if not self.deprecation_warnings.get("max_len_single_sentence",
                                                  False):
-                logger.warning(
+                warnings.warn(
                     "Setting 'max_len_single_sentence' is now deprecated. "
                     "This value is automatically set up.")
             self.deprecation_warnings["max_len_single_sentence"] = True
@@ -1417,7 +1417,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 pair=True) and self.verbose:
             if not self.deprecation_warnings.get("max_len_sentences_pair",
                                                  False):
-                logger.warning(
+                warnings.warn(
                     "Setting 'max_len_sentences_pair' is now deprecated. "
                     "This value is automatically set up.")
             self.deprecation_warnings["max_len_sentences_pair"] = True
@@ -1548,14 +1548,17 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     resolved_vocab_files[file_id] = get_path_from_url(
                         file_path, default_root)
                 except RuntimeError as err:
-                    logger.error(err)
-                    raise RuntimeError(
-                        f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                        "- a correct model-identifier of built-in pretrained models,\n"
-                        "- or a correct model-identifier of community-contributed pretrained models,\n"
-                        "- or the correct path to a directory containing relevant tokenizer files.\n"
-                    )
+                    if file_id not in cls.resource_files_names:
+                        resolved_vocab_files[file_id] = None
+                    else:
+                        logger.error(err)
+                        raise RuntimeError(
+                            f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+                            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                            "- a correct model-identifier of built-in pretrained models,\n"
+                            "- or a correct model-identifier of community-contributed pretrained models,\n"
+                            "- or the correct path to a directory containing relevant tokenizer files.\n"
+                        )
 
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -1868,7 +1871,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if verbose:
                 if not self.deprecation_warnings.get(
                         "Truncation-not-explicitly-activated", False):
-                    logger.warning(
+                    warnings.warn(
                         "Truncation was not explicitly activated but `max_length` is provided a specific value, "
                         "please use `truncation=True` to explicitly truncate examples to max length. "
                         "Defaulting to 'longest_first' truncation strategy. "
@@ -1947,7 +1950,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     if verbose:
                         if not self.deprecation_warnings.get(
                                 "Asking-to-pad-to-max_length", False):
-                            logger.warning(
+                            warnings.warn(
                                 "Asking to pad to max_length but no maximum length is provided and the model has no predefined maximum length. "
                                 "Default to no padding.")
                         self.deprecation_warnings[
@@ -1961,7 +1964,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     if verbose:
                         if not self.deprecation_warnings.get(
                                 "Asking-to-truncate-to-max_length", False):
-                            logger.warning(
+                            warnings.warn(
                                 "Asking to truncate to max_length but no maximum length is provided and the model has no predefined maximum length. "
                                 "Default to no truncation.")
                         self.deprecation_warnings[
@@ -2509,7 +2512,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return_tensors (`str` or [`TensorType`], *optional*):
                 If set, will return tensors instead of list of python integers. Acceptable values are:
 
-                - `'pd'`: Return Paddle `torch.Tensor` objects.
+                - `'pd'`: Return Paddle `paddle.Tensor` objects.
                 - `'np'`: Return Numpy `np.ndarray` objects.
             verbose (`bool`, *optional*, defaults to `True`):
                 Whether or not to print more information and warnings.
@@ -2884,7 +2887,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     )
                 logger.error(error_msg)
         elif truncation_strategy == TruncationStrategy.LONGEST_FIRST:
-            logger.warning(
+            warnings.warn(
                 f"Be aware, overflowing tokens are not returned for the setting you have chosen,"
                 f" i.e. sequence pairs with the '{TruncationStrategy.LONGEST_FIRST.value}' "
                 f"truncation strategy. So the returned list will always be empty even if some "
@@ -3045,7 +3048,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
     def batch_decode(self,
                      sequences: Union[List[int], List[List[int]], "np.ndarray",
-                                      "torch.Tensor", "tf.Tensor"],
+                                      "paddle.Tensor"],
                      skip_special_tokens: bool=False,
                      clean_up_tokenization_spaces: bool=True,
                      **kwargs) -> List[str]:
@@ -3053,7 +3056,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Convert a list of lists of token ids into a list of strings by calling decode.
 
         Args:
-            sequences (`Union[List[int], List[List[int]], np.ndarray, torch.Tensor, tf.Tensor]`):
+            sequences (`Union[List[int], List[List[int]], np.ndarray, paddle.Tensor]`):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
@@ -3085,7 +3088,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         Similar to doing `self.convert_tokens_to_string(self.convert_ids_to_tokens(token_ids))`.
 
         Args:
-            token_ids (`Union[int, List[int], np.ndarray, paddle.Tensor, tf.Tensor]`):
+            token_ids (`Union[int, List[int], np.ndarray, paddle.Tensor]`):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
@@ -3183,7 +3186,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if not self.deprecation_warnings.get(
                     "sequence-length-is-longer-than-the-specified-maximum",
                     False):
-                logger.warning(
+                warnings.warn(
                     "Token indices sequence length is longer than the specified maximum sequence length "
                     f"for this model ({len(ids)} > {self.model_max_length}). Running this sequence through the model "
                     "will result in indexing errors")

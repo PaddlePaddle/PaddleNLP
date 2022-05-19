@@ -28,7 +28,7 @@
 本项目针对中文文本分类问题，开源了一系列模型，供用户可配置地使用：
 
 + BERT([Bidirectional Encoder Representations from Transformers](https://arxiv.org/abs/1810.04805))中文模型，简写`bert-base-chinese`， 其由12层Transformer网络组成。
-+ ERNIE([Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223))，支持ERNIE 1.0中文模型（简写`ernie-1.0`）和ERNIE Tiny中文模型（简写`ernie-tiny`)。
++ ERNIE([Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223))，支持ERNIE 1.0中文模型（简写`ernie-1.0-base-zh`）和ERNIE Tiny中文模型（简写`ernie-tiny`)。
    其中`ernie`由12层Transformer网络组成，`ernie-tiny`由3层Transformer网络组成。
 + RoBERTa([A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692))，支持24层Transformer网络的`roberta-wwm-ext-large`和12层Transformer网络的`roberta-wwm-ext`。
 
@@ -37,7 +37,7 @@
 | bert-base-chinese  | 0.93833 | 0.94750 |
 | bert-wwm-chinese | 0.94583 | 0.94917 |
 | bert-wwm-ext-chinese | 0.94667 | 0.95500 |
-| ernie-1.0  | 0.94667  | 0.95333  |
+| ernie-1.0-base-zh  | 0.94667  | 0.95333  |
 | ernie-tiny  | 0.93917  | 0.94833 |
 | roberta-wwm-ext  | 0.94750  | 0.95250 |
 | roberta-wwm-ext-large | 0.95250 | 0.95333 |
@@ -94,16 +94,16 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 
 ```python
 # 使用ernie预训练模型
-# ernie-1.0
-model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0',num_classes=2))
-tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+# ernie-1.0-base-zh
+model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0-base-zh',num_classes=2))
+tokenizer = AutoTokenizer.from_pretrained('ernie-1.0-base-zh')
 
 # 使用bert预训练模型
 # bert-base-chinese
 model = AutoModelForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
 tokenizer = AutoTokenizer.from_pretrained('bert-base-chinese')
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
+更多预训练模型，参考[transformers](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
