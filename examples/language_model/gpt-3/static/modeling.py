@@ -155,6 +155,11 @@ class MultiHeadAttention(nn.Layer):
             # for decoder self-attention in inference
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
+
+            ## if not assign here, assign in While loop
+            #layers.assign(k, cache.k)    # update caches
+            #layers.assign(v, cache.v)
+
         if use_cache is True:
             cache = self.Cache(k, v)
 
@@ -318,12 +323,20 @@ class TransformerDecoder(nn.Layer):
                                  cache=cache)
 
             else:
-                output, new_cache = mod(output,
-                                        memory,
-                                        tgt_mask=tgt_mask,
-                                        use_cache=use_cache,
-                                        cache=cache[i])
-                new_caches.append(new_cache)
+                if use_cache:
+                    output, new_cache = mod(output,
+                                            memory,
+                                            tgt_mask=tgt_mask,
+                                            use_cache=use_cache,
+                                            cache=cache[i])
+                    new_caches.append(new_cache)
+                else:
+                    output = mod(output,
+                                 memory,
+                                 tgt_mask=tgt_mask,
+                                 use_cache=use_cache,
+                                 cache=cache[i])
+
             self.checkpoints.append(output.name)
 
         if self.norm is not None:
@@ -682,6 +695,9 @@ class GPTModel(GPTPretrainedModel):
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+        self.num_attention_heads = num_attention_heads
+        self.num_hidden_layers = num_hidden_layers
+        self.hidden_size = hidden_size
 
         self.pipline_mode = topo is not None and topo.pp_info.size > 1
         if self.pipline_mode:
@@ -745,29 +761,18 @@ class GPTModel(GPTPretrainedModel):
                 paddle.shape(input_ids)[-1] + past_length,
                 dtype='int64')
             position_ids = position_ids.unsqueeze(0)
-            # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
-        causal_mask = paddle.tensor.triu(
-            paddle.ones((paddle.shape(input_ids)[-1],
-                         paddle.shape(input_ids)[-1])) * -1e4,
-            diagonal=1)
-        if attention_mask is not None:
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = attention_mask + causal_mask
-        else:
-            attention_mask = causal_mask
-        # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
-
+        tgt_mask = None
+        if not self.training:
+            tgt_mask = attention_mask
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=attention_mask,
+            tgt_mask=tgt_mask,
             use_cache=use_cache,
             cache=cache)
         self.checkpoints.extend(self.decoder.checkpoints)
@@ -874,6 +879,34 @@ class GPTForGeneration(GPTPretrainedModel):
         self.temperature = temperature
         self.topk = top_k
         self.topp = top_p
+        self._fuse = False
+        self._init_gen_cache = False
+        self.generation_caches = []
+        self._dtype = "float32"
+
+    def _init_generation_caches(self, src_ids):
+        if self._init_gen_cache:
+            return self.generation_caches
+
+        num_heads = self.gpt.num_attention_heads
+        num_layers = self.gpt.num_hidden_layers
+        mp_n_head = num_heads // self.gpt.topo.mp_info.size
+        hidden_size = self.gpt.hidden_size
+        head_size = hidden_size // num_heads
+        for i in range(num_layers):
+            k = layers.fill_constant_batch_size_like(
+                input=src_ids,
+                shape=[-1, mp_n_head, 0, head_size],
+                dtype=self._dtype,
+                value=0)
+            v = layers.fill_constant_batch_size_like(
+                input=src_ids,
+                shape=[-1, mp_n_head, 0, head_size],
+                dtype=self._dtype,
+                value=0)
+            self.generation_caches.append(MultiHeadAttention.Cache(k, v))
+        self._init_gen_cache = True
+        return self.generation_caches
 
     def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
         if topo is not None and topo.mp_info.size > 1:
@@ -886,13 +919,13 @@ class GPTForGeneration(GPTPretrainedModel):
             if parallel_output:
                 return logits
 
-            paddle.distributed.init_parallel_env()
+            # TODO(qinqing): collective._c_concat is not support in static graph now
             return paddle.distributed.collective._c_concat(logits, group=None)
         else:
             logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
             return logits
 
-    def TopKSampling(self, probs):
+    def topk_sampling(self, probs):
         topk_probs, _ = paddle.topk(probs, self.topk)
         ge_cond = paddle.cast(
             paddle.greater_equal(probs,
@@ -904,7 +937,7 @@ class GPTForGeneration(GPTPretrainedModel):
         probs = old_probs
         return probs, sampling_ids
 
-    def TopPSampling(self, probs):
+    def topp_sampling(self, probs):
         sorted_probs, sorted_idx = layers.argsort(probs, descending=True)
         cum_sorted_probs = layers.cumsum(sorted_probs, axis=1, exclusive=True)
         lt_cond = paddle.cast(
@@ -914,12 +947,13 @@ class GPTForGeneration(GPTPretrainedModel):
                                  cum_sorted_probs.dtype, self.topp)), "float32")
         old_probs = probs
         candidate_probs = sorted_probs * lt_cond
-        probs = candidate_probs / layers.reduce_sum(
-            candidate_probs, dim=-1, keep_dim=True)
+        probs = candidate_probs / paddle.sum(candidate_probs,
+                                             axis=-1,
+                                             keep_dim=True)
         sampling_ids = layers.sampling_id(probs, dtype="int")
         sampling_ids = paddle.index_sample(sorted_idx,
                                            paddle.unsqueeze(sampling_ids, [1]))
-        sampling_ids = layers.squeeze(sampling_ids, [1])
+        sampling_ids = paddle.squeeze(sampling_ids, [1])
         probs = old_probs
         return probs, sampling_ids
 
@@ -958,8 +992,27 @@ class GPTForGeneration(GPTPretrainedModel):
         position_ids = inputs['pos_ids'] if 'pos_ids' in inputs else None
         attention_mask = inputs[
             'input_mask'] if 'input_mask' in inputs else None
+
+        causal_mask = paddle.tensor.triu(
+            paddle.ones((paddle.shape(input_ids)[-1],
+                         paddle.shape(input_ids)[-1])) * -1e4,
+            diagonal=1)
+        if attention_mask is not None:
+            tgt_pos = paddle.sum(attention_mask, axis=-1,
+                                 keepdim=True).astype('int64')
+            if len(attention_mask.shape) == 2:
+                attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
+            encode_mask = attention_mask + causal_mask
+        else:
+            encode_mask = causal_mask
+
+        # if cached_kvs are assigned to next step in _prepare_qkv of MultiHeadAttention,
+        # need to init the global caches here
+        #gen_caches = self._init_generation_caches(input_ids)
+
         logits, cached_kvs = self.model(
-            input_ids, position_ids, attention_mask, use_cache=True)
+            input_ids, position_ids, encode_mask, use_cache=True)
+
         next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
         ####################################
 
@@ -986,15 +1039,30 @@ class GPTForGeneration(GPTPretrainedModel):
         cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
         cond = paddle.less_than(step_idx, max_len)
 
+        if attention_mask is not None:
+            append_mask = layers.fill_constant_batch_size_like(
+                input=next_id,
+                value=1,
+                shape=[-1, 1, 1, 1],
+                dtype=attention_mask.dtype)
+
         while_op = layers.While(cond, is_test=True)
         with while_op.block():
             pre_ids = layers.array_read(array=ids, i=step_idx)
+            if attention_mask:
+                decode_mask = paddle.concat(
+                    [attention_mask, append_mask], axis=-1)
+                tgt_pos = tgt_pos + step_idx
+                att_mask = (1 - decode_mask) * -1e4
+            else:
+                att_mask = None
+                tgt_pos = None
 
             layers.increment(x=step_idx, value=1.0, in_place=True)
             layers.array_write(placehold_ids, i=step_idx, array=ids)
 
-            logits, cached_kvs = self.model(
-                pre_ids, use_cache=True, cache=cached_kvs)
+            logits, decode_cached_kvs = self.model(
+                pre_ids, tgt_pos, att_mask, use_cache=True, cache=cached_kvs)
 
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)
@@ -1002,9 +1070,9 @@ class GPTForGeneration(GPTPretrainedModel):
             if self.decoding_strategy.startswith("sampling"):
                 sampling_ids = layers.sampling_id(probs, dtype="int")
             elif self.decoding_strategy.startswith("topk_sampling"):
-                probs, sampling_ids = self.TopKSampling(probs)
+                probs, sampling_ids = self.topk_sampling(probs)
             elif self.decoding_strategy.startswith("topp_sampling"):
-                probs, sampling_ids = self.TopPSampling(probs)
+                probs, sampling_ids = self.topp_sampling(probs)
             else:
                 raise ValueError(self.decoding_strategy)
 
@@ -1019,6 +1087,11 @@ class GPTForGeneration(GPTPretrainedModel):
                 x=length_cond, y=finish_cond, out=cond, name="logical_and_cond")
 
             paddle.assign(layers.cast(cond, dtype='bool'), cond)
+            if attention_mask:
+                paddle.assign(decode_mask, attention_mask)
+                for i in range(len(decode_cached_kvs)):
+                    paddle.assign(decode_cached_kvs[i].k, cached_kvs[i].k)
+                    paddle.assign(decode_cached_kvs[i].v, cached_kvs[i].v)
 
         ids, _ = layers.tensor_array_to_tensor(ids)
         return ids

@@ -62,10 +62,10 @@ device_id = int(os.environ.get('FLAGS_selected_gpus', 0))
 
 
 def create_data_holder(args):
-    shapes = [[-1, -1], [-1, args.max_seq_len], [-1, args.max_seq_len]]
+    shapes = [[-1, -1], [-1, -1], [-1, -1]]
     dtypes = [int_type, 'float32', int_type]
-    #names = ['src_ids', 'input_mask', 'pos_ids']  # three inputs
-    names = ['src_ids']  # one input
+    names = ['src_ids', 'input_mask', 'pos_ids']  # three inputs
+    #names = ['src_ids']  # one input
 
     inputs = [
         paddle.static.data(
@@ -233,21 +233,35 @@ def do_generation(args):
     fetchs = [preds]
 
     ### check resutls
-    question = 'Who is the CEO of Apple?'
-    text = "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer:" % question
-    ids = tokenizer(text)["input_ids"]
-    t = paddle.fluid.core.Tensor()
-    t.set(np.array(ids).reshape(1, -1).astype('int64'), place)
+    text = [
+        "Question: Where is the capital of China? Answer:",
+        "Question:Who is the CEO of Apple? Answer:"
+    ]
+    inputs = tokenizer(
+        text,
+        padding=True,
+        return_attention_mask=True,
+        return_position_ids=True)
+    ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype('int64')
+    position_ids = np.array(inputs["position_ids"]).reshape(len(text),
+                                                            -1).astype('int64')
+    attention_mask = np.array(inputs["attention_mask"]).reshape(
+        len(text), -1).astype('float32')
 
-    batch = {'src_ids': t}
-    ret = exe.run(main_program, feed=batch, fetch_list=fetchs)
+    t_ids = paddle.fluid.core.Tensor()
+    t_ids.set(ids, place)
+    t_mask = paddle.fluid.core.Tensor()
+    t_mask.set(attention_mask, place)
+    t_pos = paddle.fluid.core.Tensor()
+    t_pos.set(position_ids, place)
+    feed_data = {'src_ids': t_ids, 'pos_ids': t_pos, 'input_mask': t_mask}
+    ret = exe.run(main_program, feed=feed_data, fetch_list=fetchs)
     ret = np.array(ret[0])
-    ret = [int(x) for x in ret.reshape([-1])]
-    ret_str = tokenizer.convert_ids_to_string(ret)
-
-    out = "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer: %s" % (
-        question, ret_str)
-    logger.info(out)
+    for i in range(ret.shape[0]):
+        o = [int(x) for x in ret[i]]
+        ret_str = tokenizer.convert_ids_to_string(o)
+        ret_str = text[i] + ret_str
+        logger.info(ret_str)
     ##################
 
     for step, batch in enumerate(test_data_loader()):
@@ -261,8 +275,10 @@ def do_generation(args):
         inference_save_path = os.path.join(save_inference_model_dir,
                                            'rank_' + str(fleet.worker_index()),
                                            'step_' + str(0))
-        print("saving inference models to {}".format(inference_save_path),
-              fetchs)
+        print("saving inference models to {}".format(inference_save_path))
+        feed_names = [v.name for v in feeds]
+        fetchs_names = [v.name for v in fetchs]
+        print('feeds: ', feed_names, 'fetches: ', fetchs_names)
         paddle.static.save_inference_model(
             inference_save_path, feeds, fetchs, exe, program=main_program)
 

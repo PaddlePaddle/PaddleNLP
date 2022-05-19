@@ -9,7 +9,7 @@ rm -rf main_sharding*
 task_name="gpt-generation"
 rm -rf output/$task_name/log
 
-python3.7 -u  -m paddle.distributed.fleet.launch \
+python -u  -m paddle.distributed.fleet.launch \
     --gpus "0" \
     --log_dir "output/$task_name/log" run_generation.py \
     --model_type "gpt" \
