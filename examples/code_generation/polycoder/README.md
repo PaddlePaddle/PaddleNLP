@@ -11,9 +11,10 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── dataset.py                     # 数据处理
 ├── lr.py                          # 学习率控制
 ├── README.md                      # 文档
-├── run_generation.py              # 生成入口
-├── run_pretrain.py                # 预训练入口
-├── scripts/                       # 数据处理/训练/生成脚本
+├── run_generation.py              # 生成代码
+├── run_pretrain.py                # 预训练代码
+├── human_eval.py                  # 评估代码
+├── scripts/                       # 数据处理/训练/生成/评估脚本
 └── data_tools/  
     ├── Makefile                   # Makefile
     ├── README.md                  # 文档
