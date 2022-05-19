@@ -13,32 +13,23 @@
 # limitations under the License.
 
 
-export TASK_NAME=$1
-export LR=$2
-export BS=$3
-export EPOCH=$4
-export MAX_SEQ_LEN=$5
-export CUDA_VISIBLE_DEVICES=$6
-export MODEL_PATH=$7
-export grad_acc=$8
+MODEL_PATH=$1
+BATCH_SIZE=$2
+LR=$3
+grd=$4
 git rev-parse HEAD
 
-python -u ./run_clue_classifier.py \
-    --model_name_or_path ${MODEL_PATH} \
-    --task_name ${TASK_NAME} \
-    --max_seq_length ${MAX_SEQ_LEN} \
-    --batch_size ${BS}   \
-    --learning_rate ${LR} \
-    --num_train_epochs ${EPOCH} \
-    --logging_steps 100 \
-    --seed 42  \
-    --save_steps  100 \
-    --warmup_proportion 0.1 \
-    --weight_decay 0.01 \
-    --adam_epsilon 1e-8 \
-    --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/ \
-    --device gpu  \
-    --gradient_accumulation_steps ${grad_acc} \
-    --do_train \
-    --dropout $9 \
 
+logdir=${MODEL_PATH}/chid_log
+mkdir ${logdir}
+python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_chid.py \
+    --model_name_or_path ${MODEL_PATH} \
+    --batch_size ${BATCH_SIZE} \
+    --learning_rate ${LR} \
+    --max_seq_length 64 \
+    --num_train_epochs 3 \
+    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BS}/ \
+    --warmup_proportion 0.06 \
+    --do_train \
+    --gradient_accumulation_steps ${grd} \
+    --weight_decay 0.01 \

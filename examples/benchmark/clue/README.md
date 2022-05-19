@@ -653,6 +653,27 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 ```
 需要注意的是，如果显存无法容纳所传入的 `batch_size`，可以通过传入 `gradient_accumulation_steps` 参数来模拟该 `batch_size`。
 
+### 批量启动 grid search 任务
+
+```shell
+
+cd tools
+# 7 个分类任务
+# 12组超参视为12组实验，可以起3组4卡实验，也可以起1组8卡实验，
+# 对于32G 8 GPUs 卡机器，base 模型可以选1组8卡，large 需要3组4卡
+
+# 方法一：3代表模式3，1组8卡实验
+bash run_all_cls.sh ernie-3.0-medium-zh 3
+# 方法二：0、1、2分别代表模式0、1、2，代表起了3组4卡实验
+bash run_all_cls.sh ernie-3.0-medium-zh 0
+bash run_all_cls.sh ernie-3.0-medium-zh 1
+bash run_all_cls.sh ernie-3.0-medium-zh 2
+
+
+# 3 个阅读理解任务
+
+```
+
 ## 参加 CLUE 竞赛
 
 对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至CLUE官网进行评测。

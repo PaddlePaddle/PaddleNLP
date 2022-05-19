@@ -143,9 +143,6 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-gen-large-en-430g": {
             "do_lower_case": True
         },
-        "ppminilm-6l-768h": {
-            "do_lower_case": True
-        },
         "rocketqa-zh-dureader-query-encoder": {
             "do_lower_case": True
         },

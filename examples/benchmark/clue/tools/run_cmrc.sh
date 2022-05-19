@@ -17,16 +17,22 @@ MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
 
-logdir=${MODEL_PATH}/c3_log
-mkdir ${logdir}
-python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} run_c3.py \
-    --model_name_or_path ${MODEL_PATH} \
-    --batch_size ${BATCH_SIZE} \
-    --learning_rate ${LR} \
-    --max_seq_length 512 \
-    --num_train_epochs 8 \
-    --output_dir ${MODEL_PATH}/c3_model/${LR}_${BS}/ \
-    --do_train \
-    --warmup_proportion 0.1 \
-    --gradient_accumulation_steps $5 \
 
+git rev-parse HEAD
+
+logdir=${MODEL_PATH}/cmrc2018_log
+mkdir ${logdir}
+python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_cmrc.py \
+    --model_name_or_path ${MODEL_PATH} \
+    --max_seq_length 512 \
+    --batch_size ${BATCH_SIZE}  \
+    --learning_rate ${LR} \
+    --num_train_epochs 2 \
+    --logging_steps 100 \
+    --output_dir ${MODEL_PATH}/cmrc2018_model/${LR}_${BS}/ \
+    --save_steps 1000 \
+    --warmup_proportion 0.1 \
+    --weight_decay 0.01 \
+    --do_train \
+    --device gpu \
+    --gradient_accumulation_steps 2 \

@@ -17,7 +17,7 @@ card=$2
 
 for task in afqmc tnews ifly ocnli wsc csl cmnli
 do
-    mkdir ${OUTPUT_DIR}/${task}
+    mkdir -p ${OUTPUT_DIR}/${task}
 done
 
 

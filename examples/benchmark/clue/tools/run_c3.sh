@@ -13,9 +13,20 @@
 # limitations under the License.
 
 
-# For base-size or smaller size model.
-# Larger model needs to adjust gradient_accumulation argument or not run all hyperparameters together like this
-for hyper_id in 0 1 2 3 4 5 6 7 8 9 10 11
-do
-    nohup bash launch_one_hyper.sh ${hyper_id} &
-done
+MODEL_PATH=$1
+BATCH_SIZE=$2
+LR=$3
+
+logdir=${MODEL_PATH}/c3_log
+mkdir ${logdir}
+python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c3.py \
+    --model_name_or_path ${MODEL_PATH} \
+    --batch_size ${BATCH_SIZE} \
+    --learning_rate ${LR} \
+    --max_seq_length 512 \
+    --num_train_epochs 8 \
+    --output_dir ${MODEL_PATH}/c3_model/${LR}_${BS}/ \
+    --do_train \
+    --warmup_proportion 0.1 \
+    --gradient_accumulation_steps $5 \
+

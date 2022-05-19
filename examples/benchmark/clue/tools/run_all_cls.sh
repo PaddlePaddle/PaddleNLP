@@ -13,23 +13,34 @@
 # limitations under the License.
 
 
-MODEL_PATH=$1
-BATCH_SIZE=$2
-LR=$3
-grd=$4
-git rev-parse HEAD
+# For base-size or smaller size model.
+# Larger model needs to adjust gradient_accumulation argument or not run all hyperparameters together like this
 
 
-logdir=${MODEL_PATH}/chid_log
-mkdir ${logdir}
-python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} run_chid.py \
-    --model_name_or_path ${MODEL_PATH} \
-    --batch_size ${BATCH_SIZE} \
-    --learning_rate ${LR} \
-    --max_seq_length 64 \
-    --num_train_epochs 3 \
-    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BS}/ \
-    --warmup_proportion 0.06 \
-    --do_train \
-    --gradient_accumulation_steps ${grd} \
-    --weight_decay 0.01 \
+MODEL_DIR=$1
+mode=$2
+
+if [ ${mode} == 0 ]
+then
+id_list="0 1 2 3"
+fi
+
+if [ ${mode} == 1 ]
+then
+id_list="4 5 6 7"
+fi
+
+if [ ${mode} == 2 ]
+then
+id_list="8 9 10 11"
+fi
+
+if [ ${mode} == 3 ]
+then
+id_list="0 1 2 3 4 5 6 7 8 9 10 11"
+fi
+
+for hyper_id in ${id_list}
+do
+    nohup bash launch_one_hyper.sh ${MODEL_DIR} ${hyper_id} &
+done
