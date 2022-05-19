@@ -52,8 +52,8 @@ parser = PdArgumentParser(TrainingArguments, DataArguments)
     - 这里的，`labels`如果模型没有使用到，我们还需要额外定义`criterion`，计算最后的loss损失。
 ```python
 train_dataset = load_dataset("chnsenticorp", splits=["train"])
-model = AutoModelForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(train_dataset.label_list))
-tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
+model = AutoModelForSequenceClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(train_dataset.label_list))
+tokenizer = AutoTokenizer.from_pretrained("ernie-1.0-base-zh")
 
 def convert_example(example, tokenizer):
     encoded_inputs = tokenizer(text=example["text"], max_seq_len=128, pad_to_max_seq_len=True)
@@ -81,7 +81,7 @@ if training_args.do_train:
     trainer.log_metrics("train", metrics)
     trainer.save_state()
 ```
-预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-1.0/run_pretrain_trainer.py)版本。
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
 ## Trainer 实例化参数介绍

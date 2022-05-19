@@ -7,12 +7,12 @@ unset CUDA_VISIBLE_DEVICES
 task_name="ernie-1.0-dp8-gb512"
 rm -rf output/$task_name/
 
-PYTHONPATH=../../../  python -u  -m paddle.distributed.launch \
+python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
     run_pretrain_trainer.py \
     --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
+    --model_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --max_seq_length 512 \

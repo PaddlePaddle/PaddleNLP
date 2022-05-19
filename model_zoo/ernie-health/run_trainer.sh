@@ -4,7 +4,7 @@ unset CUDA_VISIBLE_DEVICES
 task_name="eheath-pretraining"
 rm -rf output/$task_name/log
 
-PYTHONPATH=../../../  python -u -m paddle.distributed.launch \
+python -u -m paddle.distributed.launch \
     --gpus 0,1,2,3,4,5,6,7  \
     run_pretrain_trainer.py \
     --input_dir "./data" \

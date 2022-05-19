@@ -1,0 +1,155 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:5
+msgid "RoFormer模型汇总"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:7
+msgid "下表汇总介绍了目前PaddleNLP支持的RoFormer模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:11
+msgid "Pretrained Weight"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:11
+msgid "Language"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:11
+msgid "Details of the model"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:13
+msgid "``roformer-chinese-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:13
+#: ../model_zoo/transformers/RoFormer/contents.rst:17
+#: ../model_zoo/transformers/RoFormer/contents.rst:21
+#: ../model_zoo/transformers/RoFormer/contents.rst:25
+#: ../model_zoo/transformers/RoFormer/contents.rst:29
+#: ../model_zoo/transformers/RoFormer/contents.rst:33
+#: ../model_zoo/transformers/RoFormer/contents.rst:37
+#: ../model_zoo/transformers/RoFormer/contents.rst:41
+msgid "Chinese"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:13
+msgid ""
+"6-layer, 384-hidden, 6-heads, 30M parameters. Roformer Small Chinese "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:17
+msgid "``roformer-chinese-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:17
+msgid ""
+"12-layer, 768-hidden, 12-heads, 124M parameters. Roformer Base Chinese "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:21
+msgid "``roformer-chinese-char-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:21
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Char Small"
+" model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:25
+msgid "``roformer-chinese-char-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:25
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Char "
+"Base model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:29
+msgid "``roformer-chinese-sim-char-ft-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:29
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Char Ft "
+"Small model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:33
+msgid "``roformer-chinese-sim-char-ft-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:33
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Char Ft "
+"Base model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:37
+msgid "``roformer-chinese-sim-char-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:37
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Sim Char "
+"Small model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:41
+msgid "``roformer-chinese-sim-char-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:41
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Sim Char"
+" Base model."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:45
+msgid "``roformer-english-small-discriminator``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:45
+#: ../model_zoo/transformers/RoFormer/contents.rst:49
+msgid "English"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:45
+msgid ""
+"12-layer, 256-hidden, 4-heads, 13M parameters. Roformer English Small "
+"Discriminator."
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:49
+msgid "``roformer-english-small-generator``"
+msgstr ""
+
+#: ../model_zoo/transformers/RoFormer/contents.rst:49
+msgid ""
+"12-layer, 64-hidden, 1-heads, 5M parameters. Roformer English Small "
+"Generator."
+msgstr ""
+

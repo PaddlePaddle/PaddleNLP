@@ -93,6 +93,31 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                              cache_max_len);
 }
 
+template <typename T>
+void transpose_general_kernelLauncher(T* dst,
+                                      T* src,
+                                      const int batch_size,
+                                      const int seq_len,
+                                      const int head_num,
+                                      const int size_per_head,
+                                      cudaStream_t stream) {
+  dim3 grid, block;
+  int grid_size = batch_size * head_num * seq_len;
+  if (sizeof(T) == 2) {
+    int seq_per_block = grid_size % 4 == 0 ? 4 : 1;
+    grid.x = grid_size / seq_per_block;
+    block.x = seq_per_block * size_per_head / 2;
+    transpose<T><<<grid, block, 0, stream>>>(
+        src, dst, batch_size, seq_len, head_num, size_per_head / 2);
+  } else {
+    const int seq_per_block = 1;
+    grid.x = grid_size / seq_per_block;
+    block.x = seq_per_block * size_per_head;
+    transpose<T><<<grid, block, 0, stream>>>(
+        src, dst, batch_size, seq_len, head_num, size_per_head);
+  }
+}
+
 template void transpose_cache_batch_major_kernelLauncher(
     float* k_dst,
     float* v_dst,
@@ -118,4 +143,20 @@ template void transpose_cache_batch_major_kernelLauncher(
     const int size_per_head,
     const int local_head_num,
     cudaStream_t stream);
+
+template void transpose_general_kernelLauncher(float* dst,
+                                               float* src,
+                                               const int batch_size,
+                                               const int seq_len,
+                                               const int head_num,
+                                               const int size_per_head,
+                                               cudaStream_t stream);
+
+template void transpose_general_kernelLauncher(half* dst,
+                                               half* src,
+                                               const int batch_size,
+                                               const int seq_len,
+                                               const int head_num,
+                                               const int size_per_head,
+                                               cudaStream_t stream);
 }

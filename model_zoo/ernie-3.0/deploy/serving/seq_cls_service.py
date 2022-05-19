@@ -24,7 +24,11 @@ _LOGGER = logging.getLogger()
 class ErnieSeqClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "ernie-3.0-medium-zh", use_faster=True)
+        # Output nodes may differ from model to model
+        # You can see the output node name in the conf.prototxt file of serving_server
+        self.fetch_names = ["linear_113.tmp_1", ]
 
     def preprocess(self, input_dicts, data_id, log_id):
         # convert input format
@@ -64,11 +68,13 @@ class ErnieSeqClsOp(Op):
                           It is handled in the same way as exception.
             prod_errinfo: "" default
         """
-        result = fetch_dict["linear_75.tmp_1"]
-        # np.argpartition
+        result = fetch_dict[self.fetch_names[0]]
+        max_value = np.max(result, axis=1, keepdims=True)
+        exp_data = np.exp(result - max_value)
+        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
         out_dict = {
             "label": result.argmax(axis=-1),
-            "confidence": result.max(axis=-1)
+            "confidence": probs.max(axis=-1)
         }
         return out_dict, None, ""
 
