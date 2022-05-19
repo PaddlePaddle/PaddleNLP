@@ -39,21 +39,28 @@ class InstallPlatlib(install):
 
 if os.name != 'nt':
     package_data = {
-        "faster_tokenizers":
-        ["core_tokenizers.so", "libicuuc.so.70", "libicudata.so.70"]
+        "faster_tokenizers": [
+            "core_tokenizers.so", "libicuuc.so.70", "libicudata.so.70",
+            "commit.log"
+        ]
     }
 else:
     package_data = {
         "faster_tokenizers":
-        ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll"]
+        ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll", "commit.log"]
     }
 
 
 def get_version():
-    import sys
-    sys.path.append('python/')
-    import faster_tokenizers
-    return faster_tokenizers.__version__
+    f = open(os.path.join("python", "faster_tokenizers", "__init__.py"))
+    lines = f.readlines()
+    version = ""
+    for line in lines:
+        if line.startswith("__version__"):
+            version = line.split("=")[1]
+            version = version.strip().replace("\"", "")
+            break
+    return version
 
 
 long_description = "PaddleNLP Faster Tokenizer Library written in C++ "

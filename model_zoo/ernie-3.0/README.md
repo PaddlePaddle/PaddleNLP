@@ -16,6 +16,7 @@
        * [Python 部署](#Python部署)
        * [服务化部署](#服务化部署)
        * [Paddle2ONNX 部署](#Paddle2ONNX部署)
+   * [Notebook教程](#Notebook教程)
    * [参考文献](#参考文献)
 
 ## 模型介绍
@@ -170,7 +171,7 @@
                 </tr>
                <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">Mengzi-Bert-Base</span>
+                                <span style="font-size:18px">Mengzi-BERT-Base</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">74.69</span>
@@ -321,7 +322,7 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=2 align=center> 6L768H </td>
+                       <td rowspan=5 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
                         </td>
@@ -361,7 +362,7 @@
                 </tr>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">RBT6, Chinese</span>
+                                <span style="font-size:18px">HLF/RBT6, Chinese</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">69.74</span>
@@ -395,6 +396,120 @@
                         </td>  
                         <td style="text-align:center">
                                 <span style="font-size:18px">59.93</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">69.58</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.22</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">55.70</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">54.48</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">79.12</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">74.07</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.63</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">80.17</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.63/83.72</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.64</span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.11</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">RoFormerV2 Small</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">68.52</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.47</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">56.53</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">60.72</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">76.37</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">72.95</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">75.00</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">81.07</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">62.97/83.64</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">67.66</span>
+                        </td>  
+                        <td style="text-align:center">
+                          <span style="font-size:18px">59.41</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">66.67</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">70.13</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">56.41</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">59.79</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.38</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">71.86</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">69.41</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">76.73</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">53.22/75.03</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">77.00</span>
+                        </td>
+                        <td style="text-align:center">
+                          <span style="font-size:18px">54.77</span>
                         </td>
                 </tr>
         <tbody>
@@ -687,6 +802,17 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指�
 
 
 <a name="参考文献"></a>
+
+
+## Notebook教程
+
+- [【快速上手ERNIE 3.0】中文情感分析实战](https://aistudio.baidu.com/aistudio/projectdetail/3955163)
+
+- [【快速上手ERNIE 3.0】法律文本多标签分类实战](https://aistudio.baidu.com/aistudio/projectdetail/3996601)
+
+- [【快速上手ERNIE 3.0】中文语义匹配实战](https://aistudio.baidu.com/aistudio/projectdetail/3986803)
+
+- [【快速上手ERNIE 3.0】MSRA序列标注实战](https://aistudio.baidu.com/aistudio/projectdetail/3989073)
 
 ## 参考文献
 

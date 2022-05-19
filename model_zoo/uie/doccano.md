@@ -24,7 +24,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
 
 #### 2.1 抽取式任务项目创建
 
-创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation L=labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
+创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation Labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
@@ -139,7 +139,7 @@ Relation类型标签构建示例：
 
 示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签**由评价维度指向观点词**。
 
-#### 5.5 文本分类
+#### 5.5 分类任务
 
 标注示例：
 
@@ -147,7 +147,7 @@ Relation类型标签构建示例：
     <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='20'/>
 </div>
 
-示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类，除了二分类，UIE还支持多类别、多标签分类。
+示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类。
 
 <a name="数据导出"></a>
 
