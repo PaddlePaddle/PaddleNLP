@@ -16,9 +16,9 @@
 
 参考[doccano官方文档](https://github.com/doccano/doccano) 完成doccano的安装与初始配置。
 
-以下标注示例用到的环境配置：
+**以下标注示例用到的环境配置**：
 
-- **doccano 1.6.2**
+- doccano 1.6.2
 
 <a name="项目创建"></a>
 
