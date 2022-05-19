@@ -341,7 +341,7 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: ", best_acc)
+                    print("best_acc: %.2f" % best_acc * 100)
                     return
             tic_eval = time.time()
             acc = evaluate(model, loss_fct, dev_data_loader, metric)
@@ -356,7 +356,7 @@ def run(args):
                 model_to_save.save_pretrained(args.output_dir)
                 tokenizer.save_pretrained(args.output_dir)
 
-        print("best_acc: ", best_acc)
+        print("best_acc: %.2f" % best_acc * 100)
 
     if args.do_predict:
         column_names = test_ds.column_names

@@ -197,7 +197,7 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
             preds=all_predictions,
             is_whitespace_splited=False)
         model.train()
-        return res['exact']
+        return res['exact'], res['f1']
 
     model.train()
 
@@ -423,7 +423,7 @@ def run(args):
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
-        best_em = 0.0
+        best_res = (0.0, 0.0)
         global_step = 0
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
@@ -450,9 +450,10 @@ def run(args):
                         tic_train = time.time()
                     if global_step >= num_training_steps:
                         break
-            em = evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
-            if paddle.distributed.get_rank() == 0 and em > best_em:
-                best_em = em
+            em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
+                              args)
+            if paddle.distributed.get_rank() == 0 and em > best_res[0]:
+                best_res = (em, f1)
                 output_dir = args.output_dir
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
@@ -461,6 +462,7 @@ def run(args):
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
+        print("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,
