@@ -266,6 +266,9 @@ def main():
         metric.update(result)
         accu = metric.accumulate()
         metric.reset()
+        del metric
+        del preds
+        del label
         return {"accuracy": accu}
 
     trainer = Trainer(

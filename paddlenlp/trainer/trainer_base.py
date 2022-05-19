@@ -510,8 +510,9 @@ class Trainer:
                         tr_loss_step = self.training_step(model, inputs)
                 else:
                     tr_loss_step = self.training_step(model, inputs)
+                del inputs
 
-                tr_loss += tr_loss_step
+                tr_loss.add_(tr_loss_step)
 
                 if (step + 1) % args.gradient_accumulation_steps == 0 or (
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
@@ -555,10 +556,6 @@ class Trainer:
 
             if self.control.should_training_stop:
                 break
-
-        if args.past_index and hasattr(self, "_past"):
-            # Clean the state at the end of training
-            delattr(self, "_past")
 
         logger.info("\nTraining completed. \n")
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
@@ -935,8 +932,6 @@ class Trainer:
         handling potential state.
         """
         inputs = self._prepare_input(inputs)
-        if self.args.past_index >= 0 and self._past is not None:
-            inputs["mems"] = self._past
 
         return inputs
 
@@ -980,11 +975,6 @@ class Trainer:
             loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
 
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
@@ -1011,7 +1001,7 @@ class Trainer:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
-        inputs = self._prepare_inputs(inputs)
+        # inputs = self._prepare_inputs(inputs)
 
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
@@ -1412,9 +1402,6 @@ class Trainer:
         # Do this before wrapping.
         eval_dataset = dataloader.dataset
 
-        if args.past_index >= 0:
-            self._past = None
-
         # Initialize containers
         # losses/preds/labels on GPU (accumulated for eval_accumulation_steps)
         losses_host = None
@@ -1624,9 +1611,6 @@ class Trainer:
                                    if k not in ignore_keys)
                 else:
                     logits = outputs
-                # TODO: this needs to be fixed and made cleaner later.
-                if self.args.past_index >= 0:
-                    self._past = outputs[self.args.past_index - 1]
 
         if prediction_loss_only:
             return (loss, None, None)
