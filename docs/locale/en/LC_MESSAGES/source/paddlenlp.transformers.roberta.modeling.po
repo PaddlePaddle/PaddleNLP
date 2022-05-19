@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.transformers.roberta.modeling.rst:2
 msgid "modeling"
@@ -154,6 +154,10 @@ msgstr ""
 msgid "The index of padding token in the token vocabulary. Defaults to `0`."
 msgstr ""
 
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel:50
+msgid "The index of cls token in the token vocabulary. Defaults to `101`."
+msgstr ""
+
 #: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:1
 msgid ""
 "Indices of input sequence tokens in the vocabulary. They are numerical "
@@ -217,6 +221,12 @@ msgid ""
 "to."
 msgstr ""
 
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:30
+msgid ""
+"Whether or not to output hidden states for all hidden layers. Defaults to"
+" `False`."
+msgstr ""
+
 #: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward
@@ -226,48 +236,75 @@ msgstr ""
 msgid "返回"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:31
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:34
 msgid ""
-"Returns tuple (`sequence_output`, `pooled_output`).  With the fields:  - "
-"sequence_output (Tensor):     Sequence of hidden-states at the last layer"
-" of the model.     It's data type should be float32 and its shape is "
-"[batch_size, sequence_length, hidden_size].  - pooled_output (Tensor):"
-"     The output of first token (`[CLS]`) in sequence.     We \"pool\" the"
-" model by simply taking the hidden state corresponding to the first "
-"token.     Its data type should be float32 and its shape is [batch_size, "
-"hidden_size]."
+"Returns tuple (`sequence_output`, `pooled_output`) by default. Returns "
+"(`encoder_outputs`, `pooled_output`) if output_hidden_states is `True`.  "
+"With the fields:  - `sequence_output` (Tensor):     Sequence of hidden-"
+"states at the last layer of the model.     It's data type should be "
+"float32 and its shape is [batch_size, sequence_length, hidden_size].  - "
+"`pooled_output` (Tensor):     The output of first token (`[CLS]`) in "
+"sequence.     We \"pool\" the model by simply taking the hidden state "
+"corresponding to the first token.     Its data type should be float32 and"
+" its shape is [batch_size, hidden_size].  - `encoder_outputs` "
+"(List(Tensor)):     A list of Tensor containing hidden-states of the "
+"model at each hidden layer in the Transformer encoder.     The length of "
+"the list is `num_hidden_layers`.     Each Tensor has a data type of "
+"float32 and its shape is [batch_size, sequence_length, hidden_size]."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:31
-msgid "Returns tuple (`sequence_output`, `pooled_output`)."
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:34
+msgid ""
+"Returns tuple (`sequence_output`, `pooled_output`) by default. Returns "
+"(`encoder_outputs`, `pooled_output`) if output_hidden_states is `True`."
 msgstr ""
 
-#: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:12
-#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:33
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:37
 msgid "With the fields:"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:37
-msgid "sequence_output (Tensor):"
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:41
+msgid "`sequence_output` (Tensor):"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:36
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:40
 msgid ""
 "Sequence of hidden-states at the last layer of the model. It's data type "
 "should be float32 and its shape is [batch_size, sequence_length, "
 "hidden_size]."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:41
-msgid "pooled_output (Tensor):"
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:46
+msgid "`pooled_output` (Tensor):"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:40
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:44
 msgid ""
 "The output of first token (`[CLS]`) in sequence. We \"pool\" the model by"
 " simply taking the hidden state corresponding to the first token. Its "
 "data type should be float32 and its shape is [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:27
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:23
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:50
+msgid "`encoder_outputs` (List(Tensor)):"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:49
+msgid ""
+"A list of Tensor containing hidden-states of the model at each hidden "
+"layer in the Transformer encoder. The length of the list is "
+"`num_hidden_layers`. Each Tensor has a data type of float32 and its shape"
+" is [batch_size, sequence_length, hidden_size]."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward
@@ -279,12 +316,12 @@ msgstr ""
 msgid "返回类型"
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:15
-#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:15
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:24
-#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:15
-#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:15
-#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:46
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:28
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:28
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:32
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:28
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:28
+#: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:55
 msgid "示例"
 msgstr ""
 
@@ -326,7 +363,7 @@ msgstr ""
 msgid "The number of classes. Defaults to `2`."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:6
+#: of
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification:8
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:8
 msgid ""
@@ -339,31 +376,75 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:3
 #: paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:9
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:3
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:9
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:3
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:9
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:3
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:9
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:1
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:3
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:5
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:7
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:9
 msgid "See :class:`RobertaModel`."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:10
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:12
 msgid ""
-"Returns tensor `logits`, a tensor of the input text classification "
-"logits. Its data type should be float32 and it has a shape of "
-"[batch_size, num_classes]."
+"Returns tensor `logits` by default. Returns tuple (`logits`, "
+"`encoder_outputs`) if output_hidden_states is set to `True`.  With the "
+"fields:  - `logits` (Tensor):     a tensor of the input text "
+"classification logits.     Its data type should be float32 and it has a "
+"shape of [batch_size, num_classes].  - `encoder_outputs` (List(Tensor)):"
+"     A list of Tensor containing hidden-states of the model at each "
+"hidden layer in the Transformer encoder.     The length of the list is "
+"`num_hidden_layers`.     Each Tensor has a data type of float32 and a "
+"shape of [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:12
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:12
+msgid ""
+"Returns tensor `logits` by default. Returns tuple (`logits`, "
+"`encoder_outputs`) if output_hidden_states is set to `True`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:19
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:19
+msgid "`logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:18
+msgid ""
+"a tensor of the input text classification logits. Its data type should be"
+" float32 and it has a shape of [batch_size, num_classes]."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:22
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:22
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:26
+#: paddlenlp.transformers.roberta.modeling.RobertaForSequenceClassification.forward:22
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:22
+msgid ""
+"A list of Tensor containing hidden-states of the model at each hidden "
+"layer in the Transformer encoder. The length of the list is "
+"`num_hidden_layers`. Each Tensor has a data type of float32 and a shape "
+"of [batch_size, sequence_length, hidden_size]."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:1
@@ -373,11 +454,24 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:10
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:12
 msgid ""
-"Returns tensor `logits`, a tensor of the input token classification "
-"logits. Shape as `[batch_size, sequence_length, num_classes]` and dtype "
-"as `float32`."
+"Returns tensor `logits` by default. Returns tuple (`logits`, "
+"`encoder_outputs`) if output_hidden_states is set to `True`.  With the "
+"fields:  - `logits` (Tensor):     a tensor of the input token "
+"classification logits.     Shape as `[batch_size, sequence_length, "
+"num_classes]` and dtype as `float32`.  - `encoder_outputs` "
+"(List(Tensor)):     A list of Tensor containing hidden-states of the "
+"model at each hidden layer in the Transformer encoder.     The length of "
+"the list is `num_hidden_layers`.     Each Tensor has a data type of "
+"float32 and a shape of [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:18
+msgid ""
+"a tensor of the input token classification logits. Shape as `[batch_size,"
+" sequence_length, num_classes]` and dtype as `float32`."
 msgstr ""
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering:2
@@ -395,29 +489,40 @@ msgid "An instance of RobertaModel."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:10
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:12
 msgid ""
-"Returns tuple (`start_logits`, `end_logits`).  With the fields:  - "
-"`start_logits` (Tensor):     A tensor of the input token classification "
-"logits, indicates the start position of the labelled span.     Its data "
-"type should be float32 and its shape is [batch_size, sequence_length].  -"
-" `end_logits` (Tensor):     A tensor of the input token classification "
-"logits, indicates the end position of the labelled span.     Its data "
-"type should be float32 and its shape is [batch_size, sequence_length]."
+"Returns tuple (`start_logits`, `end_logits`) by default if "
+"output_hidden_states is `False`. Returns tuple (`start_logits`, "
+"`end_logits`, `encoder_outputs`) if output_hidden_states is set to "
+"`True`.  With the fields:  - `start_logits` (Tensor):     A tensor of the"
+" input token classification logits, indicates the start position of the "
+"labelled span.     Its data type should be float32 and its shape is "
+"[batch_size, sequence_length].  - `end_logits` (Tensor):     A tensor of "
+"the input token classification logits, indicates the end position of the "
+"labelled span.     Its data type should be float32 and its shape is "
+"[batch_size, sequence_length].  - `encoder_outputs` (List(Tensor)):     A"
+" list of Tensor containing hidden-states of the model at each hidden "
+"layer in the Transformer encoder.     The length of the list is "
+"`num_hidden_layers`.     Each Tensor has a data type of float32 and a "
+"shape of [batch_size, sequence_length, hidden_size]."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:10
-msgid "Returns tuple (`start_logits`, `end_logits`)."
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:12
+msgid ""
+"Returns tuple (`start_logits`, `end_logits`) by default if "
+"output_hidden_states is `False`. Returns tuple (`start_logits`, "
+"`end_logits`, `encoder_outputs`) if output_hidden_states is set to "
+"`True`."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:16
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:19
 msgid "`start_logits` (Tensor):"
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:15
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:18
 msgid ""
 "A tensor of the input token classification logits, indicates the start "
 "position of the labelled span. Its data type should be float32 and its "
@@ -425,12 +530,12 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:19
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:23
 msgid "`end_logits` (Tensor):"
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:19
+#: paddlenlp.transformers.roberta.modeling.RobertaForQuestionAnswering.forward:22
 msgid ""
 "A tensor of the input token classification logits, indicates the end "
 "position of the labelled span. Its data type should be float32 and its "
@@ -446,12 +551,39 @@ msgstr ""
 msgid "class:RobertaModel`): An instance of :class:`RobertaModel`."
 msgstr ""
 
-#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:10
-#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:10
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:12
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:12
 msgid ""
-"Returns tensor `prediction_scores`, The scores of masked token "
-"prediction. Its data type should be float32 and shape is [batch_size, "
-"sequence_length, vocab_size]."
+"Returns tensor `prediction_scores` by default. Returns tuple "
+"(`prediction_scores`, `encoder_outputs`) if output_hidden_states is set "
+"to `True`.  With the fields:  - `prediction_scores` (Tensor):     The "
+"scores of masked token prediction.     Its data type should be float32 "
+"and shape is [batch_size, sequence_length, vocab_size].  - "
+"`encoder_outputs` (List(Tensor)):     A list of Tensor containing hidden-"
+"states of the model at each hidden layer in the Transformer encoder.     "
+"The length of the list is `num_hidden_layers`.     Each Tensor has a data"
+" type of float32 and a shape of [batch_size, sequence_length, "
+"hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:12
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:12
+msgid ""
+"Returns tensor `prediction_scores` by default. Returns tuple "
+"(`prediction_scores`, `encoder_outputs`) if output_hidden_states is set "
+"to `True`."
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:19
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:19
+msgid "`prediction_scores` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:18
+#: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:18
+msgid ""
+"The scores of masked token prediction. Its data type should be float32 "
+"and shape is [batch_size, sequence_length, vocab_size]."
 msgstr ""
 
 #: of
@@ -474,4 +606,71 @@ msgstr ""
 #: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM:1
 msgid "Roberta Model with a `Causal language modeling` head on top."
 msgstr ""
+
+#~ msgid ""
+#~ "Returns tuple (`sequence_output`, `pooled_output`)."
+#~ "  With the fields:  - sequence_output "
+#~ "(Tensor):     Sequence of hidden-states "
+#~ "at the last layer of the model."
+#~ "     It's data type should be float32"
+#~ " and its shape is [batch_size, "
+#~ "sequence_length, hidden_size].  - pooled_output "
+#~ "(Tensor):     The output of first token"
+#~ " (`[CLS]`) in sequence.     We \"pool\" "
+#~ "the model by simply taking the "
+#~ "hidden state corresponding to the first"
+#~ " token.     Its data type should be"
+#~ " float32 and its shape is "
+#~ "[batch_size, hidden_size]."
+#~ msgstr ""
+
+#~ msgid "Returns tuple (`sequence_output`, `pooled_output`)."
+#~ msgstr ""
+
+#~ msgid "sequence_output (Tensor):"
+#~ msgstr ""
+
+#~ msgid "pooled_output (Tensor):"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns tensor `logits`, a tensor of "
+#~ "the input text classification logits. "
+#~ "Its data type should be float32 "
+#~ "and it has a shape of [batch_size,"
+#~ " num_classes]."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns tensor `logits`, a tensor of "
+#~ "the input token classification logits. "
+#~ "Shape as `[batch_size, sequence_length, "
+#~ "num_classes]` and dtype as `float32`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns tuple (`start_logits`, `end_logits`).  "
+#~ "With the fields:  - `start_logits` "
+#~ "(Tensor):     A tensor of the input "
+#~ "token classification logits, indicates the "
+#~ "start position of the labelled span."
+#~ "     Its data type should be float32"
+#~ " and its shape is [batch_size, "
+#~ "sequence_length].  - `end_logits` (Tensor):     "
+#~ "A tensor of the input token "
+#~ "classification logits, indicates the end "
+#~ "position of the labelled span.     Its"
+#~ " data type should be float32 and "
+#~ "its shape is [batch_size, sequence_length]."
+#~ msgstr ""
+
+#~ msgid "Returns tuple (`start_logits`, `end_logits`)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returns tensor `prediction_scores`, The scores"
+#~ " of masked token prediction. Its data"
+#~ " type should be float32 and shape "
+#~ "is [batch_size, sequence_length, vocab_size]."
+#~ msgstr ""
 
