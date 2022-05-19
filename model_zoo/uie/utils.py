@@ -199,7 +199,7 @@ def reader(data_path, max_seq_len=512):
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
     with tqdm(total=len(prompts)) as pbar:
         for i, prompt in enumerate(prompts):
-            negtive_sample = []
+            negative_sample = []
             redundants_list = list(set(label_set) ^ set(prompt))
             redundants_list.sort()
 
@@ -209,7 +209,7 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
                 actual_ratio = math.ceil(
                     len(redundants_list) / len(examples[i]))
 
-            if actual_ratio <= negative_ratio:
+            if actual_ratio <= negative_ratio or negative_ratio == -1:
                 idxs = [k for k in range(len(redundants_list))]
             else:
                 idxs = random.sample(
@@ -217,13 +217,33 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
                     negative_ratio * len(examples[i]))
 
             for idx in idxs:
-                negtive_result = {
+                negative_result = {
                     "content": texts[i],
                     "result_list": [],
                     "prompt": redundants_list[idx]
                 }
-                negtive_sample.append(negtive_result)
-            examples[i].extend(negtive_sample)
+                negative_sample.append(negative_result)
+            examples[i].extend(negative_sample)
+            pbar.update(1)
+    return examples
+
+
+def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
+                              subject_goldens):
+    with tqdm(total=len(relation_prompts)) as pbar:
+        for i, relation_prompt in enumerate(relation_prompts):
+            negative_sample = []
+            for subject in subject_goldens[i]:
+                for predicate in predicate_set:
+                    prompt = subject + "的" + predicate
+                    if prompt not in relation_prompt:
+                        negative_result = {
+                            "content": texts[i],
+                            "result_list": [],
+                            "prompt": prompt
+                        }
+                        negative_sample.append(negative_result)
+            examples[i].extend(negative_sample)
             pbar.update(1)
     return examples
 
@@ -269,7 +289,7 @@ def convert_cls_examples(raw_examples, prompt_prefix, options):
     return examples
 
 
-def convert_ext_examples(raw_examples, negative_ratio):
+def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
     texts = []
     entity_examples = []
     relation_examples = []
@@ -278,6 +298,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
     entity_label_set = []
     entity_name_set = []
     predicate_set = []
+    subject_goldens = []
 
     print(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
@@ -357,6 +378,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
             entity_examples.append(entity_example)
             entity_prompts.append(entity_prompt)
 
+            subject_golden = []
             relation_example = []
             relation_prompt = []
             relation_example_map = {}
@@ -367,6 +389,8 @@ def convert_ext_examples(raw_examples, negative_ratio):
                 # The relation prompt is constructed as follows: 
                 # subject + "的" + predicate
                 prompt = entity_map[subject_id]["name"] + "的" + predicate
+                if entity_map[subject_id]["name"] not in subject_golden:
+                    subject_golden.append(entity_map[subject_id]["name"])
                 result = {
                     "text": entity_map[object_id]["name"],
                     "start": entity_map[object_id]["start"],
@@ -390,6 +414,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
 
             relation_examples.append(relation_example)
             relation_prompts.append(relation_prompt)
+            subject_goldens.append(subject_golden)
             pbar.update(1)
 
     print(f"Adding negative samples for first stage prompt...")
@@ -397,12 +422,16 @@ def convert_ext_examples(raw_examples, negative_ratio):
                                            entity_prompts, entity_label_set,
                                            negative_ratio)
     if len(predicate_set) != 0:
-        print(f"Constructing relation prompts...")
-        relation_prompt_set = construct_relation_prompt_set(entity_name_set,
-                                                            predicate_set)
-
-        print(f"Adding negative samples for second stage prompt...")
-        relation_examples = add_negative_example(
-            relation_examples, texts, relation_prompts, relation_prompt_set,
-            negative_ratio)
+        if is_train:
+            print(f"Adding negative samples for second stage prompt...")
+            relation_prompt_set = construct_relation_prompt_set(entity_name_set,
+                                                                predicate_set)
+            relation_examples = add_negative_example(
+                relation_examples, texts, relation_prompts, relation_prompt_set,
+                negative_ratio)
+        else:
+            print(f"Adding negative samples for second stage prompt...")
+            relation_examples = add_full_negative_example(
+                relation_examples, texts, relation_prompts, predicate_set,
+                subject_goldens)
     return entity_examples, relation_examples
