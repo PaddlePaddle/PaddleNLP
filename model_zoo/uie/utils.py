@@ -235,6 +235,8 @@ def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
             negative_sample = []
             for subject in subject_goldens[i]:
                 for predicate in predicate_set:
+                    # The relation prompt is constructed as follows: 
+                    # subject + "的" + predicate
                     prompt = subject + "的" + predicate
                     if prompt not in relation_prompt:
                         negative_result = {
