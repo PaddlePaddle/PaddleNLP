@@ -1,6 +1,5 @@
 cd ../examples/language_model/gpt-3/data_tools/
 sed -i "s/python/python3.7/g" Makefile
-sed -i "s/python-config/python3.7-config/g" Makefile
 cd -
 
 python3 -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
