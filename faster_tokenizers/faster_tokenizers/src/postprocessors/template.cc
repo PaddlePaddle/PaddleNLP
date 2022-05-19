@@ -1,0 +1,303 @@
+// Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <algorithm>
+#include <string>
+
+#include "core/encoding.h"
+#include "glog/logging.h"
+#include "postprocessors/template.h"
+
+namespace tokenizers {
+namespace postprocessors {
+
+void TemplatePiece::ParseIdFromString(const std::string& template_id_string) {
+  if (template_id_string.find_first_of("$") == 0) {
+    auto& seq = boost::get<TemplateSequence>(*this);
+    std::string rest =
+        template_id_string.substr(template_id_string.find_first_not_of("$"));
+    std::string::size_type sz;
+    uint type_id = std::stoul(rest, &sz);
+    if (rest == "" || rest == "A" || rest == "a") {
+      seq = TemplateSequence{SequenceType::SEQ_A, 0};
+    } else if (rest == "B" || rest == "b") {
+      seq = TemplateSequence{SequenceType::SEQ_B, 0};
+    } else if (sz == rest.length()) {
+      seq = TemplateSequence{SequenceType::SEQ_A, type_id};
+    } else {
+      throw std::runtime_error(
+          "ParseIdFromString error! The format of template piece id should be "
+          "$A, $a, $B, $b or ${type_id}");
+    }
+  } else {
+    boost::get<TemplateSpecialToken>(*this) = {template_id_string, 0};
+  }
+}
+
+void TemplatePiece::SetTypeId(uint type_id) {
+  if (boost::get<TemplateSequence>(this) != nullptr) {
+    boost::get<TemplateSequence>(*this).second = type_id;
+  } else {
+    boost::get<TemplateSpecialToken>(*this).second = type_id;
+  }
+}
+
+TemplatePiece TemplatePiece::CreateTemplatePiece(
+    const std::string& template_string) {
+  TemplatePiece piece;
+  auto spliter_idx = template_string.find_first_of(":");
+  if (spliter_idx == std::string::npos) {
+    throw std::runtime_error(
+        "Fail to CreateTemplatePiece because lack `:` ! Please make sure the "
+        "format of template should be ${id}:${type_id}");
+  } else {
+    std::string template_id_string = template_string.substr(0, spliter_idx);
+    std::string template_type_id_string =
+        template_string.substr(spliter_idx + 1);
+    piece.ParseIdFromString(template_id_string);
+
+    std::string::size_type sz;
+    uint type_id = std::stoul(template_type_id_string, &sz);
+    if (sz == template_type_id_string.length()) {
+      piece.SetTypeId(type_id);
+    } else {
+      throw std::runtime_error(
+          "ParseTypeIdFromString error! The type id should be unsigned "
+          "integer.");
+    }
+  }
+  return piece;
+}
+
+size_t TemplatePostProcessor::CountAdded(
+    Template* template_, const SpecialTokensMap& special_tokens_map) {
+  size_t count = 0;
+  for (auto& piece : template_->pieces_) {
+    TemplateSpecialToken* special_token =
+        boost::get<TemplateSpecialToken>(&piece);
+    if (special_token != nullptr) {
+      auto token_iter =
+          special_tokens_map.tokens_map_.find(special_token->first);
+      if (token_iter != special_tokens_map.tokens_map_.end()) {
+        count += token_iter->second.ids_.size();
+      }
+    }
+  }
+  return count;
+}
+
+size_t TemplatePostProcessor::DefaultAdded(bool is_single) {
+  Template* target = nullptr;
+  if (is_single) {
+    target = &single_;
+  } else {
+    target = &pair_;
+  }
+  return CountAdded(target, special_tokens_map_);
+}
+
+TemplatePostProcessor::TemplatePostProcessor() {
+  added_single_ = DefaultAdded(true);
+  added_pair_ = DefaultAdded(false);
+}
+
+size_t TemplatePostProcessor::AddedTokensNum(bool is_pair) const {
+  if (is_pair) {
+    return added_pair_;
+  }
+  return added_single_;
+}
+
+void TemplatePostProcessor::ApplyTemplate(
+    const Template& pieces,
+    core::Encoding* encoding,
+    core::Encoding* pair_encoding,
+    bool add_special_tokens,
+    core::Encoding* result_encoding) const {
+  size_t new_size = 0;
+  for (auto&& piece : pieces.pieces_) {
+    if (boost::get<TemplateSequence>(&piece) != nullptr) {
+      auto seq_type = boost::get<TemplateSequence>(piece).first;
+      if (seq_type == SequenceType::SEQ_A) {
+        new_size += encoding->GetLen();
+      } else {
+        if (pair_encoding == nullptr) {
+          throw std::runtime_error(
+              "Template expected a pair sequence, but none provided");
+        }
+        new_size += pair_encoding->GetLen();
+      }
+    } else {
+      if (add_special_tokens) {
+        auto&& special_token = boost::get<TemplateSpecialToken>(piece).first;
+        if (special_tokens_map_.tokens_map_.find(special_token) !=
+            special_tokens_map_.tokens_map_.end()) {
+          new_size +=
+              special_tokens_map_.tokens_map_.at(special_token).ids_.size();
+        }
+      }
+    }
+  }
+  std::vector<uint> ids;
+  ids.reserve(new_size);
+  std::vector<uint> type_ids;
+  type_ids.reserve(new_size);
+  std::vector<std::string> tokens;
+  tokens.reserve(new_size);
+  std::vector<uint> words_idx;
+  words_idx.reserve(new_size);
+  std::vector<core::Offset> offsets;
+  offsets.reserve(new_size);
+  std::vector<uint> special_tokens_mask;
+  special_tokens_mask.reserve(new_size);
+  std::vector<uint> attention_mask;
+  attention_mask.reserve(new_size);
+  std::unordered_map<uint, core::Range> sequence_ranges;
+  std::vector<core::Encoding> result_overflowings;
+  auto& overflowings = encoding->GetMutableOverflowing();
+  for (auto& overflow_encoding : overflowings) {
+    core::Encoding encoding_copy = overflow_encoding;
+    core::Encoding pair_encoding_copy;
+    if (pair_encoding != nullptr) {
+      pair_encoding_copy = *pair_encoding;
+      ApplyTemplate(pieces,
+                    &encoding_copy,
+                    &pair_encoding_copy,
+                    add_special_tokens,
+                    &overflow_encoding);
+      result_overflowings.push_back(overflow_encoding);
+      for (auto& encoding : pair_encoding->GetMutableOverflowing()) {
+        core::Encoding tmp_encoding;
+        ApplyTemplate(pieces,
+                      &encoding_copy,
+                      &encoding,
+                      add_special_tokens,
+                      &tmp_encoding);
+        result_overflowings.push_back(tmp_encoding);
+      }
+    } else {
+      ApplyTemplate(pieces,
+                    &encoding_copy,
+                    pair_encoding,
+                    add_special_tokens,
+                    &overflow_encoding);
+      result_overflowings.push_back(overflow_encoding);
+    }
+  }
+  if (pair_encoding != nullptr) {
+    for (auto& pair_overflow_encoding :
+         pair_encoding->GetMutableOverflowing()) {
+      core::Encoding encoding_copy = *encoding;
+      core::Encoding tmp_encoding;
+      ApplyTemplate(pieces,
+                    &encoding_copy,
+                    pair_encoding,
+                    add_special_tokens,
+                    &tmp_encoding);
+      result_overflowings.push_back(tmp_encoding);
+    }
+  }
+  for (auto& piece : pieces.pieces_) {
+    if (boost::get<TemplateSequence>(&piece) != nullptr) {
+      auto& template_sequence = boost::get<TemplateSequence>(piece);
+      if (template_sequence.first == SequenceType::SEQ_A) {
+        auto seq_start = ids.size();
+        auto seq_end = seq_start + encoding->GetLen();
+        sequence_ranges[0] = {seq_start, seq_end};
+        ids.insert(
+            ids.end(), encoding->GetIds().begin(), encoding->GetIds().end());
+        type_ids.insert(
+            type_ids.end(), encoding->GetLen(), template_sequence.second);
+        words_idx.insert(words_idx.end(),
+                         encoding->GetWordsIdx().begin(),
+                         encoding->GetWordsIdx().end());
+        offsets.insert(offsets.end(),
+                       encoding->GetOffsets().begin(),
+                       encoding->GetOffsets().end());
+        special_tokens_mask.insert(special_tokens_mask.end(),
+                                   encoding->GetSpecialTokensMask().begin(),
+                                   encoding->GetSpecialTokensMask().end());
+        attention_mask.insert(attention_mask.end(),
+                              encoding->GetAttentionMask().begin(),
+                              encoding->GetAttentionMask().end());
+      } else if (template_sequence.first == SequenceType::SEQ_B) {
+        if (pair_encoding == nullptr) {
+          throw std::runtime_error("Missing pair sequence, checked above");
+        }
+        auto seq_start = ids.size();
+        auto seq_end = seq_start + pair_encoding->GetLen();
+        sequence_ranges[0] = {seq_start, seq_end};
+        ids.insert(ids.end(),
+                   pair_encoding->GetIds().begin(),
+                   pair_encoding->GetIds().end());
+        type_ids.insert(
+            type_ids.end(), pair_encoding->GetLen(), template_sequence.second);
+        words_idx.insert(words_idx.end(),
+                         pair_encoding->GetWordsIdx().begin(),
+                         pair_encoding->GetWordsIdx().end());
+        offsets.insert(offsets.end(),
+                       pair_encoding->GetOffsets().begin(),
+                       pair_encoding->GetOffsets().end());
+        special_tokens_mask.insert(
+            special_tokens_mask.end(),
+            pair_encoding->GetSpecialTokensMask().begin(),
+            pair_encoding->GetSpecialTokensMask().end());
+        attention_mask.insert(attention_mask.end(),
+                              pair_encoding->GetAttentionMask().begin(),
+                              pair_encoding->GetAttentionMask().end());
+      }
+    } else {
+      auto& special_token = boost::get<TemplateSpecialToken>(piece);
+      if (add_special_tokens) {
+        const std::string& id = special_token.first;
+        uint type_id = special_token.second;
+        auto& tok = special_tokens_map_.tokens_map_.at(
+            id);  // We already checked existance above
+        auto size = tok.ids_.size();
+        ids.insert(ids.end(), tok.ids_.begin(), tok.ids_.end());
+        type_ids.insert(type_ids.end(), size, type_id);
+        tokens.insert(tokens.end(), tok.tokens_.begin(), tok.tokens_.end());
+        words_idx.insert(words_idx.end(), size, -1 /* 2^32 */);
+        offsets.insert(offsets.end(), size, {0, 0});
+        special_tokens_mask.insert(special_tokens_mask.end(), size, 1);
+        attention_mask.insert(attention_mask.end(), size, 1);
+      }
+    }
+  }
+  *result_encoding = core::Encoding(std::move(ids),
+                                    std::move(type_ids),
+                                    std::move(tokens),
+                                    std::move(words_idx),
+                                    std::move(offsets),
+                                    std::move(special_tokens_mask),
+                                    std::move(attention_mask),
+                                    std::move(overflowings),
+                                    std::move(sequence_ranges));
+}
+
+void TemplatePostProcessor::operator()(core::Encoding* encoding,
+                                       core::Encoding* pair_encoding,
+                                       bool add_special_tokens,
+                                       core::Encoding* result_encoding) const {
+  if (pair_encoding != nullptr) {
+    ApplyTemplate(
+        pair_, encoding, pair_encoding, add_special_tokens, result_encoding);
+  } else {
+    ApplyTemplate(
+        single_, encoding, pair_encoding, add_special_tokens, result_encoding);
+  }
+}
+
+}  // postprocessors
+}  // tokenizers
