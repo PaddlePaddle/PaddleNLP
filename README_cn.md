@@ -38,12 +38,12 @@
   </div>
 
 * 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
-  * 💎 通用信息抽取技术[**UIE**](./model_zoo/uie)发布，单个模型可以同时支持命名实体识别、关系抽取、事件抽取、情感分析等任务。
-  * 😊 开源文心大模型[**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在CLUE上实现同规模结构效果最佳，并提供 **🗜️无损压缩**和**⚙️全场景部署**方案。
-  * 🏥 新增中文医疗领域预训练模型[**ERNIE-Health**](./model_zoo/ernie-health)，CBLUE中文医疗信息处理评测冠军模型。
-  * 💬 新增大规模百亿开放域对话预训练模型[**PLATO-XL (11B)**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl) ，并提供⚡**FasterGeneration**⚡高性能GPU并行推理加速。
+  * 💎 发布通用信息抽取技术[**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**一键抽取**与全流程**小样本**高效定制开发。
+  * 😊 发布文心大模型[**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在CLUE上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案。
+  * 🏥 发布中文医疗领域预训练模型[**ERNIE-Health**](./model_zoo/ernie-health)，CBLUE中文医疗信息处理评测冠军模型。
+  * 💬 发布大规模百亿开放域对话预训练模型[**PLATO-XL**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl) ，配合⚡**FasterGeneration**⚡快速实现高性能GPU并行推理加速。
 
-* 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 📬 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 ## 特性
 
@@ -58,7 +58,7 @@
 
 ### 开箱即用的NLP工具集
 
-Taskflow提供丰富的 **📦开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供 **💪产业级的效果** 与 **⚡️极致的推理性能**。
+Taskflow提供丰富的**📦开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**💪产业级的效果**与**⚡️极致的推理性能**。
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -101,7 +101,7 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-3.0-medium-zh')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 ```
 
-#### 全场景覆盖的应用示例
+#### 💯 全场景覆盖的应用示例
 
 覆盖从学术到产业的NLP应用示例，涵盖NLP基础技术、NLP系统应用以及拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
 
@@ -194,7 +194,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 #### 🎙️ 智能语音指令解析
 
-集成了业界领先的语音识别（Automatic Speech Recognition, ASR）、信息抽取（Information Extraction, IE）等技术，打造智能一体化的语音指令系统，广泛应用于智能语音填单、智能语音交互、智能语音检索、手机APP语音唤醒等场景，提高人机交互效率。
+集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的的语音识别和[UIE]通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
@@ -281,15 +281,18 @@ PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练
 
 如果对一键预测效果不满意，也可以使用少量数据进行模型微调，进一步提升模型在特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
 
-更多内容可参考：[精选模型库](./model_zoo)、[NLP多场景示例](./examples)、[PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)。
+更多内容可参考：
+- [精选模型库](./model_zoo)，包含优质预训练模型的端到端全流程使用。
+- [多场景示例](./examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
+- [NoteBook教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在**🆓FREE**算力平台AI Studio上快速学习PaddleNLP。
 
 
 ## API文档
 
 PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的效率：
 
-- 支持丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)。
-- 提供500+预训练模型的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。  
+- 支持[千言](https://www.luge.ai)等丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)。
+- 提供🤗Hugging Face Style的API，支持**500+**优质预训练模型加载的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。  
 - 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。
