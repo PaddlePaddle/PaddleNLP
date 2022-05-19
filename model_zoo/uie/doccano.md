@@ -16,6 +16,10 @@
 
 参考[doccano官方文档](https://github.com/doccano/doccano) 完成doccano的安装与初始配置。
 
+**以下标注示例用到的环境配置：**
+
+- doccano 1.6.2
+
 <a name="项目创建"></a>
 
 ## 2. 项目创建
@@ -78,8 +82,6 @@ Relation类型标签构建示例：
 </div>
 
 #### 4.2 构建分类式任务标签
-
-分类式任务支持句子级情感倾向分类，以及多类别分类、多标签分类等多种类型的文本分类任务。
 
 添加分类类别标签：
 
@@ -159,33 +161,52 @@ Relation类型标签构建示例：
 
 ```text
 {
-    "id": 36,
-    "text": "2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌",
-    "relations": [],
+    "id": 38,
+    "text": "百科名片你知道我要什么，是歌手高明骏演唱的一首歌曲，1989年发行，收录于个人专辑《丛林男孩》中",
+    "relations": [
+        {
+            "id": 20,
+            "from_id": 51,
+            "to_id": 53,
+            "type": "歌手"
+        },
+        {
+            "id": 21,
+            "from_id": 51,
+            "to_id": 55,
+            "type": "发行时间"
+        },
+        {
+            "id": 22,
+            "from_id": 51,
+            "to_id": 54,
+            "type": "所属专辑"
+        }
+    ],
     "entities": [
         {
-            "id": 47,
-            "start_offset": 0,
-            "end_offset": 6,
-            "label": "时间"
+            "id": 51,
+            "start_offset": 4,
+            "end_offset": 11,
+            "label": "作品名"
         },
         {
-            "id": 48,
-            "start_offset": 6,
-            "end_offset": 23,
-            "label": "赛事名称"
+            "id": 53,
+            "start_offset": 15,
+            "end_offset": 18,
+            "label": "人物名"
         },
         {
-            "id": 49,
-            "start_offset": 28,
+            "id": 54,
+            "start_offset": 42,
+            "end_offset": 46,
+            "label": "作品名"
+        },
+        {
+            "id": 55,
+            "start_offset": 26,
             "end_offset": 31,
-            "label": "选手"
-        },
-        {
-            "id": 50,
-            "start_offset": 32,
-            "end_offset": 39,
-            "label": "得分"
+            "label": "时间"
         }
     ]
 }
