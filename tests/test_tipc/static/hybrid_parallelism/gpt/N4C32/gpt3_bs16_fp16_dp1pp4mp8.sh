@@ -8,7 +8,7 @@ micro_batch_size=4
 global_batch_size=16
 run_mode=DP1-MP8-PP4
 device_num=N4C32
-max_iter=30
+max_iter=10
 use_sharding=true
 
 # run
