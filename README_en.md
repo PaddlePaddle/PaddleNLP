@@ -1,4 +1,4 @@
-[简体中文](./README_cn.md) | English
+[简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
@@ -26,21 +26,21 @@
   <a href=#community> Community </a>
 </h4>
 
-**PaddleNLP** is an easy-to-use and powerful NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
+**PaddleNLP** is an *easy-to-use* and *powerful* NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
 
-## News  <img src="./docs/imgs/news_icon.png" width="40"/>
+## News 📢
 
-* 🔥 2021.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](). Welcome to join us!
+* 🔥 2022.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
   </div>
 
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-  * 🔥 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support NER, Relation Extraction, Event Extraction and Sentiment Anlaysis simultaneously.
-  * 🔥 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model which achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/).
-  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a SOTA biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
-  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with FasterGeneration, which can do fast parallel inference with 11B large-scale model.
+  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, which single model can support *NER*, *Relation Extraction*, *Event Extraction* and *Sentiment Analysis* simultaneously.
+  * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
+  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
+  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with ⚡**FasterGeneration**⚡, the *11B open-domain SOTA chatbot model* can be deployed on multi-GPU and do parallel inference easily.
 
 ## Features
 
@@ -55,7 +55,7 @@
 
 ### Out-of-Box NLP Toolset
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -104,7 +104,7 @@ PaddleNLP provides rich examples covering mainstream NLP task to help developers
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
-<details><summary> PaddleNLP Transformer model summary, (**click to show the table**) </summary><div>
+<details><summary> PaddleNLP Transformer model summary (<b>click to show details</b>) </summary><div>
 
 | Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
 | :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
@@ -171,14 +171,14 @@ For more details please refer to [Neural Search](./applications/neural_search).
 
 #### ❓ Question Answering System
 
-We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [RocketQA](https://github.com/PaddlePaddle/RocketQA) technique.
+We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [🚀RocketQA](https://github.com/PaddlePaddle/RocketQA).
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="400">
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering).
+For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/doc_vqa).
 
 
 #### 💌 Opinion Extraction and Sentiment Analysis
@@ -192,7 +192,7 @@ We build an opinion extraction system for product review and fine-grained sentim
 
 For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
 
-#### 🎤 Speech Command Analysis
+#### 🎙️ Speech Command Analysis
 
 Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and PaddleSpeech to solve Speech + NLP real scenarios.
 
@@ -212,7 +212,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 </div>
 
 
-For more super large-scale model training details please refer to [GPT-3](./examples/language_model/gpt-3).
+For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
 
 #### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
 
@@ -220,8 +220,11 @@ For more super large-scale model training details please refer to [GPT-3](./exam
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
 </div>
 
+```python
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+```
 
-For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
 
 #### ⚡ FasterGeneration: High Perforance Generation Utilities
 
@@ -229,8 +232,15 @@ For more usage please refer to [FasterTokenizers](./faster_tokenizers).
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
 </div>
 
+```python
+model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
+...
+outputs, _ = model.generate(
+    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
+    use_faster=True)
+```
 
-For more usage please refer to [FasterGeneration](./faster_generation).
+Set `use_faster=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FasterGeneration](./faster_generation).
 
 
 ## Installation
@@ -283,13 +293,11 @@ senta("这个产品用起来真的很流畅，我非常喜欢")
 
 ## API Reference
 
-- [Transformer API](./docs/model_zoo/transformers.rst)
-- [Data API](./docs/data.md)
-- [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/model_zoo/embeddings.md)
-- [Metrics API](./docs/metrics.md)
+- Support [luge.ai](https://www.luge.ai/) dataset loading and compatible with Hugging Face [Datasets](https://huggingface.co/datasets). For more details please refer to [Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html).
+- Using Hugging Face style API to load 500+ selected transformer models and download with fast speed. For more information please refer to [Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html).
+- One-line of code to load pre-trained word embedding. For more usage please refer to [Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html).
 
-Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
+Please find all PaddleNLP API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
 ## Community
 

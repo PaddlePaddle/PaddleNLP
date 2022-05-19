@@ -296,7 +296,7 @@ class WordTagTask(Task):
                     list(text),
                     return_length=True,
                     is_split_into_words=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
@@ -689,7 +689,7 @@ class NPTagTask(Task):
                     tokens,
                     return_length=True,
                     is_split_into_words=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 label_indices = list(
                     range(tokenized_output["seq_len"] - 1 - self._max_cls_len,
                           tokenized_output["seq_len"] - 1))

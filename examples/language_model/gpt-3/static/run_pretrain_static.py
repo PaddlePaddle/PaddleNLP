@@ -108,6 +108,9 @@ def dist_optimizer(args, topo):
             "dp_degree": args.dp_degree,
             "optimize_offload": False,
         }
+    elif args.mp_degree > 1 and args.dp_degree == 1:
+        # For MP or MP + DP, use executor instead of parallel_executor
+        dist_strategy.without_graph_optimization = True
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",

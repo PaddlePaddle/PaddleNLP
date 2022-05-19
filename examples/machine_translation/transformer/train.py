@@ -16,8 +16,8 @@ from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
 from paddlenlp.utils import profiler
 
-from util.record import AverageStatistical
-from util.to_static import apply_to_static
+from tls.record import AverageStatistical
+from tls.to_static import apply_to_static
 
 
 def parse_args():
