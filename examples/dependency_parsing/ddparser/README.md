@@ -15,7 +15,7 @@
 依存句法分析任务通过分析句子中词语之间的依存关系来确定句子的句法结构，
 该项目是基于Paddle v2.1的[baidu/ddparser](https://github.com/baidu/DDParser)实现，
 模型结构为[Deep Biaffine Attention for Neural Dependency Parsing](https://arxiv.org/abs/1611.01734)。
-同时本项目引入了[ERNIE](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/transformers.rst)系列预训练模型，
+同时本项目引入了[ERNIE](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 系列预训练模型，
 用户可以基于预训练模型finetune完成依存句法分析训练（参考以下[示例](#模型训练)）。
 
 ## 快速开始

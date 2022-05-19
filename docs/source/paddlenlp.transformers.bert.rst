@@ -10,5 +10,6 @@ bert
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.bert.faster_tokenizer
    paddlenlp.transformers.bert.modeling
    paddlenlp.transformers.bert.tokenizer

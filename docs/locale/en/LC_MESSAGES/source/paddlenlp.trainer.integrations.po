@@ -1,0 +1,47 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../source/paddlenlp.trainer.integrations.rst:2
+msgid "integrations"
+msgstr ""
+
+#: of paddlenlp.trainer.integrations.VisualDLCallback:1
+msgid "基类：:class:`paddlenlp.trainer.trainer_callback.TrainerCallback`"
+msgstr ""
+
+#: of paddlenlp.trainer.integrations.VisualDLCallback:1
+msgid ""
+"A [`TrainerCallback`] that sends the logs to "
+"[VisualDL](https://www.paddlepaddle.org.cn/paddle/visualdl). :param "
+"vdl_writer: The writer to use. Will instantiate one if not set. :type "
+"vdl_writer: `LogWriter`, *optional*"
+msgstr ""
+
+#: of paddlenlp.trainer.integrations.VisualDLCallback.on_train_begin:1
+msgid "Event called at the beginning of training."
+msgstr ""
+
+#: of paddlenlp.trainer.integrations.VisualDLCallback.on_log:1
+msgid "Event called after logging the last logs."
+msgstr ""
+
+#: of paddlenlp.trainer.integrations.VisualDLCallback.on_train_end:1
+msgid "Event called at the end of training."
+msgstr ""
+

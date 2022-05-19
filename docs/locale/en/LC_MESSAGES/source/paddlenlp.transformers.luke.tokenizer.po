@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.transformers.luke.tokenizer.rst:2
 msgid "tokenizer"
@@ -26,7 +26,7 @@ msgid "Tokenization classes for LUKE."
 msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
-msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer`"
+msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer`"
 msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
@@ -46,7 +46,6 @@ msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.add_special_tokens
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
@@ -102,7 +101,6 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:37
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids:10
 msgid "实际案例"
 msgstr ""
 
@@ -141,35 +139,6 @@ msgstr ""
 msgid "Converts a sequence of tokens (string) in a single string."
 msgstr ""
 
-#: of
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids:1
-msgid "Converts a sequence of tokens (list of string) to a list of ids."
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids:3
-msgid "A list of string representing tokens to be converted."
-msgstr ""
-
-#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
-msgid "返回"
-msgstr ""
-
-#: of
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids:6
-msgid "Converted ids from tokens."
-msgstr ""
-
-#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_ids
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
-#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
-msgid "返回类型"
-msgstr ""
-
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.add_special_tokens:1
 msgid "Adding special tokens if you need."
 msgstr ""
@@ -201,8 +170,22 @@ msgstr ""
 msgid "Input text."
 msgstr ""
 
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
+msgid "返回"
+msgstr ""
+
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping:7
 msgid "The offset map of input text."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
+msgid "返回类型"
 msgstr ""
 
 #: of
@@ -264,4 +247,16 @@ msgid ""
 "Build model inputs from a sequence or a pair of sequence for sequence "
 "classification tasks by concatenating and adding special tokens."
 msgstr ""
+
+#~ msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer`"
+#~ msgstr ""
+
+#~ msgid "Converts a sequence of tokens (list of string) to a list of ids."
+#~ msgstr ""
+
+#~ msgid "A list of string representing tokens to be converted."
+#~ msgstr ""
+
+#~ msgid "Converted ids from tokens."
+#~ msgstr ""
 
