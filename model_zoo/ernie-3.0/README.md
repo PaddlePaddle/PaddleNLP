@@ -562,7 +562,7 @@ from paddlenlp.transformers import *
 tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
 # 用于分类任务
-seq_cls_model = AutoModelForSequenceClassificaion.from_pretrained("ernie-3.0-medium-zh")
+seq_cls_model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh")
 
 # 用于序列标注任务
 token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-base-zh")

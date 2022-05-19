@@ -1,0 +1,782 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/index.rst:75
+msgid "ALBERT"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "BART"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "BERT"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "BigBird"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "Blenderbot"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "Blenderbot-Small"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ChineseBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ConvBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "CTRL"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "DistilBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ELECTRA"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE-CTM"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE-DOC"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE-GEN"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE-GRAM"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ERNIE-M"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "FNet"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "Funnel"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "GPT"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "LayoutLM"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "LayoutLMV2"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "LayoutXLM"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "Luke"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "MBart"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "MegatronBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "MobileBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "MPNet"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "NeZha"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "PPMiniLM"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "ProphetNet"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "Reformer"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "RemBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "RoBERTa"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "RoFormer"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "SKEP"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "SqueezeBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "T5"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "TinyBert"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "UnifiedTransformer"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "UNIMO"
+msgstr ""
+
+#: ../model_zoo/index.rst:75
+msgid "XLNet"
+msgstr ""
+
+#: ../model_zoo/index.rst:4
+msgid "PaddleNLP Transformer预训练模型"
+msgstr ""
+
+#: ../model_zoo/index.rst:6
+msgid ""
+"随着深度学习的发展，NLP领域涌现了一大批高质量的Transformer类预训练模型，多次刷新了不同NLP任务的SOTA（State of the"
+" Art），极大地推动了自然语言处理的进展。 PaddleNLP为用户提供了常用的预训练模型及其相应权重，如 "
+"``BERT``、``ERNIE``、``ALBERT``、``RoBERTa``、``XLNet`` 等，采用统一的API进行加载、训练和调用，"
+" 让开发者能够方便快捷地应用各种Transformer类预训练模型及其下游任务，且相应预训练模型权重下载速度快、稳定。"
+msgstr ""
+
+#: ../model_zoo/index.rst:12
+msgid "预训练模型使用方法"
+msgstr ""
+
+#: ../model_zoo/index.rst:14
+msgid ""
+"PaddleNLP Transformer API在提供丰富预训练模型的同时，也降低了用户的使用门槛。 "
+"使用Auto模块，可以加载不同网络结构的预训练模型，无需查找模型对应的类别。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。"
+msgstr ""
+
+#: ../model_zoo/index.rst:52
+msgid ""
+"上面的代码给出使用预训练模型的简要示例，更完整详细的示例代码， 可以参考：`使用预训练模型Fine-tune完成中文文本分类任务 "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models/>`_"
+msgstr ""
+
+#: ../model_zoo/index.rst:55
+msgid "加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。"
+msgstr ""
+
+#: ../model_zoo/index.rst:56
+msgid ""
+"加载预训练模型：PaddleNLP的预训练模型可以很容易地通过 ``from_pretrained()`` 方法加载。 "
+"Auto模块（包括AutoModel, AutoTokenizer, 及各种下游任务类）提供了方便易用的接口， "
+"无需指定类别，即可调用不同网络结构的预训练模型。 第一个参数是汇总表中对应的 ``Pretrained Weight``，可加载对应的预训练权重。"
+" ``AutoModelForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 "
+"``num_classes`` 等， 也是通过 ``from_pretrained()`` 传入。``Tokenizer`` 使用同样的 "
+"``from_pretrained`` 方法加载。"
+msgstr ""
+
+#: ../model_zoo/index.rst:62
+msgid "通过 ``Dataset`` 的 ``map`` 函数，使用 ``tokenizer`` 将 ``dataset`` 从原始文本处理成模型的输入。"
+msgstr ""
+
+#: ../model_zoo/index.rst:63
+msgid "定义 ``BatchSampler`` 和 ``DataLoader``，shuffle数据、组合Batch。"
+msgstr ""
+
+#: ../model_zoo/index.rst:64
+msgid "定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。"
+msgstr ""
+
+#: ../model_zoo/index.rst:68
+msgid "Transformer预训练模型汇总"
+msgstr ""
+
+#: ../model_zoo/index.rst:70
+msgid ""
+"PaddleNLP的Transformer预训练模型包含从 `huggingface.co`_ "
+"直接转换的模型权重和百度自研模型权重，方便社区用户直接迁移使用。 目前共包含了40多个主流预训练模型，500多个模型权重。"
+msgstr ""
+
+#: ../model_zoo/index.rst:125
+msgid "Transformer预训练模型适用任务汇总"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Model"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Sequence Classification"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Token Classification"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Question Answering"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Text Generation"
+msgstr ""
+
+#: ../model_zoo/index.rst:128
+msgid "Multiple Choice"
+msgstr ""
+
+#: ../model_zoo/index.rst:130
+msgid "ALBERT_"
+msgstr ""
+
+#: ../model_zoo/index.rst:130 ../model_zoo/index.rst:132
+#: ../model_zoo/index.rst:134 ../model_zoo/index.rst:136
+#: ../model_zoo/index.rst:138 ../model_zoo/index.rst:140
+#: ../model_zoo/index.rst:142 ../model_zoo/index.rst:144
+#: ../model_zoo/index.rst:146 ../model_zoo/index.rst:148
+#: ../model_zoo/index.rst:150 ../model_zoo/index.rst:152
+#: ../model_zoo/index.rst:154 ../model_zoo/index.rst:156
+#: ../model_zoo/index.rst:158 ../model_zoo/index.rst:160
+#: ../model_zoo/index.rst:162 ../model_zoo/index.rst:164
+#: ../model_zoo/index.rst:166 ../model_zoo/index.rst:168
+#: ../model_zoo/index.rst:170 ../model_zoo/index.rst:172
+#: ../model_zoo/index.rst:174 ../model_zoo/index.rst:176
+#: ../model_zoo/index.rst:178 ../model_zoo/index.rst:180
+#: ../model_zoo/index.rst:182 ../model_zoo/index.rst:184
+#: ../model_zoo/index.rst:186 ../model_zoo/index.rst:188
+#: ../model_zoo/index.rst:190 ../model_zoo/index.rst:192
+#: ../model_zoo/index.rst:194 ../model_zoo/index.rst:196
+#: ../model_zoo/index.rst:198 ../model_zoo/index.rst:200
+#: ../model_zoo/index.rst:202 ../model_zoo/index.rst:204
+#: ../model_zoo/index.rst:206 ../model_zoo/index.rst:208
+#: ../model_zoo/index.rst:210
+msgid "✅"
+msgstr ""
+
+#: ../model_zoo/index.rst:130 ../model_zoo/index.rst:132
+#: ../model_zoo/index.rst:134 ../model_zoo/index.rst:136
+#: ../model_zoo/index.rst:138 ../model_zoo/index.rst:140
+#: ../model_zoo/index.rst:142 ../model_zoo/index.rst:144
+#: ../model_zoo/index.rst:146 ../model_zoo/index.rst:148
+#: ../model_zoo/index.rst:150 ../model_zoo/index.rst:152
+#: ../model_zoo/index.rst:154 ../model_zoo/index.rst:156
+#: ../model_zoo/index.rst:158 ../model_zoo/index.rst:160
+#: ../model_zoo/index.rst:162 ../model_zoo/index.rst:164
+#: ../model_zoo/index.rst:166 ../model_zoo/index.rst:168
+#: ../model_zoo/index.rst:170 ../model_zoo/index.rst:172
+#: ../model_zoo/index.rst:174 ../model_zoo/index.rst:176
+#: ../model_zoo/index.rst:178 ../model_zoo/index.rst:180
+#: ../model_zoo/index.rst:182 ../model_zoo/index.rst:184
+#: ../model_zoo/index.rst:186 ../model_zoo/index.rst:188
+#: ../model_zoo/index.rst:190 ../model_zoo/index.rst:192
+#: ../model_zoo/index.rst:194 ../model_zoo/index.rst:196
+#: ../model_zoo/index.rst:198 ../model_zoo/index.rst:200
+#: ../model_zoo/index.rst:202 ../model_zoo/index.rst:204
+#: ../model_zoo/index.rst:206 ../model_zoo/index.rst:208
+#: ../model_zoo/index.rst:210
+msgid "❌"
+msgstr ""
+
+#: ../model_zoo/index.rst:132
+msgid "BART_"
+msgstr ""
+
+#: ../model_zoo/index.rst:134
+msgid "BERT_"
+msgstr ""
+
+#: ../model_zoo/index.rst:136
+msgid "BigBird_"
+msgstr ""
+
+#: ../model_zoo/index.rst:138
+msgid "Blenderbot_"
+msgstr ""
+
+#: ../model_zoo/index.rst:140
+msgid "Blenderbot-Small_"
+msgstr ""
+
+#: ../model_zoo/index.rst:142
+msgid "ChineseBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:144
+msgid "ConvBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:146
+msgid "CTRL_"
+msgstr ""
+
+#: ../model_zoo/index.rst:148
+msgid "DistilBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:150
+msgid "ELECTRA_"
+msgstr ""
+
+#: ../model_zoo/index.rst:152
+msgid "ERNIE_"
+msgstr ""
+
+#: ../model_zoo/index.rst:154
+msgid "ERNIE-CTM_"
+msgstr ""
+
+#: ../model_zoo/index.rst:156
+msgid "ERNIE-DOC_"
+msgstr ""
+
+#: ../model_zoo/index.rst:158
+msgid "ERNIE-GEN_"
+msgstr ""
+
+#: ../model_zoo/index.rst:160
+msgid "ERNIE-GRAM_"
+msgstr ""
+
+#: ../model_zoo/index.rst:162
+msgid "ERNIE-M_"
+msgstr ""
+
+#: ../model_zoo/index.rst:164
+msgid "FNet_"
+msgstr ""
+
+#: ../model_zoo/index.rst:166
+msgid "Funnel_"
+msgstr ""
+
+#: ../model_zoo/index.rst:168
+msgid "GPT_"
+msgstr ""
+
+#: ../model_zoo/index.rst:170
+msgid "LayoutLM_"
+msgstr ""
+
+#: ../model_zoo/index.rst:172
+msgid "LayoutLMV2_"
+msgstr ""
+
+#: ../model_zoo/index.rst:174
+msgid "LayoutXLM_"
+msgstr ""
+
+#: ../model_zoo/index.rst:176
+msgid "Luke_"
+msgstr ""
+
+#: ../model_zoo/index.rst:178
+msgid "MBart_"
+msgstr ""
+
+#: ../model_zoo/index.rst:180
+msgid "MegatronBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:182
+msgid "MobileBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:184
+msgid "MPNet_"
+msgstr ""
+
+#: ../model_zoo/index.rst:186
+msgid "NeZha_"
+msgstr ""
+
+#: ../model_zoo/index.rst:188
+msgid "PPMiniLM_"
+msgstr ""
+
+#: ../model_zoo/index.rst:190
+msgid "ProphetNet_"
+msgstr ""
+
+#: ../model_zoo/index.rst:192
+msgid "Reformer_"
+msgstr ""
+
+#: ../model_zoo/index.rst:194
+msgid "RemBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:196
+msgid "RoBERTa_"
+msgstr ""
+
+#: ../model_zoo/index.rst:198
+msgid "RoFormer_"
+msgstr ""
+
+#: ../model_zoo/index.rst:200
+msgid "SKEP_"
+msgstr ""
+
+#: ../model_zoo/index.rst:202
+msgid "SqueezeBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:204
+msgid "T5_"
+msgstr ""
+
+#: ../model_zoo/index.rst:206
+msgid "TinyBert_"
+msgstr ""
+
+#: ../model_zoo/index.rst:208
+msgid "UnifiedTransformer_"
+msgstr ""
+
+#: ../model_zoo/index.rst:210
+msgid "XLNet_"
+msgstr ""
+
+#: ../model_zoo/index.rst:259
+msgid "Reference"
+msgstr ""
+
+#: ../model_zoo/index.rst:260
+msgid ""
+"部分中文预训练模型来自： `brightmart/albert_zh "
+"<https://github.com/brightmart/albert_zh>`_, `ymcui/Chinese-BERT-wwm "
+"<https://github.com/ymcui/Chinese-BERT-wwm>`_, `huawei-noah/Pretrained-"
+"Language-Model/TinyBERT <https://github.com/huawei-noah/Pretrained-"
+"Language-Model/tree/master/TinyBERT>`_, `ymcui/Chinese-XLNet "
+"<https://github.com/ymcui/Chinese-XLNet>`_, "
+"`huggingface/xlnet_chinese_large "
+"<https://huggingface.co/clue/xlnet_chinese_large>`_, `Knover/luge-"
+"dialogue <https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-"
+"dialogue>`_, `huawei-noah/Pretrained-Language-Model/NEZHA-PyTorch/ "
+"<https://github.com/huawei-noah/Pretrained-Language-Model/tree/master"
+"/NEZHA-PyTorch>`_, `ZhuiyiTechnology/simbert "
+"<https://github.com/ZhuiyiTechnology/simbert>`_"
+msgstr ""
+
+#: ../model_zoo/index.rst:269
+msgid ""
+"Lan, Zhenzhong, et al. \"Albert: A lite bert for self-supervised learning"
+" of language representations.\" arXiv preprint arXiv:1909.11942 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:270
+msgid ""
+"Lewis, Mike, et al. \"BART: Denoising Sequence-to-Sequence Pre-training "
+"for Natural Language Generation, Translation, and Comprehension.\" arXiv "
+"preprint arXiv:1910.13461 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:271
+msgid ""
+"Devlin, Jacob, et al. \"Bert: Pre-training of deep bidirectional "
+"transformers for language understanding.\" arXiv preprint "
+"arXiv:1810.04805 (2018)."
+msgstr ""
+
+#: ../model_zoo/index.rst:272
+msgid ""
+"Zaheer, Manzil, et al. \"Big bird: Transformers for longer sequences.\" "
+"arXiv preprint arXiv:2007.14062 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:273
+msgid ""
+"Stephon, Emily, et al. \"Blenderbot: Recipes for building an open-domain "
+"chatbot.\" arXiv preprint arXiv:2004.13637 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:274
+msgid ""
+"Stephon, Emily, et al. \"Blenderbot-Small: Recipes for building an open-"
+"domain chatbot.\" arXiv preprint arXiv:2004.13637 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:275
+msgid ""
+"Sun, Zijun, et al. \"Chinesebert: Chinese pretraining enhanced by glyph "
+"and pinyin information.\" arXiv preprint arXiv:2106.16038 (2021)."
+msgstr ""
+
+#: ../model_zoo/index.rst:276
+msgid ""
+"Zhang, zhengyan, et al. \"CPM: A Large-scale Generative Chinese Pre-"
+"trained Language Model.\" arXiv preprint arXiv:2012.00413 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:277
+msgid ""
+"Jiang, Zihang, et al. \"ConvBERT: Improving BERT with Span-based Dynamic "
+"Convolution.\" arXiv preprint arXiv:2008.02496 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:278
+msgid ""
+"Nitish, Bryan, et al. \"CTRL: A Conditional Transformer Language Model "
+"for Controllable Generation.\" arXiv preprint arXiv:1909.05858 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:279
+msgid ""
+"Sanh, Victor, et al. \"DistilBERT, a distilled version of BERT: smaller, "
+"faster, cheaper and lighter.\" arXiv preprint arXiv:1910.01108 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:280
+msgid ""
+"Clark, Kevin, et al. \"Electra: Pre-training text encoders as "
+"discriminators rather than generators.\" arXiv preprint arXiv:2003.10555 "
+"(2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:281
+msgid ""
+"Sun, Yu, et al. \"Ernie: Enhanced representation through knowledge "
+"integration.\" arXiv preprint arXiv:1904.09223 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:282
+msgid ""
+"Ding, Siyu, et al. \"ERNIE-Doc: A retrospective long-document modeling "
+"transformer.\" arXiv preprint arXiv:2012.15688 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:283
+msgid ""
+"Xiao, Dongling, et al. \"Ernie-gen: An enhanced multi-flow pre-training "
+"and fine-tuning framework for natural language generation.\" arXiv "
+"preprint arXiv:2001.11314 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:284
+msgid ""
+"Xiao, Dongling, et al. \"ERNIE-Gram: Pre-Training with Explicitly N-Gram "
+"Masked Language Modeling for Natural Language Understanding.\" arXiv "
+"preprint arXiv:2010.12148 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:285
+msgid ""
+"Ouyang, Xuan, et al. \"ERNIE-M: enhanced multilingual representation by "
+"aligning cross-lingual semantics with monolingual corpora.\" arXiv "
+"preprint arXiv:2012.15674 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:286
+msgid ""
+"Lee-Thorp, James, et al. \"Fnet: Mixing tokens with fourier transforms.\""
+" arXiv preprint arXiv:2105.03824 (2021)."
+msgstr ""
+
+#: ../model_zoo/index.rst:287
+msgid ""
+"Dai, Zihang, et al. \"Funnel-transformer: Filtering out sequential "
+"redundancy for efficient language processing.\" Advances in neural "
+"information processing systems 33 (2020): 4271-4282."
+msgstr ""
+
+#: ../model_zoo/index.rst:288
+msgid ""
+"Radford, Alec, et al. \"Language models are unsupervised multitask "
+"learners.\" OpenAI blog 1.8 (2019): 9."
+msgstr ""
+
+#: ../model_zoo/index.rst:289
+msgid ""
+"Xu, Yiheng, et al. \"LayoutLM: Pre-training of Text and Layout for "
+"Document Image Understanding.\" arXiv preprint arXiv:1912.13318 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:290
+msgid ""
+"Xu, Yang, et al. \"LayoutLMv2: Multi-modal Pre-training for Visually-Rich"
+" Document Understanding\" arXiv preprint arXiv:2012.14740 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:291
+msgid ""
+"Xu, Yiheng, et al. \"LayoutXLM: Multimodal Pre-training for Multilingual "
+"Visually-rich Document Understanding\" arXiv preprint arXiv:2104.08836 "
+"(2021)."
+msgstr ""
+
+#: ../model_zoo/index.rst:292
+msgid ""
+"Yamada, Ikuya, et al. \"Luke: deep contextualized entity representations "
+"with entity-aware self-attention.\" arXiv preprint arXiv:2010.01057 "
+"(2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:293
+msgid ""
+"Liu, Yinhan, et al. \"MBart: Multilingual Denoising Pre-training for "
+"Neural Machine Translation\" arXiv preprint arXiv:2001.08210 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:294
+msgid ""
+"Shoeybi, Mohammad, et al. \"Megatron-lm: Training multi-billion parameter"
+" language models using model parallelism.\" arXiv preprint "
+"arXiv:1909.08053 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:295
+msgid ""
+"Sun, Zhiqing, et al. \"MobileBERT: a Compact Task-Agnostic BERT for "
+"Resource-Limited Devices\" arXiv preprint arXiv:2004.02984 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:296
+msgid ""
+"Song, Kaitao, et al. \"MPNet: Masked and Permuted Pre-training for "
+"Language Understanding.\" arXiv preprint arXiv:2004.09297 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:297
+msgid ""
+"Wei, Junqiu, et al. \"NEZHA: Neural contextualized representation for "
+"chinese language understanding.\" arXiv preprint arXiv:1909.00204 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:298
+msgid ""
+"Qi, Weizhen, et al. \"Prophetnet: Predicting future n-gram for sequence-"
+"to-sequence pre-training.\" arXiv preprint arXiv:2001.04063 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:299
+msgid ""
+"Kitaev, Nikita, et al. \"Reformer: The efficient Transformer.\" arXiv "
+"preprint arXiv:2001.04451 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:300
+msgid ""
+"Chung, Hyung Won, et al. \"Rethinking embedding coupling in pre-trained "
+"language models.\" arXiv preprint arXiv:2010.12821 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:301
+msgid ""
+"Liu, Yinhan, et al. \"Roberta: A robustly optimized bert pretraining "
+"approach.\" arXiv preprint arXiv:1907.11692 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:302
+msgid ""
+"Su Jianlin, et al. \"RoFormer: Enhanced Transformer with Rotary Position "
+"Embedding.\" arXiv preprint arXiv:2104.09864 (2021)."
+msgstr ""
+
+#: ../model_zoo/index.rst:303
+msgid ""
+"Tian, Hao, et al. \"SKEP: Sentiment knowledge enhanced pre-training for "
+"sentiment analysis.\" arXiv preprint arXiv:2005.05635 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:304
+msgid ""
+"Forrest, ALbert, et al. \"SqueezeBERT: What can computer vision teach NLP"
+" about efficient neural networks?\" arXiv preprint arXiv:2006.11316 "
+"(2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:305
+msgid ""
+"Raffel, Colin, et al. \"T5: Exploring the Limits of Transfer Learning "
+"with a Unified Text-to-Text Transformer.\" arXiv preprint "
+"arXiv:1910.10683 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:306
+msgid ""
+"Vaswani, Ashish, et al. \"Attention is all you need.\" arXiv preprint "
+"arXiv:1706.03762 (2017)."
+msgstr ""
+
+#: ../model_zoo/index.rst:307
+msgid ""
+"Jiao, Xiaoqi, et al. \"Tinybert: Distilling bert for natural language "
+"understanding.\" arXiv preprint arXiv:1909.10351 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:308
+msgid ""
+"Bao, Siqi, et al. \"Plato-2: Towards building an open-domain chatbot via "
+"curriculum learning.\" arXiv preprint arXiv:2006.16779 (2020)."
+msgstr ""
+
+#: ../model_zoo/index.rst:309
+msgid ""
+"Yang, Zhilin, et al. \"Xlnet: Generalized autoregressive pretraining for "
+"language understanding.\" arXiv preprint arXiv:1906.08237 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:310
+msgid ""
+"Cui, Yiming, et al. \"Pre-training with whole word masking for chinese "
+"bert.\" arXiv preprint arXiv:1906.08101 (2019)."
+msgstr ""
+
+#: ../model_zoo/index.rst:311
+msgid ""
+"Wang, Quan, et al. “Building Chinese Biomedical Language Models via "
+"Multi-Level Text Discrimination.” arXiv preprint arXiv:2110.07244 (2021)."
+msgstr ""
+
