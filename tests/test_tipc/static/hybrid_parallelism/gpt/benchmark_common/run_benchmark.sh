@@ -131,12 +131,12 @@ function _train(){
         workerlog_id=0
 	;;
     DP1-MP8-PP4)  echo "run run_mode: DP1-MP8-PP4"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP4-MP8-PP1)  echo "run run_mode: DP4-MP8-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
