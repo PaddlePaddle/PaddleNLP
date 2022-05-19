@@ -42,6 +42,7 @@ function _train(){
     if [ -d $OUTPUT_PATH ]; then
         rm -rf $OUTPUT_PATH
     fi
+    mkdir $OUTPUT_PATH
 
     if [ ${model_item} = "gpt2" ];then
         static_scripts="../examples/language_model/gpt/"
