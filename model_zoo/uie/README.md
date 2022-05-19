@@ -1,21 +1,21 @@
-# 通用信息抽取 Universal Information Extraction (UIE)
+# 通用信息抽取 UIE(Universal Information Extraction)
 
  **目录**
 
 * [1. 模型简介](#模型简介)
-* [2. 应用场景](#应用场景)
+* [2. 应用示例](#应用示例)
 * [3. 开箱即用](#开箱即用)
 * [4. 轻定制功能](#轻定制功能)
+* [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
 
 ## 1. 模型简介
 
-[Universal Information Extraction (UIE)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人提出了开放域信息抽取的统一框架，这一框架在实体抽取、关系抽取、事件抽取、情感分析等任务上都有着良好的泛化效果。本示例基于这篇工作的prompt设计思想，提供了以ERNIE为底座的阅读理解型信息抽取模型，用于关键信息抽取。同时，针对不同场景，支持通过构造小样本数据来优化模型效果，快速适配特定的关键信息配置。
+[UIE(Universal Information Extraction)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人在ACL-2022中提出了通用信息抽取统一框架UIE。该框架实现了实体抽取、关系抽取、事件抽取、情感分析等任务的统一建模，并使得不同任务间具备良好的迁移和泛化能力。为了推动信息抽取产业化应用，PaddleNLP借鉴该论文的方法，基于ERNIE3.0知识增强预训练模型，训练并开源了首个中文通用信息抽取模型UIE。该模型可以支持不限定行业领域和抽取目标的关键信息抽取，实现零样本快速冷启动，并具备优秀的小样本微调能力，快速适配特定的抽取目标。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
-    <p>图1 模型结构图 <p/>
 </div>
 
 #### UIE的优势
@@ -26,29 +26,31 @@
 
 - **效果领先**：开放域信息抽取在多种场景，多种任务上，均有不俗的表现。
 
-<a name="应用场景"></a>
+<a name="应用示例"></a>
 
-## 2. 应用场景
+## 2. 应用示例
 
-UIE可以从自然语言文本中，抽取出结构化的关键字段信息，以下是UIE在医疗、金融等领域的应用示例。
+UIE不限定行业领域和抽取目标，以下是一些零样本行业示例：
 
-#### 医疗
+- 医疗场景-专病结构化
 
-在医疗场景下，医生需要从病历中快速重要信息以便分析病人病情，UIE可将专病信息进行结构化处理，快速抽取病历内容中的检查内容、炎症部位、结节大小等信息，大幅提升医务人员对患者的诊断效率以及准确率，协助医务人员高效诊断病情。
+![image](https://user-images.githubusercontent.com/40840292/169017581-93c8ee44-856d-4d17-970c-b6138d10f8bc.png)
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166708474-8f05bdba-143f-4d11-8bd5-8ce26ab7c987.png height=300 hspace='10'/>
-    <p>图2 医疗场景示例<p/>
-</div>
+- 法律场景-判决书抽取
 
-#### 金融
+![image](https://user-images.githubusercontent.com/40840292/169017863-442c50f1-bfd4-47d0-8d95-8b1d53cfba3c.png)
 
-在金融场景下，工作人员想要整理一份资产评估证明，UIE可以根据抽取内容自定义抽取目标，大幅提升工作人员的工作效率及准确率，协助工作人员对数据进行整理和调研。
+- 金融场景-收入证明、招股书抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/166708694-e2671e29-3c02-4e29-9823-9fbdfd117eb6.png height=400 hspace='10'/>
-    <p>图3 金融场景示例<p/>
-</div>
+![image](https://user-images.githubusercontent.com/40840292/169017982-e521ddf6-d233-41f3-974e-6f40f8f2edbc.png)
+
+- 公安场景-事故报告抽取
+
+![image](https://user-images.githubusercontent.com/40840292/169018340-31efc1bf-f54d-43f7-b62a-8f7ce9bf0536.png)
+
+- 旅游场景-宣传册、手册抽取
+
+![image](https://user-images.githubusercontent.com/40840292/169018113-c937eb0b-9fd7-4ecc-8615-bcdde2dac81d.png)
 
 <a name="开箱即用"></a>
 
@@ -56,28 +58,284 @@ UIE可以从自然语言文本中，抽取出结构化的关键字段信息，�
 
 ```paddlenlp.Taskflow```提供通用信息抽取、评价观点抽取等能力，可抽取多种类型的信息，包括但不限于命名实体识别（如人名、地名、机构名等）、关系（如电影的导演、歌曲的发行时间等）、事件（如某路口发生车祸、某地发生地震等）、以及评价维度、观点词、情感倾向等信息。用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+#### 支持多场景信息抽取任务
 
->>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
->>> ie = Taskflow('information_extraction', schema=schema)
->>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
-[{'时间': [{'end': 6,
-          'probability': 0.9857378532924486,
-          'start': 0,
-          'text': '2月8日上午'}],
-  '赛事名称': [{'end': 23,
-            'probability': 0.8503089953268272,
-            'start': 6,
-            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
-  '选手': [{'end': 31,
-          'probability': 0.8981548639781138,
-          'start': 28,
-          'text': '谷爱凌'}]}]
-```
+- 命名实体识别
 
-更多不同任务的使用方法请参考[Taskflow信息抽取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E4%BF%A1%E6%81%AF%E6%8A%BD%E5%8F%96)
+  命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
+
+  例如抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
+
+  ```text
+  ['时间', '选手', '赛事名称']
+  ```
+
+  预测：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+  >>> ie = Taskflow('information_extraction', schema=schema)
+  >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")) # Better print results using pprint
+  [{'时间': [{'end': 6,
+            'probability': 0.9857378532924486,
+            'start': 0,
+            'text': '2月8日上午'}],
+    '赛事名称': [{'end': 23,
+              'probability': 0.8503089953268272,
+              'start': 6,
+              'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+    '选手': [{'end': 31,
+            'probability': 0.8981548639781138,
+            'start': 28,
+            'text': '谷爱凌'}]}]
+  ```
+
+  例如抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
+
+  ```text
+  ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+  ```
+
+  在上例中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
+
+  预测：
+
+  ```python
+  >>> schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+  >>> ie.set_schema(schema)
+  >>> pprint(ie("（右肝肿瘤）肝细胞性肝癌（II-III级，梁索型和假腺管型），肿瘤包膜不完整，紧邻肝被膜，侵及周围肝组织，未见脉管内癌栓（MVI分级：M0级）及卫星子灶形成。（肿物1个，大小4.2×4.0×2.8cm）。"))
+  [{'肝癌级别': [{'end': 20,
+              'probability': 0.9243267447402701,
+              'start': 13,
+              'text': 'II-III级'}],
+    '肿瘤的个数': [{'end': 84,
+              'probability': 0.7538413804059623,
+              'start': 82,
+              'text': '1个'}],
+    '肿瘤的大小': [{'end': 100,
+              'probability': 0.8341128043459491,
+              'start': 87,
+              'text': '4.2×4.0×2.8cm'}],
+    '脉管内癌栓分级': [{'end': 70,
+                'probability': 0.9083292325934664,
+                'start': 67,
+                'text': 'M0级'}]}]
+  ```
+
+- 关系抽取
+
+  关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
+
+  例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"已举办次数", schema构造如下：
+
+  ```text
+  {
+    '竞赛名称': [
+      '主办方',
+      '承办方',
+      '已举办次数'
+    ]
+  }
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
+  [{'竞赛名称': [{'end': 13,
+              'probability': 0.7825402622754041,
+              'relations': {'主办方': [{'end': 22,
+                                    'probability': 0.8421710521379353,
+                                    'start': 14,
+                                    'text': '中国中文信息学会'},
+                                    {'end': 30,
+                                    'probability': 0.7580801847701935,
+                                    'start': 23,
+                                    'text': '中国计算机学会'}],
+                            '已举办次数': [{'end': 82,
+                                      'probability': 0.4671295049136148,
+                                      'start': 80,
+                                      'text': '4届'}],
+                            '承办方': [{'end': 39,
+                                    'probability': 0.8292706618236352,
+                                    'start': 35,
+                                    'text': '百度公司'},
+                                    {'end': 72,
+                                    'probability': 0.6193477885474685,
+                                    'start': 56,
+                                    'text': '中国计算机学会自然语言处理专委会'},
+                                    {'end': 55,
+                                    'probability': 0.7000497331473241,
+                                    'start': 40,
+                                    'text': '中国中文信息学会评测工作委员会'}]},
+              'start': 0,
+              'text': '2022语言与智能技术竞赛'}]}]
+  ```
+
+- 事件抽取
+
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词和事件要素，组合为相应的结构化信息。
+
+  例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
+
+  ```text
+  {
+    '地震触发词': [
+      '地震强度',
+      '时间',
+      '震中位置',
+      '震源深度'
+    ]
+  }
+  ```
+
+  触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+
+  预测：
+
+  ```python
+  >>> schema = {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']} # Define the schema for event extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
+  [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+  ```
+
+- 评论观点抽取
+
+  评论观点抽取，是指抽取文本中包含的评价维度、观点词。
+
+  例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
+
+  ```text
+  {
+    '评价维度': [
+      '观点词',
+      '情感倾向[正向，负向]'
+    ]
+  }
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = {'评价维度': ['观点词', '情感倾向[正向，负向]']} # Define the schema for opinion extraction
+  >>> ie.set_schema(schema) # Reset schema
+  >>> pprint(ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")) # Better print results using pprint
+  [{'评价维度': [{'end': 20,
+              'probability': 0.9817040258681473,
+              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9966142505350533,
+                                            'text': '正向'}],
+                            '观点词': [{'end': 22,
+                                    'probability': 0.957396472711558,
+                                    'start': 21,
+                                    'text': '高'}]},
+              'start': 17,
+              'text': '性价比'},
+            {'end': 2,
+              'probability': 0.9696849569741168,
+              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9982153274927796,
+                                            'text': '正向'}],
+                            '观点词': [{'end': 4,
+                                    'probability': 0.9945318044652538,
+                                    'start': 2,
+                                    'text': '干净'}]},
+              'start': 0,
+              'text': '店面'}]}]
+  ```
+
+- 情感倾向分类
+
+  句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
+
+  ```text
+  '情感倾向[正向，负向]'
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
+  >>> ie.set_schema(schema) # Reset schema
+  >>> ie('这个产品用起来真的很流畅，我非常喜欢')
+  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
+  ```
+
+- 跨任务抽取
+
+  例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
+
+  ```text
+  [
+    "法院",
+    {
+        "原告": [
+            "委托代理人",
+            "法定代表人"
+        ]
+    },
+    {
+        "被告": [
+            "委托代理人",
+            "法定代表人"
+        ]
+    }
+  ]
+  ```
+
+  预测：
+
+  ```python
+  >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
+  >>> ie.set_schema(schema)
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。")) # Better print results using pprint
+  [{'原告': [{'end': 37,
+            'probability': 0.9955972637653154,
+            'relations': {'委托代理人': [{'end': 46,
+                                    'probability': 0.9835957661618089,
+                                    'start': 44,
+                                    'text': '李四'}]},
+            'start': 35,
+            'text': '张三'}],
+    '法院': [{'end': 10,
+            'probability': 0.9245885500450299,
+            'start': 0,
+            'text': '北京市海淀区人民法院'}],
+    '被告': [{'end': 67,
+            'probability': 0.9033652934762237,
+            'relations': {'委托代理人': [{'end': 46,
+                                    'probability': 0.3863244074945271,
+                                    'start': 44,
+                                    'text': '李四'}]},
+            'start': 64,
+            'text': 'B公司'}]}]
+  ```
+
+
+#### 多模型选择，满足精度、速度要求
+
+- 模型选择
+
+  | 模型 |  结构  |
+  | :---: | :--------: |
+  | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
+  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
+
+- 使用`UIE-Tiny`进行预测
+
+  ```python
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['时间', '选手', '赛事名称']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-tiny")
+  >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
+  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9492842181233527}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.7277186614493836}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8751028059367947}]}]
+  ```
 
 <a name="轻定制功能"></a>
 
@@ -186,14 +444,6 @@ python finetune.py \
 - `valid_steps`: evaluate的间隔steps数，默认100。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 
-模型选择：
-
-| 模型 |  结构  |
-| :---: | :--------: |
-| `uie-tiny`| 6-layers, 768-hidden, 12-heads |
-| `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
-| `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
-
 #### 模型评估
 
 通过运行以下命令进行模型评估：
@@ -256,6 +506,15 @@ python evaluate.py \
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
+
+<a name="CCKS比赛"></a>
+
+## 5.CCKS比赛
+
+为了进一步探索通用信息抽取的边界，我们举办了**CCKS 2022 千言通用信息抽取竞赛评测**（2022/03/30 - 2022/07/31）。
+
+- [报名链接](https://aistudio.baidu.com/aistudio/competition/detail/161/0/introduction)
+- [基线代码](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/DuUIE)
 
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**

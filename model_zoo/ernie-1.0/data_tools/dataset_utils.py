@@ -752,7 +752,7 @@ def _build_train_valid_test_datasets(data_prefix,
             elif dataset_type == DSET_TYPE_ERNIE:
                 dataset = ErnieDataset(
                     indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,  #ErnieTokenizer.from_pretrained("ernie-1.0"),
+                    tokenizer=tokenizer,
                     masked_lm_prob=masked_lm_prob,
                     short_seq_prob=short_seq_prob,
                     binary_head=binary_head,
