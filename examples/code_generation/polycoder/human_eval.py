@@ -97,7 +97,7 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         '--model_type',
-        default='gpt2-en',
+        default='gpt2',
         type=str,
         help="Model type selected in the list: " +
         ", ".join(MODEL_CLASSES.keys()))

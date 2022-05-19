@@ -303,10 +303,14 @@ class FasterTransformer(TransformerModel):
 
         self.load_dict(model_dict)
 
+        if self.enable_faster_encoder:
+            self = enable_faster_encoder(self, use_fp16=self.use_fp16_encoder)
+
     def export_params(self, init_from_params, place):
         '''
         This method is used for load static graph from dygraph checkpoint
         or export inference model using static graph. 
+        Do NOT support faster encoder. 
 
         Args:
             init_from_params (string):
@@ -835,7 +839,12 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         decoder_type_ids = token_type_ids[:, -1:]
         token_type_ids = token_type_ids[:, :-1]
 
-        attention_mask = attention_mask[:, :, :-1, :-1]
+        # TODO(guosheng): attention_mask of UnifiedTransformer uses 0/-INF
+        # and is 4D. While now we want to use 1/0 to unify all models and
+        # tokenizers.
+        attention_mask = (attention_mask[:, :, :-1, :-1]
+                          if attention_mask.ndim == 4 else
+                          attention_mask[:, :-1, :-1])
         attention_mask = paddle.cast(
             attention_mask == 0,
             dtype="float16" if self._use_fp16_decoding else "float32")

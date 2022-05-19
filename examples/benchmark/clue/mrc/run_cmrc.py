@@ -26,7 +26,7 @@ import paddle
 
 from paddle.io import DataLoader
 
-from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
@@ -43,9 +43,8 @@ def parse_args():
         help="Path to pre-trained model or shortcut name of model.")
     parser.add_argument(
         "--output_dir",
-        default=None,
+        default="best_cmrc_model",
         type=str,
-        required=True,
         help="The output directory where the model predictions and checkpoints will be written."
     )
     parser.add_argument(
@@ -71,7 +70,7 @@ def parse_args():
         help="The initial learning rate for Adam.")
     parser.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
@@ -93,8 +92,14 @@ def parse_args():
         help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
+        "--warmup_steps",
+        default=0,
+        type=int,
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
+    )
+    parser.add_argument(
         "--warmup_proportion",
-        default=0.0,
+        default=0.1,
         type=float,
         help="Proportion of training steps to perform linear learning rate warmup for."
     )
@@ -159,36 +164,32 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, raw_dataset, data_loader, args, do_eval=True):
+def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
     model.eval()
 
     all_start_logits = []
     all_end_logits = []
     tic_eval = time.time()
-
     for batch in data_loader:
-        input_ids, token_type_ids = batch
-        start_logits_tensor, end_logits_tensor = model(input_ids,
-                                                       token_type_ids)
-
-        for idx in range(start_logits_tensor.shape[0]):
+        start_logits, end_logits = model(**batch)
+        for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 print("Processing example: %d" % len(all_start_logits))
                 print('time per 1000:', time.time() - tic_eval)
                 tic_eval = time.time()
 
-            all_start_logits.append(start_logits_tensor.numpy()[idx])
-            all_end_logits.append(end_logits_tensor.numpy()[idx])
+            all_start_logits.append(start_logits.numpy()[idx])
+            all_end_logits.append(end_logits.numpy()[idx])
 
     all_predictions, _, _ = compute_prediction(
-        raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
-        False, args.n_best_size, args.max_answer_length)
+        raw_dataset, dataset, (all_start_logits, all_end_logits), False,
+        args.n_best_size, args.max_answer_length)
 
     mode = 'validation' if do_eval else 'test'
     if do_eval:
-        filename = 'prediction_validation.json'
+        filename = os.path.join(args.output_dir, 'prediction_validation.json')
     else:
-        filename = 'cmrc2018_predict.json'
+        filename = os.path.join(args.output_dir, 'cmrc2018_predict.json')
     with open(filename, "w", encoding='utf-8') as writer:
         writer.write(
             json.dumps(
@@ -233,7 +234,7 @@ def run(args):
     set_seed(args)
 
     train_examples, dev_examples, test_examples = load_dataset(
-        'cmrc2018', split=["train", "validation", "test"])
+        'clue', 'cmrc2018', split=["train", "validation", "test"])
 
     column_names = train_examples.column_names
     if rank == 0:
@@ -377,32 +378,27 @@ def run(args):
                                       num_proc=1)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
-        train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "start_positions": Stack(dtype="int64"),
-            "end_positions": Stack(dtype="int64")
-        }): fn(samples)
+
+        batchify_fn = DataCollatorWithPadding(tokenizer)
         train_data_loader = DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
-            collate_fn=train_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
         dev_ds = dev_examples.map(prepare_validation_features,
                                   batched=True,
                                   remove_columns=column_names,
                                   num_proc=1)
+        dev_ds_for_model = dev_ds.remove_columns(
+            ["example_id", "offset_mapping", "attention_mask"])
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
-        dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+
         dev_data_loader = DataLoader(
-            dataset=dev_ds,
+            dataset=dev_ds_for_model,
             batch_sampler=dev_batch_sampler,
-            collate_fn=dev_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
         num_training_steps = int(
@@ -411,8 +407,9 @@ def run(args):
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_proportion)
+        warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps, warmup)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -432,9 +429,9 @@ def run(args):
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_data_loader):
-                input_ids, token_type_ids, start_positions, end_positions = batch
-                logits = model(
-                    input_ids=input_ids, token_type_ids=token_type_ids)
+                start_positions = batch.pop("start_positions")
+                end_positions = batch.pop("end_positions")
+                logits = model(**batch)
                 loss = criterion(logits, (start_positions, end_positions))
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
@@ -467,26 +464,34 @@ def run(args):
                             print('Saving checkpoint to:', output_dir)
                         if global_step == num_training_steps:
                             break
-            evaluate(model, dev_examples, dev_data_loader, args)
+            evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
                                     num_proc=1)
+        test_ds_for_model = test_ds.remove_columns(
+            ["example_id", "offset_mapping", "attention_mask"])
+        dev_batchify_fn = DataCollatorWithPadding(tokenizer)
+
         test_batch_sampler = paddle.io.BatchSampler(
-            test_ds, batch_size=args.eval_batch_size, shuffle=False)
-        test_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+            test_ds_for_model, batch_size=args.eval_batch_size, shuffle=False)
+
+        batchify_fn = DataCollatorWithPadding(tokenizer)
         test_data_loader = DataLoader(
-            dataset=test_ds,
+            dataset=test_ds_for_model,
             batch_sampler=test_batch_sampler,
-            collate_fn=test_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
-        evaluate(model, test_examples, test_data_loader, args, do_eval=False)
+        evaluate(
+            model,
+            test_examples,
+            test_ds,
+            test_data_loader,
+            args,
+            do_eval=False)
 
 
 def print_arguments(args):

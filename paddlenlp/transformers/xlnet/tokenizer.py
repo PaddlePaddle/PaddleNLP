@@ -131,20 +131,20 @@ class XLNetTokenizer(PretrainedTokenizer):
     padding_side = "left"
     pad_token_type_id = 3
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=False,
-            remove_space=True,
-            keep_accents=False,
-            bos_token="<s>",
-            eos_token="</s>",
-            unk_token="<unk>",
-            sep_token="<sep>",
-            pad_token="<pad>",
-            cls_token="<cls>",
-            mask_token="<mask>",
-            additional_special_tokens=["<eop>", "<eod>"], ):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=False,
+                 remove_space=True,
+                 keep_accents=False,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 unk_token="<unk>",
+                 sep_token="<sep>",
+                 pad_token="<pad>",
+                 cls_token="<cls>",
+                 mask_token="<mask>",
+                 additional_special_tokens=["<eop>", "<eod>"],
+                 **kwargs):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space

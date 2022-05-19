@@ -8,7 +8,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 
 - 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
-- 解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 **8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/perf>`_ 。
+- 解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 **8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf>`_ 。
 - 易用性强。功能的入口为 `model.generate` ，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。下图展示了FasterGeneration的启动流程：
 
 .. image:: /imgs/faster_generation.png
@@ -23,7 +23,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
     python samples/gpt_sample.py
 
 
-如果是第一次执行，PaddleNLP会启动即时编译（ `JIT Compile <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/07_new_op/new_custom_op_cn.html#jit-compile>`_ ）自动编译高性能解码算子。
+如果是第一次执行，PaddleNLP会启动即时编译（ `JIT Compile <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/new_op/new_custom_op_cn.html#jit-compile>`_ ）自动编译高性能解码算子。
 
 .. code-block::
 
@@ -93,7 +93,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 除了以上简单示例之外，PaddleNLP的examples中所有使用了 `model.generate()` 的示例都可以通过调整到合适的参数使用高性能推理。具体如下：
 
 - `examples/dialogue/unified_transformer <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_
-- `examples/language_model/gpt/faster_gpt <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_
+- `model_zoo/gpt/faster_gpt <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/faster_gpt>`_
 - `examples/text_generation/unimo-text <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation/unimo-text>`_
 - `examples/text_summarization/bart <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_
 
