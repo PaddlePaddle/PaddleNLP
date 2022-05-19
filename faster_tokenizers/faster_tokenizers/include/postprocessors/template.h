@@ -26,7 +26,10 @@ namespace tokenizers {
 namespace postprocessors {
 
 enum SequenceType { SEQ_A, SEQ_B };
-
+NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
+                             {
+                                 {SEQ_A, "A"}, {SEQ_B, "B"},
+                             });
 // The template indicate `${Id} : ${TypeId}`
 using TemplateSequence = std::pair<SequenceType, uint>;
 using TemplateSpecialToken = std::pair<std::string, uint>;
@@ -105,6 +108,10 @@ struct TemplatePostProcessor : public PostProcessor {
                      bool add_special_tokens,
                      core::Encoding* result_encoding) const;
 
+  friend void to_json(nlohmann::json& j,
+                      const TemplatePostProcessor& template_postprocessor);
+  friend void from_json(const nlohmann::json& j,
+                        TemplatePostProcessor& template_postprocessor);
 
   Template single_;
   Template pair_;

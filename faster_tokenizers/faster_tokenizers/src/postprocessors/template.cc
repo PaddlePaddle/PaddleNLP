@@ -80,6 +80,56 @@ TemplatePiece TemplatePiece::CreateTemplatePiece(
   return piece;
 }
 
+void to_json(nlohmann::json& j, const TemplatePiece& template_piece) {
+  if (boost::get<TemplateSequence>(&template_piece) != nullptr) {
+    auto& template_sequence = boost::get<TemplateSequence>(template_piece);
+    j = {
+        {"Sequence",
+         {
+             {"id", template_sequence.first},
+             {"type_id", template_sequence.second},
+         }},
+    };
+  } else {
+    auto& template_special_token =
+        boost::get<TemplateSpecialToken>(template_piece);
+    j = {
+        {"SpecialToken",
+         {
+             {"id", template_special_token.first},
+             {"type_id", template_special_token.second},
+         }},
+    };
+  }
+}
+
+void from_json(const nlohmann::json& j, TemplatePiece& template_piece) {
+  if (j.find("Sequence") != j.end()) {
+    auto& template_sequence = boost::get<TemplateSequence>(template_piece);
+    j["Sequence"]["id"].get_to(template_sequence.first);
+    j["Sequence"]["type_id"].get_to(template_sequence.second);
+  } else {
+    auto& template_special_token =
+        boost::get<TemplateSpecialToken>(template_piece);
+    j["SpecialToken"]["id"].get_to(template_special_token.first);
+    j["SpecialToken"]["type_id"].get_to(template_special_token.second);
+  }
+}
+
+void to_json(nlohmann::json& j, const SpecialToken& special_token) {
+  j = {
+      {"id", special_token.id_},
+      {"ids", special_token.ids_},
+      {"tokens", special_token.tokens_},
+  };
+}
+
+void from_json(const nlohmann::json& j, SpecialToken& special_token) {
+  j["id"].get_to(special_token.id_);
+  j["ids"].get_to(special_token.ids_);
+  j["tokens"].get_to(special_token.tokens_);
+}
+
 size_t TemplatePostProcessor::CountAdded(
     Template* template_, const SpecialTokensMap& special_tokens_map) {
   size_t count = 0;
@@ -95,6 +145,34 @@ size_t TemplatePostProcessor::CountAdded(
     }
   }
   return count;
+}
+
+void to_json(nlohmann::json& j, const Template& template_) {
+  for (auto& piece : template_.pieces_) {
+    j.push_back(piece);
+  }
+}
+
+void from_json(const nlohmann::json& j, Template& template_) {
+  template_.pieces_.resize(j.size());
+  for (int i = 0; i < j.size(); ++i) {
+    j[i].get_to(template_.pieces_[i]);
+  }
+}
+
+void to_json(nlohmann::json& j, const SpecialTokensMap& tokens_map) {
+  for (auto it = tokens_map.tokens_map_.begin();
+       it != tokens_map.tokens_map_.end();
+       ++it) {
+    j[it->first] = it->second;
+  }
+}
+
+void from_json(const nlohmann::json& j, SpecialTokensMap& tokens_map) {
+  SpecialToken special_token;
+  for (auto it = j.begin(); it != j.end(); ++it) {
+    tokens_map.tokens_map_[it.key()] = it.value().get_to(special_token);
+  }
 }
 
 size_t TemplatePostProcessor::DefaultAdded(bool is_single) {
@@ -297,6 +375,27 @@ void TemplatePostProcessor::operator()(core::Encoding* encoding,
     ApplyTemplate(
         single_, encoding, pair_encoding, add_special_tokens, result_encoding);
   }
+}
+
+void to_json(nlohmann::json& j,
+             const TemplatePostProcessor& template_postprocessor) {
+  j = {
+      {"type", "TemplateProcessing"},
+      {"single", template_postprocessor.single_},
+      {"pair", template_postprocessor.pair_},
+      {"special_tokens", template_postprocessor.special_tokens_map_},
+  };
+}
+
+void from_json(const nlohmann::json& j,
+               TemplatePostProcessor& template_postprocessor) {
+  j["single"].get_to(template_postprocessor.single_);
+  j["pair"].get_to(template_postprocessor.pair_);
+  j["special_tokens"].get_to(template_postprocessor.special_tokens_map_);
+  template_postprocessor.added_single_ =
+      template_postprocessor.DefaultAdded(true);
+  template_postprocessor.added_pair_ =
+      template_postprocessor.DefaultAdded(false);
 }
 
 }  // postprocessors
