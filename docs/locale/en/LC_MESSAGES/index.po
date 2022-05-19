@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../index.rst:26
 msgid "安装"
@@ -58,7 +58,11 @@ msgid "Transformer预训练模型"
 msgstr ""
 
 #: ../index.rst:43
-msgid "TaskFlow"
+msgid "使用Trainer API训练"
+msgstr ""
+
+#: ../index.rst:43
+msgid "一键预测功能"
 msgstr ""
 
 #: ../index.rst:43
@@ -69,103 +73,107 @@ msgstr ""
 msgid "模型库"
 msgstr ""
 
-#: ../index.rst:51
+#: ../index.rst:53
 msgid "评价指标"
 msgstr ""
 
-#: ../index.rst:57
+#: ../index.rst:59
 msgid "AI Studio Notebook"
 msgstr ""
 
-#: ../index.rst:57
+#: ../index.rst:59
 msgid "实践教程"
 msgstr ""
 
-#: ../index.rst:63
+#: ../index.rst:65
 msgid "模型压缩"
 msgstr ""
 
-#: ../index.rst:63
+#: ../index.rst:65
 msgid "文本生成高性能加速"
 msgstr ""
 
-#: ../index.rst:63
+#: ../index.rst:65
 msgid "大规模分布式训练"
 msgstr ""
 
-#: ../index.rst:63
+#: ../index.rst:65
 msgid "进阶指南"
 msgstr ""
 
-#: ../index.rst:71
+#: ../index.rst:73
 msgid "如何贡献模型"
 msgstr ""
 
-#: ../index.rst:71
+#: ../index.rst:73
 msgid "如何贡献数据集"
 msgstr ""
 
-#: ../index.rst:71
+#: ../index.rst:73
 msgid "如何贡献文档案例"
 msgstr ""
 
-#: ../index.rst:71
+#: ../index.rst:73
 msgid "如何加入兴趣小组"
 msgstr ""
 
-#: ../index.rst:71
+#: ../index.rst:73
 msgid "社区交流共建"
 msgstr ""
 
-#: ../index.rst:80
+#: ../index.rst:82
 msgid "FAQ"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.data"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.datasets"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.embeddings"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.layers"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.losses"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.metrics"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.ops"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.seq2vec"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.taskflow"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
+msgid "paddlenlp.trainer"
+msgstr ""
+
+#: ../index.rst:88
 msgid "paddlenlp.transformers"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "paddlenlp.utils"
 msgstr ""
 
-#: ../index.rst:86
+#: ../index.rst:88
 msgid "API Reference"
 msgstr ""
 
@@ -223,19 +231,22 @@ msgstr ""
 msgid "官方QQ技术交流群: 973379845"
 msgstr ""
 
-#: ../index.rst:103
+#: ../index.rst:106
 msgid "Indices and tables"
 msgstr ""
 
-#: ../index.rst:104
+#: ../index.rst:107
 msgid ":ref:`genindex`"
 msgstr ""
 
-#: ../index.rst:105
+#: ../index.rst:108
 msgid ":ref:`modindex`"
 msgstr ""
 
-#: ../index.rst:106
+#: ../index.rst:109
 msgid ":ref:`search`"
 msgstr ""
+
+#~ msgid "TaskFlow"
+#~ msgstr ""
 
