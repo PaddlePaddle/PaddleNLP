@@ -721,12 +721,17 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         return embeddings
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
-        visual_embeddings = self.visual_proj(
-            self.visual(image.astype(paddle.float32)))
+        if image is not None:
+            visual_embeddings = self.visual_proj(
+                self.visual(image.astype(paddle.float32)))
         position_embeddings = self.embeddings.position_embeddings(position_ids)
         spatial_position_embeddings = self.embeddings._cal_spatial_position_embeddings(
             bbox)
-        embeddings = visual_embeddings + position_embeddings + spatial_position_embeddings
+        if image is not None:
+            embeddings = visual_embeddings + position_embeddings + spatial_position_embeddings
+        else:
+            embeddings = position_embeddings + spatial_position_embeddings
+
         if self.has_visual_segment_embedding:
             embeddings += self.visual_segment_embedding
         embeddings = self.visual_LayerNorm(embeddings)

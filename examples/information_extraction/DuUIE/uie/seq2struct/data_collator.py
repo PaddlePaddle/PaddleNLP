@@ -27,30 +27,35 @@ logger = logging.getLogger("__main__")
 
 @dataclass
 class SpotAsocNoiser:
-    spot_noise_ratio: float = 0.
-    asoc_noise_ratio: float = 0.
-    null_span: str = null_span
+    spot_noise_ratio: float = 0.  # Ratio of insert spot not in raw record
+    asoc_noise_ratio: float = 0.  # Ratio of insert asoc not in raw record
+    null_span: str = null_span  # Null span string
 
     def random_insert_spot(self, spot_asoc, spot_label_list=None):
         """ Insert negative spot in random, sample negative spot from spot_label_list
         """
+        # If no negative spot_label_list, skip insertion of spot null span
         if spot_label_list is None or len(spot_label_list) == 0:
             return spot_asoc
+
         random_num = sum(
             np.random.binomial(1, self.spot_noise_ratio, len(spot_asoc)))
         for _ in range(random_num):
             random_position = np.random.randint(low=0, high=len(spot_asoc))
-            random_label = np.random.choice(spot_label_list)
-            spot_asoc.insert(random_position, {
+            to_insert_negative_spot = {
                 "span": self.null_span,
-                "label": random_label,
+                "label":
+                np.random.choice(spot_label_list
+                                 ),  # Sample negative spot from spot_label_list
                 'asoc': list()
-            })
+            }
+            spot_asoc.insert(random_position, to_insert_negative_spot)
         return spot_asoc
 
     def random_insert_asoc(self, spot_asoc, asoc_label_list=None):
         """ Insert negative asoc in random, sample negative asoc from asoc_label_list
         """
+        # If no negative asoc_label_list, skip insertion of asoc null span
         if asoc_label_list is None or len(asoc_label_list) == 0:
             return spot_asoc
 
@@ -61,17 +66,19 @@ class SpotAsocNoiser:
             spot_position = np.random.randint(low=0, high=len(spot_asoc))
             asoc_position = np.random.randint(
                 low=0, high=len(spot_asoc[spot_position]['asoc']) + 1)
+            # Insert random negative span at `asoc_position`
             spot_asoc[spot_position]['asoc'].insert(
                 asoc_position, (random_label, self.null_span))
         return spot_asoc
 
     def add_noise(self, spot_asoc, spot_label_list, asoc_label_list):
-        spot_asoc = self.random_insert_asoc(
-            spot_asoc=spot_asoc,
-            asoc_label_list=asoc_label_list, )
-        spot_asoc = self.random_insert_spot(
-            spot_asoc=spot_asoc,
-            spot_label_list=spot_label_list, )
+        """ Add noise to target spot-asoc structure
+        spot_asoc: raw spot-asoc structure
+        spot_label_list: negative spot candidates
+        asoc_label_list: negative asoc candidates
+        """
+        spot_asoc = self.random_insert_asoc(spot_asoc, asoc_label_list)
+        spot_asoc = self.random_insert_spot(spot_asoc, spot_label_list)
         return spot_asoc
 
 
@@ -90,11 +97,10 @@ class DynamicSSIGenerator():
         self.asoc_dict = self.get_ordered_dict(schema.role_list, tokenizer)
         self.spot_list = list(self.spot_dict.keys())
         self.asoc_list = list(self.asoc_dict.keys())
-        # Tokenizer of PaddleNLP don't have get_vocab()
-        self.spot_prompt = self.get_vocab(tokenizer, spot_prompt)
-        self.asoc_prompt = self.get_vocab(tokenizer, asoc_prompt)
-        self.text_start = self.get_vocab(tokenizer, text_start)
-        self.positive_rate = positive_rate if positive_rate > 0 and positive_rate < 1 else 1
+        self.spot_prompt_id = tokenizer.convert_tokens_to_ids(spot_prompt)
+        self.asoc_prompt_id = tokenizer.convert_tokens_to_ids(asoc_prompt)
+        self.text_start_id = tokenizer.convert_tokens_to_ids(text_start)
+        self.positive_rate = positive_rate if 0 < positive_rate < 1 else 1
         self.negative = negative
         self.ordered_prompt = ordered_prompt
         logger.info(f"Meta Sample "
@@ -102,21 +108,16 @@ class DynamicSSIGenerator():
                     f"Ordered SSI: {self.ordered_prompt}")
 
     @staticmethod
-    def get_vocab(tokenizer, token):
-        token_encoded = tokenizer.encode(
-            token,
-            return_token_type_ids=False,
-            return_attention_mask=False, )["input_ids"]
-        assert len(token_encoded) == 2
-        return token_encoded[0]
-
-    @staticmethod
     def get_ordered_dict(schema_name_list, tokenizer):
+        """ Get schema name -> id dict
+        schema_name_list: ["人物", "组织机构"]
+        """
         schema_ordered_dict = OrderedDict()
-        # PaddleNLP has no remove_special_tokens param
         for name in schema_name_list:
-            encoded_name = tokenizer.encode(name)
-            schema_ordered_dict[name] = encoded_name["input_ids"][:-1:]
+            # tokenizer.encode("人物") -> [8, 122]
+            encoded_name = tokenizer.encode(
+                name, add_special_tokens=False, return_token_type_ids=None)
+            schema_ordered_dict[name] = encoded_name["input_ids"]
         return schema_ordered_dict
 
     @staticmethod
@@ -131,57 +132,79 @@ class DynamicSSIGenerator():
 
         return list(negative_set)
 
-    def sample_spot(self, positive):
+    def sample_spot(self, positive, candidates=None):
         """ Sample spot
+
+        Args:
+            positive (List[str]): Positive Spot List
+
+        Returns:
+            List[int]: spot index list
+            List[str]: Sampled Positive Spot List
+            List[str]: Sampled Negative Spot List
         """
+        neg_cands = candidates if candidates is not None else self.spot_list
+
         negative_spot = self.sample_negative(
-            postive=positive, candidates=self.spot_list, k=self.negative)
+            postive=positive, candidates=neg_cands, k=self.negative)
         positive_spot = random.sample(
             positive, math.floor(len(positive) * self.positive_rate))
 
-        prefix_spot_candidates = positive_spot + negative_spot
         converted_spot_prefix = self.convert_prefix(
-            candidates=prefix_spot_candidates,
-            prompt=self.spot_prompt,
+            candidates=positive_spot + negative_spot,
+            prompt=self.spot_prompt_id,
             mapper=self.spot_dict,
             ordered_prompt=self.ordered_prompt, )
 
         return converted_spot_prefix, positive_spot, negative_spot
 
-    def sample_asoc(self, positive):
+    def sample_asoc(self, positive, candidates=None):
         """ Sample Asoc
+
+        Args:
+            positive (List[str]): Positive Asoc List
+
+        Returns:
+            List[int]: asoc index list
+            List[str]: Sampled Negative Asoc List
         """
+        neg_cands = candidates if candidates is not None else self.asoc_list
         negative_asoc = self.sample_negative(
-            postive=positive, candidates=self.asoc_list, k=self.negative)
-        prefix_asoc_candidates = positive + negative_asoc
+            postive=positive, candidates=neg_cands, k=self.negative)
         converted_asoc_prefix = self.convert_prefix(
-            candidates=prefix_asoc_candidates,
-            prompt=self.asoc_prompt,
+            candidates=positive + negative_asoc,
+            prompt=self.asoc_prompt_id,
             mapper=self.asoc_dict,
             ordered_prompt=self.ordered_prompt, )
         return converted_asoc_prefix, negative_asoc
 
-    def full_spot(self, shuffle=False):
+    def full_spot(self, candidates=None, shuffle=False):
         # Random Prompt + Shuffle
         if not self.ordered_prompt and shuffle:
             ordered_prompt = False
         else:
             ordered_prompt = True
+
+        prefix_cands = candidates if candidates is not None else self.spot_list
+
         return self.convert_prefix(
-            candidates=self.spot_list,
-            prompt=self.spot_prompt,
+            candidates=prefix_cands,
+            prompt=self.spot_prompt_id,
             mapper=self.spot_dict,
             ordered_prompt=ordered_prompt, )
 
-    def full_asoc(self, shuffle=False):
+    def full_asoc(self, candidates=None, shuffle=False):
         # Random Prompt + Shuffle
         if not self.ordered_prompt and shuffle:
             ordered_prompt = False
         else:
             ordered_prompt = True
+
+        prefix_cands = candidates if candidates is not None else self.asoc_list
+
         return self.convert_prefix(
-            candidates=self.asoc_list,
-            prompt=self.asoc_prompt,
+            candidates=prefix_cands,
+            prompt=self.asoc_prompt_id,
             mapper=self.asoc_dict,
             ordered_prompt=ordered_prompt, )
 
@@ -206,26 +229,24 @@ class DynamicSSIGenerator():
 class DataCollatorForSeq2Seq:
     def __init__(self,
                  tokenizer,
-                 negative_sampler: DynamicSSIGenerator,
+                 ssi_generator: DynamicSSIGenerator,
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
                  max_source_length: Optional[int]=None,
                  max_target_length: Optional[int]=None,
                  max_prefix_length: Optional[int]=None,
-                 pad_to_multiple_of: Optional[int]=None,
                  spot_asoc_nosier: SpotAsocNoiser=None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
-        self.negative_sampler = negative_sampler
+        self.ssi_generator = ssi_generator
         self.model = model
         self.label_pad_token_id = label_pad_token_id
         self.padding = padding
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
         self.max_prefix_length = max_prefix_length
-        self.pad_to_multiple_of = pad_to_multiple_of
         self.spot_asoc_nosier = spot_asoc_nosier
         self.return_tensors = return_tensors
 
@@ -235,73 +256,61 @@ class DataCollatorForSeq2Seq:
 
         for ins in data:
 
-            n_ins = {}
-            n_ins['spots'] = copy.deepcopy(ins['spots'])
-            n_ins['asocs'] = copy.deepcopy(ins['asocs'])
-            n_ins['spot_asoc'] = copy.deepcopy(ins['spot_asoc'])
+            target_spot_asoc = copy.deepcopy(ins['spot_asoc'])
 
-            sample_prompt = ins['sample_prompt']
-            if not sample_prompt:
-                # Evaluation using Ordered SSI
-                spot_prefix = self.negative_sampler.full_spot(
-                    shuffle=self.model.training)
-                asoc_prefix = self.negative_sampler.full_asoc(
-                    shuffle=self.model.training)
+            if ins['sample_ssi'] is True:
+                # Sample Dynamic SSI
+                spot_prefix, pos_spot, neg_spot = self.ssi_generator.sample_spot(
+                    positive=ins.get('spots', []))
+                asoc_prefix, neg_asoc = self.ssi_generator.sample_asoc(
+                    positive=ins.get('asocs', []))
+
+                # Filter spot-asoc not in Positive Spot
+                target_spot_asoc = list(
+                    filter(lambda x: x['label'] in pos_spot, target_spot_asoc))
+
+                # Inject rejection noise
+                if self.spot_asoc_nosier is not None:
+                    target_spot_asoc = self.spot_asoc_nosier.add_noise(
+                        target_spot_asoc,
+                        spot_label_list=neg_spot,
+                        asoc_label_list=neg_asoc, )
             else:
-                # Sample 
-                spot_prefix, pos_spot, neg_spot = self.negative_sampler.sample_spot(
-                    positive=n_ins.get('spots', []))
-                asoc_prefix, neg_asoc = self.negative_sampler.sample_asoc(
-                    positive=n_ins.get('asocs', []))
+                # Evaluation using Ordered SSI
+                spot_prefix = self.ssi_generator.full_spot(
+                    shuffle=self.model.training)
+                asoc_prefix = self.ssi_generator.full_asoc(
+                    shuffle=self.model.training)
 
-                if 'spot_asoc' in ins:
-                    # Filter spot/asoc not in Positive Spot
-                    n_ins['spot_asoc'] = list(
-                        filter(lambda x: x['label'] in pos_spot, n_ins[
-                            'spot_asoc']))
-
-                    # Inject rejection noise
-                    if self.spot_asoc_nosier is not None:
-                        n_ins['spot_asoc'] = self.spot_asoc_nosier.add_noise(
-                            n_ins['spot_asoc'],
-                            spot_label_list=neg_spot,
-                            asoc_label_list=neg_asoc, )
-
-                    # Generate new record
-
-                    target_record = convert_spot_asoc(
-                        n_ins['spot_asoc'],
-                        structure_maker=BaseStructureMarker())
-                    n_ins["labels"] = self.tokenizer.encode(
-                        target_record,
-                        return_token_type_ids=False,
-                        return_attention_mask=False, )['input_ids']
-
-            n_ins.pop('asocs')
-            n_ins.pop('spots')
-            n_ins.pop('spot_asoc')
-
+            # Prepare prefix ids
             prefix = spot_prefix + asoc_prefix
-
             # truncate `prefix` to max length
             if self.max_prefix_length is not None and self.max_prefix_length >= 0:
                 prefix = prefix[:self.max_prefix_length]
+            prefix = prefix + [self.ssi_generator.text_start_id]
 
-            n_ins['input_ids'] = prefix \
-                + [self.negative_sampler.text_start] \
-                + ins['input_ids']
-
-            # truncate `input_ids` to max length
+            # Prepare source text ids
+            source_text_id = prefix + ins['input_ids']
+            # truncate `input_ids` to max source length
             if self.max_source_length is not None:
-                n_ins['input_ids'] = n_ins['input_ids'][:self.max_source_length]
+                source_text_id = source_text_id[:self.max_source_length]
 
-            if self.max_target_length is not None and 'labels' in ins:
-                n_ins['labels'] = n_ins['labels'][:self.max_target_length]
+            # Prepare target record ids
+            # Generate new record
+            target_record = convert_spot_asoc(
+                target_spot_asoc, structure_maker=BaseStructureMarker())
+            target_labels = self.tokenizer.encode(
+                target_record,
+                return_token_type_ids=False,
+                return_attention_mask=True,
+                max_seq_len=self.max_target_length)
 
-            n_ins['attention_mask'] = [1] * len(n_ins['input_ids'])
-            n_ins['decoder_attention_mask'] = [1] * len(n_ins['labels'])
-
-            new_data.append(n_ins)
+            new_data.append({
+                'input_ids': source_text_id,
+                'labels': target_labels['input_ids'],
+                'attention_mask': [1] * len(source_text_id),
+                'decoder_attention_mask': target_labels['attention_mask'],
+            })
 
         first = new_data[0]
         assert isinstance(
@@ -342,212 +351,33 @@ class DataCollatorForSeq2Seq:
                 labels=batch["labels"])
             if not return_tensors:
                 batch["decoder_input_ids"] = decoder_input_ids.numpy()
-
         if self.return_tensors:
             for k, v in batch.items():
                 batch[k] = paddle.to_tensor(v)
-
         return batch
 
 
-class DynamicMultiTaskSSIGenerator:
-    """
-    Sample negative spot and asoc to construct Multi-Task SSI
-    """
-
-    def __init__(self,
-                 tokenizer,
-                 schema: RecordSchema,
-                 positive_rate=1,
-                 negative=-1,
-                 ordered_prompt=False) -> None:
-        self.spot_dict = self.get_ordered_dict(schema.type_list, tokenizer)
-        self.asoc_dict = self.get_ordered_dict(schema.role_list, tokenizer)
-        self.spot_list = list(self.spot_dict.keys())
-        self.asoc_list = list(self.asoc_dict.keys())
-        # Tokenizer of PaddleNLP don't have get_vocab()
-        self.spot_prompt = self.get_vocab(tokenizer, spot_prompt)
-        self.asoc_prompt = self.get_vocab(tokenizer, asoc_prompt)
-        self.text_start = self.get_vocab(tokenizer, text_start)
-        self.positive_rate = positive_rate if positive_rate > 0 and positive_rate < 1 else 1
-        self.negative = negative
-        self.ordered_prompt = ordered_prompt
-        logger.info(f"Meta Sample "
-                    f"Negative: {self.negative}, "
-                    f"Ordered Prompt: {self.ordered_prompt}")
-
-    @staticmethod
-    def get_vocab(tokenizer, token):
-        token_encoded = tokenizer.encode(
-            token,
-            return_token_type_ids=False,
-            return_attention_mask=False, )["input_ids"]
-        assert len(token_encoded) == 2
-        return token_encoded[0]
-
-    @staticmethod
-    def get_ordered_dict(schema_name_list, tokenizer):
-        schema_ordered_dict = OrderedDict()
-        # PaddleNLP has no remove_special_tokens param
-        for name in schema_name_list:
-            encoded_name = tokenizer.encode(name)
-            schema_ordered_dict[name] = encoded_name["input_ids"][:-1:]
-        return schema_ordered_dict
-
-    @staticmethod
-    def sample_negative(postive, candidates, k=5):
-        if k < 0:
-            k = len(candidates)
-        negative_set = set()
-        for index in np.random.permutation(len(candidates))[:k].tolist():
-            negative = candidates[index]
-            if negative not in postive:
-                negative_set.add(negative)
-
-        return list(negative_set)
-
-    def sample_spot(self, positive, candidates):
-        """ Sample spot
-
-        Args:
-            positive (List[str]): Positive Spot List
-
-        Returns:
-            List[int]: spot index list
-            List[str]: Sampled Positive Spot List
-            List[str]: Sampled Negative Spot List
-        """
-        negative_spot = self.sample_negative(
-            postive=positive, candidates=candidates, k=self.negative)
-        positive_spot = random.sample(
-            positive,
-            math.floor(len(positive) * self.positive_rate))  # 只对 spot 正例进行采样
-
-        # Prefix 中的正负例 Spot
-        prefix_spot_candidates = positive_spot + negative_spot
-        converted_spot_prefix = self.convert_prefix(
-            candidates=prefix_spot_candidates,
-            prompt=self.spot_prompt,
-            mapper=self.spot_dict,
-            ordered_prompt=self.ordered_prompt, )
-
-        return converted_spot_prefix, positive_spot, negative_spot
-
-    def sample_asoc(self, positive, candidates):
-        """ Sample Asoc
-
-        Args:
-            positive (List[str]): Positive Asoc List
-
-        Returns:
-            List[int]: asoc index list
-            List[str]: Sampled Negative Asoc List
-        """
-        negative_asoc = self.sample_negative(
-            postive=positive, candidates=candidates, k=self.negative)
-        prefix_asoc_candidates = positive + negative_asoc
-        converted_asoc_prefix = self.convert_prefix(
-            candidates=prefix_asoc_candidates,
-            prompt=self.asoc_prompt,
-            mapper=self.asoc_dict,
-            ordered_prompt=self.ordered_prompt, )
-        return converted_asoc_prefix, negative_asoc
-
-    def full_spot(self, candidates, shuffle=False):
-        # Random Prompt + Shuffle
-        if not self.ordered_prompt and shuffle:
-            ordered_prompt = False
-        else:
-            ordered_prompt = True
-        return self.convert_prefix(
-            candidates=candidates,
-            prompt=self.spot_prompt,
-            mapper=self.spot_dict,
-            ordered_prompt=ordered_prompt, )
-
-    def full_asoc(self, candidates, shuffle=False):
-        # Random Prompt + Shuffle
-        if not self.ordered_prompt and shuffle:
-            ordered_prompt = False
-        else:
-            ordered_prompt = True
-        return self.convert_prefix(
-            candidates=candidates,
-            prompt=self.asoc_prompt,
-            mapper=self.asoc_dict,
-            ordered_prompt=ordered_prompt, )
-
-    @staticmethod
-    def convert_prefix(candidates, prompt, mapper, ordered_prompt=True):
-        prefix = list()
-
-        if ordered_prompt:
-            candidate_sorted = sorted(
-                [(candidate, index)
-                 for index, candidate in enumerate(candidates)])
-            index_list = [index for _, index in candidate_sorted]
-        else:
-            index_list = np.random.permutation(len(candidates)).tolist()
-
-        for index in index_list:
-            prefix += [prompt]
-            prefix += mapper[candidates[index]]
-        return prefix
-
-
 class DataCollatorForMultiTaskSeq2Seq:
-    """
-    Data collator that will dynamically pad the inputs received, as well as the labels.
-    Args:
-        tokenizer ([`PreTrainedTokenizer`] or [`PreTrainedTokenizerFast`]):
-            The tokenizer used for encoding the data.
-        model ([`PreTrainedModel`]):
-            The model that is being trained. If set and has the *prepare_decoder_input_ids_from_labels*, use it to
-            prepare the *decoder_input_ids*
-            This is useful when using *label_smoothing* to avoid calculating loss twice.
-        padding (`bool`, `str` or [`~file_utils.PaddingStrategy`], *optional*, defaults to `True`):
-            Select a strategy to pad the returned sequences (according to the model's padding side and padding index)
-            among:
-            - `True` or `'longest'`: Pad to the longest sequence in the batch (or no padding if only a single sequence
-              is provided).
-            - `'max_length'`: Pad to a maximum length specified with the argument `max_length` or to the maximum
-              acceptable input length for the model if that argument is not provided.
-            - `False` or `'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of different
-              lengths).
-        max_length (`int`, *optional*):
-            Maximum length of the returned list and optionally padding length (see above).
-        pad_to_multiple_of (`int`, *optional*):
-            If set will pad the sequence to a multiple of the provided value.
-            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
-            7.5 (Volta).
-        label_pad_token_id (`int`, *optional*, defaults to -100):
-            The id to use when padding the labels (-100 will be automatically ignored by PyTorch loss functions).
-        return_tensors (`str`):
-            The type of Tensor to return. Allowable values are "np", "pt" and "tf".
-    """
-
     def __init__(self,
                  tokenizer,
-                 negative_sampler: DynamicMultiTaskSSIGenerator,
+                 ssi_generator: DynamicSSIGenerator,
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
                  max_source_length: Optional[int]=None,
                  max_target_length: Optional[int]=None,
                  max_prefix_length: Optional[int]=None,
-                 pad_to_multiple_of: Optional[int]=None,
                  spot_asoc_nosier: SpotAsocNoiser=None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
-        self.negative_sampler = negative_sampler
+        self.ssi_generator = ssi_generator
         self.model = model
         self.label_pad_token_id = label_pad_token_id
         self.padding = padding
         self.max_source_length = max_source_length
         self.max_target_length = max_target_length
         self.max_prefix_length = max_prefix_length
-        self.pad_to_multiple_of = pad_to_multiple_of
         self.spot_asoc_nosier = spot_asoc_nosier
         self.return_tensors = return_tensors
 
@@ -557,26 +387,13 @@ class DataCollatorForMultiTaskSeq2Seq:
 
         for ins in data:
 
-            n_ins = {}
-            n_ins['spots'] = copy.deepcopy(ins['spots'])
-            n_ins['asocs'] = copy.deepcopy(ins['asocs'])
-            n_ins['spot_asoc'] = copy.deepcopy(ins['spot_asoc'])
+            target_spot_asoc = copy.deepcopy(ins['spot_asoc'])
 
-            sample_prompt = ins['sample_prompt']
-            if not sample_prompt:
-                # Eval 不 Shuffle
-                spot_prefix = self.negative_sampler.full_spot(
-                    candidates=n_ins.get('spots', []),
-                    shuffle=self.model.training)
-                asoc_prefix = self.negative_sampler.full_asoc(
-                    candidates=n_ins.get('asocs', []),
-                    shuffle=self.model.training)
-            else:
-                assert 'spot_asoc' in n_ins
+            if ins['sample_ssi'] is True:
 
                 positive_spot = set()
                 positive_asoc = set()
-                for spot_asoc in n_ins['spot_asoc']:
+                for spot_asoc in ins['spot_asoc']:
                     positive_spot.add(spot_asoc['label'])
                     for asoc in spot_asoc['asoc']:
                         positive_asoc.add(asoc[0])
@@ -586,64 +403,60 @@ class DataCollatorForMultiTaskSeq2Seq:
                 #   ‘spots’ 对应该任务的 spots
                 #   ‘asocs’ 对应该任务的 asocs
                 # 因此 candidates 在任务内进行采样
-                spot_prefix, pos_spot, neg_spot = self.negative_sampler.sample_spot(
+                spot_prefix, pos_spot, neg_spot = self.ssi_generator.sample_spot(
                     positive=list(positive_spot),
-                    candidates=n_ins.get('spots', []), )
-                asoc_prefix, neg_asoc = self.negative_sampler.sample_asoc(
+                    candidates=ins['spots'], )
+                asoc_prefix, neg_asoc = self.ssi_generator.sample_asoc(
                     positive=list(positive_asoc),
-                    candidates=n_ins.get('asocs', []), )
+                    candidates=ins['asocs'], )
 
-                if 'spot_asoc' in ins:
-                    # 过滤不在 Pos Spot 中的实例
-                    n_ins['spot_asoc'] = list(
-                        filter(lambda x: x['label'] in pos_spot, n_ins[
-                            'spot_asoc']))
+                # Filter spot-asoc not in Positive Spot
+                target_spot_asoc = list(
+                    filter(lambda x: x['label'] in pos_spot, target_spot_asoc))
 
-                    # 注入拒绝识别噪声
-                    if self.spot_asoc_nosier is not None:
-                        n_ins['spot_asoc'] = self.spot_asoc_nosier.add_noise(
-                            n_ins['spot_asoc'],
-                            spot_label_list=neg_spot,
-                            asoc_label_list=neg_asoc, )
+                # Inject rejection noise
+                if self.spot_asoc_nosier is not None:
+                    target_spot_asoc = self.spot_asoc_nosier.add_noise(
+                        target_spot_asoc,
+                        spot_label_list=neg_spot,
+                        asoc_label_list=neg_asoc, )
 
-                    # 生成新的信息记录
-                    target_record = convert_spot_asoc(
-                        n_ins['spot_asoc'],
-                        structure_maker=BaseStructureMarker())
-                    n_ins["labels"] = self.tokenizer.encode(
-                        target_record,
-                        return_token_type_ids=False,
-                        return_attention_mask=False, )['input_ids']
+            else:
+                # Evaluation using Ordered SSI
+                spot_prefix = self.ssi_generator.full_spot(
+                    candidates=ins['spots'], shuffle=self.model.training)
+                asoc_prefix = self.ssi_generator.full_asoc(
+                    candidates=ins['asocs'], shuffle=self.model.training)
 
-            n_ins.pop('asocs')
-            n_ins.pop('spots')
-            n_ins.pop('spot_asoc')
-
-            prefix = spot_prefix + asoc_prefix
-
-            # 超过最大长度之后，对 prefix 进行截断
+            # Prepare prefix ids
+            prefix_id = spot_prefix + asoc_prefix
+            # truncate `prefix` to max length
             if self.max_prefix_length is not None and self.max_prefix_length >= 0:
-                prefix = prefix[:self.max_prefix_length]
-            logger.debug(f"SSI: {self.tokenizer.decode(prefix)}")
+                prefix_id = prefix_id[:self.max_prefix_length]
+            prefix_id = prefix_id + [self.ssi_generator.text_start_id]
 
-            n_ins['input_ids'] = prefix \
-                + [self.negative_sampler.text_start] \
-                + ins['input_ids']
-
-            # 超过最大长度之后，对 input_ids 进行截断
+            # Prepare source text ids
+            source_text_id = prefix_id + ins['input_ids']
+            # truncate `input_ids` to max source length
             if self.max_source_length is not None:
-                n_ins['input_ids'] = n_ins['input_ids'][:self.max_source_length]
+                source_text_id = source_text_id[:self.max_source_length]
 
-            if self.max_target_length is not None and 'labels' in ins:
-                n_ins['labels'] = n_ins['labels'][:self.max_target_length]
+            # Prepare target record ids
+            # Generate new record
+            target_record = convert_spot_asoc(
+                target_spot_asoc, structure_maker=BaseStructureMarker())
+            target_labels = self.tokenizer.encode(
+                target_record,
+                return_token_type_ids=False,
+                return_attention_mask=True,
+                max_seq_len=self.max_target_length)
 
-            logger.debug(
-                f"input_ids: {self.tokenizer.decode(n_ins['input_ids'])}")
-            logger.debug(f"label: {self.tokenizer.decode(n_ins['labels'])}")
-            n_ins['attention_mask'] = [1] * len(n_ins['input_ids'])
-            n_ins['decoder_attention_mask'] = [1] * len(n_ins['labels'])
-
-            new_data.append(n_ins)
+            new_data.append({
+                'input_ids': source_text_id,
+                'labels': target_labels['input_ids'],
+                'attention_mask': [1] * len(source_text_id),
+                'decoder_attention_mask': target_labels['attention_mask'],
+            })
 
         first = new_data[0]
         assert isinstance(

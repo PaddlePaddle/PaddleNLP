@@ -178,7 +178,7 @@ python doccano.py \
     --save_cls_dir ./data/cls_data
 ```
 
-**备注：** 
+**备注：**
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 

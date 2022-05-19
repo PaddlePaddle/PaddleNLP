@@ -120,8 +120,6 @@ python process_data.py preprocess
 
 处理之后的数据将自动生成在 data/DuUIE_pre 下，每个实例中添加了 `spot`, `asoc` 和 `spot_asoc` 三个字段。
 
-在多任务训练集 `train.json` 的每个样例中，spot/asoc 为每个任务中所有的 Spot/Asoc 类型，用于生成对应的 SSI。
-
 ### 快速基线第二步：多任务模型训练
 
 基线采用的预训练模型为字符级别的中文模型 [uie-char-small](https://paddlenlp.bj.bcebos.com/models/ccks2022/uie-char-small.zip)，该模型采用两阶段的训练方式构建：首先使用 100G 中文数据进行 Span Corruption 预训练；然后使用远距离监督产生的文本-结构数据进行结构生成预训练。
@@ -129,31 +127,23 @@ python process_data.py preprocess
 
 #### 多任务配置
 
-本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见 `config/multi-task-duuie.yaml`。
-
+本例中采用 Yaml 配置文件来配置不同任务的数据来源和验证方式，详见多任务配置文件 `config/multi-task-duuie.yaml`。
+本例将依据配置文件自动读取每个任务所需的训练数据进行训练，并对每个任务进行验证并汇报结果。
 ``` bash
 python3 run_seq2struct.py                              \
-  --multi_task                                         \
   --multi_task_config config/multi-task-duuie.yaml     \
   --negative_keep 1.0                                  \
   --do_train                                           \
   --metric_for_best_model=all-task-ave                 \
   --model_name_or_path=./uie-char-small                \
-  --max_source_length=384                              \
-  --max_prefix_length=-1                               \
-  --max_target_length=192                              \
   --num_train_epochs=10                                \
-  --train_file=data/duuie_pre/train.json               \
-  --validation_file=data/duuie_pre/val.json            \
-  --record_schema=data/duuie_pre/record.schema         \
-  --per_device_train_batch_size=16                     \
+  --per_device_train_batch_size=32                     \
   --per_device_eval_batch_size=256                     \
   --output_dir=output/duuie_multi_task_b32_lr5e-4      \
   --logging_dir=output/duuie_multi_task_b32_lr5e-4_log \
   --learning_rate=5e-4                                 \
-  --seed=42                                            \
   --overwrite_output_dir                               \
-  --gradient_accumulation_steps 2
+  --gradient_accumulation_steps 1
 ```
 
 训练完成后，将生成对应的文件夹 `output/duuie_multi_task_b32_lr5e-4`
