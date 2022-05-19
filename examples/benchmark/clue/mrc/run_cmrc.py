@@ -109,11 +109,6 @@ def parse_args():
         default=500,
         help="Log every X updates steps.")
     parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
         '--device',
@@ -186,6 +181,8 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         args.n_best_size, args.max_answer_length)
 
     mode = 'validation' if do_eval else 'test'
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
     if do_eval:
         filename = os.path.join(args.output_dir, 'prediction_validation.json')
     else:
@@ -195,10 +192,12 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
             json.dumps(
                 all_predictions, ensure_ascii=False, indent=4) + "\n")
     if do_eval:
-        squad_evaluate(
+        res = squad_evaluate(
             examples=[raw_data for raw_data in raw_dataset],
             preds=all_predictions,
             is_whitespace_splited=False)
+        model.train()
+        return res['exact']
 
     model.train()
 
@@ -424,7 +423,7 @@ def run(args):
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
-
+        best_em = 0.0
         global_step = 0
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
@@ -449,22 +448,19 @@ def run(args):
                                loss,
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
-
-                    if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                        if rank == 0:
-                            output_dir = os.path.join(args.output_dir,
-                                                      "model_%d" % global_step)
-                            if not os.path.exists(output_dir):
-                                os.makedirs(output_dir)
-                            # need better way to get inner model of DataParallel
-                            model_to_save = model._layers if isinstance(
-                                model, paddle.DataParallel) else model
-                            model_to_save.save_pretrained(output_dir)
-                            tokenizer.save_pretrained(output_dir)
-                            print('Saving checkpoint to:', output_dir)
-                        if global_step == num_training_steps:
-                            break
-            evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
+                    if global_step >= num_training_steps:
+                        break
+            em = evaluate(model, dev_examples, dev_ds, dev_data_loader, args)
+            if paddle.distributed.get_rank() == 0 and em > best_em:
+                best_em = em
+                output_dir = args.output_dir
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+                # need better way to get inner model of DataParallel
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(output_dir)
+                tokenizer.save_pretrained(output_dir)
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,

@@ -56,11 +56,6 @@ def parse_args():
         type=int,
         help="Total number of training epochs to perform.", )
     parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
         "--weight_decay",
         default=0.01,
         type=float,
@@ -345,6 +340,9 @@ def run(args):
                                optimizer.get_lr(),
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
+                if global_step >= num_training_steps:
+                    print("best_acc: ", best_acc)
+                    return
             tic_eval = time.time()
             acc = evaluate(model, loss_fct, dev_data_loader, metric)
             print("eval acc: %.5f, eval done total : %s s" %
@@ -357,6 +355,7 @@ def run(args):
                     os.makedirs(args.output_dir)
                 model_to_save.save_pretrained(args.output_dir)
                 tokenizer.save_pretrained(args.output_dir)
+
         print("best_acc: ", best_acc)
 
     if args.do_predict:

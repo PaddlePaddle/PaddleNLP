@@ -27,7 +27,6 @@ python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} run_c3.py \
     --num_train_epochs 8 \
     --output_dir ${MODEL_PATH}/c3_model/${LR}_${BS}/ \
     --do_train \
-    --do_predict \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps $5 \
 

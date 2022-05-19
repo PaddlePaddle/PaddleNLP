@@ -34,6 +34,5 @@ python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} run_cmrc.py
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --do_train \
-    --do_predict \
     --device gpu \
     --gradient_accumulation_steps 2 \
