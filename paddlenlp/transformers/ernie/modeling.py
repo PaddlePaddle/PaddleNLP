@@ -307,6 +307,51 @@ class ErniePretrainedModel(PretrainedModel):
             "use_task_id": True,
             "vocab_size": 40000
         },
+        "ernie-3.0-mini-zh": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "ernie-3.0-micro-zh": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "ernie-3.0-nano-zh": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -340,6 +385,12 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams",
             "ernie-3.0-medium-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams",
+            "ernie-3.0-mini-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
+            "ernie-3.0-micro-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
+            "ernie-3.0-nano-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
         }
     }
     base_model_prefix = "ernie"
