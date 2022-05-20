@@ -20,6 +20,7 @@ function _set_params(){
     max_iter=${10:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
     use_sharding=${11:-"true"}               # （可选) 是否使用ShardingOptimizer
     num_workers=0                  # (可选)
+    base_batch_size=$global_batch_size
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
