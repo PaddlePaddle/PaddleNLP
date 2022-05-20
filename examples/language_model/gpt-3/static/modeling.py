@@ -934,7 +934,8 @@ class GPTForGeneration(GPTPretrainedModel):
         self._fuse = kwargs.get("fuse", False)
 
     def _init_generation_caches(self, src_ids):
-        if self._init_gen_cache:
+        # not fuse, return None
+        if self._init_gen_cache or self._fuse is False:
             return self.generation_caches
 
         self.generation_caches = []
@@ -1070,7 +1071,7 @@ class GPTForGeneration(GPTPretrainedModel):
 
         # if cached_kvs are assigned to next step in _prepare_qkv of MultiHeadAttention,
         # need to init the global caches here
-        gen_caches = self._init_generation_caches(input_ids) if self._fuse else None
+        gen_caches = self._init_generation_caches(input_ids)
 
         logits, cached_kvs = self.model(
             input_ids, position_ids, encode_mask, use_cache=True, cache=gen_caches)
