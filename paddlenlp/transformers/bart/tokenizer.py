@@ -151,26 +151,6 @@ class BartTokenizer(GPTTokenizer):
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
                                             max_len, pad_token, eos_token)
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
-        return super(BartTokenizer, self).__call__(
-            text, text_pair, max_seq_len, stride, is_split_into_words,
-            pad_to_max_seq_len, truncation_strategy, return_position_ids,
-            return_token_type_ids, return_attention_mask, return_length,
-            return_overflowing_tokens, return_special_tokens_mask)
-
     def _bpe_encode(self, text):
         bpe_tokens = []
         re = try_import("regex")
