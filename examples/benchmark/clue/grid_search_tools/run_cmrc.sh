@@ -21,7 +21,7 @@ LR=$3
 git rev-parse HEAD
 
 logdir=${MODEL_PATH}/cmrc2018_log
-mkdir ${logdir}
+mkdir -p ${logdir}
 python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_cmrc.py \
     --model_name_or_path ${MODEL_PATH} \
     --max_seq_length 512 \
@@ -36,4 +36,4 @@ python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_
     --do_train \
     --device gpu \
     --gradient_accumulation_steps 2 \
-    --save_best_models False \
+    --save_best_model False \

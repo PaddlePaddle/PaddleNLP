@@ -21,7 +21,7 @@ git rev-parse HEAD
 
 
 logdir=${MODEL_PATH}/chid_log
-mkdir ${logdir}
+mkdir -p ${logdir}
 python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_chid.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
@@ -33,5 +33,5 @@ python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_ch
     --do_train \
     --gradient_accumulation_steps ${grd} \
     --weight_decay 0.01 \
-    --save_best_models False \
+    --save_best_model False \
 

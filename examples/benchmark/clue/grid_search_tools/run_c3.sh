@@ -18,7 +18,7 @@ BATCH_SIZE=$2
 LR=$3
 
 logdir=${MODEL_PATH}/c3_log
-mkdir ${logdir}
+mkdir -p ${logdir}
 python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c3.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
@@ -29,4 +29,4 @@ python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c
     --do_train \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps $5 \
-    --save_best_models False \
+    --save_best_model False \

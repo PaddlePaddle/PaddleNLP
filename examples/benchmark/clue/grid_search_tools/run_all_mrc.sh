@@ -38,12 +38,12 @@ then
 task_name=cmrc2018
 cards="0,1"
 nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
-
 fi
 
 
 # mode 3: 8 cards for CHID, C3 and CMRC2018
 if [ ${mode} == 3 ]
+then
 task_name=chid
 cards="0,1,2,3"
 nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
