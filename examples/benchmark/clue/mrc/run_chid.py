@@ -487,7 +487,7 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % best_acc * 100)
+                    print("best_acc: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
             acc = evaluate(model, dev_data_loader)

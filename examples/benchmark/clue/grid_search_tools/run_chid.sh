@@ -28,7 +28,7 @@ python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_ch
     --learning_rate ${LR} \
     --max_seq_length 64 \
     --num_train_epochs 3 \
-    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BS}/ \
+    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BATCH_SIZE}/ \
     --warmup_proportion 0.06 \
     --do_train \
     --gradient_accumulation_steps ${grd} \

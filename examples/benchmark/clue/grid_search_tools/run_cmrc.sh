@@ -29,7 +29,7 @@ python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_
     --learning_rate ${LR} \
     --num_train_epochs 2 \
     --logging_steps 100 \
-    --output_dir ${MODEL_PATH}/cmrc2018_model/${LR}_${BS}/ \
+    --output_dir ${MODEL_PATH}/cmrc2018_model/${LR}_${BATCH_SIZE}/ \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --do_train \

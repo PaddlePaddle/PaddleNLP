@@ -25,7 +25,7 @@ python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c
     --learning_rate ${LR} \
     --max_seq_length 512 \
     --num_train_epochs 8 \
-    --output_dir ${MODEL_PATH}/c3_model/${LR}_${BS}/ \
+    --output_dir ${MODEL_PATH}/c3_model/${LR}_${BATCH_SIZE}/ \
     --do_train \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps $5 \
