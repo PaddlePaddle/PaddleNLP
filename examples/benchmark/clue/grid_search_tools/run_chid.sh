@@ -13,16 +13,25 @@
 # limitations under the License.
 
 
-MODEL_DIR=$1
+MODEL_PATH=$1
+BATCH_SIZE=$2
+LR=$3
+grd=$4
+git rev-parse HEAD
 
-task_name=chid
-cards="0,1,2,3"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
 
-task_name=c3
-cards="4,5,6,7"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+logdir=${MODEL_PATH}/chid_log
+mkdir ${logdir}
+python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_chid.py \
+    --model_name_or_path ${MODEL_PATH} \
+    --batch_size ${BATCH_SIZE} \
+    --learning_rate ${LR} \
+    --max_seq_length 64 \
+    --num_train_epochs 3 \
+    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BS}/ \
+    --warmup_proportion 0.06 \
+    --do_train \
+    --gradient_accumulation_steps ${grd} \
+    --weight_decay 0.01 \
+    --save_best_models False \
 
-task_name=cmrc2018
-cards="0,1"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &

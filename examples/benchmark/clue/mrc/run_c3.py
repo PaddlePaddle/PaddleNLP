@@ -20,6 +20,7 @@ import random
 import argparse
 import numpy as np
 import json
+import distutils.util
 from functools import partial
 
 import paddle
@@ -50,6 +51,11 @@ def parse_args():
         default="best_c3_model",
         type=str,
         help="The path of the checkpoints .", )
+    parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.", )
     parser.add_argument(
         "--num_train_epochs",
         default=8,
@@ -349,12 +355,13 @@ def run(args):
                   (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
-                if not os.path.exists(args.output_dir):
-                    os.makedirs(args.output_dir)
-                model_to_save.save_pretrained(args.output_dir)
-                tokenizer.save_pretrained(args.output_dir)
+                if args.save_best_model:
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    if not os.path.exists(args.output_dir):
+                        os.makedirs(args.output_dir)
+                    model_to_save.save_pretrained(args.output_dir)
+                    tokenizer.save_pretrained(args.output_dir)
 
         print("best_acc: %.2f" % best_acc * 100)
 

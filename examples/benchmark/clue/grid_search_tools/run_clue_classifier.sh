@@ -13,20 +13,32 @@
 # limitations under the License.
 
 
-MODEL_PATH=$1
-BATCH_SIZE=$2
-LR=$3
+export TASK_NAME=$1
+export LR=$2
+export BS=$3
+export EPOCH=$4
+export MAX_SEQ_LEN=$5
+export CUDA_VISIBLE_DEVICES=$6
+export MODEL_PATH=$7
+export grad_acc=$8
+git rev-parse HEAD
 
-logdir=${MODEL_PATH}/c3_log
-mkdir ${logdir}
-python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c3.py \
+python -u ../classification/run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
-    --batch_size ${BATCH_SIZE} \
+    --task_name ${TASK_NAME} \
+    --max_seq_length ${MAX_SEQ_LEN} \
+    --batch_size ${BS}   \
     --learning_rate ${LR} \
-    --max_seq_length 512 \
-    --num_train_epochs 8 \
-    --output_dir ${MODEL_PATH}/c3_model/${LR}_${BS}/ \
-    --do_train \
+    --num_train_epochs ${EPOCH} \
+    --logging_steps 100 \
+    --seed 42  \
+    --save_steps  100 \
     --warmup_proportion 0.1 \
-    --gradient_accumulation_steps $5 \
-
+    --weight_decay 0.01 \
+    --adam_epsilon 1e-8 \
+    --output_dir ${MODEL_PATH}/models/${TASK_NAME}/${LR}_${BS}/ \
+    --device gpu  \
+    --gradient_accumulation_steps ${grad_acc} \
+    --do_train \
+    --dropout $9 \
+    --save_best_model False \

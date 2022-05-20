@@ -18,6 +18,7 @@ import random
 import time
 import json
 import math
+import distutils.util
 import argparse
 
 from functools import partial
@@ -47,6 +48,11 @@ def parse_args():
         type=str,
         help="The output directory where the model predictions and checkpoints will be written."
     )
+    parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.", )
     parser.add_argument(
         "--max_seq_length",
         default=128,
@@ -454,14 +460,15 @@ def run(args):
                               args)
             if paddle.distributed.get_rank() == 0 and em > best_res[0]:
                 best_res = (em, f1)
-                output_dir = args.output_dir
-                if not os.path.exists(output_dir):
-                    os.makedirs(output_dir)
-                # need better way to get inner model of DataParallel
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
-                model_to_save.save_pretrained(output_dir)
-                tokenizer.save_pretrained(output_dir)
+                if args.save_best_model:
+                    output_dir = args.output_dir
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
         print("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:

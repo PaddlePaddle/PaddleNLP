@@ -591,6 +591,7 @@ python -u ./run_clue_classifier.py \
     --device gpu  \
     --dropout 0.1 \
     --gradient_accumulation_steps 1 \
+    --save_best_model True \
     --do_train \
 
 ```
@@ -607,6 +608,7 @@ python -u ./run_clue_classifier.py \
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
+- `save_best_model` 是否保存在评估集上效果最好的模型，默认为 True
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu' 表示使用GPU, 'xpu' 表示使用百度昆仑卡, 'cpu' 表示使用 CPU。
 
@@ -692,26 +694,54 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 ```
 需要注意的是，如果显存无法容纳所传入的 `batch_size`，可以通过传入 `gradient_accumulation_steps` 参数来模拟该 `batch_size`。
 
-### 批量启动 grid search 任务
+### 批量启动 Grid Search
 
-```shell
-
-cd tools
-# 7 个分类任务
-# 12组超参视为12组实验，可以起3组4卡实验，也可以起1组8卡实验，
-# 对于32G 8 GPUs 卡机器，base 模型可以选1组8卡，large 需要3组4卡
-
-# 方法一：3代表模式3，1组8卡实验
-bash run_all_cls.sh ernie-3.0-medium-zh 3
-# 方法二：0、1、2分别代表模式0、1、2，代表起了3组4卡实验
-bash run_all_cls.sh ernie-3.0-medium-zh 0
-bash run_all_cls.sh ernie-3.0-medium-zh 1
-bash run_all_cls.sh ernie-3.0-medium-zh 2
-
-
-# 3 个阅读理解任务
+- `run_all_cls.sh` 分类任务批量启动脚本入口，需要2个参数：模型名称或目录、模式id
+    - 模式 0、1、2 分别代表平行的 3 组 4 卡实验
+    - 模型 3 代表 同时起 12 组 8 卡实验
+    - 对于 32G 8 GPUs 卡机器，base 模型可以选模式 3，即 1 组 8 卡，可同时完成所有分类任务。而 large 模型需要分别起模式 0、1、2 三组实验
+- `run_all_mrc.sh` 阅读理解任务批量启动脚本入口，需要 2 个参数：模型名称或目录、模式id
+    - 模式 0、1、2 分别代表起 4 卡 CHID，4 卡 C<sup>3</sup>，2 卡 CMRC2018 实验
+    - 模式 3 代表 起 8 卡实验，任务会完成 CHID、C<sup>3</sup>、CMRC2018 任务
+    - 对于32G 8 GPUs 卡机器，base 模型可以选模式 3
+- `extract_acc.sh` 从日志抽取每个任务的最佳结果，需要 1。个参数：模型名称或目录。调用前需要确认训练均全部完成，并且该目录下有分类和阅读理解任务所有的日志。可以把打印出的 10 个任务的结果直接复制到表格中。
 
 ```
+75.3    557.45  60.18   81.16   77.19   79.28   81.93   65.83/87.29     80.00   70.36
+```
+
+
+```shell
+cd grid_search_tools
+# 7 个分类任务
+# 方法一：3 代表模式 3，1 组 8 卡实验（适用于 base 及更小的模型）
+bash run_all_cls.sh ernie-3.0-nano-zh 3 # 第二个参数 3 就代表模式 3
+
+# 方法二：0、1、2 分别代表模式 0、1、2，代表起了 3 组 4 卡实验（适用于较大的模型）
+bash run_all_cls.sh ernie-3.0-nano-zh 0
+bash run_all_cls.sh ernie-3.0-nano-zh 1
+bash run_all_cls.sh ernie-3.0-nano-zh 2
+
+# 3 个阅读理解任务
+#
+# 对于32G 8 GPUs 卡机器，base 模型可以选模式 3
+
+# 方法一：3 代表模式3，1组8卡实验
+bash run_all_mrc.sh ernie-3.0-nano-zh 3
+
+# 方法二：对于较大模型，分别起3组实验：
+bash run_all_mrc.sh ernie-3.0-nano-zh 0
+bash run_all_mrc.sh ernie-3.0-nano-zh 1
+bash run_all_mrc.sh ernie-3.0-nano-zh 2
+```
+
+确认模型所有任务训练完成后，可以调用脚本 `extract_acc.sh` 一键抽取 Grid Search 结果
+
+```shell
+sh extract_acc.sh ernie-3.0-nano-zh
+```
+
+例如
 
 ## 参加 CLUE 竞赛
 

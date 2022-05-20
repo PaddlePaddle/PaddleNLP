@@ -16,20 +16,24 @@
 MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
-grd=$4
+
+
 git rev-parse HEAD
 
-
-logdir=${MODEL_PATH}/chid_log
+logdir=${MODEL_PATH}/cmrc2018_log
 mkdir ${logdir}
-python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_chid.py \
+python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_cmrc.py \
     --model_name_or_path ${MODEL_PATH} \
-    --batch_size ${BATCH_SIZE} \
+    --max_seq_length 512 \
+    --batch_size ${BATCH_SIZE}  \
     --learning_rate ${LR} \
-    --max_seq_length 64 \
-    --num_train_epochs 3 \
-    --output_dir ${MODEL_PATH}/chid_model/${LR}_${BS}/ \
-    --warmup_proportion 0.06 \
-    --do_train \
-    --gradient_accumulation_steps ${grd} \
+    --num_train_epochs 2 \
+    --logging_steps 100 \
+    --output_dir ${MODEL_PATH}/cmrc2018_model/${LR}_${BS}/ \
+    --save_steps 1000 \
+    --warmup_proportion 0.1 \
     --weight_decay 0.01 \
+    --do_train \
+    --device gpu \
+    --gradient_accumulation_steps 2 \
+    --save_best_models False \
