@@ -15,19 +15,15 @@
 import argparse
 import os
 import tempfile
-from functools import partial
 
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
-from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import GPTForGreedyGeneration, GPTChineseTokenizer, GPTTokenizer
-
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
-    "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
-    "gpt": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt-cn": (GPTChineseTokenizer, ),
+    "gpt": (GPTTokenizer, ),
 }
 
 
@@ -36,12 +32,11 @@ def parse_args():
     # yapf: disable
     parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--model_path", default=None, type=str, required=True, help="The path prefix of inference model to be used.")
-    parser.add_argument("--tokenizer_name_or_path", default=None, type=str, help="Path to tokenizer or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+    parser.add_argument("--tokenizer_name_or_path", default=None, type=str,
+                        help="Path to tokenizer or shortcut name selected in the list: "
+                             + ", ".join(sum([
+                                list(classes[-1].pretrained_init_configuration.keys())
+                                for classes in MODEL_CLASSES.values()], [])), )
     # yapf: enable
 
     args = parser.parse_args()
@@ -63,7 +58,8 @@ class Predictor(object):
 
         model_path = os.path.join(args.model_path, 'rank_' + str(rank))
         if not os.path.isdir(model_path):
-            config = paddle.inference.Config(args.model_path + '.pdmodel', args.model_path + '.pdiparams')
+            config = paddle.inference.Config(args.model_path + '.pdmodel',
+                                             args.model_path + '.pdiparams')
         else:
             model_file = None
             param_file = None
@@ -85,7 +81,7 @@ class Predictor(object):
         dist_config.set_endpoints(trainer_endpoints, current_endpoint)
 
         # Difficult to use, needs to be simplified...
-        ring_id_to_ranks = ','.join(['0'] + [str(i) for i in range(nranks)]) 
+        ring_id_to_ranks = ','.join(['0'] + [str(i) for i in range(nranks)])
         rank_to_ring_ids = ''
         for i in range(nranks):
             rank_to_ring_ids += '{},0\n'.format(i)
@@ -135,7 +131,7 @@ def main():
     fleet.init(is_collective=True)
     predictor = Predictor.create_predictor(args)
     args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    tokenizer_class, = MODEL_CLASSES[args.model_type]
 
     if args.tokenizer_name_or_path is None:
         if args.model_type == "gpt":
@@ -172,7 +168,7 @@ def main():
         len(text), -1).astype('float32')
     position_ids = np.array(inputs["position_ids"]).reshape(len(text),
                                                             -1).astype('int64')
-    
+
     dataset = [[ids, attention_mask, position_ids]]
 
     outs = predictor.predict(dataset)
