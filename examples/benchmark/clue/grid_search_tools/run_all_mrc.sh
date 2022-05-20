@@ -21,7 +21,7 @@ if [ ${mode} == 0 ]
 then
 task_name=chid
 cards="0,1,2,3"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 fi
 
 # mode 1: 4 cards for C3
@@ -29,7 +29,7 @@ if [ ${mode} == 1 ]
 then
 task_name=c3
 cards="0,1,2,3"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 fi
 
 # mode 2: 2 cards for CMRC2018
@@ -37,7 +37,7 @@ if [ ${mode} == 2 ]
 then
 task_name=cmrc2018
 cards="0,1"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 fi
 
 
@@ -46,13 +46,13 @@ if [ ${mode} == 3 ]
 then
 task_name=chid
 cards="0,1,2,3"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 
 task_name=c3
 cards="4,5,6,7"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 
 task_name=cmrc2018
 cards="0,1"
-nohup bash run_all.sh ${task_name} ${MODEL_DIR} ${cards} &
+nohup bash run_mrc.sh ${task_name} ${MODEL_DIR} ${cards} &
 fi
