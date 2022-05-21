@@ -12,4 +12,5 @@ max_iter=3
 use_sharding=true
 
 # run
+bash ./test_tipc/static/hybrid_parallelism/${model}/benchmark_common/prepare.sh
 bash ./test_tipc/static/hybrid_parallelism/${model}/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${mp_degree} ${pp_degree} ${dp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num} ${max_iter} ${use_sharding} 2>&1;
