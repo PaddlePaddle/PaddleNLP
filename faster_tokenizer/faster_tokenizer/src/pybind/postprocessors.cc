@@ -73,6 +73,32 @@ public:
   }
 };
 
+class PyTemplatePostProcessor : public postprocessors::TemplatePostProcessor {
+public:
+  using TemplatePostProcessor::TemplatePostProcessor;
+  virtual void operator()(core::Encoding* encoding,
+                          core::Encoding* pair_encoding,
+                          bool add_special_tokens,
+                          core::Encoding* result_encoding) const override {
+    PYBIND11_OVERLOAD_NAME(void,
+                           TemplatePostProcessor,
+                           "__call__",
+                           operator(),
+                           encoding,
+                           pair_encoding,
+                           add_special_tokens,
+                           result_encoding);
+  }
+  virtual size_t AddedTokensNum(bool is_pair) const override {
+    PYBIND11_OVERLOAD_NAME(size_t,
+                           TemplatePostProcessor,
+                           "num_special_tokens_to_add",
+                           AddedTokensNum,
+                           is_pair);
+  }
+};
+
+
 void BindPostProcessors(pybind11::module* m) {
   auto submodule =
       m->def_submodule("postprocessors", "The postprocessors module");
@@ -107,6 +133,51 @@ void BindPostProcessors(pybind11::module* m) {
            py::arg("is_pair"))
       .def("__call__",
            [](const postprocessors::BertPostProcessor& self,
+              core::Encoding* encoding,
+              core::Encoding* pair_encoding,
+              bool add_special_tokens) {
+             core::Encoding result_encoding;
+             self(
+                 encoding, pair_encoding, add_special_tokens, &result_encoding);
+             return result_encoding;
+           },
+           py::arg("encoding"),
+           py::arg("pair_encoding"),
+           py::arg("add_special_tokens"));
+
+  // For Template Processing
+  py::class_<postprocessors::SpecialToken>(submodule, "SpecialToken")
+      .def(py::init<>())
+      .def(py::init<const std::string&,
+                    const std::vector<uint>&,
+                    const std::vector<std::string>&>(),
+           py::arg("id"),
+           py::arg("ids"),
+           py::arg("tokens"))
+      .def(py::init<const std::string&, uint>(),
+           py::arg("token"),
+           py::arg("id"));
+
+  py::class_<postprocessors::Template>(submodule, "Template")
+      .def(py::init<>())
+      .def(py::init<const std::string&>(), py::arg("template"))
+      .def(py::init<const std::vector<std::string>&>(), py::arg("pieces"))
+      .def(py::init<const std::vector<postprocessors::TemplatePiece>&>(),
+           py::arg("pieces"));
+
+  py::class_<postprocessors::TemplatePostProcessor, PyTemplatePostProcessor>(
+      submodule, "TemplatePostProcessor")
+      .def(py::init<const postprocessors::Template&,
+                    const postprocessors::Template&,
+                    const std::vector<postprocessors::SpecialToken>&>(),
+           py::arg("single"),
+           py::arg("pair"),
+           py::arg("special_tokens"))
+      .def("num_special_tokens_to_add",
+           &postprocessors::TemplatePostProcessor::AddedTokensNum,
+           py::arg("is_pair"))
+      .def("__call__",
+           [](const postprocessors::TemplatePostProcessor& self,
               core::Encoding* encoding,
               core::Encoding* pair_encoding,
               bool add_special_tokens) {

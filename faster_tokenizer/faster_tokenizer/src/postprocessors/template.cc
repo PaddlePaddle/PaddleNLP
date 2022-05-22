@@ -190,6 +190,15 @@ TemplatePostProcessor::TemplatePostProcessor() {
   added_pair_ = DefaultAdded(false);
 }
 
+TemplatePostProcessor::TemplatePostProcessor(
+    const Template& single,
+    const Template& pair,
+    const std::vector<SpecialToken>& special_tokens_map)
+    : single_(single), pair_(pair), special_tokens_map_(special_tokens_map) {
+  added_single_ = DefaultAdded(true);
+  added_pair_ = DefaultAdded(false);
+}
+
 size_t TemplatePostProcessor::AddedTokensNum(bool is_pair) const {
   if (is_pair) {
     return added_pair_;

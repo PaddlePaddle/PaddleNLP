@@ -63,17 +63,33 @@ struct SpecialToken {
 struct Template {
   std::vector<TemplatePiece> pieces_;
   Template() = default;
-  Template(const std::vector<TemplatePiece> pieces) : pieces_(pieces) {}
+  Template(const std::string& template_str) {
+    TemplatePiece template_piece;
+    std::vector<std::string> pieces;
 
-  static Template CreateTemplate(const std::vector<std::string>& pieces) {
-    Template template_;
-    for (auto&& piece : pieces) {
-      TemplatePiece template_piece;
-      template_piece.ParseIdFromString(piece);
-      template_.pieces_.push_back(template_piece);
+    // Parse the pieces
+    size_t start = template_str.find_first_not_of(" ");
+    size_t pos;
+    while ((pos = template_str.find_first_of(" ", start)) !=
+           std::string::npos) {
+      pieces.push_back(template_str.substr(start, pos - start));
+      start = template_str.find_first_not_of(" ", pos);
     }
-    return template_;
+    AddStringPiece(pieces);
   }
+
+  Template(const std::vector<TemplatePiece>& pieces) : pieces_(pieces) {}
+  Template(const std::vector<std::string>& pieces) { AddStringPiece(pieces); }
+
+private:
+  void AddStringPiece(const std::vector<std::string>& pieces) {
+    TemplatePiece template_piece;
+    for (auto&& piece : pieces) {
+      template_piece.ParseIdFromString(piece);
+      pieces_.push_back(template_piece);
+    }
+  }
+
   friend void to_json(nlohmann::json& j, const Template& template_);
   friend void from_json(const nlohmann::json& j, Template& template_);
 };
@@ -92,6 +108,10 @@ struct SpecialTokensMap {
 
 struct TemplatePostProcessor : public PostProcessor {
   TemplatePostProcessor();
+  TemplatePostProcessor(const Template&,
+                        const Template&,
+                        const std::vector<SpecialToken>&);
+
   virtual void operator()(core::Encoding* encoding,
                           core::Encoding* pair_encoding,
                           bool add_special_tokens,
