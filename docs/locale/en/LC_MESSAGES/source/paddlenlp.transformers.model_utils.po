@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.transformers.model_utils.rst:2
 msgid "model\\_utils"
@@ -182,6 +182,7 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained
+#: paddlenlp.transformers.model_utils.PretrainedModel.get_model_config
 #: paddlenlp.transformers.model_utils.register_base_model
 msgid "返回"
 msgstr ""
@@ -191,6 +192,7 @@ msgid "An instance of `PretrainedModel`."
 msgstr ""
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained
+#: paddlenlp.transformers.model_utils.PretrainedModel.get_model_config
 #: paddlenlp.transformers.model_utils.register_base_model
 msgid "返回类型"
 msgstr ""
@@ -199,6 +201,14 @@ msgstr ""
 #: paddlenlp.transformers.model_utils.PretrainedModel.save_pretrained:13
 #: paddlenlp.transformers.model_utils.register_base_model:13
 msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.get_model_config:1
+msgid "Get model configuration."
+msgstr ""
+
+#: of paddlenlp.transformers.model_utils.PretrainedModel.get_model_config:3
+msgid "The config of the model."
 msgstr ""
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.save_model_config:1
