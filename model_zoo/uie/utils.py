@@ -38,16 +38,7 @@ MODEL_MAP = {
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
         }
-    },
-    "uie-medical-base": {
-        "encoding_model": "ernie-3.0-medium-zh",
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
-        }
-    },
+    }
 }
 
 
@@ -267,7 +258,10 @@ def convert_cls_examples(raw_examples, prompt_prefix, options):
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
-            text, labels = items["data"], items["label"]
+            if "data" in items.keys():
+                text, labels = items["data"], items["label"]
+            else:
+                text, labels = items["text"], items["label"]
             random.shuffle(options)
             prompt = ""
             sep = ","
