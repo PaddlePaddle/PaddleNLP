@@ -416,7 +416,7 @@ def run(args):
                 prepare_train_features,
                 batched=True,
                 remove_columns=column_names,
-                load_from_cache_file=args.overwrite_cache,
+                load_from_cache_file=not args.overwrite_cache,
                 num_proc=4,
                 desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(

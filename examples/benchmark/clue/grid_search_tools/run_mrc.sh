@@ -45,16 +45,19 @@ fi
 
 if [ ${task_name} == 'c3' ]
 then
+
+bs=6
 grd_accu_steps=3
-for bs in 6 8
+for lr in 1e-5 2e-5 3e-5
 do
-    if [ $bs == 8]
-    then
-    grd_accu_steps=4
-    fi
-    for lr in 1e-5 2e-5 3e-5
-    do
-        bash run_c3.sh  ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
-    done
+    bash run_c3.sh  ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
 done
+
+bs=8
+grd_accu_steps=4
+for lr in 1e-5 2e-5 3e-5
+do
+    bash run_c3.sh  ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
+done
+
 fi

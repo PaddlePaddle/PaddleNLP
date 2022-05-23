@@ -298,13 +298,14 @@ def run(args):
                               args.gradient_accumulation_steps)
         column_names = train_ds.column_names
         with main_process_first(desc="train dataset map pre-processing"):
-            train_ds = train_ds.map(preprocess_function,
-                                    batched=True,
-                                    batch_size=len(train_ds),
-                                    num_proc=4,
-                                    remove_columns=column_names,
-                                    load_from_cache_file=args.overwrite_cache,
-                                    desc="Running tokenizer on train dataset")
+            train_ds = train_ds.map(
+                preprocess_function,
+                batched=True,
+                batch_size=len(train_ds),
+                num_proc=4,
+                remove_columns=column_names,
+                load_from_cache_file=not args.overwrite_cache,
+                desc="Running tokenizer on train dataset")
         batchify_fn = lambda samples, fn=Dict({
             'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
             'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
