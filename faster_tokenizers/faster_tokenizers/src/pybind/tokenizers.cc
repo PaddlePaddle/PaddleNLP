@@ -212,10 +212,10 @@ static PyObject* TokenizerPropertiesGetPadding(TokenizerObject* self,
                  ToPyObject(pad_method.pad_token_type_id_));
   PyDict_SetItem(
       py_dict, ToPyObject("pad_token"), ToPyObject(pad_method.pad_token_));
-  if (pad_method.pad_to_mutiple_of > 0) {
+  if (pad_method.pad_to_multiple_of_ > 0) {
     PyDict_SetItem(py_dict,
                    ToPyObject("pad_to_multiple_of"),
-                   ToPyObject(pad_method.pad_to_mutiple_of));
+                   ToPyObject(pad_method.pad_to_multiple_of_));
   } else {
     Py_INCREF(Py_None);
     PyDict_SetItem(py_dict, ToPyObject("pad_to_multiple_of"), Py_None);

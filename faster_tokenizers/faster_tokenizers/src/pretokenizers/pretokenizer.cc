@@ -159,15 +159,15 @@ bool PreTokenizedString::TransformToEncodingUseConvertor(
     const auto& normalized = split.normalized_;
     auto offset = normalized.GetOrginalOffset();
     for (const auto& token : split.tokens_) {
-      auto token_offset = token.offset;
+      auto token_offset = token.offset_;
       if (normalized.ConvertOffsets(&token_offset, false)) {
         token_offset.first += offset.first;
         token_offset.second += offset.first;
       }
       offset = token_offset;
       converter.convert(token_offset, &offset);
-      token_ids[curr_idx] = token.id;
-      tokens[curr_idx] = token.value;
+      token_ids[curr_idx] = token.id_;
+      tokens[curr_idx] = token.value_;
       offsets[curr_idx] = offset;
       ++curr_idx;
     }

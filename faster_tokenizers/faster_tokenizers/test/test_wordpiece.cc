@@ -78,9 +78,9 @@ TEST(model, wordpiece_model) {
                         const std::string& expected_string,
                         uint id,
                         core::Offset offset) {
-    ASSERT_EQ(token.value, expected_string);
-    ASSERT_EQ(token.id, id);
-    ASSERT_EQ(token.offset, offset);
+    ASSERT_EQ(token.value_, expected_string);
+    ASSERT_EQ(token.id_, id);
+    ASSERT_EQ(token.offset_, offset);
   };
   check_token(chinese_tokens[0], "今", 508, {0, 3});
   check_token(chinese_tokens[1], "##天", 12172, {3, 6});

@@ -71,7 +71,7 @@ struct PadMethod {
   uint pad_token_type_id_;
   std::string pad_token_;
   uint pad_len_;
-  uint pad_to_mutiple_of;
+  uint pad_to_multiple_of_;
 
   PadMethod()
       : strategy_(BATCH_LONGEST),
@@ -80,7 +80,7 @@ struct PadMethod {
         pad_token_type_id_(0),
         pad_token_("[PAD]"),
         pad_len_(0),
-        pad_to_mutiple_of(0) {}
+        pad_to_multiple_of_(0) {}
 };
 
 inline void to_json(nlohmann::json& j, const TruncMethod& trunc_method) {
@@ -108,7 +108,7 @@ inline void to_json(nlohmann::json& j, const PadMethod& pad_method) {
       {"pad_token_type_id", pad_method.pad_token_type_id_},
       {"pad_token", pad_method.pad_token_},
       {"pad_len", pad_method.pad_len_},
-      {"pad_to_mutiple_of", pad_method.pad_to_mutiple_of},
+      {"pad_to_multiple_of", pad_method.pad_to_multiple_of_},
   };
 }
 
@@ -119,7 +119,7 @@ inline void from_json(const nlohmann::json& j, PadMethod& pad_method) {
   j["pad_token_type_id"].get_to(pad_method.pad_token_type_id_);
   j["pad_token"].get_to(pad_method.pad_token_);
   j["pad_len"].get_to(pad_method.pad_len_);
-  j["pad_to_mutiple_of"].get_to(pad_method.pad_to_mutiple_of);
+  j["pad_to_multiple_of"].get_to(pad_method.pad_to_multiple_of_);
 }
 
 using Offset = std::pair<uint, uint>;
@@ -128,12 +128,12 @@ using Vocab = std::unordered_map<std::string, uint>;
 using VocabReversed = std::unordered_map<uint, std::string>;
 
 struct Token {
-  uint id;
-  std::string value;
-  Offset offset;
+  uint id_;
+  std::string value_;
+  Offset offset_;
   Token() = default;
   Token(uint id, const std::string& value, const Offset& offset)
-      : id(id), value(value), offset(offset) {}
+      : id_(id), value_(value), offset_(offset) {}
 };
 
 }  // core

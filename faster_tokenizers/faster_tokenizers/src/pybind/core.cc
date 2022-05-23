@@ -41,13 +41,13 @@ py::list GetWordIdx(const core::Encoding& self) {
 void BindCore(pybind11::module* m) {
   py::class_<core::Token>(*m, "Token")
       .def(py::init<>())
-      .def_readwrite("id", &core::Token::id)
-      .def_readwrite("value", &core::Token::value)
-      .def_readwrite("offset", &core::Token::offset)
+      .def_readwrite("id", &core::Token::id_)
+      .def_readwrite("value", &core::Token::value_)
+      .def_readwrite("offset", &core::Token::offset_)
       .def("__repr__", [](const core::Token& token) {
         std::ostringstream oss;
-        oss << "id: " << token.id << "\tvalue:" << token.value << "\toffset: ("
-            << token.offset.first << ", " << token.offset.second << ")";
+        oss << "id: " << token.id_ << "\tvalue:" << token.value_ << "\toffset: ("
+            << token.offset_.first << ", " << token.offset_.second << ")";
         return oss.str();
       });
   py::class_<core::PadMethod>(*m, "PadMethod")
@@ -58,7 +58,7 @@ void BindCore(pybind11::module* m) {
       .def_readwrite("pad_token_type_id", &core::PadMethod::pad_token_type_id_)
       .def_readwrite("pad_token", &core::PadMethod::pad_token_)
       .def_readwrite("pad_len", &core::PadMethod::pad_len_)
-      .def_readwrite("pad_to_mutiple_of", &core::PadMethod::pad_to_mutiple_of);
+      .def_readwrite("pad_to_multiple_of", &core::PadMethod::pad_to_multiple_of_);
   py::class_<core::TruncMethod>(*m, "TruncMethod")
       .def(py::init<>())
       .def_readwrite("direction", &core::TruncMethod::direction_)

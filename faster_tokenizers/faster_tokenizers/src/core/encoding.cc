@@ -80,9 +80,9 @@ Encoding::Encoding(const std::vector<Token>& tokens, uint type_id)
   offsets_.reserve(length);
   tokens_.reserve(length);
   for (const auto& token : tokens) {
-    ids_.push_back(token.id);
-    tokens_.push_back(token.value);
-    offsets_.push_back(token.offset);
+    ids_.push_back(token.id_);
+    tokens_.push_back(token.value_);
+    offsets_.push_back(token.offset_);
   }
 }
 
@@ -617,8 +617,8 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   } else {
     pad_length = method.pad_len_;
   }
-  if (method.pad_to_mutiple_of > 0 && pad_length % method.pad_to_mutiple_of) {
-    pad_length += pad_length - pad_length % method.pad_to_mutiple_of;
+  if (method.pad_to_multiple_of_ > 0 && pad_length % method.pad_to_multiple_of_) {
+    pad_length += pad_length - pad_length % method.pad_to_multiple_of_;
   }
   for (auto& encoding : *encodings) {
     encoding.Pad(pad_length,
