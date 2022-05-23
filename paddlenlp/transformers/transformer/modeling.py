@@ -57,9 +57,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
 
 
 class WordEmbedding(nn.Layer):
-    """
-    Word Embedding layer of Transformer. 
-
+    r"""
+    Word Embedding Layer of Transformer.
     This layer automatically constructs a 2D embedding matrix based on the
     input the size of vocabulary (`vocab_size`) and the size of each embedding
     vector (`emb_dim`). This layer lookups embeddings vector of ids provided
@@ -90,7 +89,7 @@ class WordEmbedding(nn.Layer):
             embedding_dim=emb_dim,
             padding_idx=bos_id,
             weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Normal(0., emb_dim**-0.5)))
+                initializer=nn.initializer.Normal(0., emb_dim**(-0.5))))
 
     def forward(self, word):
         r"""
