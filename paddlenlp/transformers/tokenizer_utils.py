@@ -1318,7 +1318,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
-            if self.do_lower_case:
+            if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
                 ch = unicodedata.normalize('NFD', ch)
                 ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])

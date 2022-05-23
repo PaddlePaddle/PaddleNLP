@@ -1,0 +1,132 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/transformers/Funnel/contents.rst:5
+msgid "Funnel模型汇总"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:9
+msgid "下表汇总介绍了目前PaddleNLP支持的Funnel模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:13
+msgid "Pretrained Weight"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:13
+msgid "Language"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:13
+msgid "Details of the model"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:15
+msgid "``funnel-transformer/small``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:15
+#: ../model_zoo/transformers/Funnel/contents.rst:18
+#: ../model_zoo/transformers/Funnel/contents.rst:21
+#: ../model_zoo/transformers/Funnel/contents.rst:24
+#: ../model_zoo/transformers/Funnel/contents.rst:27
+#: ../model_zoo/transformers/Funnel/contents.rst:30
+#: ../model_zoo/transformers/Funnel/contents.rst:33
+#: ../model_zoo/transformers/Funnel/contents.rst:36
+#: ../model_zoo/transformers/Funnel/contents.rst:39
+#: ../model_zoo/transformers/Funnel/contents.rst:42
+msgid "English"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:15
+msgid "For details, please refer to: `funnel-transformer/small`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:18
+msgid "``funnel-transformer/small-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:18
+msgid "For details, please refer to: `funnel-transformer/small-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:21
+msgid "``funnel-transformer/meduim``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:21
+msgid "For details, please refer to: `funnel-transformer/meduim`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:24
+msgid "``funnel-transformer/meduim-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:24
+msgid "For details, please refer to: `funnel-transformer/meduim-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:27
+msgid "``funnel-transformer/intermediate``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:27
+msgid "For details, please refer to: `funnel-transformer/intermediate`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:30
+msgid "``funnel-transformer/intermediate-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:30
+msgid "For details, please refer to: `funnel-transformer/intermediate-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:33
+msgid "``funnel-transformer/large``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:33
+msgid "For details, please refer to: `funnel-transformer/large`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:36
+msgid "``funnel-transformer/large-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:36
+msgid "For details, please refer to: `funnel-transformer/large-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:39
+msgid "``funnel-transformer/xlarge``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:39
+msgid "For details, please refer to: `funnel-transformer/xlarge`_"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:42
+msgid "``funnel-transformer/xlarge-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/Funnel/contents.rst:42
+msgid "For details, please refer to: `funnel-transformer/xlarge-base`_"
+msgstr ""
+
