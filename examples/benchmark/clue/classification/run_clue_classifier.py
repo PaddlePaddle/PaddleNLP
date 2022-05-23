@@ -19,6 +19,7 @@ import random
 import time
 import math
 import json
+import distutils.util
 from functools import partial
 
 import numpy as np
@@ -136,6 +137,11 @@ def parse_args():
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
+    parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.", )
     parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
@@ -404,18 +410,19 @@ def do_train(args):
                     print("eval done total : %s s" % (time.time() - tic_eval))
                     if acc > best_acc:
                         best_acc = acc
-                        output_dir = args.output_dir
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # Need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
+                        if args.save_best_model:
+                            output_dir = args.output_dir
+                            if not os.path.exists(output_dir):
+                                os.makedirs(output_dir)
+                            # Need better way to get inner model of DataParallel
+                            model_to_save = model._layers if isinstance(
+                                model, paddle.DataParallel) else model
+                            model_to_save.save_pretrained(output_dir)
+                            tokenizer.save_pretrained(output_dir)
                 if global_step >= num_training_steps:
-                    print("best_acc: ", best_acc)
+                    print("best_acc: %.2f" % (best_acc * 100))
                     return
-    print("best_acc: ", best_acc)
+    print("best_acc: %.2f" % (best_acc * 100))
 
 
 def do_predict(args):
