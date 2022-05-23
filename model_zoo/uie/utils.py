@@ -258,6 +258,7 @@ def convert_cls_examples(raw_examples, prompt_prefix, options):
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
+            # Compatible with doccano >= 1.6.2
             if "data" in items.keys():
                 text, labels = items["data"], items["label"]
             else:
@@ -309,6 +310,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 text = items["data"]
                 entities = []
                 if not relation_mode:
+                    # Export file in JSONL format which doccano < 1.7.0
                     for item in items["label"]:
                         entity = {
                             "id": entity_id,
@@ -319,6 +321,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                         entities.append(entity)
                         entity_id += 1
                 else:
+                    # Export file in JSONL format for relation labeling task which doccano < 1.7.0
                     for item in items["label"]["entities"]:
                         entity = {
                             "id": entity_id,
@@ -330,8 +333,24 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                         entity_id += 1
                 relations = []
             else:
-                text, relations, entities = items["text"], items[
-                    "relations"], items["entities"]
+                # Export file in JSONL format which doccano >= 1.7.0
+                if "label" in items.keys():
+                    text = items["data"]
+                    entities = []
+                    for item in items["label"]:
+                        entity = {
+                            "id": entity_id,
+                            "start_offset": item[0],
+                            "end_offset": item[1],
+                            "label": item[2]
+                        }
+                        entities.append(entity)
+                        entity_id += 1
+                    relations = []
+                else:
+                    # Export file in JSONL (relation) format
+                    text, relations, entities = items["text"], items[
+                        "relations"], items["entities"]
             texts.append(text)
 
             entity_example = []
