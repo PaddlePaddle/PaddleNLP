@@ -27,5 +27,6 @@ cmrc2018=`cat ${MODEL_PATH}/cmrc2018_log/workerlog.0|grep best_res|awk '{print $
 chid=`cat ${MODEL_PATH}/chid_log/workerlog.0|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
 c3=`cat  ${MODEL_PATH}/c3_log/workerlog.0|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
 
+echo AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3
 echo  ${afqmc}"\t"${tnews}"\t"${ifly}"\t"${cmnli}"\t"${ocnli}"\t"${wsc}"\t"${csl}"\t"${cmrc2018}"\t"${chid}"\t"${c3}
 

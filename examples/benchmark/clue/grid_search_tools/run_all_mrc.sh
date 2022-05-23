@@ -13,6 +13,8 @@
 # limitations under the License.
 
 
+git rev-parse HEAD
+
 MODEL_DIR=$1
 mode=$2
 

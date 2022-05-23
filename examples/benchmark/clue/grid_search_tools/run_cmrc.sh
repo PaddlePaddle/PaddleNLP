@@ -18,8 +18,6 @@ BATCH_SIZE=$2
 LR=$3
 
 
-git rev-parse HEAD
-
 logdir=${MODEL_PATH}/cmrc2018_log
 mkdir -p ${logdir}
 python -m paddle.distributed.launch --gpus "$4"  --log_dir ${logdir} ../mrc/run_cmrc.py \

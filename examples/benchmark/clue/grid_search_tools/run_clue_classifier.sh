@@ -21,7 +21,6 @@ export MAX_SEQ_LEN=$5
 export CUDA_VISIBLE_DEVICES=$6
 export MODEL_PATH=$7
 export grad_acc=$8
-git rev-parse HEAD
 
 python -u ../classification/run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \

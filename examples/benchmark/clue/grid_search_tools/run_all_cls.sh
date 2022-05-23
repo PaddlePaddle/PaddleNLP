@@ -16,6 +16,7 @@
 # For base-size or smaller size model.
 # Larger model needs to adjust gradient_accumulation argument or not run all hyperparameters together like this
 
+git rev-parse HEAD
 
 MODEL_DIR=$1
 mode=$2

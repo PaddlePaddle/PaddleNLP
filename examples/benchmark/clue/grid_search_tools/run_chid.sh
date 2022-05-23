@@ -17,7 +17,6 @@ MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
 grd=$4
-git rev-parse HEAD
 
 
 logdir=${MODEL_PATH}/chid_log
