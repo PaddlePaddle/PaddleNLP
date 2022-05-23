@@ -160,7 +160,7 @@ We provide high value scenarios including information extraction, semantic retri
 For more details industial cases please refer to [Applications](./applications).
 
 
-#### 🧠 Neural Search System
+#### 🔍 Neural Search System
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="400">
@@ -205,7 +205,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### 🚀 Fleet API: 4D Hybrid Distributed Training
+#### 🚀 Fleet: 4D Hybrid Distributed Training
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
@@ -226,7 +226,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 
 Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
 
-#### ⚡ FasterGeneration: High Perforance Generation Utilities
+#### ⚡ FasterGeneration: High Perforance Generation Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
