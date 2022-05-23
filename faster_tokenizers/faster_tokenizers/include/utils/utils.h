@@ -73,5 +73,9 @@ inline void StringReplaceAll(std::string* str,
   }
 }
 
+inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
+  return 0;
+}
+
 }  // namespace utils
 }  // namespace tokenizers

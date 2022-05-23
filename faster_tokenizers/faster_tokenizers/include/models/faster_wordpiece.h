@@ -17,6 +17,7 @@ limitations under the License. */
 #include "models/model.h"
 #include "models/wordpiece.h"
 #include "nlohmann/json.hpp"
+#include "utils/trie.h"
 
 namespace tokenizers {
 namespace models {
@@ -27,17 +28,12 @@ struct FasterWordPiece : public WordPiece {
                   const std::string& unk_token = "[UNK]",
                   size_t max_input_chars_per_word = 100,
                   const std::string& continuing_subword_prefix = "##");
-  // Move version
-  FasterWordPiece(core::Vocab&& vocab,
-                  std::string&& unk_token,
-                  size_t max_input_chars_per_word,
-                  std::string&& continuing_subword_prefix);
 
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) const override;
 
 private:
-  void ContructTrie(const core::Vocab&) const;
+  utils::Trie trie_;
   friend void to_json(nlohmann::json& j, const FasterWordPiece& model);
   friend void from_json(const nlohmann::json& j, FasterWordPiece& model);
 };

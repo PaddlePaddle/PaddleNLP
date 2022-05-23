@@ -38,23 +38,8 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
     : WordPiece(vocab,
                 unk_token,
                 max_input_chars_per_word,
-                continuing_subword_prefix) {
-  ContructTrie(vocab);
-}
-
-// Move version
-FasterWordPiece::FasterWordPiece(core::Vocab&& vocab,
-                                 std::string&& unk_token,
-                                 size_t max_input_chars_per_word,
-                                 std::string&& continuing_subword_prefix)
-    : WordPiece(std::move(vocab),
-                std::move(unk_token),
-                std::move(max_input_chars_per_word),
-                std::move(continuing_subword_prefix)) {
-  ContructTrie(vocab);
-}
-
-void FasterWordPiece::ContructTrie(const core::Vocab&) const {}
+                continuing_subword_prefix),
+      trie_(vocab) {}
 
 std::vector<core::Token> FasterWordPiece::Tokenize(
     const std::string& sequence) const {
