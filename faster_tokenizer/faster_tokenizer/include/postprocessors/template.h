@@ -19,6 +19,7 @@ limitations under the License. */
 #include <vector>
 
 #include "boost/variant.hpp"
+#include "glog/logging.h"
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
 
@@ -34,13 +35,32 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
 using TemplateSequence = std::pair<SequenceType, uint>;
 using TemplateSpecialToken = std::pair<std::string, uint>;
 
-struct TemplatePiece : boost::variant<TemplateSequence, TemplateSpecialToken> {
-  void ParseIdFromString(const std::string& template_id_string);
-  void SetTypeId(uint type_id);
-  static TemplatePiece CreateTemplatePiece(const std::string& template_string);
-  friend void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
-  friend void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
-};
+using TemplatePiece = boost::variant<TemplateSequence, TemplateSpecialToken>;
+void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
+void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
+
+// struct TemplatePiece {
+//   TemplatePiece() = default;
+//   template<typename PieceType>
+//   TemplatePiece(PieceType&& other) : piece_impl_(other) {}
+//   template<typename PieceType>
+//   TemplatePiece& operator=(PieceType&& other) {
+//     piece_impl_ = std::forward<PieceType>(other);
+//     return *this;
+//   }
+//   void ParseIdFromString(const std::string& template_id_string);
+//   void SetTypeId(uint type_id);
+//   void GetTemplatePieceFromString(const std::string& template_string);
+
+//   boost::variant<TemplateSequence, TemplateSpecialToken> piece_impl_;
+
+// };
+
+void ParseIdFromString(const std::string& template_id_string,
+                       TemplatePiece* template_piece);
+void SetTypeId(uint type_id, TemplatePiece* template_piece);
+void GetTemplatePieceFromString(const std::string& template_string,
+                                TemplatePiece* template_piece);
 
 struct SpecialToken {
   std::string id_;
@@ -63,8 +83,7 @@ struct SpecialToken {
 struct Template {
   std::vector<TemplatePiece> pieces_;
   Template() = default;
-  Template(const std::string& template_str) {
-    TemplatePiece template_piece;
+  explicit Template(const std::string& template_str) {
     std::vector<std::string> pieces;
 
     // Parse the pieces
@@ -75,18 +94,51 @@ struct Template {
       pieces.push_back(template_str.substr(start, pos - start));
       start = template_str.find_first_not_of(" ", pos);
     }
+    if (start != std::string::npos) {
+      pieces.push_back(template_str.substr(start));
+    }
     AddStringPiece(pieces);
   }
 
-  Template(const std::vector<TemplatePiece>& pieces) : pieces_(pieces) {}
-  Template(const std::vector<std::string>& pieces) { AddStringPiece(pieces); }
+  explicit Template(const std::vector<TemplatePiece>& pieces)
+      : pieces_(pieces) {}
+  explicit Template(const std::vector<std::string>& pieces) {
+    AddStringPiece(pieces);
+  }
+
+  void GetPiecesFromVec(const std::vector<std::string>& pieces) {
+    AddStringPiece(pieces);
+  }
+
+  void GetPiecesFromStr(const std::string& template_str) {
+    std::vector<std::string> pieces;
+
+    // Parse the pieces
+    size_t start = template_str.find_first_not_of(" ");
+    size_t pos;
+    while ((pos = template_str.find_first_of(" ", start)) !=
+           std::string::npos) {
+      pieces.push_back(template_str.substr(start, pos - start));
+      start = template_str.find_first_not_of(" ", pos);
+    }
+    if (start != std::string::npos) {
+      pieces.push_back(template_str.substr(start));
+    }
+    AddStringPiece(pieces);
+  }
+
+  void Clean() { pieces_.clear(); }
 
 private:
   void AddStringPiece(const std::vector<std::string>& pieces) {
-    TemplatePiece template_piece;
     for (auto&& piece : pieces) {
-      template_piece.ParseIdFromString(piece);
-      pieces_.push_back(template_piece);
+      TemplatePiece template_piece;
+      GetTemplatePieceFromString(piece, &template_piece);
+      if (boost::get<TemplateSequence>(&template_piece)) {
+        pieces_.push_back(boost::get<TemplateSequence>(template_piece));
+      } else {
+        pieces_.push_back(boost::get<TemplateSpecialToken>(template_piece));
+      }
     }
   }
 
@@ -97,8 +149,12 @@ private:
 struct SpecialTokensMap {
   std::unordered_map<std::string, SpecialToken> tokens_map_;
   SpecialTokensMap() = default;
-  SpecialTokensMap(const std::vector<SpecialToken>& special_tokens) {
-    for (auto&& special_token : special_tokens) {
+  explicit SpecialTokensMap(const std::vector<SpecialToken>& special_tokens) {
+    SetTokensMap(special_tokens);
+  }
+  void SetTokensMap(const std::vector<SpecialToken>& special_tokens) {
+    tokens_map_.clear();
+    for (const auto& special_token : special_tokens) {
       tokens_map_.insert({special_token.id_, special_token});
     }
   }

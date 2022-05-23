@@ -22,62 +22,64 @@
 namespace tokenizers {
 namespace postprocessors {
 
-void TemplatePiece::ParseIdFromString(const std::string& template_id_string) {
+void ParseIdFromString(const std::string& template_id_string,
+                       TemplatePiece* template_piece) {
   if (template_id_string.find_first_of("$") == 0) {
-    auto& seq = boost::get<TemplateSequence>(*this);
+    *template_piece = TemplateSequence();
+    auto& seq = boost::get<TemplateSequence>(*template_piece);
     std::string rest =
         template_id_string.substr(template_id_string.find_first_not_of("$"));
-    std::string::size_type sz;
-    uint type_id = std::stoul(rest, &sz);
     if (rest == "" || rest == "A" || rest == "a") {
       seq = TemplateSequence{SequenceType::SEQ_A, 0};
     } else if (rest == "B" || rest == "b") {
       seq = TemplateSequence{SequenceType::SEQ_B, 0};
-    } else if (sz == rest.length()) {
-      seq = TemplateSequence{SequenceType::SEQ_A, type_id};
     } else {
-      throw std::runtime_error(
-          "ParseIdFromString error! The format of template piece id should be "
-          "$A, $a, $B, $b or ${type_id}");
+      std::string::size_type sz;
+      uint type_id = std::stoul(rest, &sz);
+      if (sz = rest.length()) {
+        seq = TemplateSequence{SequenceType::SEQ_A, type_id};
+      } else {
+        throw std::runtime_error(
+            "ParseIdFromString error! The format of template piece id should "
+            "be "
+            "$A, $a, $B, $b or ${type_id}");
+      }
     }
   } else {
-    boost::get<TemplateSpecialToken>(*this) = {template_id_string, 0};
+    *template_piece = TemplateSpecialToken();
+    boost::get<TemplateSpecialToken>(*template_piece) = {template_id_string, 0};
   }
 }
 
-void TemplatePiece::SetTypeId(uint type_id) {
-  if (boost::get<TemplateSequence>(this) != nullptr) {
-    boost::get<TemplateSequence>(*this).second = type_id;
+void SetTypeId(uint type_id, TemplatePiece* template_piece) {
+  if (boost::get<TemplateSequence>(template_piece) != nullptr) {
+    boost::get<TemplateSequence>(*template_piece).second = type_id;
   } else {
-    boost::get<TemplateSpecialToken>(*this).second = type_id;
+    boost::get<TemplateSpecialToken>(*template_piece).second = type_id;
   }
 }
 
-TemplatePiece TemplatePiece::CreateTemplatePiece(
-    const std::string& template_string) {
-  TemplatePiece piece;
+void GetTemplatePieceFromString(const std::string& template_string,
+                                TemplatePiece* template_piece) {
   auto spliter_idx = template_string.find_first_of(":");
   if (spliter_idx == std::string::npos) {
-    throw std::runtime_error(
-        "Fail to CreateTemplatePiece because lack `:` ! Please make sure the "
-        "format of template should be ${id}:${type_id}");
+    ParseIdFromString(template_string, template_piece);
   } else {
     std::string template_id_string = template_string.substr(0, spliter_idx);
     std::string template_type_id_string =
         template_string.substr(spliter_idx + 1);
-    piece.ParseIdFromString(template_id_string);
+    ParseIdFromString(template_id_string, template_piece);
 
     std::string::size_type sz;
     uint type_id = std::stoul(template_type_id_string, &sz);
     if (sz == template_type_id_string.length()) {
-      piece.SetTypeId(type_id);
+      SetTypeId(type_id, template_piece);
     } else {
       throw std::runtime_error(
           "ParseTypeIdFromString error! The type id should be unsigned "
           "integer.");
     }
   }
-  return piece;
 }
 
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece) {

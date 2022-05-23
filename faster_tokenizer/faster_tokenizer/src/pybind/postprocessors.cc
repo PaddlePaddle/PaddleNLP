@@ -14,9 +14,10 @@ limitations under the License. */
 
 #include "postprocessors/postprocessors.h"
 #include <Python.h>
-#include "pybind/postprocessors.h"
-
 #include "core/encoding.h"
+#include "glog/logging.h"
+#include "pybind/postprocessors.h"
+#include "pybind/utils.h"
 
 namespace py = pybind11;
 
@@ -167,12 +168,136 @@ void BindPostProcessors(pybind11::module* m) {
 
   py::class_<postprocessors::TemplatePostProcessor, PyTemplatePostProcessor>(
       submodule, "TemplatePostProcessor")
-      .def(py::init<const postprocessors::Template&,
-                    const postprocessors::Template&,
-                    const std::vector<postprocessors::SpecialToken>&>(),
-           py::arg("single"),
-           py::arg("pair"),
-           py::arg("special_tokens"))
+      .def(
+          "__init__",
+          [](postprocessors::TemplatePostProcessor* self,
+             const py::object& single_obj,
+             const py::object& pair_obj,
+             const py::object& special_tokens_obj) {
+            VLOG(0) << "Setting single";
+            // Setting single
+            if (py::isinstance<py::list>(single_obj)) {
+              std::vector<std::string> template_piece =
+                  CastPyArg2VectorOfStr(single_obj.ptr(), 0);
+              self->single_.GetPiecesFromVec(template_piece);
+            } else if (py::isinstance<py::str>(single_obj)) {
+              self->single_.GetPiecesFromStr(
+                  CastPyArg2AttrString(single_obj.ptr(), 0));
+            } else {
+              throw py::value_error(
+                  "Type of args single need to be List[str] or str.");
+            }
+            // Setting pair
+            VLOG(0) << "Setting pair";
+            if (py::isinstance<py::list>(pair_obj)) {
+              std::vector<std::string> template_piece =
+                  CastPyArg2VectorOfStr(pair_obj.ptr(), 0);
+              self->pair_.GetPiecesFromVec(template_piece);
+            } else if (py::isinstance<py::str>(pair_obj)) {
+              self->pair_.GetPiecesFromStr(
+                  CastPyArg2AttrString(pair_obj.ptr(), 0));
+            } else {
+              throw py::value_error(
+                  "Type of args pair need to be List[str] or str.");
+            }
+
+            VLOG(0) << "Setting special_tokens";
+            // Setting special_tokens
+            if (py::isinstance<py::list>(special_tokens_obj)) {
+              std::vector<postprocessors::SpecialToken> special_tokens;
+              for (auto& str : special_tokens_obj.cast<py::list>()) {
+                if (py::isinstance<py::tuple>(str)) {
+                  auto token_tuple = str.cast<py::tuple>();
+                  uint id;
+                  std::string token;
+                  if (token_tuple.size() == 2) {
+                    if (py::isinstance<py::str>(token_tuple[0]) &&
+                        py::isinstance<py::int_>(token_tuple[1])) {
+                      token = token_tuple[0].cast<std::string>();
+                      id = token_tuple[1].cast<uint>();
+                    } else if (py::isinstance<py::str>(token_tuple[1]) &&
+                               py::isinstance<py::int_>(token_tuple[0])) {
+                      token = token_tuple[1].cast<std::string>();
+                      id = token_tuple[0].cast<uint>();
+                    } else {
+                      throw py::value_error(
+                          "`Tuple` with both a token and its associated ID, in "
+                          "any order");
+                    }
+                    special_tokens.emplace_back(token, id);
+                  } else {
+                    throw py::value_error(
+                        "Type of args special_tokens need to be "
+                        "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
+                  }
+                } else if (py::isinstance<py::dict>(str)) {
+                  auto token_dict = str.cast<py::dict>();
+                  std::string id;
+                  std::vector<uint> ids;
+                  std::vector<std::string> tokens;
+                  if (token_dict.contains("id") &&
+                      py::isinstance<py::str>(token_dict["id"])) {
+                    id = token_dict["id"].cast<std::string>();
+                  } else {
+                    throw py::value_error(
+                        "Type of args special_tokens dict need to have key 'id'"
+                        "and the respective value should be `str`");
+                  }
+                  if (token_dict.contains("ids") &&
+                      py::isinstance<py::list>(token_dict["ids"])) {
+                    for (auto py_id : token_dict["ids"].cast<py::list>()) {
+                      if (py::isinstance<py::int_>(py_id)) {
+                        ids.push_back(py_id.cast<uint>());
+                      } else {
+                        throw py::value_error(
+                            "Type of args special_tokens dict need to have key "
+                            "'ids'"
+                            "and the respective value should be List[int]");
+                      }
+                    }
+                  } else {
+                    throw py::value_error(
+                        "Type of args special_tokens dict need to have key "
+                        "'ids'"
+                        "and the respective value should be List[int]");
+                  }
+                  if (token_dict.contains("tokens") &&
+                      py::isinstance<py::list>(token_dict["tokens"])) {
+                    for (auto& py_token :
+                         token_dict["tokens"].cast<py::list>()) {
+                      if (py::isinstance<py::str>(py_token)) {
+                        tokens.push_back(py_token.cast<std::string>());
+                      } else {
+                        throw py::value_error(
+                            "Type of args special_tokens dict need to have key "
+                            "'tokens'"
+                            "and the respective value should be List[str]");
+                      }
+                    }
+                  } else {
+                    throw py::value_error(
+                        "Type of args special_tokens dict need to have key "
+                        "'tokens'"
+                        "and the respective value should be List[str]");
+                  }
+                  special_tokens.emplace_back(id, ids, tokens);
+                } else {
+                  throw py::value_error(
+                      "Type of args special_tokens need to be "
+                      "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
+                }
+              }
+              VLOG(0) << "Before setting special_tokens_map_";
+              self->special_tokens_map_.SetTokensMap(special_tokens);
+            } else {
+              throw py::value_error(
+                  "Type of args special_tokens need to be "
+                  "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
+            }
+          },
+          py::arg("single"),
+          py::arg("pair"),
+          py::arg("special_tokens"))
       .def("num_special_tokens_to_add",
            &postprocessors::TemplatePostProcessor::AddedTokensNum,
            py::arg("is_pair"))
