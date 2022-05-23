@@ -73,8 +73,45 @@ inline void StringReplaceAll(std::string* str,
   }
 }
 
+
+// Used in faster wordpiece model
+
+static constexpr uint32_t kBitToIndicateSuffixToken = 30;
+
+static constexpr uint32_t kBitsToEncodeVocabTokenLength = 8;
+
+static constexpr uint32_t kMaskToEncodeVocabTokenLength =
+    (1 << kBitsToEncodeVocabTokenLength) - 1;
+
+static constexpr uint32_t kMaxVocabTokenLengthInUTF8Bytes =
+    (1 << kBitsToEncodeVocabTokenLength);
+
+static constexpr uint32_t kMaxSupportedVocabSize =
+    (1 << (32 - 1 - 1 - kBitsToEncodeVocabTokenLength));
+
+static constexpr uint32_t kMaskToEncodeVocabTokenId =
+    ((1 << kBitToIndicateSuffixToken) - 1) ^ kMaskToEncodeVocabTokenLength;
+
 inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
-  return 0;
+  int encoded_value = (is_suffix_token << kBitToIndicateSuffixToken) |
+                            (token_id << kBitsToEncodeVocabTokenLength) |
+                            (token_length - 1);
+  return encoded_value;
+}
+
+inline bool IsSuffixToken(int token_encoded_value) {
+  return static_cast<bool>(token_encoded_value >> kBitToIndicateSuffixToken);
+}
+
+// Gets the token id from the encoded value.
+inline int GetTokenId(int token_encoded_value) {
+  return (token_encoded_value & kMaskToEncodeVocabTokenId) >>
+         kBitsToEncodeVocabTokenLength;
+}
+
+// Gets the token length (without the suffix indicator) from the encoded value.
+inline int GetTokenLength(int token_encoded_value) {
+  return (token_encoded_value & kMaskToEncodeVocabTokenLength) + 1;
 }
 
 }  // namespace utils

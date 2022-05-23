@@ -466,6 +466,8 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
   if (tokenizer.model_ != nullptr) {
     if (typeid(*tokenizer.model_.get()) == typeid(models::WordPiece)) {
       j["model"] = *dynamic_cast<models::WordPiece*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::FasterWordPiece)){
+      j["model"] = *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
     }
   }
 
@@ -513,6 +515,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
     if (!model.is_null()) {
       if (model.at("type") == "WordPiece") {
         models::WordPiece wordpiece;
+        model.get_to(wordpiece);
+        tokenizer.SetModel(wordpiece);
+      } else if(model.at("type") == "FasterWordPiece"){
+        models::FasterWordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);
       }
@@ -594,6 +600,8 @@ template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
 template void Tokenizer::SetModel(const models::WordPiece&);
+template Tokenizer::Tokenizer(const models::FasterWordPiece&);
+template void Tokenizer::SetModel(const models::FasterWordPiece&);
 
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(
