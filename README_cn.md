@@ -204,15 +204,6 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 ### 高性能分布式训练与推理
 
-#### 🚀 Fleet：飞桨4D混合并行分布式训练技术
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
-</div>
-
-
-更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
-
 #### ⚡ FasterTokenizers：高性能文本处理库
 
 <div align="center">
@@ -239,8 +230,16 @@ outputs, _ = model.generate(
     use_faster=True)
 ```
 
-简单地在`generate()`API上打开`use_faster=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FasterGeneration文档]。
+简单地在`generate()`API上打开`use_faster=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
 
+#### 🚀 Fleet：飞桨4D混合并行分布式训练技术
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
+</div>
+
+
+更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
 ## 安装
 
