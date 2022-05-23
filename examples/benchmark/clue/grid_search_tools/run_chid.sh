@@ -13,15 +13,23 @@
 # limitations under the License.
 
 
+# $1: Model name or directory
+# $2: Batch_size
+# $3: Learning rate
+# $4: Gradient accumulation steps
+# $5: Card id(s)
+
+
 MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
-grd=$4
+GRAD_ACCU_STEPS=$4
+CARD_ID=$5
 
 
 logdir=${MODEL_PATH}/chid_log
 mkdir -p ${logdir}
-python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_chid.py \
+python -m paddle.distributed.launch --gpu "$CARD_ID" --log_dir ${logdir} ../mrc/run_chid.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
     --learning_rate ${LR} \
@@ -30,7 +38,7 @@ python -m paddle.distributed.launch --gpu "$5" --log_dir ${logdir} ../mrc/run_ch
     --output_dir ${MODEL_PATH}/chid_model/${LR}_${BATCH_SIZE}/ \
     --warmup_proportion 0.06 \
     --do_train \
-    --gradient_accumulation_steps ${grd} \
+    --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --weight_decay 0.01 \
     --save_best_model False \
 

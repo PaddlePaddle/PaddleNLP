@@ -696,6 +696,11 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 ### 批量启动 Grid Search
 
+#### 环境说明
+
+脚本中的默认参数是针对 32G 显卡的机器设置的，如果显卡是 16G 或者更小，可以在`grid_search_tools/run_mrc.sh`中增加每个任务的`${grd_accu_steps}`，`${grd_accu_steps}` 对应于 Python 脚本中的 `--gradient_accumulation_steps` 参数，该参数代表梯度累加的步数。即，实际训练的时候，会以 batch_size 为 `batch_size / ${grd_accu_steps}` 训练 `${grd_accu_steps}` 步来模拟原 batch_size 下的训练。因此也需要保证原 batch_size 能被 `${grd_accu_steps}` 整除。
+
+#### 使用说明
 - `run_all_cls.sh` 分类任务批量启动脚本入口，需要 2 个参数：模型名称或目录、模式 id
     - 模式 0、1、2 均代表独立的 1 组 4 卡实验，需要在不同的 4 张卡上运行（见下方分类任务的方法二）
     - 模型 3 代表 同时起 12 组 8 卡实验（见下方分类任务的方法一）

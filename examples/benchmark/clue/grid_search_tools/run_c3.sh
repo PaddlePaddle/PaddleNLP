@@ -13,13 +13,22 @@
 # limitations under the License.
 
 
+# $1: Model name or directory
+# $2: Batch_size
+# $3: Learning rate
+# $4: Gradient accumulation steps
+# $5: Card id(s)
+
 MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
+GRAD_ACCU_STEPS=$4
+CARD_ID=$5
+
 
 logdir=${MODEL_PATH}/c3_log
 mkdir -p ${logdir}
-python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c3.py \
+python -m paddle.distributed.launch --gpus "$CARD_ID" --log_dir ${logdir} ../mrc/run_c3.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
     --learning_rate ${LR} \
@@ -28,5 +37,5 @@ python -m paddle.distributed.launch --gpus "$4" --log_dir ${logdir} ../mrc/run_c
     --output_dir ${MODEL_PATH}/c3_model/${LR}_${BATCH_SIZE}/ \
     --do_train \
     --warmup_proportion 0.1 \
-    --gradient_accumulation_steps $5 \
+    --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --save_best_model False \

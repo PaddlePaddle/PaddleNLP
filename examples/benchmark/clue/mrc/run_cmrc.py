@@ -20,6 +20,7 @@ import json
 import math
 import distutils.util
 import argparse
+import contextlib
 
 from functools import partial
 import numpy as np
@@ -31,6 +32,8 @@ from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+from paddlenlp.utils.log import logger
+
 from datasets import load_dataset
 
 
@@ -52,7 +55,12 @@ def parse_args():
         "--save_best_model",
         default=True,
         type=distutils.util.strtobool,
-        help="Whether to save best model.", )
+        help="Whether to save best model.")
+    parser.add_argument(
+        "--overwrite_cache",
+        default=False,
+        type=distutils.util.strtobool,
+        help="Whether to overwrite cache for dataset.")
     parser.add_argument(
         "--max_seq_length",
         default=128,
@@ -225,6 +233,32 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         return loss
 
 
+@contextlib.contextmanager
+def main_process_first(desc="work"):
+    if paddle.distributed.get_world_size() > 1:
+        rank = paddle.distributed.get_rank()
+        is_main_process = rank == 0
+        main_process_desc = "main local process"
+
+        try:
+            if not is_main_process:
+                # tell all replicas to wait
+                logger.debug(
+                    f"{rank}: waiting for the {main_process_desc} to perform {desc}"
+                )
+                paddle.distributed.barrier()
+            yield
+        finally:
+            if is_main_process:
+                # the wait is over
+                logger.debug(
+                    f"{rank}: {main_process_desc} completed {desc}, releasing all replicas"
+                )
+                paddle.distributed.barrier()
+    else:
+        yield
+
+
 def run(args):
     if args.do_train:
         assert args.batch_size % args.gradient_accumulation_steps == 0, \
@@ -377,10 +411,14 @@ def run(args):
         args.batch_size = int(args.batch_size /
                               args.gradient_accumulation_steps)
 
-        train_ds = train_examples.map(prepare_train_features,
-                                      batched=True,
-                                      remove_columns=column_names,
-                                      num_proc=1)
+        with main_process_first(desc="train dataset map pre-processing"):
+            train_ds = train_examples.map(
+                prepare_train_features,
+                batched=True,
+                remove_columns=column_names,
+                load_from_cache_file=args.overwrite_cache,
+                num_proc=4,
+                desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
 
@@ -391,10 +429,14 @@ def run(args):
             collate_fn=batchify_fn,
             return_list=True)
 
-        dev_ds = dev_examples.map(prepare_validation_features,
-                                  batched=True,
-                                  remove_columns=column_names,
-                                  num_proc=1)
+        with main_process_first(desc="evaluate dataset map pre-processing"):
+            dev_ds = dev_examples.map(
+                prepare_validation_features,
+                batched=True,
+                remove_columns=column_names,
+                num_proc=4,
+                load_from_cache_file=args.overwrite_cache,
+                desc="Running tokenizer on validation dataset")
         dev_ds_for_model = dev_ds.remove_columns(
             ["example_id", "offset_mapping", "attention_mask"])
         dev_batch_sampler = paddle.io.BatchSampler(

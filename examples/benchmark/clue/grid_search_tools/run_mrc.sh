@@ -17,15 +17,15 @@ task_name=$1
 MODEL_DIR=$2
 cards=$3
 
-
 if [ ${task_name} == 'chid' ]
 then
 
+grd_accu_steps=2
 for bs in 6 8
     do
     for lr in 1e-5 2e-5 3e-5
         do
-        bash run_chid.sh ${MODEL_DIR} $bs $lr 2 ${cards}
+        bash run_chid.sh ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
     done
 done
 fi
@@ -33,28 +33,28 @@ fi
 
 if [ ${task_name} == 'cmrc2018' ]
 then 
-
+grd_accu_steps=2
 for bs in 16 12
 do
     for lr in  1e-5 2e-5 3e-5
     do
-        bash run_cmrc.sh ${MODEL_DIR} $bs $lr ${cards}
+        bash run_cmrc.sh ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
     done
 done
 fi
 
 if [ ${task_name} == 'c3' ]
 then
-grd=3
-for bs in 6 8:
+grd_accu_steps=3
+for bs in 6 8
 do
+    if [ $bs == 8]
+    then
+    grd_accu_steps=4
+    fi
     for lr in 1e-5 2e-5 3e-5
     do
-        if [ $bs == 6]
-        then
-        grd=4
-        fi
-        bash run_c3.sh  ${MODEL_DIR} ${bs} ${lr} ${cards} ${grd}
+        bash run_c3.sh  ${MODEL_DIR} $bs $lr $grd_accu_steps $cards
     done
 done
 fi
