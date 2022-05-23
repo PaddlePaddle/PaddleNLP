@@ -24,6 +24,7 @@ include(external/glog)
 include(external/re2)
 include(external/boost)
 include(external/nlohmann_json)
+include(external/dart) # For trie
 if (WITH_PYTHON)
 include(external/python)
 include(external/pybind11)

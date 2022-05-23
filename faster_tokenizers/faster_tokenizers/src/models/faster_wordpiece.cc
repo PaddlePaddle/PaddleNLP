@@ -58,7 +58,15 @@ void FasterWordPiece::ContructTrie(const core::Vocab&) const {}
 
 std::vector<core::Token> FasterWordPiece::Tokenize(
     const std::string& sequence) const {
-  return {};
+  std::vector<core::Token> all_tokens;
+  size_t unicode_len =
+      utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());
+  if (unicode_len > max_input_chars_per_word_) {
+    all_tokens.emplace_back(
+        vocab_.at(unk_token_), unk_token_, core::Offset{0, sequence.length()});
+  } else {
+  }
+  return all_tokens;
 }
 
 void to_json(nlohmann::json& j, const FasterWordPiece& model) {
