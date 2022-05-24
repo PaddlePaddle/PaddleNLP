@@ -23,9 +23,9 @@ from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'PPMiniLMModel',
-    'PPMiniLMPretrainedModel',
-    'PPMiniLMForSequenceClassification',
+    'PPMiniLMModel', 'PPMiniLMPretrainedModel',
+    'PPMiniLMForSequenceClassification', 'PPMiniLMForQuestionAnswering',
+    'PPMiniLMForMultipleChoice'
 ]
 
 
@@ -486,3 +486,154 @@ class PPMiniLMForSequenceClassification(PPMiniLMPretrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         return logits
+
+
+class PPMiniLMForQuestionAnswering(PPMiniLMPretrainedModel):
+    """
+    PPMiniLM Model with a linear layer on top of the hidden-states
+    output to compute `span_start_logits` and `span_end_logits`,
+    designed for question-answering tasks like SQuAD.
+
+    Args:
+        ppminilm (`PPMiniLMModel`):
+            An instance of `PPMiniLMModel`.
+    """
+
+    def __init__(self, ppminilm):
+        super(PPMiniLMForQuestionAnswering, self).__init__()
+        self.ppminilm = ppminilm  # allow ppminilm to be config
+        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"], 2)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`PPMiniLMModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`PPMiniLMModel`.
+            position_ids (Tensor, optional):
+                See :class:`PPMiniLMModel`.
+            attention_mask (Tensor, optional):
+                See :class:`PPMiniLMModel`.
+
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import PPMiniLMForQuestionAnswering, PPMiniLMTokenizer
+
+                tokenizer = PPMiniLMTokenizer.from_pretrained('ppminilm-6l-768h')
+                model = PPMiniLMForQuestionAnswering.from_pretrained('ppminilm-6l-768h')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+
+        sequence_output, _ = self.ppminilm(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+
+        logits = self.classifier(sequence_output)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+
+        return start_logits, end_logits
+
+
+class PPMiniLMForMultipleChoice(PPMiniLMPretrainedModel):
+    """
+    PPMiniLM Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+
+    Args:
+        ppminilm (:class:`PPMiniLMModel`):
+            An instance of PPMiniLMModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of PPMiniLM.
+            If None, use the same value as `hidden_dropout_prob` of `PPMiniLMModel`
+            instance `ppminilm`. Defaults to None.
+    """
+
+    def __init__(self, ppminilm, num_choices=2, dropout=None):
+        super(PPMiniLMForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.ppminilm = ppminilm
+        self.dropout = nn.Dropout(dropout if dropout is not None else
+                                  self.ppminilm.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ppminilm.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
+        r"""
+        The PPMiniLMForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`PPMiniLMModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`PPMiniLMModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`PPMiniLMModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`PPMiniLMModel` and shape as [batch_size, num_choice, sequence_length].
+
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.reshape(shape=(
+                -1, token_type_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.ppminilm(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits
