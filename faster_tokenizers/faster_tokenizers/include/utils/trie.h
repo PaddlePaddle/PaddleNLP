@@ -16,7 +16,6 @@ limitations under the License. */
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,9 +41,9 @@ public:
         : node_id_(node_id), unit_(unit) {}
   };
 
-  TraversalCursor CreateRootTraversalCursor();
-  TraversalCursor CreateTraversalCursor(uint32_t node_id);
-  void SetTraversalCursor(TraversalCursor* cursor, uint32_t node_id);
+  TraversalCursor CreateRootTraversalCursor() const;
+  TraversalCursor CreateTraversalCursor(uint32_t node_id) const;
+  void SetTraversalCursor(TraversalCursor* cursor, uint32_t node_id) const;
   bool TryTraverseOneStep(TraversalCursor* cursor, unsigned char ch) const;
   bool TryTraverseSeveralSteps(TraversalCursor* cursor,
                                const std::string& path) const;
@@ -52,7 +51,12 @@ public:
   void SetVocab(const std::unordered_map<std::string, uint>& vocab);
 
 private:
-  void CreateTrie(const std::vector<std::string>& keys,
+  void GetSortedVocab(const std::vector<const char*>& keys,
+                      const std::vector<int>& values,
+                      std::vector<const char*>* sorted_keys,
+                      std::vector<int>* sorted_values) const;
+  int EncodeTokenId(const std::string& token, uint id) const;
+  void CreateTrie(const std::vector<const char*>& keys,
                   const std::vector<int>& values);
 
   bool TryTraverseSeveralSteps(TraversalCursor* cursor,

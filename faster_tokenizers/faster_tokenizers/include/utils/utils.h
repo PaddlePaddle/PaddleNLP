@@ -100,18 +100,18 @@ inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
   return encoded_value;
 }
 
-inline bool IsSuffixToken(int token_encoded_value) {
+inline bool IsSuffixTokenFromEncodedValue(int token_encoded_value) {
   return static_cast<bool>(token_encoded_value >> kBitToIndicateSuffixToken);
 }
 
 // Gets the token id from the encoded value.
-inline int GetTokenId(int token_encoded_value) {
+inline int GetTokenIdFromEncodedValue(int token_encoded_value) {
   return (token_encoded_value & kMaskToEncodeVocabTokenId) >>
          kBitsToEncodeVocabTokenLength;
 }
 
 // Gets the token length (without the suffix indicator) from the encoded value.
-inline int GetTokenLength(int token_encoded_value) {
+inline int GetTokenLengthFromEncodedValue(int token_encoded_value) {
   return (token_encoded_value & kMaskToEncodeVocabTokenLength) + 1;
 }
 

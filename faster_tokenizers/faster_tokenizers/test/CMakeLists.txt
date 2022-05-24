@@ -14,6 +14,7 @@ cc_test(test_bert_pretokenizer SRCS test_bert_pretokenizer.cc DEPS pretokenizers
 
 # Test Model
 cc_test(test_wordpiece SRCS test_wordpiece.cc DEPS models)
+cc_test(test_faster_wordpiece SRCS test_faster_wordpiece.cc DEPS models)
 
 # Download ernie vocab for test
 set(ERNIE_VOCAB_PATH ${CMAKE_CURRENT_BINARY_DIR}/ernie_vocab.txt)

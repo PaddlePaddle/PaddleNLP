@@ -131,8 +131,7 @@ size_t Tokenizer::AddTokens(const std::vector<AddedToken>& tokens) {
 }
 
 size_t Tokenizer::AddSpecialTokens(const std::vector<AddedToken>& tokens) {
-  return added_vocabulary_.AddSpecialTokens(
-      tokens, *model_, normalizer_.get());
+  return added_vocabulary_.AddSpecialTokens(tokens, *model_, normalizer_.get());
 }
 
 bool Tokenizer::TokenToId(const std::string& token, uint* id) const {
@@ -148,7 +147,6 @@ bool Tokenizer::DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
                            const std::vector<uint>& word_idx,
                            OffsetType offset_type,
                            Encoding* encoding) const {
-  auto split_size = pretokenized->GetSplitsSize();
   pretokenized->Tokenize([&](normalizers::NormalizedString* normalized) {
     return this->GetModelPtr()->Tokenize(normalized->GetStr());
   });
@@ -466,8 +464,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
   if (tokenizer.model_ != nullptr) {
     if (typeid(*tokenizer.model_.get()) == typeid(models::WordPiece)) {
       j["model"] = *dynamic_cast<models::WordPiece*>(tokenizer.model_.get());
-    } else if (typeid(*tokenizer.model_.get()) == typeid(models::FasterWordPiece)){
-      j["model"] = *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) ==
+               typeid(models::FasterWordPiece)) {
+      j["model"] =
+          *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
     }
   }
 
@@ -517,7 +517,7 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         models::WordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);
-      } else if(model.at("type") == "FasterWordPiece"){
+      } else if (model.at("type") == "FasterWordPiece") {
         models::FasterWordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);

@@ -23,6 +23,7 @@ limitations under the License. */
 #include "models/wordpiece.h"
 #include "utils/path.h"
 #include "utils/utf8.h"
+#include "utils/utils.h"
 
 namespace tokenizers {
 namespace models {
@@ -39,9 +40,21 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 unk_token,
                 max_input_chars_per_word,
                 continuing_subword_prefix),
-      trie_(vocab) {}
+      trie_(vocab, continuing_subword_prefix) {}
 
 bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
+  auto curr_cursor = trie_.CreateRootTraversalCursor();
+  for (auto& ch : token) {
+    if (!trie_.TryTraverseOneStep(&curr_cursor, ch)) {
+      return false;
+    }
+  }
+  int encoded_value;
+  if (!trie_.TryGetData(curr_cursor, &encoded_value)) {
+    return false;
+  }
+  // Decode the encoded_value
+  *id = utils::GetTokenIdFromEncodedValue(encoded_value);
   return true;
 }
 
