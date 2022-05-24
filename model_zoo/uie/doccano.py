@@ -42,8 +42,12 @@ def do_convert():
     with open(args.doccano_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    def _create_ext_examples(examples, negative_ratio=0, shuffle=False):
-        entities, relations = convert_ext_examples(examples, negative_ratio)
+    def _create_ext_examples(examples,
+                             negative_ratio=0,
+                             shuffle=False,
+                             is_train=True):
+        entities, relations = convert_ext_examples(
+            examples, negative_ratio, is_train=is_train)
         examples = [e + r for e, r in zip(entities, relations)]
         if shuffle:
             indexes = np.random.permutation(len(examples))
@@ -91,8 +95,10 @@ def do_convert():
         if args.task_type == "ext":
             train_examples = _create_ext_examples(
                 raw_examples[:p1], args.negative_ratio, args.is_shuffle)
-            dev_examples = _create_ext_examples(raw_examples[p1:p2])
-            test_examples = _create_ext_examples(raw_examples[p2:])
+            dev_examples = _create_ext_examples(
+                raw_examples[p1:p2], -1, is_train=False)
+            test_examples = _create_ext_examples(
+                raw_examples[p2:], -1, is_train=False)
         else:
             train_examples = _create_cls_examples(
                 raw_examples[:p1], args.prompt_prefix, args.options)
