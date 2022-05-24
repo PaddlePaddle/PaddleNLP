@@ -18,6 +18,7 @@ limitations under the License. */
 #include <limits>
 #include <string>
 #include <unordered_map>
+#include "unicode/uchar.h"
 
 namespace tokenizers {
 namespace utils {
@@ -51,6 +52,23 @@ inline void GetVocabFromFiles(const std::string& files,
       (*vocab)[word_str] = i++;
     }
   }
+}
+
+inline bool IsChineseChar(int ch) {
+  return (
+      (ch >= 0x4E00 && ch <= 0x9FFF) || (ch >= 0x3400 && ch <= 0x4DBF) ||
+      (ch >= 0x20000 && ch <= 0x2A6DF) || (ch >= 0x2A700 && ch <= 0x2B73F) ||
+      (ch >= 0x2B740 && ch <= 0x2B81F) || (ch >= 0x2B820 && ch <= 0x2CEAF) ||
+      (ch >= 0xF900 && ch <= 0xFAFF) || (ch >= 0x2F800 && ch <= 0x2FA1F));
+}
+
+inline bool IsPunctuation(int ch) {
+  return (ch >= 33 && ch <= 47) || (ch >= 58 && ch <= 64) ||
+         (ch >= 91 && ch <= 96) || (ch >= 123 && ch <= 126) || u_ispunct(ch);
+}
+
+inline bool IsPunctuationOrChineseChar(int ch) {
+  return IsChineseChar(ch) || IsPunctuation(ch);
 }
 
 inline bool StringReplace(std::string* str,
@@ -146,6 +164,9 @@ static constexpr uint32_t kNullNode = std::numeric_limits<uint32_t>::max();
 static constexpr uint32_t kMaxSupportedTrieSize =
     std::numeric_limits<uint32_t>::max();
 
+// A Unicode control char that never appears in the input as it is filtered
+// during text normalization. It is used to build dummy nodes in the trie.
+static constexpr char kInvalidControlChar = 0x11;
 
 }  // namespace utils
 }  // namespace tokenizers

@@ -21,6 +21,7 @@ limitations under the License. */
 #include "normalizers/utils.h"
 #include "unicode/uchar.h"
 #include "unicode/unistr.h"
+#include "utils/utils.h"
 
 namespace tokenizers {
 namespace normalizers {
@@ -60,14 +61,6 @@ void BertNormalizer::DoCleanText(NormalizedString* input) const {
       });
 }
 
-inline bool IsChineseChar(int ch) {
-  return (
-      (ch >= 0x4E00 && ch <= 0x9FFF) || (ch >= 0x3400 && ch <= 0x4DBF) ||
-      (ch >= 0x20000 && ch <= 0x2A6DF) || (ch >= 0x2A700 && ch <= 0x2B73F) ||
-      (ch >= 0x2B740 && ch <= 0x2B81F) || (ch >= 0x2B820 && ch <= 0x2CEAF) ||
-      (ch >= 0xF900 && ch <= 0xFAFF) || (ch >= 0x2F800 && ch <= 0x2FA1F));
-}
-
 void BertNormalizer::DoHandleChineseChars(NormalizedString* input) const {
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
   std::u32string u32input = conv.from_bytes(input->GetStr());
@@ -76,7 +69,7 @@ void BertNormalizer::DoHandleChineseChars(NormalizedString* input) const {
   u32output.reserve(u32input.length() * 3);
   changes.reserve(u32input.length() * 3);
   for (int i = 0; i < u32input.length(); ++i) {
-    if (IsChineseChar(u32input[i])) {
+    if (utils::IsChineseChar(u32input[i])) {
       u32output.push_back(' ');
       u32output.push_back(u32input[i]);
       u32output.push_back(' ');

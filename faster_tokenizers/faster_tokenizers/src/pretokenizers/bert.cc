@@ -16,6 +16,7 @@ limitations under the License. */
 #include "glog/logging.h"
 #include "re2/re2.h"
 #include "unicode/uchar.h"
+#include "utils/utils.h"
 
 namespace tokenizers {
 namespace pretokenizers {
@@ -48,13 +49,7 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
                            std::vector<StringSplit>* string_splits) {
         // Use single character match instead of regex to improve performance
         normalized->Split(
-            [](char32_t ch) -> bool {
-              return (ch >= 33 && ch <= 47) || (ch >= 58 && ch <= 64) ||
-                     (ch >= 91 && ch <= 96) || (ch >= 123 && ch <= 126) ||
-                     u_ispunct(ch);
-            },
-            normalizers::ISOLATED,
-            &normalized_splits);
+            utils::IsPunctuation, normalizers::ISOLATED, &normalized_splits);
         for (auto&& normalize : normalized_splits) {
           if (!normalize.IsEmpty()) {
             string_splits->emplace_back(std::move(normalize));
