@@ -19,7 +19,7 @@ limitations under the License. */
 #include "core/tokenizer.h"
 #include "decoders/decoders.h"
 #include "glog/logging.h"
-#include "models/wordpiece.h"
+#include "models/models.h"
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
@@ -162,6 +162,10 @@ static int TokenizerPropertiesSetModel(TokenizerObject* self,
   int ret = 0;
   if (pybind11::type::of(py_obj).is(py::type::of<models::WordPiece>())) {
     const auto& model = py_obj.cast<const models::WordPiece&>();
+    self->tokenizer.SetModel(model);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<models::FasterWordPiece>())) {
+    const auto& model = py_obj.cast<const models::FasterWordPiece&>();
     self->tokenizer.SetModel(model);
   } else {
     ret = 1;
@@ -366,6 +370,14 @@ int TokenizerInit(PyObject* self, PyObject* args, PyObject* kwargs) {
     if (pybind11::type::of(py_obj).is(py::type::of<models::WordPiece>())) {
       const auto& model = py_obj.cast<const models::WordPiece&>();
       py_tokenizer_ptr->tokenizer.SetModel(model);
+    } else if (pybind11::type::of(py_obj).is(
+                   py::type::of<models::FasterWordPiece>())) {
+      const auto& model = py_obj.cast<const models::FasterWordPiece&>();
+      py_tokenizer_ptr->tokenizer.SetModel(model);
+    } else {
+      std::ostringstream oss;
+      oss << "Expected tpye of arguments is `model`";
+      throw std::runtime_error(oss.str());
     }
     return 0;
   } else if (args_num >= 1) {

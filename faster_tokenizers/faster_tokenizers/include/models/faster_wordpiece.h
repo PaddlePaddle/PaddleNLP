@@ -29,6 +29,7 @@ struct FasterWordPiece : public WordPiece {
                   size_t max_input_chars_per_word = 100,
                   const std::string& continuing_subword_prefix = "##");
 
+  virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) const override;
 

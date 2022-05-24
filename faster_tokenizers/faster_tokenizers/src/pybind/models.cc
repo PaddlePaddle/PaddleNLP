@@ -88,6 +88,43 @@ class PyWordPiece : public models::WordPiece {
   }
 };
 
+class PyFasterWordPiece : public models::FasterWordPiece {
+  using FasterWordPiece::FasterWordPiece;
+  virtual std::vector<core::Token> Tokenize(
+      const std::string& tokens) const override {
+    PYBIND11_OVERLOAD_NAME(std::vector<core::Token>,
+                           FasterWordPiece,
+                           "tokenize",
+                           Tokenize,
+                           tokens);
+  }
+
+  virtual bool TokenToId(const std::string& token, uint* id) const override {
+    PYBIND11_OVERLOAD_NAME(
+        bool, FasterWordPiece, "token_to_id", TokenToId, token, id);
+  }
+
+  virtual bool IdToToken(uint id, std::string* token) const override {
+    PYBIND11_OVERLOAD_NAME(
+        bool, FasterWordPiece, "id_to_token", IdToToken, id, token);
+  }
+
+  virtual core::Vocab GetVocab() const override {
+    PYBIND11_OVERLOAD_NAME(core::Vocab, FasterWordPiece, "get_vocab", GetVocab);
+  }
+
+  virtual size_t GetVocabSize() const override {
+    PYBIND11_OVERLOAD_NAME(
+        size_t, FasterWordPiece, "get_vocab_size", GetVocabSize);
+  }
+
+  virtual std::string Save(const std::string& folder,
+                           const std::string& filename_prefix) const override {
+    PYBIND11_OVERLOAD_NAME(
+        std::string, FasterWordPiece, "save", Save, folder, filename_prefix);
+  }
+};
+
 void BindModels(pybind11::module* m) {
   auto submodule = m->def_submodule("models", "The models module");
   py::class_<models::Model, PyModel>(submodule, "Model")
@@ -123,6 +160,43 @@ void BindModels(pybind11::module* m) {
                   py::arg("continuing_subword_prefix") = "##")
       .def("save",
            [](const models::WordPiece& wordpiece,
+              const std::string& folder,
+              const py::object& py_obj) {
+             std::string prefix = "";
+             if (!py_obj.is(py::none())) {
+               prefix = py_obj.cast<std::string>();
+             }
+             return wordpiece.Save(folder, prefix);
+           },
+           py::arg("folder"),
+           py::arg("prefix") = py::none());
+  py::class_<models::FasterWordPiece, PyFasterWordPiece>(submodule,
+                                                         "FasterWordPiece")
+      .def(py::init<>())
+      .def(py::init<const core::Vocab&,
+                    const std::string&,
+                    size_t,
+                    const std::string&>(),
+           py::arg("vocab"),
+           py::arg("unk_token") = "[UNK]",
+           py::arg("max_input_chars_per_word") = 100,
+           py::arg("continuing_subword_prefix") = "##")
+      .def("tokenize", &models::FasterWordPiece::Tokenize)
+      .def("token_to_id", &models::FasterWordPiece::TokenToId)
+      .def("id_to_token", &models::FasterWordPiece::IdToToken)
+      .def("get_vocab", &models::FasterWordPiece::GetVocab)
+      .def("get_vocab_size", &models::FasterWordPiece::GetVocabSize)
+      .def_static("read_file",
+                  &models::FasterWordPiece::GetVocabFromFile,
+                  py::arg("vocab"))
+      .def_static("from_file",
+                  &models::FasterWordPiece::GetWordPieceFromFile,
+                  py::arg("vocab"),
+                  py::arg("unk_token") = "[UNK]",
+                  py::arg("max_input_chars_per_word") = 100,
+                  py::arg("continuing_subword_prefix") = "##")
+      .def("save",
+           [](const models::FasterWordPiece& wordpiece,
               const std::string& folder,
               const py::object& py_obj) {
              std::string prefix = "";

@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 
@@ -94,8 +95,8 @@ static constexpr uint32_t kMaskToEncodeVocabTokenId =
 
 inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
   int encoded_value = (is_suffix_token << kBitToIndicateSuffixToken) |
-                            (token_id << kBitsToEncodeVocabTokenLength) |
-                            (token_length - 1);
+                      (token_id << kBitsToEncodeVocabTokenLength) |
+                      (token_length - 1);
   return encoded_value;
 }
 
@@ -113,6 +114,38 @@ inline int GetTokenId(int token_encoded_value) {
 inline int GetTokenLength(int token_encoded_value) {
   return (token_encoded_value & kMaskToEncodeVocabTokenLength) + 1;
 }
+
+static constexpr uint32_t kBitsToEncodeFailurePopsListSize =
+    kBitsToEncodeVocabTokenLength;
+
+static constexpr uint32_t kMaskToEncodeFailurePopsListSize =
+    (1 << kBitsToEncodeFailurePopsListSize) - 1;
+
+static constexpr uint32_t kMaxFailurePopsListSize =
+    (1 << kBitsToEncodeFailurePopsListSize);
+
+static constexpr uint32_t kMaxSupportedFailurePoolOffset =
+    (1 << (32 - kBitsToEncodeFailurePopsListSize)) - 1 - 1;
+
+static constexpr uint32_t kNullFailurePopsList =
+    std::numeric_limits<uint32_t>::max();
+
+inline uint32_t EncodeFailurePopList(int offset, int length) {
+  return (offset << kBitsToEncodeFailurePopsListSize) | (length - 1);
+}
+
+inline void GetFailurePopsOffsetAndLength(uint32_t offset_and_length,
+                                          int& out_offset,
+                                          int& out_length) {
+  out_offset = offset_and_length >> kBitsToEncodeFailurePopsListSize;
+  out_length = (offset_and_length & kMaskToEncodeFailurePopsListSize) + 1;
+}
+
+static constexpr uint32_t kNullNode = std::numeric_limits<uint32_t>::max();
+
+static constexpr uint32_t kMaxSupportedTrieSize =
+    std::numeric_limits<uint32_t>::max();
+
 
 }  // namespace utils
 }  // namespace tokenizers

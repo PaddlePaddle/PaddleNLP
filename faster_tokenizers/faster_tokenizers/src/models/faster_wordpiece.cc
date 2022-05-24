@@ -41,6 +41,10 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 continuing_subword_prefix),
       trie_(vocab) {}
 
+bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
+  return true;
+}
+
 std::vector<core::Token> FasterWordPiece::Tokenize(
     const std::string& sequence) const {
   std::vector<core::Token> all_tokens;
