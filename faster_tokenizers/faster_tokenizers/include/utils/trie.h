@@ -49,6 +49,12 @@ public:
                                const std::string& path) const;
   bool TryGetData(const TraversalCursor& cursor, int* out_data) const;
   void SetVocab(const std::unordered_map<std::string, uint>& vocab);
+  uint Size() const {
+    if (trie_.get() != nullptr) {
+      return trie_->size();
+    }
+    return 0;
+  }
 
 private:
   void GetSortedVocab(const std::vector<const char*>& keys,
