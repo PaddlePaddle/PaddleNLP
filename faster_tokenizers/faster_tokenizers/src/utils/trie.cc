@@ -111,13 +111,13 @@ bool Trie::TryTraverseSeveralSteps(Trie::TraversalCursor* cursor,
 }
 
 bool Trie::TryGetData(const Trie::TraversalCursor& cursor,
-                      int& out_data) const {
+                      int* out_data) const {
   if (!HasLeaf(cursor.unit_)) {
     return false;
   }
   const uint32_t value_unit =
       trie_array_[cursor.node_id_ ^ Offset(cursor.unit_)];
-  out_data = Value(value_unit);
+  *out_data = Value(value_unit);
   return true;
 }
 

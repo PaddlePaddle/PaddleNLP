@@ -48,7 +48,7 @@ public:
   bool TryTraverseOneStep(TraversalCursor* cursor, unsigned char ch) const;
   bool TryTraverseSeveralSteps(TraversalCursor* cursor,
                                const std::string& path) const;
-  bool TryGetData(const TraversalCursor& cursor, int& out_data) const;
+  bool TryGetData(const TraversalCursor& cursor, int* out_data) const;
   void SetVocab(const std::unordered_map<std::string, uint>& vocab);
 
 private:
