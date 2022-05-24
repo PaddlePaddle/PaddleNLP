@@ -168,5 +168,10 @@ static constexpr uint32_t kMaxSupportedTrieSize =
 // during text normalization. It is used to build dummy nodes in the trie.
 static constexpr char kInvalidControlChar = 0x11;
 
+inline bool IsSuffixWord(const std::string& word,
+                         const std::string& continuing_subword_prefix) {
+  return word.rfind(continuing_subword_prefix) == 0;
+}
+
 }  // namespace utils
 }  // namespace tokenizers

@@ -78,17 +78,23 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
 
 
 Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
-           const std::string& continuing_subword_prefix)
-    : continuing_subword_prefix_(continuing_subword_prefix) {
+           const std::string& continuing_subword_prefix,
+           const std::string& unk_token)
+    : continuing_subword_prefix_(continuing_subword_prefix), unk_token_(unk_token) {
+  unk_token_id_ = vocab.at(unk_token);
   SetVocab(vocab);
 }
 
 Trie::Trie(const std::vector<std::string>& keys,
-           const std::string& continuing_subword_prefix)
-    : continuing_subword_prefix_(continuing_subword_prefix) {
+           const std::string& continuing_subword_prefix,
+           const std::string& unk_token)
+    : continuing_subword_prefix_(continuing_subword_prefix), unk_token_(unk_token) {
   std::vector<const char*> char_keys(keys.size());
   for (int i = 0; i < keys.size(); ++i) {
     char_keys[i] = keys[i].c_str();
+    if (keys[i] == unk_token_) {
+      unk_token_id_ = i;
+    }
   }
   std::vector<int> values(keys.size());
   std::iota(values.begin(), values.end(), 0);

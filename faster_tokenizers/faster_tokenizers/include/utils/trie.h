@@ -26,14 +26,20 @@ namespace utils {
 
 class Trie {
 public:
-  Trie(const std::string& continuing_subword_prefix = "##")
+  static constexpr uint32_t kRootNodeId = 0;
+
+  Trie(const std::string& continuing_subword_prefix = "##",
+       const std::string& unk_token = "[UNK]")
       : trie_(nullptr),
         trie_array_(nullptr),
-        continuing_subword_prefix_(continuing_subword_prefix) {}
+        continuing_subword_prefix_(continuing_subword_prefix),
+        unk_token_(unk_token) {}
   Trie(const std::unordered_map<std::string, uint>& vocab,
-       const std::string& continuing_subword_prefix = "##");
+       const std::string& continuing_subword_prefix = "##",
+       const std::string& unk_token = "[UNK]");
   Trie(const std::vector<std::string>& keys,
-       const std::string& continuing_subword_prefix = "##");
+       const std::string& continuing_subword_prefix = "##",
+       const std::string& unk_token = "[UNK]");
   struct TraversalCursor {
     uint32_t node_id_;
     uint32_t unit_;
@@ -55,6 +61,10 @@ public:
     }
     return 0;
   }
+  std::string GetContinuingSubwordPrefix() const {
+    return continuing_subword_prefix_;
+  }
+  uint GetUNKTokenID() const { return unk_token_id_; }
 
 private:
   void GetSortedVocab(const std::vector<const char*>& keys,
@@ -88,8 +98,9 @@ private:
   std::shared_ptr<Darts::DoubleArray> trie_;
   const uint* trie_array_;
   // The node id of trie's root
-  static constexpr uint32_t kRootNodeId = 0;
   std::string continuing_subword_prefix_;
+  uint unk_token_id_;
+  std::string unk_token_;
 };
 
 }  // namespace utils

@@ -40,7 +40,7 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 unk_token,
                 max_input_chars_per_word,
                 continuing_subword_prefix),
-      trie_(vocab, continuing_subword_prefix) {}
+      trie_(vocab, continuing_subword_prefix, unk_token) {}
 
 bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
   auto curr_cursor = trie_.CreateRootTraversalCursor();

@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace tokenizers {
@@ -29,6 +30,29 @@ struct Failure {
   Failure();
 };
 
+class FailureVocabToken {
+public:
+  FailureVocabToken(const std::string& token,
+                    int token_id,
+                    const std::string& continuing_subword_prefix);
+
+  std::string Token() const;
+
+  int TokenId() const;
+  bool IsSuffixToken() const;
+  bool ContainsPunctuation() const;
+  int TokenUnicodeLengthWithoutContinuingSubwordPrefix() const;
+  int TokenLengthWithoutContinuingSubwordPrefix() const;
+
+private:
+  std::string token_;
+  int token_id_;
+  bool is_suffix_token_;
+  int actual_token_start_offset_;
+  int actual_token_unicode_len_;
+  bool contains_punctuation_;
+};
+
 struct FailureArray {
   FailureArray() = default;
   FailureArray(const std::unordered_map<std::string, uint>& vocab,
@@ -39,6 +63,20 @@ struct FailureArray {
   std::vector<Failure> failure_array_;
   std::vector<int> failure_pops_pool_;
   std::unordered_map<uint32_t, bool> node_id_is_punc_map_;
+
+private:
+  void BuildOutgoingEdgeLabelsForTrie(
+      const std::unordered_map<std::string, uint>& vocab,
+      const Trie& trie,
+      std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
+  void BuildOutgoingEdgeLabelsFromToken(
+      const std::pair<std::string, uint>& vocab_token,
+      const Trie& trie,
+      std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
+  void BuildFailureVocab(const std::unordered_map<std::string, uint>& vocab,
+                         const Trie& trie);
+
+  std::vector<FailureVocabToken> failure_vocab_tokens_;
 };
 
 }  // namespace utils
