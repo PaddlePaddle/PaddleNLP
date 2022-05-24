@@ -541,7 +541,7 @@ def run(args):
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
 
-        print("best_acc: %.2f" % best_acc * 100)
+        print("best_acc: %.2f" % (best_acc * 100))
 
     if args.do_predict:
         column_names = test_ds.column_names
