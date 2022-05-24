@@ -188,24 +188,27 @@ def reader(data_path, max_seq_len=512):
 
 
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
+    negative_examples = []
+    positive_examples = []
     with tqdm(total=len(prompts)) as pbar:
         for i, prompt in enumerate(prompts):
             negative_sample = []
             redundants_list = list(set(label_set) ^ set(prompt))
             redundants_list.sort()
 
-            if len(examples[i]) == 0:
-                continue
+            num_positive = len(examples[i])
+            if num_positive != 0:
+                actual_ratio = math.ceil(len(redundants_list) / num_positive)
             else:
-                actual_ratio = math.ceil(
-                    len(redundants_list) / len(examples[i]))
+                # Set num_positive to 1 for text without positive example
+                num_positive, actual_ratio = 1, 0
 
             if actual_ratio <= negative_ratio or negative_ratio == -1:
                 idxs = [k for k in range(len(redundants_list))]
             else:
                 idxs = random.sample(
                     range(0, len(redundants_list)),
-                    negative_ratio * len(examples[i]))
+                    negative_ratio * num_positive)
 
             for idx in idxs:
                 negative_result = {
@@ -213,10 +216,10 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
                     "result_list": [],
                     "prompt": redundants_list[idx]
                 }
-                negative_sample.append(negative_result)
-            examples[i].extend(negative_sample)
+                negative_examples.append(negative_result)
+            positive_examples.extend(examples[i])
             pbar.update(1)
-    return examples
+    return positive_examples, negative_examples
 
 
 def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
@@ -335,7 +338,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
             else:
                 # Export file in JSONL format which doccano >= 1.7.0
                 if "label" in items.keys():
-                    text = items["data"]
+                    text = items["text"]
                     entities = []
                     for item in items["label"]:
                         entity = {
@@ -432,21 +435,49 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
             subject_goldens.append(subject_golden)
             pbar.update(1)
 
+    def concat_examples(positive_examples, negative_examples, negative_ratio):
+        examples = []
+        if math.ceil(len(negative_examples) /
+                     len(positive_examples)) <= negative_ratio:
+            examples = positive_examples + negative_examples
+        else:
+            # Random sampling the negative examples to ensure overall negative ratio unchanged.
+            idxs = random.sample(
+                range(0, len(negative_examples)),
+                negative_ratio * len(positive_examples))
+            negative_examples_sampled = []
+            for idx in idxs:
+                negative_examples_sampled.append(negative_examples[idx])
+            examples = positive_examples + negative_examples_sampled
+        return examples
+
     print(f"Adding negative samples for first stage prompt...")
-    entity_examples = add_negative_example(entity_examples, texts,
-                                           entity_prompts, entity_label_set,
-                                           negative_ratio)
+    positive_examples, negative_examples = add_negative_example(
+        entity_examples, texts, entity_prompts, entity_label_set,
+        negative_ratio)
+    if len(positive_examples) == 0:
+        all_entity_examples = []
+    elif is_train:
+        all_entity_examples = concat_examples(positive_examples,
+                                              negative_examples, negative_ratio)
+    else:
+        all_entity_examples = positive_examples + negative_examples
+
+    all_relation_examples = []
     if len(predicate_set) != 0:
         if is_train:
             print(f"Adding negative samples for second stage prompt...")
             relation_prompt_set = construct_relation_prompt_set(entity_name_set,
                                                                 predicate_set)
-            relation_examples = add_negative_example(
+            positive_examples, negative_examples = add_negative_example(
                 relation_examples, texts, relation_prompts, relation_prompt_set,
                 negative_ratio)
+            all_relation_examples = concat_examples(
+                positive_examples, negative_examples, negative_ratio)
         else:
             print(f"Adding negative samples for second stage prompt...")
             relation_examples = add_full_negative_example(
                 relation_examples, texts, relation_prompts, predicate_set,
                 subject_goldens)
-    return entity_examples, relation_examples
+            all_relation_examples = [r for r in relation_examples]
+    return all_entity_examples, all_relation_examples
