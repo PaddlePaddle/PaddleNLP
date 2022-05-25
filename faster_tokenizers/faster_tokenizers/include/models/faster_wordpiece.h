@@ -61,8 +61,14 @@ private:
       int* original_num_tokens,
       int* curr_offset_in_sequence,
       std::vector<core::Token>* tokens) const;
+  void ResetOutputAppendUNK(int sequence_offset_in_text,
+                            int sequence_size,
+                            int* original_num_tokens,
+                            std::vector<core::Token>* tokens) const;
+  void PrecomputeEncodeValueForSubwordPrefix();
   utils::Trie trie_;
   utils::FailureArray failure_array_;
+  std::vector<int> encoded_value_for_subword_prefix_;
   friend void to_json(nlohmann::json& j, const FasterWordPiece& model);
   friend void from_json(const nlohmann::json& j, FasterWordPiece& model);
 };

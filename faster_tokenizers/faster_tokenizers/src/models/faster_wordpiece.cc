@@ -32,6 +32,7 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 
 FasterWordPiece::FasterWordPiece() : WordPiece() {
   failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+  PrecomputeEncodeValueForSubwordPrefix();
 }
 
 FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
@@ -44,6 +45,22 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 continuing_subword_prefix),
       trie_(vocab, continuing_subword_prefix, unk_token) {
   failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+  PrecomputeEncodeValueForSubwordPrefix();
+}
+
+void FasterWordPiece::PrecomputeEncodeValueForSubwordPrefix() {
+  auto subword_prefix_tokens = WordPiece::Tokenize(continuing_subword_prefix_);
+  encoded_value_for_subword_prefix_.reserve(subword_prefix_tokens.size());
+
+  for (auto& token : subword_prefix_tokens) {
+    utils::FailureVocabToken failure_vocab_token(
+        token.value_, token.id_, continuing_subword_prefix_);
+    int encoded_value = utils::EncodeToken(
+        failure_vocab_token.TokenId(),
+        failure_vocab_token.TokenLengthWithoutContinuingSubwordPrefix(),
+        failure_vocab_token.IsSuffixToken());
+    encoded_value_for_subword_prefix_.push_back(encoded_value);
+  }
 }
 
 bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
@@ -131,14 +148,48 @@ void FasterWordPiece::AppendTokensToOutput(
   *curr_offset_in_sequence += token_substr_length;
 }
 
+void FasterWordPiece::ResetOutputAppendUNK(
+    int sequence_offset_in_text,
+    int sequence_size,
+    int* original_num_tokens,
+    std::vector<core::Token>* tokens) const {
+  tokens->resize(*original_num_tokens + 1);
+  tokens->back() = {
+      unk_token_id_,
+      unk_token_,
+      {sequence_offset_in_text, sequence_offset_in_text + sequence_size}};
+  (*original_num_tokens)++;
+}
+
 bool FasterWordPiece::TryHandleContinuingSubWordPrefix(
     const std::string& sequence,
     int sequence_offset_in_text,
-    const utils::Trie::TraversalCursor& node,
+    const utils::Trie::TraversalCursor& curr_node,
     int* original_num_tokens,
     int* curr_offset_in_sequence,
     std::vector<core::Token>* tokens) const {
-  return false;
+  if (curr_node.node_id_ != trie_.GetSuffixRoot()) {
+    return false;
+  }
+  int cur_num_tokens = tokens->size();
+  if (cur_num_tokens != *original_num_tokens) {
+    return false;
+  }
+  if (encoded_value_for_subword_prefix_.size() == 1 &&
+      utils::GetTokenIdFromEncodedValue(encoded_value_for_subword_prefix_[0]) ==
+          unk_token_id_) {
+    ResetOutputAppendUNK(
+        sequence_offset_in_text, sequence.size(), original_num_tokens, tokens);
+    return true;
+  }
+  for (int encoded_token_value : encoded_value_for_subword_prefix_) {
+    AppendTokensToOutput(sequence,
+                         sequence_offset_in_text,
+                         curr_offset_in_sequence,
+                         encoded_token_value,
+                         tokens);
+  }
+  return true;
 }
 
 void FasterWordPiece::HandleTheRemainingStringOnTriePath(
@@ -164,9 +215,10 @@ void FasterWordPiece::HandleTheRemainingStringOnTriePath(
          curr_node->node_id_ != trie_.GetPuncFailureNode()) {
     if (!TryFollowFailureLinkAndCollectTokens(
             sequence, 0, curr_offset_in_sequence, curr_node, tokens)) {
-      tokens->clear();
-      tokens->emplace_back(
-          unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
+      ResetOutputAppendUNK(sequence_offset_in_text,
+                           sequence.size(),
+                           original_num_tokens,
+                           tokens);
       return;
     }
   }
@@ -195,9 +247,8 @@ std::vector<core::Token> FasterWordPiece::Tokenize(
                                                   &curr_offset_in_sequence,
                                                   &curr_node,
                                                   &all_tokens)) {
-          all_tokens.clear();
-          all_tokens.emplace_back(
-              unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
+          ResetOutputAppendUNK(
+              0, sequence.size(), &original_num_tokens, &all_tokens);
           return all_tokens;
         }
       }
