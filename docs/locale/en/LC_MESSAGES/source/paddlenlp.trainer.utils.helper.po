@@ -1,0 +1,49 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../source/paddlenlp.trainer.utils.helper.rst:2
+msgid "helper"
+msgstr ""
+
+#: of paddlenlp.trainer.utils.helper.paddle_pad_and_concatenate:1
+msgid ""
+"Concatenates `tensor1` and `tensor2` on first axis, applying padding on "
+"the second if necessary."
+msgstr ""
+
+#: of paddlenlp.trainer.utils.helper.nested_concat:1
+msgid ""
+"Concat the `new_tensors` to `tensors` on the first dim and pad them on "
+"the second if needed. Works for tensors or nested list/tuples of tensors."
+msgstr ""
+
+#: of paddlenlp.trainer.utils.helper.nested_detach:1
+msgid "Detach `tensors` (even if it's a nested list/tuple of tensors)."
+msgstr ""
+
+#: of paddlenlp.trainer.utils.helper.nested_numpify:1
+msgid "Numpify `tensors` (even if it's a nested list/tuple of tensors)."
+msgstr ""
+
+#: of paddlenlp.trainer.utils.helper.nested_truncate:1
+msgid ""
+"Truncate `tensors` at `limit` (even if it's a nested list/tuple of "
+"tensors)."
+msgstr ""
+

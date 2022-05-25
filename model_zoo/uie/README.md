@@ -12,7 +12,7 @@
 
 ## 1. 模型简介
 
-[UIE(Universal Information Extraction)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人在ACL-2022中提出了通用信息抽取统一框架UIE。该框架实现了实体抽取、关系抽取、事件抽取、情感分析等任务的统一建模，并使得不同任务间具备良好的迁移和泛化能力。为了推动信息抽取产业化应用，PaddleNLP借鉴该论文的方法，基于ERNIE3.0知识增强预训练模型，训练并开源了首个中文通用信息抽取模型UIE。该模型可以支持不限定行业领域和抽取目标的关键信息抽取，实现零样本快速冷启动，并具备优秀的小样本微调能力，快速适配特定的抽取目标。
+[UIE(Universal Information Extraction)](https://arxiv.org/pdf/2203.12277.pdf)：Yaojie Lu等人在ACL-2022中提出了通用信息抽取统一框架UIE。该框架实现了实体抽取、关系抽取、事件抽取、情感分析等任务的统一建模，并使得不同任务间具备良好的迁移和泛化能力。为了方便大家使用UIE的强大能力，PaddleNLP借鉴该论文的方法，基于ERNIE 3.0知识增强预训练模型，训练并开源了首个中文通用信息抽取模型UIE。该模型可以支持不限定行业领域和抽取目标的关键信息抽取，实现零样本快速冷启动，并具备优秀的小样本微调能力，快速适配特定的抽取目标。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
@@ -438,7 +438,7 @@ python finetune.py \
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`、`uie-tiny`和`uie-medical-base`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
@@ -456,13 +456,15 @@ python evaluate.py \
     --max_seq_len 512
 ```
 
+评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
+
 可配置参数说明：
 
 - `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 选择所使用的模型，可选有`uie-base`、`uie-tiny`和`uie-medical-base`，默认为`uie-base`。
+- `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
 
 #### 定制模型一键预测
 
