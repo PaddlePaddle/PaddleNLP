@@ -51,6 +51,7 @@ protected:
   core::Vocab vocab_;
   core::VocabReversed vocab_reversed_;
   std::string unk_token_;
+  uint unk_token_id_;
   size_t max_input_chars_per_word_;
   std::string continuing_subword_prefix_;
   friend void to_json(nlohmann::json& j, const WordPiece& model);

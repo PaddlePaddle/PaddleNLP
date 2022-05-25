@@ -29,11 +29,7 @@ public:
   static constexpr uint32_t kRootNodeId = 0;
 
   Trie(const std::string& continuing_subword_prefix = "##",
-       const std::string& unk_token = "[UNK]")
-      : trie_(nullptr),
-        trie_array_(nullptr),
-        continuing_subword_prefix_(continuing_subword_prefix),
-        unk_token_(unk_token) {}
+       const std::string& unk_token = "[UNK]");
   Trie(const std::unordered_map<std::string, uint>& vocab,
        const std::string& continuing_subword_prefix = "##",
        const std::string& unk_token = "[UNK]");
@@ -66,6 +62,7 @@ public:
   }
   uint GetUNKTokenID() const { return unk_token_id_; }
   uint GetSuffixRoot() const { return suffix_root_; }
+  uint GetPuncFailureNode() const { return punct_failure_link_node_; }
 
 private:
   void InitTrieSuffixRoot();
@@ -105,6 +102,7 @@ private:
   uint unk_token_id_;
   std::string unk_token_;
   uint suffix_root_;
+  uint punct_failure_link_node_;
 };
 
 }  // namespace utils

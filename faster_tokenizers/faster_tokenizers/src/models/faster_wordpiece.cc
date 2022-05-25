@@ -62,15 +62,152 @@ bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
   return true;
 }
 
+bool FasterWordPiece::TryFollowFailureLinkAndCollectTokens(
+    const std::string& sequence,
+    int sequence_offset_in_text,
+    int* curr_offset_in_sequence,
+    utils::Trie::TraversalCursor* node,
+    std::vector<core::Token>* tokens) const {
+  int curr_node_value = 0;
+  if (trie_.TryGetData(*node, &curr_node_value)) {
+    AppendTokensToOutput(sequence,
+                         sequence_offset_in_text,
+                         curr_offset_in_sequence,
+                         curr_node_value,
+                         tokens);
+    trie_.SetTraversalCursor(
+        node, failure_array_.GetFailure(node->node_id_)->failure_link_);
+    return true;
+  }
+  const auto& node_aux = failure_array_.GetFailure(node->node_id_);
+
+  if (node_aux->failure_link_ == utils::kNullNode) {
+    // No failure_link can be followed.
+    return false;
+  }
+  int offset = 0, length = 0;
+  utils::GetFailurePopsOffsetAndLength(
+      node_aux->failure_pops_offset_length_, &offset, &length);
+  for (int i = offset; i < offset + length; ++i) {
+    AppendTokensToOutput(sequence,
+                         sequence_offset_in_text,
+                         curr_offset_in_sequence,
+                         failure_array_.GetFailurePop(i),
+                         tokens);
+  }
+  trie_.SetTraversalCursor(node, node_aux->failure_link_);
+  return true;
+}
+
+void FasterWordPiece::AppendTokensToOutput(
+    const std::string& sequence,
+    int sequence_offset_in_text,
+    int* curr_offset_in_sequence,
+    int curr_node_value,
+    std::vector<core::Token>* tokens) const {
+  uint id = utils::GetTokenIdFromEncodedValue(curr_node_value);
+  std::string value;
+  int token_substr_length =
+      utils::GetTokenLengthFromEncodedValue(curr_node_value);
+  if (*curr_offset_in_sequence == 0 &&
+      utils::IsSuffixTokenFromEncodedValue(curr_node_value)) {
+    token_substr_length += continuing_subword_prefix_.size();
+  }
+
+  if (id == unk_token_id_) {
+    value = unk_token_;
+  } else {
+    value = sequence.substr(*curr_offset_in_sequence, token_substr_length);
+  }
+
+  if (*curr_offset_in_sequence > 0) {
+    value = continuing_subword_prefix_ + value;
+  }
+  core::Offset offset = {
+      sequence_offset_in_text + *curr_offset_in_sequence,
+      sequence_offset_in_text + *curr_offset_in_sequence + token_substr_length};
+  tokens->emplace_back(id, value, offset);
+
+  *curr_offset_in_sequence += token_substr_length;
+}
+
+bool FasterWordPiece::TryHandleContinuingSubWordPrefix(
+    const std::string& sequence,
+    int sequence_offset_in_text,
+    const utils::Trie::TraversalCursor& node,
+    int* original_num_tokens,
+    int* curr_offset_in_sequence,
+    std::vector<core::Token>* tokens) const {
+  return false;
+}
+
+void FasterWordPiece::HandleTheRemainingStringOnTriePath(
+    const std::string& sequence,
+    int sequence_offset_in_text,
+    utils::Trie::TraversalCursor* curr_node,
+    int* original_num_tokens,
+    int* curr_offset_in_sequence,
+    std::vector<core::Token>* tokens) const {
+  if (curr_node->node_id_ == utils::Trie::kRootNodeId) {
+    return;
+  }
+  if (TryHandleContinuingSubWordPrefix(sequence,
+                                       sequence_offset_in_text,
+                                       *curr_node,
+                                       original_num_tokens,
+                                       curr_offset_in_sequence,
+                                       tokens)) {
+    *original_num_tokens = tokens->size();
+    return;
+  }
+  while (curr_node->node_id_ != trie_.GetSuffixRoot() &&
+         curr_node->node_id_ != trie_.GetPuncFailureNode()) {
+    if (!TryFollowFailureLinkAndCollectTokens(
+            sequence, 0, curr_offset_in_sequence, curr_node, tokens)) {
+      tokens->clear();
+      tokens->emplace_back(
+          unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
+      return;
+    }
+  }
+  *original_num_tokens = tokens->size();
+}
+
 std::vector<core::Token> FasterWordPiece::Tokenize(
     const std::string& sequence) const {
+  if (sequence.empty()) {
+    return {};
+  }
   std::vector<core::Token> all_tokens;
   size_t unicode_len =
       utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());
+  int original_num_tokens = 0;
   if (unicode_len > max_input_chars_per_word_) {
     all_tokens.emplace_back(
-        vocab_.at(unk_token_), unk_token_, core::Offset{0, sequence.length()});
+        unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
   } else {
+    int curr_offset_in_sequence = 0;
+    auto curr_node = trie_.CreateRootTraversalCursor();
+    for (auto ch : sequence) {
+      while (!trie_.TryTraverseOneStep(&curr_node, ch)) {
+        if (!TryFollowFailureLinkAndCollectTokens(sequence,
+                                                  0,
+                                                  &curr_offset_in_sequence,
+                                                  &curr_node,
+                                                  &all_tokens)) {
+          all_tokens.clear();
+          all_tokens.emplace_back(
+              unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
+          return all_tokens;
+        }
+      }
+    }
+    HandleTheRemainingStringOnTriePath(sequence,
+                                       0,
+                                       &curr_node,
+                                       &original_num_tokens,
+                                       &curr_offset_in_sequence,
+                                       &all_tokens);
   }
   return all_tokens;
 }

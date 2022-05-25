@@ -30,7 +30,8 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 WordPiece::WordPiece()
     : unk_token_("[UNK]"),
       continuing_subword_prefix_("##"),
-      max_input_chars_per_word_(100) {}
+      max_input_chars_per_word_(100),
+      unk_token_id_(0) {}
 
 WordPiece::WordPiece(const core::Vocab& vocab,
                      const std::string& unk_token,
@@ -43,6 +44,7 @@ WordPiece::WordPiece(const core::Vocab& vocab,
   for (const auto& vocab_item : vocab) {
     vocab_reversed_[vocab_item.second] = vocab_item.first;
   }
+  unk_token_id_ = vocab.at(unk_token);
 }
 
 // Move version
@@ -57,6 +59,7 @@ WordPiece::WordPiece(core::Vocab&& vocab,
   for (const auto& vocab_item : vocab) {
     vocab_reversed_[vocab_item.second] = vocab_item.first;
   }
+  unk_token_id_ = vocab.at(unk_token);
 }
 
 core::Vocab WordPiece::GetVocab() const { return vocab_; }

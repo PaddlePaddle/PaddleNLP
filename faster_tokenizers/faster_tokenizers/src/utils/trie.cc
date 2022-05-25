@@ -90,13 +90,21 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
   InitTrie(keys, values);
 }
 
+Trie::Trie(const std::string& continuing_subword_prefix, const std::string& unk_token)
+      : trie_(nullptr),
+        trie_array_(nullptr),
+        continuing_subword_prefix_(continuing_subword_prefix),
+        suffix_root_(utils::kNullNode),
+        punct_failure_link_node_(utils::kNullNode),
+        unk_token_(unk_token) {}
 
 Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
            const std::string& continuing_subword_prefix,
            const std::string& unk_token)
     : continuing_subword_prefix_(continuing_subword_prefix),
       unk_token_(unk_token),
-      suffix_root_(utils::kNullNode) {
+      suffix_root_(utils::kNullNode),
+      punct_failure_link_node_(utils::kNullNode) {
   unk_token_id_ = vocab.at(unk_token);
   SetVocab(vocab);
 }
@@ -106,7 +114,8 @@ Trie::Trie(const std::vector<std::string>& keys,
            const std::string& unk_token)
     : continuing_subword_prefix_(continuing_subword_prefix),
       unk_token_(unk_token),
-      suffix_root_(utils::kNullNode) {
+      suffix_root_(utils::kNullNode),
+      punct_failure_link_node_(utils::kNullNode) {
   std::vector<const char*> char_keys(keys.size());
   for (int i = 0; i < keys.size(); ++i) {
     char_keys[i] = keys[i].c_str();

@@ -35,6 +35,32 @@ struct FasterWordPiece : public WordPiece {
       const std::string& sequence) const override;
 
 private:
+  bool TryFollowFailureLinkAndCollectTokens(
+      const std::string& sequence,
+      int sequence_offset_in_text,
+      int* curr_offset_in_sequence,
+      utils::Trie::TraversalCursor* node,
+      std::vector<core::Token>* tokens) const;
+
+  void AppendTokensToOutput(const std::string& sequence,
+                            int sequence_offset_in_text,
+                            int* curr_offset_in_sequence,
+                            int curr_node_value,
+                            std::vector<core::Token>* tokens) const;
+  void HandleTheRemainingStringOnTriePath(
+      const std::string& sequence,
+      int sequence_offset_in_text,
+      utils::Trie::TraversalCursor* node,
+      int* original_num_tokens,
+      int* curr_offset_in_sequence,
+      std::vector<core::Token>* tokens) const;
+  bool TryHandleContinuingSubWordPrefix(
+      const std::string& sequence,
+      int sequence_offset_in_text,
+      const utils::Trie::TraversalCursor& node,
+      int* original_num_tokens,
+      int* curr_offset_in_sequence,
+      std::vector<core::Token>* tokens) const;
   utils::Trie trie_;
   utils::FailureArray failure_array_;
   friend void to_json(nlohmann::json& j, const FasterWordPiece& model);

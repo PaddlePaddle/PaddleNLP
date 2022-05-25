@@ -64,11 +64,10 @@ struct FailureArray {
       const Trie& trie);
   void BuildFailureVocab(const std::unordered_map<std::string, uint>& vocab,
                          const Trie& trie);
-  std::vector<Failure> failure_array_;
-  std::vector<int> failure_pops_pool_;
-  std::unordered_map<uint32_t, bool> node_id_is_punc_map_;
   void InitFromVocabAndTrie(const std::unordered_map<std::string, uint>& vocab,
                             const Trie& trie);
+  const Failure* GetFailure(int idx) const { return &(failure_array_.at(idx)); }
+  int GetFailurePop(int idx) const { return failure_pops_pool_.at(idx); }
 
 private:
   void BuildOutgoingEdgeLabelsForTrie(
@@ -85,6 +84,10 @@ private:
                                 int parent_failure_pops_offset_length);
   void GetFailurePopsAndAppendToOut(uint32_t failure_pops_offset_length,
                                     std::vector<int>* out_failure_pops);
+
+  std::vector<Failure> failure_array_;
+  std::vector<int> failure_pops_pool_;
+  std::unordered_map<uint32_t, bool> node_id_is_punc_map_;
   std::vector<FailureVocabToken> failure_vocab_tokens_;
 };
 
