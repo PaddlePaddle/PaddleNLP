@@ -62,6 +62,23 @@ void Trie::GetSortedVocab(const std::vector<const char*>& keys,
     (*sorted_values)[i] = values[idx];
   }
 }
+void Trie::InitTrieSuffixRoot() {
+  auto node = CreateRootTraversalCursor();
+  if (!TryTraverseSeveralSteps(&node, continuing_subword_prefix_)) {
+    throw std::runtime_error(
+        "Cannot locate suffix_root_. This should never happen.");
+  }
+  suffix_root_ = node.node_id_;
+}
+
+void Trie::InitTrie(const std::vector<const char*>& keys,
+                    const std::vector<int>& values) {
+  std::vector<const char*> sorted_keys;
+  std::vector<int> sorted_values;
+  GetSortedVocab(keys, values, &sorted_keys, &sorted_values);
+  CreateTrie(sorted_keys, sorted_values);
+  InitTrieSuffixRoot();
+}
 
 void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
   std::vector<const char*> keys;
@@ -70,17 +87,16 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
     keys.push_back(item.first.c_str());
     values.push_back(EncodeTokenId(item.first, item.second));
   }
-  std::vector<const char*> sorted_keys;
-  std::vector<int> sorted_values;
-  GetSortedVocab(keys, values, &sorted_keys, &sorted_values);
-  CreateTrie(sorted_keys, sorted_values);
+  InitTrie(keys, values);
 }
 
 
 Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
            const std::string& continuing_subword_prefix,
            const std::string& unk_token)
-    : continuing_subword_prefix_(continuing_subword_prefix), unk_token_(unk_token) {
+    : continuing_subword_prefix_(continuing_subword_prefix),
+      unk_token_(unk_token),
+      suffix_root_(utils::kNullNode) {
   unk_token_id_ = vocab.at(unk_token);
   SetVocab(vocab);
 }
@@ -88,7 +104,9 @@ Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
 Trie::Trie(const std::vector<std::string>& keys,
            const std::string& continuing_subword_prefix,
            const std::string& unk_token)
-    : continuing_subword_prefix_(continuing_subword_prefix), unk_token_(unk_token) {
+    : continuing_subword_prefix_(continuing_subword_prefix),
+      unk_token_(unk_token),
+      suffix_root_(utils::kNullNode) {
   std::vector<const char*> char_keys(keys.size());
   for (int i = 0; i < keys.size(); ++i) {
     char_keys[i] = keys[i].c_str();
@@ -102,10 +120,7 @@ Trie::Trie(const std::vector<std::string>& keys,
   for (int i = 0; i < keys.size(); ++i) {
     values[i] = EncodeTokenId(keys[i], values[i]);
   }
-  std::vector<const char*> sorted_keys;
-  std::vector<int> sorted_values;
-  GetSortedVocab(char_keys, values, &sorted_keys, &sorted_values);
-  CreateTrie(sorted_keys, sorted_values);
+  InitTrie(char_keys, values);
 }
 
 Trie::TraversalCursor Trie::CreateRootTraversalCursor() const {

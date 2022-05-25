@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
+#include <queue>
 #include <sstream>
 
 #include "glog/logging.h"
@@ -61,7 +62,7 @@ FailureVocabToken::FailureVocabToken(
   }
 }
 
-std::string FailureVocabToken::Token() const { return token_; }
+const std::string& FailureVocabToken::Token() const { return token_; }
 
 int FailureVocabToken::TokenId() const { return token_id_; }
 
@@ -140,33 +141,171 @@ void FailureArray::BuildFailureVocab(
   }
 }
 
-FailureArray::FailureArray(const std::unordered_map<std::string, uint>& vocab,
-                           const Trie& trie) {
+void FailureArray::InitFromVocabAndTrie(
+    const std::unordered_map<std::string, uint>& vocab, const Trie& trie) {
   BuildFailureVocab(vocab, trie);
-  BuildFailureArray(vocab, trie);
+  BuildFailureArray(failure_vocab_tokens_, trie);
 }
 
+
+FailureArray::FailureArray(const std::unordered_map<std::string, uint>& vocab,
+                           const Trie& trie) {
+  InitFromVocabAndTrie(vocab, trie);
+}
+
+// Algorithm 2 in https://arxiv.org/pdf/2012.15524.pdf
 void FailureArray::BuildFailureArray(
-    const std::unordered_map<std::string, uint>& vocab, const Trie& trie) {}
+    const std::vector<FailureVocabToken>& failure_vocab_tokens,
+    const Trie& trie) {
+  std::vector<std::unordered_set<char>> node_outgoing_edge_labels;
+  BuildOutgoingEdgeLabelsForTrie(
+      failure_vocab_tokens, trie, &node_outgoing_edge_labels);
+  failure_array_.resize(trie.Size());
+  std::queue<uint> trie_node_queue({trie.kRootNodeId});
+  if (trie.GetSuffixRoot() != trie.kRootNodeId) {
+    trie_node_queue.push(trie.GetSuffixRoot());
+  }
+  while (!trie_node_queue.empty()) {
+    uint32_t parent_id = trie_node_queue.front();
+    trie_node_queue.pop();
+    std::vector<char> outgoing_labels_sorted(
+        node_outgoing_edge_labels[parent_id].begin(),
+        node_outgoing_edge_labels[parent_id].end());
+    std::sort(outgoing_labels_sorted.begin(), outgoing_labels_sorted.end());
+    for (const char edge_label : outgoing_labels_sorted) {
+      auto child_node = trie.CreateTraversalCursor(parent_id);
+      if (!trie.TryTraverseOneStep(&child_node, edge_label)) {
+        std::ostringstream oss;
+        oss << "Failed to traverse to child following edge " << edge_label
+            << " at parent " << parent_id << ".";
+        throw std::runtime_error(oss.str());
+      }
+      if (child_node.node_id_ == trie.GetSuffixRoot()) {
+        continue;
+      }
+      int child_data_value = -1;
+      // Case 1: str(v) in V
+      //  * f(v) = trie.GetSuffixRoot()
+      //  * F(v) = [str(v)]
+      if (trie.TryGetData(child_node, &child_data_value)) {
+        uint32_t failure_link = trie.GetSuffixRoot();
+        if (node_id_is_punc_map_.count(child_node.node_id_) != 0) {
+          throw std::invalid_argument(
+              "Failed to find if an end node in the trie is a punctuation char "
+              "in node_id_is_punc_map_. It should never happen.");
+        }
+        AssignFailureLinkAndPops(child_node.node_id_,
+                                 failure_link,
+                                 {child_data_value},
+                                 utils::kNullFailurePopsList);
+        continue;
+      }
+
+      // Case 2: str(v) is not in V
+      const Failure& parent_failure = failure_array_[parent_id];
+      if (parent_failure.failure_link_ != utils::kNullNode) {
+        std::vector<int> one_step_pops;
+        auto curr_node =
+            trie.CreateTraversalCursor(parent_failure.failure_link_);
+        // Find the failure link util the failure link is root or
+        // the node has the outgoing label correspoding to edge_label.
+        while (true) {
+          if (trie.TryTraverseOneStep(&curr_node, edge_label)) {
+            AssignFailureLinkAndPops(
+                child_node.node_id_,
+                curr_node.node_id_,
+                one_step_pops,
+                parent_failure.failure_pops_offset_length_);
+            break;
+          }
+          const Failure& curr_node_failure = failure_array_[curr_node.node_id_];
+          if (curr_node_failure.failure_link_ == utils::kNullNode) {
+            break;
+          }
+          GetFailurePopsAndAppendToOut(
+              curr_node_failure.failure_pops_offset_length_, &one_step_pops);
+          trie.SetTraversalCursor(&curr_node, curr_node_failure.failure_link_);
+        }
+      }
+      // If the failure_link of parent is root,
+      // * f(v) = none
+      // * F(v) = []
+      trie_node_queue.push(child_node.node_id_);
+    }
+  }
+}
+
+void FailureArray::AssignFailureLinkAndPops(
+    uint32_t cur_node,
+    uint32_t failure_link,
+    const std::vector<int>& one_step_pops,
+    int parent_failure_pops_offset_length) {
+  if (failure_link == utils::kNullNode) {
+    return;
+  }
+  auto& curr_node_failure = failure_array_[cur_node];
+  curr_node_failure.failure_link_ = failure_link;
+  if (one_step_pops.empty()) {
+    curr_node_failure.failure_pops_offset_length_ =
+        parent_failure_pops_offset_length;
+  } else {
+    const int offset = failure_pops_pool_.size();
+    if (offset > utils::kMaxSupportedFailurePoolOffset) {
+      std::ostringstream oss;
+      oss << "Failure pops list offset is " << offset
+          << ", which exceeds maximum supported offset "
+          << utils::kMaxSupportedFailurePoolOffset
+          << ". The vocabulary seems to be too large to be supported.";
+      throw std::runtime_error(oss.str());
+    }
+    GetFailurePopsAndAppendToOut(parent_failure_pops_offset_length,
+                                 &failure_pops_pool_);
+    failure_pops_pool_.insert(
+        failure_pops_pool_.end(), one_step_pops.begin(), one_step_pops.end());
+    const int length = failure_pops_pool_.size() - offset;
+    if (length > utils::kMaxSupportedFailurePoolOffset) {
+      std::ostringstream oss;
+      oss << "Failure pops list size is " << length
+          << ", which exceeds maximum supported offset "
+          << utils::kMaxFailurePopsListSize;
+      throw std::runtime_error(oss.str());
+    }
+    curr_node_failure.failure_pops_offset_length_ =
+        utils::EncodeFailurePopList(offset, length);
+  }
+}
+
+void FailureArray::GetFailurePopsAndAppendToOut(
+    uint32_t failure_pops_offset_length, std::vector<int>* out_failure_pops) {
+  if (failure_pops_offset_length == utils::kNullFailurePopsList) {
+    return;
+  }
+  int offset = 0, length = 0;
+  utils::GetFailurePopsOffsetAndLength(
+      failure_pops_offset_length, &offset, &length);
+  out_failure_pops->insert(out_failure_pops->end(),
+                           failure_pops_pool_.begin() + offset,
+                           failure_pops_pool_.begin() + offset + length);
+}
 
 void FailureArray::BuildOutgoingEdgeLabelsForTrie(
-    const std::unordered_map<std::string, uint>& vocab,
+    const std::vector<FailureVocabToken>& failure_vocab_tokens,
     const Trie& trie,
     std::vector<std::unordered_set<char>>* node_outgoing_edge_labels) {
   node_outgoing_edge_labels->resize(trie.Size());
   const std::string dummy_token = std::string(1, utils::kInvalidControlChar);
-  for (auto& item : vocab) {
-    if (item.first != dummy_token) {
+  for (auto& item : failure_vocab_tokens) {
+    if (item.Token() != dummy_token) {
       BuildOutgoingEdgeLabelsFromToken(item, trie, node_outgoing_edge_labels);
     }
   }
 }
 
 void FailureArray::BuildOutgoingEdgeLabelsFromToken(
-    const std::pair<std::string, uint>& vocab_token,
+    const FailureVocabToken& vocab_token,
     const Trie& trie,
     std::vector<std::unordered_set<char>>* node_outgoing_edge_labels) {
-  const std::string& token = vocab_token.first;
+  const std::string& token = vocab_token.Token();
   Trie::TraversalCursor curr_node;
   int char_pos = 0;
   trie.SetTraversalCursor(&curr_node, Trie::kRootNodeId);
@@ -185,13 +324,9 @@ void FailureArray::BuildOutgoingEdgeLabelsFromToken(
     }
     ++char_pos;
   }
-  //   node_id_is_punc_map_[cur_node.node_id] =
-  //       !vocab_token.IsSuffixToken() && vocab_token.ContainsPunctuation() &&
-  //       vocab_token.TokenUnicodeLengthWithoutSuffixIndicator() == 1;
-  //   return absl::OkStatus();
-  //   node_id_is_punc_map_[curr_node.node_id_] =
-  //     !utils::IsSuffixWord(token, trie.GetContinuingSubwordPrefix())
-  //   && utils::IsPunctuationOrChineseChar()
+  node_id_is_punc_map_[curr_node.node_id_] =
+      !vocab_token.IsSuffixToken() && vocab_token.ContainsPunctuation() &&
+      vocab_token.TokenUnicodeLengthWithoutContinuingSubwordPrefix() == 1;
 }
 
 

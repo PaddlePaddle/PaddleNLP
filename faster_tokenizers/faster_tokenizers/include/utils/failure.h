@@ -26,6 +26,8 @@ class Trie;
 // Used in Faster WordPiece Model specially
 struct Failure {
   uint failure_link_;
+  // Indicate the number of failure_pops
+  // and the offset in failure_pops_pool
   uint failure_pops_offset_length_;
   Failure();
 };
@@ -36,7 +38,7 @@ public:
                     int token_id,
                     const std::string& continuing_subword_prefix);
 
-  std::string Token() const;
+  const std::string& Token() const;
 
   int TokenId() const;
   bool IsSuffixToken() const;
@@ -57,25 +59,32 @@ struct FailureArray {
   FailureArray() = default;
   FailureArray(const std::unordered_map<std::string, uint>& vocab,
                const Trie& trie);
-  void BuildFailureArray(const std::unordered_map<std::string, uint>& vocab,
+  void BuildFailureArray(
+      const std::vector<FailureVocabToken>& failure_vocab_tokens,
+      const Trie& trie);
+  void BuildFailureVocab(const std::unordered_map<std::string, uint>& vocab,
                          const Trie& trie);
-
   std::vector<Failure> failure_array_;
   std::vector<int> failure_pops_pool_;
   std::unordered_map<uint32_t, bool> node_id_is_punc_map_;
+  void InitFromVocabAndTrie(const std::unordered_map<std::string, uint>& vocab,
+                            const Trie& trie);
 
 private:
   void BuildOutgoingEdgeLabelsForTrie(
-      const std::unordered_map<std::string, uint>& vocab,
+      const std::vector<FailureVocabToken>& failure_vocab_tokens,
       const Trie& trie,
       std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
   void BuildOutgoingEdgeLabelsFromToken(
-      const std::pair<std::string, uint>& vocab_token,
+      const FailureVocabToken& vocab_token,
       const Trie& trie,
       std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
-  void BuildFailureVocab(const std::unordered_map<std::string, uint>& vocab,
-                         const Trie& trie);
-
+  void AssignFailureLinkAndPops(uint32_t cur_node,
+                                uint32_t failure_link,
+                                const std::vector<int>& one_step_pops,
+                                int parent_failure_pops_offset_length);
+  void GetFailurePopsAndAppendToOut(uint32_t failure_pops_offset_length,
+                                    std::vector<int>* out_failure_pops);
   std::vector<FailureVocabToken> failure_vocab_tokens_;
 };
 

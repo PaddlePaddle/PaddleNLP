@@ -65,8 +65,12 @@ public:
     return continuing_subword_prefix_;
   }
   uint GetUNKTokenID() const { return unk_token_id_; }
+  uint GetSuffixRoot() const { return suffix_root_; }
 
 private:
+  void InitTrieSuffixRoot();
+  void InitTrie(const std::vector<const char*>& keys,
+                const std::vector<int>& values);
   void GetSortedVocab(const std::vector<const char*>& keys,
                       const std::vector<int>& values,
                       std::vector<const char*>* sorted_keys,
@@ -97,10 +101,10 @@ private:
 
   std::shared_ptr<Darts::DoubleArray> trie_;
   const uint* trie_array_;
-  // The node id of trie's root
   std::string continuing_subword_prefix_;
   uint unk_token_id_;
   std::string unk_token_;
+  uint suffix_root_;
 };
 
 }  // namespace utils

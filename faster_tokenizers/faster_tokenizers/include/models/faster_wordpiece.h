@@ -17,6 +17,7 @@ limitations under the License. */
 #include "models/model.h"
 #include "models/wordpiece.h"
 #include "nlohmann/json.hpp"
+#include "utils/failure.h"
 #include "utils/trie.h"
 
 namespace tokenizers {
@@ -35,6 +36,7 @@ struct FasterWordPiece : public WordPiece {
 
 private:
   utils::Trie trie_;
+  utils::FailureArray failure_array_;
   friend void to_json(nlohmann::json& j, const FasterWordPiece& model);
   friend void from_json(const nlohmann::json& j, FasterWordPiece& model);
 };

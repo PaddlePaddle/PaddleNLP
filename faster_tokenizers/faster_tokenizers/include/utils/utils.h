@@ -153,10 +153,10 @@ inline uint32_t EncodeFailurePopList(int offset, int length) {
 }
 
 inline void GetFailurePopsOffsetAndLength(uint32_t offset_and_length,
-                                          int& out_offset,
-                                          int& out_length) {
-  out_offset = offset_and_length >> kBitsToEncodeFailurePopsListSize;
-  out_length = (offset_and_length & kMaskToEncodeFailurePopsListSize) + 1;
+                                          int* out_offset,
+                                          int* out_length) {
+  *out_offset = offset_and_length >> kBitsToEncodeFailurePopsListSize;
+  *out_length = (offset_and_length & kMaskToEncodeFailurePopsListSize) + 1;
 }
 
 static constexpr uint32_t kNullNode = std::numeric_limits<uint32_t>::max();

@@ -30,7 +30,9 @@ namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
-FasterWordPiece::FasterWordPiece() : WordPiece() {}
+FasterWordPiece::FasterWordPiece() : WordPiece() {
+  failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+}
 
 FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                                  const std::string& unk_token,
@@ -40,7 +42,9 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 unk_token,
                 max_input_chars_per_word,
                 continuing_subword_prefix),
-      trie_(vocab, continuing_subword_prefix, unk_token) {}
+      trie_(vocab, continuing_subword_prefix, unk_token) {
+  failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+}
 
 bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
   auto curr_cursor = trie_.CreateRootTraversalCursor();
