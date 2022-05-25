@@ -154,12 +154,18 @@ def convert_clue(example,
     if tokenizer is None:
         return example
     if 'sentence' in example:
-        example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
+        example = tokenizer(
+            example['sentence'],
+            padding=True,
+            truncation=True,
+            max_length=max_seq_length)
     elif 'sentence1' in example:
         example = tokenizer(
             example['sentence1'],
             text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+            padding=True,
+            truncation=True,
+            max_length=max_seq_length)
 
     if not is_test:
         return {

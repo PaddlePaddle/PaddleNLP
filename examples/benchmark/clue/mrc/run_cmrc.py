@@ -233,7 +233,9 @@ def run(args):
     set_seed(args)
 
     train_examples, dev_examples, test_examples = load_dataset(
-        'cmrc2018', split=["train", "validation", "test"])
+        'cmrc2018',
+        split=["train", "validation", "test"],
+        cache_dir="./cache_dir")
 
     column_names = train_examples.column_names
     if rank == 0:
@@ -374,7 +376,8 @@ def run(args):
         train_ds = train_examples.map(prepare_train_features,
                                       batched=True,
                                       remove_columns=column_names,
-                                      num_proc=1)
+                                      load_from_cache_file=False,
+                                      num_proc=4)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict({
@@ -392,7 +395,8 @@ def run(args):
         dev_ds = dev_examples.map(prepare_validation_features,
                                   batched=True,
                                   remove_columns=column_names,
-                                  num_proc=1)
+                                  load_from_cache_file=False,
+                                  num_proc=4)
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
         dev_batchify_fn = lambda samples, fn=Dict({
@@ -455,16 +459,17 @@ def run(args):
 
                     if global_step % args.save_steps == 0 or global_step == num_training_steps:
                         if rank == 0:
-                            output_dir = os.path.join(args.output_dir,
-                                                      "model_%d" % global_step)
-                            if not os.path.exists(output_dir):
-                                os.makedirs(output_dir)
-                            # need better way to get inner model of DataParallel
-                            model_to_save = model._layers if isinstance(
-                                model, paddle.DataParallel) else model
-                            model_to_save.save_pretrained(output_dir)
-                            tokenizer.save_pretrained(output_dir)
-                            print('Saving checkpoint to:', output_dir)
+                            pass
+                            # output_dir = os.path.join(args.output_dir,
+                            #                           "model_%d" % global_step)
+                            # if not os.path.exists(output_dir):
+                            #     os.makedirs(output_dir)
+                            # # need better way to get inner model of DataParallel
+                            # model_to_save = model._layers if isinstance(
+                            #     model, paddle.DataParallel) else model
+                            # model_to_save.save_pretrained(output_dir)
+                            # tokenizer.save_pretrained(output_dir)
+                            # print('Saving checkpoint to:', output_dir)
                         if global_step == num_training_steps:
                             break
             evaluate(model, dev_examples, dev_data_loader, args)
@@ -473,7 +478,8 @@ def run(args):
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
-                                    num_proc=1)
+                                    load_from_cache_file=False,
+                                    num_proc=4)
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=args.eval_batch_size, shuffle=False)
         test_batchify_fn = lambda samples, fn=Dict({

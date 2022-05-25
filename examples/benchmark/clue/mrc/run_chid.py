@@ -31,6 +31,9 @@ from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
+from datasets import set_caching_enabled
+set_caching_enabled(False)
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -100,7 +103,7 @@ def parse_args():
         help="Batch size per GPU/CPU for training.", )
     parser.add_argument(
         "--eval_batch_size",
-        default=24,
+        default=12,
         type=int,
         help="Batch size per GPU/CPU for training.", )
     parser.add_argument(
@@ -397,7 +400,8 @@ def run(args):
         train_ds = train_ds.map(partial(preprocess_function),
                                 batched=True,
                                 batch_size=len(train_ds),
-                                num_proc=1,
+                                num_proc=4,
+                                load_from_cache_file=False,
                                 remove_columns=column_names)
         batchify_fn = lambda samples, fn=Dict({
             'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
@@ -419,7 +423,8 @@ def run(args):
                             batched=True,
                             batch_size=len(dev_ds),
                             remove_columns=column_names,
-                            num_proc=1)
+                            load_from_cache_file=False,
+                            num_proc=4)
 
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
@@ -481,12 +486,12 @@ def run(args):
                   (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
-                if not os.path.exists(args.output_dir):
-                    os.makedirs(args.output_dir)
-                model_to_save.save_pretrained(args.output_dir)
-                tokenizer.save_pretrained(args.output_dir)
+                # model_to_save = model._layers if isinstance(
+                #     model, paddle.DataParallel) else model
+                # if not os.path.exists(args.output_dir):
+                #     os.makedirs(args.output_dir)
+                # model_to_save.save_pretrained(args.output_dir)
+                # tokenizer.save_pretrained(args.output_dir)
         print("best_acc: ", best_acc)
 
     if args.do_predict:
@@ -496,7 +501,8 @@ def run(args):
                               batched=True,
                               batch_size=len(test_ds),
                               remove_columns=column_names,
-                              num_proc=1)
+                              load_from_cache_file=False,
+                              num_proc=4)
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=args.eval_batch_size, shuffle=False)
 
