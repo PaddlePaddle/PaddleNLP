@@ -696,51 +696,24 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 ### 批量启动 Grid Search
 
-#### 环境说明
-
-脚本中的默认参数是针对 32G 显卡的机器设置的，如果显卡是 16G 或者更小，可以在`grid_search_tools/run_mrc.sh`中增加每个任务的`${grd_accu_steps}`，`${grd_accu_steps}` 对应于 Python 脚本中的 `--gradient_accumulation_steps` 参数，该参数代表梯度累加的步数。即，实际训练的时候，会以 batch_size 为 `batch_size / ${grd_accu_steps}` 训练 `${grd_accu_steps}` 步来模拟原 batch_size 下的训练。因此也需要保证原 batch_size 能被 `${grd_accu_steps}` 整除。
-
 #### 使用说明
-- `run_all_cls.sh` 分类任务批量启动脚本入口，需要 2 个参数：模型名称或目录、模式 id
-    - 模式 0、1、2 均代表独立的 1 组 4 卡实验，需要在不同的 4 张卡上运行（见下方分类任务的方法二）
-    - 模型 3 代表 同时起 12 组 8 卡实验（见下方分类任务的方法一）
-    - 对于 32G 8 GPUs 卡机器，base 模型可以选模式 3，即 1 组 8 卡，可同时完成所有分类任务。而 large 模型需要分别起模式 0、1、2 三组实验
-- `run_all_mrc.sh` 阅读理解任务批量启动脚本入口，需要 2 个参数：模型名称或目录、模式id
-    - 模式 0、1、2 分别代表起 4 卡 CHID，4 卡 C<sup>3</sup>，2 卡 CMRC2018 实验（见下方阅读理解任务的方法二）
-    - 模式 3 代表 起 8 卡实验，任务会完成 CHID、C<sup>3</sup>、CMRC2018 任务（见下方阅读理解任务的方法一）
-    - 对于 32G 8 GPUs 卡机器，base 模型可以选模式 3
-- `extract_acc.sh` 从日志抽取每个任务的最佳结果，需要 1 个参数：模型名称或目录。调用前需要确认训练均全部完成，并且该目录下有分类和阅读理解任务所有的日志。可以把打印出的 10 个任务的结果直接复制到表格中。例如：
+- `grid_search.py` grid search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解任务跑完，然后会自动调用抽取结果的脚本`extract_acc.sh`抽取所有的结果并打印
+- `extract_acc.sh` 从日志抽取每个任务的最佳结果，在grid search结束后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解任务所有的日志。
+
+```shell
+cd grid_search_tools
+
+python grid_seach.py ernie-3.0-nano-zh
+
+```
+
+确认模型所有任务训练完成后，可以调用脚本 `extract_acc.sh` 一键抽取 Grid Search 结果，可以把打印出的 10 个任务的结果直接复制到表格中。例如：
 
 ```
 AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
 75.3    557.45  60.18   81.16   77.19   79.28   81.93   65.83/87.29     80.00   70.36
 ```
 
-
-```shell
-cd grid_search_tools
-# 7 个分类任务
-# 方法一：3 代表模式 3，1 组 8 卡实验（适用于 base 及更小的模型）
-bash run_all_cls.sh ernie-3.0-nano-zh 3 # 第二个参数 3 就代表模式 3
-
-# 方法二：0、1、2 分别代表模式 0、1、2，代表起了 3 组 4 卡实验（适用于较大的模型）
-bash run_all_cls.sh ernie-3.0-nano-zh 0
-bash run_all_cls.sh ernie-3.0-nano-zh 1
-bash run_all_cls.sh ernie-3.0-nano-zh 2
-
-# 3 个阅读理解任务
-# 对于32G 8 GPUs 卡机器，base 模型可以选模式 3
-
-# 方法一：3 代表模式3，1组8卡实验
-bash run_all_mrc.sh ernie-3.0-nano-zh 3
-
-# 方法二：对于较大模型，分别起3组实验：
-bash run_all_mrc.sh ernie-3.0-nano-zh 0
-bash run_all_mrc.sh ernie-3.0-nano-zh 1
-bash run_all_mrc.sh ernie-3.0-nano-zh 2
-```
-
-确认模型所有任务训练完成后，可以调用脚本 `extract_acc.sh` 一键抽取 Grid Search 结果
 
 ```shell
 sh extract_acc.sh ernie-3.0-nano-zh

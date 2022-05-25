@@ -14,19 +14,26 @@
 
 
 MODEL_PATH=$1
+declare -A dict
 
-afqmc=`cat ${MODEL_PATH}/afqmc/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-tnews=`cat ${MODEL_PATH}/tnews/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-ifly=`cat ${MODEL_PATH}/ifly/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-cmnli=`cat ${MODEL_PATH}/cmnli/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-ocnli=`cat ${MODEL_PATH}/ocnli/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-wsc=`cat ${MODEL_PATH}/wsc/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-csl=`cat ${MODEL_PATH}/csl/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
+for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
+do
+    dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
+done
 
-cmrc2018=`cat ${MODEL_PATH}/cmrc2018_log/workerlog.0|grep best_res|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-chid=`cat ${MODEL_PATH}/chid_log/workerlog.0|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
-c3=`cat  ${MODEL_PATH}/c3_log/workerlog.0|grep best_acc|awk '{print $2}'|awk '$0>x{x=$0};END{print x}'`
+echo -e AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3
 
-echo AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3
-echo  ${afqmc}"\t"${tnews}"\t"${ifly}"\t"${cmnli}"\t"${ocnli}"\t"${wsc}"\t"${csl}"\t"${cmrc2018}"\t"${chid}"\t"${c3}
+#for task in $(echo ${!dict[*]})
+for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
+do
+    echo -e -n "${dict[$task]}\t"
+done
 
+echo "best hyper-paramter list: "
+for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
+do
+    s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_acc: $dict[${task}]"|awk '{split($1, hy, "/"); print(hy[3])}'`
+    #s=`find ppminilm-6l-768h/afqmc/* | xargs grep -rin "best_acc: 73.91" |awk '{split($1, hy, "/"); print hy[3]}'`
+    echo -e -n "${task}'s best lr, bs, dropout_p: \t"
+    echo $s|awk '{split($1, hy, "_"); print hy[1] " " hy[2] " "hy[3]}'
+done

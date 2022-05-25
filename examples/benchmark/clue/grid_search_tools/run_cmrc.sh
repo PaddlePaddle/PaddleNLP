@@ -24,12 +24,8 @@ MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
 GRAD_ACCU_STEPS=$4
-CARD_ID=$5
 
-logdir=${MODEL_PATH}/cmrc2018_log
-mkdir -p ${logdir}
-
-python -m paddle.distributed.launch --gpus "${CARD_ID}"  --log_dir ${logdir} ../mrc/run_cmrc.py \
+python ../mrc/run_cmrc.py \
     --model_name_or_path ${MODEL_PATH} \
     --max_seq_length 512 \
     --batch_size ${BATCH_SIZE}  \
@@ -42,4 +38,4 @@ python -m paddle.distributed.launch --gpus "${CARD_ID}"  --log_dir ${logdir} ../
     --do_train \
     --device gpu \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
-    --save_best_model False \
+    --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}.log

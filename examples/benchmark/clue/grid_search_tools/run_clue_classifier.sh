@@ -18,9 +18,11 @@ export LR=$2
 export BS=$3
 export EPOCH=$4
 export MAX_SEQ_LEN=$5
-export CUDA_VISIBLE_DEVICES=$6
-export MODEL_PATH=$7
-export grad_acc=$8
+export MODEL_PATH=$6
+export grad_acc=$7
+export dropout_p=$8
+
+mkdir -p ${MODEL_PATH}/${TASK_NAME}
 
 python -u ../classification/run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -39,5 +41,6 @@ python -u ../classification/run_clue_classifier.py \
     --device gpu  \
     --gradient_accumulation_steps ${grad_acc} \
     --do_train \
-    --dropout $9 \
-    --save_best_model False \
+    --dropout ${dropout_p} \
+    --save_best_model False > ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log
+

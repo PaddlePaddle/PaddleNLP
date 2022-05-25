@@ -24,12 +24,9 @@ MODEL_PATH=$1
 BATCH_SIZE=$2
 LR=$3
 GRAD_ACCU_STEPS=$4
-CARD_ID=$5
 
 
-logdir=${MODEL_PATH}/chid_log
-mkdir -p ${logdir}
-python -m paddle.distributed.launch --gpu "$CARD_ID" --log_dir ${logdir} ../mrc/run_chid.py \
+python ../mrc/run_chid.py \
     --model_name_or_path ${MODEL_PATH} \
     --batch_size ${BATCH_SIZE} \
     --learning_rate ${LR} \
@@ -40,5 +37,5 @@ python -m paddle.distributed.launch --gpu "$CARD_ID" --log_dir ${logdir} ../mrc/
     --do_train \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --weight_decay 0.01 \
-    --save_best_model False \
+    --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}.log
 
