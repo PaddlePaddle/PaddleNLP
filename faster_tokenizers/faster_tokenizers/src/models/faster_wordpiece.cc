@@ -235,8 +235,8 @@ std::vector<core::Token> FasterWordPiece::Tokenize(
       utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());
   int original_num_tokens = 0;
   if (unicode_len > max_input_chars_per_word_) {
-    all_tokens.emplace_back(
-        unk_token_id_, unk_token_, core::Offset{0, sequence.length()});
+    ResetOutputAppendUNK(
+              0, sequence.size(), &original_num_tokens, &all_tokens);
   } else {
     int curr_offset_in_sequence = 0;
     auto curr_node = trie_.CreateRootTraversalCursor();

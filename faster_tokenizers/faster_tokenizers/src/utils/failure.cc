@@ -189,7 +189,7 @@ void FailureArray::BuildFailureArray(
       //  * F(v) = [str(v)]
       if (trie.TryGetData(child_node, &child_data_value)) {
         uint32_t failure_link = trie.GetSuffixRoot();
-        if (node_id_is_punc_map_.count(child_node.node_id_) != 0) {
+        if (node_id_is_punc_map_.count(child_node.node_id_) == 0) {
           throw std::invalid_argument(
               "Failed to find if an end node in the trie is a punctuation char "
               "in node_id_is_punc_map_. It should never happen.");
@@ -198,6 +198,7 @@ void FailureArray::BuildFailureArray(
                                  failure_link,
                                  {child_data_value},
                                  utils::kNullFailurePopsList);
+        trie_node_queue.push(child_node.node_id_);
         continue;
       }
 
