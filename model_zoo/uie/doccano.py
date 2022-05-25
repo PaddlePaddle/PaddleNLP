@@ -48,7 +48,7 @@ def do_convert():
                              is_train=True):
         entities, relations = convert_ext_examples(
             examples, negative_ratio, is_train=is_train)
-        examples = [e + r for e, r in zip(entities, relations)]
+        examples = entities + relations
         if shuffle:
             indexes = np.random.permutation(len(examples))
             examples = [examples[i] for i in indexes]
@@ -66,13 +66,8 @@ def do_convert():
         save_path = os.path.join(save_dir, file_name)
         with open(save_path, "w", encoding="utf-8") as f:
             for example in examples:
-                if args.task_type == "ext":
-                    for x in example:
-                        f.write(json.dumps(x, ensure_ascii=False) + "\n")
-                        count += 1
-                else:
-                    f.write(json.dumps(example, ensure_ascii=False) + "\n")
-                    count += 1
+                f.write(json.dumps(example, ensure_ascii=False) + "\n")
+                count += 1
         print("\nSave %d examples to %s." % (count, save_path))
 
     if len(args.splits) == 0:
