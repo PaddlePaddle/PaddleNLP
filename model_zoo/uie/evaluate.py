@@ -84,7 +84,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medical-base"], type=str, default="uie-base", help="Specify the pretrained model.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny"], type=str, default="uie-base", help="Specify the pretrained model.")
 
     args = parser.parse_args()
     # yapf: enable
