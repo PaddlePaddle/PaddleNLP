@@ -205,15 +205,6 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### 🚀 Fleet: 4D Hybrid Distributed Training
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
-</div>
-
-
-For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
-
 #### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
 
 <div align="center">
@@ -241,6 +232,15 @@ outputs, _ = model.generate(
 ```
 
 Set `use_faster=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FasterGeneration](./faster_generation).
+
+#### 🚀 Fleet: 4D Hybrid Distributed Training
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
+</div>
+
+
+For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
 
 
 ## Installation

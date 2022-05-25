@@ -98,47 +98,47 @@ function _train(){
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
         ;;
     DP2-MP1-PP1)  echo "run run_mode: DP2-MP1-PP1"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP1-MP4-PP1)  echo "run run_mode: DP1-MP4-PP1"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP1-MP1-PP4)  echo "run run_mode: DP1-MP1-PP4"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=3
 	;;
     DP2-MP4-PP1)  echo "run run_mode: DP2-MP4-PP1"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP2-MP2-PP2)  echo "run run_mode: DP2-MP2-PP2"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=7
 	;;
     DP2-MP8-PP2)  echo "run run_mode: DP2-MP8-PP2"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP1-MP8-PP4)  echo "run run_mode: DP1-MP8-PP4"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
     DP4-MP8-PP1)  echo "run run_mode: DP4-MP8-PP1"
-        train_cmd="python3 -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus="0,1,2,3,4,5,6,7" \
               run_pretrain_static.py ${train_cmd}"
         workerlog_id=0
 	;;
@@ -146,6 +146,7 @@ function _train(){
     esac
     cd ../examples/language_model/gpt-3/static/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
+    python -c "import paddlenlp"
     timeout 15m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
