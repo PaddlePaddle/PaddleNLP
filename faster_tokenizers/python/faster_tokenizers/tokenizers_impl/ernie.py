@@ -16,7 +16,7 @@ from .base_tokenizer import BaseFasterTokenizer
 
 from faster_tokenizers.normalizers import BertNormalizer
 from faster_tokenizers.pretokenizers import BertPreTokenizer
-from faster_tokenizers.models import WordPiece
+from faster_tokenizers.models import WordPiece, FasterWordPiece
 from faster_tokenizers.postprocessors import BertPostProcessor
 from faster_tokenizers import decoders
 from faster_tokenizers import Tokenizer
@@ -37,16 +37,18 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
                  strip_accents=None,
                  lowercase=True,
                  wordpieces_prefix="##",
-                 max_sequence_len=None):
+                 max_sequence_len=None,
+                 use_faster_wordpiece=False):
+        tokenizer_model = WordPiece if not use_faster_wordpiece else FasterWordPiece
         if vocab is not None:
             tokenizer = Tokenizer(
-                WordPiece(
+                tokenizer_model(
                     vocab,
                     unk_token=str(unk_token),
                     continuing_subword_prefix=wordpieces_prefix))
         else:
             tokenizer = Tokenizer(
-                WordPiece(
+                tokenizer_model(
                     unk_token=str(unk_token),
                     continuing_subword_prefix=wordpieces_prefix))
 
