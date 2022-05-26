@@ -10,6 +10,7 @@ nvmlInit()
 
 world_size = nvmlDeviceGetCount()
 handles = []
+mrc_device = {}
 handle_mapping = {}
 for i in range(world_size):
     h = nvmlDeviceGetHandleByIndex(i)
@@ -17,11 +18,14 @@ for i in range(world_size):
     handle_mapping[str(h)] = i
 
 
-def get_availble(est=15):
-    # sort handles according to info.free
+def get_availble(est=15, is_mrc=False):
+    # Sort handles according to info.free
     handles.sort(key=lambda x: nvmlDeviceGetMemoryInfo(x).free, reverse=True)
     for i, h in enumerate(handles):
         device_id = handle_mapping[str(h)]
+        # TODO: mrc任务的est
+        if device_id in mrc_device.values():
+            continue
         info = nvmlDeviceGetMemoryInfo(h)
         gb = 1024 * 1024 * 1024
         print(f'- device_id: {device_id}')
@@ -66,7 +70,6 @@ def get_cls_tasks(model_name_or_path):
     datasets = [
         'afqmc', 'tnews', 'iflytek', 'ocnli', 'cmnli', 'cluewsc2020', 'csl'
     ]
-    # epoch, max_seq_len, grd_acc, dropout
     cls_base_grd_acc = 1
     hyper_params = {
         "afqmc": [[3, 128, cls_base_grd_acc, 0.1]],
@@ -94,7 +97,7 @@ def get_cls_tasks(model_name_or_path):
             bs = 8
             epoch, max_seq_len, grd_acc, dropout = hyper_param
             tasks.append(
-                f"bash run_clue_classifier.sh {dataset} {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
+                f"bash run_clue_classifier.sh cluewsc2020 {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
             )
     return tasks
 
@@ -105,15 +108,21 @@ def do_task(task):
     # if int(tmp[4]) * int(tmp[6]) > 32 * 128:
     #     est = 30
     print(est)
-    device_id = get_availble(est)
+    is_mrc = False
+    if "cmrc" in task or "chid" in task or "c3" in task:
+        is_mrc = True
+    device_id = get_availble(est, is_mrc)
     while device_id is None:
-        print("> No device avaliable, wait 15 seconds.")
-        time.sleep(15)
-        device_id = get_availble()
+        print("> No device avaliable, wait 120 seconds.")
+        time.sleep(120)
+        device_id = get_availble(est, is_mrc)
     task = f"set -x \nexport CUDA_VISIBLE_DEVICES={device_id}\n" + task
     print(f"> Send task \n{task}\n")
     ps = subprocess.Popen(
         task, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if is_mrc and device_id is not None:
+        mrc_device[task] = device_id
+        print("mrc_device", mrc_device)
     return ps
 
 
@@ -121,7 +130,7 @@ def main():
     # Make sure that dataset has been downloaded first
     status = os.system('python download_dataset.py')
     model_name_or_path = sys.argv[1]
-    # """
+    tasks = []
     tasks = get_cls_tasks(model_name_or_path)
     tasks += get_mrc_tasks(model_name_or_path)
 
@@ -149,6 +158,10 @@ def main():
                     if retry[runs[i]["ts"]] <= 5:
                         tasks.append(runs[i]["ts"])
                 else:
+                    if "cmrc" in runs[i]["ts"] or "chid" in runs[i][
+                            "ts"] or "c3" in runs[i]["ts"]:
+                        mrc_device.remove(runs[i]['ts'])
+                        print("mrc_device", mrc_device)
                     print(f"> Done! {runs[i]['ts']}")
                 runs.pop(i)
                 i = i - 1
@@ -162,9 +175,8 @@ def main():
             ps = do_task(task)
             runs.append({"ps": ps, "ts": task})
 
-        print(f"> Wait for 10 seconds to start!")
-        time.sleep(10)
-    # """
+        print(f"> Wait for 15 seconds to start!")
+        time.sleep(15)
     status = os.system('bash extract_acc.sh ' + model_name_or_path)
 
 

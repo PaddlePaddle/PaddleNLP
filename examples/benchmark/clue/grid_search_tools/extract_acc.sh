@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+unset GREP_OPTIONS
 
 MODEL_PATH=$1
 declare -A dict
@@ -23,17 +24,16 @@ done
 
 echo -e AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3
 
-#for task in $(echo ${!dict[*]})
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
     echo -e -n "${dict[$task]}\t"
 done
 
-echo "best hyper-paramter list: "
+echo -e "\n==================================\nbest hyper-paramter list: \n=================================="
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
-    s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_acc: $dict[${task}]"|awk '{split($1, hy, "/"); print(hy[3])}'`
-    #s=`find ppminilm-6l-768h/afqmc/* | xargs grep -rin "best_acc: 73.91" |awk '{split($1, hy, "/"); print hy[3]}'`
-    echo -e -n "${task}'s best lr, bs, dropout_p: \t"
-    echo $s|awk '{split($1, hy, "_"); print hy[1] " " hy[2] " "hy[3]}'
+    s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_acc: ${dict[$task]}"|awk '{split($1, hy, "/"); print(hy[3])}'`
+    s=`echo $s|awk '{split($1, hy, "."); print hy[1]"."hy[2]}'`
+    s=`echo $s|awk '{split($1, hy, "_"); print hy[1] " " hy[2] " "hy[3]}'`
+    echo -e "${task}'s best lr, bs, dropout_p: "$s
 done

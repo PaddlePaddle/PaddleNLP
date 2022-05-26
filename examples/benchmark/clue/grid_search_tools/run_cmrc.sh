@@ -25,6 +25,8 @@ BATCH_SIZE=$2
 LR=$3
 GRAD_ACCU_STEPS=$4
 
+mkdir -p ${MODEL_PATH}/cmrc2018
+
 python ../mrc/run_cmrc.py \
     --model_name_or_path ${MODEL_PATH} \
     --max_seq_length 512 \
@@ -38,4 +40,4 @@ python ../mrc/run_cmrc.py \
     --do_train \
     --device gpu \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
-    --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}.log
+    --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}_0.1.log

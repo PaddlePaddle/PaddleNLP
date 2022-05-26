@@ -25,6 +25,7 @@ BATCH_SIZE=$2
 LR=$3
 GRAD_ACCU_STEPS=$4
 
+mkdir -p ${MODEL_PATH}/chid
 
 python ../mrc/run_chid.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -37,5 +38,5 @@ python ../mrc/run_chid.py \
     --do_train \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --weight_decay 0.01 \
-    --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}.log
+    --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}_0.1.log
 

@@ -24,6 +24,7 @@ BATCH_SIZE=$2
 LR=$3
 GRAD_ACCU_STEPS=$4
 
+mkdir -p ${MODEL_PATH}/c3
 
 python ../mrc/run_c3.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -35,4 +36,4 @@ python ../mrc/run_c3.py \
     --do_train \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
-    --save_best_model False  > ${MODEL_PATH}/c3/${LR}_${BATCH_SIZE}.log
+    --save_best_model False  > ${MODEL_PATH}/c3/${LR}_${BATCH_SIZE}_0.1.log
