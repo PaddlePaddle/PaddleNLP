@@ -193,12 +193,16 @@ class Predictor(object):
     @classmethod
     def create_predictor(cls, args):
         if args.use_onnxruntime:
-            import paddle2onnx
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=args.model_path + ".pdmodel",
-                params_file=args.model_path + ".pdiparams",
-                opset_version=13,
-                enable_onnx_checker=True)
+            assert args.device != "xpu", "Running ONNXRuntime on XPU is temporarily not supported."
+            if args.model_path.count(".onnx"):
+                onnx_model = args.model_path
+            else:
+                import paddle2onnx
+                onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+                    model_file=args.model_path + ".pdmodel",
+                    params_file=args.model_path + ".pdiparams",
+                    opset_version=13,
+                    enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
             if args.enable_quantize:
