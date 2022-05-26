@@ -26,7 +26,7 @@
 #### 环境要求
 
 - paddlepaddle >= 2.2.0
-- paddlenlp
+- paddlenlp >= 2.3.1
 - paddleocr >= 2.5
 
 安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。
@@ -34,22 +34,21 @@
 
 ## 3. 整体流程
 
-汽车说明书问答系统针对用户提出的汽车使用相关问题，智能化地在汽车说明书中找出对应答案，并返回给用户。本项目提供的汽车说明书问答系统的使用流程如下图所示。本项目提供的汽车说明书问答系统主要包括 3 个模块：文档解析模块、排序模块和跨模态阅读理解模块。
+汽车说明书问答系统针对用户提出的汽车使用相关问题，智能化地在汽车说明书中找出对应答案，并返回给用户。本项目提供的汽车说明书问答系统的使用流程如下图所示。本项目提供的汽车说明书问答系统主要包括 3 个模块：OCR处理模块、排序模块和跨模态阅读理解模块。
 
 在使用汽车说明书问答模型回答问题之前，需要先使用PaddleOCR对离线提供的汽车说明书文档进解析，并将解析结果保存下来，以备后续排序模块使用。
 
 对于用户提问的问题，首先会被传入排序模块，排序模块会针对该问题对解析的文档进行排序打分，其结果将会被传入跨模态阅读理解模块。阅读理解模块将从分数最高的说明书文档中，抽取用户问题的答案，并返回给用户。
 
-<center><img width="864" alt="image" src="https://user-images.githubusercontent.com/35913314/169781673-0695b4e3-5da8-4c4e-97ac-a4c8c8d3e8f7.png"></center>
+<center><img width="864" alt="image" src="https://user-images.githubusercontent.com/35913314/170222662-c438ff2a-a1df-44e5-8a83-f14dc0814b9d.png"></center>
 
 下面将具体介绍各个模块的功能。
 
-
-## 4. 文档解析模块
+## 4. OCR处理模块
 
 本项目提供了包含10张图片的汽车说明书，为方便后续处理，首先需要通过 PaddleOCR 对汽车说明书进行识别，记录汽车说明书上的文字和文字布局信息， 以方便后续使用计算机视觉和自然语言处理方面的技术进行问答任务。
 
-本项目提供的汽车说明书图片可点击[这里](https://paddlenlp.bj.bcebos.com/images/applications/automobile.tar.gz)进行下载，下载后解压放至 `./OCR_process/demo_pics` 目录下，然后通过如下命令，使用 PaddleOCR 进行图片文档解析。
+本项目提供的汽车说明书图片可点击[这里](https://paddlenlp.bj.bcebos.com/images/applications/automobile.tar.gz)进行下载，下载后解压放至 `./OCR_process/demo_pics` 目录下，然后通过如下命令，使用 PaddleOCR 对图片进行解析。
 
 ```shell
 cd OCR_process/
@@ -60,9 +59,9 @@ cd ..
 解析后的结果存放至 `./OCR_process/demo_ocr_res.json` 中。
 
 ## 5. 排序模块
-对于用户提出的问题，如果从所有的汽车说明书图片中去寻找答案会比较耗时且耗费资源。因此这里使用了一个排序模块，该模块将根据用户提出的问题对汽车说明书的不同图片进行打分排序，这样便可以获取和问题最相关的图片，并使用跨模态阅读理解模块在该问题上进行抽取答案。
+对于用户提出的问题，如果从所有的汽车说明书图片中去寻找答案会比较耗时且耗费资源。因此这里使用了一个基于[RocketQA](https://arxiv.org/pdf/2010.08191.pdf)的排序模块，该模块将根据用户提出的问题对汽车说明书的不同图片进行打分排序，这样便可以获取和问题最相关的图片，并使用跨模态阅读理解模块在该问题上进行抽取答案。
 
-本项目提供了140条汽车说明书相关的训练样本，用于排序模型的训练， 同时也提供了一个预先训练好的基线模型 base_model。 本模块可以使用 base_model 在汽车说明书训练样本上进一步微调。
+本项目提供了140条汽车说明书相关的训练样本，用于排序模型的训练， 同时也提供了一个基于RocketQA的预先训练好的基线模型 base_model。 本模块可以使用 base_model 在汽车说明书训练样本上进一步微调。
 
 其中，汽车说明书的训练集可点击[这里](https://paddlenlp.bj.bcebos.com/data/automobile_rerank_train.tsv) 进行下载，下载后将其重命名为 `train.tsv` ，存放至 `./Rerank/data/` 目录下。
 
