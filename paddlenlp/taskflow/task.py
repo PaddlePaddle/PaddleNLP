@@ -135,6 +135,9 @@ class Task(metaclass=abc.ABCMeta):
         place = paddle.get_device()
         if place == 'cpu':
             self._config.disable_gpu()
+            if self.enable_mkldnn:
+                self._config.enable_mkldnn()
+            self._config.set_cpu_math_library_num_threads(self.num_threads)
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
             # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed

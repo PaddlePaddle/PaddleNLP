@@ -40,9 +40,19 @@ def parse_args():
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.", )
     parser.add_argument(
+        "--position_prob",
+        default=0.5,
+        type=float,
+        help="Probability threshold for start/end index probabiliry.", )
+    parser.add_argument(
         "--use_quantize",
         action='store_true',
         help="Whether to use quantization for acceleration.", )
+    parser.add_argument(
+        "--mode",
+        default='onnx',
+        type=str,
+        help="", )
     parser.add_argument(
         "--num_threads",
         default=cpu_count(),

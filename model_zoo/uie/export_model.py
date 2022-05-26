@@ -21,13 +21,13 @@ from model import UIE
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name_or_path", type=str, required=True, default='./checkpoint/model_best', help="The path to model parameters to be loaded.")
+parser.add_argument("--model_path", type=str, required=True, default='./checkpoint/model_best', help="The path to model parameters to be loaded.")
 parser.add_argument("--infer_model_dir", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    model = UIE.from_pretrained(args.model_name_or_path)
+    model = UIE.from_pretrained(args.model_path)
     model.eval()
 
     # Convert to static graph with specific input description
@@ -44,5 +44,5 @@ if __name__ == "__main__":
                 shape=[None, None], dtype="int64", name='att_mask'),
         ])
     # Save in static graph model.
-    save_path = os.path.join(args.output_path, "inference")
+    save_path = os.path.join(args.infer_model_dir, "inference")
     paddle.jit.save(model, save_path)
