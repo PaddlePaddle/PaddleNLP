@@ -397,7 +397,7 @@ class TransformerDecoderLayer(nn.Layer):
             if topo is not None and topo.mp_info.size > 1:
                 nranks = topo.mp_info.size
                 ring_id = 0
-            self.self_attn = paddlenlp.ops.ParallelFusedMultiHeadAttention(
+            self.self_attn = incubate.nn.FusedMultiHeadAttention(
                 d_model, nhead, dropout_rate=dropout, attn_dropout_rate=attn_dropout,
                 normalize_before=normalize_before,
                 qkv_weight_attr=weight_attrs[0],
@@ -407,7 +407,7 @@ class TransformerDecoderLayer(nn.Layer):
                 epsilon=1e-5,
                 nranks=nranks,
                 ring_id=ring_id)
-            self.ffn = paddlenlp.ops.ParallelFusedFeedForward(
+            self.ffn = incubate.nn.FusedFeedForward(
                 d_model, dim_feedforward, dropout_rate=act_dropout,
                 epsilon=1e-5, activation=activation,
                 normalize_before=normalize_before,
