@@ -337,6 +337,12 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9492842181233527}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.7277186614493836}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8751028059367947}]}]
   ```
 
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
+* `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
+* `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+
 <a name="轻定制功能"></a>
 
 ## 4. 轻定制功能
@@ -380,7 +386,6 @@ schema = ['出发地', '目的地', '费用', '时间']
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167336891-afef1ad5-8777-456d-805b-9c65d9014b80.png height=100 hspace='10'/>
-    <p>图4 标注示例图<p/>
 </div>
 
 - 标注完成后，在doccano平台上导出文件，并将其重命名为``doccano_ext.json``后，放入``./data``目录下。
