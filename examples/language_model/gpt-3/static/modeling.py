@@ -398,7 +398,10 @@ class TransformerDecoderLayer(nn.Layer):
                 nranks = topo.mp_info.size
                 ring_id = 0
             self.self_attn = incubate.nn.FusedMultiHeadAttention(
-                d_model, nhead, dropout_rate=dropout, attn_dropout_rate=attn_dropout,
+                d_model,
+                nhead,
+                dropout_rate=dropout,
+                attn_dropout_rate=attn_dropout,
                 normalize_before=normalize_before,
                 qkv_weight_attr=weight_attrs[0],
                 qkv_bias_attr=bias_attrs[0],
@@ -408,8 +411,11 @@ class TransformerDecoderLayer(nn.Layer):
                 nranks=nranks,
                 ring_id=ring_id)
             self.ffn = incubate.nn.FusedFeedForward(
-                d_model, dim_feedforward, dropout_rate=act_dropout,
-                epsilon=1e-5, activation=activation,
+                d_model,
+                dim_feedforward,
+                dropout_rate=act_dropout,
+                epsilon=1e-5,
+                activation=activation,
                 normalize_before=normalize_before,
                 act_dropout_rate=0.0,
                 linear1_weight_attr=weight_attrs[2],
@@ -1074,7 +1080,11 @@ class GPTForGeneration(GPTPretrainedModel):
         gen_caches = self._init_generation_caches(input_ids)
 
         logits, cached_kvs = self.model(
-            input_ids, position_ids, encode_mask, use_cache=True, cache=gen_caches)
+            input_ids,
+            position_ids,
+            encode_mask,
+            use_cache=True,
+            cache=gen_caches)
 
         next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
         ####################################
