@@ -177,6 +177,7 @@ class ErniePretrainedModel(PretrainedModel):
             "hidden_act": "relu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 1024,
+            "intermediate_size": 4096,  # special for large model
             "initializer_range": 0.02,
             "max_position_embeddings": 512,
             "num_attention_heads": 16,
@@ -184,7 +185,7 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 4,
             "vocab_size": 12800,
         },
-        "ernie-2.0-en": {
+        "ernie-2.0-base-en": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -197,7 +198,7 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
-        "ernie-2.0-en-finetuned-squad": {
+        "ernie-2.0-base-en-finetuned-squad": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -306,6 +307,7 @@ class ErniePretrainedModel(PretrainedModel):
             "attention_probs_dropout_prob": 0.0,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.0,
+            "intermediate_size": 4096,  # special for large model
             "hidden_size": 1024,
             "initializer_range": 0.02,
             "max_position_embeddings": 2048,
@@ -405,9 +407,9 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_base_zh.pdparams",
             "ernie-2.0-large-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_large_zh.pdparams",
-            "ernie-2.0-en":
+            "ernie-2.0-base-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base.pdparams",
-            "ernie-2.0-en-finetuned-squad":
+            "ernie-2.0-base-en-finetuned-squad":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/ernie_v2_eng_base_finetuned_squad.pdparams",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/ernie_v2_eng_large.pdparams",
