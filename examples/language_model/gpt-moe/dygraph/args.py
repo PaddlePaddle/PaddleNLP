@@ -237,7 +237,7 @@ def parse_args(MODEL_CLASSES):
         "--resume_dir",
         default="",
         type=str,
-        required=True,
+        required=False,
         help="The resume directory where the checkpoint will be resume."
     )
 
