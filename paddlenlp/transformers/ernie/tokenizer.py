@@ -85,9 +85,13 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
-            "ernie-2.0-en":
+            "ernie-2.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_base_zh_vocab.txt",
+            "ernie-2.0-large-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_large_zh_vocab.txt",
+            "ernie-2.0-base-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-en-finetuned-squad":
+            "ernie-2.0-base-en-finetuned-squad":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
@@ -133,10 +137,16 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-tiny": {
             "do_lower_case": True
         },
-        "ernie-2.0-en": {
+        "ernie-2.0-base-zh": {
             "do_lower_case": True
         },
-        "ernie-2.0-en-finetuned-squad": {
+        "ernie-2.0-large-zh": {
+            "do_lower_case": True
+        },
+        "ernie-2.0-base-en": {
+            "do_lower_case": True
+        },
+        "ernie-2.0-base-en-finetuned-squad": {
             "do_lower_case": True
         },
         "ernie-2.0-large-en": {
