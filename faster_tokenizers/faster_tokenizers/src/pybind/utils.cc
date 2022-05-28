@@ -140,7 +140,7 @@ bool CastPyArg2AttrBoolean(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be bool, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
   }
   return false;
 }
@@ -155,7 +155,7 @@ std::string CastPyArg2AttrString(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be str, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return "";
   }
 }
@@ -167,7 +167,7 @@ int CastPyArg2AttrInt(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be str, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return 0;
   }
 }
@@ -179,7 +179,7 @@ int64_t CastPyArg2AttrLong(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be str, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return 0;
   }
 }
@@ -191,7 +191,7 @@ size_t CastPyArg2AttrSize_t(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be str, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return 0;
   }
 }
@@ -203,7 +203,7 @@ float CastPyArg2AttrFloat(PyObject* obj, ssize_t arg_pos) {
     std::ostringstream oss;
     oss << "argument (position" << arg_pos + 1 << " must be str, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return 0;
   }
 }
@@ -222,7 +222,7 @@ std::vector<std::string> CastPyArg2VectorOfStr(PyObject* obj, size_t arg_pos) {
         oss << "argument (position" << arg_pos + 1
             << " must be list of str, but got "
             << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-        throw oss.str();
+        throw std::runtime_error(oss.str());
         return {};
       }
     }
@@ -238,7 +238,7 @@ std::vector<std::string> CastPyArg2VectorOfStr(PyObject* obj, size_t arg_pos) {
         oss << "argument (position" << arg_pos + 1
             << " must be list of str, but got "
             << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-        throw oss.str();
+        throw std::runtime_error(oss.str());
         return {};
       }
     }
@@ -249,7 +249,7 @@ std::vector<std::string> CastPyArg2VectorOfStr(PyObject* obj, size_t arg_pos) {
     oss << "argument (position" << arg_pos + 1
         << " must be list or tuple, but got "
         << (reinterpret_cast<PyTypeObject*>(obj->ob_type))->tp_name;
-    throw oss.str();
+    throw std::runtime_error(oss.str());
     return {};
   }
   return result;

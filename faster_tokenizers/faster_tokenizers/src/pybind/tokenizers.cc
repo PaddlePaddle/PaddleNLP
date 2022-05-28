@@ -800,6 +800,10 @@ static PyObject* Encode(TokenizerObject* self,
             &encoding, pair_encoding_ptr, add_special_tokens, &result_encoding);
       } else {
         // throw error
+        std::ostringstream oss;
+        oss << "The sequence should be list of string when "
+               "is_pretokenized=True";
+        throw std::runtime_error(oss.str());
       }
     } else {
       std::string sequence = CastPyArg2AttrString(kw_sequence, 0);
