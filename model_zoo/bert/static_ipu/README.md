@@ -115,6 +115,15 @@ pip install -U python/dist/paddlepaddle-0.0.0-cp37-cp37m-linux_x86_64.whl
 cd /workdir
 ```
 
+- IPUTrainer
+```bash
+# clone PaddleNLP repo
+git clone git@github.com:graphcore/PaddleNLP-IPU.git
+
+# setup
+python setup.py install
+```
+
 ### Execution
 
 - Run pretraining phase1 (sequence_length = 128)
