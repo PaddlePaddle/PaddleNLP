@@ -107,8 +107,8 @@ class UIETask(Task):
         },
         "uie-medical-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
-                "56c2b7d02403f2ede513cedaabc8212a"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
+                "569b4bc1abf80eedcdad5a6e774d46bf"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",

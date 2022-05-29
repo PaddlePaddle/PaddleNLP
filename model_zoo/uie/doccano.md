@@ -296,6 +296,7 @@ python doccano.py \
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
+- 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 ## References
 - **[doccano](https://github.com/doccano/doccano)**
