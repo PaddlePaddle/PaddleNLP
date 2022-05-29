@@ -27,91 +27,47 @@ from model import UIE
 class InferBackend(object):
     def __init__(self,
                  model_path_prefix,
-                 infer_model_dir,
-                 mode,
                  device='cpu',
                  use_quantize=False,
                  use_fp16=False,
                  num_threads=10):
-        if mode == "paddle":
-            config = paddle.inference.Config(model_path_prefix + ".pdmodel",
-                                             model_path_prefix + ".pdiparams")
-            if device == "cpu":
-                config.disable_gpu()
-                config.enable_mkldnn()
-                config.set_cpu_math_library_num_threads(num_threads)
-                #config.enable_onnxruntime()
-                #config.enable_ort_optimization()
-            else:
-                config.enable_use_gpu(100, 0)
-            config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
-            self.predictor_type = "inference"
-            self.predictor = paddle.inference.create_predictor(config)
-            self.input_names = [
-                name for name in self.predictor.get_input_names()
-            ]
-            self.input_handles = [
-                self.predictor.get_input_handle(name)
-                for name in self.predictor.get_input_names()
-            ]
-            self.output_handles = [
-                self.predictor.get_output_handle(name)
-                for name in self.predictor.get_output_names()
-            ]
+        print(">>> [InferBackend] Creating Engine ...")
+        onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+            model_file=model_path_prefix + ".pdmodel",
+            params_file=model_path_prefix + ".pdiparams",
+            opset_version=13,
+            enable_onnx_checker=True)
+        infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
+        float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
+        with open(float_onnx_file, "wb") as f:
+            f.write(onnx_model)
+
+        if device == "gpu":
+            providers = ['CUDAExecutionProvider']
+            print(">>> [InferBackend] Use GPU to inference ...")
+            if use_fp16:
+                print(">>> [InferBackend] Use FP16 to inference ...")
+                from onnxconverter_common import float16
+                import onnx
+                fp16_model_file = os.path.join(infer_model_dir,
+                                               "fp16_model.onnx")
+                onnx_model = onnx.load_model(float_onnx_file)
+                trans_model = float16.convert_float_to_float16(
+                    onnx_model, keep_io_types=True)
+                onnx.save_model(trans_model, fp16_model_file)
+                onnx_model = fp16_model_file
         else:
-            self.predictor_type = "onnxruntime"
-            print(">>> [InferBackend] Creating Engine ...")
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=model_path_prefix + ".pdmodel",
-                params_file=model_path_prefix + ".pdiparams",
-                opset_version=13,
-                enable_onnx_checker=True)
-            float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
-            with open(float_onnx_file, "wb") as f:
-                f.write(onnx_model)
+            providers = ['CPUExecutionProvider']
+            print(">>> [InferBackend] Use CPU to inference ...")
 
-            if device == "gpu":
-                providers = ['CUDAExecutionProvider']
-                print(">>> [InferBackend] Use GPU to inference ...")
-                if use_fp16:
-                    print(">>> [InferBackend] Use FP16 to inference ...")
-                    from onnxconverter_common import float16
-                    import onnx
-                    fp16_model_file = os.path.join(infer_model_dir,
-                                                   "fp16_model.onnx")
-                    onnx_model = onnx.load_model(float_onnx_file)
-                    trans_model = float16.convert_float_to_float16(
-                        onnx_model, keep_io_types=True)
-                    onnx.save_model(trans_model, fp16_model_file)
-                    onnx_model = fp16_model_file
-            else:
-                providers = ['CPUExecutionProvider']
-                print(">>> [InferBackend] Use CPU to inference ...")
-                if use_quantize:
-                    print(">>> [InferBackend] Use dynamic quantize ...")
-                    from onnxruntime.quantization import QuantizationMode, quantize_dynamic
-                    quantize_model_file = os.path.join(
-                        infer_model_dir, "dynamic_quantize_model.onnx")
-                    quantize_dynamic(float_onnx_file, quantize_model_file)
-                    onnx_model = quantize_model_file
-
-            sess_options = ort.SessionOptions()
-            sess_options.intra_op_num_threads = num_threads
-            sess_options.inter_op_num_threads = num_threads
-            self.predictor = ort.InferenceSession(
-                onnx_model, sess_options=sess_options, providers=providers)
-            print(">>> [InferBackend] Engine Created ...")
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads = num_threads
+        sess_options.inter_op_num_threads = num_threads
+        self.predictor = ort.InferenceSession(
+            onnx_model, sess_options=sess_options, providers=providers)
+        print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
-        if self.predictor_type == "inference":
-            for idx, input_name in enumerate(self.input_names):
-                self.input_handles[idx].copy_from_cpu(input_dict[input_name])
-            self.predictor.run()
-            output = [
-                output_handle.copy_to_cpu()
-                for output_handle in self.output_handles
-            ]
-            return output
         result = self.predictor.run(None, input_dict)
         return result
 
@@ -133,7 +89,7 @@ class UIEPredictor(object):
             "ernie-3.0-base-zh", use_faster=True)
 
         self._position_prob = args.position_prob
-        self._max_seq_len = args.max_seq_len
+        self._max_seq_len = 512
         if isinstance(args.schema, dict) or isinstance(args.schema, str):
             args.schema = [args.schema]
         self._schema_tree = self._build_tree(args.schema)
@@ -141,14 +97,10 @@ class UIEPredictor(object):
         if args.device == 'cpu':
             args.use_fp16 = False
         if args.device == 'gpu':
-            args.use_quantize = False
             args.num_threads = cpu_count()
         self.inference_backend = InferBackend(
             args.model_path_prefix,
-            args.infer_model_dir,
-            args.mode,
             device=args.device,
-            use_quantize=args.use_quantize,
             use_fp16=args.use_fp16,
             num_threads=args.num_threads)
 

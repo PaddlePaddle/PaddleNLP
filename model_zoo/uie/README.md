@@ -2,11 +2,11 @@
 
  **目录**
 
-* [1. 模型简介](#模型简介)
-* [2. 应用示例](#应用示例)
-* [3. 开箱即用](#开箱即用)
-* [4. 轻定制功能](#轻定制功能)
-* [5. CCKS比赛](#CCKS比赛)
+- [1. 模型简介](#模型简介)
+- [2. 应用示例](#应用示例)
+- [3. 开箱即用](#开箱即用)
+- [4. 轻定制功能](#轻定制功能)
+- [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
 
@@ -273,16 +273,10 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   [
     "法院",
     {
-        "原告": [
-            "委托代理人",
-            "法定代表人"
-        ]
+        "原告": "委托代理人"
     },
     {
-        "被告": [
-            "委托代理人",
-            "法定代表人"
-        ]
+        "被告": "委托代理人"
     }
   ]
   ```
@@ -336,6 +330,14 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9492842181233527}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.7277186614493836}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8751028059367947}]}]
   ```
+
+#### 可配置参数说明
+* `num_threads`：配置CPU的线程数，默认为CPU的最大线程数。
+* `infer_precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快，如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，确保CUDA>=11.2，CuDNN>=8.2，初次使用需按照提示安装相关依赖。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
+* `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
+* `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 
 <a name="轻定制功能"></a>
 
@@ -508,6 +510,108 @@ python evaluate.py \
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
+
+#### 部署
+
+以下是UIE Python端的部署流程，包括环境准备、模型导出和使用示例。
+
+- 环境准备
+  UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
+
+  - CPU端
+
+    CPU端的部署请使用如下命令安装所需依赖
+
+    ```shell
+    pip install -r deploy/python/requirements_cpu.txt
+    ```
+
+  - GPU端
+
+    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖
+
+    ```shell
+    pip install -r deploy/python/requirements_gpu.txt
+    ```
+
+- 模型导出
+
+  将训练后的动态图参数导出为静态图参数：
+
+  ```shell
+  python export_model.py --model_path=./checkpoint/model_best --output_path=./export
+  ```
+
+  可配置参数说明：
+
+  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
+  - `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+
+- 推理
+
+  - CPU端推理样例
+
+    在CPU端，请使用如下命令进行部署
+
+    ```shell
+    python deploy/python/infer_cpu.py --model_path_prefix export/inference --num_threads 10
+    ```
+
+    输出打印如下：
+
+    ```text
+    [{'肝癌级别': [{'end': 20,
+                'probability': 0.9683538,
+                'start': 13,
+                'text': 'II-III级'}],
+      '肿瘤的个数': [{'end': 84, 'probability': 0.9032264, 'start': 82, 'text': '1个'}],
+      '肿瘤的大小': [{'end': 100,
+                'probability': 0.9612219,
+                'start': 87,
+                'text': '4.2×4.0×2.8cm'}],
+      '脉管内癌栓分级': [{'end': 70,
+                  'probability': 0.9865319,
+                  'start': 67,
+                  'text': 'M0级'}]}]
+    ```
+
+    可配置参数说明：
+
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `num_threads`: 配置cpu的线程数，默认为cpu的最大线程数。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+
+  - GPU端推理样例
+
+    在GPU端，请使用如下命令进行部署
+
+    ```shell
+    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    ```
+
+    输出打印如下：
+
+    ```text
+    [{'肝癌级别': [{'end': 20,
+                'probability': 0.9683538,
+                'start': 13,
+                'text': 'II-III级'}],
+      '肿瘤的个数': [{'end': 84, 'probability': 0.9032264, 'start': 82, 'text': '1个'}],
+      '肿瘤的大小': [{'end': 100,
+                'probability': 0.9612219,
+                'start': 87,
+                'text': '4.2×4.0×2.8cm'}],
+      '脉管内癌栓分级': [{'end': 70,
+                  'probability': 0.9865319,
+                  'start': 67,
+                  'text': 'M0级'}]}]
+    ```
+
+    可配置参数说明：
+
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `use_fp16`: 是否使用FP16进行加速，默认关闭。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 
 <a name="CCKS比赛"></a>
 

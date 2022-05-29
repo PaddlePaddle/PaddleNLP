@@ -22,7 +22,7 @@ from model import UIE
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str, required=True, default='./checkpoint/model_best', help="The path to model parameters to be loaded.")
-parser.add_argument("--infer_model_dir", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
+parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
 # yapf: enable
 

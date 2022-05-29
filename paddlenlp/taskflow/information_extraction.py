@@ -127,6 +127,7 @@ class UIETask(Task):
         self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
+        self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._max_seq_len = self.kwargs[
@@ -242,13 +243,22 @@ class UIETask(Task):
         probs = []
         for batch in infer_data_loader:
             input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
-            self.input_handles[0].copy_from_cpu(input_ids.numpy())
-            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-            self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-            self.input_handles[3].copy_from_cpu(att_mask.numpy())
-            self.predictor.run()
-            start_prob = self.output_handle[0].copy_to_cpu().tolist()
-            end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            if self._predictor_type == "paddle-inference":
+                self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                self.predictor.run()
+                start_prob = self.output_handle[0].copy_to_cpu().tolist()
+                end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            else:
+                input_dict = {
+                    "input_ids": input_ids.numpy(),
+                    "token_type_ids": token_type_ids.numpy(),
+                    "pos_ids": pos_ids.numpy(),
+                    "att_mask": att_mask.numpy()
+                }
+                start_prob, end_prob = self.predictor.run(None, input_dict)
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)

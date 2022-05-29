@@ -29,35 +29,15 @@ def parse_args():
         required=True,
         help="The path prefix of inference model to be used.", )
     parser.add_argument(
-        "--infer_model_dir",
-        type=str,
-        default='./export',
-        help="The path to model parameter in onnx to be saved.", )
-    parser.add_argument(
-        "--max_seq_len",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
         "--position_prob",
         default=0.5,
         type=float,
         help="Probability threshold for start/end index probabiliry.", )
     parser.add_argument(
-        "--use_quantize",
-        action='store_true',
-        help="Whether to use quantization for acceleration.", )
-    parser.add_argument(
-        "--mode",
-        default='onnx',
-        type=str,
-        help="", )
-    parser.add_argument(
         "--num_threads",
         default=cpu_count(),
         type=int,
-        help="num_threads for cpu.", )
+        help="Number of threads for cpu.", )
     args = parser.parse_args()
     return args
 
@@ -75,7 +55,6 @@ def main():
     predictor = UIEPredictor(args)
 
     outputs = predictor.predict(text)
-    from pprint import pprint
     pprint(outputs)
 
 
