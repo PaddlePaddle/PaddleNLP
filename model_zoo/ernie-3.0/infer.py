@@ -20,6 +20,7 @@ from functools import partial
 import distutils.util
 import numpy as np
 import onnxruntime as ort
+from multiprocessing import cpu_count
 
 import paddle
 from paddle import inference
@@ -114,7 +115,7 @@ def parse_args():
         help="Precision for inference.")
     parser.add_argument(
         "--num_threads",
-        default=12,
+        default=cpu_count(),
         type=int,
         help="num_threads for cpu.", )
     parser.add_argument(
@@ -192,12 +193,16 @@ class Predictor(object):
     @classmethod
     def create_predictor(cls, args):
         if args.use_onnxruntime:
-            import paddle2onnx
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=args.model_path + ".pdmodel",
-                params_file=args.model_path + ".pdiparams",
-                opset_version=13,
-                enable_onnx_checker=True)
+            assert args.device != "xpu", "Running ONNXRuntime on XPU is temporarily not supported."
+            if args.model_path.count(".onnx"):
+                onnx_model = args.model_path
+            else:
+                import paddle2onnx
+                onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+                    model_file=args.model_path + ".pdmodel",
+                    params_file=args.model_path + ".pdiparams",
+                    opset_version=13,
+                    enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
             if args.enable_quantize:

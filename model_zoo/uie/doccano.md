@@ -16,6 +16,10 @@
 
 参考[doccano官方文档](https://github.com/doccano/doccano) 完成doccano的安装与初始配置。
 
+**以下标注示例用到的环境配置：**
+
+- doccano 1.6.2
+
 <a name="项目创建"></a>
 
 ## 2. 项目创建
@@ -24,7 +28,7 @@ UIE支持抽取与分类两种类型的任务，根据实际需要创建一个�
 
 #### 2.1 抽取式任务项目创建
 
-创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation L=labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
+创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation Labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
@@ -78,8 +82,6 @@ Relation类型标签构建示例：
 </div>
 
 #### 4.2 构建分类式任务标签
-
-分类式任务支持句子级情感倾向分类，以及多类别分类、多标签分类等多种类型的文本分类任务。
 
 添加分类类别标签：
 
@@ -139,7 +141,7 @@ Relation类型标签构建示例：
 
 示例中定义了`评价维度`和`观点词`两种Span标签，以及`观点词`一种Relation标签。Relation标签**由评价维度指向观点词**。
 
-#### 5.5 文本分类
+#### 5.5 分类任务
 
 标注示例：
 
@@ -147,7 +149,7 @@ Relation类型标签构建示例：
     <img src=https://user-images.githubusercontent.com/40840292/167249572-48a04c4f-ab79-47ef-a138-798f4243f520.png height=100 hspace='20'/>
 </div>
 
-示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类，除了二分类，UIE还支持多类别、多标签分类。
+示例中定义了`正向`和`负向`两种类别标签对文本的情感倾向进行分类。
 
 <a name="数据导出"></a>
 
@@ -159,33 +161,52 @@ Relation类型标签构建示例：
 
 ```text
 {
-    "id": 36,
-    "text": "2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌",
-    "relations": [],
+    "id": 38,
+    "text": "百科名片你知道我要什么，是歌手高明骏演唱的一首歌曲，1989年发行，收录于个人专辑《丛林男孩》中",
+    "relations": [
+        {
+            "id": 20,
+            "from_id": 51,
+            "to_id": 53,
+            "type": "歌手"
+        },
+        {
+            "id": 21,
+            "from_id": 51,
+            "to_id": 55,
+            "type": "发行时间"
+        },
+        {
+            "id": 22,
+            "from_id": 51,
+            "to_id": 54,
+            "type": "所属专辑"
+        }
+    ],
     "entities": [
         {
-            "id": 47,
-            "start_offset": 0,
-            "end_offset": 6,
-            "label": "时间"
+            "id": 51,
+            "start_offset": 4,
+            "end_offset": 11,
+            "label": "作品名"
         },
         {
-            "id": 48,
-            "start_offset": 6,
-            "end_offset": 23,
-            "label": "赛事名称"
+            "id": 53,
+            "start_offset": 15,
+            "end_offset": 18,
+            "label": "人物名"
         },
         {
-            "id": 49,
-            "start_offset": 28,
+            "id": 54,
+            "start_offset": 42,
+            "end_offset": 46,
+            "label": "作品名"
+        },
+        {
+            "id": 55,
+            "start_offset": 26,
             "end_offset": 31,
-            "label": "选手"
-        },
-        {
-            "id": 50,
-            "start_offset": 32,
-            "end_offset": 39,
-            "label": "得分"
+            "label": "时间"
         }
     ]
 }
@@ -263,7 +284,7 @@ python doccano.py \
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取类型任务有效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，为了保证评估指标的准确性，验证集和测试集默认构造全负例。默认为5。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
 - ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。
@@ -275,6 +296,7 @@ python doccano.py \
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
+- 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 ## References
 - **[doccano](https://github.com/doccano/doccano)**

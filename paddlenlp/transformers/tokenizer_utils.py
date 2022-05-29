@@ -1318,7 +1318,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
-            if self.do_lower_case:
+            if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
                 ch = unicodedata.normalize('NFD', ch)
                 ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
@@ -1645,7 +1645,7 @@ class BPETokenizer(PretrainedTokenizer):
     def _get_encoder(self, encoder_json_path, vocab_bpe_path):
         with open(encoder_json_path, 'r') as f:
             encoder = json.load(f)
-        with open(vocab_bpe_path, 'r') as f:
+        with open(vocab_bpe_path, 'r', encoding='utf-8') as f:
             bpe_data = f.read()
         bpe_merges = [
             tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
