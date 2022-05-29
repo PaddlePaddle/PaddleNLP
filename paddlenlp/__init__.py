@@ -50,6 +50,7 @@ from paddle import in_dynamic_mode
 import warnings
 import sys
 
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
 def _patch_data_loader_init(self,
                             dataset,
