@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from collections import defaultdict
 from contextlib import contextmanager
 import os
@@ -32,12 +33,15 @@ from paddlenlp.transformers.utils import fn_args_to_dict
 
 def infer_transformer_decoding(
         enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
-        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
-        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
-        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
-        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
-        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
-        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        slf_q_weight, slf_q_weight_scale, slf_q_bias, slf_k_weight,
+        slf_k_weight_scale, slf_k_bias, slf_v_weight, slf_v_weight_scale,
+        slf_v_bias, slf_out_weight, slf_out_weight_scale, slf_out_bias,
+        cross_ln_weight, cross_ln_bias, cross_q_weight, cross_q_weight_scale,
+        cross_q_bias, cross_k_weight, cross_k_weight_scale, cross_k_bias,
+        cross_v_weight, cross_v_weight_scale, cross_v_bias, cross_out_weight,
+        cross_out_weight_scale, cross_out_bias, ffn_ln_weight, ffn_ln_bias,
+        ffn_inter_weight, ffn_inter_weight_scale, ffn_inter_bias,
+        ffn_out_weight, ffn_out_weight_scale, ffn_out_bias, decoder_ln_weight,
         decoder_ln_bias, linear_weight, linear_bias, pos_emb,
         _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
@@ -51,28 +55,38 @@ def infer_transformer_decoding(
         'SelfLayernormWeight@VECTOR': slf_ln_weight,
         'SelfLayernormBias@VECTOR': slf_ln_bias,
         'SelfQueryWeight@VECTOR': slf_q_weight,
+        'SelfQueryWeightScale@VECTOR': slf_q_weight_scale,
         'SelfQueryBias@VECTOR': slf_q_bias,
         'SelfKeyWeight@VECTOR': slf_k_weight,
+        'SelfKeyWeightScale@VECTOR': slf_k_weight_scale,
         'SelfKeyBias@VECTOR': slf_k_bias,
         'SelfValueWeight@VECTOR': slf_v_weight,
+        'SelfValueWeightScale@VECTOR': slf_v_weight_scale,
         'SelfValueBias@VECTOR': slf_v_bias,
         'SelfOutWeight@VECTOR': slf_out_weight,
+        'SelfOutWeightScale@VECTOR': slf_out_weight_scale,
         'SelfOutBias@VECTOR': slf_out_bias,
         'CrossLayernormWeight@VECTOR': cross_ln_weight,
         'CrossLayernormBias@VECTOR': cross_ln_bias,
         'CrossQueryWeight@VECTOR': cross_q_weight,
+        'CrossQueryWeightScale@VECTOR': cross_q_weight_scale,
         'CrossQueryBias@VECTOR': cross_q_bias,
         'CrossKeyWeight@VECTOR': cross_k_weight,
+        'CrossKeyWeightScale@VECTOR': cross_k_weight_scale,
         'CrossKeyBias@VECTOR': cross_k_bias,
         'CrossValueWeight@VECTOR': cross_v_weight,
+        'CrossValueWeightScale@VECTOR': cross_v_weight_scale,
         'CrossValueBias@VECTOR': cross_v_bias,
         'CrossOutWeight@VECTOR': cross_out_weight,
+        'CrossOutWeightScale@VECTOR': cross_out_weight_scale,
         'CrossOutBias@VECTOR': cross_out_bias,
         'FFNLayernormWeight@VECTOR': ffn_ln_weight,
         'FFNLayernormBias@VECTOR': ffn_ln_bias,
         'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterWeightScale@VECTOR': ffn_inter_weight_scale,
         'FFNInterBias@VECTOR': ffn_inter_bias,
         'FFNOutWeight@VECTOR': ffn_out_weight,
+        'FFNOutWeightScale@VECTOR': ffn_out_weight_scale,
         'FFNOutBias@VECTOR': ffn_out_bias,
         'DecoderLayernormWeight': decoder_ln_weight,
         'DecoderLayernormBias': decoder_ln_bias,
@@ -867,7 +881,8 @@ class InferTransformerDecoding(nn.Layer):
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  rel_len=False,
-                 alpha=0.6):
+                 alpha=0.6,
+                 use_int8=True):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use FasterTransformer. ")
@@ -963,30 +978,40 @@ class InferTransformerDecoding(nn.Layer):
         self.slf_ln_weight = []
         self.slf_ln_bias = []
         self.slf_q_weight = []
+        self.slf_q_weight_scale = []
         self.slf_q_bias = []
         self.slf_k_weight = []
+        self.slf_k_weight_scale = []
         self.slf_k_bias = []
         self.slf_v_weight = []
+        self.slf_v_weight_scale = []
         self.slf_v_bias = []
         self.slf_out_weight = []
+        self.slf_out_weight_scale = []
         self.slf_out_bias = []
 
         self.cross_ln_weight = []
         self.cross_ln_bias = []
         self.cross_q_weight = []
+        self.cross_q_weight_scale = []
         self.cross_q_bias = []
         self.cross_k_weight = []
+        self.cross_k_weight_scale = []
         self.cross_k_bias = []
         self.cross_v_weight = []
+        self.cross_v_weight_scale = []
         self.cross_v_bias = []
         self.cross_out_weight = []
+        self.cross_out_weight_scale = []
         self.cross_out_bias = []
 
         self.ffn_ln_weight = []
         self.ffn_ln_bias = []
         self.ffn_inter_weight = []
+        self.ffn_inter_weight_scale = []
         self.ffn_inter_bias = []
         self.ffn_out_weight = []
+        self.ffn_out_weight_scale = []
         self.ffn_out_bias = []
 
         for i, mod in enumerate(decoder.layers):
@@ -1005,8 +1030,15 @@ class InferTransformerDecoding(nn.Layer):
                     ],
                     dtype="float16" if use_fp16_decoding else "float32")
                 setattr(self, "slf_q_weight_" + str(i), q_weights)
-                self.slf_q_weight.append(
-                    getattr(self, "slf_q_weight_" + str(i)))
+
+                if use_int8:
+                    self.create_int8_parameter(
+                        prefix="self_attn_q_proj_weight",
+                        parameter=getattr(self, "slf_q_weight_" + str(i)),
+                        layer=i)
+                else:
+                    self.slf_q_weight.append(
+                        getattr(self, "slf_q_weight_" + str(i)))
 
                 q_bias_shape = mod.self_attn.q_proj.bias.shape
                 k_bias_shape = mod.self_attn.k_proj.bias.shape
@@ -1021,32 +1053,149 @@ class InferTransformerDecoding(nn.Layer):
                 setattr(self, "slf_q_bias_" + str(i), q_biases)
                 self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
             else:
-                self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+
+                if use_int8:
+                    self.create_int8_parameter(
+                        prefix="self_attn_q_proj_weight",
+                        parameter=mod.self_attn.q_proj.weight,
+                        layer=i)
+                else:
+                    self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+
                 self.slf_q_bias.append(mod.self_attn.q_proj.bias)
 
-            self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+            self.fake_scale = [
+                paddle.zeros(
+                    shape=[0],
+                    dtype="float16" if use_fp16_decoding else "float32")
+            ]
+            if use_int8:
+                self.create_int8_parameter(
+                    prefix="self_attn_k_proj_weight",
+                    parameter=mod.self_attn.k_proj.weight,
+                    layer=i)
+                self.create_int8_parameter(
+                    prefix="self_attn_v_proj_weight",
+                    parameter=mod.self_attn.v_proj.weight,
+                    layer=i)
+                self.create_int8_parameter(
+                    prefix="self_attn_out_proj_weight",
+                    parameter=mod.cross_attn.out_proj.weight,
+                    layer=i)
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_q_proj_weight",
+                    parameter=mod.cross_attn.q_proj.weight,
+                    layer=i)
+                # TODO: static cache supports general int8.
+                # self.create_int8_parameter(prefix="cross_attn_k_proj_weight", parameter=mod.cross_attn.k_proj.weight, layer=i)
+                # self.create_int8_parameter(prefix="cross_attn_v_proj_weight", parameter=mod.cross_attn.v_proj.weight, layer=i)
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_out_proj_weight",
+                    parameter=mod.cross_attn.out_proj.weight,
+                    layer=i)
+
+                self.create_int8_parameter(
+                    prefix="linear1_weight",
+                    parameter=mod.linear1.weight,
+                    layer=i)
+                self.create_int8_parameter(
+                    prefix="linear2_weight",
+                    parameter=mod.linear2.weight,
+                    layer=i)
+
+                # Append corresponding param into the list.
+                self.slf_q_weight.append(
+                    getattr(self, "self_attn_q_proj_weight_" + str(i)))
+                self.slf_q_weight_scale.append(
+                    getattr(self, "self_attn_q_proj_weight_scale_" + str(i)))
+
+                self.slf_k_weight.append(
+                    getattr(self, "self_attn_k_proj_weight_" + str(i)))
+                self.slf_k_weight_scale.append(
+                    getattr(self, "self_attn_k_proj_weight_scale_" + str(i)))
+
+                self.slf_v_weight.append(
+                    getattr(self, "self_attn_v_proj_weight_" + str(i)))
+                self.slf_v_weight_scale.append(
+                    getattr(self, "self_attn_v_proj_weight_scale_" + str(i)))
+
+                self.slf_out_weight.append(
+                    getattr(self, "self_attn_out_proj_weight_" + str(i)))
+                self.slf_out_weight_scale.append(
+                    getattr(self, "self_attn_out_proj_weight_scale_" + str(i)))
+
+                self.cross_q_weight.append(
+                    getattr(self, "cross_attn_q_proj_weight_" + str(i)))
+                self.cross_q_weight_scale.append(
+                    getattr(self, "cross_attn_q_proj_weight_scale_" + str(i)))
+
+                # TODO: static cache supports general int8.
+                # self.cross_k_weight.append(getattr(self, "cross_attn_k_proj_weight_" + str(i)))
+                # self.cross_k_weight_scale.append(getattr(self, "cross_attn_k_proj_weight_scale_" + str(i)))
+
+                # self.cross_v_weight.append(getattr(self, "cross_attn_v_proj_weight_" + str(i)))
+                # self.cross_v_weight_scale.append(getattr(self, "cross_attn_v_proj_weight_scale_" + str(i)))
+
+                self.cross_out_weight.append(
+                    getattr(self, "cross_attn_out_proj_weight_" + str(i)))
+                self.cross_out_weight_scale.append(
+                    getattr(self, "cross_attn_out_proj_weight_scale_" + str(i)))
+
+                self.ffn_inter_weight.append(
+                    getattr(self, "linear1_weight_" + str(i)))
+                self.ffn_inter_weight_scale.append(
+                    getattr(self, "linear1_weight_scale_" + str(i)))
+
+                self.ffn_out_weight.append(
+                    getattr(self, "linear2_weight_" + str(i)))
+                self.ffn_out_weight_scale.append(
+                    getattr(self, "linear2_weight_scale_" + str(i)))
+            else:
+                self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+                self.slf_v_weight.append(mod.self_attn.v_proj.weight)
+                self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+
+                self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
+                self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
+                self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
+                self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+
+                self.ffn_inter_weight.append(mod.linear1.weight)
+                self.ffn_out_weight.append(mod.linear2.weight)
+
+            # 
+            # self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+            # self.slf_v_weight.append(mod.self_attn.v_proj.weight)
+            # self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+            # self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
+            # self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+            # self.ffn_inter_weight.append(mod.linear1.weight)
+            # self.ffn_out_weight.append(mod.linear2.weight)
+
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
-            self.slf_v_weight.append(mod.self_attn.v_proj.weight)
             self.slf_v_bias.append(mod.self_attn.v_proj.bias)
-            self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+
             self.slf_out_bias.append(mod.self_attn.out_proj.bias)
 
             self.cross_ln_weight.append(mod.norm2.weight)
             self.cross_ln_bias.append(mod.norm2.bias)
-            self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
-            self.cross_q_bias.append(mod.cross_attn.q_proj.bias)
+
+            # TODO: static cache supports general int8.
             self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
-            self.cross_k_bias.append(mod.cross_attn.k_proj.bias)
             self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
+
+            self.cross_q_bias.append(mod.cross_attn.q_proj.bias)
+            self.cross_k_bias.append(mod.cross_attn.k_proj.bias)
             self.cross_v_bias.append(mod.cross_attn.v_proj.bias)
-            self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+
             self.cross_out_bias.append(mod.cross_attn.out_proj.bias)
 
             self.ffn_ln_weight.append(mod.norm3.weight)
             self.ffn_ln_bias.append(mod.norm3.bias)
-            self.ffn_inter_weight.append(mod.linear1.weight)
+
             self.ffn_inter_bias.append(mod.linear1.bias)
-            self.ffn_out_weight.append(mod.linear2.weight)
             self.ffn_out_bias.append(mod.linear2.bias)
 
         self.decoder_ln_weight = [decoder.norm.weight]
@@ -1058,6 +1207,26 @@ class InferTransformerDecoding(nn.Layer):
         self.linear_weight = [linear.weight]
         self.linear_bias = [linear.bias]
 
+    def create_int8_parameter(self, prefix, parameter, layer):
+        setattr(
+            self,
+            prefix + "_" + str(layer),
+            paddle.cast(
+                parameter, dtype="int8"))
+        setattr(
+            self,
+            prefix + "_scale_" + str(layer),
+            paddle.create_parameter(
+                shape=[parameter.shape[1]],
+                dtype="float16" if self._use_fp16_decoding else "float32"))
+
+    def get_scale(self, scale):
+        if (len(scale) == 0):
+            # Reuse the same param to prevent performance issue. 
+            return self.fake_scale
+        else:
+            return scale
+
     def forward(self, enc_output, memory_seq_lens, trg_word=None):
         def parse_function(func_name):
             return partial(
@@ -1066,28 +1235,40 @@ class InferTransformerDecoding(nn.Layer):
                 slf_ln_weight=self.slf_ln_weight,
                 slf_ln_bias=self.slf_ln_bias,
                 slf_q_weight=self.slf_q_weight,
+                slf_q_weight_scale=self.get_scale(self.slf_q_weight_scale),
                 slf_q_bias=self.slf_q_bias,
                 slf_k_weight=self.slf_k_weight,
+                slf_k_weight_scale=self.get_scale(self.slf_k_weight_scale),
                 slf_k_bias=self.slf_k_bias,
                 slf_v_weight=self.slf_v_weight,
+                slf_v_weight_scale=self.get_scale(self.slf_v_weight_scale),
                 slf_v_bias=self.slf_v_bias,
                 slf_out_weight=self.slf_out_weight,
+                slf_out_weight_scale=self.get_scale(self.slf_out_weight_scale),
                 slf_out_bias=self.slf_out_bias,
                 cross_ln_weight=self.cross_ln_weight,
                 cross_ln_bias=self.cross_ln_bias,
                 cross_q_weight=self.cross_q_weight,
+                cross_q_weight_scale=self.get_scale(self.cross_q_weight_scale),
                 cross_q_bias=self.cross_q_bias,
                 cross_k_weight=self.cross_k_weight,
+                cross_k_weight_scale=self.get_scale(self.cross_k_weight_scale),
                 cross_k_bias=self.cross_k_bias,
                 cross_v_weight=self.cross_v_weight,
+                cross_v_weight_scale=self.get_scale(self.cross_v_weight_scale),
                 cross_v_bias=self.cross_v_bias,
                 cross_out_weight=self.cross_out_weight,
+                cross_out_weight_scale=self.get_scale(
+                    self.cross_out_weight_scale),
                 cross_out_bias=self.cross_out_bias,
                 ffn_ln_weight=self.ffn_ln_weight,
                 ffn_ln_bias=self.ffn_ln_bias,
                 ffn_inter_weight=self.ffn_inter_weight,
+                ffn_inter_weight_scale=self.get_scale(
+                    self.ffn_inter_weight_scale),
                 ffn_inter_bias=self.ffn_inter_bias,
                 ffn_out_weight=self.ffn_out_weight,
+                ffn_out_weight_scale=self.get_scale(self.ffn_out_weight_scale),
                 ffn_out_bias=self.ffn_out_bias,
                 decoder_ln_weight=self.decoder_ln_weight,
                 decoder_ln_bias=self.decoder_ln_bias,

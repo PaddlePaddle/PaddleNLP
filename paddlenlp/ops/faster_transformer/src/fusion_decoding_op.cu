@@ -33,28 +33,38 @@ std::vector<paddle::Tensor> decoding_kernel(
     const std::vector<paddle::Tensor>& self_layernorm_weight,
     const std::vector<paddle::Tensor>& self_layernorm_bias,
     const std::vector<paddle::Tensor>& self_attn_query_weight,
+    const std::vector<paddle::Tensor>& self_attn_query_weight_scale,
     const std::vector<paddle::Tensor>& self_attn_query_bias,
     const std::vector<paddle::Tensor>& self_attn_key_weight,
+    const std::vector<paddle::Tensor>& self_attn_key_weight_scale,
     const std::vector<paddle::Tensor>& self_attn_key_bias,
     const std::vector<paddle::Tensor>& self_attn_value_weight,
+    const std::vector<paddle::Tensor>& self_attn_value_weight_scale,
     const std::vector<paddle::Tensor>& self_attn_value_bias,
     const std::vector<paddle::Tensor>& self_attn_output_weight,
+    const std::vector<paddle::Tensor>& self_attn_output_weight_scale,
     const std::vector<paddle::Tensor>& self_attn_output_bias,
     const std::vector<paddle::Tensor>& cross_layernorm_weight,
     const std::vector<paddle::Tensor>& cross_layernorm_bias,
     const std::vector<paddle::Tensor>& cross_attn_query_weight,
+    const std::vector<paddle::Tensor>& cross_attn_query_weight_scale,
     const std::vector<paddle::Tensor>& cross_attn_query_bias,
     const std::vector<paddle::Tensor>& cross_attn_key_weight,
+    const std::vector<paddle::Tensor>& cross_attn_key_weight_scale,
     const std::vector<paddle::Tensor>& cross_attn_key_bias,
     const std::vector<paddle::Tensor>& cross_attn_value_weight,
+    const std::vector<paddle::Tensor>& cross_attn_value_weight_scale,
     const std::vector<paddle::Tensor>& cross_attn_value_bias,
     const std::vector<paddle::Tensor>& cross_attn_output_weight,
+    const std::vector<paddle::Tensor>& cross_attn_output_weight_scale,
     const std::vector<paddle::Tensor>& cross_attn_output_bias,
     const std::vector<paddle::Tensor>& ffn_layernorm_weight,
     const std::vector<paddle::Tensor>& ffn_layernorm_bias,
     const std::vector<paddle::Tensor>& ffn_intermediate_weight,
+    const std::vector<paddle::Tensor>& ffn_intermediate_weight_scale,
     const std::vector<paddle::Tensor>& ffn_intermediate_bias,
     const std::vector<paddle::Tensor>& ffn_output_weight,
+    const std::vector<paddle::Tensor>& ffn_output_weight_scale,
     const std::vector<paddle::Tensor>& ffn_output_bias,
     const paddle::Tensor& decoder_layernorm_weight,
     const paddle::Tensor& decoder_layernorm_bias,
@@ -128,6 +138,9 @@ std::vector<paddle::Tensor> decoding_kernel(
   auto k_weight_shape = self_attn_key_weight[0].shape();
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
+//   bool use_int8 = (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
+  bool use_int8 = true;
+
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
     params[i].cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
@@ -150,30 +163,62 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(
         self_layernorm_bias[i].data<data_t_>());
     // query
-    params[i].self_attention.query_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            self_attn_query_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].self_attention.query_weight.int8_kernel =
+            self_attn_query_weight[i].data<int8_t>();
+        params[i].self_attention.query_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            self_attn_query_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].self_attention.query_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                self_attn_query_weight[i].data<data_t_>());
+    }
+
     params[i].self_attention.query_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_query_bias[i].data<data_t_>());
     // key
-    params[i].self_attention.key_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            self_attn_key_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].self_attention.key_weight.int8_kernel =
+            self_attn_key_weight[i].data<int8_t>();
+        params[i].self_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            self_attn_key_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].self_attention.key_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                self_attn_key_weight[i].data<data_t_>());
+    }
+
     params[i].self_attention.key_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_key_bias[i].data<data_t_>());
     // value
-    params[i].self_attention.value_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            self_attn_value_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].self_attention.value_weight.int8_kernel =
+            self_attn_value_weight[i].data<int8_t>();
+        params[i].self_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            self_attn_value_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].self_attention.value_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                self_attn_value_weight[i].data<data_t_>());
+    }
+
     params[i].self_attention.value_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_value_bias[i].data<data_t_>());
     // out proj
-    params[i].self_attention.attention_output_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            self_attn_output_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].self_attention.attention_output_weight.int8_kernel =
+            self_attn_output_weight[i].data<int8_t>();
+        params[i].self_attention.attention_output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            self_attn_output_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].self_attention.attention_output_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                self_attn_output_weight[i].data<data_t_>());
+    }
+
     params[i].self_attention.attention_output_weight.bias =
         reinterpret_cast<const DataType_*>(
             self_attn_output_bias[i].data<data_t_>());
@@ -184,13 +229,27 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].cross_layernorm.beta = reinterpret_cast<const DataType_*>(
         cross_layernorm_bias[i].data<data_t_>());
     // query
-    params[i].cross_attention.query_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            cross_attn_query_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].cross_attention.query_weight.int8_kernel =
+            cross_attn_query_weight[i].data<int8_t>();
+        params[i].cross_attention.query_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            cross_attn_query_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].cross_attention.query_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                cross_attn_query_weight[i].data<data_t_>());
+    }
+
     params[i].cross_attention.query_weight.bias =
         reinterpret_cast<const DataType_*>(
             cross_attn_query_bias[i].data<data_t_>());
     // key
+    // TODO: static cache supports general int8.
+    // params[i].cross_attention.key_weight.int8_kernel =
+    //     cross_attn_key_weight[i].data<int8_t>();
+    // params[i].cross_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+    //     cross_attn_key_weight_scale[i].data<data_t_>());
+
     params[i].cross_attention.key_weight.kernel =
         reinterpret_cast<const DataType_*>(
             cross_attn_key_weight[i].data<data_t_>());
@@ -198,6 +257,12 @@ std::vector<paddle::Tensor> decoding_kernel(
         reinterpret_cast<const DataType_*>(
             cross_attn_key_bias[i].data<data_t_>());
     // value
+    // TODO: static cache supports general int8.
+    // params[i].cross_attention.value_weight.int8_kernel =
+    //     cross_attn_value_weight[i].data<int8_t>();
+    // params[i].cross_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+    //     cross_attn_value_weight_scale[i].data<data_t_>());
+
     params[i].cross_attention.value_weight.kernel =
         reinterpret_cast<const DataType_*>(
             cross_attn_value_weight[i].data<data_t_>());
@@ -205,9 +270,17 @@ std::vector<paddle::Tensor> decoding_kernel(
         reinterpret_cast<const DataType_*>(
             cross_attn_value_bias[i].data<data_t_>());
     // out proj
-    params[i].cross_attention.attention_output_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            cross_attn_output_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].cross_attention.attention_output_weight.int8_kernel =
+            cross_attn_output_weight[i].data<int8_t>();
+        params[i].cross_attention.attention_output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            cross_attn_output_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].cross_attention.attention_output_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                cross_attn_output_weight[i].data<data_t_>());
+    }
+
     params[i].cross_attention.attention_output_weight.bias =
         reinterpret_cast<const DataType_*>(
             cross_attn_output_bias[i].data<data_t_>());
@@ -218,14 +291,30 @@ std::vector<paddle::Tensor> decoding_kernel(
     params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
         ffn_layernorm_bias[i].data<data_t_>());
     // intermediate proj
-    params[i].ffn.intermediate_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            ffn_intermediate_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].ffn.intermediate_weight.int8_kernel =
+            ffn_intermediate_weight[i].data<int8_t>();
+        params[i].ffn.intermediate_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            ffn_intermediate_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].ffn.intermediate_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                ffn_intermediate_weight[i].data<data_t_>());
+    }
+
     params[i].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
         ffn_intermediate_bias[i].data<data_t_>());
     // out proj
-    params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
-        ffn_output_weight[i].data<data_t_>());
+    if (use_int8) {
+        params[i].ffn.output_weight.int8_kernel =
+            ffn_output_weight[i].data<int8_t>();
+        params[i].ffn.output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            ffn_output_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
+            ffn_output_weight[i].data<data_t_>());
+    }
+
     params[i].ffn.output_weight.bias =
         reinterpret_cast<const DataType_*>(ffn_output_bias[i].data<data_t_>());
   }
@@ -265,7 +354,20 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
-        fuse_qkv);
+        fuse_qkv,
+        false,  // keep_alive_beam
+        0.6,  // alpha
+        true,  // normalization_before
+        0,  // pos_offset
+        ActivationType::RELU,  // act
+        false,  // pos_bias
+        false,  // prefix_lm
+        -1,  // finished_candidate_num
+        false,  // early_stopping
+        false,  // is_mbart
+        0,  // min_length
+        4,  // inner_coeff
+        use_int8);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -289,7 +391,18 @@ std::vector<paddle::Tensor> decoding_kernel(
         true,   // is_fuse_topk_softMax
         fuse_qkv,
         true,   // keep_alive_beam
-        alpha);
+        alpha,
+        true,  // normalization_before
+        0,  // pos_offset
+        ActivationType::RELU,  // act
+        false,  // pos_bias
+        false,  // prefix_lm
+        -1,  // finished_candidate_num
+        false,  // early_stopping
+        false,  // is_mbart
+        0,  // min_length
+        4,  // inner_coeff
+        use_int8);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -334,28 +447,38 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
     const std::vector<paddle::Tensor>& self_q_weight,
+    const std::vector<paddle::Tensor>& self_q_weight_scale,
     const std::vector<paddle::Tensor>& self_q_bias,
     const std::vector<paddle::Tensor>& self_k_weight,
+    const std::vector<paddle::Tensor>& self_k_weight_scale,
     const std::vector<paddle::Tensor>& self_k_bias,
     const std::vector<paddle::Tensor>& self_v_weight,
+    const std::vector<paddle::Tensor>& self_v_weight_scale,
     const std::vector<paddle::Tensor>& self_v_bias,
     const std::vector<paddle::Tensor>& self_out_weight,
+    const std::vector<paddle::Tensor>& self_out_weight_scale,
     const std::vector<paddle::Tensor>& self_out_bias,
     const std::vector<paddle::Tensor>& cross_ln_weight,
     const std::vector<paddle::Tensor>& cross_ln_bias,
     const std::vector<paddle::Tensor>& cross_q_weight,
+    const std::vector<paddle::Tensor>& cross_q_weight_scale,
     const std::vector<paddle::Tensor>& cross_q_bias,
     const std::vector<paddle::Tensor>& cross_k_weight,
+    const std::vector<paddle::Tensor>& cross_k_weight_scale,
     const std::vector<paddle::Tensor>& cross_k_bias,
     const std::vector<paddle::Tensor>& cross_v_weight,
+    const std::vector<paddle::Tensor>& cross_v_weight_scale,
     const std::vector<paddle::Tensor>& cross_v_bias,
     const std::vector<paddle::Tensor>& cross_out_weight,
+    const std::vector<paddle::Tensor>& cross_out_weight_scale,
     const std::vector<paddle::Tensor>& cross_out_bias,
     const std::vector<paddle::Tensor>& ffn_ln_weight,
     const std::vector<paddle::Tensor>& ffn_ln_bias,
     const std::vector<paddle::Tensor>& ffn_inter_weight,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_scale,
     const std::vector<paddle::Tensor>& ffn_inter_bias,
     const std::vector<paddle::Tensor>& ffn_out_weight,
+    const std::vector<paddle::Tensor>& ffn_out_weight_scale,
     const std::vector<paddle::Tensor>& ffn_out_bias,
     const paddle::Tensor& decoder_ln_weight,
     const paddle::Tensor& decoder_ln_bias,
@@ -392,28 +515,38 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           self_ln_weight,
           self_ln_bias,
           self_q_weight,
+          self_q_weight_scale,
           self_q_bias,
           self_k_weight,
+          self_k_weight_scale,
           self_k_bias,
           self_v_weight,
+          self_v_weight_scale,
           self_v_bias,
           self_out_weight,
+          self_out_weight_scale,
           self_out_bias,
           cross_ln_weight,
           cross_ln_bias,
           cross_q_weight,
+          cross_q_weight_scale,
           cross_q_bias,
           cross_k_weight,
+          cross_k_weight_scale,
           cross_k_bias,
           cross_v_weight,
+          cross_v_weight_scale,
           cross_v_bias,
           cross_out_weight,
+          cross_out_weight_scale,
           cross_out_bias,
           ffn_ln_weight,
           ffn_ln_bias,
           ffn_inter_weight,
+          ffn_inter_weight_scale,
           ffn_inter_bias,
           ffn_out_weight,
+          ffn_out_weight_scale,
           ffn_out_bias,
           decoder_ln_weight,
           decoder_ln_bias,
@@ -446,28 +579,38 @@ std::vector<paddle::Tensor> DecodingCUDAForward(
           self_ln_weight,
           self_ln_bias,
           self_q_weight,
+          self_q_weight_scale,
           self_q_bias,
           self_k_weight,
+          self_k_weight_scale,
           self_k_bias,
           self_v_weight,
+          self_v_weight_scale,
           self_v_bias,
           self_out_weight,
+          self_out_weight_scale,
           self_out_bias,
           cross_ln_weight,
           cross_ln_bias,
           cross_q_weight,
+          cross_q_weight_scale,
           cross_q_bias,
           cross_k_weight,
+          cross_k_weight_scale,
           cross_k_bias,
           cross_v_weight,
+          cross_v_weight_scale,
           cross_v_bias,
           cross_out_weight,
+          cross_out_weight_scale,
           cross_out_bias,
           ffn_ln_weight,
           ffn_ln_bias,
           ffn_inter_weight,
+          ffn_inter_weight_scale,
           ffn_inter_bias,
           ffn_out_weight,
+          ffn_out_weight_scale,
           ffn_out_bias,
           decoder_ln_weight,
           decoder_ln_bias,

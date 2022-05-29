@@ -14,6 +14,7 @@
 import os
 import shutil
 import numpy as np
+from functools import partial
 
 import paddle
 import paddle.nn as nn
@@ -33,6 +34,8 @@ from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UnifiedTransformerPretrainedModel,
                                     UNIMOPretrainedModel, BartPretrainedModel,
                                     GPTPretrainedModel, MBartPretrainedModel)
+
+from .utils import weight_channel_wise_quantize, weight_COL4_4R2_8C_channel_wise_quantize
 
 
 class FasterTransformer(TransformerModel):
@@ -145,7 +148,8 @@ class FasterTransformer(TransformerModel):
                  enable_faster_encoder=False,
                  use_fp16_encoder=False,
                  rel_len=False,
-                 alpha=0.6):
+                 alpha=0.6,
+                 use_int8=True):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use FasterTransformer. ")
@@ -167,6 +171,7 @@ class FasterTransformer(TransformerModel):
         self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
+        self.use_int8 = args.pop("use_int8")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -210,7 +215,8 @@ class FasterTransformer(TransformerModel):
             decoding_lib=self.decoding_lib,
             use_fp16_decoding=self.use_fp16_decoding,
             rel_len=self.rel_len,
-            alpha=self.alpha)
+            alpha=self.alpha,
+            use_int8=self.use_int8)
 
     def forward(self, src_word, trg_word=None):
         src_max_len = paddle.shape(src_word)[-1]
@@ -300,6 +306,59 @@ class FasterTransformer(TransformerModel):
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
             model_dict["decoding_linear.bias"] = np.zeros(
                 [self.trg_vocab_size], dtype="float16")
+
+        if self.use_int8:
+            sm = 70
+
+            if sm >= 75:
+                quantize_function = partial(
+                    weight_COL4_4R2_8C_channel_wise_quantize,
+                    use_fp16_decoding=self.use_fp16_decoding)
+            else:
+                quantize_function = partial(
+                    weight_channel_wise_quantize,
+                    use_fp16_decoding=self.use_fp16_decoding)
+
+            for item in self.state_dict():
+                if "decoder" in item and "weight" in item and "norm" not in item and "embedding" not in item:
+                    # TODO: static cache supports general int8.
+                    if "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
+                        continue
+                    # if "cross_attn.out_proj" in item or "cross_attn.q_proj" in item or "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
+                    #     continue
+                    # if "linear1.weight" in item or "linear2.weight" in item or "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
+                    #     continue
+                    # if "self_attn.out_proj" in item or "self_attn.k_proj" in item or "self_attn.v_proj" in item or "self_attn.q_proj" in item:
+                    #     continue
+
+                    # w_int8 = np.load("./int8_param/" + item, allow_pickle=True)
+                    # w_scale = np.load("./int8_param/" + item + ".scale", allow_pickle=True)
+
+                    item_list = item.split(".")
+                    num_layer = item_list[3]
+
+                    # Fused qkv setting. 
+                    if self.decoding._fuse_qkv and "self_attn.q_proj" in item:
+                        param_type = item_list[-1]
+                        w_int8, w_scale = quantize_function(weight=model_dict[
+                            "decoding.slf_q_" + param_type + "_" + num_layer])
+                    else:
+                        w_int8, w_scale = quantize_function(
+                            weight=model_dict[item])
+                    # w_int8.dump("./int8_param/" + item)
+                    # w_scale.dump("./int8_param/" + item + ".scale")
+
+                    param_state = "_".join(item_list[4:])
+                    # model_dict[param_state + "_" + num_layer] = w_int8
+                    # model_dict[param_state + "_scale_" + num_layer] = w_scale
+
+                    param = getattr(self.decoding,
+                                    param_state + "_" + num_layer)
+                    param.set_value(w_int8)
+
+                    scale = getattr(self.decoding,
+                                    param_state + "_scale_" + num_layer)
+                    scale.set_value(w_scale)
 
         self.load_dict(model_dict)
 

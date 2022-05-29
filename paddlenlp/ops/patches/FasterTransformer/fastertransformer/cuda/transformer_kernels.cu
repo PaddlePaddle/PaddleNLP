@@ -72,6 +72,36 @@ __inline__ __device__ T blockReduceSum(T val) {
 }
 
 template <typename T>
+  __inline__ __device__
+T warpReduceMax(T val)
+{
+  for(int mask = 16; mask > 0; mask >>= 1)
+    val = max(val, __shfl_xor_sync(FINAL_MASK, val, mask, 32));
+  return val;
+}
+
+/* Calculate the maximum of all elements in a block */
+template <typename T>
+  __inline__ __device__
+T blockReduceMax(T val)
+{
+  static __shared__ T shared[32];
+  int lane = threadIdx.x & 0x1f; // in-warp idx
+  int wid = threadIdx.x >> 5;  // warp idx
+
+  val = warpReduceMax(val); // get maxx in each warp
+
+  if(lane == 0) // record in-warp maxx by warp Idx
+    shared[wid] = val;
+
+  __syncthreads();
+  val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : (T)-1e20f;
+  val = warpReduceMax<T>(val);
+
+  return val;
+}
+
+template <typename T>
 __global__ void add_bias_gelu(T* out, const T* __restrict bias, int m, int n) {
   for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
        id += blockDim.x * gridDim.x) {
@@ -344,6 +374,80 @@ void add_bias_act_kernelLauncher(T* out,
 }
 
 template <typename T>
+__global__ void dequant_add_bias_relu_quant(int32_t* input,
+                                            int8_t* output,
+                                            T* scale,
+                                            T* ffn_inner,
+                                            const T* __restrict bias,
+                                            const T* __restrict w_scale,
+                                            int n,
+                                            const T max_range) {
+  float local_i = -1e20f;
+  int row_idx = blockIdx.x;
+  T* ffn_inner_t = ffn_inner + row_idx * n;
+
+  for (int id = threadIdx.x; id < n; id += blockDim.x) {
+    T reg_bias = __ldg(&bias[id]);
+
+    T val = (T)((float)input[row_idx * n + id]) * (scale[row_idx] / max_range) * (w_scale[id] / max_range);
+    val = val + reg_bias;
+    val = val > (T)0.0f ? val : (T)0.0f;
+
+    ffn_inner_t[id] = val;
+
+    local_i = max(fabs((float)val), local_i);
+  }
+  float max_val = blockReduceMax<float>(local_i);
+
+  if (threadIdx.x == 0) {
+    scale[row_idx] = (T)max_val;
+  }
+  __syncthreads();
+
+  int8_t *quant_out = output + blockIdx.x * n;
+  for (int idx = threadIdx.x; idx < n; idx += blockDim.x) {
+    quant_out[idx] =
+        __float2int_rn(ffn_inner_t[idx] / scale[row_idx] * max_range);
+  }
+}
+
+template <typename T>
+__global__ void dequant_add_bias_gelu_quant(T* out,
+                                            const T* __restrict bias,
+                                            int m,
+                                            int n) {
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    T reg_bias = __ldg(&bias[id % n]);
+    T val = out[id] + reg_bias;
+    out[id] = (T)(gelu(val));
+  }
+}
+
+template <typename T>
+void dequant_add_bias_act_quant_kernelLauncher(int32_t* out_quant_buf,
+                                               int8_t* input_quant_buf,
+                                               T* scale,
+                                               T* ffn_inner,
+                                               const T* bias,
+                                               const T* w_scale,
+                                               int m,
+                                               int n,
+                                               ActivationType activation_type,
+                                               cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  if (activation_type == ActivationType::RELU) {
+    dequant_add_bias_relu_quant<T><<<grid, block, 0, stream>>>(
+        out_quant_buf, input_quant_buf, scale, ffn_inner, bias, w_scale, n, (T)127.0f);
+  } else if (activation_type == ActivationType::GELU) {
+    // dequant_add_bias_gelu_quant<T><<<grid, block, 0, stream>>>(
+    //     out, bias, m, n / data_type_factor);
+  }
+}
+
+template <typename T>
 void add_bias_input_layernorm_kernelLauncher(T* out,
                                              const T* input,
                                              const T* bias,
@@ -460,6 +564,633 @@ void add_bias_input_layernorm_2_kernelLauncher(const T* input,
 }
 
 template <typename T>
+__global__ void dequant_add_bias_input_layernorm_2_quant_COL32(
+                                                const int32_t* quant_input,
+                                                const T* input,
+                                                const T* __restrict gamma,
+                                                const T* __restrict beta,
+                                                const T* __restrict bias,
+                                                const T* __restrict w_scale,
+                                                T* output,
+                                                T* norm_output,
+                                                char4* quant_out,
+                                                T* scale,
+                                                const int m,
+                                                const int n,
+                                                const T max_range) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    output[bid * n + i] = (T)(quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)]) * scale[bid] / max_range * w_scale[i] / max_range; 
+
+    float local_out = (float)(__ldg(&input[bid * n + i]));
+    local_out += (float)(output[bid * n + i]);
+    local_out += (float)(__ldg(&bias[i]));
+    output[bid * n + i] = (T)local_out;
+    local_sum += local_out;
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&output[bid * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6);
+  __syncthreads();
+
+  float local_i = -FLT_MAX;
+  for (int i = tid; i < n; i += blockDim.x) {
+    norm_output[bid * n + i] =
+        (T)((((float)output[bid * n + i] - s_mean) * s_variance) *
+                (float)(__ldg(&gamma[i])) +
+            (float)(__ldg(&beta[i])));
+    local_i = max(local_i, fabs((float)norm_output[bid * n + i]));
+  }
+
+  float max_val = blockReduceMax<float>(local_i);
+  if (tid == 0) {
+    scale[bid] = (T)max_val;
+  }
+  __syncthreads();
+
+  const float scale_val = (float)(max_range / scale[bid]);
+
+  for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
+    char4 tmp4;
+    int x = tid << 2;
+
+    tmp4.x = __float2int_rn(static_cast<float>(norm_output[bid * n + x]) * scale_val);
+    tmp4.y = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 1]) * scale_val);
+    tmp4.z = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 2]) * scale_val); 
+    tmp4.w = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 3]) * scale_val);
+
+    quant_out[((x & 0xffffffe0) * m + (bid << 5) + (x & 31)) >> 2] = tmp4;
+  }
+}
+
+template <typename T>
+__global__ void dequant_add_bias_input_layernorm_2_quant(
+                                                const int32_t* quant_input,
+                                                const T* input,
+                                                const T* __restrict gamma,
+                                                const T* __restrict beta,
+                                                const T* __restrict bias,
+                                                const T* __restrict w_scale,
+                                                T* output,
+                                                T* norm_output,
+                                                int8_t* quant_out,
+                                                T* scale,
+                                                const int m,
+                                                const int n,
+                                                const T max_range) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    output[bid * n + i] = (T)(quant_input[bid * n + i]) * scale[bid] / max_range * w_scale[i] / max_range;
+
+    float local_out = (float)(__ldg(&input[bid * n + i]));
+    local_out += (float)(output[bid * n + i]);
+    local_out += (float)(__ldg(&bias[i]));
+    output[bid * n + i] = (T)local_out;
+    local_sum += local_out;
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&output[bid * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6);
+  __syncthreads();
+
+  float local_i = -FLT_MAX;
+  for (int i = tid; i < n; i += blockDim.x) {
+    norm_output[bid * n + i] =
+        (T)((((float)output[bid * n + i] - s_mean) * s_variance) *
+                (float)(__ldg(&gamma[i])) +
+            (float)(__ldg(&beta[i])));
+    local_i = max(local_i, fabs((float)norm_output[bid * n + i]));
+  }
+
+  float max_val = blockReduceMax<float>(local_i);
+  if (tid == 0) {
+    scale[bid] = (T)max_val;
+  }
+  __syncthreads();
+
+  const float scale_val = (float)(max_range / scale[bid]);
+
+  for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
+    quant_out[bid * n + tid] = __float2int_rn((float)norm_output[bid * n + tid] * scale_val);
+  }
+}
+
+template <typename T>
+void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const T* input,
+                                                     const T* gamma,
+                                                     const T* beta,
+                                                     const T* bias,
+                                                     const T* w_scale,
+                                                     T* output,
+                                                     T* norm_output,
+                                                     int8_t* quantize_input_buf,
+                                                     T* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  /* For general cases, n is equal to hidden_units, e.g., 512/1024.
+  Since we have warp shuffle inside the code, block.x % 32 should be 0.
+  */
+
+  if (n % 32 != 0) block.x = 1024;
+
+  block.x =
+      block.x / (4 / sizeof(T));  // if using half, only need half of block.x
+
+  /* should pay attention to the rsqrt precision*/
+  if (use_COL32) {
+    dequant_add_bias_input_layernorm_2_quant_COL32<T><<<grid, block, 0, stream>>>(
+        quant_output_buf,
+        input,
+        gamma,
+        beta,
+        bias,
+        w_scale,
+        output,
+        norm_output,
+        (char4 *) quantize_input_buf,
+        scale,
+        m,
+        n,
+        (T)127.0f);
+  } else {
+    dequant_add_bias_input_layernorm_2_quant<T><<<grid, block, 0, stream>>>(
+        quant_output_buf,
+        input,
+        gamma,
+        beta,
+        bias,
+        w_scale,
+        output,
+        norm_output,
+        quantize_input_buf,
+        scale,
+        m,
+        n,
+        (T)127.0f);
+
+  }
+}
+
+template <typename T>
+__global__ void dequant_add_bias_input_layernorm_2_kernel(
+                                                const int32_t* quant_input,
+                                                const T* input,
+                                                const T* __restrict gamma,
+                                                const T* __restrict beta,
+                                                const T* __restrict bias,
+                                                const T* __restrict w_scale,
+                                                T* output,
+                                                T* norm_output,
+                                                char4* quant_out,
+                                                T* scale,
+                                                const int m,
+                                                const int n,
+                                                const T max_range,
+                                                bool use_COL32) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    if (use_COL32) {
+      output[bid * n + i] = (T)(quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)]) * scale[bid] / max_range * w_scale[i] / max_range;
+    } else {
+      output[bid * n + i] = (T)(quant_input[bid * n + i]) * scale[bid] / max_range * w_scale[i] / max_range;
+    }
+
+    float local_out = (float)(__ldg(&input[bid * n + i]));
+    local_out += (float)(output[bid * n + i]);
+    local_out += (float)(__ldg(&bias[i]));
+    output[bid * n + i] = (T)local_out;
+    local_sum += local_out;
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&output[bid * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6);
+  __syncthreads();
+
+  for (int i = tid; i < n; i += blockDim.x) {
+    norm_output[bid * n + i] =
+        (T)((((float)output[bid * n + i] - s_mean) * s_variance) *
+                (float)(__ldg(&gamma[i])) +
+            (float)(__ldg(&beta[i])));
+  }
+}
+
+template <typename T>
+void dequant_add_bias_input_layernorm_2_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const T* input,
+                                                     const T* gamma,
+                                                     const T* beta,
+                                                     const T* bias,
+                                                     const T* w_scale,
+                                                     T* output,
+                                                     T* norm_output,
+                                                     int8_t* quantize_input_buf,
+                                                     T* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  /* For general cases, n is equal to hidden_units, e.g., 512/1024.
+  Since we have warp shuffle inside the code, block.x % 32 should be 0.
+  */
+
+  if (n % 32 != 0) block.x = 1024;
+
+  block.x =
+      block.x / (4 / sizeof(T));  // if using half, only need half of block.x
+
+  /* should pay attention to the rsqrt precision*/
+  dequant_add_bias_input_layernorm_2_kernel<T><<<grid, block, 0, stream>>>(
+      quant_output_buf,
+      input,
+      gamma,
+      beta,
+      bias,
+      w_scale,
+      output,
+      norm_output,
+      (char4 *) quantize_input_buf,
+      scale,
+      m,
+      n,
+      (T)127.0f,
+      use_COL32);
+}
+
+template <typename T>
+__global__ void add_bias_input_layernorm_2_quant(
+                                                const int32_t* quant_input,
+                                                const T* input,
+                                                const T* __restrict gamma,
+                                                const T* __restrict beta,
+                                                const T* __restrict bias,
+                                                const T* __restrict w_scale,
+                                                T* output,
+                                                T* norm_output,
+                                                char4* quant_out,
+                                                // int8_t* quant_out,
+                                                T* scale,
+                                                const int m,
+                                                const int n,
+                                                const T max_range,
+                                                bool use_COL32) {
+  int tid = threadIdx.x;
+  int bid = blockIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean = 0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float local_out = (float)(__ldg(&input[bid * n + i]));
+    local_out += (float)(output[bid * n + i]);
+    local_out += (float)(__ldg(&bias[i]));
+    output[bid * n + i] = (T)local_out;
+    local_sum += local_out;
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if (threadIdx.x == 0) s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&output[bid * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6);
+  __syncthreads();
+
+  float local_i = -FLT_MAX;
+  for (int i = tid; i < n; i += blockDim.x) {
+    norm_output[bid * n + i] =
+        (T)((((float)output[bid * n + i] - s_mean) * s_variance) *
+                (float)(__ldg(&gamma[i])) +
+            (float)(__ldg(&beta[i])));
+    local_i = max(local_i, fabs((float)norm_output[bid * n + i]));
+  }
+
+  float max_val = blockReduceMax<float>(local_i);
+  if (tid == 0) {
+    scale[bid] = (T)max_val;
+  }
+  __syncthreads();
+
+  const float scale_val = (float)(max_range / scale[bid]);
+
+  for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
+    char4 tmp4;
+    int x = tid << 2;
+
+    tmp4.x = __float2int_rn(static_cast<float>(norm_output[bid * n + x]) * scale_val);
+    tmp4.y = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 1]) * scale_val);
+    tmp4.z = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 2]) * scale_val); 
+    tmp4.w = __float2int_rn(static_cast<float>(norm_output[bid * n + x + 3]) * scale_val);
+
+    if (use_COL32) {
+      quant_out[((x & 0xffffffe0) * m + (bid << 5) + (x & 31)) >> 2] = tmp4;
+    } else {
+      quant_out[(bid * n + x) >> 2] = tmp4;
+    }
+  }
+}
+
+template <typename T>
+void add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const T* input,
+                                                     const T* gamma,
+                                                     const T* beta,
+                                                     const T* bias,
+                                                     const T* w_scale,
+                                                     T* output,
+                                                     T* norm_output,
+                                                     int8_t* quantize_input_buf,
+                                                     T* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  /* For general cases, n is equal to hidden_units, e.g., 512/1024.
+  Since we have warp shuffle inside the code, block.x % 32 should be 0.
+  */
+
+  if (n % 32 != 0) block.x = 1024;
+
+  block.x =
+      block.x / (4 / sizeof(T));  // if using half, only need half of block.x
+
+  /* should pay attention to the rsqrt precision*/
+  add_bias_input_layernorm_2_quant<T><<<grid, block, 0, stream>>>(
+      quant_output_buf,
+      input,
+      gamma,
+      beta,
+      bias,
+      w_scale,
+      output,
+      norm_output,
+      (char4 *) quantize_input_buf,
+      scale,
+      m,
+      n,
+      (T)127.0f,
+      use_COL32);
+}
+
+template <typename T>
+__global__
+void layer_norm_quant_COL32_kernel(const T* __restrict input, 
+                          const T* __restrict gamma, 
+                          const T* __restrict beta, 
+                          T* scale,
+                          T* output,
+                          char4* quant_out,
+                          int m,
+                          int n,
+                          T max_range) {
+  const int tid = threadIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean =  0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f; 
+  for(int i = tid; i < n; i+= blockDim.x) {
+    local_sum += (float)(__ldg(&input[blockIdx.x * n + i]));
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if(threadIdx.x == 0)
+    s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for(int i = tid; i < n; i+= blockDim.x)
+  {
+    float diff = (float)(__ldg(&input[blockIdx.x * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if(threadIdx.x == 0)
+    s_variance = rsqrtf(variance / n + 1e-6);
+
+  __syncthreads();
+
+  float local_i = -FLT_MAX;
+  for(int i = tid; i < n; i+= blockDim.x) {
+    output[blockIdx.x * n + i] = 
+      (T)((( (float)input[blockIdx.x * n + i] - s_mean) * s_variance) * (float)(__ldg(&gamma[i])) + (float)(__ldg(&beta[i])));
+    local_i = max(local_i, fabs((float)output[blockIdx.x * n + i]));
+  }
+
+  float max_val = blockReduceMax<float>(local_i);
+  if (tid == 0) {
+    scale[blockIdx.x] = (T)max_val;
+  }
+  __syncthreads();
+
+  const float scale_val = (float)(max_range / scale[blockIdx.x]);
+
+  for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
+    char4 tmp4;
+    int x = tid << 2;
+
+    tmp4.x = __float2int_rn(static_cast<float>(output[blockIdx.x * n + x]) * scale_val);
+    tmp4.y = __float2int_rn(static_cast<float>(output[blockIdx.x * n + x + 1]) * scale_val);
+    tmp4.z = __float2int_rn(static_cast<float>(output[blockIdx.x * n + x + 2]) * scale_val); 
+    tmp4.w = __float2int_rn(static_cast<float>(output[blockIdx.x * n + x + 3]) * scale_val);
+
+    quant_out[((x & 0xffffffe0) * m + (blockIdx.x << 5) + (x & 31)) >> 2] = tmp4;
+  }
+}
+
+template <typename T>
+__global__
+void layer_norm_quant_kernel(const T* __restrict input, 
+                          const T* __restrict gamma, 
+                          const T* __restrict beta, 
+                          T* scale,
+                          T* output,
+                          int8_t* quant_out,
+                          int m,
+                          int n,
+                          T max_range) {
+  const int tid = threadIdx.x;
+
+  __shared__ float s_mean;
+  __shared__ float s_variance;
+  float mean =  0.0f;
+  float variance = 0.0f;
+
+  float local_sum = 0.0f; 
+  for(int i = tid; i < n; i+= blockDim.x) {
+    local_sum += (float)(__ldg(&input[blockIdx.x * n + i]));
+  }
+
+  mean = blockReduceSum<float>(local_sum);
+
+  if(threadIdx.x == 0)
+    s_mean = mean / n;
+  __syncthreads();
+
+  float local_var_sum = 0.0f;
+  for(int i = tid; i < n; i+= blockDim.x)
+  {
+    float diff = (float)(__ldg(&input[blockIdx.x * n + i])) - s_mean;
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if(threadIdx.x == 0)
+    s_variance = rsqrtf(variance / n + 1e-6);
+
+  __syncthreads();
+
+  float local_i = -FLT_MAX;
+  for(int i = tid; i < n; i+= blockDim.x) {
+    output[blockIdx.x * n + i] = 
+      (T)((( (float)input[blockIdx.x * n + i] - s_mean) * s_variance) * (float)(__ldg(&gamma[i])) + (float)(__ldg(&beta[i])));
+    local_i = max(local_i, fabs((float)output[blockIdx.x * n + i]));
+  }
+
+  float max_val = blockReduceMax<float>(local_i);
+  if (tid == 0) {
+    scale[blockIdx.x] = (T)max_val;
+  }
+  __syncthreads();
+
+  const float scale_val = (float)(max_range / scale[blockIdx.x]);
+
+  for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
+    quant_out[blockIdx.x * n + tid] = __float2int_rn((float)output[blockIdx.x * n + tid] * scale_val);
+  }
+}
+
+template <typename T>
+void layer_norm_quant(const T *from_tensor,
+                      const T *gamma,
+                      const T *beta,
+                      T *norm_from_tensor_buf_,
+                      T *scale,
+                      int8_t* quantize_input_buf_,
+                      const int m,
+                      const int n,
+                      cudaStream_t stream,
+                      bool use_COL32) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  if(n % 32 != 0)
+    block.x = 1024;
+
+  block.x = block.x / (4 / sizeof(T));
+
+  if (use_COL32) {
+    layer_norm_quant_COL32_kernel<T><<<grid, block, 0, stream>>>(
+                            from_tensor, 
+                            gamma, 
+                            beta, 
+                            scale,
+                            norm_from_tensor_buf_,
+                            (char4 *) quantize_input_buf_,
+                            m,
+                            n,
+                            (T)127.0f);
+  } else {
+    layer_norm_quant_kernel<T><<<grid, block, 0, stream>>>(
+                            from_tensor, 
+                            gamma, 
+                            beta, 
+                            scale,
+                            norm_from_tensor_buf_,
+                            quantize_input_buf_,
+                            m,
+                            n,
+                            (T)127.0f);
+
+  }
+}
+
+template <typename T>
 __global__ void add_bias_input(
     T* output, const T* input, const T* bias, const int m, const int n) {
   // This kernel can run with any block size and grid size
@@ -487,6 +1218,57 @@ void add_bias_input_kernelLauncher(T* output,
   dim3 block(min(n, 1024));
 
   add_bias_input<<<grid, block, 0, stream>>>(output, input, bias, m, n);
+}
+
+template <typename T>
+__global__ void dequant_add_bias_input(
+    const int32_t* quant_in,
+    const T* scale,
+    const T* weight_scale,
+    T* output,
+    const T* input,
+    const T* bias,
+    const int m,
+    const int n,
+    const T max_range,
+    const bool use_COL32) {
+  const int bid = blockIdx.x;
+
+  for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
+    T bias_val = __ldg(&bias[tid]);
+    if (use_COL32) {
+      output[bid * n + tid] = (T)(quant_in[(tid & 0xffffffe0) * m + (bid << 5) + (tid & 31)]) * scale[bid] / max_range * weight_scale[tid] / max_range + input[bid * n + tid] + bias_val;
+    } else {
+      output[bid * n + tid] = (T)(quant_in[bid * n + tid]) * scale[bid] / max_range * weight_scale[tid] / max_range + input[bid * n + tid] + bias_val;
+    }
+  }
+}
+
+template <typename T>
+void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
+                                           const T* scale,
+                                           const T* weight_scale,
+                                           T* output,
+                                           const T* bias,
+                                           const T* input,
+                                           const int m,
+                                           const int n,
+                                           cudaStream_t stream,
+                                           bool use_COL32) {
+  dim3 grid(min(m, 65536));
+  dim3 block(min(n, 1024));
+
+  dequant_add_bias_input<<<grid, block, 0, stream>>>(
+      quant_in,
+      scale,
+      weight_scale,
+      output,
+      input,
+      bias,
+      m,
+      n,
+      (T)127.0f,
+      use_COL32);
 }
 
 template <typename T>
@@ -580,6 +1362,28 @@ template void add_bias_act_kernelLauncher<half>(half* out,
                                                 ActivationType activation_type,
                                                 cudaStream_t stream);
 
+template void dequant_add_bias_act_quant_kernelLauncher<float>(int32_t* out_quant_buf,
+                                               int8_t* input_quant_buf,
+                                               float* scale,
+                                               float* ffn_inner,
+                                               const float* bias,
+                                               const float* w_scale,
+                                               int m,
+                                               int n,
+                                               ActivationType activation_type,
+                                               cudaStream_t stream);
+
+template void dequant_add_bias_act_quant_kernelLauncher<half>(int32_t* out_quant_buf,
+                                               int8_t* input_quant_buf,
+                                               half* scale,
+                                               half* ffn_inner,
+                                               const half* bias,
+                                               const half* w_scale,
+                                               int m,
+                                               int n,
+                                               ActivationType activation_type,
+                                               cudaStream_t stream);
+
 template void add_bias_input_layernorm_kernelLauncher<half>(
     half* out,
     const half* input,
@@ -611,6 +1415,146 @@ template void add_bias_input_layernorm_2_kernelLauncher<half>(
     int m,
     int n,
     cudaStream_t stream);
+
+template void dequant_add_bias_input_layernorm_2_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const float* input,
+                                                     const float* gamma,
+                                                     const float* beta,
+                                                     const float* bias,
+                                                     const float* w_scale,
+                                                     float* output,
+                                                     float* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     float* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void dequant_add_bias_input_layernorm_2_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const half* input,
+                                                     const half* gamma,
+                                                     const half* beta,
+                                                     const half* bias,
+                                                     const half* w_scale,
+                                                     half* output,
+                                                     half* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     half* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const float* input,
+                                                     const float* gamma,
+                                                     const float* beta,
+                                                     const float* bias,
+                                                     const float* w_scale,
+                                                     float* output,
+                                                     float* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     float* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const half* input,
+                                                     const half* gamma,
+                                                     const half* beta,
+                                                     const half* bias,
+                                                     const half* w_scale,
+                                                     half* output,
+                                                     half* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     half* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const float* input,
+                                                     const float* gamma,
+                                                     const float* beta,
+                                                     const float* bias,
+                                                     const float* w_scale,
+                                                     float* output,
+                                                     float* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     float* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void add_bias_input_layernorm_2_quant_kernelLauncher(
+                                                     const int32_t* quant_output_buf,
+                                                     const half* input,
+                                                     const half* gamma,
+                                                     const half* beta,
+                                                     const half* bias,
+                                                     const half* w_scale,
+                                                     half* output,
+                                                     half* norm_output,
+                                                     int8_t* quantize_input_buf_,
+                                                     half* scale,
+                                                     int m,
+                                                     int n,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
+                                           const float* scale,
+                                           const float* weight_scale,
+                                           float* output,
+                                           const float* bias,
+                                           const float* input,
+                                           const int m,
+                                           const int n,
+                                           cudaStream_t stream,
+                                           bool use_COL32);
+
+template void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
+                                           const half* scale,
+                                           const half* weight_scale,
+                                           half* output,
+                                           const half* bias,
+                                           const half* input,
+                                           const int m,
+                                           const int n,
+                                           cudaStream_t stream,
+                                           bool use_COL32);
+
+template void layer_norm_quant(const float *from_tensor,
+                      const float *gamma,
+                      const float *beta,
+                      float *norm_from_tensor_buf_,
+                      float *scale,
+                      int8_t* quantize_input_buf_,
+                      const int m,
+                      const int n,
+                      cudaStream_t stream,
+                      bool use_COL32);
+
+template void layer_norm_quant(const half *from_tensor,
+                      const half *gamma,
+                      const half *beta,
+                      half *norm_from_tensor_buf_,
+                      half *scale,
+                      int8_t* quantize_input_buf_,
+                      const int m,
+                      const int n,
+                      cudaStream_t stream,
+                      bool use_COL32);
 
 template void add_bias_input_kernelLauncher<float>(float* output,
                                                    const float* bias,

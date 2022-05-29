@@ -30,4 +30,62 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 const int local_head_num,
                                                 cudaStream_t stream);
 
+template <typename T>
+void channel_wise_quantize_kernelLauncher(const T* input,
+                                        int8_t* ffn_quantize_input_buf_,
+                                        T* scale,
+                                        const int batch_size,
+                                        const int hidden_units,
+                                        cudaStream_t stream,
+                                        bool use_COL32 = true);
+
+template <typename T>
+void channel_wise_dequantize_kernelLauncher(const int32_t* input,
+                                          const T* scale,
+                                          const T* weight_scale,
+                                          T* output,
+                                          const int batch_size,
+                                          const int hidden_units,
+                                          cudaStream_t stream,
+                                          bool use_COL32 = true);
+
+template <typename T>
+void qkv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
+                                          const T* scale,
+                                          const T* qw_scale,
+                                          const T* kw_scale,
+                                          const T* vw_scale,
+                                          T* query,
+                                          T* key,
+                                          T* value,
+                                          const int batch_size,
+                                          const int hidden_units,
+                                          cudaStream_t stream,
+                                          bool use_COL32 = true);
+
+template <typename T>
+void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
+                                          const T* scale,
+                                          const T* kw_scale,
+                                          const T* vw_scale,
+                                          T* key,
+                                          T* value,
+                                          const int m,
+                                          const int hidden_units,
+                                          cudaStream_t stream,
+                                          bool use_COL32 = true);
+
+template <typename T>
+void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(
+                                          int8_t *out,
+                                          const int32_t* input,
+                                          const T* bias,
+                                          T* ffn_inner,
+                                          const int batch_size,
+                                          const int hidden_units,
+                                          const T* weight_scale,
+                                          T* scale,
+                                          ActivationType activation_type,
+                                          cudaStream_t stream);
+
 }

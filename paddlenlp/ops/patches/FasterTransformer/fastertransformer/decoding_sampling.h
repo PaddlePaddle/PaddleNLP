@@ -51,6 +51,8 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
+  int8_t* decoder_int8_buf_;
+
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
   DataType_ *trans_out_buf_;
@@ -63,6 +65,8 @@ private:
   void *buf_;
   int *finished_count_buf_;
   bool *h_finished_buf_;
+
+  bool use_int8_ = true;
 
   void *topk_workspace_ = nullptr;
   size_t topk_workspace_size_ = 0;
@@ -101,8 +105,11 @@ public:
                    const bool prefix_lm = false,
                    const bool is_mbart = false,
                    const int min_length = 0,
-                   const int inner_coeff = 4)
-      : allocator_(allocator) {
+                   const int inner_coeff = 4,
+                   const bool use_int8 = true)
+      : allocator_(allocator),
+        use_int8_(use_int8) {
+
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
     args_.memory_max_seq_len_ = memory_max_seq_len;
@@ -160,8 +167,12 @@ public:
                                         is_fuse_qkv,
                                         normalization_before,
                                         args_.act_,
-                                        inner_coeff);
+                                        inner_coeff,
+                                        use_int8_,
+                                        args_.memory_max_seq_len_);
     decoder_->set_max_batch_size(batch_size);
+
+    size_t decoder_int8_workspace_size = (use_int8_) ? decoder_->getInt8WorkspaceSize() : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.hidden_units_;                   // type T
@@ -249,7 +260,8 @@ public:
         sizeof(int) * finished_count_size +
         sizeof(int) * (topp_id_vals_buf_size + 2 * topp_offset_buf_size) +
         topp_workspace_size_ + topk_workspace_size_ +
-        curandState_size * sizeof(curandState_t)));
+        curandState_size * sizeof(curandState_t) +
+        decoder_int8_workspace_size));
 
     if (sizeof(DataType_) == sizeof(half)) {
       cublas_workspace_ = buf_;
@@ -310,6 +322,12 @@ public:
         (DataType_ *)(padded_embedding_kernel + padded_embedding_kernel_size);
     curandstate_buf_ =
         (curandState_t *)(padded_embedding_bias + padded_embedding_bias_size);
+
+    if (use_int8_) {
+      decoder_int8_buf_ = (int8_t*)(curandstate_buf_ + curandState_size);
+    } else {
+      decoder_int8_buf_ = nullptr;
+    }
 
     h_finished_buf_ = new bool[finished_buf_size];
     h_trg_length_ = new int[args_.batch_size_];
@@ -695,7 +713,12 @@ public:
 
           The decoder_buf_ is reused.
         */
-        decoder_->initialize(param[layer], decoder_buf_, cublas_workspace_);
+        decoder_->initialize(
+          param[layer],
+          decoder_buf_,
+          cublas_workspace_,
+          true,
+          decoder_int8_buf_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();

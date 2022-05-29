@@ -261,6 +261,12 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common.h common_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common.h common_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common_structure.h common_structure_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common_structure.h common_structure_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/functions.h functions_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/functions.h functions_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/CMakeLists.txt cmakelists_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/CMakeLists.txt cmakelists_dst)
 
@@ -306,6 +312,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/transformer_kernels.cu trans_kernels_cu_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_kernels.cuh trans_kernels_cuh_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/transformer_kernels.cuh trans_kernels_cuh_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/masked_multihead_attention.cu masked_multihead_attention_cu_dst)
 
@@ -327,6 +336,7 @@ set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
   && cp ${allocator_src} ${allocator_dst}
   && cp ${common_src} ${common_dst}
+  && cp ${common_structure_src} ${common_structure_dst}
   && cp ${cmakelists_src} ${cmakelists_dst}
   && cp ${topk_kernels_src} ${topk_kernels_dst}
   && cp ${decoding_beamsearch_h_src} ${decoding_beamsearch_h_dst}
@@ -347,6 +357,8 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
+  && cat blank_lines ${functions_src} >> ${functions_dst}
+  && cat blank_lines ${trans_kernels_cuh_src} >> ${trans_kernels_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
   && ${MUTE_COMMAND}
   && ${OPEN_ATTENTION_MUTE_COMMAND}
