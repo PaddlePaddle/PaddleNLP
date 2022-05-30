@@ -127,9 +127,10 @@ def do_task(task):
 
 
 def main():
-    # Make sure that dataset has been downloaded first
-    status = os.system('python download_dataset.py')
     model_name_or_path = sys.argv[1]
+    # Make sure that dataset has been downloaded first
+    status = os.system(
+        'python warmup_dataset_and_model.py {model_name_or_path}')
     tasks = []
     tasks = get_cls_tasks(model_name_or_path)
     tasks += get_mrc_tasks(model_name_or_path)
