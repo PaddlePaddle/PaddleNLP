@@ -481,7 +481,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 relation_examples, texts, relation_prompts, predicate_set,
                 subject_goldens)
             all_relation_examples = [
-                r 
+                r
                 for r in relation_example
                 for relation_example in relation_examples
             ]
