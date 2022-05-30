@@ -27,20 +27,15 @@ import paddle.static
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import BertTokenizer, LinearDecayWithWarmup
 from paddlenlp.IPU import IPUTrainer
-from paddlenlp.IPU import (
-    AutoModel,
-    AutoConfig,
-    AutoPipeline
-)
+from paddlenlp.IPU import (AutoModel, AutoConfig, AutoPipeline)
 
 from datasets import load_dataset
 from args import load_custom_ops, parse_args
-from modeling_trainer import (
-    IpuBertForQuestionAnswering,
-    IpuBertQAAccAndLoss)
+from modeling_trainer import (IpuBertForQuestionAnswering, IpuBertQAAccAndLoss)
 
 
 class Squadtrainer(IPUTrainer):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -68,21 +63,27 @@ def set_seed(seed):
 
 def create_data_holder(args):
     bs = args.micro_batch_size
-    indices = paddle.static.data(
-        name="indices", shape=[bs * args.seq_len], dtype="int32")
-    segments = paddle.static.data(
-        name="segments", shape=[bs * args.seq_len], dtype="int32")
-    positions = paddle.static.data(
-        name="positions", shape=[bs * args.seq_len], dtype="int32")
-    input_mask = paddle.static.data(
-        name="input_mask", shape=[bs, 1, 1, args.seq_len], dtype="float32")
+    indices = paddle.static.data(name="indices",
+                                 shape=[bs * args.seq_len],
+                                 dtype="int32")
+    segments = paddle.static.data(name="segments",
+                                  shape=[bs * args.seq_len],
+                                  dtype="int32")
+    positions = paddle.static.data(name="positions",
+                                   shape=[bs * args.seq_len],
+                                   dtype="int32")
+    input_mask = paddle.static.data(name="input_mask",
+                                    shape=[bs, 1, 1, args.seq_len],
+                                    dtype="float32")
     if not args.is_training:
         return [indices, segments, positions, input_mask]
     else:
-        start_labels = paddle.static.data(
-            name="start_labels", shape=[bs], dtype="int32")
-        end_labels = paddle.static.data(
-            name="end_labels", shape=[bs], dtype="int32")
+        start_labels = paddle.static.data(name="start_labels",
+                                          shape=[bs],
+                                          dtype="int32")
+        end_labels = paddle.static.data(name="end_labels",
+                                        shape=[bs],
+                                        dtype="int32")
         return [
             indices, segments, positions, input_mask, start_labels, end_labels
         ]
@@ -130,16 +131,15 @@ def prepare_train_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=128,
-        max_seq_len=args.seq_len,
-        pad_to_max_seq_len=True,
-        return_position_ids=True,
-        return_token_type_ids=True,
-        return_attention_mask=True,
-        return_length=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=128,
+                                   max_seq_len=args.seq_len,
+                                   pad_to_max_seq_len=True,
+                                   return_position_ids=True,
+                                   return_token_type_ids=True,
+                                   return_attention_mask=True,
+                                   return_length=True)
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -161,8 +161,8 @@ def prepare_train_features(examples, tokenizer, args):
         sequence_ids = tokenized_examples['token_type_ids'][i]
 
         # attention_mask to input_mask
-        input_mask = (
-            np.asarray(tokenized_examples["attention_mask"][i]) - 1) * 1e3
+        input_mask = (np.asarray(tokenized_examples["attention_mask"][i]) -
+                      1) * 1e3
         input_mask = np.expand_dims(input_mask, axis=(0, 1))
         if args.ipu_enable_fp16:
             input_mask = input_mask.astype(np.float16)
@@ -194,8 +194,8 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char and
-                    offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char):
                 tokenized_examples["start_positions"].append(cls_index)
                 tokenized_examples["end_positions"].append(cls_index)
             else:
@@ -221,16 +221,15 @@ def prepare_validation_features(examples, tokenizer, args):
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     contexts = examples['context']
     questions = examples['question']
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=128,
-        max_seq_len=args.seq_len,
-        pad_to_max_seq_len=True,
-        return_position_ids=True,
-        return_token_type_ids=True,
-        return_attention_mask=True,
-        return_length=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=128,
+                                   max_seq_len=args.seq_len,
+                                   pad_to_max_seq_len=True,
+                                   return_position_ids=True,
+                                   return_token_type_ids=True,
+                                   return_attention_mask=True,
+                                   return_length=True)
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -261,8 +260,8 @@ def prepare_validation_features(examples, tokenizer, args):
         ]
 
         # attention_mask to input_mask
-        input_mask = (
-            np.asarray(tokenized_examples["attention_mask"][i]) - 1) * 1e3
+        input_mask = (np.asarray(tokenized_examples["attention_mask"][i]) -
+                      1) * 1e3
         input_mask = np.expand_dims(input_mask, axis=(0, 1))
         if args.ipu_enable_fp16:
             input_mask = input_mask.astype(np.float16)
@@ -281,8 +280,9 @@ def load_squad_dataset(args):
     else:
         raw_dataset = load_dataset('squad', split='validation')
     column_names = raw_dataset.column_names
-    dataset = raw_dataset.map(partial(
-        features_fn, tokenizer=tokenizer, args=args),
+    dataset = raw_dataset.map(partial(features_fn,
+                                      tokenizer=tokenizer,
+                                      args=args),
                               batched=True,
                               remove_columns=column_names,
                               num_proc=4)
@@ -336,12 +336,11 @@ def main(args):
     if args.is_training:
         lr_scheduler = LinearDecayWithWarmup(args.learning_rate, max_steps,
                                              args.warmup_steps)
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=lr_scheduler,
-            weight_decay=args.weight_decay,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=args.adam_epsilon)
+        optimizer = paddle.optimizer.Adam(learning_rate=lr_scheduler,
+                                          weight_decay=args.weight_decay,
+                                          beta1=args.beta1,
+                                          beta2=args.beta2,
+                                          epsilon=args.adam_epsilon)
         optimizer.minimize(loss)
 
     # Static executor
@@ -358,9 +357,7 @@ def main(args):
     to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
         main_program, amp_list, use_fp16_guard=False)
     paddle.static.amp.cast_parameters_to_fp16(
-        paddle.CPUPlace(),
-        main_program,
-        to_fp16_var_names=to_fp16_var_names)
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     if args.enable_load_params:
         logging.info(f'loading weights from: {args.load_params_path}')
@@ -392,26 +389,22 @@ def main(args):
 
     if args.is_training:
         # Initialize Trainer
-        trainer = Squadtrainer(
-            args = args,
-            dataset = dataset,
-            exe = exe,
-            tensor_list = [feed_list, fetch_list],
-            program = [main_program, startup_program],
-            optimizers = [optimizer, lr_scheduler]
-        )
+        trainer = Squadtrainer(args=args,
+                               dataset=dataset,
+                               exe=exe,
+                               tensor_list=[feed_list, fetch_list],
+                               program=[main_program, startup_program],
+                               optimizers=[optimizer, lr_scheduler])
         trainer.train()
         trainer.save_model()
 
     if not args.is_training:
         # Initialize Trainer
-        trainer = IPUTrainer(
-            args = args,
-            dataset = dataset,
-            exe = exe,
-            tensor_list = [feed_list, fetch_list],
-            program = [main_program, startup_program]
-        )
+        trainer = IPUTrainer(args=args,
+                             dataset=dataset,
+                             exe=exe,
+                             tensor_list=[feed_list, fetch_list],
+                             program=[main_program, startup_program])
 
         trainer.eval()
 
@@ -419,34 +412,31 @@ def main(args):
         all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
             raw_dataset, dataset,
             (trainer.all_start_logits, trainer.all_end_logits))
-        squad_evaluate(
-            examples=[raw_data for raw_data in raw_dataset],
-            preds=all_predictions,
-            na_probs=scores_diff_json)
+        squad_evaluate(examples=[raw_data for raw_data in raw_dataset],
+                       preds=all_predictions,
+                       na_probs=scores_diff_json)
         # write results to file
         with open('squad_prediction.json', "w", encoding='utf-8') as writer:
             writer.write(
-                json.dumps(
-                    all_predictions, ensure_ascii=False, indent=4) + "\n")
+                json.dumps(all_predictions, ensure_ascii=False, indent=4) +
+                "\n")
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S %a')
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+                        datefmt='%Y-%m-%d %H:%M:%S %a')
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
     if args.wandb:
         import wandb
-        wandb.init(
-            project="paddle-squad",
-            settings=wandb.Settings(console='off'),
-            name='paddle-squad')
+        wandb.init(project="paddle-squad",
+                   settings=wandb.Settings(console='off'),
+                   name='paddle-squad')
         wandb_config = vars(args)
         wandb_config["global_batch_size"] = args.batch_size
         wandb.config.update(args)
