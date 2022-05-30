@@ -560,14 +560,15 @@ python evaluate.py \
     在CPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_cpu.py --model_path_prefix export/inference --num_threads 10
+    python deploy/python/infer_cpu.py --model_path_prefix export/inference
     ```
 
     可配置参数说明：
 
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `num_threads`: 配置cpu的线程数，默认为当前CPU的物理核数。
+    - `num_threads`：配置CPU的线程数，默认为CPU的逻辑核数/2。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 
   - GPU端推理样例
 
@@ -582,6 +583,7 @@ python evaluate.py \
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
     - `use_fp16`: 是否使用FP16进行加速，默认关闭。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 
 <a name="CCKS比赛"></a>
 

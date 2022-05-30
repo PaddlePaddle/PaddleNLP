@@ -37,6 +37,12 @@ def parse_args():
         action='store_true',
         help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
     )
+    parser.add_argument(
+        "--max_seq_len",
+        default=512,
+        type=int,
+        help="The maximum input sequence length. Sequences longer than this will be split automatically.",
+    )
     args = parser.parse_args()
     return args
 

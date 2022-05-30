@@ -37,15 +37,15 @@ def do_train():
 
     set_seed(args.seed)
 
-    encoding_model = MODEL_MAP[args.model]['encoding_model']
     resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
 
+    logger.info("Downloading resource files...")
     for key, val in resource_file_urls.items():
         file_path = os.path.join(args.model, key)
         if not os.path.exists(file_path):
             get_path_from_url(val, args.model)
 
-    tokenizer = AutoTokenizer.from_pretrained(encoding_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(
@@ -126,6 +126,7 @@ def do_train():
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(save_dir)
+                tokenizer.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
                 logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f"
@@ -139,6 +140,7 @@ def do_train():
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(save_dir)
+                    tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
 
 
@@ -152,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
-        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+        "Sequences longer than this will be split automatically.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")

@@ -213,7 +213,7 @@ class Task(metaclass=abc.ABCMeta):
         except AssertionError:
             raise AssertionError(
                 f"The environment for GPU inference is not set properly. "
-                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu."
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                 "Please run the following commands to reinstall: \n "
                 "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
             )

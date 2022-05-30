@@ -23,21 +23,31 @@ from paddlenlp.utils.log import logger
 
 MODEL_MAP = {
     "uie-base": {
-        "encoding_model": "ernie-3.0-base-zh",
         "resource_file_urls": {
             "model_state.pdparams":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
             "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
         }
     },
     "uie-tiny": {
-        "encoding_model": "ernie-3.0-medium-zh",
         "resource_file_urls": {
             "model_state.pdparams":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
             "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json"
         }
     }
 }
@@ -481,8 +491,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 relation_examples, texts, relation_prompts, predicate_set,
                 subject_goldens)
             all_relation_examples = [
-                r
-                for r in relation_example
+                r for r in relation_example
                 for relation_example in relation_examples
             ]
     return all_entity_examples, all_relation_examples

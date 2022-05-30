@@ -39,6 +39,12 @@ def parse_args():
         default=math.ceil(cpu_count() / 2),
         type=int,
         help="Number of threads for cpu, default to half of logical cores.", )
+    parser.add_argument(
+        "--max_seq_len",
+        default=512,
+        type=int,
+        help="The maximum input sequence length. Sequences longer than this will be split automatically.",
+    )
     args = parser.parse_args()
     return args
 

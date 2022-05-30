@@ -72,7 +72,7 @@ class InferBackend(object):
             except AssertionError:
                 raise AssertionError(
                     f"The environment for GPU inference is not set properly. "
-                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu."
+                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                     "Please run the following commands to reinstall: \n "
                     "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
                 )
@@ -99,7 +99,7 @@ class UIEPredictor(object):
         self._tokenizer = AutoTokenizer.from_pretrained(
             "ernie-3.0-base-zh", use_faster=True)
         self._position_prob = args.position_prob
-        self._max_seq_len = 512
+        self._max_seq_len = args.max_seq_len
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == 'cpu':
