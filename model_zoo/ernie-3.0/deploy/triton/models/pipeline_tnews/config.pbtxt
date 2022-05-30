@@ -1,0 +1,65 @@
+name: "pipeline_tnews"
+platform: "ensemble"
+max_batch_size: 64
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_FP32
+    dims: [ 15 ]
+  }
+]
+ensemble_scheduling {
+  step [
+    {
+      model_name: "preprocess"
+      model_version: 1
+      input_map {
+        key: "INPUT_0"
+        value: "INPUT"
+      }
+      output_map {
+        key: "OUTPUT_0"
+        value: "preprocess_input_ids"
+      }
+      output_map {
+        key: "OUTPUT_1"
+        value: "preprocess_token_type_ids"
+      }
+    },
+    {
+      model_name: "tnews"
+      model_version: 1
+      input_map {
+        key: "input_ids"
+        value: "preprocess_input_ids"
+      }
+      input_map {
+        key: "token_type_ids"
+        value: "preprocess_token_type_ids"
+      }
+      output_map {
+        key: "linear_75.tmp_1"
+        value: "OUTPUT_2"
+      },
+      {
+      model_name: "tnews_postprocess"
+      model_version: 1
+      input_map {
+        key: "POST_INPUT"
+        value: "linear_75.tmp_1"
+      }
+      output_map {
+        key: "POST_OUTPUT"
+        value: "OUTPUT"
+      }
+    }
+  ]
+}
+
