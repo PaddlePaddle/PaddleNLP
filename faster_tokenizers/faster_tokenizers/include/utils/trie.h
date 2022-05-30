@@ -29,13 +29,16 @@ public:
   static constexpr uint32_t kRootNodeId = 0;
 
   Trie(const std::string& continuing_subword_prefix = "##",
-       const std::string& unk_token = "[UNK]");
+       const std::string& unk_token = "[UNK]",
+       bool with_pretokenization = false);
   Trie(const std::unordered_map<std::string, uint>& vocab,
        const std::string& continuing_subword_prefix = "##",
-       const std::string& unk_token = "[UNK]");
+       const std::string& unk_token = "[UNK]",
+       bool with_pretokenization = false);
   Trie(const std::vector<std::string>& keys,
        const std::string& continuing_subword_prefix = "##",
-       const std::string& unk_token = "[UNK]");
+       const std::string& unk_token = "[UNK]",
+       bool with_pretokenization = false);
   struct TraversalCursor {
     uint32_t node_id_;
     uint32_t unit_;
@@ -63,6 +66,8 @@ public:
   uint GetUNKTokenID() const { return unk_token_id_; }
   uint GetSuffixRoot() const { return suffix_root_; }
   uint GetPuncFailureNode() const { return punct_failure_link_node_; }
+  void DeleteValueOfNode(uint32_t node_id);
+  void DeleteLinkFromParent(uint32_t child_node_id);
 
 private:
   void InitTrieSuffixRoot();
@@ -97,12 +102,13 @@ private:
   }
 
   std::shared_ptr<Darts::DoubleArray> trie_;
-  const uint* trie_array_;
+  std::vector<uint> trie_array_;
   std::string continuing_subword_prefix_;
   uint unk_token_id_;
   std::string unk_token_;
   uint suffix_root_;
   uint punct_failure_link_node_;
+  bool with_pretokenization_;
 };
 
 }  // namespace utils

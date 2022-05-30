@@ -30,21 +30,23 @@ namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
-FasterWordPiece::FasterWordPiece() : WordPiece() {
-  failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+FasterWordPiece::FasterWordPiece() : WordPiece(), with_pretokenization_(false) {
+  failure_array_.InitFromVocabAndTrie(vocab_, &trie_);
   PrecomputeEncodeValueForSubwordPrefix();
 }
 
 FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                                  const std::string& unk_token,
                                  size_t max_input_chars_per_word,
-                                 const std::string& continuing_subword_prefix)
+                                 const std::string& continuing_subword_prefix,
+                                 bool with_pretokenization)
     : WordPiece(vocab,
                 unk_token,
                 max_input_chars_per_word,
                 continuing_subword_prefix),
-      trie_(vocab, continuing_subword_prefix, unk_token) {
-  failure_array_.InitFromVocabAndTrie(vocab_, trie_);
+      trie_(vocab, continuing_subword_prefix, unk_token),
+      with_pretokenization_(with_pretokenization) {
+  failure_array_.InitFromVocabAndTrie(vocab_, &trie_);
   PrecomputeEncodeValueForSubwordPrefix();
 }
 
@@ -225,7 +227,7 @@ void FasterWordPiece::HandleTheRemainingStringOnTriePath(
   *original_num_tokens = tokens->size();
 }
 
-std::vector<core::Token> FasterWordPiece::Tokenize(
+std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
     const std::string& sequence) const {
   if (sequence.empty()) {
     return {};
@@ -235,8 +237,7 @@ std::vector<core::Token> FasterWordPiece::Tokenize(
       utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());
   int original_num_tokens = 0;
   if (unicode_len > max_input_chars_per_word_) {
-    ResetOutputAppendUNK(
-              0, sequence.size(), &original_num_tokens, &all_tokens);
+    ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
   } else {
     int curr_offset_in_sequence = 0;
     auto curr_node = trie_.CreateRootTraversalCursor();
@@ -263,6 +264,20 @@ std::vector<core::Token> FasterWordPiece::Tokenize(
   return all_tokens;
 }
 
+std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
+    const std::string& sequence) const {
+  // Need to implement
+  return {};
+}
+
+std::vector<core::Token> FasterWordPiece::Tokenize(
+    const std::string& sequence) const {
+  if (!with_pretokenization_) {
+    return TokenizeWithoutPreTokenize(sequence);
+  }
+  return TokenizeWithPreTokenize(sequence);
+}
+
 void to_json(nlohmann::json& j, const FasterWordPiece& model) {
   j = {
       {"type", "FasterWordPiece"},
@@ -270,6 +285,7 @@ void to_json(nlohmann::json& j, const FasterWordPiece& model) {
       {"unk_token", model.unk_token_},
       {"max_input_chars_per_word", model.max_input_chars_per_word_},
       {"continuing_subword_prefix", model.continuing_subword_prefix_},
+      {"with_pretokenization", model.with_pretokenization_},
   };
 }
 
@@ -278,6 +294,7 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
   j["unk_token"].get_to(model.unk_token_);
   j["max_input_chars_per_word"].get_to(model.max_input_chars_per_word_);
   j["continuing_subword_prefix"].get_to(model.continuing_subword_prefix_);
+  j["with_pretokenization"].get_to(model.with_pretokenization_);
 }
 
 }  // models

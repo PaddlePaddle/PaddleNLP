@@ -176,11 +176,13 @@ void BindModels(pybind11::module* m) {
       .def(py::init<const core::Vocab&,
                     const std::string&,
                     size_t,
-                    const std::string&>(),
+                    const std::string&,
+                    bool>(),
            py::arg("vocab"),
            py::arg("unk_token") = "[UNK]",
            py::arg("max_input_chars_per_word") = 100,
-           py::arg("continuing_subword_prefix") = "##")
+           py::arg("continuing_subword_prefix") = "##",
+           py::arg("with_pretokenization") = false)
       .def("tokenize", &models::FasterWordPiece::Tokenize)
       .def("token_to_id", &models::FasterWordPiece::TokenToId)
       .def("id_to_token", &models::FasterWordPiece::IdToToken)

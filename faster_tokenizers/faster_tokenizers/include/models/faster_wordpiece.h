@@ -28,13 +28,18 @@ struct FasterWordPiece : public WordPiece {
   FasterWordPiece(const core::Vocab& vocab,
                   const std::string& unk_token = "[UNK]",
                   size_t max_input_chars_per_word = 100,
-                  const std::string& continuing_subword_prefix = "##");
+                  const std::string& continuing_subword_prefix = "##",
+                  bool with_pretokenization = false);
 
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) const override;
 
 private:
+  std::vector<core::Token> TokenizeWithoutPreTokenize(
+      const std::string& sequence) const;
+  std::vector<core::Token> TokenizeWithPreTokenize(
+      const std::string& sequence) const;
   bool TryFollowFailureLinkAndCollectTokens(
       const std::string& sequence,
       int sequence_offset_in_text,
@@ -71,6 +76,7 @@ private:
   std::vector<int> encoded_value_for_subword_prefix_;
   friend void to_json(nlohmann::json& j, const FasterWordPiece& model);
   friend void from_json(const nlohmann::json& j, FasterWordPiece& model);
+  bool with_pretokenization_;  // The end-to-end version of FasterWordPiece
 };
 
 }  // models

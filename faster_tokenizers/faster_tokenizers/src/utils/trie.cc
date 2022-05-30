@@ -29,7 +29,8 @@ void Trie::CreateTrie(const std::vector<const char*>& keys,
                const_cast<char**>(&keys[0]),
                nullptr,
                const_cast<int*>(&values[0]));
-  trie_array_ = static_cast<const uint*>(trie_->array());
+  const uint* trie_ptr = reinterpret_cast<const uint*>(trie_->array());
+  trie_array_ = std::vector<uint>(trie_ptr, trie_ptr + trie_->size());
 }
 
 int Trie::EncodeTokenId(const std::string& token, uint id) const {
@@ -78,6 +79,18 @@ void Trie::InitTrie(const std::vector<const char*>& keys,
   GetSortedVocab(keys, values, &sorted_keys, &sorted_values);
   CreateTrie(sorted_keys, sorted_values);
   InitTrieSuffixRoot();
+  if (with_pretokenization_) {
+    auto node = CreateRootTraversalCursor();
+    if (!TryTraverseSeveralSteps(&node,
+                                 std::string(1, utils::kInvalidControlChar))) {
+      throw std::runtime_error(
+          "Cannot locate the dummy node for the failure link for punctuation "
+          "nodes. This should never happen.");
+    }
+    punct_failure_link_node_ = node.node_id_;
+    DeleteLinkFromParent(punct_failure_link_node_);
+    DeleteValueOfNode(punct_failure_link_node_);
+  }
 }
 
 void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
@@ -90,32 +103,38 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
   InitTrie(keys, values);
 }
 
-Trie::Trie(const std::string& continuing_subword_prefix, const std::string& unk_token)
-      : trie_(nullptr),
-        trie_array_(nullptr),
-        continuing_subword_prefix_(continuing_subword_prefix),
-        suffix_root_(utils::kNullNode),
-        punct_failure_link_node_(utils::kNullNode),
-        unk_token_(unk_token) {}
+Trie::Trie(const std::string& continuing_subword_prefix,
+           const std::string& unk_token,
+           bool with_pretokenization)
+    : trie_(nullptr),
+      continuing_subword_prefix_(continuing_subword_prefix),
+      suffix_root_(utils::kNullNode),
+      punct_failure_link_node_(utils::kNullNode),
+      unk_token_(unk_token),
+      with_pretokenization_(with_pretokenization) {}
 
 Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
            const std::string& continuing_subword_prefix,
-           const std::string& unk_token)
+           const std::string& unk_token,
+           bool with_pretokenization)
     : continuing_subword_prefix_(continuing_subword_prefix),
       unk_token_(unk_token),
       suffix_root_(utils::kNullNode),
-      punct_failure_link_node_(utils::kNullNode) {
+      punct_failure_link_node_(utils::kNullNode),
+      with_pretokenization_(with_pretokenization) {
   unk_token_id_ = vocab.at(unk_token);
   SetVocab(vocab);
 }
 
 Trie::Trie(const std::vector<std::string>& keys,
            const std::string& continuing_subword_prefix,
-           const std::string& unk_token)
+           const std::string& unk_token,
+           bool with_pretokenization)
     : continuing_subword_prefix_(continuing_subword_prefix),
       unk_token_(unk_token),
       suffix_root_(utils::kNullNode),
-      punct_failure_link_node_(utils::kNullNode) {
+      punct_failure_link_node_(utils::kNullNode),
+      with_pretokenization_(with_pretokenization) {
   std::vector<const char*> char_keys(keys.size());
   for (int i = 0; i < keys.size(); ++i) {
     char_keys[i] = keys[i].c_str();
@@ -190,6 +209,14 @@ bool Trie::TryGetData(const Trie::TraversalCursor& cursor,
       trie_array_[cursor.node_id_ ^ Offset(cursor.unit_)];
   *out_data = Value(value_unit);
   return true;
+}
+
+void Trie::DeleteValueOfNode(uint32_t node_id) {
+  trie_array_[node_id] &= 0xFFFFFEFF;
+}
+
+void Trie::DeleteLinkFromParent(uint32_t child_node_id) {
+  trie_array_[child_node_id] &= 0xFFFFFF00;
 }
 
 }  // namespace utils

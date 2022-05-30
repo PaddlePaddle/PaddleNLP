@@ -57,26 +57,24 @@ private:
 
 struct FailureArray {
   FailureArray() = default;
-  FailureArray(const std::unordered_map<std::string, uint>& vocab,
-               const Trie& trie);
+  FailureArray(const std::unordered_map<std::string, uint>& vocab, Trie* trie);
   void BuildFailureArray(
-      const std::vector<FailureVocabToken>& failure_vocab_tokens,
-      const Trie& trie);
+      const std::vector<FailureVocabToken>& failure_vocab_tokens, Trie* trie);
   void BuildFailureVocab(const std::unordered_map<std::string, uint>& vocab,
-                         const Trie& trie);
+                         Trie* trie);
   void InitFromVocabAndTrie(const std::unordered_map<std::string, uint>& vocab,
-                            const Trie& trie);
+                            Trie* trie);
   const Failure* GetFailure(int idx) const { return &(failure_array_.at(idx)); }
   int GetFailurePop(int idx) const { return failure_pops_pool_.at(idx); }
 
 private:
   void BuildOutgoingEdgeLabelsForTrie(
       const std::vector<FailureVocabToken>& failure_vocab_tokens,
-      const Trie& trie,
+      Trie* trie,
       std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
   void BuildOutgoingEdgeLabelsFromToken(
       const FailureVocabToken& vocab_token,
-      const Trie& trie,
+      Trie* trie,
       std::vector<std::unordered_set<char>>* node_outgoing_edge_labels);
   void AssignFailureLinkAndPops(uint32_t cur_node,
                                 uint32_t failure_link,
@@ -84,11 +82,12 @@ private:
                                 int parent_failure_pops_offset_length);
   void GetFailurePopsAndAppendToOut(uint32_t failure_pops_offset_length,
                                     std::vector<int>* out_failure_pops);
-
+  void RemovePunctuationTrieLink(Trie* trie) const;
   std::vector<Failure> failure_array_;
   std::vector<int> failure_pops_pool_;
   std::unordered_map<uint32_t, bool> node_id_is_punc_map_;
   std::vector<FailureVocabToken> failure_vocab_tokens_;
+  bool with_pretokenization_;  // The end-to-end version of FailureArray
 };
 
 }  // namespace utils

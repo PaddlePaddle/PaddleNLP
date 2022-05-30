@@ -18,6 +18,16 @@ limitations under the License. */
 namespace tokenizers {
 namespace utils {
 
+inline bool IsUnicodeNonChar(uint32_t c) {
+  return ((c) >= 0xfdd0 && ((c) <= 0xfdef || ((c)&0xfffe) == 0xfffe) &&
+          (c) <= 0x10ffff);
+}
+
+inline bool IsUnicodeChar(uint32_t c) {
+  return ((c) < 0xd800 ||
+          (0xdfff < (c) && (c) <= 0x10ffff && !IsUnicodeNonChar(c)));
+}
+
 inline uint32_t BytesInUTF8Char(uint8_t byte) {
   unsigned int count = 1;
   // no if-statements means no divergence

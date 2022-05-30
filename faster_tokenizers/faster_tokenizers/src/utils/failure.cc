@@ -82,7 +82,7 @@ int FailureVocabToken::TokenLengthWithoutContinuingSubwordPrefix() const {
 }
 
 void FailureArray::BuildFailureVocab(
-    const std::unordered_map<std::string, uint>& vocab, const Trie& trie) {
+    const std::unordered_map<std::string, uint>& vocab, Trie* trie) {
   if (vocab.size() > utils::kMaxSupportedVocabSize) {
     std::ostringstream oss;
     oss << "Vocab size exceeds the max supported ("
@@ -91,7 +91,7 @@ void FailureArray::BuildFailureVocab(
     throw std::invalid_argument(oss.str());
   }
   failure_vocab_tokens_.reserve(vocab.size());
-  auto continuing_subword_prefix = trie.GetContinuingSubwordPrefix();
+  auto continuing_subword_prefix = trie->GetContinuingSubwordPrefix();
   for (auto& item : vocab) {
     if (item.first == continuing_subword_prefix) {
       VLOG(6)
@@ -120,6 +120,12 @@ void FailureArray::BuildFailureVocab(
           << vocab_token.TokenLengthWithoutContinuingSubwordPrefix();
       throw std::invalid_argument(oss.str());
     }
+    // Skip the word which contains punctuation but not a punctuation.
+    if (with_pretokenization_ && vocab_token.ContainsPunctuation() &&
+        (vocab_token.IsSuffixToken() ||
+         vocab_token.TokenUnicodeLengthWithoutContinuingSubwordPrefix() > 1)) {
+      continue;
+    }
     failure_vocab_tokens_.emplace_back(vocab_token);
   }
   if (failure_vocab_tokens_.empty()) {
@@ -136,34 +142,90 @@ void FailureArray::BuildFailureVocab(
       auto new_suffix_token = continuing_subword_prefix +
                               std::string(1, utils::kInvalidControlChar);
       failure_vocab_tokens_.emplace_back(FailureVocabToken(
-          new_suffix_token, trie.GetUNKTokenID(), continuing_subword_prefix));
+          new_suffix_token, trie->GetUNKTokenID(), continuing_subword_prefix));
+    }
+  }
+  if (with_pretokenization_) {
+    for (uint32_t cp = 1; cp < 0x0010FFFF; ++cp) {
+      if (!utils::IsUnicodeChar(cp) || !utils::IsPunctuationOrChineseChar(cp)) {
+        continue;
+      }
+      char utf_str[5];
+      utils::GetUTF8Str(reinterpret_cast<char32_t*>(&cp), utf_str, 1);
+      std::string punc_str(utf_str);
+      if (vocab.count(punc_str) == 0) {
+        FailureVocabToken vocab_token(
+            punc_str, trie->GetUNKTokenID(), continuing_subword_prefix);
+        failure_vocab_tokens_.emplace_back(vocab_token);
+      }
     }
   }
 }
 
 void FailureArray::InitFromVocabAndTrie(
-    const std::unordered_map<std::string, uint>& vocab, const Trie& trie) {
+    const std::unordered_map<std::string, uint>& vocab, Trie* trie) {
   BuildFailureVocab(vocab, trie);
   BuildFailureArray(failure_vocab_tokens_, trie);
 }
 
 
 FailureArray::FailureArray(const std::unordered_map<std::string, uint>& vocab,
-                           const Trie& trie) {
+                           Trie* trie) {
   InitFromVocabAndTrie(vocab, trie);
+}
+
+void FailureArray::RemovePunctuationTrieLink(Trie* trie) const {
+  auto continuing_subword_prefix = trie->GetContinuingSubwordPrefix();
+  if (with_pretokenization_ && !continuing_subword_prefix.empty()) {
+    int cur_idx = 0;
+    int next_idx = 0;
+    uint32_t curr_char, next_char;
+    bool prev_node_is_root = false;
+    auto node = trie->CreateRootTraversalCursor();
+    while (cur_idx < continuing_subword_prefix.length()) {
+      auto chwidth = utils::UTF8ToUInt32(
+          continuing_subword_prefix.data() + cur_idx, &curr_char);
+      prev_node_is_root = (node.node_id_ == trie->kRootNodeId);
+      std::string cur_unicode_char(continuing_subword_prefix.data() + cur_idx,
+                                   chwidth);
+      if (!trie->TryTraverseSeveralSteps(&node, cur_unicode_char)) {
+        throw std::runtime_error(
+            "Cannot locate a character in suffix_indicator_. It should never "
+            "happen.");
+      }
+      if (IsPunctuationOrChineseChar(curr_char)) {
+        if (prev_node_is_root) {
+          auto next_chwidth = utils::UTF8ToUInt32(
+              continuing_subword_prefix.data() + cur_idx + chwidth, &next_char);
+          std::string next_unicode_char(
+              continuing_subword_prefix.data() + cur_idx + chwidth,
+              next_chwidth);
+          auto child_node = node;
+          if (!trie->TryTraverseSeveralSteps(&child_node, next_unicode_char)) {
+            throw std::runtime_error(
+                "Cannot locate a character in suffix_indicator_. It should "
+                "never happen.");
+          }
+          trie->DeleteLinkFromParent(child_node.node_id_);
+        } else {
+          trie->DeleteLinkFromParent(node.node_id_);
+        }
+      }
+      cur_idx += chwidth;
+    }
+  }
 }
 
 // Algorithm 2 in https://arxiv.org/pdf/2012.15524.pdf
 void FailureArray::BuildFailureArray(
-    const std::vector<FailureVocabToken>& failure_vocab_tokens,
-    const Trie& trie) {
+    const std::vector<FailureVocabToken>& failure_vocab_tokens, Trie* trie) {
   std::vector<std::unordered_set<char>> node_outgoing_edge_labels;
   BuildOutgoingEdgeLabelsForTrie(
       failure_vocab_tokens, trie, &node_outgoing_edge_labels);
-  failure_array_.resize(trie.Size());
-  std::queue<uint> trie_node_queue({trie.kRootNodeId});
-  if (trie.GetSuffixRoot() != trie.kRootNodeId) {
-    trie_node_queue.push(trie.GetSuffixRoot());
+  failure_array_.resize(trie->Size());
+  std::queue<uint> trie_node_queue({trie->kRootNodeId});
+  if (trie->GetSuffixRoot() != trie->kRootNodeId) {
+    trie_node_queue.push(trie->GetSuffixRoot());
   }
   while (!trie_node_queue.empty()) {
     uint32_t parent_id = trie_node_queue.front();
@@ -173,26 +235,30 @@ void FailureArray::BuildFailureArray(
         node_outgoing_edge_labels[parent_id].end());
     std::sort(outgoing_labels_sorted.begin(), outgoing_labels_sorted.end());
     for (const char edge_label : outgoing_labels_sorted) {
-      auto child_node = trie.CreateTraversalCursor(parent_id);
-      if (!trie.TryTraverseOneStep(&child_node, edge_label)) {
+      auto child_node = trie->CreateTraversalCursor(parent_id);
+      if (!trie->TryTraverseOneStep(&child_node, edge_label)) {
         std::ostringstream oss;
         oss << "Failed to traverse to child following edge " << edge_label
             << " at parent " << parent_id << ".";
         throw std::runtime_error(oss.str());
       }
-      if (child_node.node_id_ == trie.GetSuffixRoot()) {
+      if (child_node.node_id_ == trie->GetSuffixRoot()) {
         continue;
       }
       int child_data_value = -1;
       // Case 1: str(v) in V
       //  * f(v) = trie.GetSuffixRoot()
       //  * F(v) = [str(v)]
-      if (trie.TryGetData(child_node, &child_data_value)) {
-        uint32_t failure_link = trie.GetSuffixRoot();
+      if (trie->TryGetData(child_node, &child_data_value)) {
+        uint32_t failure_link = trie->GetSuffixRoot();
         if (node_id_is_punc_map_.count(child_node.node_id_) == 0) {
           throw std::invalid_argument(
               "Failed to find if an end node in the trie is a punctuation char "
               "in node_id_is_punc_map_. It should never happen.");
+        }
+        if (with_pretokenization_ &&
+            node_id_is_punc_map_.at(child_node.node_id_)) {
+          failure_link = trie->GetPuncFailureNode();
         }
         AssignFailureLinkAndPops(child_node.node_id_,
                                  failure_link,
@@ -207,11 +273,11 @@ void FailureArray::BuildFailureArray(
       if (parent_failure.failure_link_ != utils::kNullNode) {
         std::vector<int> one_step_pops;
         auto curr_node =
-            trie.CreateTraversalCursor(parent_failure.failure_link_);
+            trie->CreateTraversalCursor(parent_failure.failure_link_);
         // Find the failure link util the failure link is root or
         // the node has the outgoing label correspoding to edge_label.
         while (true) {
-          if (trie.TryTraverseOneStep(&curr_node, edge_label)) {
+          if (trie->TryTraverseOneStep(&curr_node, edge_label)) {
             AssignFailureLinkAndPops(
                 child_node.node_id_,
                 curr_node.node_id_,
@@ -225,7 +291,7 @@ void FailureArray::BuildFailureArray(
           }
           GetFailurePopsAndAppendToOut(
               curr_node_failure.failure_pops_offset_length_, &one_step_pops);
-          trie.SetTraversalCursor(&curr_node, curr_node_failure.failure_link_);
+          trie->SetTraversalCursor(&curr_node, curr_node_failure.failure_link_);
         }
       }
       // If the failure_link of parent is root,
@@ -234,6 +300,7 @@ void FailureArray::BuildFailureArray(
       trie_node_queue.push(child_node.node_id_);
     }
   }
+  RemovePunctuationTrieLink(trie);
 }
 
 void FailureArray::AssignFailureLinkAndPops(
@@ -291,9 +358,9 @@ void FailureArray::GetFailurePopsAndAppendToOut(
 
 void FailureArray::BuildOutgoingEdgeLabelsForTrie(
     const std::vector<FailureVocabToken>& failure_vocab_tokens,
-    const Trie& trie,
+    Trie* trie,
     std::vector<std::unordered_set<char>>* node_outgoing_edge_labels) {
-  node_outgoing_edge_labels->resize(trie.Size());
+  node_outgoing_edge_labels->resize(trie->Size());
   const std::string dummy_token = std::string(1, utils::kInvalidControlChar);
   for (auto& item : failure_vocab_tokens) {
     if (item.Token() != dummy_token) {
@@ -304,16 +371,16 @@ void FailureArray::BuildOutgoingEdgeLabelsForTrie(
 
 void FailureArray::BuildOutgoingEdgeLabelsFromToken(
     const FailureVocabToken& vocab_token,
-    const Trie& trie,
+    Trie* trie,
     std::vector<std::unordered_set<char>>* node_outgoing_edge_labels) {
   const std::string& token = vocab_token.Token();
   Trie::TraversalCursor curr_node;
   int char_pos = 0;
-  trie.SetTraversalCursor(&curr_node, Trie::kRootNodeId);
+  trie->SetTraversalCursor(&curr_node, Trie::kRootNodeId);
   while (char_pos < token.size()) {
     const char edge_label = token[char_pos];
     (*node_outgoing_edge_labels)[curr_node.node_id_].insert(edge_label);
-    if (!trie.TryTraverseOneStep(&curr_node, edge_label)) {
+    if (!trie->TryTraverseOneStep(&curr_node, edge_label)) {
       std::ostringstream oss;
       oss << "Error in traversing to child following edge " << edge_label
           << " from the prefix " << token.substr(0, char_pos)
