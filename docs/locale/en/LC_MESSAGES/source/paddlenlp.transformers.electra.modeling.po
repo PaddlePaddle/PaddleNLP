@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.transformers.electra.modeling.rst:2
 msgid "modeling"
@@ -29,6 +29,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:1
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator:1
 #: paddlenlp.transformers.electra.modeling.ElectraModel:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:1
 msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
 msgstr ""
 
@@ -72,6 +73,12 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "参数"
 msgstr ""
 
@@ -241,6 +248,10 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "返回"
 msgstr ""
 
@@ -261,6 +272,10 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "返回类型"
 msgstr ""
 
@@ -303,6 +318,7 @@ msgid "Electra Model for pretraining tasks."
 msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining:3
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining:3
 msgid "An instance of :class:`ElectraGenerator`."
 msgstr ""
 
@@ -312,6 +328,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:1
 msgid ""
 "The ElectraForPretraining forward method, overrides the __call__() "
 "special method."
@@ -342,11 +359,21 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:5
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:7
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:14
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:6
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:8
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:10
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:3
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:5
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:7
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:9
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:14
 msgid "See :class:`ElectraModel`."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:11
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:11
 msgid ""
 "Raw inputs used to get discriminator labels. Its data type should be "
 "`int64` and it has a shape of [batch_size, sequence_length]."
@@ -354,6 +381,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:14
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:14
 msgid ""
 "Labels to compute the discriminator inputs. Its data type should be int64"
 " and its shape is [batch_size, sequence_length]. The value for unmasked "
@@ -362,13 +390,14 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:19
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:19
 msgid ""
-"Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask).  "
-"With the fields:  - `gen_logits` (Tensor):     The scores of Electra "
-"Generator.     Its data type should be int64 and its shape is "
-"[batch_size, sequence_length, vocab_size].  - `disc_logits` (Tensor):"
-"     The the prediction result of replaced tokens.     Its data type "
-"should be float32 and if batch_size>1, its shape is [batch_size, "
+"Returns tuple (generator_logits, disc_logits, disc_labels, "
+"attention_mask).  With the fields:  - `generator_logits` (Tensor):     "
+"The scores of Electra Generator.     Its data type should be int64 and "
+"its shape is [batch_size, sequence_length, vocab_size].  - `disc_logits` "
+"(Tensor):     The the prediction result of replaced tokens.     Its data "
+"type should be float32 and if batch_size>1, its shape is [batch_size, "
 "sequence_length],     if batch_size=1, its shape is [sequence_length].  -"
 " `disc_labels` (Tensor):     The labels of electra discriminator. Its "
 "data type should be int32,     and its shape is [batch_size, "
@@ -378,22 +407,28 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:19
-msgid "Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask)."
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:19
+msgid ""
+"Returns tuple (generator_logits, disc_logits, disc_labels, "
+"attention_mask)."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForQuestionAnswering.forward:14
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:21
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:21
 msgid "With the fields:"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:25
-msgid "`gen_logits` (Tensor):"
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:25
+msgid "`generator_logits` (Tensor):"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:24
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:24
 msgid ""
 "The scores of Electra Generator. Its data type should be int64 and its "
 "shape is [batch_size, sequence_length, vocab_size]."
@@ -401,11 +436,13 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:30
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:30
 msgid "`disc_logits` (Tensor):"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:28
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:28
 msgid ""
 "The the prediction result of replaced tokens. Its data type should be "
 "float32 and if batch_size>1, its shape is [batch_size, sequence_length], "
@@ -414,11 +451,13 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:34
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:34
 msgid "`disc_labels` (Tensor):"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:33
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:33
 msgid ""
 "The labels of electra discriminator. Its data type should be int32, and "
 "its shape is [batch_size, sequence_length]."
@@ -426,11 +465,13 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:36
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:36
 msgid "`attention_mask` (Tensor):"
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining.forward:37
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.forward:37
 msgid "See :class:`ElectraModel`. Its data type should be bool."
 msgstr ""
 
@@ -442,6 +483,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator:3
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator:4
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:6
 msgid "An instance of :class:`ElectraModel`."
 msgstr ""
 
@@ -468,6 +510,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
 msgstr ""
 
@@ -481,6 +524,10 @@ msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:7
 msgid "The number of classes."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:9
+msgid "The activation function name between layers."
 msgstr ""
 
 #: of
@@ -535,6 +582,16 @@ msgid ""
 msgstr ""
 
 #: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:12
+msgid "The activation function name for classifier. Defaults to \"gelu\"."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification:15
+msgid "The epsilon to initialize nn.LayerNorm layers. Defaults to 1e-12."
+msgstr ""
+
+#: of
 #: paddlenlp.transformers.electra.modeling.ElectraForSequenceClassification.forward:1
 msgid ""
 "The ElectraForSequenceClassification forward method, overrides the "
@@ -570,6 +627,7 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:1
 msgid ""
 "Vocabulary size of `inputs_ids` in `ElectraModel`. Defines the number of "
 "different tokens that can be represented by the `inputs_ids` passed when "
@@ -577,15 +635,18 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:4
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:4
 msgid "The weight of the Electra Generator."
 msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:6
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:6
 msgid "The weight of the Electra Discriminator."
 msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:1
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:1
 msgid ""
 "The scores of masked token prediction. Its data type should be float32. "
 "and its shape is [batch_size, sequence_length, vocab_size]."
@@ -593,6 +654,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:4
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:7
 msgid ""
 "The scores of masked token prediction. Its data type should be float32. "
 "and its shape is [batch_size, sequence_length] or [sequence length] if "
@@ -601,6 +663,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:7
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:4
 msgid ""
 "The labels of the generator, its dimensionality is equal to "
 "`generator_prediction_scores`. Its data type should be int64 and its "
@@ -609,6 +672,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:10
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:10
 msgid ""
 "The labels of the discriminator, its dimensionality is equal to "
 "`discriminator_prediction_scores`. The labels should be numbers between 0"
@@ -618,6 +682,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion.forward:17
+#: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward:17
 msgid ""
 "The pretraining loss, equals to weighted generator loss plus the weighted"
 " discriminator loss. Its data type should be float32 and its shape is "
@@ -715,4 +780,126 @@ msgid ""
 "position of the labelled span. Its data type should be float32 and its "
 "shape is [batch_size, sequence_length]."
 msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining:1
+msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraForTotalPretraining`"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining:1
+msgid "ERNIE-Health Model for pretraining task."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining:5
+msgid ""
+"class:`ErnieHealthDiscriminator): An instance of "
+":class:`ErnieHealthDiscriminator`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax:1
+msgid "Sample K=5 non-original negative samples for candidate set."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax:3
+msgid ""
+"Returns tensor `neg_samples_ids`, a tensor of the negative samples of "
+"original inputs. Shape as ` [batch_size, sequence_length, K, vocab_size]`"
+" and dtype as `int64`."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:4
+msgid ""
+"The Discriminators in ERNIE-Health (https://arxiv.org/abs/2110.07244), "
+"including"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:2
+msgid "token-level Replaced Token Detection (RTD) task"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:3
+msgid "token-level Multi-Token Selection (MTS) task"
+msgstr ""
+
+#: of paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:4
+msgid "sequence-level Contrastive Sequence Prediction (CSP) task."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:3
+msgid ""
+"The candidate indices of input sequence tokens in the vocabulary for MTS "
+"task. Its data type should be `int64` and it has a shape of [batch_size, "
+"sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:13
+msgid ""
+"Returns list of tensors, the prediction results of RTD, MTS and CSP. The "
+"logits' data type should be float32 and if batch_size > 1,     - the "
+"shape of `logits_rtd` is [batch_size, sequence_length],     - the shape "
+"of `logits_mts` is [batch_size, sequence_length, num_candidate],     - "
+"the shape of `logits_csp` is [batch_size, 128]. If batch_size=1, the "
+"shapes are [sequence_length], [sequence_length, num_cadidate], [128], "
+"separately."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:13
+msgid ""
+"Returns list of tensors, the prediction results of RTD, MTS and CSP. The "
+"logits' data type should be float32 and if batch_size > 1,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:15
+msgid "the shape of `logits_rtd` is [batch_size, sequence_length],"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:16
+msgid "the shape of `logits_mts` is [batch_size, sequence_length, num_candidate],"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:17
+msgid "the shape of `logits_csp` is [batch_size, 128]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator.forward:18
+msgid ""
+"If batch_size=1, the shapes are [sequence_length], [sequence_length, "
+"num_cadidate], [128], separately."
+msgstr ""
+
+#~ msgid ""
+#~ "Returns tuple (gen_logits, disc_logits, "
+#~ "disc_labels, attention_mask).  With the "
+#~ "fields:  - `gen_logits` (Tensor):     The "
+#~ "scores of Electra Generator.     Its "
+#~ "data type should be int64 and its"
+#~ " shape is [batch_size, sequence_length, "
+#~ "vocab_size].  - `disc_logits` (Tensor):     "
+#~ "The the prediction result of replaced"
+#~ " tokens.     Its data type should be"
+#~ " float32 and if batch_size>1, its "
+#~ "shape is [batch_size, sequence_length],     if"
+#~ " batch_size=1, its shape is "
+#~ "[sequence_length].  - `disc_labels` (Tensor):"
+#~ "     The labels of electra discriminator."
+#~ " Its data type should be int32,"
+#~ "     and its shape is [batch_size, "
+#~ "sequence_length].  - `attention_mask` (Tensor):"
+#~ "     See :class:`ElectraModel`. Its data "
+#~ "type should be bool."
+#~ msgstr ""
+
+#~ msgid "Returns tuple (gen_logits, disc_logits, disc_labels, attention_mask)."
+#~ msgstr ""
+
+#~ msgid "`gen_logits` (Tensor):"
+#~ msgstr ""
 

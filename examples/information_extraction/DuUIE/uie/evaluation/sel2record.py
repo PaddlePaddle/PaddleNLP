@@ -38,13 +38,17 @@ def proprocessing_graph_record(graph, schema_dict):
 
         if record['type'] in schema_dict['entity'].type_list:
             records['entity'] += [{
-                'trigger': record['trigger'],
+                'text': record['spot'],
                 'type': record['type']
             }]
-            entity_dict[record['trigger']] = record['type']
+            entity_dict[record['spot']] = record['type']
 
         elif record['type'] in schema_dict['event'].type_list:
-            records['event'] += [record]
+            records['event'] += [{
+                'trigger': record['spot'],
+                'type': record['type'],
+                'roles': record['asocs']
+            }]
 
         else:
             print("Type `%s` invalid." % record['type'])
@@ -53,11 +57,11 @@ def proprocessing_graph_record(graph, schema_dict):
     # Mapping generated asoc result to Relation/Argument
     for record in graph['pred_record']:
         if record['type'] in schema_dict['entity'].type_list:
-            for role in record['roles']:
+            for role in record['asocs']:
                 records['relation'] += [{
                     'type': role[0],
                     'roles': [
-                        (record['type'], record['trigger']),
+                        (record['type'], record['spot']),
                         (entity_dict.get(role[1], record['type']), role[1]),
                     ]
                 }]
@@ -75,11 +79,17 @@ def proprocessing_graph_record(graph, schema_dict):
 
 
 def match_sublist(the_list, to_match):
-    """
-    :param the_list: [1, 2, 3, 4, 5, 6, 1, 2, 4, 5]
-    :param to_match: [1, 2]
-    :return:
-        [(0, 1), (6, 7)]
+    """ Find sublist in the whole list
+
+    Args:
+        the_list (list(str)): the whole list
+            - [1, 2, 3, 4, 5, 6, 1, 2, 4, 5]
+        to_match (list(str)): the sublist
+            - [1, 2]
+
+    Returns:
+        list(tuple): matched (start, end) position list
+            - [(0, 1), (6, 7)]
     """
     len_to_match = len(to_match)
     matched_list = list()
@@ -90,6 +100,19 @@ def match_sublist(the_list, to_match):
 
 
 def check_overlap(x, y):
+    """Check two span whether overlap or not
+
+    Args:
+        x (Tuple[int, int]): start, end including position of span x
+        y (Tuple[int, int]): start, end including position of span y
+
+    x: (3, 4), y: (4, 5) -> True
+    x: (3, 3), y: (4, 5) -> False
+
+    Returns:
+        bool: two span whether overlap or not
+    """
+    # x start > y end or y start > x end, no overlap
     if x[0] > y[1] or y[0] > x[1]:
         return False
     else:
@@ -97,10 +120,35 @@ def check_overlap(x, y):
 
 
 def get_index_tuple(matched: Tuple[int, int]):
+    """ Convert start, end (inlcuding) tuple to index list
+
+    Args:
+        matched (Tuple[int, int]): start and end position tuple
+
+    (3, 4) -> [3, 4]
+    (3, 3) -> [3]
+
+    Returns:
+        List[int]: List of index
+    """
     return tuple(range(matched[0], matched[1] + 1))
 
 
 def span_to_token(text, span_to_token_strategy='space'):
+    """Convert text span string to token list
+
+    Args:
+        text (string): text span string
+        span_to_token_strategy (str, optional): Defaults to 'space'.
+            - space: split text to tokens using space
+            - list: split text to toekns as list
+
+    Raises:
+        NotImplementedError: No implemented span_to_token_strategy
+
+    Returns:
+        list(str): list of token
+    """
     if span_to_token_strategy == 'space':
         return text.split(' ')
     elif span_to_token_strategy == 'list':
@@ -112,6 +160,9 @@ def span_to_token(text, span_to_token_strategy='space'):
 
 
 class MapConfig:
+    """ Config of mapping string to offset
+    """
+
     def __init__(self,
                  map_strategy: str='first',
                  de_duplicate: bool=True,
@@ -138,15 +189,23 @@ class MapConfig:
 
 
 class RecordSchema:
+    """ Record Schema Class
+    type_list: list of spot name
+    role_list: list of asoc name
+    type_role_dict: the mapping of spot-to-asoc
+    """
+
     def __init__(self, type_list, role_list, type_role_dict):
         self.type_list = type_list
         self.role_list = role_list
         self.type_role_dict = type_role_dict
 
     def __repr__(self) -> str:
-        return f"Type: {self.type_list}\n" \
-            f"Role: {self.role_list}\n" \
+        repr_list = [
+            f"Type: {self.type_list}\n", f"Role: {self.role_list}\n",
             f"Map: {self.type_role_dict}"
+        ]
+        return '\n'.join(repr_list)
 
     @staticmethod
     def get_empty_schema():
@@ -171,6 +230,14 @@ class RecordSchema:
 
 
 def merge_schema(schema_list: List[RecordSchema]):
+    """Merge list of schema
+
+    Args:
+        schema_list (List[RecordSchema]): list of record schema
+
+    Returns:
+        RecordSchema: A merged schema
+    """
     type_set = set()
     role_set = set()
     type_role_dict = defaultdict(list)
@@ -196,6 +263,9 @@ def merge_schema(schema_list: List[RecordSchema]):
 
 
 class Record:
+    """ Record for converting generated string to information record
+    """
+
     def __init__(self, map_config) -> None:
         self._map_config = map_config
 
@@ -205,12 +275,14 @@ class Record:
 
 
 class EntityRecord(Record):
+    """ Record for converting generated string to information record <type, span>
+    """
+
     @staticmethod
     def to_string(pred_record_list):
         entity_list = list()
         for pred_record in pred_record_list:
-            record_type, record_text = pred_record['type'], pred_record[
-                'trigger']
+            record_type, record_text = pred_record['type'], pred_record['text']
             if record_text == "":
                 logger.warning(f"Empty Extraction {pred_record}")
                 continue
@@ -239,7 +311,7 @@ class EntityRecord(Record):
             instance,
             token_list, ):
         """
-        Find Role's offset using closest matched with trigger work.
+        Find Role's offset using closest matched with trigger word.
         :param instance:
         :return:
         """
@@ -255,8 +327,7 @@ class EntityRecord(Record):
 
         entity_matched_set = set()
         for pred_record in instance:
-            record_type, record_text = pred_record['type'], pred_record[
-                'trigger']
+            record_type, record_text = pred_record['type'], pred_record['text']
             if record_text == "":
                 logger.warning(f"Empty Extraction {pred_record}")
                 continue
@@ -281,12 +352,11 @@ class EntityRecord(Record):
 
         entity_matched_set = set()
         for x in instance:
-            x['length'] = len(x['trigger'])
+            x['length'] = len(x['text'])
         instance.sort(reverse=True, key=lambda x: x['length'])
 
         for pred_record in instance:
-            record_type, record_text = pred_record['type'], pred_record[
-                'trigger']
+            record_type, record_text = pred_record['type'], pred_record['text']
             if record_text == "":
                 logger.warning(f"Empty Extraction {pred_record}")
                 continue
@@ -311,6 +381,10 @@ class EntityRecord(Record):
 
 
 class RelationRecord(Record):
+    """ Record for converting generated string to information record
+    <type, arg1_type, arg1_span, arg2_type, arg2_span>
+    """
+
     def to_offset(self, instance, tokens):
         map_strategy_dict = {
             'first': self.record_to_offset_first_role,
@@ -372,7 +446,7 @@ class RelationRecord(Record):
 
     def record_to_offset_closest_role(self, instance, token_list):
         """
-        Find Role's offset using closest matched with trigger work.
+        Find Role's offset using closest matched with trigger word.
         :param instance:
         :return:
         """
@@ -423,6 +497,14 @@ class RelationRecord(Record):
 
 
 class EventRecord(Record):
+    """ Record for converting generated string to information record in predicate-arguments
+    {
+        type: pred_type,
+        trigger: predicate_span,
+        args: [(arg_type, arg_span), ...]
+    }
+    """
+
     def to_offset(self, instance, tokens):
         map_strategy_dict = {
             'first': self.record_to_offset_first_role,
@@ -454,8 +536,6 @@ class EventRecord(Record):
     def record_to_offset_first_role(self, instance, token_list):
         """
         Find Role's offset using first matched in the sentence.
-        :param instance:
-        :return:
         """
         record_list = list()
 
@@ -504,9 +584,7 @@ class EventRecord(Record):
 
     def record_to_offset_closest_role(self, instance, token_list):
         """
-        Find Role's offset using closest matched with trigger work.
-        :param instance:
-        :return:
+        Find Role's offset using closest matched with trigger word.
         """
         record_list = list()
 
@@ -542,8 +620,6 @@ class EventRecord(Record):
             for role_type, text_str in record['roles']:
                 matched_list = match_sublist(token_list,
                                              self.span_to_token(text_str))
-                # if len(matched_list) == 1:
-                #     pred_record['roles'] += [(role_type, get_index_tuple(matched_list[0]))]
                 if len(matched_list) == 0:
                     logger.warning("[Cannot reconstruct]: %s %s\n" %
                                    (text_str, token_list))
@@ -561,19 +637,15 @@ class EventRecord(Record):
         return record_list
 
 
-task_record_map = {
-    'entity': EntityRecord,
-    'relation': RelationRecord,
-    'event': EventRecord,
-}
-
-
 class SEL2Record:
+    """ Converting sel expression to information records
+    """
+
     def __init__(self, schema_dict, map_config: MapConfig,
                  tokenizer=None) -> None:
         self._schema_dict = schema_dict
         self._predict_parser = SpotAsocPredictParser(
-            label_constraint=schema_dict['record'],
+            record_schema=schema_dict['record'],
             tokenizer=tokenizer, )
         self._map_config = map_config
         self._tokenizer = tokenizer
@@ -582,6 +654,16 @@ class SEL2Record:
         return f"## {self._map_config}"
 
     def sel2record(self, pred, text, tokens):
+        """ Converting sel expression to information records
+
+        Args:
+            pred (str): sel expression
+            text (str): input text
+            tokens (list(str)): token list
+
+        Returns:
+            _type_: _description_
+        """
         # Parsing generated SEL to String-level Record
         # 将生成的结构表达式解析成 String 级别的 Record
         well_formed_list, counter = self._predict_parser.decode(
@@ -595,19 +677,25 @@ class SEL2Record:
         pred_records = proprocessing_graph_record(well_formed_list[0],
                                                   self._schema_dict)
 
-        pred = defaultdict(dict)
+        task_record_map = {
+            'entity': EntityRecord,
+            'relation': RelationRecord,
+            'event': EventRecord,
+        }
+
+        parsed_record = defaultdict(dict)
         # Mapping String-level record to Offset-level record
         # 将 String 级别的 Record 回标成 Offset 级别的 Record
         for task in task_record_map:
             record_map = task_record_map[task](map_config=self._map_config, )
 
-            pred[task]['offset'] = record_map.to_offset(
+            parsed_record[task]['offset'] = record_map.to_offset(
                 instance=pred_records.get(task, []),
                 tokens=tokens, )
 
-            pred[task]['string'] = record_map.to_string(
+            parsed_record[task]['string'] = record_map.to_string(
                 pred_records.get(task, []), )
-        return pred
+        return parsed_record
 
     @staticmethod
     def load_schema_dict(schema_folder):
@@ -625,6 +713,17 @@ class SEL2Record:
 
 
 def fix_unk_from_text(span, text, unk='<unk>', tokenizer=None):
+    """Fixing unknown tokens `unk` in the generated expression
+
+    Args:
+        span (str): generated span
+        text (str): raw text
+        unk (str, optional): symbol of unk token
+        tokenizer (Tokenizer, optional): the tokenizer
+
+    Returns:
+        fixed span
+    """
     if tokenizer is not None:
         return fix_unk_from_text_with_tokenizer(
             span, text, unk=unk, tokenizer=tokenizer)
@@ -637,7 +736,8 @@ def fix_unk_from_text_without_tokenizer(span, text, unk='<unk>'):
     Find span from the text to fix unk in the generated span
     Example:
     span = "<unk> colo e Bengo"
-    text = "At 159 meters above sea level , Angola International Airport is located at Ícolo e Bengo , part of Luanda Province , in Angola ."
+    text = "Angola International Airport is located at Ícolo e Bengo"
+    fixed_span = "Ícolo e Bengo"
     """
     if unk not in span:
         return span
@@ -649,9 +749,11 @@ def fix_unk_from_text_without_tokenizer(span, text, unk='<unk>'):
 
     match = r'\s*[^，？。\s]+\s*'.join(
         [clean_wildcard(item.strip()) for item in span.split(unk)])
+
     if len(match) > 100:
-        # May lead re problem
+        # Too long regular expression may lead re problem
         return span
+
     result = re.search(match, text)
 
     if not result:
@@ -661,9 +763,11 @@ def fix_unk_from_text_without_tokenizer(span, text, unk='<unk>'):
 
 def fix_unk_from_text_with_tokenizer(span, text, tokenizer, unk='<unk>'):
     unk_id = tokenizer.vocab.to_indices(unk)
-    # Remvoe last special token in the result of Paddle Tokenizer
-    tokenized_span = tokenizer.encode(span)['input_ids'][:-1]
-    tokenized_text = tokenizer.encode(text)['input_ids'][:-1]
+    tokenized_span = tokenizer.encode(
+        span, add_special_tokens=False, return_token_type_ids=None)['input_ids']
+    tokenized_text = tokenizer.encode(
+        text, add_special_tokens=False, return_token_type_ids=None)['input_ids']
+
     matched = match_sublist(tokenized_text, tokenized_span)
     if len(matched) == 0:
         return span
@@ -714,7 +818,7 @@ def convert_bracket(text):
 
 def find_bracket_num(tree_str):
     """
-    Count Bracket Number, 0 indicate num_left = num_right
+    Count Bracket Number (num_left - num_right), 0 indicates num_left = num_right
     """
     count = 0
     for char in tree_str:
@@ -763,8 +867,7 @@ def resplit_label_span(label, span, split_symbol=span_start):
 
 
 def add_bracket(tree_str):
-    """
-    add right bracket to fill ill-formed
+    """add right bracket to fix ill-formed expression
     """
     tree_str_list = tree_str.split()
     bracket_num = find_bracket_num(tree_str_list)
@@ -773,8 +876,7 @@ def add_bracket(tree_str):
 
 
 def get_tree_str(tree):
-    """
-    get str from sel tree
+    """get str from sel tree
     """
     str_list = list()
     for element in tree:
@@ -837,11 +939,12 @@ def convert_spot_asoc(spot_asoc_instance, structure_maker):
 
 
 class SpotAsocPredictParser:
-    def __init__(self, label_constraint=None, tokenizer=None):
-        self.predicate_set = label_constraint.type_list if label_constraint else list(
-        )
-        self.role_set = label_constraint.role_list if label_constraint else list(
-        )
+    """ Parser for converting generated sel to extraction record
+    """
+
+    def __init__(self, record_schema: RecordSchema=None, tokenizer=None):
+        self.spot_set = set(record_schema.type_list) if record_schema else None
+        self.asoc_set = set(record_schema.role_list) if record_schema else None
         self.tokenizer = tokenizer
 
     def decode(
@@ -888,9 +991,8 @@ class SpotAsocPredictParser:
 
             counter.update(['gold_tree' for _ in gold_tree])
 
-            instance['gold_event'], instance['gold_role'], instance[
-                'gold_record'] = self.get_record_list(
-                    tree=instance["gold_tree"], text=instance['text'])
+            _, _, instance['gold_record'] = self.get_record_list(
+                sel_tree=instance["gold_tree"], text=instance['text'])
 
             try:
                 if not check_well_form(pred):
@@ -909,26 +1011,33 @@ class SpotAsocPredictParser:
                 instance['pred_tree'] = ParentedTree.fromstring(
                     left_bracket + right_bracket, brackets=brackets)
 
-            instance['pred_event'], instance['pred_role'], instance[
-                'pred_record'] = self.get_record_list(
-                    tree=instance["pred_tree"], text=instance['text'])
+            _, _, instance['pred_record'] = self.get_record_list(
+                sel_tree=instance["pred_tree"], text=instance['text'])
 
             well_formed_list += [instance]
 
         return well_formed_list, counter
 
-    def get_record_list(self, tree, text=None):
+    def get_record_list(self, sel_tree, text=None):
+        """ Convert single sel expression to extraction records
 
+        Args:
+            sel_tree (Tree): sel tree
+            text (str, optional): _description_. Defaults to None.
+
+        Returns:
+            spot_list: list of (spot_type: str, spot_span: str)
+            asoc_list: list of (spot_type: str, asoc_label: str, asoc_text: str)
+            record_list: list of {'asocs': list(), 'type': spot_type, 'spot': spot_text}
+        """
         spot_list = list()
         asoc_list = list()
         record_list = list()
 
-        for spot_tree in tree:
+        for spot_tree in sel_tree:
 
-            if isinstance(spot_tree, str):
-                continue
-
-            if len(spot_tree) == 0:
+            # Drop incomplete tree
+            if isinstance(spot_tree, str) or len(spot_tree) == 0:
                 continue
 
             spot_type = spot_tree.label()
@@ -937,17 +1046,21 @@ class SpotAsocPredictParser:
             spot_type, spot_text = rewrite_label_span(
                 label=spot_type,
                 span=spot_text,
-                label_set=self.predicate_set,
+                label_set=self.spot_set,
                 text=text,
                 tokenizer=self.tokenizer, )
 
-            if spot_text == null_span:
+            # Drop empty generated span
+            if spot_text is None or spot_text == null_span:
+                continue
+            # Drop empty generated type
+            if spot_type is None:
+                continue
+            # Drop invalid spot type
+            if self.spot_set is not None and spot_type not in self.spot_set:
                 continue
 
-            if spot_type is None or spot_text is None:
-                continue
-
-            record = {'roles': list(), 'type': spot_type, 'trigger': spot_text}
+            record = {'asocs': list(), 'type': spot_type, 'spot': spot_text}
 
             for asoc_tree in spot_tree:
                 if isinstance(asoc_tree, str) or len(asoc_tree) < 1:
@@ -960,17 +1073,22 @@ class SpotAsocPredictParser:
                 asoc_label, asoc_text = rewrite_label_span(
                     label=asoc_label,
                     span=asoc_text,
-                    label_set=self.role_set,
+                    label_set=self.asoc_set,
                     text=text,
                     tokenizer=self.tokenizer, )
 
-                if asoc_text == null_span:
+                # Drop empty generated span
+                if asoc_text is None or asoc_text == null_span:
                     continue
-                if asoc_label is None or asoc_text is None:
+                # Drop empty generated type
+                if asoc_label is None:
+                    continue
+                # Drop invalid asoc type
+                if self.asoc_set is not None and asoc_label not in self.asoc_set:
                     continue
 
                 asoc_list += [(spot_type, asoc_label, asoc_text)]
-                record['roles'] += [(asoc_label, asoc_text)]
+                record['asocs'] += [(asoc_label, asoc_text)]
 
             spot_list += [(spot_type, spot_text)]
             record_list += [record]

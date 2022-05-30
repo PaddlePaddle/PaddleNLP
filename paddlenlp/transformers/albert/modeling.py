@@ -28,6 +28,7 @@ __all__ = [
     "AlbertForMaskedLM",
     "AlbertForSequenceClassification",
     "AlbertForTokenClassification",
+    "AlbertForQuestionAnswering",
     "AlbertForMultipleChoice",
 ]
 

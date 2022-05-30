@@ -120,6 +120,14 @@ PyObject* ToPyObject(const std::vector<std::vector<size_t>>& value) {
   return result;
 }
 
+PyObject* ToPyObject(const std::vector<std::string>& value) {
+  PyObject* result = PyList_New((Py_ssize_t)value.size());
+  for (size_t i = 0; i < value.size(); i++) {
+    PyList_SET_ITEM(result, static_cast<Py_ssize_t>(i), ToPyObject(value[i]));
+  }
+  return result;
+}
+
 bool CastPyArg2AttrBoolean(PyObject* obj, ssize_t arg_pos) {
   if (obj == Py_None) {
     return false;  // To be compatible with QA integration testing. Some
@@ -245,6 +253,23 @@ std::vector<std::string> CastPyArg2VectorOfStr(PyObject* obj, size_t arg_pos) {
     return {};
   }
   return result;
+}
+
+bool PyObject_CheckLongOrConvertToLong(PyObject** obj) {
+  if ((PyLong_Check(*obj) && !PyBool_Check(*obj))) {
+    return true;
+  }
+
+  if (std::string((reinterpret_cast<PyTypeObject*>((*obj)->ob_type))->tp_name)
+          .find("numpy") != std::string::npos) {
+    auto to = PyNumber_Long(*obj);
+    if (to) {
+      *obj = to;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 }  // pybind
