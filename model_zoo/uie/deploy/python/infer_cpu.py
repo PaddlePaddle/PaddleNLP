@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import argparse
+import math
 from pprint import pprint
+from multiprocessing import cpu_count
 
 import paddle
-from psutil import cpu_count
 from uie_predictor import UIEPredictor
 
 
@@ -35,9 +36,9 @@ def parse_args():
         help="Probability threshold for start/end index probabiliry.", )
     parser.add_argument(
         "--num_threads",
-        default=cpu_count(logical=False),
+        default=math.ceil(cpu_count() / 2),
         type=int,
-        help="Number of threads for cpu.", )
+        help="Number of threads for cpu, default to half of logical cores.", )
     args = parser.parse_args()
     return args
 

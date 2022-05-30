@@ -691,7 +691,7 @@ from paddlenlp import Taskflow
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
 
 #### 可配置参数说明
-* `num_threads`：配置CPU的线程数，默认为当前CPU的物理核数。
+* `num_threads`：配置CPU的线程数，默认为CPU的逻辑核数/2。
 * `infer_precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快，如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，确保CUDA>=11.2，CuDNN>=8.1.1，初次使用需按照提示安装相关依赖。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。

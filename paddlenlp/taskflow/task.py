@@ -17,7 +17,7 @@ import os
 import abc
 import math
 from abc import abstractmethod
-from psutil import cpu_count
+from multiprocessing import cpu_count
 
 import paddle
 from paddle.dataset.common import md5file
@@ -51,8 +51,8 @@ class Task(metaclass=abc.ABCMeta):
         self._custom_model = False
         self._param_updated = False
         self._num_threads = self.kwargs[
-            'num_threads'] if 'num_threads' in self.kwargs else cpu_count(
-                logical=False)
+            'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
+                cpu_count() / 2)
         self._infer_precision = self.kwargs[
             'infer_precision'] if 'infer_precision' in self.kwargs else 'fp32'
         # Default to use Paddle Inference

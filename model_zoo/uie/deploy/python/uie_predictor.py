@@ -14,7 +14,8 @@
 
 import six
 import os
-from psutil import cpu_count
+import math
+from multiprocessing import cpu_count
 import numpy as np
 import paddle
 import paddle2onnx
@@ -104,7 +105,7 @@ class UIEPredictor(object):
         if args.device == 'cpu':
             args.use_fp16 = False
         if args.device == 'gpu':
-            args.num_threads = cpu_count(logical=False)
+            args.num_threads = math.ceil(cpu_count() / 2)
         self.inference_backend = InferBackend(
             args.model_path_prefix,
             device=args.device,
