@@ -57,7 +57,7 @@ def pad_sequence_paddle(inputs, lens, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(inputs[idx:idx + l])
+        sequences.append(np.array(inputs[idx:idx + l]))
         idx += l
     outputs = Pad(pad_val=pad_index)(sequences)
     output_tensor = paddle.to_tensor(outputs)
