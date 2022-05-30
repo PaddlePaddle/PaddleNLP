@@ -27,7 +27,6 @@ from paddlenlp.IPU import register
 
 @register("BERT_Base")
 class IpuBertConfig(object):
-
     def __init__(self, args):
         self.args = args
         self.micro_batch_size = self.args.micro_batch_size
@@ -75,7 +74,6 @@ class IpuBertConfig(object):
 
 @register("BERT_Base")
 class IpuBertPipeline(object):
-
     def __init__(self, args, config, model):
         self.args = args
         self.config = config
@@ -84,11 +82,12 @@ class IpuBertPipeline(object):
     def to_pipelined(self):
         paddle.static.set_ipu_shard(self.model.embedding, index=0, stage=0)
         for i in range(self.config.num_hidden_layers):
-            paddle.static.set_ipu_shard(self.model.bert.bert[i],
-                                        index=i // self.args.layers_per_ipu +
-                                        self.args.encoder_start_ipu,
-                                        stage=i // self.args.layers_per_ipu +
-                                        self.args.encoder_start_ipu)
+            paddle.static.set_ipu_shard(
+                self.model.bert.bert[i],
+                index=i // self.args.layers_per_ipu +
+                self.args.encoder_start_ipu,
+                stage=i // self.args.layers_per_ipu +
+                self.args.encoder_start_ipu)
 
 
 class IpuBertEmbeddings(Layer):
@@ -113,9 +112,8 @@ class IpuBertEmbeddings(Layer):
         # word embeddings
         word_embeddings_weights = paddle.transpose(self.word_embeddings_weights,
                                                    [1, 0])
-        input_embeddings = paddle.gather(word_embeddings_weights,
-                                         indices,
-                                         axis=0)
+        input_embeddings = paddle.gather(
+            word_embeddings_weights, indices, axis=0)
 
         # position_embeddings
         position_embeddings = self.position_embeddings(positions)
@@ -155,8 +153,8 @@ class IPUMultiHeadAttention(Layer):
         self.index = index
         self.qkv_shape = [-1, self.config.seq_len, 12, 64]
         self.masks = {}
-        qk_scale = 1 / np.sqrt(
-            self.config.hidden_size / self.config.num_hidden_layers)
+        qk_scale = 1 / np.sqrt(self.config.hidden_size /
+                               self.config.num_hidden_layers)
         self.qk_scale_attrs = {
             'name': 'QK_scale',
             'shape': [1],
@@ -178,13 +176,13 @@ class IPUMultiHeadAttention(Layer):
         qkv = paddle.matmul(sequence_output, qkv)
         qkv.block.ops[-1]._set_attr('__available_memory',
                                     self.config.available_mem_proportion)
-        q, k, v = paddle.split(qkv,
-                               num_or_sections=[
-                                   self.config.hidden_size,
-                                   self.config.hidden_size,
-                                   self.config.hidden_size
-                               ],
-                               axis=1)
+        q, k, v = paddle.split(
+            qkv,
+            num_or_sections=[
+                self.config.hidden_size, self.config.hidden_size,
+                self.config.hidden_size
+            ],
+            axis=1)
         q = paddle.reshape(q, self.qkv_shape)
         q = paddle.transpose(q, [0, 2, 1, 3])
         k = paddle.reshape(k, self.qkv_shape)
@@ -199,8 +197,8 @@ class IPUMultiHeadAttention(Layer):
                     final_mask = self.masks[self.index]
                 else:
                     with paddle.static.name_scope("Mask"):
-                        base_value = np.arange(
-                            self.config.seq_len).astype('int32')
+                        base_value = np.arange(self.config.seq_len).astype(
+                            'int32')
                         base = paddle.fluid.layers.assign(base_value)
                         mmask = paddle.less_than(base, input_mask[0])
                         mask_value = np.greater_equal(
@@ -294,9 +292,10 @@ class TransformerEncoderLayer(Layer):
             layer_input = sequence_output
             qkv = self.self_attn(sequence_output, input_mask)
 
-            qkv_linear = nn.Linear(self.config.hidden_size,
-                                   self.config.hidden_size,
-                                   bias_attr=False)
+            qkv_linear = nn.Linear(
+                self.config.hidden_size,
+                self.config.hidden_size,
+                bias_attr=False)
             qkv = qkv_linear(qkv)
             qkv.block.ops[-1]._set_attr('__available_memory',
                                         self.config.available_mem_proportion)
@@ -362,13 +361,13 @@ class TransformerEncoderLayer(Layer):
 
 
 class BERTEncoder(Layer):
-
     def __init__(self, config, custom_ops=None):
         super(BERTEncoder, self).__init__()
         self.config = config
         self.custom_ops = custom_ops
         self.bert = [
-            TransformerEncoderLayer(config, custom_ops, index=i)
+            TransformerEncoderLayer(
+                config, custom_ops, index=i)
             for i in range(self.config.num_hidden_layers)
         ]
 
@@ -497,10 +496,8 @@ class IpuBertForQuestionAnswering(Layer):
         """
         logits = self.classifier(sequence_output)
 
-        start_logits = paddle.slice(input=logits,
-                                    axes=[1],
-                                    starts=[0],
-                                    ends=[1])
+        start_logits = paddle.slice(
+            input=logits, axes=[1], starts=[0], ends=[1])
         end_logits = paddle.slice(input=logits, axes=[1], starts=[1], ends=[2])
 
         start_logits = paddle.reshape(start_logits, [-1, self.seq_len])
@@ -702,14 +699,12 @@ class IpuBertPretrainingMLMAccAndLoss(Layer):
             total_tokens = paddle.fluid.layers.reduce_sum(mlm_mask)
             total_correct_tokens = paddle.cast(total_correct_tokens, "float32")
             total_tokens = paddle.cast(total_tokens, "float32")
-            mlm_acc = paddle.fluid.layers.elementwise_div(
-                total_correct_tokens, total_tokens)
+            mlm_acc = paddle.fluid.layers.elementwise_div(total_correct_tokens,
+                                                          total_tokens)
 
         masked_lm_softmax = paddle.fluid.layers.softmax(mlm)
-        mlm_loss = self.custom_ops.custom_nll_loss(masked_lm_softmax,
-                                                   masked_lm_ids, 1,
-                                                   str(self.ignore_index),
-                                                   False)
+        mlm_loss = self.custom_ops.custom_nll_loss(
+            masked_lm_softmax, masked_lm_ids, 1, str(self.ignore_index), False)
 
         return mlm_acc, mlm_loss
 
@@ -743,8 +738,8 @@ class IpuBertPretrainingNSPAccAndLoss(Layer):
             }
             nsp_total = paddle.fluid.layers.fill_constant(**attrs)
             nsp_total = paddle.cast(nsp_total, "float32")
-            nsp_acc = paddle.fluid.layers.elementwise_div(
-                nsp_correct, nsp_total)
+            nsp_acc = paddle.fluid.layers.elementwise_div(nsp_correct,
+                                                          nsp_total)
 
         next_sentence_softmax = paddle.fluid.layers.softmax(nsp)
         nsp_loss = self.custom_ops.custom_nll_loss(next_sentence_softmax,
