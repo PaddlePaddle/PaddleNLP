@@ -44,5 +44,5 @@ if __name__ == "__main__":
                 shape=[None, None], dtype="int64", name='att_mask'),
         ])
     # Save in static graph model.
-    save_path = os.path.join(args.infer_model_dir, "inference")
+    save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

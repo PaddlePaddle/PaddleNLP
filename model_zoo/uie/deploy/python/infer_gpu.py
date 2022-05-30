@@ -44,17 +44,39 @@ def parse_args():
 def main():
     args = parse_args()
 
-    text = [
-        '（右肝肿瘤）肝细胞性肝癌（II-III级，梁索型和假腺管型），肿瘤包膜不完整，紧邻肝被膜，侵及周围肝组织，未见脉管内癌栓（MVI分级：M0级）及卫星子灶形成。（肿物1个，大小4.2×4.0×2.8cm）。'
+    texts = [
+        '"北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。"',
+        '原告赵六，2022年5月29日生\n委托代理人孙七，深圳市C律师事务所律师。\n被告周八，1990年7月28日出生\n委托代理人吴九，山东D律师事务所律师'
     ]
-    schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+    schema1 = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
+    schema2 = [{'原告': ['出生日期', '委托代理人']}, {'被告': ['出生日期', '委托代理人']}]
 
     args.device = 'gpu'
-    args.schema = schema
+    args.schema = schema1
     predictor = UIEPredictor(args)
 
-    outputs = predictor.predict(text)
-    pprint(outputs)
+    print("-----------------------------")
+    outputs = predictor.predict(texts)
+    for text, output in zip(texts, outputs):
+        print("1. Input text: ")
+        print(text)
+        print("2. Input schema: ")
+        print(schema1)
+        print("3. Result: ")
+        pprint(output)
+        print("-----------------------------")
+
+    # Reset schema
+    predictor.set_schema(schema2)
+    outputs = predictor.predict(texts)
+    for text, output in zip(texts, outputs):
+        print("1. Input text: ")
+        print(text)
+        print("2. Input schema: ")
+        print(schema2)
+        print("3. Result: ")
+        pprint(output)
+        print("-----------------------------")
 
 
 if __name__ == "__main__":

@@ -87,13 +87,10 @@ class UIEPredictor(object):
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             "ernie-3.0-base-zh", use_faster=True)
-
         self._position_prob = args.position_prob
         self._max_seq_len = 512
-        if isinstance(args.schema, dict) or isinstance(args.schema, str):
-            args.schema = [args.schema]
-        self._schema_tree = self._build_tree(args.schema)
-
+        self._schema_tree = None
+        self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
         if args.device == 'gpu':
@@ -103,6 +100,11 @@ class UIEPredictor(object):
             device=args.device,
             use_fp16=args.use_fp16,
             num_threads=args.num_threads)
+
+    def set_schema(self, schema):
+        if isinstance(schema, dict) or isinstance(schema, str):
+            schema = [schema]
+        self._schema_tree = self._build_tree(schema)
 
     @classmethod
     def _build_tree(cls, schema, name='root'):

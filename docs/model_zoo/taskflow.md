@@ -630,25 +630,25 @@ from paddlenlp import Taskflow
   ```python
   >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
   >>> ie.set_schema(schema)
-  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。")) # Better print results using pprint
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
   [{'原告': [{'end': 37,
-            'probability': 0.9955972637653154,
+            'probability': 0.9949814024296764,
             'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.9835957661618089,
+                                    'probability': 0.7956844697990384,
                                     'start': 44,
                                     'text': '李四'}]},
             'start': 35,
             'text': '张三'}],
     '法院': [{'end': 10,
-            'probability': 0.9245885500450299,
+            'probability': 0.9221074192336651,
             'start': 0,
             'text': '北京市海淀区人民法院'}],
     '被告': [{'end': 67,
-            'probability': 0.9033652934762237,
-            'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.3863244074945271,
-                                    'start': 44,
-                                    'text': '李四'}]},
+            'probability': 0.8437349536631089,
+            'relations': {'委托代理人': [{'end': 92,
+                                    'probability': 0.7267121388225029,
+                                    'start': 90,
+                                    'text': '赵六'}]},
             'start': 64,
             'text': 'B公司'}]}]
   ```
