@@ -1,0 +1,74 @@
+# Default Args for all dataset 
+# You can overwrite the configs in each dataset.
+DefaultArgs:
+    learning_rate: 0.00003
+    num_train_epochs: 3
+    batch_size: 64
+    max_seq_length: 128
+    weight_decay: 0.01
+    logging_steps: 100
+    eval_steps: 100
+    minimum_eval_times: -1
+    max_steps: -1
+    warmup_steps: 0
+    warmup_ratio: 0.0
+    metric: "Accuracy"
+    do_train: True
+    save_steps: 100
+    max_answer_length: 50
+# Datasets which used for sequence classfication
+SequenceClassification:
+    clue afqmc: 
+        num_train_epochs: 6
+        learning_rate: 0.00003
+        batch_size: 64
+        max_seq_length: 128
+    clue tnews:
+        num_train_epochs: 3
+        learning_rate: 0.00005
+        batch_size: 32
+        max_seq_length: 128
+    clue iflytek:
+        num_train_epochs: 3
+        learning_rate: 0.00005
+        batch_size: 16
+        max_seq_length: 128
+    clue ocnli:
+        num_train_epochs: 6
+        learning_rate: 0.00005
+        batch_size: 64
+        max_seq_length: 128
+    clue cmnli: 
+        num_train_epochs: 4
+        learning_rate: 0.00002
+        batch_size: 32
+        max_seq_length: 128
+    clue cluewsc2020: 
+        num_train_epochs: 50
+        learning_rate: 0.00003
+        batch_size: 16
+        max_seq_length: 128
+    clue csl:
+        num_train_epochs: 8
+        learning_rate: 0.00005
+        max_seq_length: 256
+        batch_size: 64
+
+# Datasets which used for token classfication
+TokenClassification:
+    msra_ner:
+        num_train_epochs: 3
+        learning_rate: 0.00005
+        save_steps: 100
+        batch_size: 32
+        max_seq_length: 128
+        remove_unused_columns: False
+
+# Datasets which used for question answersing
+QuestionAnswering:
+    clue cmrc2018:
+        learning_rate: 0.00003
+        num_train_epochs: 8
+        batch_size: 24
+        max_seq_length: 512
+

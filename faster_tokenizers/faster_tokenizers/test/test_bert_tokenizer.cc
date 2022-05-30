@@ -68,9 +68,9 @@ TEST(tokenizer, bert_tokenizer) {
 
   // Tokenize the sample strings
   std::vector<core::Encoding> encodings(2);
-  tokenizer.EncodePairStrings("今天天气真好", true, &encodings[0]);
-  tokenizer.EncodePairStrings(
-      "don't know how this missed award nominations.", true, &encodings[1]);
+  tokenizer.EncodePairStrings("今天天气真好", &encodings[0]);
+  tokenizer.EncodePairStrings("don't know how this missed award nominations.",
+                              &encodings[1]);
   std::vector<std::vector<std::string>> expected_tokens = {
       {"[CLS]", "今", "天", "天", "气", "真", "好", "[SEP]"},
       {"[CLS]",

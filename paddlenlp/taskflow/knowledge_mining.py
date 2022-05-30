@@ -296,7 +296,7 @@ class WordTagTask(Task):
                     list(text),
                     return_length=True,
                     is_split_into_words=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
@@ -498,7 +498,7 @@ class NPTagTask(Task):
     """
 
     resource_files_names = {
-        "model_state": "model_state.pdparms",
+        "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "name_category_map": "name_category_map.json",
     }
@@ -689,8 +689,7 @@ class NPTagTask(Task):
                     tokens,
                     return_length=True,
                     is_split_into_words=True,
-                    pad_to_max_seq_len=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 label_indices = list(
                     range(tokenized_output["seq_len"] - 1 - self._max_cls_len,
                           tokenized_output["seq_len"] - 1))
@@ -700,8 +699,11 @@ class NPTagTask(Task):
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Stack(dtype='int64'),  # input_ids
-            Stack(dtype='int64'),  # token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # token_type_ids
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 

@@ -2,18 +2,14 @@
 # -*- coding:utf-8 -*-
 import logging
 import argparse
-from tqdm import tqdm
 import math
 import os
-import json
-
 import paddle
 
 from paddle.optimizer import AdamW
 from paddle.amp import GradScaler, auto_cast
 from paddlenlp.transformers import T5ForConditionalGeneration
 
-from uie.evaluation import constants
 from uie.evaluation.sel2record import evaluate_extraction_results
 from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 from uie.seq2struct.utils import (
@@ -32,37 +28,16 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--multi_task",
-        action="store_true",
-        help="Path to pre-trained model or shortcut name of model.", )
-    parser.add_argument(
         "--multi_task_config",
         required=True,
-        help="Path to pre-trained model or shortcut name of model.", )
+        help="Path to multi-task config file.", )
     parser.add_argument(
         "--model_name_or_path",
         default="t5-large",
         type=str,
         help="Path to pre-trained model or shortcut name of model.", )
     parser.add_argument(
-        "--train_file",
-        default=None,
-        type=str,
-        help="The input training data jsonlines file.", )
-    parser.add_argument(
-        "--validation_file",
-        default=None,
-        type=str,
-        help="An optional input evaluation data file to evaluate the metrics.",
-    )
-    parser.add_argument(
-        "--record_schema",
-        default=None,
-        type=str,
-        help="Schema for information extraction.", )
-    parser.add_argument(
         "--output_dir",
-        required=True,
         type=str,
         help="The output directory where the model predictions and checkpoints"
         " will be written. Default as `outputs`", )
@@ -72,19 +47,18 @@ def parse_args():
         help="Overwrite output directory", )
     parser.add_argument(
         "--logging_dir",
-        required=True,
         type=str,
         help="The output logging directory", )
     parser.add_argument(
         "--max_source_length",
-        default=256,
+        default=384,
         type=int,
         help="The maximum total input sequence length after tokenization."
         " Sequences longer than this will be truncated, sequences shorter will be padded."
     )
     parser.add_argument(
         "--max_target_length",
-        default=128,
+        default=192,
         type=int,
         help="The maximum total target sequence length to be generated.", )
     parser.add_argument(
@@ -105,8 +79,7 @@ def parse_args():
     parser.add_argument(
         "--metric_for_best_model",
         type=str,
-        required=True,
-        help="The main metric to choose the best epoch.", )
+        help="The main metric to choose the best checkpoint.", )
     parser.add_argument(
         "--gradient_accumulation_steps",
         default=1,
@@ -114,7 +87,7 @@ def parse_args():
         help="gradient_accumulation_steps.", )
     parser.add_argument(
         "--learning_rate",
-        default=1e-4,
+        default=5e-4,
         type=float,
         help="The initial learning rate for Adam.", )
     parser.add_argument(
@@ -141,7 +114,7 @@ def parse_args():
         "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
     parser.add_argument(
         "--num_train_epochs",
-        default=4,
+        default=10,
         type=int,
         help="Total number of training epochs to perform.", )
     parser.add_argument(
@@ -170,7 +143,7 @@ def parse_args():
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=100,
+        default=500,
         help="Log every X updates steps.", )
     parser.add_argument(
         "--seed",
@@ -207,12 +180,12 @@ def parse_args():
         "--spot_noise",
         type=float,
         default=0,
-        help="The noise rate of null spot.")
+        help="The noise rate of inserting rejection null spot.")
     parser.add_argument(
         "--asoc_noise",
         type=float,
         default=0,
-        help="The noise rate of null asoc.")
+        help="The noise rate of inserting rejection null asoc.")
     parser.add_argument(
         '--negative_keep',
         type=float,
@@ -232,14 +205,8 @@ def parse_args():
         "--ordered_prompt",
         action='store_true',
         help="Whether to sort the spot prompt and asoc prompt or not.")
-    parser.add_argument(
-        '--offset_map',
-        dest='map_config',
-        help='Offset match strategy.',
-        choices=constants.offset_map_strategy.keys())
     parser.add_argument('--do_train', action='store_true')
     parser.add_argument('--do_eval', action='store_true')
-    parser.add_argument('--do_predict', action='store_true')
     parser.add_argument(
         "--device",
         type=str,
@@ -250,10 +217,13 @@ def parse_args():
     args = parser.parse_args()
 
     # Sanity check
-    if not (args.do_train or args.do_predict):
+    if not (args.do_train or args.do_eval):
         raise ValueError(
-            "At least one of the \"--do_train\" or \"--do_predict\" should be true."
+            "At least one of the \"--do_train\" or \"--do_eval\" should be true."
         )
+    if args.do_train and not args.output_dir:
+        raise ValueError(
+            "--output_dir should be given when --do_train is true.")
 
     return args
 
@@ -261,6 +231,7 @@ def parse_args():
 @paddle.no_grad()
 def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
              sel2record, eval_match_mode):
+    """ Evaluate single task """
 
     model = model._layers if isinstance(model, paddle.DataParallel) else model
 
@@ -279,14 +250,13 @@ def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
 
         return x_str.strip()
 
+    # Generate SEL using Trained Model
     all_preds = []
-    for batch in tqdm(data_loader, desc='evaluate'):
-        source_ids, source_mask = batch['input_ids'], batch['attention_mask']
+    for batch in data_loader:
 
-        # We can no longer use model.generate because it fails in distributed envs
         outputs, scores = model.generate(
-            input_ids=source_ids,
-            attention_mask=source_mask,
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
             max_length=generate_max_length,
             use_faster=True, )
 
@@ -296,34 +266,38 @@ def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
             clean_up_tokenization_spaces=False,
             skip_special_tokens=False)
 
-        preds = [postprocess_text(o) for o in outputs]
+        preds = [postprocess_text(output) for output in outputs]
         all_preds.extend(preds)
 
     assert len(all_preds) == len(eval_instances)
 
     # Parsing SEL to Record
     all_records = []
-    for p, instance in zip(all_preds, eval_instances):
-        r = sel2record.sel2record(
-            pred=p, text=instance['text'], tokens=instance['tokens'])
-        all_records += [r]
+    for predicted_sel, instance in zip(all_preds, eval_instances):
+        record = sel2record.sel2record(
+            pred=predicted_sel,
+            text=instance['text'],
+            tokens=instance['tokens'])
+        all_records += [record]
 
-    results = evaluate_extraction_results(
+    task_metrics = evaluate_extraction_results(
         eval_instances, all_records, eval_match_mode=eval_match_mode)
 
     prediction = {
-        'preds_record.txt': all_records,
-        'preds_seq2seq.txt': all_preds,
-        'results.txt': results
+        'record': all_records,
+        'sel': all_preds,
+        'metric': task_metrics
     }
 
-    return results, prediction
+    return task_metrics, prediction
 
 
 def eval_all_tasks(eval_tasks, model, tokenizer, generate_max_length):
+    """ Evaluate all tasks """
     eval_overall_results = dict()
     eval_overall_predictions = dict()
     for task_name, eval_task in eval_tasks.items():
+        # Evaulate single task
         logger.info(f"Evaluate {task_name} ...")
         eval_results, eval_prediction = evaluate(
             model=model,
@@ -333,58 +307,31 @@ def eval_all_tasks(eval_tasks, model, tokenizer, generate_max_length):
             eval_instances=eval_task.val_instances,
             sel2record=eval_task.sel2record,
             eval_match_mode=eval_task.config.eval_match_mode, )
+
         for metric_name in eval_task.metrics:
-            eval_overall_results[f"{task_name}:{metric_name}"] = eval_results[
-                metric_name]
+            metric_key = f"{task_name}:{metric_name}"
+            eval_overall_results[metric_key] = eval_results[metric_name]
+
         eval_overall_predictions[task_name] = eval_prediction
 
-    metric_sum = sum(eval_overall_results.values())
-    metric_num = len(eval_overall_results.values())
-    eval_overall_results['all-task-ave'] = metric_sum / float(metric_num)
-
-    for line in better_print_multi(eval_overall_results).split('\n'):
-        logger.info(line)
+    sum_metric = sum(eval_overall_results.values())
+    number_metric = len(eval_overall_results.values())
+    eval_overall_results['all-task-ave'] = sum_metric / float(number_metric)
 
     return eval_overall_results, eval_overall_predictions
 
 
 def test(args, model, tokenizer):
-    generate_max_length = args.max_target_length
     eval_tasks = load_eval_tasks(model=model, tokenizer=tokenizer, args=args)
 
-    eval_overall_results, eval_overall_predictions = eval_all_tasks(
+    eval_overall_results, eval_predictions = eval_all_tasks(
         eval_tasks=eval_tasks,
         model=model,
         tokenizer=tokenizer,
-        generate_max_length=generate_max_length, )
+        generate_max_length=args.max_target_length, )
 
-    better_print_multi(eval_overall_results)
-
-    for task_name in eval_overall_predictions:
-        write_prediction(
-            eval_prediction=eval_overall_predictions[task_name],
-            prefix='test-' + task_name, )
-
-
-def write_prediction(eval_prediction, prefix='eval'):
-
-    for pred_file, pred_result in eval_prediction.items():
-        output_filename = os.path.join(args.output_dir, f"{prefix}-{pred_file}")
-
-        with open(output_filename, 'w', encoding='utf8') as output:
-            if isinstance(pred_result, list):
-                for pred in pred_result:
-                    if isinstance(pred_result, str):
-                        output.write(pred + '\n')
-                    else:
-                        output.write(
-                            json.dumps(
-                                pred, ensure_ascii=False) + '\n')
-
-            elif isinstance(pred_result, dict):
-                for pred in pred_result:
-                    output.write(f"{prefix}-{pred} = {pred_result[pred]}" +
-                                 '\n')
+    for line in better_print_multi(eval_overall_results).split('\n'):
+        logger.info(line)
 
 
 def train(args, model, tokenizer):
@@ -404,7 +351,6 @@ def train(args, model, tokenizer):
     train_dataloader = get_train_dataloader(
         model=model,
         tokenizer=tokenizer,
-        train_filename=args.train_file,
         args=args, )
     eval_tasks = load_eval_tasks(
         model=model, tokenizer=tokenizer, args=args) if args.do_eval else None
@@ -414,6 +360,8 @@ def train(args, model, tokenizer):
 
     num_update_steps_per_epoch = math_ceil(
         len(train_dataloader), args.gradient_accumulation_steps)
+    if args.logging_steps > num_update_steps_per_epoch:
+        args.logging_steps = num_update_steps_per_epoch
     if args.max_steps > 0:
         args.num_train_epochs = math_ceil(args.max_steps,
                                           num_update_steps_per_epoch)
@@ -428,14 +376,15 @@ def train(args, model, tokenizer):
         if args.warmup_steps > 0 else args.warmup_ratio,
         num_training_steps=args.max_steps, )
 
-    total_batch_size = args.per_device_train_batch_size * \
-        args.gradient_accumulation_steps
+    total_batch_size = (args.per_device_train_batch_size *
+                        args.gradient_accumulation_steps *
+                        paddle.distributed.get_world_size())
 
     decay_params = [
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-
+    grad_clip = paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm)
     optimizer = AdamW(
         learning_rate=lr_scheduler,
         beta1=args.adam_beta1,
@@ -443,7 +392,8 @@ def train(args, model, tokenizer):
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params, )
+        apply_decay_param_fun=lambda x: x in decay_params,
+        grad_clip=grad_clip, )
 
     if args.use_amp:
         scaler = GradScaler(init_loss_scaling=args.scale_loss)
@@ -461,8 +411,6 @@ def train(args, model, tokenizer):
         f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_steps}")
 
-    progress_bar = tqdm(range(args.max_steps))
-
     global_steps = 0
     tr_loss, logging_loss = 0.0, 0.0
 
@@ -473,8 +421,8 @@ def train(args, model, tokenizer):
         cur_loss = (tr_loss - logging_loss) / args.logging_steps
         writer.add_scalar("lr", cur_lr, global_steps)
         writer.add_scalar("loss", cur_loss, global_steps)
-        logger.info("global_steps {} - lr: {:.10f}  loss: {:.10f}".format(
-            global_steps, cur_lr, cur_loss))
+        logger.info(f"global_steps {global_steps}/{args.max_steps}"
+                    f" - lr: {cur_lr:.10f}  loss: {cur_loss:.10f}")
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
@@ -501,30 +449,28 @@ def train(args, model, tokenizer):
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 global_steps += 1
-                progress_bar.update(1)
 
-                if args.logging_steps > 0 and global_steps % args.logging_steps == 0:
-
+                if (args.logging_steps > 0 and
+                        global_steps % args.logging_steps == 0):
                     if paddle.distributed.get_rank() == 0:
                         logging_lr_loss()
                         logging_loss = tr_loss
 
-        save_checkpoint(tokenizer, model, args.output_dir)
+        save_checkpoint(tokenizer, model,
+                        os.path.join(args.output_dir, f"ckpt_epoch{epoch}"))
         if args.do_eval and paddle.distributed.get_rank() == 0:
 
             logger.info(f"********** Running evaluating **********")
             logger.info(f"************* Epoch {epoch} ************")
 
-            eval_overall_results, eval_overall_predictions = eval_all_tasks(
+            eval_overall_results, eval_predictions = eval_all_tasks(
                 eval_tasks=eval_tasks,
                 model=model,
                 tokenizer=tokenizer,
                 generate_max_length=generate_max_length, )
 
-            for task_name in eval_overall_predictions:
-                write_prediction(
-                    eval_overall_predictions[task_name],
-                    'valid-' + task_name, )
+            for line in better_print_multi(eval_overall_results).split('\n'):
+                logger.info(line)
 
             if args.metric_for_best_model not in eval_overall_results:
                 raise ValueError(f"Main metric {args.metric_for_best_model} "
@@ -538,6 +484,14 @@ def train(args, model, tokenizer):
                 save_checkpoint(tokenizer, model,
                                 os.path.join(args.output_dir, f"best"))
 
+    best_ckpt_file = os.path.join(args.output_dir, "best",
+                                  "model_state.pdparams")
+    if os.path.exists(best_ckpt_file):
+        logger.info(f"Load best checkpoint from {best_ckpt_file}")
+        model.load_dict(paddle.load(best_ckpt_file))
+
+    save_checkpoint(tokenizer, model, args.output_dir)
+
 
 def main(args):
     logger.info("**********  Configuration Arguments **********")
@@ -545,26 +499,25 @@ def main(args):
         logger.info(f"{arg}: {value}")
     logger.info("**********************************************")
 
-    if os.path.exists(args.output_dir
-                      ) and args.do_train and not args.overwrite_output_dir:
-        raise ValueError(
-            f"Output directory ({args.output_dir}) already exists and is not empty. "
-            "Use --overwrite_output_dir to overcome.")
-    else:
-        os.makedirs(args.output_dir, exist_ok=True)
+    if args.do_train and args.output_dir is not None:
+        if os.path.exists(args.output_dir) and not args.overwrite_output_dir:
+            raise ValueError(
+                f"Output directory ({args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome.")
+        else:
+            os.makedirs(args.output_dir, exist_ok=True)
 
     # Set device
     paddle.set_device(args.device)
 
-    # get model and tokenizer
-
-    tokenizer = T5BertTokenizer.from_pretrained(args.model_name_or_path, )
+    # Prepare model and tokenizer
+    tokenizer = T5BertTokenizer.from_pretrained(args.model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
 
     if args.do_train:
         train(args, model, tokenizer)
 
-    if args.do_predict:
+    if args.do_eval:
         test(args, model, tokenizer)
 
     logger.info(f"Output Dir: {args.output_dir}")
@@ -573,7 +526,8 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     os.makedirs("caches", exist_ok=True)
-    os.makedirs(args.logging_dir, exist_ok=True)
+    if args.logging_dir is not None:
+        os.makedirs(args.logging_dir, exist_ok=True)
     set_logger(args)
     logger.info(args)
     main(args)

@@ -1,54 +1,246 @@
-
-
-English | [简体中文](./README.md)
+[简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
   <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
-[![PyPI - PaddleNLP Version](https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white)](https://pypi.org/project/paddlenlp/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/paddlenlp)](https://pypi.org/project/paddlenlp/)
-[![PyPI Status](https://pepy.tech/badge/paddlenlp/month)](https://pepy.tech/project/paddlenlp)
-![support os](https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-yellow.svg)
-![GitHub](https://img.shields.io/github/license/paddlepaddle/paddlenlp)
 
-## News  <img src="./docs/imgs/news_icon.png" width="40"/>
+<p align="center">
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202-dfd.svg"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
+    <a href=""><img src="https://img.shields.io/badge/python-3.6.2+-aff.svg"></a>
+    <a href=""><img src="https://img.shields.io/badge/os-linux%2C%20win%2C%20mac-pink.svg"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/graphs/contributors"><img src="https://img.shields.io/github/contributors/PaddlePaddle/PaddleNLP?color=9ea"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/commits"><img src="https://img.shields.io/github/commit-activity/m/PaddlePaddle/PaddleNLP?color=3af"></a>
+    <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/dm/paddlenlp?color=9cf"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/issues"><img src="https://img.shields.io/github/issues/PaddlePaddle/PaddleNLP?color=9cc"></a>
+    <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
+</p>
 
-* [2021-12-12] PaddleNLP v2.2 has been officially relealsed! :tada: For more information please refer to [Release Note](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.2.0).
-* [2021-12-12] *End-to-end Question Answering Toolkit**🚀[RocketQA](https://github.com/PaddlePaddle/RocketQA) has been released！:tada:
+<h4 align="center">
+  <a href=#features> Features </a> |
+  <a href=#installation> Installation </a> |
+  <a href=#quick-start> Quick Start </a> |
+  <a href=#api-reference> API Reference </a> |
+  <a href=#community> Community </a>
+</h4>
 
-## Introduction
+**PaddleNLP** is an *easy-to-use* and *powerful* NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
 
-**PaddleNLP** is an **easy-to-use** and **high performance** NLP library with **awesome** pre-trained Transformer models, supporting wide-range of NLP tasks from research to industrial applications.
+## News 📢
+
+* 🔥 2022.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
+
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+  </div>
+
+* 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
+  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow]((./docs/model_zoo/taskflow.md)).
+  * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
+  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
+  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with ⚡**FasterGeneration**⚡, the *11B open-domain SOTA chatbot model* can be deployed on multi-GPU and do parallel inference easily.
+
+## Features
+
+#### <a href=#out-of-box-nlp-toolset> 📦 Out-of-Box NLP Toolset </a>
+
+#### <a href=#awesome-chinese-model-zoo> 🤗 Awesome Chinese Model Zoo </a>
+
+#### <a href=#industrial-end-to-end-system> 🎛️ Industrial End-to-end System </a>
+
+#### <a href=#high-performance-distributed-training-and-inference> 🚀 High Performance Distributed Training and Inference </a>
 
 
-* **Easy-to-Use API**
-  - The API is fully integrated with PaddlePaddle 2.0 high-level API system. It minimizes the number of user actions required for common use cases like data loading, text pre-processing, awesome transfomer models, and fast inference, which enables developer to deal with text problems more productively.
+### Out-of-Box NLP Toolset
 
-* **Wide-range NLP Task Support**
-  - PaddleNLP support NLP task from research to industrial applications, including Lexical Analysis, Text Classification, Text Matching, Text Generation, Information Extraction, Machine Translation, General Dialogue and Question Answering etc.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
 
-* **High Performance Distributed Training**
-  -  We provide an industrial level training pipeline for super large-scale Transformer model based on **Auto Mixed Precision** and Fleet distributed training API by PaddlePaddle, which can support customized model pre-training efficiently.
+![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
-## Community
+For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
-### Special Interest Group (SIG)
+### Awesome Chinese Model Zoo
 
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
+#### 🀄 Comprehensive Chinese Transformer Models  
 
-### Slack
+We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
-To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
+```python
+from paddlenlp.transformers import *
 
-### WeChat
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+bert = AutoModel.from_pretrained('bert-wwm-chinese')
+albert = AutoModel.from_pretrained('albert-chinese-tiny')
+roberta = AutoModel.from_pretrained('roberta-wwm-ext')
+electra = AutoModel.from_pretrained('chinese-electra-small')
+gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
+```
 
-Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
+Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
+
+```python
+import paddle
+from paddlenlp.transformers import *
+
+tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+text = tokenizer('natural language processing')
+
+# Semantic Representation
+model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
+# Text Classificaiton and Matching
+model = AutoModelForSequenceClassification.from_pretrained('ernie-3.0-medium-zh')
+# Sequence Labeling
+model = AutoModelForTokenClassification.from_pretrained('ernie-3.0-medium-zh')
+# Question Answering
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
+```
+
+#### Wide-range NLP Task Support
+
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+
+Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
+
+<details><summary> PaddleNLP Transformer model summary (<b>click to show details</b>) </summary><div>
+
+| Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
+| :----------------- | ----------------------- | -------------------- | ------------------ | --------------- | --------------- |
+| ALBERT             | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| BART               | ✅                       | ✅                    | ✅                  | ✅               | ❌               |
+| BERT               | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| BigBird            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| BlenderBot         | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
+| ChineseBERT        | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| ConvBERT           | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| CTRL               | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
+| DistilBERT         | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| ELECTRA            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| ERNIE              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| ERNIE-CTM          | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
+| ERNIE-Doc          | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| ERNIE-GEN          | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
+| ERNIE-Gram         | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| ERNIE-M            | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| FNet               | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| Funnel-Transformer | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| GPT                | ✅                       | ✅                    | ❌                  | ✅               | ❌               |
+| LayoutLM           | ✅                       | ✅                    | ❌                  | ❌               | ❌               |
+| LayoutLMv2         | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
+| LayoutXLM          | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
+| LUKE               | ❌                       | ✅                    | ✅                  | ❌               | ❌               |
+| mBART              | ✅                       | ❌                    | ✅                  | ❌               | ✅               |
+| MegatronBERT       | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| MobileBERT         | ✅                       | ❌                    | ✅                  | ❌               | ❌               |
+| MPNet              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| NEZHA              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| PP-MiniLM          | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
+| ProphetNet         | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
+| Reformer           | ✅                       | ❌                    | ✅                  | ❌               | ❌               |
+| RemBERT            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| RoBERTa            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+| RoFormer           | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| SKEP               | ✅                       | ✅                    | ❌                  | ❌               | ❌               |
+| SqueezeBERT        | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
+| T5                 | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
+| TinyBERT           | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
+| UnifiedTransformer | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
+| XLNet              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
+
+</div></details>
+
+For more pretrained model usage, please refer to [Transformer API Docs](./docs/model_zoo/index.rst).
+
+### Industrial End-to-end System
+
+We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
+
+For more details industial cases please refer to [Applications](./applications).
+
+
+#### 🔍 Neural Search System
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
+    <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="400">
 </div>
+
+
+For more details please refer to [Neural Search](./applications/neural_search).
+
+#### ❓ Question Answering System
+
+We provide question answering pipeline which can support FAQ system, Document-level Visual Question answering system based on [🚀RocketQA](https://github.com/PaddlePaddle/RocketQA).
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="400">
+</div>
+
+
+For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/doc_vqa).
+
+
+#### 💌 Opinion Extraction and Sentiment Analysis
+
+We build an opinion extraction system for product review and fine-grained sentiment analysis based on [SKEP](https://arxiv.org/abs/2005.05635) Model.
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="300">
+</div>
+
+
+For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
+
+#### 🎙️ Speech Command Analysis
+
+Integrated ASR Model, Information Extraction, we provide a speech command analysis pipeline that show how to use PaddleNLP and [PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech) to solve Speech + NLP real scenarios.
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168412618-04897a47-79c9-4fe7-a054-5dc1f6a1f75c.png" width="500">
+</div>
+
+
+For more details please refer to [Speech Command Analysis](./applications/speech_cmd_analysis).
+
+### High Performance Distributed Training and Inference
+
+#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
+</div>
+
+```python
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+```
+
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+
+#### ⚡ FasterGeneration: High Perforance Generation Library
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
+</div>
+
+```python
+model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
+...
+outputs, _ = model.generate(
+    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
+    use_faster=True)
+```
+
+Set `use_faster=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FasterGeneration](./faster_generation).
+
+#### 🚀 Fleet: 4D Hybrid Distributed Training
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
+</div>
+
+
+For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
 
 
 ## Installation
@@ -66,139 +258,64 @@ More information about PaddlePaddle installation please refer to [PaddlePaddle's
 pip install --upgrade paddlenlp
 ```
 
-## Easy-to-use API
+## Quick Start
 
-### Taskflow：Off-the-shelf Industial NLP Pre-built Task
-
-Taskflow aims to provide **off-the-shelf** NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
-
-![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
-
-For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md)
-
-### Transformer API: Awesome Pre-trained Model Ecosystem
-
-We provide **30** network architectures and over **100** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high quality Chinese pretrained model developed by other organizations. Use AutoModel to download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP! 🤗
+**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
 
 ```python
-from paddlenlp.transformers import *
+from paddlenlp import Taskflow
 
-ernie = AutoModel.from_pretrained('ernie-1.0')
-ernie_gram = AutoModel.from_pretrained('ernie-gram-zh')
-bert = AutoModel.from_pretrained('bert-wwm-chinese')
-albert = AutoModel.from_pretrained('albert-chinese-tiny')
-roberta = AutoModel.from_pretrained('roberta-wwm-ext')
-electra = AutoModel.from_pretrained('chinese-electra-small')
-gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
+# Chinese Word Segmentation
+seg = Taskflow("word_segmentation")
+seg("第十四届全运会在西安举办")
+>>> ['第十四届', '全运会', '在', '西安', '举办']
+
+# POS Tagging
+tag = Taskflow("pos_tagging")
+tag("第十四届全运会在西安举办")
+>>> [('第十四届', 'm'), ('全运会', 'nz'), ('在', 'p'), ('西安', 'LOC'), ('举办', 'v')]
+
+# Named Entity Recognition
+ner = Taskflow("ner")
+ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+>>> [('《', 'w'), ('孤女', '作品类_实体'), ('》', 'w'), ('是', '肯定词'), ('2010年', '时间类'), ('九州出版社', '组织机构类'), ('出版', '场景事件'), ('的', '助词'), ('小说', '作品类_概念'), ('，', 'w'), ('作者', '人物类_概念'), ('是', '肯定词'), ('余兼羽', '人物类_实体')]
+
+# Dependency Parsing
+ddp = Taskflow("dependency_parsing")
+ddp("9月9日上午纳达尔在亚瑟·阿什球场击败俄罗斯球员梅德韦杰夫")
+>>> [{'word': ['9月9日', '上午', '纳达尔', '在', '亚瑟·阿什球场', '击败', '俄罗斯', '球员', '梅德韦杰夫'], 'head': [2, 6, 6, 5, 6, 0, 8, 9, 6], 'deprel': ['ATT', 'ADV', 'SBV', 'MT', 'ADV', 'HED', 'ATT', 'ATT', 'VOB']}]
+
+# Sentiment Analysis
+senta = Taskflow("sentiment_analysis")
+senta("这个产品用起来真的很流畅，我非常喜欢")
+>>> [{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}]
 ```
 
-PaddleNLP also provides unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
+## API Reference
 
-```python
-import paddle
-from paddlenlp.transformers import *
+- Support [LUGE](https://www.luge.ai/) dataset loading and compatible with Hugging Face [Datasets](https://huggingface.co/datasets). For more details please refer to [Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html).
+- Using Hugging Face style API to load 500+ selected transformer models and download with fast speed. For more information please refer to [Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html).
+- One-line of code to load pre-trained word embedding. For more usage please refer to [Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html).
 
-tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
-text = tokenizer('natural language understanding')
+Please find all PaddleNLP API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
 
-# Semantic Representation
-model = AutoModel.from_pretrained('ernie-1.0')
-sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# Text Classificaiton and Matching
-model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0')
-# Sequence Labeling
-model = AutoModelForTokenClassification.from_pretrained('ernie-1.0')
-# Question Answering
-model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
-```
+## Community
 
-For more pretrained model usage, please refer to [Transformer API](./docs/model_zoo/transformers.rst)
+### Special Interest Group (SIG)
 
-### Dataset API: Abundant Dataset Integration and Quick Loading
+Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
 
-```python
-from paddlenlp.datasets import load_dataset
+### Slack
 
-train_ds, dev_ds, test_ds = load_dataset("chnsenticorp", splits=["train", "dev", "test"])
-```
+To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
 
-For more dataset API usage please refer to [Dataset API](./docs/datasets.md).
+### WeChat
 
-### Embedding API: Quick Loading for Word Embedding
+Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
-```python
-from paddlenlp.embeddings import TokenEmbedding
-
-wordemb = TokenEmbedding("fasttext.wiki-news.target.word-word.dim300.en")
-wordemb.cosine_sim("king", "queen")
->>> 0.77053076
-wordemb.cosine_sim("apple", "rail")
->>> 0.29207364
-```
-
-For more `TokenEmbedding` usage, please refer to [Embedding API](./docs/model_zoo/embeddings.md)
-
-### More API Usage
-
-- [Transformer API](./docs/model_zoo/transformers.rst)
-- [Data API](./docs/data.md)
-- [Dataset API](./docs/datasets.md)
-- [Embedding API](./docs/model_zoo/embeddings.md)
-- [Metrics API](./docs/metrics.md)
-
-Please find more API Reference from our [readthedocs](https://paddlenlp.readthedocs.io/).
-
-## Wide-range NLP Task Support
-
-PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
-
-### NLP Basic Technique
-
-- [Word Embedding](./examples/word_embedding/)
-- [Lexical Analysis](./examples/lexical_analysis/)
-- [Dependency Parsing](./examples/dependency_parsing/)
-- [Language Model](./examples/language_model/)
-- [Semantic Parsing (Text to SQL)](./examples/text_to_sql):star:
-- [Text Classification](./examples/text_classification/)
-- [Text Matching](./examples/text_matching/)
-- [Text Generation](./examples/text_generation/)
-- [Text Correction](./examples/text_correction/):star:
-- [Semantic Indexing](./examples/semantic_indexing/)
-- [Information Extraction](./examples/information_extraction/)
-
-### NLP System
-
-- [Sentiment Analysis](./examples/sentiment_analysis/):star2:
-- [General Dialogue System](./examples/dialogue/)
-- [Machine Translation](./examples/machine_translation/)
-- [Simultaneous Translation](././examples/simultaneous_translation/)
-- [Machine Reading Comprehension](./examples/machine_reading_comprehension/)
-
-### NLP Extented Applications
-
-- [Few-shot Learning](./examples/few_shot/):star2:
-- [Text Knowledge Mining](./examples/text_to_knowledge/):star2:
-- [Model Compression](./examples/model_compression/)
-- [Text Graph Learning](./examples/text_graph/erniesage/)
-- [Time Series Prediction](./examples/time_series/)
-
-## Tutorials
-
-Please refer to our official AI Studio account for more interactive tutorials: [PaddleNLP on AI Studio](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)
-
-* [What's Seq2Vec?](https://aistudio.baidu.com/aistudio/projectdetail/1283423) shows how to use simple API to finish LSTM model and solve sentiment analysis task.
-
-* [Sentiment Analysis with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1294333) shows how to exploit the pretrained ERNIE to solve sentiment analysis problem.
-
-* [Waybill Information Extraction with BiGRU-CRF Model](https://aistudio.baidu.com/aistudio/projectdetail/1317771) shows how to make use of Bi-GRU plus CRF to finish information extraction task.
-
-* [Waybill Information Extraction with ERNIE](https://aistudio.baidu.com/aistudio/projectdetail/1329361) shows how to use ERNIE, the Chinese pre-trained model improve information extraction performance.
-
-* [Use TCN Model to predict COVID-19 confirmed cases](https://aistudio.baidu.com/aistudio/projectdetail/1290873)
-
-## ChangeLog
-
-For more details about our release, please refer to [ChangeLog](./docs/changelog.md)
+ <div align="center">
+ <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+ </div>
 
 ## Citation
 

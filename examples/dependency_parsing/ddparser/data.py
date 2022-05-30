@@ -258,8 +258,8 @@ class BucketsSampler(object):
     def __init__(self, buckets, batch_size, shuffle=False):
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.sizes, self.buckets = zip(* [(size, bucket)
-                                          for size, bucket in buckets.items()])
+        self.sizes, self.buckets = zip(*[(size, bucket)
+                                         for size, bucket in buckets.items()])
         # The number of chunks in each bucket, which is clipped by range [1, len(bucket)]
         self.chunks = []
         for size, bucket in zip(self.sizes, self.buckets):

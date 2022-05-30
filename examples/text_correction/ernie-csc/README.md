@@ -33,7 +33,7 @@ pip install -r requirements.txt
 ## 模型训练
 
 ### 参数
-- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0"。
+- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0-base-zh"。
 - `max_seq_length` 表示最大句子长度，超过该长度的部分将被切分成下一个样本。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
@@ -71,13 +71,13 @@ python change_sgml_to_txt.py -i extra_train_ds/train.sgml -o extra_train_ds/trai
 ### 单卡训练
 
 ```python
-python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
+python train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0-base-zh --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
 ```
 
 ### 多卡训练
 
 ```python
-python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0 --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
+python -m paddle.distributed.launch --gpus "0,1"  train.py --batch_size 32 --logging_steps 100 --epochs 10 --learning_rate 5e-5 --model_name_or_path ernie-1.0-base-zh --output_dir ./checkpoints/ --extra_train_ds_dir ./extra_train_ds/ --max_seq_length 192
 ```
 
 ## 模型预测
@@ -109,7 +109,7 @@ sh run_sighan_predict.sh
 - `params_path` 是指动态图训练保存的参数路径。
 - `output_path` 是指静态图参数导出路径。
 - `pinyin_vocab_file_path` 指拼音表路径。
-- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0"。
+- `model_name_or_path` 目前支持的预训练模型有："ernie-1.0-base-zh"。
 
 **运行方式**
 

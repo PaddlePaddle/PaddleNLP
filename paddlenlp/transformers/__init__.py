@@ -15,6 +15,7 @@
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken, normalize_chars, tokenize_special_chars, convert_to_unicode
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .export import export_model
 
 from .bert.modeling import *
 from .bert.tokenizer import *
@@ -104,6 +105,8 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .gau_alpha.modeling import *
+from .gau_alpha.tokenizer import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *

@@ -42,6 +42,7 @@ if(WITH_PARALLEL)
   find_package(MPI REQUIRED)
   find_package(NCCL REQUIRED)
   add_definitions(-DBUILD_GPT)
+  list(APPEND decoding_op_files parallel_utils.cc)
 endif()
 
 if(NOT WITH_GPU)
