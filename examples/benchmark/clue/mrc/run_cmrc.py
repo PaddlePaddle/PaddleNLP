@@ -184,7 +184,7 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 logger.info("Processing example: %d" % len(all_start_logits))
-                logger.info('time per 1000:', time.time() - tic_eval)
+                logger.info('time per 1000: %s' % (time.time() - tic_eval))
                 tic_eval = time.time()
 
             all_start_logits.append(start_logits.numpy()[idx])

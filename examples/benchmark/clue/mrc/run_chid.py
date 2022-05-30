@@ -207,7 +207,7 @@ def evaluate(model, data_loader, do_predict=False):
     model.train()
     if not do_predict:
         acc = right_num / total_num
-        logger.info("Eval acc: ", acc)
+        logger.info("Eval acc: %.4f" % acc)
         return acc
     return all_results
 
@@ -413,7 +413,7 @@ def run(args):
                         result["labels"].append(label)
                     candidate += 1
             if (idx + 1) % 10000 == 0:
-                logger.info(idx + 1, "samples have been processed.")
+                logger.info("%d samples have been processed." % (idx + 1))
         return result
 
     if paddle.distributed.get_world_size() > 1:

@@ -82,7 +82,6 @@ def get_cls_tasks(model_name_or_path):
         "csl": [[5, 256, cls_base_grd_acc * 2, 0.1]],
         "cmnli": [[2, 128, cls_base_grd_acc, 0.1]]
     }
-    batch_size_8_task = ["cluewsc2020"]
     tasks = []
     for dataset in datasets:
         for lr in learning_rate_list:
@@ -138,7 +137,6 @@ def main():
 
     for x in tasks:
         print(x)
-    # sys.exit(0)
 
     runs = []
     retry = defaultdict(int)
@@ -147,7 +145,6 @@ def main():
         print("\n\n\n>> Round start")
         while i < len(runs):
             returncode = runs[i]["ps"].poll()
-            # print(returncode)
             if returncode is not None:
                 if returncode != 0:
                     retry[runs[i]["ts"]] += 1

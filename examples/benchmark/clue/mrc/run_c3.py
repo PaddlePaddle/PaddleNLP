@@ -274,7 +274,7 @@ def run(args):
             if not do_predict:
                 result["labels"].append([label])
             if (idx + 1) % 1000 == 0:
-                logger.info(idx + 1, "samples have been processed.")
+                logger.info("%d samples have been processed." % (idx + 1))
         return result
 
     paddle.set_device(args.device)
