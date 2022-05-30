@@ -19,7 +19,7 @@ declare -A dict
 
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
-    dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_acc|awk '{print $7}'|awk '$0>x{x=$0};END{print x}'`
+    dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_acc|awk '{print $7}' |awk '{print substr($0,1,5)}'|awk '$0>x{x=$0};END{print x}'`
 done
 
 echo -e AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3

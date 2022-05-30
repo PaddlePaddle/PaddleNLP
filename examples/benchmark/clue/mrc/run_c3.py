@@ -274,7 +274,7 @@ def run(args):
             if not do_predict:
                 result["labels"].append([label])
             if (idx + 1) % 1000 == 0:
-                print(idx + 1, "samples have been processed.")
+                logger.info(idx + 1, "samples have been processed.")
         return result
 
     paddle.set_device(args.device)
@@ -379,7 +379,7 @@ def run(args):
                     lr_scheduler.step()
                     optimizer.clear_grad()
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
                                paddle.distributed.get_rank(), loss,
@@ -387,12 +387,12 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % (best_acc * 100))
+                    logger.info("best_acc: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
             acc = evaluate(model, loss_fct, dev_data_loader, metric)
-            print("eval acc: %.5f, eval done total : %s s" %
-                  (acc, time.time() - tic_eval))
+            logger.info("eval acc: %.5f, eval done total : %s s" %
+                        (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
                 if args.save_best_model:
@@ -403,7 +403,7 @@ def run(args):
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
 
-        print("best_acc: %.2f" % (best_acc * 100))
+        logger.info("best_acc: %.2f" % (best_acc * 100))
 
     if args.do_predict:
         column_names = test_ds.column_names

@@ -40,4 +40,4 @@ python ../mrc/run_cmrc.py \
     --do_train \
     --device gpu \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
-    --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}_0.1.log
+    --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}_0.1.log 2>&1

@@ -207,7 +207,7 @@ def evaluate(model, data_loader, do_predict=False):
     model.train()
     if not do_predict:
         acc = right_num / total_num
-        print("acc", acc)
+        logger.info("Eval acc: ", acc)
         return acc
     return all_results
 
@@ -413,7 +413,7 @@ def run(args):
                         result["labels"].append(label)
                     candidate += 1
             if (idx + 1) % 10000 == 0:
-                print(idx + 1, "samples have been processed.")
+                logger.info(idx + 1, "samples have been processed.")
         return result
 
     if paddle.distributed.get_world_size() > 1:
@@ -518,19 +518,19 @@ def run(args):
                     lr_scheduler.step()
                     optimizer.clear_grad()
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
                                loss,
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % (best_acc * 100))
+                    logger.info("best_acc: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
             acc = evaluate(model, dev_data_loader)
-            print("eval acc: %.5f, eval done total : %s s" %
-                  (acc, time.time() - tic_eval))
+            logger.info("eval acc: %.5f, eval done total : %s s" %
+                        (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
                 if args.save_best_model:
@@ -541,7 +541,7 @@ def run(args):
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
 
-        print("best_acc: %.2f" % (best_acc * 100))
+        logger.info("best_acc: %.2f" % (best_acc * 100))
 
     if args.do_predict:
         column_names = test_ds.column_names

@@ -36,4 +36,4 @@ python ../mrc/run_c3.py \
     --do_train \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
-    --save_best_model False  > ${MODEL_PATH}/c3/${LR}_${BATCH_SIZE}_0.1.log
+    --save_best_model False  > ${MODEL_PATH}/c3/${LR}_${BATCH_SIZE}_0.1.log 2>&1

@@ -181,7 +181,6 @@ def evaluate(model, loss_fct, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    # with logger.use_terminator(''):
     logger.info("eval loss: %f, acc: %s, " % (loss.numpy(), res))
     model.train()
     return res
@@ -286,7 +285,7 @@ def do_eval(args):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    logger.info("acc: %s\n, " % (res), end='')
+    logger.info("acc: %s\n, " % (res))
 
 
 def do_train(args):

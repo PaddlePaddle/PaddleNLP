@@ -38,5 +38,5 @@ python ../mrc/run_chid.py \
     --do_train \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --weight_decay 0.01 \
-    --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}_0.1.log
+    --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}_0.1.log 2>&1
 

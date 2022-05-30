@@ -15,22 +15,38 @@
 import sys
 import os
 from paddlenlp.datasets import load_dataset
+from paddlenlp.utils.log import logger
 
 model_name_or_path = sys.argv[1]
 
 # CLUE classification dataset warmup
+logger.info("Download model and data for CLUE classification tasks.")
 for task in [
         "afqmc", "tnews", "iflytek", "ocnli", "cmnli", "cluewsc2020", "csl"
 ]:
     load_dataset("clue", task, splits=("train", "dev", "test"))
 
-# HF dataset warmup
-status = os.system(
-    'python ../mrc/run_chid.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}'
+# Downloads HF dataset
+from datasets import load_dataset
+load_dataset("clue", "chid")
+load_dataset("clue", "cmrc2018")
+load_dataset("clue", "c3")
+
+# HF dataset process and cache
+logger.info(
+    "Data process for CHID tasks, and this will take some time. If cache exists, this will skip."
 )
 status = os.system(
-    'python ../mrc/run_cmrc.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}'
+    f"python ../mrc/run_chid.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}"
 )
+assert status == 0, "Please make sure clue dataset CHID has been preprocessed successfully."
+logger.info("Data process for CMRC2018 tasks. If cache exists, this will skip.")
 status = os.system(
-    'python ../mrc/run_c3.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}'
+    f"python ../mrc/run_cmrc.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}"
 )
+assert status == 0, "Please make sure clue dataset CMRC2018 has been preprocessed successfully."
+logger.info("Data process for C3 tasks. If cache exists, this will skip.")
+status = os.system(
+    f"python ../mrc/run_c3.py --do_train --max_steps 1 --model_name_or_path {model_name_or_path}"
+)
+assert status == 0, "Please make sure clue dataset C3 has been preprocessed successfully."

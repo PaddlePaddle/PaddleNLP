@@ -49,18 +49,18 @@ def get_mrc_tasks(model_name_or_path):
             tasks.append(
                 f"bash run_chid.sh {model_name_or_path}  {bs} {lr} {cls_base_grd_acc*2}"
             )
-    # c3
+    # cmrc2018
     for lr in learning_rate_list:
         for bs in batch_size_list:
             tasks.append(
-                f"bash run_cmrc.sh {model_name_or_path}  {bs} {lr} {cls_base_grd_acc}"
+                f"bash run_cmrc2018.sh {model_name_or_path}  {bs} {lr} {cls_base_grd_acc}"
             )
-    # cmrc2018
+    # c3
     for lr in learning_rate_list:
         for bs in batch_size_list:
             grd_acc = bs // 2
             tasks.append(
-                f"bash run_chid.sh {model_name_or_path}  {bs} {lr} {grd_acc}")
+                f"bash run_c3.sh {model_name_or_path}  {bs} {lr} {grd_acc}")
     return tasks
 
 
@@ -130,7 +130,8 @@ def main():
     model_name_or_path = sys.argv[1]
     # Make sure that dataset has been downloaded first
     status = os.system(
-        'python warmup_dataset_and_model.py {model_name_or_path}')
+        f"python warmup_dataset_and_model.py {model_name_or_path}")
+    assert status is 0, "Please make sure clue dataset has been downloaded successfully."
     tasks = []
     tasks = get_cls_tasks(model_name_or_path)
     tasks += get_mrc_tasks(model_name_or_path)

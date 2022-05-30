@@ -42,5 +42,5 @@ python -u ../classification/run_clue_classifier.py \
     --gradient_accumulation_steps ${grad_acc} \
     --do_train \
     --dropout ${dropout_p} \
-    --save_best_model False > ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log
+    --save_best_model False > ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log 2>&1
 
