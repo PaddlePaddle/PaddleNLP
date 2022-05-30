@@ -20,6 +20,7 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.utils.log import logger
 
 from model import UIE
 from utils import convert_example, reader, MODEL_MAP
@@ -72,8 +73,8 @@ def do_eval():
 
     metric = SpanEvaluator()
     precision, recall, f1 = evaluate(model, metric, test_data_loader)
-    print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
-          (precision, recall, f1))
+    logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
+                (precision, recall, f1))
 
 
 if __name__ == "__main__":

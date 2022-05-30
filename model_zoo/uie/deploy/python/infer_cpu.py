@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ import argparse
 from pprint import pprint
 
 import paddle
-from multiprocessing import cpu_count
+from psutil import cpu_count
 from uie_predictor import UIEPredictor
 
 
@@ -35,7 +35,7 @@ def parse_args():
         help="Probability threshold for start/end index probabiliry.", )
     parser.add_argument(
         "--num_threads",
-        default=cpu_count(),
+        default=cpu_count(logical=False),
         type=int,
         help="Number of threads for cpu.", )
     args = parser.parse_args()

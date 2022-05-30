@@ -17,7 +17,7 @@ import os
 import abc
 import math
 from abc import abstractmethod
-from multiprocessing import cpu_count
+from psutil import cpu_count
 
 import paddle
 from paddle.dataset.common import md5file
@@ -51,7 +51,8 @@ class Task(metaclass=abc.ABCMeta):
         self._custom_model = False
         self._param_updated = False
         self._num_threads = self.kwargs[
-            'num_threads'] if 'num_threads' in self.kwargs else cpu_count()
+            'num_threads'] if 'num_threads' in self.kwargs else cpu_count(
+                logical=False)
         self._infer_precision = self.kwargs[
             'infer_precision'] if 'infer_precision' in self.kwargs else 'fp32'
         # Default to use Paddle Inference
@@ -207,6 +208,15 @@ class Task(metaclass=abc.ABCMeta):
         sess_options.inter_op_num_threads = self._num_threads
         self.predictor = ort.InferenceSession(
             fp16_model_file, sess_options=sess_options, providers=providers)
+        try:
+            assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+        except AssertionError:
+            raise AssertionError(
+                f"The environment for GPU inference is not set properly. "
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu."
+                "Please run the following commands to reinstall: \n "
+                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
+            )
 
     def _get_inference_model(self):
         """

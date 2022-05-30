@@ -14,11 +14,11 @@
 
 import six
 import os
+from psutil import cpu_count
 import numpy as np
 import paddle
 import paddle2onnx
 import onnxruntime as ort
-from multiprocessing import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 from model import UIE
@@ -65,6 +65,16 @@ class InferBackend(object):
         sess_options.inter_op_num_threads = num_threads
         self.predictor = ort.InferenceSession(
             onnx_model, sess_options=sess_options, providers=providers)
+        if device == "gpu":
+            try:
+                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+            except AssertionError:
+                raise AssertionError(
+                    f"The environment for GPU inference is not set properly. "
+                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu."
+                    "Please run the following commands to reinstall: \n "
+                    "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
+                )
         print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
@@ -94,7 +104,7 @@ class UIEPredictor(object):
         if args.device == 'cpu':
             args.use_fp16 = False
         if args.device == 'gpu':
-            args.num_threads = cpu_count()
+            args.num_threads = cpu_count(logical=False)
         self.inference_backend = InferBackend(
             args.model_path_prefix,
             device=args.device,

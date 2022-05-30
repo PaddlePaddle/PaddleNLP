@@ -333,8 +333,8 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 
 #### 可配置参数说明
 
-* `num_threads`：配置CPU的线程数，默认为CPU的最大线程数。
-* `infer_precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快，如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，确保CUDA>=11.2，CuDNN>=8.2，初次使用需按照提示安装相关依赖。
+* `num_threads`：配置CPU的线程数，默认为当前CPU的物理核数。
+* `infer_precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快，如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，确保CUDA>=11.2，CuDNN>=8.1.1，初次使用需按照提示安装相关依赖。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
@@ -566,7 +566,7 @@ python evaluate.py \
     可配置参数说明：
 
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `num_threads`: 配置cpu的线程数，默认为cpu的最大线程数。
+    - `num_threads`: 配置cpu的线程数，默认为当前CPU的物理核数。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 
   - GPU端推理样例

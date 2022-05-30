@@ -8,3 +8,4 @@ tqdm
 paddlefsl
 sentencepiece
 paddle2onnx
+psutil

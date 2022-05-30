@@ -22,6 +22,7 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.utils.log import logger
 
 from model import UIE
 from evaluate import evaluate
@@ -79,6 +80,9 @@ def do_train():
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
 
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
     optimizer = paddle.optimizer.AdamW(
         learning_rate=args.learning_rate, parameters=model.parameters())
 
@@ -109,7 +113,7 @@ def do_train():
             if global_step % args.logging_steps == 0 and rank == 0:
                 time_diff = time.time() - tic_train
                 loss_avg = sum(loss_list) / len(loss_list)
-                print(
+                logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, loss_avg,
                        args.logging_steps / time_diff))
@@ -119,18 +123,22 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                model.save_pretrained(save_dir)
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
-                print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
-                      (precision, recall, f1))
+                logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f"
+                            % (precision, recall, f1))
                 if f1 > best_f1:
-                    print(
+                    logger.info(
                         f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
                     )
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
-                    model.save_pretrained(save_dir)
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(save_dir)
                 tic_train = time.time()
 
 
