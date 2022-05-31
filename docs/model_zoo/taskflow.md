@@ -691,12 +691,11 @@ from paddlenlp import Taskflow
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
 
 #### 可配置参数说明
-* `num_threads`：配置CPU的线程数，默认为CPU的逻辑核数/2。
-* `infer_precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快，如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，确保CUDA>=11.2，CuDNN>=8.1.1，初次使用需按照提示安装相关依赖。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
 
 ### 解语知识标注

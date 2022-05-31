@@ -15,7 +15,6 @@
 import six
 import os
 import math
-from multiprocessing import cpu_count
 import numpy as np
 import paddle
 import paddle2onnx
@@ -30,8 +29,7 @@ class InferBackend(object):
                  model_path_prefix,
                  device='cpu',
                  use_quantize=False,
-                 use_fp16=False,
-                 num_threads=10):
+                 use_fp16=False):
         print(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
@@ -62,8 +60,6 @@ class InferBackend(object):
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
-        sess_options.intra_op_num_threads = num_threads
-        sess_options.inter_op_num_threads = num_threads
         self.predictor = ort.InferenceSession(
             onnx_model, sess_options=sess_options, providers=providers)
         if device == "gpu":
@@ -104,13 +100,8 @@ class UIEPredictor(object):
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        if args.device == 'gpu':
-            args.num_threads = math.ceil(cpu_count() / 2)
         self.inference_backend = InferBackend(
-            args.model_path_prefix,
-            device=args.device,
-            use_fp16=args.use_fp16,
-            num_threads=args.num_threads)
+            args.model_path_prefix, device=args.device, use_fp16=args.use_fp16)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):

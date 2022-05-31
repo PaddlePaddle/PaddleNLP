@@ -15,7 +15,6 @@
 import argparse
 import math
 from pprint import pprint
-from multiprocessing import cpu_count
 
 import paddle
 from uie_predictor import UIEPredictor
@@ -34,11 +33,6 @@ def parse_args():
         default=0.5,
         type=float,
         help="Probability threshold for start/end index probabiliry.", )
-    parser.add_argument(
-        "--num_threads",
-        default=math.ceil(cpu_count() / 2),
-        type=int,
-        help="Number of threads for cpu, default to half of logical cores.", )
     parser.add_argument(
         "--max_seq_len",
         default=512,

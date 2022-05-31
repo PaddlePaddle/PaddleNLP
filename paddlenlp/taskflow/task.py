@@ -54,7 +54,7 @@ class Task(metaclass=abc.ABCMeta):
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
         self._infer_precision = self.kwargs[
-            'infer_precision'] if 'infer_precision' in self.kwargs else 'fp32'
+            'precision'] if 'precision' in self.kwargs else 'fp32'
         # Default to use Paddle Inference
         self._predictor_type = 'paddle-inference'
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
