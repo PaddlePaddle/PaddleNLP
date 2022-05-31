@@ -512,6 +512,123 @@
                           <span style="font-size:18px">54.77</span>
                         </td>
                 </tr>
+                <tr>
+            <td rowspan=1 align=center> 6L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>66.90</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.85</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.24</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.48</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>77.19</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>73.08</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">71.05</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">79.30</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">58.53/81.97</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>69.71</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.60</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>64.21</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.15</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.05</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>53.83</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.81</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.41</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">69.08</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">76.50</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">53.77/77.82</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.26</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.53</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L312H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.51</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.57</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>48.36</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.61</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">68.75</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">75.93</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">52.00/76.35</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.91</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.11</b></span>
+                        </td>
+                </tr>
         <tbody>
 </table>
 <br />
