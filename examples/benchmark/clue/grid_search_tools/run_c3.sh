@@ -34,6 +34,7 @@ python ../mrc/run_c3.py \
     --num_train_epochs 8 \
     --output_dir ${MODEL_PATH}/c3_model/${LR}_${BATCH_SIZE}/ \
     --do_train \
+    --seed 42 \
     --warmup_proportion 0.1 \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --save_best_model False  > ${MODEL_PATH}/c3/${LR}_${BATCH_SIZE}_0.1.log 2>&1

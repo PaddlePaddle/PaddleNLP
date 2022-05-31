@@ -38,6 +38,7 @@ python ../mrc/run_cmrc.py \
     --warmup_proportion 0.1 \
     --weight_decay 0.01 \
     --do_train \
+    --seed 42 \
     --device gpu \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --save_best_model False  > ${MODEL_PATH}/cmrc2018/${LR}_${BATCH_SIZE}_0.1.log 2>&1

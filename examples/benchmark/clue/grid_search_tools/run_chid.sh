@@ -35,8 +35,8 @@ python ../mrc/run_chid.py \
     --num_train_epochs 3 \
     --output_dir ${MODEL_PATH}/chid_model/${LR}_${BATCH_SIZE}/ \
     --warmup_proportion 0.06 \
+    --seed 42 \
     --do_train \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \
     --weight_decay 0.01 \
     --save_best_model False  > ${MODEL_PATH}/chid/${LR}_${BATCH_SIZE}_0.1.log 2>&1
-
