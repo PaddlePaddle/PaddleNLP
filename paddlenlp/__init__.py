@@ -188,7 +188,7 @@ def _patch_batch_sampler_init(self,
 import functools
 
 # Any '2.3.X' version would be bigger than '2.3'
-if paddle.__version__ != '0.0.0' or paddle.__version__ < '2.3':
+if paddle.__version__ != '0.0.0' and paddle.__version__ < '2.3':
     paddle.io.DataLoader.__init__ = functools.wraps(
         paddle.io.DataLoader.__init__)(_patch_data_loader_init)
     paddle.io.BatchSampler.__init__ = functools.wraps(
