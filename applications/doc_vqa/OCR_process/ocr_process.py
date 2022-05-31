@@ -195,7 +195,6 @@ def tokenize_ocr_res(ocr_reses):
             text_chars = list(text.lower())
             char_num = 0
             for char in text_chars:
-                # 匹配双字节字符
                 if re.match("[^\x00-\xff]", char):
                     char_num += 2
                 else:

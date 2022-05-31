@@ -30,7 +30,10 @@ def parse_args():
     parser.add_argument("--test_file", default=None, type=str, required=False)
     parser.add_argument("--train_file", default=None, type=str, required=False)
     parser.add_argument("--output_dir", default=None, type=str, required=True)
-    parser.add_argument("--max_seq_length", default=512, type=int)
+    parser.add_argument("--max_seq_len", default=512, type=int)
+    parser.add_argument("--max_query_length", default=20, type=int)
+    parser.add_argument("--max_doc_length", default=512, type=int)
+    parser.add_argument("--max_span_num", default=1, type=int)
     parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for eval.")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
@@ -114,10 +117,10 @@ def main(args):
         args,
         tokenizer,
         label2id_map,
-        max_seq_len=512,
-        max_query_length=20,
-        max_doc_length=512,
-        max_span_num=1)
+        max_seq_len=args.max_seq_len,
+        max_query_length=args.max_query_length,
+        max_doc_length=args.max_doc_length,
+        max_span_num=args.max_span_num)
 
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=False)
