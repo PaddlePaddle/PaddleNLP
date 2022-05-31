@@ -41,31 +41,31 @@ RoBERTa模型汇总
 |                                                                                  |              | Please refer to:                                                                 |
 |                                                                                  |              | `uer/roberta-base-chinese-extractive-qa`_                                        |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``uer/roberta-base-ft-chinanews-chn``                                             | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/roberta-base-finetuned-chinanews-chinese``                                  | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese text.                                                         |
 |                                                                                  |              |                                                                                  |
 |                                                                                  |              | Please refer to:                                                                 |
-|                                                                                  |              | `uer/roberta-base-ft-chinanews-chn`_                                             |
+|                                                                                  |              | `uer/roberta-base-finetuned-chinanews-chinese`_                                  |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``uer/roberta-base-ft-cluener2020-chn``                                           | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/roberta-base-finetuned-cluener2020-chinese``                                | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 101M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese text.                                                         |
 |                                                                                  |              |                                                                                  |
 |                                                                                  |              | Please refer to:                                                                 |
-|                                                                                  |              | `uer/roberta-base-ft-cluener2020-chn`_                                           |
+|                                                                                  |              | `uer/roberta-base-finetuned-cluener2020-chinese`_                                |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``roberta-base``                                                                  | English      | Please refer to:                                                                 |                                   
-|                                                                                  |              | roberta-base_                                                                    |
+|                                                                                  |              | `roberta-base`_                                                                    |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``cardiffnlp/twitter-roberta-base-sentiment``                                     | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `cardiffnlp/twitter-roberta-base-sentiment`_                                     |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``roberta-large``                                                                 | English      | Please refer to:                                                                 |                                   
-|                                                                                  |              | roberta-large_                                                                   |
+|                                                                                  |              | `roberta-large`_                                                                   |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``distilroberta-base``                                                            | English      | Please refer to:                                                                 |                                   
-|                                                                                  |              | distilroberta-base_                                                              |
+|                                                                                  |              | `distilroberta-base`_                                                              |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``cross-encoder/nli-distilroberta-base``                                          | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `cross-encoder/nli-distilroberta-base`_                                          |
@@ -325,8 +325,8 @@ RoBERTa模型汇总
 
 .. _deepset/roberta-base-squad2: https://huggingface.co/deepset/roberta-base-squad2
 .. _uer/roberta-base-chinese-extractive-qa: https://huggingface.co/uer/roberta-base-chinese-extractive-qa
-.. _uer/roberta-base-ft-chinanews-chn: https://huggingface.co/uer/roberta-base-ft-chinanews-chn
-.. _uer/roberta-base-ft-cluener2020-chn: https://huggingface.co/uer/roberta-base-ft-cluener2020-chn
+.. _uer/roberta-base-finetuned-chinanews-chinese: https://huggingface.co/uer/roberta-base-finetuned-chinanews-chinese
+.. _uer/roberta-base-finetuned-cluener2020-chinese: https://huggingface.co/uer/uer/roberta-base-finetuned-cluener2020-chinese
 .. _roberta-base: https://huggingface.co/roberta-base
 .. _cardiffnlp/twitter-roberta-base-sentiment: https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment
 .. _roberta-large: https://huggingface.co/roberta-large
