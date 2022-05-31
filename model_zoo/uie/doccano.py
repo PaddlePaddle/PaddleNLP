@@ -17,6 +17,7 @@ import time
 import argparse
 import json
 import numpy as np
+from paddlenlp.utils.log import logger
 
 from utils import set_seed, convert_ext_examples, convert_cls_examples
 
@@ -68,7 +69,7 @@ def do_convert():
             for example in examples:
                 f.write(json.dumps(example, ensure_ascii=False) + "\n")
                 count += 1
-        print("\nSave %d examples to %s." % (count, save_path))
+        logger.info("Save %d examples to %s." % (count, save_path))
 
     if len(args.splits) == 0:
         if args.task_type == "ext":
@@ -106,7 +107,7 @@ def do_convert():
         _save_examples(args.save_dir, "dev.txt", dev_examples)
         _save_examples(args.save_dir, "test.txt", test_examples)
 
-    print('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
@@ -115,7 +116,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--doccano_file", default="./data/doccano.json", type=str, help="The doccano file exported from doccano platform.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
-    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the classification task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
+    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the extraction task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.")
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")
