@@ -536,13 +536,13 @@
                                 <span style="font-size:18px"><b>73.08</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">71.05</span>
+                                <span style="font-size:18px"><b>71.05</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">79.30</span>
+                                <span style="font-size:18px"><b>79.30</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">58.53/81.97</span>
+                                <span style="font-size:18px"><b>58.53/81.97</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>69.71</b></span>
@@ -575,13 +575,13 @@
                                 <span style="font-size:18px"><b>70.41</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">69.08</span>
+                                <span style="font-size:18px"><b>69.08</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">76.50</span>
+                                <span style="font-size:18px"><b>76.50</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">53.77/77.82</span>
+                                <span style="font-size:18px"><b>53.77/77.82</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>62.26</b></span>
@@ -614,13 +614,13 @@
                                 <span style="font-size:18px"><b>70.61</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">68.75</span>
+                                <span style="font-size:18px"><b>68.75</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">75.93</span>
+                                <span style="font-size:18px"><b>75.93</b></span>
                         </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">52.00/76.35</span>
+                                <span style="font-size:18px"><b>52.00/76.35</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>58.91</b></span>
