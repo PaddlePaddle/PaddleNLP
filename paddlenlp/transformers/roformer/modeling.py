@@ -34,19 +34,6 @@ __all__ = [
 ]
 
 
-def _convert_attention_mask(attn_mask, dtype):
-    if attn_mask is not None and attn_mask.dtype != dtype:
-        attn_mask_dtype = attn_mask.dtype
-        if attn_mask_dtype in [
-                paddle.bool, paddle.int8, paddle.int16, paddle.int32,
-                paddle.int64
-        ]:
-            attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e4
-        else:
-            attn_mask = paddle.cast(attn_mask, dtype)
-    return attn_mask
-
-
 class RotaryPositionEmbedding(Layer):
     def __init__(self, dim, max_position_embeddings=512):
         super().__init__()
@@ -123,7 +110,6 @@ class MultiHeadAttentionWithRotary(Layer):
 
         product = paddle.matmul(x=q, y=k, transpose_y=True) * self.scale
         if attn_mask is not None:
-            attn_mask = _convert_attention_mask(attn_mask, product.dtype)
             product = product + attn_mask
 
         weights = F.softmax(product)
@@ -554,7 +540,7 @@ class RoFormerModel(RoFormerPretrainedModel):
             token_type_ids=None,
             attention_mask=None,
             output_hidden_states=False, ):
-        r'''
+        r"""
         The RoFormerModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -621,7 +607,7 @@ class RoFormerModel(RoFormerPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
