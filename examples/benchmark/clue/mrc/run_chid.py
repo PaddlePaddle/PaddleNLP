@@ -207,7 +207,6 @@ def evaluate(model, data_loader, do_predict=False):
     model.train()
     if not do_predict:
         acc = right_num / total_num
-        logger.info("Eval acc: %.4f" % acc)
         return acc
     return all_results
 

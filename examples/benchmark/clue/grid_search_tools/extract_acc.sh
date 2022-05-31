@@ -19,7 +19,11 @@ declare -A dict
 
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
+    if [ $task == 'cmrc2018' ]; then
+        dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_acc|awk '{print $7}' |awk '{print substr($0,1,11)}'|awk '$0>x{x=$0};END{print x}'`
+    else
     dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_acc|awk '{print $7}' |awk '{print substr($0,1,5)}'|awk '$0>x{x=$0};END{print x}'`
+    fi
 done
 
 echo -e AFQMC"\t"TNEWS"\t"IFLYTEK"\t"CMNLI"\t"OCNLI"\t"CLUEWSC2020"\t"CSL"\t"CMRC2018"\t"CHID"\t"C3
@@ -32,8 +36,13 @@ done
 echo -e "\n==================================\nbest hyper-paramter list: \n=================================="
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
+    if [ -z ${dict[$task]} ]
+    then
+    echo ${dict[$task]} > test
+    continue
+    fi
     s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_acc: ${dict[$task]}"|awk '{split($1, hy, "/"); print(hy[3])}'`
     s=`echo $s|awk '{split($1, hy, "."); print hy[1]"."hy[2]}'`
     s=`echo $s|awk '{split($1, hy, "_"); print hy[1] " " hy[2] " "hy[3]}'`
-    echo -e "${task}'s best lr, bs, dropout_p: "$s
+    echo -e "${task}'s best acc ${dict[$task]}, lr, bs, dropout_p are: "$s
 done

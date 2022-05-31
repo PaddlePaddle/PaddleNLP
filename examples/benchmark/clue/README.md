@@ -697,8 +697,9 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 ### 批量启动 Grid Search
 
 #### 使用说明
-- `grid_search.py` grid search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解任务跑完，然后会自动调用抽取结果的脚本`extract_acc.sh`抽取所有的结果并打印
-- `extract_acc.sh` 从日志抽取每个任务的最佳结果，在grid search结束后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解任务所有的日志。
+- `grid_search.py` grid search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解任务跑完，然后会自动调用抽取结果的脚本 `extract_acc.sh` 抽取所有任务的最佳结果和对应的超参并打印。
+- `warmup_dataset_and_model.py` 该脚本完成 grid search 前的数据集下载和预处理缓存的工作，在grid search 开始前会调用，如果该阶段任务失败，需要检查原因，如果是网络的原因，需要调整网络之后重试 `grid_search.py`。该脚本也可手动调用，需要 1 个参数：模型名称或目录。；
+- `extract_acc.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参，在 grid search 结束后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解任务所有的日志。
 
 ```shell
 cd grid_search_tools

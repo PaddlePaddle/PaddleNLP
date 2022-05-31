@@ -23,7 +23,6 @@ def get_availble(est=15, is_mrc=False):
     handles.sort(key=lambda x: nvmlDeviceGetMemoryInfo(x).free, reverse=True)
     for i, h in enumerate(handles):
         device_id = handle_mapping[str(h)]
-        # TODO: mrc任务的est
         if device_id in mrc_device.values():
             continue
         info = nvmlDeviceGetMemoryInfo(h)
@@ -53,7 +52,7 @@ def get_mrc_tasks(model_name_or_path):
     for lr in learning_rate_list:
         for bs in batch_size_list:
             tasks.append(
-                f"bash run_cmrc2018.sh {model_name_or_path}  {bs} {lr} {cls_base_grd_acc}"
+                f"bash run_cmrc.sh {model_name_or_path}  {bs} {lr} {cls_base_grd_acc}"
             )
     # c3
     for lr in learning_rate_list:
@@ -111,14 +110,18 @@ def do_task(task):
     if "cmrc" in task or "chid" in task or "c3" in task:
         is_mrc = True
     device_id = get_availble(est, is_mrc)
-    while device_id is None:
+    retry = 5
+    while device_id is None and retry > 0:
         print("> No device avaliable, wait 120 seconds.")
         time.sleep(120)
         device_id = get_availble(est, is_mrc)
-    task = f"set -x \nexport CUDA_VISIBLE_DEVICES={device_id}\n" + task
-    print(f"> Send task \n{task}\n")
+        retry -= 1
+    if retry == 0:
+        return None
+    task_ps = f"set -x \nexport CUDA_VISIBLE_DEVICES={device_id}\n" + task
+    print(f"> Send task \n{task_ps}\n")
     ps = subprocess.Popen(
-        task, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        task_ps, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if is_mrc and device_id is not None:
         mrc_device[task] = device_id
         print("mrc_device", mrc_device)
@@ -159,7 +162,7 @@ def main():
                 else:
                     if "cmrc" in runs[i]["ts"] or "chid" in runs[i][
                             "ts"] or "c3" in runs[i]["ts"]:
-                        mrc_device.remove(runs[i]['ts'])
+                        mrc_device.pop(runs[i]['ts'])
                         print("mrc_device", mrc_device)
                     print(f"> Done! {runs[i]['ts']}")
                 runs.pop(i)
@@ -172,11 +175,15 @@ def main():
             task = tasks.pop(0)
             print(f"> Try to append {task}")
             ps = do_task(task)
-            runs.append({"ps": ps, "ts": task})
+            if ps is None:
+                tasks.append(task)
+            else:
+                runs.append({"ps": ps, "ts": task})
 
         print(f"> Wait for 15 seconds to start!")
         time.sleep(15)
-    status = os.system('bash extract_acc.sh ' + model_name_or_path)
+    print("All done!")
+    status = os.system(f'bash extract_acc.sh {model_name_or_path}')
 
 
 if __name__ == "__main__":
