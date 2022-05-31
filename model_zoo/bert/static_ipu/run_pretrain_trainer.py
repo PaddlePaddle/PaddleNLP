@@ -23,8 +23,8 @@ import paddle
 import paddle.optimizer
 import paddle.static
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.trainer import IPUTrainer
-from paddlenlp.utils import (AutoModel, AutoConfig, AutoPipeline)
+from paddlenlp.IPU import Trainer as IPUTrainer
+from paddlenlp.IPU import (AutoModel, AutoConfig, AutoPipeline)
 
 from args import load_custom_ops, parse_args
 from dataset_ipu import PretrainingHDF5DataLoader
