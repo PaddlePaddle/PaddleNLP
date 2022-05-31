@@ -666,4 +666,3 @@ BERT模型汇总
 .. _sshleifer/tiny-distilbert-base-cased: https://huggingface.co/sshleifer/tiny-distilbert-base-cased
 .. _ckiplab/bert-base-chinese: https://huggingface.co/ckiplab/bert-base-chinese
 .. _fabriceyhc/bert-base-uncased-amazon_polarity: https://huggingface.co/fabriceyhc/bert-base-uncased-amazon_polarity
-
