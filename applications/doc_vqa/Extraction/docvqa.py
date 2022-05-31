@@ -65,7 +65,7 @@ class DocVQA(Dataset):
         self.max_span_num = max_span_num
         self.sample_list = None
         self.args = args
-        
+
         self.docvqa_inputs = self.docvqa_input()
 
     def check_is_max_context(self, doc_spans, cur_span_index, position):
@@ -105,14 +105,9 @@ class DocVQA(Dataset):
 
         return cur_span_index == best_span_index
 
-    def convert_examples_to_features(self,
-                                     examples,
-                                     tokenizer,
-                                     label_map,
-                                     max_seq_length,
-                                     max_span_num,
-                                     max_doc_length,
-                                     max_query_length):
+    def convert_examples_to_features(self, examples, tokenizer, label_map,
+                                     max_seq_length, max_span_num,
+                                     max_doc_length, max_query_length):
 
         if "[CLS]" in self.tokenizer.get_vocab():
             start_token = "[CLS]"
