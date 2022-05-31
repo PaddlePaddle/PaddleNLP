@@ -203,6 +203,7 @@ def do_generation(args):
                     model_config[
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
+                    model_config["fuse"] = args.fuse
                     model = GPTForGeneration(
                         GPTModel(**model_config),
                         max_length=args.max_dec_len,
@@ -210,7 +211,8 @@ def do_generation(args):
                         temperature=args.temperature,
                         top_k=args.topk,
                         top_p=args.topp,
-                        eos_id=eos_id)
+                        eos_id=eos_id,
+                        fuse=args.fuse)
                 else:
                     logger.error("No checkpoint load.")
                 model.eval()
