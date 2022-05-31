@@ -13,6 +13,7 @@ python3  ./run_docvqa.py \
     --eval_steps 6000 \
     --save_steps 6000 \
     --output_dir "output/" \
+    --save_path "data/decode_res.json" \
 	--init_checkpoint "./checkpoints/layoutxlm/" \
     --learning_rate 3e-5 \
     --warmup_steps 12000 \
