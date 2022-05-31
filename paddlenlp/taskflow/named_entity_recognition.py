@@ -91,11 +91,11 @@ class NERWordTagTask(WordTagTask):
                 "a93e4074c9440cc3f1d4d29e54cf766d"
             ],
             "model_config": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
                 "9dcbd5d6f67792b2a2be058799a144ea"
             ],
             "tags": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
                 "f33feedd01d478b03bac81be19b48d00"
             ],
         }
