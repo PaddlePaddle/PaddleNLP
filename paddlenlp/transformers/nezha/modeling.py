@@ -532,10 +532,11 @@ class NeZhaModel(NeZhaPretrainedModel):
                  initializer_range=0.02,
                  max_relative_position=64,
                  layer_norm_eps=1e-12,
+                 pad_token_id=0,
                  use_relative_position=True):
         super(NeZhaModel, self).__init__()
         self.initializer_range = initializer_range
-
+        self.pad_token_id = pad_token_id
         self.embeddings = NeZhaEmbeddings(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
@@ -620,17 +621,18 @@ class NeZhaModel(NeZhaPretrainedModel):
                 output = model(**inputs)
         """
         if attention_mask is None:
-            attention_mask = paddle.ones_like(input_ids)
-        extended_attention_mask = self.get_extended_attention_mask(
-            attention_mask)
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids)
 
         embedding_output = self.embeddings(input_ids, token_type_ids)
 
-        encoder_outputs, _ = self.encoder(embedding_output,
-                                          extended_attention_mask)
+        encoder_outputs, _ = self.encoder(embedding_output, attention_mask)
 
         sequence_output = encoder_outputs[-1]
         pooled_output = self.pooler(sequence_output)
