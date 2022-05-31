@@ -71,7 +71,7 @@ class TritonPythonModel:
           be the same as `requests`
         """
         responses = []
-        print("num:", len(requests), flush=True)
+        # print("num:", len(requests), flush=True)
         for request in requests:
             data = pb_utils.get_input_tensor_by_name(request,
                                                      self.input_names[0])
@@ -83,8 +83,8 @@ class TritonPythonModel:
             token_type_ids = np.array(
                 data["token_type_ids"], dtype=self.output_dtype[1])
 
-            print("input_ids:", input_ids)
-            print("token_type_ids:", token_type_ids)
+            # print("input_ids:", input_ids)
+            # print("token_type_ids:", token_type_ids)
 
             out_tensor1 = pb_utils.Tensor(self.output_names[0], input_ids)
             out_tensor2 = pb_utils.Tensor(self.output_names[1], token_type_ids)

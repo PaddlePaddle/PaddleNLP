@@ -98,7 +98,20 @@ if __name__ == "__main__":
     datas = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
              ["区块链投资心得，能做到就不会亏钱", ]]
 
-    for data in datas:
-        print("data:", data)
-        result = runner.Run([data])
-        print("result:", result)
+    result = runner.Run([datas[1]])
+    print(result)
+    result = runner.Run([datas[1]])
+    result = runner.Run([datas[1]])
+
+    import time
+    s = time.time()
+    for i in range(1000):
+        result = runner.Run([datas[1]])
+    e = time.time()
+    print("cost time:", (e - s) * 1.0)
+
+    # for data in datas:
+    #     print("data:", data)
+    #     result = runner.Run([data])
+    #     print("result:", result)
+    #     print(result["POST_OUTPUT1"], result["POST_OUTPUT2"])

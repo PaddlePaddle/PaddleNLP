@@ -66,13 +66,24 @@ class TritonPythonModel:
           be the same as `requests`
         """
         responses = []
-        print("num:", len(requests), flush=True)
+        # print("num:", len(requests), flush=True)
         for request in requests:
             data = pb_utils.get_input_tensor_by_name(request,
                                                      self.input_names[0])
             data = data.as_numpy()
-            print(data)
-
+            # print("post data:", data)
+            max_value = np.max(data, axis=1, keepdims=True)
+            exp_data = np.exp(data - max_value)
+            probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+            probs = probs.max(axis=-1)
+            # print("label:", data.argmax(axis=-1))
+            # print("probs:", probs)
+            out_tensor1 = pb_utils.Tensor(
+                self.output_names[0], data.argmax(axis=-1))
+            out_tensor2 = pb_utils.Tensor(self.output_names[1], probs)
+            inference_response = pb_utils.InferenceResponse(
+                output_tensors=[out_tensor1, out_tensor2])
+            responses.append(inference_response)
         return responses
 
     def finalize(self):

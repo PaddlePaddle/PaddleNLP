@@ -10,9 +10,14 @@ input [
 ]
 output [
   {
-    name: "OUTPUT"
+    name: "label"
+    data_type: TYPE_INT64
+    dims: [ 1 ]
+  },
+  {
+    name: "confidence"
     data_type: TYPE_FP32
-    dims: [ 15 ]
+    dims: [ 1 ]
   }
 ]
 ensemble_scheduling {
@@ -45,19 +50,24 @@ ensemble_scheduling {
         value: "preprocess_token_type_ids"
       }
       output_map {
-        key: "linear_75.tmp_1"
+        key: "linear_113.tmp_1"
         value: "OUTPUT_2"
-      },
-      {
+      }
+    },
+    {
       model_name: "tnews_postprocess"
       model_version: 1
       input_map {
         key: "POST_INPUT"
-        value: "linear_75.tmp_1"
+        value: "OUTPUT_2"
       }
       output_map {
-        key: "POST_OUTPUT"
-        value: "OUTPUT"
+        key: "POST_label"
+        value: "label"
+      }
+      output_map {
+        key: "POST_confidence"
+        value: "confidence"
       }
     }
   ]

@@ -12,14 +12,14 @@ input [
 
 output [
   {
-    name: "POST_OUTPUT"
+    name: "POST_label"
     data_type: TYPE_INT64
-    dims: [ -1 ]
+    dims: [ 1 ]
   },
   {
-    name: "OUTPUT_1"
-    data_type: TYPE_INT64
-    dims: [ -1 ]
+    name: "POST_confidence"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
   }
 ]
 
@@ -29,6 +29,3 @@ instance_group [
       kind: KIND_CPU
   }
 ]
-
-dynamic_batching { 
-}

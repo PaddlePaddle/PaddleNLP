@@ -30,5 +30,3 @@ instance_group [
   }
 ]
 
-dynamic_batching { 
-}
