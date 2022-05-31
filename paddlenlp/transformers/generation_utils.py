@@ -574,7 +574,8 @@ class GenerationMixin(object):
             max_length (int, optional): The maximum length of the sequence to 
                 be generated. Default to 20.
             min_length (int, optional): The minimum length of the sequence to 
-                be generated. Default to 0.
+                be generated. Default to 0. Note: it is different from HuggingFace 
+                whose min_length defaults to 10.
             decode_strategy (str, optional): The decoding strategy in generation.
                 Currently, there are three decoding strategies supported: 
                 "greedy_search", "sampling" and "beam_search". Default to 
@@ -601,7 +602,11 @@ class GenerationMixin(object):
             length_penalty (float, optional): The exponential penalty to the 
                 sequence length in the "beam_search" strategy. The larger this
                 param is, the more that the model would generate shorter 
-                sequences. Default to 0.0, which means no penalty.
+                sequences. Default to 0.0, which means no penalty. Note: it is 
+                different from HuggingFace whose length_penalty defaults to 1.0
+                enabling penalty to the length, and the penalty method is also different.
+                See `this issue<https://github.com/huggingface/transformers/issues/16930>`__
+                for more details.
             early_stopping (bool, optional): Whether to stop searching in the 
                 "beam_search" strategy when at least `num_beams` sentences are 
                 finished per batch or not. Default to False.
@@ -728,7 +733,14 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-
+        logger.warning(
+            "Argument length_penalty (default to 0.0) means no penalty and is "
+            "different from HuggingFace whose length_penalty defaults to 1.0 "
+            "enabling penalty to the length, and the penalty method is also different."
+        )
+        logger.warning(
+            "Argument min_length (default to 0) is different from HuggingFace"
+            " whose min_length defaults to 10.")
         assert (
             decode_strategy in ["greedy_search", "sampling", "beam_search"]
         ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
