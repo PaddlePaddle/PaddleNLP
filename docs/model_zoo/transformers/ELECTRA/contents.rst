@@ -36,15 +36,28 @@ ELECTRA模型汇总
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese medical corpus.                                               |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/hfl-chinese-electra-180g-base-discriminator``                            | Chinese      | Discriminator, 12-layer, 768-hidden,                                             |
+|``hfl/chinese-electra-180g-base-discriminator``                                   | Chinese      | Discriminator, 12-layer, 768-hidden,                                             |
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
 |                                                                                  |              | Trained on 180g Chinese text.                                                    |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `hfl/chinese-electra-180g-base-discriminator`_                                   |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/hfl-chinese-electra-180g-small-ex-discriminator``                        | Chinese      | Discriminator, 24-layer, 256-hidden,                                             |
+|``hfl/chinese-electra-180g-small-ex-discriminator``                               | Chinese      | Discriminator, 24-layer, 256-hidden,                                             |
 |                                                                                  |              | 4-heads, 24M parameters.                                                         |
 |                                                                                  |              | Trained on 180g Chinese text.                                                    |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `hfl/chinese-electra-180g-small-ex-discriminator`_                               |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/hfl-chinese-legal-electra-small-generator``                              | Chinese      | Generator, 12-layer, 64-hidden,                                                  |
+|``hfl/chinese-legal-electra-small-generator``                                     | Chinese      | Generator, 12-layer, 64-hidden,                                                  |
 |                                                                                  |              | 1-heads, 3M parameters.                                                          |
 |                                                                                  |              | Trained on Chinese legal corpus.                                                 |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `hfl/chinese-legal-electra-small-generator`_                                     |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+
+.. _hfl/chinese-electra-180g-base-discriminator: https://huggingface.co/hfl/chinese-electra-180g-base-discriminator
+.. _hfl/chinese-electra-180g-small-ex-discriminator: https://huggingface.co/hfl/chinese-electra-180g-small-ex-discriminator
+.. _hfl/chinese-legal-electra-small-generator: https://huggingface.co/hfl/chinese-legal-electra-small-generator
