@@ -630,25 +630,25 @@ from paddlenlp import Taskflow
   ```python
   >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
   >>> ie.set_schema(schema)
-  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。")) # Better print results using pprint
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
   [{'原告': [{'end': 37,
-            'probability': 0.9955972637653154,
+            'probability': 0.9949814024296764,
             'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.9835957661618089,
+                                    'probability': 0.7956844697990384,
                                     'start': 44,
                                     'text': '李四'}]},
             'start': 35,
             'text': '张三'}],
     '法院': [{'end': 10,
-            'probability': 0.9245885500450299,
+            'probability': 0.9221074192336651,
             'start': 0,
             'text': '北京市海淀区人民法院'}],
     '被告': [{'end': 67,
-            'probability': 0.9033652934762237,
-            'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.3863244074945271,
-                                    'start': 44,
-                                    'text': '李四'}]},
+            'probability': 0.8437349536631089,
+            'relations': {'委托代理人': [{'end': 92,
+                                    'probability': 0.7267121388225029,
+                                    'start': 90,
+                                    'text': '赵六'}]},
             'start': 64,
             'text': 'B公司'}]}]
   ```
@@ -695,6 +695,7 @@ from paddlenlp import Taskflow
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
 
 ### 解语知识标注
