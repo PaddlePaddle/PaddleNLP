@@ -925,10 +925,9 @@ class T5Stack(nn.Layer):
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         if attention_mask is None:
-            extended_attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2])
+            extended_attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         else:
             extended_attention_mask = self.get_extended_attention_mask(
                 attention_mask, input_shape)

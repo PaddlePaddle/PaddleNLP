@@ -725,7 +725,6 @@ class BlenderbotModel(BlenderbotPretrainedModel):
             memory_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            memory_mask.stop_gradient = True
         else:
             memory_mask = attention_mask
 
