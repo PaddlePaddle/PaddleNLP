@@ -27,33 +27,33 @@ RoBERTa模型汇总
 |``rbtl3``                                                                         | Chinese      | 3-layer, 1024-hidden,                                                            |
 |                                                                                  |              | 16-heads, 61M parameters.                                                        |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/deepset-roberta-base-squad2``                                       | English      | 12-layer, 768-hidden,                                                            |
+|``deepset/roberta-base-squad2``                                                   | English      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 124M parameters.                                                       |
 |                                                                                  |              | Trained on English text.                                                         |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `deepset/roberta-base-squad2`_                                                   |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/roberta-en-base``                                                   | English      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 163M parameters.                                                       |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/roberta-en-large``                                                  | English      | 24-layer, 1024-hidden,                                                           |
-|                                                                                  |              | 16-heads, 408M parameters.                                                       |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/sshleifei-tiny-distilroberta-base``                                 | English      | 2-layer, 2-hidden,                                                               |
-|                                                                                  |              | 2-heads, 0.25M parameters.                                                       |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/uer-roberta-base-chinese-extractive-qa``                            | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/roberta-base-chinese-extractive-qa``                                        | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 101M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese text.                                                         |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `uer/roberta-base-chinese-extractive-qa`_                                        |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/uer-roberta-base-ft-chinanews-chn``                                 | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/roberta-base-ft-chinanews-chn``                                             | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese text.                                                         |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `uer/roberta-base-ft-chinanews-chn`_                                             |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``nosaydomore/uer-roberta-base-ft-cluener2020-chn``                               | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/roberta-base-ft-cluener2020-chn``                                           | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 101M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese text.                                                         |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `uer/roberta-base-ft-cluener2020-chn`_                                           |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``roberta-base``                                                                  | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | roberta-base_                                                                    |
@@ -323,7 +323,10 @@ RoBERTa模型汇总
 |                                                                                  |              | `ynie/roberta-large_conv_contradiction_detector_v0`_                             |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
-
+.. _deepset/roberta-base-squad2: https://huggingface.co/deepset/roberta-base-squad2
+.. _uer/roberta-base-chinese-extractive-qa: https://huggingface.co/uer/roberta-base-chinese-extractive-qa
+.. _uer/roberta-base-ft-chinanews-chn: https://huggingface.co/uer/roberta-base-ft-chinanews-chn
+.. _uer/roberta-base-ft-cluener2020-chn: https://huggingface.co/uer/roberta-base-ft-cluener2020-chn
 .. _roberta-base: https://huggingface.co/roberta-base
 .. _cardiffnlp/twitter-roberta-base-sentiment: https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment
 .. _roberta-large: https://huggingface.co/roberta-large
