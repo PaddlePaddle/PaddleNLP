@@ -227,6 +227,27 @@ void FasterWordPiece::HandleTheRemainingStringOnTriePath(
   *original_num_tokens = tokens->size();
 }
 
+int FasterWordPiece::SkipRemainingOfWordAndTrailingWhiteSpaces(
+    const std::string& sequence, int* curr_idx) const {
+  int seq_len = sequence.length();
+  uint32_t curr_unicode_char;
+  int end_of_word = *curr_idx;
+  while (*curr_idx < seq_len) {
+    auto chwidth =
+        utils::UTF8ToUInt32(sequence.data() + *curr_idx, &curr_unicode_char);
+    if (u_isUWhiteSpace(curr_unicode_char)) {
+      *curr_idx += chwidth;
+      break;
+    }
+    if (utils::IsPunctuationOrChineseChar(curr_unicode_char)) {
+      break;
+    }
+    *curr_idx += chwidth;
+    end_of_word = *curr_idx;
+  }
+  return end_of_word;
+}
+
 std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
     const std::string& sequence) const {
   if (sequence.empty()) {
@@ -267,7 +288,81 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
 std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
     const std::string& sequence) const {
   // Need to implement
-  return {};
+  if (sequence.empty()) {
+    return {};
+  }
+  std::vector<core::Token> all_tokens;
+  int original_num_tokens = 0;
+  uint32_t prev_unicode_char, curr_unicode_char;
+  int curr_idx = 0;
+  int chwidth = 0;
+  auto seq_len = sequence.length();
+  while (curr_idx < seq_len) {
+    int curr_offset_in_word = 0;
+    auto curr_node = trie_.CreateRootTraversalCursor();
+    int bytes_length = 0;
+    int word_offset_in_sequence = curr_idx;
+    std::string sequence_substr = sequence.substr(curr_idx);
+    bool fail_to_match = false;
+    while (curr_idx < seq_len) {
+      prev_unicode_char = curr_unicode_char;
+      chwidth =
+          utils::UTF8ToUInt32(sequence.data() + curr_idx, &curr_unicode_char);
+      if (bytes_length + chwidth > max_input_chars_per_word_) {
+        break;
+      }
+      while (!trie_.TryTraverseSeveralSteps(
+          &curr_node, sequence.substr(curr_idx, chwidth))) {
+        if (TryFollowFailureLinkAndCollectTokens(sequence_substr,
+                                                 word_offset_in_sequence,
+                                                 &curr_offset_in_word,
+                                                 &curr_node,
+                                                 &all_tokens)) {
+          fail_to_match = true;
+          break;
+        }
+      }
+      if (fail_to_match) {
+        break;
+      }
+      word_offset_in_sequence += chwidth;
+      curr_idx += chwidth;
+    }
+    if (curr_idx >= seq_len) {
+      HandleTheRemainingStringOnTriePath(sequence_substr,
+                                         word_offset_in_sequence,
+                                         &curr_node,
+                                         &original_num_tokens,
+                                         &curr_offset_in_word,
+                                         &all_tokens);
+      break;
+    }
+    bool curr_unicode_char_is_space = u_isUWhiteSpace(curr_unicode_char);
+    if (curr_unicode_char_is_space ||
+        utils::IsPunctuationOrChineseChar(curr_unicode_char) ||
+        (curr_idx > 0 &&
+         utils::IsPunctuationOrChineseChar(prev_unicode_char))) {
+      HandleTheRemainingStringOnTriePath(
+          sequence_substr.substr(0, curr_idx - word_offset_in_sequence),
+          word_offset_in_sequence,
+          &curr_node,
+          &original_num_tokens,
+          &curr_offset_in_word,
+          &all_tokens);
+      if (curr_unicode_char_is_space) {
+        curr_idx += chwidth;
+      }
+      continue;
+    }
+    curr_idx += chwidth;
+    int end_of_word =
+        SkipRemainingOfWordAndTrailingWhiteSpaces(sequence, &curr_idx);
+    ResetOutputAppendUNK(word_offset_in_sequence,
+                         end_of_word - word_offset_in_sequence,
+                         &original_num_tokens,
+                         &all_tokens);
+  }
+  return all_tokens;
 }
 
 std::vector<core::Token> FasterWordPiece::Tokenize(

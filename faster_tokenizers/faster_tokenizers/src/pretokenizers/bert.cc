@@ -28,20 +28,20 @@ static re2::RE2 punc_pattern("[[:punct:]]|[\\pP]");
 
 void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
   std::vector<normalizers::NormalizedString> normalized_splits;
-  pretokenized->Split(
-      [&normalized_splits](int idx,
-                           normalizers::NormalizedString* normalized,
-                           std::vector<StringSplit>* string_splits) {
-        // Use single character match instead of regex to improve performance
-        normalized->Split([](char32_t ch) -> bool { return u_isspace(ch); },
-                          normalizers::REMOVED,
-                          &normalized_splits);
-        for (auto&& normalize : normalized_splits) {
-          if (!normalize.IsEmpty()) {
-            string_splits->emplace_back(std::move(normalize));
-          }
-        }
-      });
+  pretokenized->Split([&normalized_splits](
+      int idx,
+      normalizers::NormalizedString* normalized,
+      std::vector<StringSplit>* string_splits) {
+    // Use single character match instead of regex to improve performance
+    normalized->Split([](char32_t ch) -> bool { return u_isUWhiteSpace(ch); },
+                      normalizers::REMOVED,
+                      &normalized_splits);
+    for (auto&& normalize : normalized_splits) {
+      if (!normalize.IsEmpty()) {
+        string_splits->emplace_back(std::move(normalize));
+      }
+    }
+  });
   normalized_splits.clear();
   pretokenized->Split(
       [&normalized_splits](int idx,

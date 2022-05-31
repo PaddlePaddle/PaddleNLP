@@ -178,7 +178,6 @@ void FailureArray::RemovePunctuationTrieLink(Trie* trie) const {
   auto continuing_subword_prefix = trie->GetContinuingSubwordPrefix();
   if (with_pretokenization_ && !continuing_subword_prefix.empty()) {
     int cur_idx = 0;
-    int next_idx = 0;
     uint32_t curr_char, next_char;
     bool prev_node_is_root = false;
     auto node = trie->CreateRootTraversalCursor();

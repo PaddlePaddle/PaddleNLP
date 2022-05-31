@@ -70,6 +70,8 @@ private:
                             int sequence_size,
                             int* original_num_tokens,
                             std::vector<core::Token>* tokens) const;
+  int SkipRemainingOfWordAndTrailingWhiteSpaces(const std::string& sequence,
+                                                int* curr_idx) const;
   void PrecomputeEncodeValueForSubwordPrefix();
   utils::Trie trie_;
   utils::FailureArray failure_array_;
