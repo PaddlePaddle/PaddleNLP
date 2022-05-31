@@ -40,6 +40,8 @@ class T5BertTokenizer(BertTokenizer):
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
             **kwargs, )
+        if space_token not in self._additional_special_tokens:
+            self._additional_special_tokens += [space_token]
 
         self._space_token = space_token
 
@@ -51,7 +53,7 @@ class T5BertTokenizer(BertTokenizer):
         vocab.update(self.added_tokens_encoder)
         return vocab
 
-    def tokenize(self, text):
+    def tokenize(self, text, **kwargs):
         import re
         # Remove space between <extra_id_*> <spot> <asoc>
         split_bracket = re.compile(
@@ -64,7 +66,7 @@ class T5BertTokenizer(BertTokenizer):
                 new_text_list += [item[0].strip(), item[1]]
             text = "".join(new_text_list)
         text = text.replace(' ', self._space_token)
-        return super().tokenize(text)
+        return super().tokenize(text, **kwargs)
 
     def _add_eos_if_not_present(self, token_ids: List[int]) -> List[int]:
         """Do not add eos again if user already added it."""

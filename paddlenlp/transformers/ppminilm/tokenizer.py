@@ -94,7 +94,8 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
+                 mask_token="[MASK]",
+                 **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -133,31 +134,6 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
                 split_tokens.append(sub_token)
         return split_tokens
-
-    def tokenize(self, text):
-        r"""
-        Converts a string to a list of tokens.
-
-        Args:
-            text (str): The text to be tokenized.
-
-        Returns:
-            List(str): A list of string representing converted tokens.
-
-        Examples:
-            .. code-block::
-
-                from paddlenlp.transformers import PPMiniLMTokenizer
-                tokenizer = PPMiniLMTokenizer.from_pretrained('ppminilm-6l-768h')
-
-                tokens = tokenizer.tokenize('He was a puppeteer')
-
-                '''
-                ['he', 'was', 'a', 'pu', '##pp', '##et', '##ee', '##r']
-                '''
-
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         r"""

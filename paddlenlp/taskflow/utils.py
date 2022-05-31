@@ -49,6 +49,7 @@ def download_file(save_dir, filename, url, md5=None):
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
         if md5 and (not md5file(fullname) == md5):
+            logger.info("Updating {} from {}".format(filename, url))
             logger.disable()
             get_path_from_url(url, save_dir, md5)
     else:
@@ -870,3 +871,18 @@ def get_id_and_prob(spans, offset_map):
         prob.append(start[1] * end[1])
         sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
     return sentence_id, prob
+
+
+def dbc2sbc(s):
+    rs = ""
+    for char in s:
+        code = ord(char)
+        if code == 0x3000:
+            code = 0x0020
+        else:
+            code -= 0xfee0
+        if not (0x0021 <= code and code <= 0x7e):
+            rs += char
+            continue
+        rs += chr(code)
+    return rs
