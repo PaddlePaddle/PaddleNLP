@@ -519,7 +519,7 @@ python evaluate.py \
 
 #### Python部署
 
-以下是UIE Python端的部署流程，包括环境准备、模型导出和使用示例。
+以下是UIE Python端基于ONNXRuntime的部署流程，包括环境准备、模型导出和使用示例。
 
 - 环境准备
   UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
@@ -534,7 +534,7 @@ python evaluate.py \
 
   - GPU端
 
-    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖
+    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.1.1，并使用以下命令安装所需依赖
 
     ```shell
     pip install -r deploy/python/requirements_gpu.txt
