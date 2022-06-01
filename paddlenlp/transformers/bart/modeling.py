@@ -303,6 +303,8 @@ class BartDecoder(BartPretrainedModel):
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
 
+        if memory_mask is not None:
+            memory_mask = self.get_extended_attention_mask(memory_mask)
         decoder_output = self.decoder(
             tgt=decoder_input,
             memory=encoder_output,
@@ -509,9 +511,18 @@ class BartModel(BartPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
-        decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
-                                      encoder_output, attention_mask, cache)
 
+        if attention_mask is not None:
+            memory_mask = attention_mask
+        elif input_ids is not None:
+            memory_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype())
+        else:
+            memory_mask = None
+
+        decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
+                                      encoder_output, memory_mask, cache)
         return decoder_output
 
 
