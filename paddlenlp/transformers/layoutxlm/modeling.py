@@ -734,6 +734,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
 
         self.encoder = LayoutXLMEncoder(config)
         self.pooler = LayoutXLMPooler(config["hidden_size"], with_pool)
+        self.pad_token_id = config["pad_token_id"]
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids,
                               token_type_ids):
@@ -809,11 +810,11 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
-
-        visual_attention_mask = paddle.ones(visual_shape)
-
-        attention_mask = attention_mask.astype(visual_attention_mask.dtype)
+            attention_mask = paddle.cast(
+                (1.0 - input_ids == self.pad_token_id),
+                dtype=paddle.get_default_dtype())
+        visual_attention_mask = paddle.ones(
+            visual_shape, dtype=paddle.get_default_dtype())
 
         final_attention_mask = paddle.concat(
             [attention_mask, visual_attention_mask], axis=1)
@@ -1131,10 +1132,12 @@ class REDecoder(nn.Layer):
         for b in range(batch_size):
             if len(entities[b]["start"]) <= 2:
                 entities[b] = {"end": [1, 1], "label": [0, 0], "start": [0, 0]}
-            all_possible_relations = set(
-                [(i, j) for i in range(len(entities[b]["label"]))
-                 for j in range(len(entities[b]["label"])) if
-                 entities[b]["label"][i] == 1 and entities[b]["label"][j] == 2])
+            all_possible_relations = set([
+                (i, j)
+                for i in range(len(entities[b]["label"]))
+                for j in range(len(entities[b]["label"]))
+                if entities[b]["label"][i] == 1 and entities[b]["label"][j] == 2
+            ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
             positive_relations = set(

@@ -746,6 +746,7 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
 
         self.encoder = LayoutLMv2Encoder(config)
         self.pooler = LayoutLMv2Pooler(config["hidden_size"], with_pool)
+        self.pad_token_id = config["pad_token_id"]
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids,
                               token_type_ids):
@@ -816,11 +817,11 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
-            attention_mask = paddle.ones(input_shape)
-
-        visual_attention_mask = paddle.ones(visual_shape)
-
-        attention_mask = attention_mask.astype(visual_attention_mask.dtype)
+            attention_mask = paddle.cast(
+                (1.0 - input_ids == self.pad_token_id),
+                dtype=paddle.get_default_dtype())
+        visual_attention_mask = paddle.ones(
+            visual_shape, dtype=paddle.get_default_dtype())
 
         final_attention_mask = paddle.concat(
             [attention_mask, visual_attention_mask], axis=1)
