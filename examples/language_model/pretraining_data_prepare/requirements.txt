@@ -1,6 +1,0 @@
-datasets
-h5py
-opencc-python-reimplemented
-nltk
-LAC
-tqdm
