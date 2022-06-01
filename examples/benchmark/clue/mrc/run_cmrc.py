@@ -120,7 +120,7 @@ def parse_args():
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=500,
+        default=100,
         help="Log every X updates steps.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
@@ -450,7 +450,7 @@ def run(args):
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 

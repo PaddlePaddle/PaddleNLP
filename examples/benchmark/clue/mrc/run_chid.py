@@ -476,7 +476,7 @@ def run(args):
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 

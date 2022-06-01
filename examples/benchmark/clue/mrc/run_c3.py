@@ -338,7 +338,7 @@ def run(args):
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
@@ -390,7 +390,7 @@ def run(args):
                     logger.info("best_acc: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
-            acc = evaluate(model, loss_fct, dev_data_loader, metric)
+            acc = evaluation(model, loss_fct, dev_data_loader, metric)
             logger.info("eval acc: %.5f, eval done total : %s s" %
                         (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
