@@ -29,6 +29,7 @@ from data_utils import convert_example, get_id_to_label
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default="checkpoints/model_900/model_state.pdparams", help="The path to model parameters to be loaded.")
+parser.add_argument("--label_file", default="data/label_level1.txt", type=str, help="label file for classfication tasks.")
 parser.add_argument("--max_seq_length", type=int, default=128, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
@@ -119,10 +120,8 @@ if __name__ == "__main__":
             'label': '沙盘讲解'
         },
     ]
-    # test_ds = load_dataset(read_text_pair,data_path='related_data/test_data.txt',lazy=False)
 
-    # data = test_ds
-    label_map = get_id_to_label('related_data/label_level1.txt')
+    label_map = get_id_to_label(args.label_file)
 
     model_name_or_path = 'ernie-3.0-base-zh'
     model = AutoModelForSequenceClassification.from_pretrained(
