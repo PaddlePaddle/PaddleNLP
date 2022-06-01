@@ -55,8 +55,8 @@ class ErnieOp(Op):
                                                      self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
         feed_dict = {}

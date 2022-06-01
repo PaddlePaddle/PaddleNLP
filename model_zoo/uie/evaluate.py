@@ -20,9 +20,10 @@ import paddle
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.utils.log import logger
 
 from model import UIE
-from utils import convert_example, reader, MODEL_MAP
+from utils import convert_example, reader
 
 
 @paddle.no_grad()
@@ -51,10 +52,7 @@ def evaluate(model, metric, data_loader):
 
 
 def do_eval():
-    encoding_model = MODEL_MAP[args.model]['encoding_model']
-    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
-
-    tokenizer = AutoTokenizer.from_pretrained(encoding_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     model = UIE.from_pretrained(args.model_path)
 
     test_ds = load_dataset(
@@ -73,8 +71,8 @@ def do_eval():
 
     metric = SpanEvaluator()
     precision, recall, f1 = evaluate(model, metric, test_data_loader)
-    print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
-          (precision, recall, f1))
+    logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
+                (precision, recall, f1))
 
 
 if __name__ == "__main__":
@@ -82,7 +80,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
-    parser.add_argument('--test_path', type=str, default=None, help="The path of test set.")
+    parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
 

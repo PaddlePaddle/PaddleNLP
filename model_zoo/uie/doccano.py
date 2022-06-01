@@ -17,6 +17,7 @@ import time
 import argparse
 import json
 import numpy as np
+from paddlenlp.utils.log import logger
 
 from utils import set_seed, convert_ext_examples, convert_cls_examples
 
@@ -42,9 +43,13 @@ def do_convert():
     with open(args.doccano_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    def _create_ext_examples(examples, negative_ratio=0, shuffle=False):
-        entities, relations = convert_ext_examples(examples, negative_ratio)
-        examples = [e + r for e, r in zip(entities, relations)]
+    def _create_ext_examples(examples,
+                             negative_ratio=0,
+                             shuffle=False,
+                             is_train=True):
+        entities, relations = convert_ext_examples(
+            examples, negative_ratio, is_train=is_train)
+        examples = entities + relations
         if shuffle:
             indexes = np.random.permutation(len(examples))
             examples = [examples[i] for i in indexes]
@@ -62,14 +67,9 @@ def do_convert():
         save_path = os.path.join(save_dir, file_name)
         with open(save_path, "w", encoding="utf-8") as f:
             for example in examples:
-                if args.task_type == "ext":
-                    for x in example:
-                        f.write(json.dumps(x, ensure_ascii=False) + "\n")
-                        count += 1
-                else:
-                    f.write(json.dumps(example, ensure_ascii=False) + "\n")
-                    count += 1
-        print("\nSave %d examples to %s." % (count, save_path))
+                f.write(json.dumps(example, ensure_ascii=False) + "\n")
+                count += 1
+        logger.info("Save %d examples to %s." % (count, save_path))
 
     if len(args.splits) == 0:
         if args.task_type == "ext":
@@ -91,8 +91,10 @@ def do_convert():
         if args.task_type == "ext":
             train_examples = _create_ext_examples(
                 raw_examples[:p1], args.negative_ratio, args.is_shuffle)
-            dev_examples = _create_ext_examples(raw_examples[p1:p2])
-            test_examples = _create_ext_examples(raw_examples[p2:])
+            dev_examples = _create_ext_examples(
+                raw_examples[p1:p2], -1, is_train=False)
+            test_examples = _create_ext_examples(
+                raw_examples[p2:], -1, is_train=False)
         else:
             train_examples = _create_cls_examples(
                 raw_examples[:p1], args.prompt_prefix, args.options)
@@ -105,7 +107,7 @@ def do_convert():
         _save_examples(args.save_dir, "dev.txt", dev_examples)
         _save_examples(args.save_dir, "test.txt", test_examples)
 
-    print('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
@@ -114,7 +116,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--doccano_file", default="./data/doccano.json", type=str, help="The doccano file exported from doccano platform.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
-    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the classification task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
+    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the extraction task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.")
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")

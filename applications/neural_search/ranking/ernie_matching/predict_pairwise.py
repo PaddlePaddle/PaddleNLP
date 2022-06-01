@@ -94,8 +94,8 @@ if __name__ == "__main__":
         phase="predict")
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment_ids
     ): [data for data in fn(samples)]
 
     valid_ds = load_dataset(

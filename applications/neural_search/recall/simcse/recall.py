@@ -70,8 +70,8 @@ if __name__ == "__main__":
         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # text_segment
     ): [data for data in fn(samples)]
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(

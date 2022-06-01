@@ -59,7 +59,7 @@ def convert_example(example,
         tokens,
         return_length=True,
         is_split_into_words=True,
-        max_seq_len=max_seq_len)
+        max_length=max_seq_len)
 
     label_indices = list(
         range(inputs["seq_len"] - 1 - max_cls_len, inputs["seq_len"] - 1))

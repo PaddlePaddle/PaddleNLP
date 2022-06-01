@@ -184,7 +184,8 @@ class ErniePredictor(object):
             exit(0)
 
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name_or_path, use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -283,7 +284,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.label_names[label] == "O" and start >= 0:
+                if (self.label_names[label] == "O" or
+                        "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -293,7 +295,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.label_names[label]:
+                if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

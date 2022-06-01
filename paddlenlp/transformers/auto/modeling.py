@@ -63,8 +63,8 @@ MAPPING_NAMES = OrderedDict([
     ("ProphetNet", "prophetnet"),
     ("Reformer", "reformer"),
     ("Roberta", "roberta"),
-    ("RoFormer", "roformer"),
     ("RoFormerv2", "roformerv2"),
+    ("RoFormer", "roformer"),
     ("Skep", "skep"),
     ("SqueezeBert", "squeezebert"),
     ("TinyBert", "tinybert"),
@@ -75,6 +75,7 @@ MAPPING_NAMES = OrderedDict([
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
+    ("GAUAlpha", "gau_alpha"),
 ])
 
 MAPPING_TASKS = OrderedDict([

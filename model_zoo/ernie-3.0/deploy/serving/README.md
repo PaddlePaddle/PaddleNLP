@@ -1,6 +1,6 @@
 # 基于Paddle Serving的服务化部署
 
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署ERNIE 3.0新闻分类和命名实体识别模型的pipeline在线服务。
+本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署ERNIE 3.0新闻分类和序列标注模型的pipeline在线服务。
 
 ## 目录
 - [环境准备](#环境准备)
@@ -43,13 +43,13 @@ pip install faster_tokenizers
 
 使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
 
-下载ERNIE 3.0的新闻分类、命名实体识别模型:
+下载ERNIE 3.0的新闻分类、序列标注模型:
 
 ```bash
 # 下载并解压新闻分类模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
 unzip tnews_pruned_infer_model.zip
-# 下载并解压命名实体识别模型
+# 下载并解压序列标注模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
 unzip msra_ner_pruned_infer_model.zip
 ```
@@ -61,7 +61,7 @@ unzip msra_ner_pruned_infer_model.zip
 # 转换新闻分类模型
 python -m paddle_serving_client.convert --dirname tnews_pruned_infer_model --model_filename float32.pdmodel --params_filename float32.pdiparams
 
-# 转换命名实体识别模型
+# 转换序列标注模型
 python -m paddle_serving_client.convert --dirname msra_ner_pruned_infer_model --model_filename float32.pdmodel --params_filename float32.pdiparams
 
 # 可通过命令查参数含义
@@ -85,9 +85,9 @@ seq_cls_config.yml        # 新闻分类任务启动服务端的配置文件
 seq_cls_rpc_client.py     # 新闻分类任务发送pipeline预测请求的脚本
 seq_cls_service.py        # 新闻分类任务启动服务端的脚本
 
-token_cls_config.yml      # 命名实体识别任务启动服务端的配置文件
-token_cls_rpc_client.py   # 命名实体识别任务发送pipeline预测请求的脚本
-token_cls_service.py      # 命名实体识别任务启动服务端的脚本
+token_cls_config.yml      # 序列标注任务启动服务端的配置文件
+token_cls_rpc_client.py   # 序列标注任务发送pipeline预测请求的脚本
+token_cls_service.py      # 序列标注任务启动服务端的脚本
 ```
 
 

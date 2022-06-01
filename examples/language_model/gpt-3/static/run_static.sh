@@ -22,7 +22,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --max_seq_len 1024 \
     --micro_batch_size 8 \
     --global_batch_size 16 \
-    --sharding_degree 2\
+    --sharding_degree 2 \
     --mp_degree 2 \
     --dp_degree 1 \
     --pp_degree 1 \

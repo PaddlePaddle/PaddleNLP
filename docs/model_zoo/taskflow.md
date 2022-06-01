@@ -55,13 +55,15 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 
 PaddleNLP Taskflow API 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或[问卷](https://iwenjuan.baidu.com/?code=44amg8)反馈给我们。
 
-## 社区交流
+## 社区交流👬
 
-微信扫描下方二维码加入官方交流群，与各行各业开发者充分交流，期待你的加入⬇️
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接
+  - 10G重磅NLP学习大礼包：
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/PaddlePaddle/PaddleNLP/release/2.2/docs/imgs/wechat.png" width="188" height="188" />
-</div>
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="188" height="188" />
+  </div>
 
 ## 详细使用
 
@@ -435,35 +437,105 @@ from paddlenlp import Taskflow
             'text': '谷爱凌'}]}]
   ```
 
-- 关系抽取
-
-  关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，即抽取三元组（entity1，关系类型，entity2）。
-
-  例如抽取的目标是"歌曲名"对应实体词的"歌手"、"所属专辑", schema构造如下：
+  例如抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
 
   ```text
-  {'歌曲名称': ['歌手', '所属专辑']}
+  ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+  ```
+
+  在上例中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
+
+  预测：
+
+  ```python
+  >>> schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+  >>> ie.set_schema(schema)
+  >>> pprint(ie("（右肝肿瘤）肝细胞性肝癌（II-III级，梁索型和假腺管型），肿瘤包膜不完整，紧邻肝被膜，侵及周围肝组织，未见脉管内癌栓（MVI分级：M0级）及卫星子灶形成。（肿物1个，大小4.2×4.0×2.8cm）。"))
+  [{'肝癌级别': [{'end': 20,
+              'probability': 0.9243267447402701,
+              'start': 13,
+              'text': 'II-III级'}],
+    '肿瘤的个数': [{'end': 84,
+              'probability': 0.7538413804059623,
+              'start': 82,
+              'text': '1个'}],
+    '肿瘤的大小': [{'end': 100,
+              'probability': 0.8341128043459491,
+              'start': 87,
+              'text': '4.2×4.0×2.8cm'}],
+    '脉管内癌栓分级': [{'end': 70,
+                'probability': 0.9083292325934664,
+                'start': 67,
+                'text': 'M0级'}]}]
+  ```
+
+- 关系抽取
+
+  关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
+
+  例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"已举办次数", schema构造如下：
+
+  ```text
+  {
+    '竞赛名称': [
+      '主办方',
+      '承办方',
+      '已举办次数'
+    ]
+  }
   ```
 
   预测：
 
   ```python
-  >>> schema = {'歌曲名称': ['歌手', '所属专辑']} # Define the schema for relation extraction
+  >>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
   >>> ie.set_schema(schema) # Reset schema
-  >>> ie('《告别了》是孙耀威在专辑爱的故事里面的歌曲')
-  [{'歌曲名称': [{'text': '告别了', 'start': 1, 'end': 4, 'probability': 0.7721050787207417, 'relations': {'歌手': [{'text': '孙耀威', 'start': 6, 'end': 9, 'probability': 0.9996328066160487}], '所属专辑': [{'text': '爱的故事', 'start': 12, 'end': 16, 'probability': 0.9981007942846247}]}}]}]
+  >>> pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
+  [{'竞赛名称': [{'end': 13,
+              'probability': 0.7825402622754041,
+              'relations': {'主办方': [{'end': 22,
+                                    'probability': 0.8421710521379353,
+                                    'start': 14,
+                                    'text': '中国中文信息学会'},
+                                    {'end': 30,
+                                    'probability': 0.7580801847701935,
+                                    'start': 23,
+                                    'text': '中国计算机学会'}],
+                            '已举办次数': [{'end': 82,
+                                      'probability': 0.4671295049136148,
+                                      'start': 80,
+                                      'text': '4届'}],
+                            '承办方': [{'end': 39,
+                                    'probability': 0.8292706618236352,
+                                    'start': 35,
+                                    'text': '百度公司'},
+                                    {'end': 72,
+                                    'probability': 0.6193477885474685,
+                                    'start': 56,
+                                    'text': '中国计算机学会自然语言处理专委会'},
+                                    {'end': 55,
+                                    'probability': 0.7000497331473241,
+                                    'start': 40,
+                                    'text': '中国中文信息学会评测工作委员会'}]},
+              'start': 0,
+              'text': '2022语言与智能技术竞赛'}]}]
   ```
-
-  在实体抽取中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
 - 事件抽取
 
-  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取事件并识别事件类型和事件论元的技术。UIE所包含的事件抽取任务，是指根据已知事件类型，抽取该事件所包含的事件论元。
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词和事件要素，组合为相应的结构化信息。
 
   例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
 
   ```text
-  {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']}
+  {
+    '地震触发词': [
+      '地震强度',
+      '时间',
+      '震中位置',
+      '震源深度'
+    ]
+  }
   ```
 
   触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
@@ -484,7 +556,12 @@ from paddlenlp import Taskflow
   例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
 
   ```text
-  {'评价维度': ['观点词', '情感倾向[正向，负向]']}
+  {
+    '评价维度': [
+      '观点词',
+      '情感倾向[正向，负向]'
+    ]
+  }
   ```
 
   预测：
@@ -492,39 +569,28 @@ from paddlenlp import Taskflow
   ```python
   >>> schema = {'评价维度': ['观点词', '情感倾向[正向，负向]']} # Define the schema for opinion extraction
   >>> ie.set_schema(schema) # Reset schema
-  >>> pprint(ie("地址不错，服务一般，设施陈旧")) # Better print results using pprint
-  [{'评价维度': [{'end': 2,
-              'probability': 0.9888139270606509,
-              'relations': {'情感倾向[正向，负向]': [{'probability': 0.998228967796706,
+  >>> pprint(ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")) # Better print results using pprint
+  [{'评价维度': [{'end': 20,
+              'probability': 0.9817040258681473,
+              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9966142505350533,
+                                            'text': '正向'}],
+                            '观点词': [{'end': 22,
+                                    'probability': 0.957396472711558,
+                                    'start': 21,
+                                    'text': '高'}]},
+              'start': 17,
+              'text': '性价比'},
+            {'end': 2,
+              'probability': 0.9696849569741168,
+              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9982153274927796,
                                             'text': '正向'}],
                             '观点词': [{'end': 4,
-                                    'probability': 0.9927847072459528,
+                                    'probability': 0.9945318044652538,
                                     'start': 2,
-                                    'text': '不错'}]},
+                                    'text': '干净'}]},
               'start': 0,
-              'text': '地址'},
-            {'end': 12,
-              'probability': 0.9588297379365116,
-              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9949389795770394,
-                                            'text': '负向'}],
-                            '观点词': [{'end': 14,
-                                    'probability': 0.9286753967902683,
-                                    'start': 12,
-                                    'text': '陈旧'}]},
-              'start': 10,
-              'text': '设施'},
-            {'end': 7,
-              'probability': 0.9592857070501211,
-              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9952498258302498,
-                                            'text': '负向'}],
-                            '观点词': [{'end': 9,
-                                    'probability': 0.9949359182521675,
-                                    'start': 7,
-                                    'text': '一般'}]},
-              'start': 5,
-              'text': '服务'}]}]
+              'text': '店面'}]}]
   ```
-
 
 - 情感倾向分类
 
@@ -543,32 +609,48 @@ from paddlenlp import Taskflow
   [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
   ```
 
-- 跨任务跨领域抽取
+- 跨任务抽取
 
-  例如同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
+  例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
 
   ```text
-  ['寺庙', {'丈夫': '妻子'}]
+  [
+    "法院",
+    {
+        "原告": "委托代理人"
+    },
+    {
+        "被告": "委托代理人"
+    }
+  ]
   ```
 
   预测：
 
   ```python
-  >>> schema = ['寺庙', {'丈夫': '妻子'}]
+  >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
   >>> ie.set_schema(schema)
-  >>> pprint(ie('李治即位后，让身在感业寺的武则天续起头发，重新纳入后宫。')) # Better print results using pprint
-  [{'丈夫': [{'end': 2,
-            'probability': 0.989690572797457,
-            'relations': {'妻子': [{'end': 16,
-                                  'probability': 0.9987625986790256,
-                                  'start': 13,
-                                  'text': '武则天'}]},
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
+  [{'原告': [{'end': 37,
+            'probability': 0.9949814024296764,
+            'relations': {'委托代理人': [{'end': 46,
+                                    'probability': 0.7956844697990384,
+                                    'start': 44,
+                                    'text': '李四'}]},
+            'start': 35,
+            'text': '张三'}],
+    '法院': [{'end': 10,
+            'probability': 0.9221074192336651,
             'start': 0,
-            'text': '李治'}],
-    '寺庙': [{'end': 12,
-            'probability': 0.9888581774497425,
-            'start': 9,
-            'text': '感业寺'}]}]
+            'text': '北京市海淀区人民法院'}],
+    '被告': [{'end': 67,
+            'probability': 0.8437349536631089,
+            'relations': {'委托代理人': [{'end': 92,
+                                    'probability': 0.7267121388225029,
+                                    'start': 90,
+                                    'text': '赵六'}]},
+            'start': 64,
+            'text': 'B公司'}]}]
   ```
 
 
@@ -613,6 +695,7 @@ from paddlenlp import Taskflow
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
 
 ### 解语知识标注
