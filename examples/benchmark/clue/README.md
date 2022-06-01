@@ -818,22 +818,23 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 #### 环境依赖
 
-Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库，pynvml 库提供了 GPU 管理的 Python 接口。可启动以下命令进行安装：
+Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库。pynvml 库提供了 GPU 管理的 Python 接口。
+
+可启动以下命令进行安装 pynvml：
 
 ```shell
 pip install pynvml
 ```
 
-#### 使用说明
-- `grid_search.py` Grid Search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解下所有超参数对应的任务完成，训练完成后会自动调用抽取结果的脚本 `extract_result.sh` 打印出所有任务的最佳结果和对应的超参。
-- `warmup_dataset_and_model.py` 首次运行时，该脚本完成模型下载（如需）、数据集下载，阅读理解任务数据预处理、预处理文件缓存等工作，再次运行则会检查这些文件是否存在，存在则跳过。该脚本由 `grid_search.py` 在 Grid Search 训练前自动调用，预处理 cache 文件生成后，后面所有训练任务即可加载缓存文件避免重复进行数据预处理。如果该阶段任务失败，大多需要检查网络，解决之后需重启 `grid_search.py`，直到训练正常开始。该脚本也可手动调用，需要 1 个参数，模型名称或目录。该脚本在使用 Intel(R) Xeon(R) Gold 6271C CPU 且 `--num_proc`默认为 4 的情况下需约 30 分钟左右完成，可以更改 `run_mrc.sh` 中的 `--num_proc` 参数以改变生成 cache 的进程数。需要注意的是，若改变 num_proc，之前的缓存则不能再使用，该脚本会重新处理数据并生成新的 cache，cache 相关内容可查看[datasets.Dataset.map文档](https://huggingface.co/docs/datasets/v2.0.0/package_reference/main_classes?highlight=map#datasets.Dataset.map)；
-- `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
-- `run_mrc.sh` 阅读理解任务的启动脚本
-- `run_cls.sh` 分类任务的启动脚本
+#### 一键启动方法
+
+运行下面一句命令即可启动 Grid Search 任务。前期需要注意数据集是否正常下载，否则训练任务不会正式启动。
 
 ```shell
 cd grid_search_tools
 
+# 这里 ernie-3.0-nano-zh 是模型名，也可以传用户自定义的模型目录
+# 自定义的模型目录需要有 model_config.json, model_state.pdparams, tokenizer_config.json 和 vocab.txt 四个文件
 python grid_seach.py ernie-3.0-nano-zh
 
 ```
@@ -859,6 +860,18 @@ cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
 ```
 
 另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
+
+
+#### 脚本说明
+
+本节介绍 grid_search_tools 目录下各个脚本的功能：
+
+- `grid_search.py` Grid Search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解下所有超参数对应的任务完成，训练完成后会自动调用抽取结果的脚本 `extract_result.sh` 打印出所有任务的最佳结果和对应的超参。
+- `warmup_dataset_and_model.py` 首次运行时，该脚本完成模型下载（如需）、数据集下载，阅读理解任务数据预处理、预处理文件缓存等工作，再次运行则会检查这些文件是否存在，存在则跳过。该脚本由 `grid_search.py` 在 Grid Search 训练前自动调用，预处理 cache 文件生成后，后面所有训练任务即可加载缓存文件避免重复进行数据预处理。如果该阶段任务失败，大多需要检查网络，解决之后需重启 `grid_search.py`，直到训练正常开始。该脚本也可手动调用，需要 1 个参数，模型名称或目录。该脚本在使用 Intel(R) Xeon(R) Gold 6271C CPU 且 `--num_proc`默认为 4 的情况下需约 30 分钟左右完成，可以更改 `run_mrc.sh` 中的 `--num_proc` 参数以改变生成 cache 的进程数。需要注意的是，若改变 num_proc，之前的缓存则不能再使用，该脚本会重新处理数据并生成新的 cache，cache 相关内容可查看[datasets.Dataset.map文档](https://huggingface.co/docs/datasets/v2.0.0/package_reference/main_classes?highlight=map#datasets.Dataset.map)。
+- `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
+- `run_mrc.sh` 阅读理解任务的启动脚本。
+- `run_cls.sh` 分类任务的启动脚本。
+
 
 ## 参加 CLUE 竞赛
 
