@@ -12,7 +12,7 @@
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
-                        <td style="text-align:center;vertical-align: middle">
+                        <td style="text-align:center;vertical-align:middle">
                                 <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">

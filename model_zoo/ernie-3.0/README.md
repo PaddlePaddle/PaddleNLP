@@ -43,7 +43,7 @@
 
 ## 模型效果
 
-本项目开源 **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 、五个模型：
+本项目开源 **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 五个模型：
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
@@ -55,7 +55,7 @@
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
-                        <td style="align:center">
+                        <td style="text-align:center;vertical-align:middle">
                                 <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
@@ -518,7 +518,7 @@
                 <tr>
                         <td rowspan=1 align=center> 6L384H </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
+                                <span style="font-size:18px"><b>ERNIE 3.0-Mini-zh</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>66.90</b></span>
@@ -557,7 +557,7 @@
                 <tr>
             <td rowspan=1 align=center> 4L384H </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
+                                <span style="font-size:18px"><b>ERNIE 3.0-Micro-zh</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>64.21</b></span>
@@ -596,7 +596,7 @@
                 <tr>
             <td rowspan=1 align=center> 4L312H </td>
                         <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
+                                <span style="font-size:18px"><b>ERNIE 3.0-Nano-zh</b></span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px"><b>62.97</b></span>
