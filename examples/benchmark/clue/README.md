@@ -1,8 +1,24 @@
 # CLUE Benchmark
 
+**目录**
+    * [CLUE 评测结果](#CLUE评测结果)
+    * [一键复现模型效果](#一键复现模型效果)
+        * [启动 CLUE 分类任务](#启动CLUE分类任务)
+            * [使用 Trainer 启动 CLUE 分类任务](#使用Trainer启动CLUE分类任务)
+        * [启动 CLUE 阅读理解任务](#启动CLUE阅读理解任务)
+        * [批量启动 Grid Search](#批量启动GridSearch)
+            * [环境依赖](#环境依赖)
+            * [一键启动方法](#一键启动方法)
+            * [Grid Search 脚本说明](#GridSearch脚本说明)
+    * [参加 CLUE 竞赛](#参加CLUE竞赛)
+        * [分类任务](#分类任务)
+        * [阅读理解任务](#阅读理解任务)
+
 [CLUE](https://www.cluebenchmarks.com/) 自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之一。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)。
 
 本项目基于 PaddlePaddle 在 CLUE 数据集上对领先的开源预训练模型模型进行了充分评测，为开发者在预训练模型选择上提供参考，同时开发者基于本项目可以轻松一键复现模型效果，也可以参加 CLUE 竞赛取得好成绩。
+
+<a name="CLUE评测结果"></a>
 
 ## CLUE 评测结果
 
@@ -92,7 +108,7 @@
                         </td>
                 </tr>
                 <tr>
-			<td rowspan=6 align=center> 12L768H </td>
+            <td rowspan=6 align=center> 12L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
                         </td>
@@ -511,7 +527,7 @@
                         </td>
                 </tr>
                 <tr>
-			<td rowspan=1 align=center> 6L384H </td>
+            <td rowspan=1 align=center> 6L384H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
                         </td>
@@ -550,7 +566,7 @@
                         </td>
                 </tr>
                 <tr>
-			<td rowspan=1 align=center> 4L384H </td>
+            <td rowspan=1 align=center> 4L384H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
                         </td>
@@ -589,7 +605,7 @@
                         </td>
                 </tr>
                 <tr>
-			<td rowspan=1 align=center> 4L312H </td>
+            <td rowspan=1 align=center> 4L312H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
                         </td>
@@ -675,10 +691,13 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 
 其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
+<a name="一键复现模型效果"></a>
 
 ## 一键复现模型效果
 
 这一节将会对分类、阅读理解任务分别展示如何一键复现本文的评测结果。
+
+<a name="启动CLUE分类任务"></a>
 
 ### 启动 CLUE 分类任务
 以 CLUE 的 TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
@@ -744,7 +763,10 @@ eval loss: 2.572999, acc: 0.112, eval done total : 25.67190170288086 s
 global step 400/20010, epoch: 0, batch: 399, rank_id: 0, loss: 2.631579, lr: 0.0000059970, speed: 2.6238 step/s
 eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
-#### 使用Trainer启动 CLUE 分类任务
+
+<a name="使用Trainer启动CLUE分类任务"></a>
+
+#### 使用 Trainer 启动 CLUE 分类任务
 PaddleNLP 提供了 Trainer API，本示例新增了`run_clue_classifier_trainer.py`脚本供用户使用。
 
 ```
@@ -790,6 +812,8 @@ python -u ./run_clue_classifier_trainer.py \
 - `load_best_model_at_end` 训练结束时，时候加载评估结果最好的 ckpt。
 - `save_total_limit` 保存的ckpt数量的最大限制
 
+<a name="启动CLUE阅读理解任务"></a>
+
 ### 启动 CLUE 阅读理解任务
 以 CLUE 的 C<sup>3</sup> 任务为例，多卡启动 CLUE 任务进行 Fine-tuning 的方式如下：
 
@@ -814,7 +838,11 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 ```
 需要注意的是，如果显存无法容纳所传入的 `batch_size`，可以通过传入 `gradient_accumulation_steps` 参数来模拟该 `batch_size`。
 
+<a name="批量启动GridSearch"></a>
+
 ### 批量启动 Grid Search
+
+<a name="环境依赖"></a>
 
 #### 环境依赖
 
@@ -825,6 +853,8 @@ Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库。pynvml 库
 ```shell
 pip install pynvml
 ```
+
+<a name="一键启动方法"></a>
 
 #### 一键启动方法
 
@@ -845,8 +875,8 @@ python grid_seach.py ernie-3.0-nano-zh
 bash extract_result.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带'/'
 ```
 ```text
-AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
-76.48	58.47	61.18	83.57	80.20	88.49	82.80	72.20/90.67	83.67	78.49
+AFQMC    TNEWS    IFLYTEK    CMNLI    OCNLI    CLUEWSC2020    CSL    CMRC2018    CHID    C3
+76.48    58.47    61.18    83.57    80.20    88.49    82.80    72.20/90.67    83.67    78.49
 ====================================================================
 best hyper-parameters list:
 ====================================================================
@@ -861,8 +891,9 @@ cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
 
 另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
 
+<a name="GridSearch脚本说明"></a>
 
-#### 脚本说明
+#### Grid Search 脚本说明
 
 本节介绍 grid_search_tools 目录下各个脚本的功能：
 
@@ -872,12 +903,15 @@ cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
 - `run_mrc.sh` 阅读理解任务的启动脚本。
 - `run_cls.sh` 分类任务的启动脚本。
 
+<a name="参加CLUE竞赛"></a>
 
 ## 参加 CLUE 竞赛
 
 对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至 CLUE 官网进行评测。
 
 下面 2 小节会分别介绍分类、阅读理解任务产生预测结果的方法。
+
+<a name="分类任务"></a>
 
 ### 分类任务
 
@@ -894,6 +928,7 @@ python run_clue_classifier.py \
     --output_dir ${OUTPUT_DIR} \
     --do_predict \
 ```
+<a name="阅读理解任务"></a>
 
 ### 阅读理解任务
 
