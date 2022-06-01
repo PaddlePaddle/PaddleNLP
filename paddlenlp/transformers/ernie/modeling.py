@@ -318,9 +318,9 @@ class ErniePretrainedModel(PretrainedModel):
             "pad_token_id": 0,
         },
         "ernie-3.0-xbase-zh": {
-            "attention_probs_dropout_prob": 0.0,
+            "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
+            "hidden_dropout_prob": 0.1,
             "intermediate_size": 4096,  # special for large model
             "hidden_size": 1024,
             "initializer_range": 0.02,
