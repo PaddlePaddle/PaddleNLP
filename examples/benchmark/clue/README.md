@@ -1,18 +1,18 @@
 # CLUE Benchmark
 
 **目录**
-    * [CLUE 评测结果](#CLUE评测结果)
-    * [一键复现模型效果](#一键复现模型效果)
-        * [启动 CLUE 分类任务](#启动CLUE分类任务)
-            * [使用 Trainer 启动 CLUE 分类任务](#使用Trainer启动CLUE分类任务)
-        * [启动 CLUE 阅读理解任务](#启动CLUE阅读理解任务)
-        * [批量启动 Grid Search](#批量启动GridSearch)
-            * [环境依赖](#环境依赖)
-            * [一键启动方法](#一键启动方法)
-            * [Grid Search 脚本说明](#GridSearch脚本说明)
-    * [参加 CLUE 竞赛](#参加CLUE竞赛)
-        * [分类任务](#分类任务)
-        * [阅读理解任务](#阅读理解任务)
+   * [CLUE 评测结果](#CLUE评测结果)
+   * [一键复现模型效果](#一键复现模型效果)
+       * [启动 CLUE 分类任务](#启动CLUE分类任务)
+           * [使用 Trainer 启动 CLUE 分类任务](#使用Trainer启动CLUE分类任务)
+       * [启动 CLUE 阅读理解任务](#启动CLUE阅读理解任务)
+       * [批量启动 Grid Search](#批量启动GridSearch)
+           * [环境依赖](#环境依赖)
+           * [一键启动方法](#一键启动方法)
+           * [Grid Search 脚本说明](#GridSearch脚本说明)
+   * [参加 CLUE 竞赛](#参加CLUE竞赛)
+       * [分类任务](#分类任务)
+       * [阅读理解任务](#阅读理解任务)
 
 [CLUE](https://www.cluebenchmarks.com/) 自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之一。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)。
 
