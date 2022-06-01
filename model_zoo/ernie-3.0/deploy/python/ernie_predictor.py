@@ -94,6 +94,8 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
+            if device == 'cpu':
+                providers = ['CPUExecutionProvider']
             if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -103,7 +105,6 @@ class InferBackend(object):
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            sess_options.inter_op_num_threads = num_threads
             self.predictor = ort.InferenceSession(
                 dynamic_quantize_model,
                 sess_options=sess_options,
