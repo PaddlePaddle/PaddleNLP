@@ -22,6 +22,17 @@ export MODEL_PATH=$6
 export grad_acc=$7
 export dropout_p=$8
 
+if [ -f "${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log" ]
+then
+    # Exits if log exits and best_acc is computed.
+    best_acc=`cat ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log |grep "best_acc"`
+    if [ "${best_acc}" != "" ]
+    then
+        exit 0
+    fi
+fi
+
+
 mkdir -p ${MODEL_PATH}/${TASK_NAME}
 
 python -u ../classification/run_clue_classifier.py \

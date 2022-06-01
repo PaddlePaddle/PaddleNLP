@@ -4,7 +4,16 @@ BATCH_SIZE=$3
 LR=$4
 GRAD_ACCU_STEPS=$5
 
-
+if [ -f "${MODEL_PATH}/${TASK_NAME}/${LR}_${BATCH_SIZE}_0.1.log" ]
+then
+    # Exits if log exits and best_acc is computed.
+    best_acc=`cat ${MODEL_PATH}/${TASK_NAME}/${LR}_${BATCH_SIZE}_0.1.log |grep "best_acc"`
+    if [ "${best_acc}" != "" ]
+    then
+        exit 0
+    fi
+fi
+ 
 if [ $TASK_NAME == 'cmrc2018' ]; then
 MAX_SEQ_LEN=512
 EPOCHS=2
