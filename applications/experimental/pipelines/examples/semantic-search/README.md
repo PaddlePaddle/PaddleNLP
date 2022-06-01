@@ -68,6 +68,7 @@ python ./ui/setup.py install
 export CUDA_VISIBLE_DEVICES=0
 python examples/semantic-search/semantic_search_example.py --gpu
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
+unset CUDA_VISIBLE_DEVICES
 python examples/question-answering/dense_qa_example.py --device cpu
 ```
 

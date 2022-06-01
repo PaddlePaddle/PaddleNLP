@@ -82,7 +82,10 @@ class UIETask(Task):
     }
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json"
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
     }
     resource_files_urls = {
         "uie-base": {
@@ -93,6 +96,18 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-tiny": {
@@ -103,6 +118,18 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
                 "6f1ee399398d4f218450fbbf5f212b15"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-medical-base": {
@@ -113,8 +140,20 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        },
+        }
     }
 
     def __init__(self, task, model, schema, **kwargs):
@@ -127,6 +166,7 @@ class UIETask(Task):
         self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
+        self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._max_seq_len = self.kwargs[
@@ -170,7 +210,7 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._encoding_model)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):
         """
@@ -242,13 +282,22 @@ class UIETask(Task):
         probs = []
         for batch in infer_data_loader:
             input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
-            self.input_handles[0].copy_from_cpu(input_ids.numpy())
-            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-            self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-            self.input_handles[3].copy_from_cpu(att_mask.numpy())
-            self.predictor.run()
-            start_prob = self.output_handle[0].copy_to_cpu().tolist()
-            end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            if self._predictor_type == "paddle-inference":
+                self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                self.predictor.run()
+                start_prob = self.output_handle[0].copy_to_cpu().tolist()
+                end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            else:
+                input_dict = {
+                    "input_ids": input_ids.numpy(),
+                    "token_type_ids": token_type_ids.numpy(),
+                    "pos_ids": pos_ids.numpy(),
+                    "att_mask": att_mask.numpy()
+                }
+                start_prob, end_prob = self.predictor.run(None, input_dict)
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
