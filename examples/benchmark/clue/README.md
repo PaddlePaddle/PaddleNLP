@@ -710,15 +710,24 @@ python grid_seach.py ernie-3.0-nano-zh
 
 确认模型所有任务训练完成后，可以调用脚本 `extract_acc.sh` 一键抽取 Grid Search 结果，可以把打印出的 10 个任务的结果直接复制到表格中。例如：
 
-```
-AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
-75.3    557.45  60.18   81.16   77.19   79.28   81.93   65.83/87.29     80.00   70.36
-```
-
-
 ```shell
-sh extract_acc.sh ernie-3.0-nano-zh
+sh extract_acc.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带斜杠
 ```
+
+AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
+76.48	58.47	61.18		80.20	88.49	82.80	69.52/89.02
+====================================================================
+best hyper-parameters list:
+====================================================================
+afqmc's best acc 76.48, lr, bs, dropout_p are: 3e-05 16 0.1
+tnews's best acc 58.47, lr, bs, dropout_p are: 5e-05 16 0.1
+iflytek's best acc 61.18, lr, bs, dropout_p are: 5e-05 16 0.0
+ocnli's best acc 80.20, lr, bs, dropout_p are: 2e-05 16 0.1
+cluewsc2020's best acc 88.49, lr, bs, dropout_p are: 2e-05 32 0.0
+csl's best acc 82.80, lr, bs, dropout_p are: 5e-05 64 0.1
+cmrc2018's best acc 69.52/89.02, lr, bs, dropout_p are: 1e-05 32 0.1
+
+
 
 ## 参加 CLUE 竞赛
 

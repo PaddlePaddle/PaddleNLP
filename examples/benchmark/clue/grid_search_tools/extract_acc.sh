@@ -33,7 +33,7 @@ do
     echo -e -n "${dict[$task]}\t"
 done
 
-echo -e "\n==================================\nbest hyper-paramter list: \n=================================="
+echo -e "\n====================================================================\nBest hyper-parameters list: \n===================================================================="
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
     if [ -z ${dict[$task]} ]
