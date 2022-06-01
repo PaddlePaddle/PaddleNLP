@@ -69,6 +69,12 @@ def parse_args():
         type=int,
         help="Total number of training epochs to perform.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--weight_decay",
         default=0.0,
         type=float,
@@ -437,7 +443,7 @@ def run(args):
                 partial(preprocess_function),
                 batched=True,
                 batch_size=len(train_ds),
-                num_proc=4,
+                num_proc=args.num_proc,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
@@ -461,7 +467,7 @@ def run(args):
                                 batched=True,
                                 batch_size=len(dev_ds),
                                 remove_columns=column_names,
-                                num_proc=4,
+                                num_proc=args.num_proc,
                                 load_from_cache_file=args.overwrite_cache,
                                 desc="Running tokenizer on validation dataset")
 
@@ -549,7 +555,7 @@ def run(args):
                               batched=True,
                               batch_size=len(test_ds),
                               remove_columns=column_names,
-                              num_proc=1)
+                              num_proc=args.num_proc)
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=args.eval_batch_size, shuffle=False)
 

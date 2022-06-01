@@ -45,6 +45,7 @@ python ../mrc/run_${TASK_NAME}.py \
     --seed 42 \
     --weight_decay 0.01 \
     --device gpu \
+    --num_proc 4 \
     --logging_steps 100 \
     --warmup_proportion ${WARMUP_PROP} \
     --gradient_accumulation_steps ${GRAD_ACCU_STEPS} \

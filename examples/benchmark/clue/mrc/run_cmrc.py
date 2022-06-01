@@ -73,6 +73,12 @@ def parse_args():
         type=int,
         help="Batch size per GPU/CPU for training.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--eval_batch_size",
         default=12,
         type=int,
@@ -417,7 +423,7 @@ def run(args):
                 batched=True,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
-                num_proc=4,
+                num_proc=args.num_proc,
                 desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
@@ -434,7 +440,7 @@ def run(args):
                 prepare_validation_features,
                 batched=True,
                 remove_columns=column_names,
-                num_proc=4,
+                num_proc=args.num_proc,
                 load_from_cache_file=args.overwrite_cache,
                 desc="Running tokenizer on validation dataset")
         dev_ds_for_model = dev_ds.remove_columns(
@@ -519,7 +525,7 @@ def run(args):
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
-                                    num_proc=1)
+                                    num_proc=args.num_proc)
         test_ds_for_model = test_ds.remove_columns(
             ["example_id", "offset_mapping", "attention_mask"])
         dev_batchify_fn = DataCollatorWithPadding(tokenizer)

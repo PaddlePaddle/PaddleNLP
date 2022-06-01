@@ -49,6 +49,12 @@ def parse_args():
         required=True,
         help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--output_dir",
         default="best_c3_model",
         type=str,
@@ -302,7 +308,7 @@ def run(args):
                 preprocess_function,
                 batched=True,
                 batch_size=len(train_ds),
-                num_proc=4,
+                num_proc=args.num_proc,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
@@ -325,7 +331,7 @@ def run(args):
                                 batched=True,
                                 batch_size=len(dev_ds),
                                 remove_columns=column_names,
-                                num_proc=4,
+                                num_proc=args.num_proc,
                                 load_from_cache_file=args.overwrite_cache,
                                 desc="Running tokenizer on validation dataset")
         dev_batch_sampler = paddle.io.BatchSampler(
@@ -412,7 +418,7 @@ def run(args):
                               batched=True,
                               batch_size=len(test_ds),
                               remove_columns=column_names,
-                              num_proc=1)
+                              num_proc=args.num_proc)
         # Serveral samples have more than four choices.
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=1, shuffle=False)
