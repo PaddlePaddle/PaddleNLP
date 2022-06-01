@@ -49,8 +49,8 @@ class SyncGRPCTritonRunner:
         LOGGER.info(f"Model config {model_config}")
         LOGGER.info(f"Model metadata {model_metadata}")
 
-        # self._inputs = {tm.name: tm for tm in model_metadata.inputs}
-        self._input_names = ["INPUT", ]
+        self._inputs = {tm.name: tm for tm in model_metadata.inputs}
+        self._input_names = list(self._inputs)
         self._outputs = {tm.name: tm for tm in model_metadata.outputs}
         self._output_names = list(self._outputs)
         self._outputs_req = [
@@ -58,6 +58,12 @@ class SyncGRPCTritonRunner:
         ]
 
     def Run(self, inputs):
+        """
+        Args:
+            inputs: list, Each value corresponds to an input name of self._input_names
+        Returns: 
+            results: dict, {name : numpy.array}
+        """
         infer_inputs = []
         for idx, data in enumerate(inputs):
             data = np.array(
@@ -73,9 +79,8 @@ class SyncGRPCTritonRunner:
             inputs=infer_inputs,
             outputs=self._outputs_req,
             client_timeout=self._response_wait_t, )
-        y_pred = {name: results.as_numpy(name) for name in self._output_names}
-        # print("output:", y_pred)
-        return y_pred
+        results = {name: results.as_numpy(name) for name in self._output_names}
+        return results
 
     def _verify_triton_state(self, triton_client):
         if not triton_client.is_server_live():
@@ -88,30 +93,45 @@ class SyncGRPCTritonRunner:
         return None
 
 
-if __name__ == "__main__":
-    model_name = "pipeline_tnews"
-    model_version = "1"
-    batch_size = 2
-    url = "localhost:8001"
+def test_tnews_dataset(runner):
+    from paddlenlp.datasets import load_dataset
+    dev_ds = load_dataset('clue', "tnews", splits='dev')
 
+    batches = []
+    labels = []
+    idx = 0
+    batch_size = 32
+    while idx < len(dev_ds):
+        datas = []
+        label = []
+        for i in range(batch_size):
+            if idx + i >= len(dev_ds):
+                break
+            datas.append(dev_ds[idx + i]["sentence"])
+            label.append(dev_ds[idx + i]["label"])
+        batches.append(datas)
+        labels.append(np.array(label))
+        idx += batch_size
+
+    accuracy = 0
+    for i, data in enumerate(batches):
+        ret = runner.Run([data])
+        # print("ret:", ret)
+        accuracy += np.sum(labels[i] == ret["label"])
+    print("acc:", 1.0 * accuracy / len(dev_ds))
+
+
+if __name__ == "__main__":
+    model_name = "ernie_seqcls"
+    model_version = "1"
+    url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
     datas = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
              ["区块链投资心得，能做到就不会亏钱", ]]
 
-    result = runner.Run([datas[1]])
-    print(result)
-    result = runner.Run([datas[1]])
-    result = runner.Run([datas[1]])
+    for data in datas:
+        # input format:[input1, input2 ... inputn], n = len(self._input_names)
+        result = runner.Run([data])
+        print(result)
 
-    import time
-    s = time.time()
-    for i in range(1000):
-        result = runner.Run([datas[1]])
-    e = time.time()
-    print("cost time:", (e - s) * 1.0)
-
-    # for data in datas:
-    #     print("data:", data)
-    #     result = runner.Run([data])
-    #     print("result:", result)
-    #     print(result["POST_OUTPUT1"], result["POST_OUTPUT2"])
+    test_tnews_dataset(runner)

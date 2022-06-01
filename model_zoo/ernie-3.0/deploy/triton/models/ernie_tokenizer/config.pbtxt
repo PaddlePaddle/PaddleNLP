@@ -1,4 +1,4 @@
-name: "preprocess"
+name: "ernie_tokenizer"
 backend: "python"
 max_batch_size: 64
 
@@ -29,4 +29,3 @@ instance_group [
       kind: KIND_CPU
   }
 ]
-

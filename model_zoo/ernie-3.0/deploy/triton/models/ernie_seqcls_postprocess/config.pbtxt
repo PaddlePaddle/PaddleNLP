@@ -1,4 +1,4 @@
-name: "tnews_postprocess"
+name: "ernie_seqcls_postprocess"
 backend: "python"
 max_batch_size: 64
 

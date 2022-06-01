@@ -1,4 +1,4 @@
-name: "pipeline_tnews"
+name: "ernie_seqcls"
 platform: "ensemble"
 max_batch_size: 64
 input [
@@ -23,7 +23,7 @@ output [
 ensemble_scheduling {
   step [
     {
-      model_name: "preprocess"
+      model_name: "ernie_tokenizer"
       model_version: 1
       input_map {
         key: "INPUT_0"
@@ -31,23 +31,23 @@ ensemble_scheduling {
       }
       output_map {
         key: "OUTPUT_0"
-        value: "preprocess_input_ids"
+        value: "tokenizer_input_ids"
       }
       output_map {
         key: "OUTPUT_1"
-        value: "preprocess_token_type_ids"
+        value: "tokenizer_token_type_ids"
       }
     },
     {
-      model_name: "tnews"
+      model_name: "ernie_seqcls_model"
       model_version: 1
       input_map {
         key: "input_ids"
-        value: "preprocess_input_ids"
+        value: "tokenizer_input_ids"
       }
       input_map {
         key: "token_type_ids"
-        value: "preprocess_token_type_ids"
+        value: "tokenizer_token_type_ids"
       }
       output_map {
         key: "linear_113.tmp_1"
@@ -55,7 +55,7 @@ ensemble_scheduling {
       }
     },
     {
-      model_name: "tnews_postprocess"
+      model_name: "ernie_seqcls_postprocess"
       model_version: 1
       input_map {
         key: "POST_INPUT"
