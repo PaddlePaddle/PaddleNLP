@@ -2,6 +2,7 @@
 
  **目录**
    * [模型介绍](#模型介绍)
+       * [在线蒸馏技术](#在线蒸馏技术)
    * [模型效果](#模型效果)
    * [微调](#微调)
    * [模型压缩](#模型压缩)
@@ -19,12 +20,15 @@
    * [Notebook教程](#Notebook教程)
    * [参考文献](#参考文献)
 
+<a name="模型介绍"></a>
+
 ## 模型介绍
 
 本次开源的模型是在文心大模型ERNIE 3.0 基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与 ERNIE 2.0 保持一致，相比 ERNIE 2.0 具有更强的中文效果。
 
 相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9)
 
+<a name="在线蒸馏技术"></a>
 
 ### 在线蒸馏技术
 
@@ -40,6 +44,7 @@
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168516904-3fff73e0-010d-4bef-adc1-4d7c97a9c6ff.png" title="ERNIE 3.0 Online Distillation">
 </p>
 
+<a name="模型效果"></a>
 
 ## 模型效果
 

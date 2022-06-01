@@ -32,6 +32,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -180,7 +181,7 @@ def evaluate(model, loss_fct, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
+    logger.info("eval loss: %f, acc: %s, " % (loss.numpy(), res))
     model.train()
     return res
 
@@ -284,7 +285,7 @@ def do_eval(args):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("acc: %s\n, " % (res), end='')
+    logger.info("acc: %s\n, " % (res))
 
 
 def do_train(args):
@@ -397,7 +398,7 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 if global_step % args.logging_steps == 0:
-                    print(
+                    logger.info(
                         "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                         % (global_step, num_training_steps, epoch, step,
                            paddle.distributed.get_rank(), loss,
@@ -407,7 +408,8 @@ def do_train(args):
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     tic_eval = time.time()
                     acc = evaluate(model, loss_fct, metric, dev_data_loader)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
+                    logger.info("eval done total : %s s" %
+                                (time.time() - tic_eval))
                     if acc > best_acc:
                         best_acc = acc
                         if args.save_best_model:
@@ -420,9 +422,9 @@ def do_train(args):
                             model_to_save.save_pretrained(output_dir)
                             tokenizer.save_pretrained(output_dir)
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % (best_acc * 100))
+                    logger.info("best_result: %.2f" % (best_acc * 100))
                     return
-    print("best_acc: %.2f" % (best_acc * 100))
+    logger.info("best_result: %.2f" % (best_acc * 100))
 
 
 def do_predict(args):
