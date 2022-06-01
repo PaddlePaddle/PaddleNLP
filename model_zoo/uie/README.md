@@ -2,11 +2,11 @@
 
  **目录**
 
-* [1. 模型简介](#模型简介)
-* [2. 应用示例](#应用示例)
-* [3. 开箱即用](#开箱即用)
-* [4. 轻定制功能](#轻定制功能)
-* [5. CCKS比赛](#CCKS比赛)
+- [1. 模型简介](#模型简介)
+- [2. 应用示例](#应用示例)
+- [3. 开箱即用](#开箱即用)
+- [4. 轻定制功能](#轻定制功能)
+- [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
 
@@ -273,16 +273,10 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   [
     "法院",
     {
-        "原告": [
-            "委托代理人",
-            "法定代表人"
-        ]
+        "原告": "委托代理人"
     },
     {
-        "被告": [
-            "委托代理人",
-            "法定代表人"
-        ]
+        "被告": "委托代理人"
     }
   ]
   ```
@@ -292,25 +286,25 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   ```python
   >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
   >>> ie.set_schema(schema)
-  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。")) # Better print results using pprint
+  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
   [{'原告': [{'end': 37,
-            'probability': 0.9955972637653154,
+            'probability': 0.9949814024296764,
             'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.9835957661618089,
+                                    'probability': 0.7956844697990384,
                                     'start': 44,
                                     'text': '李四'}]},
             'start': 35,
             'text': '张三'}],
     '法院': [{'end': 10,
-            'probability': 0.9245885500450299,
+            'probability': 0.9221074192336651,
             'start': 0,
             'text': '北京市海淀区人民法院'}],
     '被告': [{'end': 67,
-            'probability': 0.9033652934762237,
-            'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.3863244074945271,
-                                    'start': 44,
-                                    'text': '李四'}]},
+            'probability': 0.8437349536631089,
+            'relations': {'委托代理人': [{'end': 92,
+                                    'probability': 0.7267121388225029,
+                                    'start': 90,
+                                    'text': '赵六'}]},
             'start': 64,
             'text': 'B公司'}]}]
   ```
@@ -342,6 +336,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 
 <a name="轻定制功能"></a>
 
@@ -404,7 +399,7 @@ python doccano.py \
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，为了保证评估指标的准确性，验证集和测试集默认构造全负例。默认为5。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全负例。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
 - ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。
@@ -418,7 +413,7 @@ python doccano.py \
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
-更多不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及参数说明，请参考[doccano数据标注指南](doccano.md)。
+更多**不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及参数说明**，请参考[doccano数据标注指南](doccano.md)。
 
 #### 模型微调
 
@@ -519,6 +514,77 @@ python evaluate.py \
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
+
+#### Python部署
+
+以下是UIE Python端基于ONNXRuntime的部署流程，包括环境准备、模型导出和使用示例。
+
+- 环境准备
+  UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
+
+  - CPU端
+
+    CPU端的部署请使用如下命令安装所需依赖
+
+    ```shell
+    pip install -r deploy/python/requirements_cpu.txt
+    ```
+
+  - GPU端
+
+    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保**CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
+
+    ```shell
+    pip install -r deploy/python/requirements_gpu.txt
+    ```
+
+    如需使用半精度（FP16）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。
+    更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
+
+
+- 模型导出
+
+  将训练后的动态图参数导出为静态图参数：
+
+  ```shell
+  python export_model.py --model_path=./checkpoint/model_best --output_path=./export
+  ```
+
+  可配置参数说明：
+
+  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
+  - `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+
+- 推理
+
+  - CPU端推理样例
+
+    在CPU端，请使用如下命令进行部署
+
+    ```shell
+    python deploy/python/infer_cpu.py --model_path_prefix export/inference
+    ```
+
+    可配置参数说明：
+
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+
+  - GPU端推理样例
+
+    在GPU端，请使用如下命令进行部署
+
+    ```shell
+    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    ```
+
+    可配置参数说明：
+
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `use_fp16`: 是否使用FP16进行加速，默认关闭。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 
 <a name="CCKS比赛"></a>
 
