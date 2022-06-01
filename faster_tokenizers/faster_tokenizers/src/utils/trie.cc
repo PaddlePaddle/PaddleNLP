@@ -17,6 +17,7 @@ limitations under the License. */
 
 #include "glog/logging.h"
 #include "utils/trie.h"
+#include "utils/utf8.h"
 #include "utils/utils.h"
 
 namespace tokenizers {
@@ -79,7 +80,7 @@ void Trie::InitTrie(const std::vector<const char*>& keys,
   GetSortedVocab(keys, values, &sorted_keys, &sorted_values);
   CreateTrie(sorted_keys, sorted_values);
   InitTrieSuffixRoot();
-  if (with_pretokenization_) {
+  if (with_pretokenization_ && keys.size() > 0) {
     auto node = CreateRootTraversalCursor();
     if (!TryTraverseSeveralSteps(&node,
                                  std::string(1, utils::kInvalidControlChar))) {
@@ -93,6 +94,25 @@ void Trie::InitTrie(const std::vector<const char*>& keys,
   }
 }
 
+void Trie::AddPuncVocab(
+    std::vector<std::string>* punc_vocab,
+    const std::unordered_map<std::string, uint>& vocab) const {
+  if (with_pretokenization_) {
+    for (uint32_t cp = 1; cp <= 0x0010FFFF; ++cp) {
+      if (!utils::IsUnicodeChar(cp) || !utils::IsPunctuationOrChineseChar(cp)) {
+        continue;
+      }
+      char utf_str[5];
+      utils::GetUTF8Str(reinterpret_cast<char32_t*>(&cp), utf_str, 1);
+      std::string punc_str(utf_str);
+      if (vocab.count(punc_str) == 0) {
+        punc_vocab->push_back(punc_str);
+      }
+    }
+    punc_vocab->push_back(std::string(1, utils::kInvalidControlChar));
+  }
+}
+
 void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
   std::vector<const char*> keys;
   std::vector<int> values;
@@ -101,6 +121,14 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
     values.push_back(EncodeTokenId(item.first, item.second));
   }
   InitTrie(keys, values);
+}
+
+void Trie::SetVocabList(const std::vector<std::string>& keys) {
+  std::unordered_map<std::string, uint> vocab;
+  for (int i = 0; i < keys.size(); ++i) {
+    vocab[keys[i]] = i;
+  }
+  SetVocab(vocab);
 }
 
 Trie::Trie(const std::string& continuing_subword_prefix,
@@ -122,7 +150,6 @@ Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
       suffix_root_(utils::kNullNode),
       punct_failure_link_node_(utils::kNullNode),
       with_pretokenization_(with_pretokenization) {
-  unk_token_id_ = vocab.at(unk_token);
   SetVocab(vocab);
 }
 
@@ -135,20 +162,7 @@ Trie::Trie(const std::vector<std::string>& keys,
       suffix_root_(utils::kNullNode),
       punct_failure_link_node_(utils::kNullNode),
       with_pretokenization_(with_pretokenization) {
-  std::vector<const char*> char_keys(keys.size());
-  for (int i = 0; i < keys.size(); ++i) {
-    char_keys[i] = keys[i].c_str();
-    if (keys[i] == unk_token_) {
-      unk_token_id_ = i;
-    }
-  }
-  std::vector<int> values(keys.size());
-  std::iota(values.begin(), values.end(), 0);
-  // Encode value
-  for (int i = 0; i < keys.size(); ++i) {
-    values[i] = EncodeTokenId(keys[i], values[i]);
-  }
-  InitTrie(char_keys, values);
+  SetVocabList(keys);
 }
 
 Trie::TraversalCursor Trie::CreateRootTraversalCursor() const {

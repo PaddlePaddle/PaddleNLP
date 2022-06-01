@@ -31,7 +31,8 @@ namespace models {
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 FasterWordPiece::FasterWordPiece() : WordPiece(), with_pretokenization_(false) {
-  failure_array_.InitFromVocabAndTrie(vocab_, &trie_);
+  failure_array_.InitFromVocabAndTrie(
+      vocab_, &trie_, unk_token_, continuing_subword_prefix_);
   PrecomputeEncodeValueForSubwordPrefix();
 }
 
@@ -44,9 +45,11 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                 unk_token,
                 max_input_chars_per_word,
                 continuing_subword_prefix),
-      trie_(vocab, continuing_subword_prefix, unk_token),
-      with_pretokenization_(with_pretokenization) {
-  failure_array_.InitFromVocabAndTrie(vocab_, &trie_);
+      trie_(continuing_subword_prefix, unk_token, with_pretokenization),
+      with_pretokenization_(with_pretokenization),
+      failure_array_(with_pretokenization) {
+  failure_array_.InitFromVocabAndTrie(
+      vocab_, &trie_, unk_token_, continuing_subword_prefix_);
   PrecomputeEncodeValueForSubwordPrefix();
 }
 
@@ -63,22 +66,6 @@ void FasterWordPiece::PrecomputeEncodeValueForSubwordPrefix() {
         failure_vocab_token.IsSuffixToken());
     encoded_value_for_subword_prefix_.push_back(encoded_value);
   }
-}
-
-bool FasterWordPiece::TokenToId(const std::string& token, uint* id) const {
-  auto curr_cursor = trie_.CreateRootTraversalCursor();
-  for (auto& ch : token) {
-    if (!trie_.TryTraverseOneStep(&curr_cursor, ch)) {
-      return false;
-    }
-  }
-  int encoded_value;
-  if (!trie_.TryGetData(curr_cursor, &encoded_value)) {
-    return false;
-  }
-  // Decode the encoded_value
-  *id = utils::GetTokenIdFromEncodedValue(encoded_value);
-  return true;
 }
 
 bool FasterWordPiece::TryFollowFailureLinkAndCollectTokens(
@@ -235,6 +222,7 @@ int FasterWordPiece::SkipRemainingOfWordAndTrailingWhiteSpaces(
   while (*curr_idx < seq_len) {
     auto chwidth =
         utils::UTF8ToUInt32(sequence.data() + *curr_idx, &curr_unicode_char);
+    curr_unicode_char = utils::UTF8ToUnicode(curr_unicode_char);
     if (u_isUWhiteSpace(curr_unicode_char)) {
       *curr_idx += chwidth;
       break;
@@ -250,6 +238,8 @@ int FasterWordPiece::SkipRemainingOfWordAndTrailingWhiteSpaces(
 
 std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
     const std::string& sequence) const {
+  VLOG(6) << "Using FasterWordPiece::TokenizeWithoutPreTokenize to tokenize "
+             "sequence";
   if (sequence.empty()) {
     return {};
   }
@@ -282,11 +272,15 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
                                        &curr_offset_in_sequence,
                                        &all_tokens);
   }
+  VLOG(6) << "All tokens num from TokenizeWithoutPreTokenize: "
+          << all_tokens.size();
   return all_tokens;
 }
 
 std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
     const std::string& sequence) const {
+  VLOG(6)
+      << "Using FasterWordPiece::TokenizeWithPreTokenize to tokenize sequence";
   // Need to implement
   if (sequence.empty()) {
     return {};
@@ -308,16 +302,17 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
       prev_unicode_char = curr_unicode_char;
       chwidth =
           utils::UTF8ToUInt32(sequence.data() + curr_idx, &curr_unicode_char);
+      curr_unicode_char = utils::UTF8ToUnicode(curr_unicode_char);
       if (bytes_length + chwidth > max_input_chars_per_word_) {
         break;
       }
-      while (!trie_.TryTraverseSeveralSteps(
-          &curr_node, sequence.substr(curr_idx, chwidth))) {
-        if (TryFollowFailureLinkAndCollectTokens(sequence_substr,
-                                                 word_offset_in_sequence,
-                                                 &curr_offset_in_word,
-                                                 &curr_node,
-                                                 &all_tokens)) {
+      std::string curr_substr = sequence.substr(curr_idx, chwidth);
+      while (!trie_.TryTraverseSeveralSteps(&curr_node, curr_substr)) {
+        if (!TryFollowFailureLinkAndCollectTokens(sequence_substr,
+                                                  word_offset_in_sequence,
+                                                  &curr_offset_in_word,
+                                                  &curr_node,
+                                                  &all_tokens)) {
           fail_to_match = true;
           break;
         }
@@ -325,7 +320,7 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
       if (fail_to_match) {
         break;
       }
-      word_offset_in_sequence += chwidth;
+      bytes_length += chwidth;
       curr_idx += chwidth;
     }
     if (curr_idx >= seq_len) {
@@ -362,6 +357,8 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
                          &original_num_tokens,
                          &all_tokens);
   }
+  VLOG(6) << "All tokens num from TokenizeWithPreTokenize: "
+          << all_tokens.size();
   return all_tokens;
 }
 

@@ -54,6 +54,8 @@ public:
                                const std::string& path) const;
   bool TryGetData(const TraversalCursor& cursor, int* out_data) const;
   void SetVocab(const std::unordered_map<std::string, uint>& vocab);
+  void SetVocabList(const std::vector<std::string>& vocab);
+
   uint Size() const {
     if (trie_.get() != nullptr) {
       return trie_->size();
@@ -70,6 +72,8 @@ public:
   void DeleteLinkFromParent(uint32_t child_node_id);
 
 private:
+  void AddPuncVocab(std::vector<std::string>* punc_vocab,
+                    const std::unordered_map<std::string, uint>& vocab) const;
   void InitTrieSuffixRoot();
   void InitTrie(const std::vector<const char*>& keys,
                 const std::vector<int>& values);

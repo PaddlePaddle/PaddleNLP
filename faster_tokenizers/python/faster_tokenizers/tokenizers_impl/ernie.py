@@ -38,19 +38,20 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
                  lowercase=True,
                  wordpieces_prefix="##",
                  max_sequence_len=None,
-                 use_faster_wordpiece=False):
+                 use_faster_wordpiece=False,
+                 use_faster_wordpiece_with_pretokenize=False):
         tokenizer_model = WordPiece if not use_faster_wordpiece else FasterWordPiece
+        model_kwargs = {
+            "unk_token": str(unk_token),
+            "continuing_subword_prefix": wordpieces_prefix
+        }
+        if use_faster_wordpiece:
+            model_kwargs[
+                "with_pretokenization"] = use_faster_wordpiece_with_pretokenize
         if vocab is not None:
-            tokenizer = Tokenizer(
-                tokenizer_model(
-                    vocab,
-                    unk_token=str(unk_token),
-                    continuing_subword_prefix=wordpieces_prefix))
+            tokenizer = Tokenizer(tokenizer_model(vocab, **model_kwargs))
         else:
-            tokenizer = Tokenizer(
-                tokenizer_model(
-                    unk_token=str(unk_token),
-                    continuing_subword_prefix=wordpieces_prefix))
+            tokenizer = Tokenizer(tokenizer_model(**model_kwargs))
 
         if tokenizer.token_to_id(str(unk_token)) is not None:
             tokenizer.add_special_tokens([str(unk_token)])
@@ -68,7 +69,8 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
             handle_chinese_chars=handle_chinese_chars,
             strip_accents=strip_accents,
             lowercase=lowercase)
-        tokenizer.pretokenizer = BertPreTokenizer()
+        if not use_faster_wordpiece or not use_faster_wordpiece_with_pretokenize:
+            tokenizer.pretokenizer = BertPreTokenizer()
 
         if vocab is not None:
             sep_token_id = tokenizer.token_to_id(str(sep_token))

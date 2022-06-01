@@ -82,7 +82,9 @@ int FailureVocabToken::TokenLengthWithoutContinuingSubwordPrefix() const {
 }
 
 void FailureArray::BuildFailureVocab(
-    const std::unordered_map<std::string, uint>& vocab, Trie* trie) {
+    const std::unordered_map<std::string, uint>& vocab,
+    const std::string& unk_token,
+    const std::string& continuing_subword_prefix) {
   if (vocab.size() > utils::kMaxSupportedVocabSize) {
     std::ostringstream oss;
     oss << "Vocab size exceeds the max supported ("
@@ -91,7 +93,7 @@ void FailureArray::BuildFailureVocab(
     throw std::invalid_argument(oss.str());
   }
   failure_vocab_tokens_.reserve(vocab.size());
-  auto continuing_subword_prefix = trie->GetContinuingSubwordPrefix();
+  int unk_id = vocab.at(unk_token);
   for (auto& item : vocab) {
     if (item.first == continuing_subword_prefix) {
       VLOG(6)
@@ -141,12 +143,12 @@ void FailureArray::BuildFailureVocab(
     if (!suffix_token_exists) {
       auto new_suffix_token = continuing_subword_prefix +
                               std::string(1, utils::kInvalidControlChar);
-      failure_vocab_tokens_.emplace_back(FailureVocabToken(
-          new_suffix_token, trie->GetUNKTokenID(), continuing_subword_prefix));
+      failure_vocab_tokens_.emplace_back(
+          new_suffix_token, unk_id, continuing_subword_prefix);
     }
   }
   if (with_pretokenization_) {
-    for (uint32_t cp = 1; cp < 0x0010FFFF; ++cp) {
+    for (uint32_t cp = 1; cp <= 0x0010FFFF; ++cp) {
       if (!utils::IsUnicodeChar(cp) || !utils::IsPunctuationOrChineseChar(cp)) {
         continue;
       }
@@ -154,36 +156,53 @@ void FailureArray::BuildFailureVocab(
       utils::GetUTF8Str(reinterpret_cast<char32_t*>(&cp), utf_str, 1);
       std::string punc_str(utf_str);
       if (vocab.count(punc_str) == 0) {
-        FailureVocabToken vocab_token(
-            punc_str, trie->GetUNKTokenID(), continuing_subword_prefix);
-        failure_vocab_tokens_.emplace_back(vocab_token);
+        failure_vocab_tokens_.emplace_back(
+            punc_str, unk_id, continuing_subword_prefix);
       }
     }
+    failure_vocab_tokens_.emplace_back(
+        std::string(1, kInvalidControlChar), unk_id, continuing_subword_prefix);
+  }
+}
+
+void FailureArray::CreateVocabFromFailureVocab(
+    const std::vector<FailureVocabToken>& failure_vocab_tokens,
+    std::unordered_map<std::string, uint>* vocab) const {
+  for (auto&& failure_vocab : failure_vocab_tokens) {
+    (*vocab)[failure_vocab.Token()] = failure_vocab.TokenId();
   }
 }
 
 void FailureArray::InitFromVocabAndTrie(
-    const std::unordered_map<std::string, uint>& vocab, Trie* trie) {
-  BuildFailureVocab(vocab, trie);
+    const std::unordered_map<std::string, uint>& vocab,
+    Trie* trie,
+    const std::string& unk_token,
+    const std::string& continuing_subword_prefix) {
+  BuildFailureVocab(vocab, unk_token, continuing_subword_prefix);
+
+  // Create Trie
+  std::unordered_map<std::string, uint> new_vocab;
+  CreateVocabFromFailureVocab(failure_vocab_tokens_, &new_vocab);
+  trie->SetVocab(new_vocab);
+
+  // Create failure array
   BuildFailureArray(failure_vocab_tokens_, trie);
-}
-
-
-FailureArray::FailureArray(const std::unordered_map<std::string, uint>& vocab,
-                           Trie* trie) {
-  InitFromVocabAndTrie(vocab, trie);
 }
 
 void FailureArray::RemovePunctuationTrieLink(Trie* trie) const {
   auto continuing_subword_prefix = trie->GetContinuingSubwordPrefix();
   if (with_pretokenization_ && !continuing_subword_prefix.empty()) {
     int cur_idx = 0;
+    int next_idx = 0;
     uint32_t curr_char, next_char;
     bool prev_node_is_root = false;
     auto node = trie->CreateRootTraversalCursor();
     while (cur_idx < continuing_subword_prefix.length()) {
+      next_idx = cur_idx;
       auto chwidth = utils::UTF8ToUInt32(
-          continuing_subword_prefix.data() + cur_idx, &curr_char);
+          continuing_subword_prefix.data() + next_idx, &curr_char);
+      curr_char = utils::UTF8ToUnicode(curr_char);
+      next_idx = cur_idx + chwidth;
       prev_node_is_root = (node.node_id_ == trie->kRootNodeId);
       std::string cur_unicode_char(continuing_subword_prefix.data() + cur_idx,
                                    chwidth);
@@ -194,11 +213,12 @@ void FailureArray::RemovePunctuationTrieLink(Trie* trie) const {
       }
       if (IsPunctuationOrChineseChar(curr_char)) {
         if (prev_node_is_root) {
+          cur_idx = next_idx;
           auto next_chwidth = utils::UTF8ToUInt32(
-              continuing_subword_prefix.data() + cur_idx + chwidth, &next_char);
+              continuing_subword_prefix.data() + next_idx, &next_char);
+          next_idx += next_chwidth;
           std::string next_unicode_char(
-              continuing_subword_prefix.data() + cur_idx + chwidth,
-              next_chwidth);
+              continuing_subword_prefix.data() + cur_idx, next_chwidth);
           auto child_node = node;
           if (!trie->TryTraverseSeveralSteps(&child_node, next_unicode_char)) {
             throw std::runtime_error(
@@ -209,8 +229,9 @@ void FailureArray::RemovePunctuationTrieLink(Trie* trie) const {
         } else {
           trie->DeleteLinkFromParent(node.node_id_);
         }
+        break;
       }
-      cur_idx += chwidth;
+      cur_idx = next_idx;
     }
   }
 }
@@ -381,10 +402,10 @@ void FailureArray::BuildOutgoingEdgeLabelsFromToken(
     (*node_outgoing_edge_labels)[curr_node.node_id_].insert(edge_label);
     if (!trie->TryTraverseOneStep(&curr_node, edge_label)) {
       std::ostringstream oss;
-      oss << "Error in traversing to child following edge " << edge_label
-          << " from the prefix " << token.substr(0, char_pos)
-          << " at parent id " << curr_node.node_id_ << ". The token is "
-          << token << ". The char position"
+      oss << "Error in traversing to child following edge `" << edge_label
+          << "` from the prefix `" << token.substr(0, char_pos)
+          << "` at parent id " << curr_node.node_id_ << ". The token is `"
+          << token << "`. The char position"
           << " is " << char_pos << ".";
 
       throw std::runtime_error(oss.str());
