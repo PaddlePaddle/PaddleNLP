@@ -36,25 +36,19 @@ GPT模型汇总
 |                                                                                  |              | 25-heads, 1558M parameters.                                                      |
 |                                                                                  |              | Trained on English text.                                                         |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/distilgpt2``                                                             | English      | 6-layer, 768-hidden,                                                             |
-|                                                                                  |              | 12-heads, 81M parameters.                                                        |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/microsoft-DialoGPT-small``                                               | English      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 124M parameters.                                                       |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/microsoft-DialoGPT-medium``                                              | English      | 24-layer, 1024-hidden,                                                           |
+|``microsoft/DialoGPT-medium``                                                     | English      | 24-layer, 1024-hidden,                                                           |
 |                                                                                  |              | 16-heads, 354M parameters.                                                       |
 |                                                                                  |              | Trained on English text.                                                         |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `microsoft/DialoGPT-medium`_                                                     |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/microsoft-DialoGPT-large``                                               | English      | 36-layer, 1280-hidden,                                                           |
-|                                                                                  |              | 20-heads, 774M parameters.                                                       |
-|                                                                                  |              | Trained on English text.                                                         |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``junnyu/uer-gpt2-chinese-poem``                                                  | Chinese      | 12-layer, 768-hidden,                                                            |
+|``uer/gpt2-chinese-poem``                                                         | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 103M parameters.                                                       |
 |                                                                                  |              | Trained on Chinese poetry corpus.                                                |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `uer/gpt2-chinese-poem`_                                                         |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``distilgpt2``                                                                   | English      | Please refer to:                                                                 |
 |                                                                                  |              | `distilgpt2`_                                                                    |
@@ -252,6 +246,8 @@ GPT模型汇总
 |                                                                                  |              | `cambridgeltl/simctg_wikitext103`_                                               |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
+.. _microsoft/DialoGPT-medium: https://huggingface.co/microsoft/DialoGPT-medium
+.. _uer/gpt2-chinese-poem: https://huggingface.co/uer/gpt2-chinese-poem
 .. _distilgpt2: https://huggingface.co/distilgpt2
 .. _w11wo/javanese-gpt2-small-imdb: https://huggingface.co/w11wo/javanese-gpt2-small-imdb
 .. _remotejob/tweetsDISTILGPT2fi_v4: https://huggingface.co/remotejob/tweetsDISTILGPT2fi_v4

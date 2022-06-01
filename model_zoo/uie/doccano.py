@@ -17,6 +17,7 @@ import time
 import argparse
 import json
 import numpy as np
+from paddlenlp.utils.log import logger
 
 from utils import set_seed, convert_ext_examples, convert_cls_examples
 
@@ -68,7 +69,7 @@ def do_convert():
             for example in examples:
                 f.write(json.dumps(example, ensure_ascii=False) + "\n")
                 count += 1
-        print("\nSave %d examples to %s." % (count, save_path))
+        logger.info("Save %d examples to %s." % (count, save_path))
 
     if len(args.splits) == 0:
         if args.task_type == "ext":
@@ -106,7 +107,7 @@ def do_convert():
         _save_examples(args.save_dir, "dev.txt", dev_examples)
         _save_examples(args.save_dir, "test.txt", test_examples)
 
-    print('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
