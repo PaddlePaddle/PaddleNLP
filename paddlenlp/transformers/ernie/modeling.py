@@ -146,6 +146,20 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 18000,
             "pad_token_id": 0,
         },
+        "ernie-1.0-large-zh": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 1024,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,  # it is 3072 instead of 4096
+            "max_position_embeddings": 512,
+            "num_attention_heads": 16,
+            "num_hidden_layers": 24,
+            "type_vocab_size": 2,
+            "vocab_size": 18000,
+            "pad_token_id": 0,
+        },
         "ernie-tiny": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "relu",
@@ -401,6 +415,8 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "ernie-1.0-large-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_large_zh.pdparams",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/ernie_tiny.pdparams",
             "ernie-2.0-base-zh":

@@ -43,16 +43,19 @@
 
 ## 模型效果
 
-本项目开源 **ERNIE 3.0 _Base_** 和 **ERNIE 3.0 _Medium_** 两个模型：
+本项目开源 **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 五个模型：
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
+- [**ERNIE 3.0-_Mini_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams) (_6-layer, 384-hidden, 12-heads_)
+- [**ERNIE 3.0-_Micro_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams) (_4-layer, 384-hidden, 12-heads_)
+- [**ERNIE 3.0-_Nano_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams) (_4-layer, 312-hidden, 12-heads_)
 
 在 CLUE **验证集**上评测指标如下表所示：
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
-                        <td style="text-align:center">
+                        <td style="text-align:center;vertical-align:middle">
                                 <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
@@ -510,6 +513,123 @@
                         </td>
                         <td style="text-align:center">
                           <span style="font-size:18px">54.77</span>
+                        </td>
+                </tr>
+                <tr>
+                        <td rowspan=1 align=center> 6L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>ERNIE 3.0-Mini-zh</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>66.90</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.85</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.24</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.48</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>77.19</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>73.08</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.05</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>79.30</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.53/81.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>69.71</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.60</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>ERNIE 3.0-Micro-zh</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>64.21</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.15</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.05</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>53.83</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.81</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.41</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>69.08</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>76.50</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>53.77/77.82</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.26</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.53</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L312H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>ERNIE 3.0-Nano-zh</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.51</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.57</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>48.36</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.61</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>68.75</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>75.93</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>52.00/76.35</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.91</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.11</b></span>
                         </td>
                 </tr>
         <tbody>
