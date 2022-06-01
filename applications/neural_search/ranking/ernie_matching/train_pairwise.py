@@ -148,15 +148,15 @@ def do_train():
         phase="eval")
 
     batchify_fn_train = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # pos_pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # pos_pair_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # neg_pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id)  # neg_pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # pos_pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # pos_pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # neg_pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64")  # neg_pair_segment
     ): [data for data in fn(samples)]
 
     batchify_fn_eval = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # pair_segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
