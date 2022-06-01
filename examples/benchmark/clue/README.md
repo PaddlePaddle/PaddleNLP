@@ -816,10 +816,20 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 ### 批量启动 Grid Search
 
+#### 环境依赖
+
+Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库，pynvml 库提供了 GPU 管理的 Python 接口。可启动以下命令进行安装：
+
+```shell
+pip install pynvml
+```
+
 #### 使用说明
-- `grid_search.py` Grid Search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解下所有超参数对应的任务完成，训练完成后会自动调用抽取结果的脚本 `extract_acc.sh` 打印出所有任务的最佳结果和对应的超参。
-- `warmup_dataset_and_model.py` 该脚本完成数据集下载，mrc 任务数据预处理、预处理文件缓存等工作，由 `grid_search.py` 在 Grid Search 训练前自动调用，缓存文件生成后，后面所有训练任务即可加载缓存文件避免重复进行数据预处理。如果该阶段任务失败，大多需要检查网络，解决之后需重启 `grid_search.py`。该脚本也可手动调用，需要 1 个参数：模型名称或目录。该脚本在 Intel(R) Xeon(R) Gold 6271C CPU 下需约 30 分钟左右完成，可以更改 `run_mrc.sh` 中的 `--num_proc` 参数以改变生成 cache 的进程数，默认是 4。需要注意的是，若改变 num_proc，之前的缓存则不能再使用，将会重新处理数据并生成新的 cache，cache 相关内容可查看[datasets.Dataset.map文档](https://huggingface.co/docs/datasets/v1.12.0/package_reference/main_classes.html?highlight=map#datasets.Dataset.map)；
-- `extract_acc.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
+- `grid_search.py` Grid Search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解下所有超参数对应的任务完成，训练完成后会自动调用抽取结果的脚本 `extract_result.sh` 打印出所有任务的最佳结果和对应的超参。
+- `warmup_dataset_and_model.py` 首次运行时，该脚本完成模型下载（如需）、数据集下载，阅读理解任务数据预处理、预处理文件缓存等工作，再次运行则会检查这些文件是否存在，存在则跳过。该脚本由 `grid_search.py` 在 Grid Search 训练前自动调用，预处理 cache 文件生成后，后面所有训练任务即可加载缓存文件避免重复进行数据预处理。如果该阶段任务失败，大多需要检查网络，解决之后需重启 `grid_search.py`，直到训练正常开始。该脚本也可手动调用，需要 1 个参数，模型名称或目录。该脚本在使用 Intel(R) Xeon(R) Gold 6271C CPU 且 `--num_proc`默认为 4 的情况下需约 30 分钟左右完成，可以更改 `run_mrc.sh` 中的 `--num_proc` 参数以改变生成 cache 的进程数。需要注意的是，若改变 num_proc，之前的缓存则不能再使用，该脚本会重新处理数据并生成新的 cache，cache 相关内容可查看[datasets.Dataset.map文档](https://huggingface.co/docs/datasets/v2.0.0/package_reference/main_classes?highlight=map#datasets.Dataset.map)；
+- `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
+- `run_mrc.sh` 阅读理解任务的启动脚本
+- `run_cls.sh` 分类任务的启动脚本
 
 ```shell
 cd grid_search_tools
@@ -828,27 +838,27 @@ python grid_seach.py ernie-3.0-nano-zh
 
 ```
 
-确认模型所有任务训练完成后，可以调用脚本 `extract_acc.sh` 一键抽取 Grid Search 结果，可以把打印出的 10 个任务的结果直接复制到表格中。例如：
+确认模型所有任务训练完成后，可以调用脚本 `extract_result.sh` 一键抽取 Grid Search 结果，打印出每个任务的最佳结果和对应的超参数，例如：
 
 ```shell
-bash extract_acc.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带斜杠
+bash extract_result.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带'/'
 ```
 ```text
 AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
-76.48	58.47	61.18		80.20	88.49	82.80	69.52/89.02
+76.48	58.47	61.18	83.57	80.20	88.49	82.80	72.20/90.67	83.67	78.49
 ====================================================================
 best hyper-parameters list:
 ====================================================================
-afqmc's best acc 76.48, lr, bs, dropout_p are: 3e-05 16 0.1
-tnews's best acc 58.47, lr, bs, dropout_p are: 5e-05 16 0.1
-iflytek's best acc 61.18, lr, bs, dropout_p are: 5e-05 16 0.0
-ocnli's best acc 80.20, lr, bs, dropout_p are: 2e-05 16 0.1
-cluewsc2020's best acc 88.49, lr, bs, dropout_p are: 2e-05 32 0.0
-csl's best acc 82.80, lr, bs, dropout_p are: 5e-05 64 0.1
-cmrc2018's best acc 69.52/89.02, lr, bs, dropout_p are: 1e-05 32 0.1
+afqmc's best result is 76.48, and lr, bs, dropout_p are: 3e-05 16 0.1
+tnews's best result is 58.47, and lr, bs, dropout_p are: 5e-05 16 0.1
+iflytek's best result is 61.18, and lr, bs, dropout_p are: 5e-05 16 0.0
+ocnli's best result is 80.20, and lr, bs, dropout_p are: 2e-05 16 0.1
+cluewsc2020's best result is 88.49, and lr, bs, dropout_p are: 2e-05 32 0.0
+csl's best result is 82.80, lr, bs, and dropout_p are: 5e-05 64 0.1
+cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
 ```
 
-另外，如果由于意外情况（如机器重启）导致训练中断，可以直接再次启动`grid_search.py`脚本，之前已完成（输出完整日志）的任务则会直接跳过。
+另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
 
 ## 参加 CLUE 竞赛
 

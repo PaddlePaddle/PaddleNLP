@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import time
 import subprocess
 import random
@@ -80,14 +94,14 @@ def get_cls_tasks(model_name_or_path):
                 for hyper_param in hyper_params[dataset]:
                     epoch, max_seq_len, grd_acc, dropout = hyper_param
                     tasks.append(
-                        f"bash run_clue_classifier.sh {dataset} {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
+                        f"bash run_cls.sh {dataset} {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
                     )
     for lr in learning_rate_list:
         for hyper_param in hyper_params["cluewsc2020"]:
             bs = 8
             epoch, max_seq_len, grd_acc, dropout = hyper_param
             tasks.append(
-                f"bash run_clue_classifier.sh cluewsc2020 {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
+                f"bash run_cls.sh cluewsc2020 {lr} {bs} {epoch} {max_seq_len} {model_name_or_path} {grd_acc} {dropout}"
             )
     return tasks
 
@@ -175,7 +189,7 @@ def main():
         print(f"> Wait for 15 seconds to start!")
         time.sleep(15)
     print("All done!")
-    status = os.system(f'bash extract_acc.sh {model_name_or_path}')
+    status = os.system(f'bash extract_result.sh {model_name_or_path}')
 
 
 if __name__ == "__main__":

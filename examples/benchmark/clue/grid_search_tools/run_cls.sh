@@ -24,8 +24,8 @@ export dropout_p=$8
 
 if [ -f "${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log" ]
 then
-    # Exits if log exits and best_acc is computed.
-    best_acc=`cat ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log |grep "best_acc"`
+    # Exits if log exits and best_result is computed.
+    best_acc=`cat ${MODEL_PATH}/${TASK_NAME}/${LR}_${BS}_${dropout_p}.log |grep "best_result"`
     if [ "${best_acc}" != "" ]
     then
         exit 0

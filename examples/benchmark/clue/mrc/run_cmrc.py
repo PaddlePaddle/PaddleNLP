@@ -503,7 +503,7 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                     if global_step >= num_training_steps:
-                        logger.info("best_acc: %.2f/%.2f" %
+                        logger.info("best_result: %.2f/%.2f" %
                                     (best_res[0], best_res[1]))
                         return
             em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
@@ -519,7 +519,7 @@ def run(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-        logger.info("best_acc: %.2f/%.2f" % (best_res[0], best_res[1]))
+        logger.info("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,

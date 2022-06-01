@@ -422,9 +422,9 @@ def do_train(args):
                             model_to_save.save_pretrained(output_dir)
                             tokenizer.save_pretrained(output_dir)
                 if global_step >= num_training_steps:
-                    logger.info("best_acc: %.2f" % (best_acc * 100))
+                    logger.info("best_result: %.2f" % (best_acc * 100))
                     return
-    logger.info("best_acc: %.2f" % (best_acc * 100))
+    logger.info("best_result: %.2f" % (best_acc * 100))
 
 
 def do_predict(args):
