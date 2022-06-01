@@ -833,7 +833,7 @@ python grid_seach.py ernie-3.0-nano-zh
 ```shell
 bash extract_acc.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带斜杠
 ```
-
+```text
 AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
 76.48	58.47	61.18		80.20	88.49	82.80	69.52/89.02
 ====================================================================
@@ -846,6 +846,7 @@ ocnli's best acc 80.20, lr, bs, dropout_p are: 2e-05 16 0.1
 cluewsc2020's best acc 88.49, lr, bs, dropout_p are: 2e-05 32 0.0
 csl's best acc 82.80, lr, bs, dropout_p are: 5e-05 64 0.1
 cmrc2018's best acc 69.52/89.02, lr, bs, dropout_p are: 1e-05 32 0.1
+```
 
 另外，如果由于意外情况（如机器重启）导致训练中断，可以直接再次启动`grid_search.py`脚本，之前已完成（输出完整日志）的任务则会直接跳过。
 
