@@ -43,16 +43,19 @@
 
 ## 模型效果
 
-本项目开源 **ERNIE 3.0 _Base_** 和 **ERNIE 3.0 _Medium_** 两个模型：
+本项目开源 **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 、五个模型：
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
+- [**ERNIE 3.0-_Mini_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams) (_6-layer, 384-hidden, 12-heads_)
+- [**ERNIE 3.0-_Micro_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams) (_4-layer, 384-hidden, 12-heads_)
+- [**ERNIE 3.0-_Nano_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams) (_4-layer, 312-hidden, 12-heads_)
 
 在 CLUE **验证集**上评测指标如下表所示：
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
-                        <td style="text-align:center">
+                        <td style="align:center">
                                 <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
@@ -513,7 +516,7 @@
                         </td>
                 </tr>
                 <tr>
-            <td rowspan=1 align=center> 6L384H </td>
+                        <td rowspan=1 align=center> 6L384H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
                         </td>
