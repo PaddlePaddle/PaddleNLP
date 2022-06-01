@@ -439,6 +439,8 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         decoder_input = self.decoder_dropout(hidden_states)
 
+        if memory_mask is not None:
+            memory_mask = self.get_extended_attention_mask(memory_mask)
         decoder_output = self.decoder(
             tgt=decoder_input,
             memory=encoder_output,
@@ -667,15 +669,14 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
         else:
             cache = None
 
-        if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating attention_mask"
-            memory_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            memory_mask.stop_gradient = True
-        else:
+        if attention_mask is not None:
             memory_mask = attention_mask
+        elif input_ids is not None:
+            memory_mask = paddle.cast(
+                (1.0 - input_ids == self.pad_token_id),
+                dtype=paddle.get_default_dtype())
+        else:
+            memory_mask = None
 
         decoder_output = self.decoder(
             decoder_input_ids=decoder_input_ids,
