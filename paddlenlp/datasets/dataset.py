@@ -121,7 +121,7 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     else:
         label_list = []
         if isinstance(hf_datasets, DatasetDict):
-            datasets = DatasetTuple(hf_datasets.keys())
+            datasets = DatasetTuple(list(hf_datasets.keys()))
             for split, ds in hf_datasets.items():
                 for feature in ds.features.values():
                     if isinstance(feature, ClassLabel):
