@@ -733,12 +733,12 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-        logger.warning(
+        logger.info(
             "Argument length_penalty (default to 0.0) means no penalty and is "
             "different from HuggingFace whose length_penalty defaults to 1.0 "
             "enabling penalty to the length, and the penalty method is also different."
         )
-        logger.warning(
+        logger.info(
             "Argument min_length (default to 0) is different from HuggingFace"
             " whose min_length defaults to 10.")
         assert (
