@@ -39,7 +39,7 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
                  wordpieces_prefix="##",
                  max_sequence_len=None,
                  use_faster_wordpiece=False,
-                 use_faster_wordpiece_with_pretokenize=False):
+                 use_faster_wordpiece_with_pretokenization=False):
         tokenizer_model = WordPiece if not use_faster_wordpiece else FasterWordPiece
         model_kwargs = {
             "unk_token": str(unk_token),
@@ -47,7 +47,7 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
         }
         if use_faster_wordpiece:
             model_kwargs[
-                "with_pretokenization"] = use_faster_wordpiece_with_pretokenize
+                "with_pretokenization"] = use_faster_wordpiece_with_pretokenization
         if vocab is not None:
             tokenizer = Tokenizer(tokenizer_model(vocab, **model_kwargs))
         else:
@@ -69,7 +69,7 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
             handle_chinese_chars=handle_chinese_chars,
             strip_accents=strip_accents,
             lowercase=lowercase)
-        if not use_faster_wordpiece or not use_faster_wordpiece_with_pretokenize:
+        if not use_faster_wordpiece or not use_faster_wordpiece_with_pretokenization:
             tokenizer.pretokenizer = BertPreTokenizer()
 
         if vocab is not None:
