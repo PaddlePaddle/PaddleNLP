@@ -49,6 +49,12 @@ def parse_args():
         required=True,
         help="Path to pre-trained model or shortcut name.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--output_dir",
         default="best_c3_model",
         type=str,
@@ -274,7 +280,7 @@ def run(args):
             if not do_predict:
                 result["labels"].append([label])
             if (idx + 1) % 1000 == 0:
-                print(idx + 1, "samples have been processed.")
+                logger.info("%d samples have been processed." % (idx + 1))
         return result
 
     paddle.set_device(args.device)
@@ -302,7 +308,7 @@ def run(args):
                 preprocess_function,
                 batched=True,
                 batch_size=len(train_ds),
-                num_proc=4,
+                num_proc=args.num_proc,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
@@ -325,7 +331,7 @@ def run(args):
                                 batched=True,
                                 batch_size=len(dev_ds),
                                 remove_columns=column_names,
-                                num_proc=4,
+                                num_proc=args.num_proc,
                                 load_from_cache_file=args.overwrite_cache,
                                 desc="Running tokenizer on validation dataset")
         dev_batch_sampler = paddle.io.BatchSampler(
@@ -338,7 +344,7 @@ def run(args):
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
@@ -379,7 +385,7 @@ def run(args):
                     lr_scheduler.step()
                     optimizer.clear_grad()
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
                                paddle.distributed.get_rank(), loss,
@@ -387,12 +393,12 @@ def run(args):
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % (best_acc * 100))
+                    logger.info("best_result: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
-            acc = evaluate(model, loss_fct, dev_data_loader, metric)
-            print("eval acc: %.5f, eval done total : %s s" %
-                  (acc, time.time() - tic_eval))
+            acc = evaluation(model, loss_fct, dev_data_loader, metric)
+            logger.info("eval acc: %.5f, eval done total : %s s" %
+                        (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
                 if args.save_best_model:
@@ -403,7 +409,7 @@ def run(args):
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
 
-        print("best_acc: %.2f" % (best_acc * 100))
+        logger.info("best_result: %.2f" % (best_acc * 100))
 
     if args.do_predict:
         column_names = test_ds.column_names
@@ -412,7 +418,7 @@ def run(args):
                               batched=True,
                               batch_size=len(test_ds),
                               remove_columns=column_names,
-                              num_proc=1)
+                              num_proc=args.num_proc)
         # Serveral samples have more than four choices.
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=1, shuffle=False)

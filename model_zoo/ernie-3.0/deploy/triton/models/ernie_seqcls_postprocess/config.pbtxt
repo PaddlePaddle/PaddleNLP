@@ -1,0 +1,31 @@
+name: "ernie_seqcls_postprocess"
+backend: "python"
+max_batch_size: 64
+
+input [
+  {
+    name: "POST_INPUT"
+    data_type: TYPE_FP32
+    dims: [ 15 ]
+  }
+]
+
+output [
+  {
+    name: "POST_label"
+    data_type: TYPE_INT64
+    dims: [ 1 ]
+  },
+  {
+    name: "POST_confidence"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+      count: 1
+      kind: KIND_CPU
+  }
+]
