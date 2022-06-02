@@ -197,6 +197,7 @@ def unscale_method(self, optimizer):
 def all_reduce_parameters(params, group):
     if group.nranks < 2:
         return
+
     div_factor = 1.0 / group.nranks
     with paddle.framework.no_grad():
         for p in params:

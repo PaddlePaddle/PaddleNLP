@@ -15,6 +15,7 @@
 from paddle.fluid import core
 import numpy as np
 from collections import OrderedDict
+
 from paddle.fluid.framework import in_dygraph_mode, _in_legacy_dygraph
 
 if in_dygraph_mode():
@@ -39,6 +40,7 @@ def assign_group_by_size(parameters, group_size=256 * 1024 * 1024):
     elif _in_legacy_dygraph():
         group_indices = core.assign_group_by_size(
             parameters, is_sparse_gradient, [group_size, group_size])
+
     var_groups = OrderedDict()
     for group_idx, indices in enumerate(group_indices):
         for index in indices:

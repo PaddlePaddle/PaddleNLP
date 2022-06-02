@@ -22,6 +22,7 @@ from collections.abc import Callable
 import paddle
 from paddle import _C_ops
 
+
 __all__ = []
 
 
