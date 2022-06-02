@@ -278,6 +278,12 @@ class MBartEncoder(MBartPretrainedModel):
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)
 
+        if attention_mask is None:
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
 
@@ -571,13 +577,6 @@ class MBartModel(MBartPretrainedModel):
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating decoder_input_ids"
             decoder_input_ids = shift_tokens_right(input_ids, self.pad_token_id)
-        if attention_mask is None:
-            attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(paddle.get_default_dtype()) * -1e4,
-                axis=[1, 2])
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
@@ -586,8 +585,15 @@ class MBartModel(MBartPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
+
+        if attention_mask is not None:
+            memory_mask = attention_mask
+        elif input_ids is not None:
+            memory_mask = (input_ids != self.pad_token_id)
+        else:
+            memory_mask = None
         decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
-                                      encoder_output, attention_mask, cache)
+                                      encoder_output, memory_mask, cache)
 
         return decoder_output
 

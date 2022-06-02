@@ -811,7 +811,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.cast(
-                (1.0 - input_ids == self.pad_token_id),
+                input_ids != self.pad_token_id,
                 dtype=paddle.get_default_dtype())
         visual_attention_mask = paddle.ones(
             visual_shape, dtype=paddle.get_default_dtype())

@@ -727,7 +727,7 @@ class BlenderbotModel(BlenderbotPretrainedModel):
             memory_mask = attention_mask
         elif input_ids is not None:
             memory_mask = paddle.cast(
-                (1.0 - input_ids == self.pad_token_id),
+                input_ids != self.pad_token_id,
                 dtype=paddle.get_default_dtype())
         else:
             memory_mask = None
