@@ -94,6 +94,8 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
+            if device == 'cpu':
+                providers = ['CPUExecutionProvider']
             if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -103,7 +105,6 @@ class InferBackend(object):
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            sess_options.inter_op_num_threads = num_threads
             self.predictor = ort.InferenceSession(
                 dynamic_quantize_model,
                 sess_options=sess_options,
@@ -284,7 +285,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.label_names[label] == "O" and start >= 0:
+                if (self.label_names[label] == "O" or
+                        "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -294,7 +296,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.label_names[label]:
+                if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

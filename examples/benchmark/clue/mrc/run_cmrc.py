@@ -73,6 +73,12 @@ def parse_args():
         type=int,
         help="Batch size per GPU/CPU for training.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--eval_batch_size",
         default=12,
         type=int,
@@ -120,7 +126,7 @@ def parse_args():
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=500,
+        default=100,
         help="Log every X updates steps.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
@@ -183,8 +189,8 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         start_logits, end_logits = model(**batch)
         for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
-                print("Processing example: %d" % len(all_start_logits))
-                print('time per 1000:', time.time() - tic_eval)
+                logger.info("Processing example: %d" % len(all_start_logits))
+                logger.info('time per 1000: %s' % (time.time() - tic_eval))
                 tic_eval = time.time()
 
             all_start_logits.append(start_logits.numpy()[idx])
@@ -278,7 +284,7 @@ def run(args):
     column_names = train_examples.column_names
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
-            print("init checkpoint from %s" % args.model_name_or_path)
+            logger.info("init checkpoint from %s" % args.model_name_or_path)
 
     model = AutoModelForQuestionAnswering.from_pretrained(
         args.model_name_or_path)
@@ -417,7 +423,7 @@ def run(args):
                 batched=True,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
-                num_proc=4,
+                num_proc=args.num_proc,
                 desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
@@ -434,7 +440,7 @@ def run(args):
                 prepare_validation_features,
                 batched=True,
                 remove_columns=column_names,
-                num_proc=4,
+                num_proc=args.num_proc,
                 load_from_cache_file=args.overwrite_cache,
                 desc="Running tokenizer on validation dataset")
         dev_ds_for_model = dev_ds.remove_columns(
@@ -450,7 +456,7 @@ def run(args):
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
@@ -490,14 +496,16 @@ def run(args):
                     optimizer.clear_grad()
 
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
                                loss,
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
                     if global_step >= num_training_steps:
-                        break
+                        logger.info("best_result: %.2f/%.2f" %
+                                    (best_res[0], best_res[1]))
+                        return
             em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
                               args)
             if paddle.distributed.get_rank() == 0 and em > best_res[0]:
@@ -511,13 +519,13 @@ def run(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-        print("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
+        logger.info("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
-                                    num_proc=1)
+                                    num_proc=args.num_proc)
         test_ds_for_model = test_ds.remove_columns(
             ["example_id", "offset_mapping", "attention_mask"])
         dev_batchify_fn = DataCollatorWithPadding(tokenizer)
