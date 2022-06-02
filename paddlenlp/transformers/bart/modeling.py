@@ -26,7 +26,8 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     'BartModel', 'BartPretrainedModel', 'BartEncoder', 'BartDecoder',
     'BartClassificationHead', 'BartForSequenceClassification',
-    'BartForQuestionAnswering', 'BartForConditionalGeneration'
+    'BartForQuestionAnswering', 'BartForConditionalGeneration',
+    'BartForPretraining', 'BartPretrainingCriterion'
 ]
 
 
@@ -893,3 +894,180 @@ class BartForConditionalGeneration(BartPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class BartEncoderPredictionHead(nn.Layer):
+    r"""
+    BART Model with a `language modeling` head on top.
+    """
+
+    def __init__(
+            self,
+            hidden_size,
+            vocab_size,
+            activation,
+            embedding_weights=None,
+            weight_attr=None, ):
+        super(BartEncoderPredictionHead, self).__init__()
+
+        self.transform = nn.Linear(
+            hidden_size, hidden_size, weight_attr=weight_attr)
+        self.activation = getattr(nn.functional, activation)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.decoder_weight = self.create_parameter(
+            shape=[vocab_size, hidden_size],
+            dtype=self.transform.weight.dtype,
+            attr=weight_attr,
+            is_bias=False) if embedding_weights is None else embedding_weights
+        self.decoder_bias = self.create_parameter(
+            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+
+    def forward(self, hidden_states, masked_positions=None):
+        if masked_positions is not None:
+            hidden_states = paddle.reshape(hidden_states,
+                                           [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states,
+                                                 masked_positions)
+        # gather masked tokens might be more quick
+        hidden_states = self.transform(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = paddle.tensor.matmul(
+            hidden_states, self.decoder_weight,
+            transpose_y=True) + self.decoder_bias
+        return hidden_states
+
+
+class BartForPretraining(BartPretrainedModel):
+    r"""
+    Bart Model with a `masked language modeling` head and `casual anguage modeling` on top.
+
+    """
+
+    def __init__(self, bart):
+        super(BartForPretraining, self).__init__()
+        self.bart = bart
+        weight_attr = paddle.ParamAttr(
+            initializer=nn.initializer.TruncatedNormal(
+                mean=0.0, std=self.bart.init_std))
+        self.predictions = BartEncoderPredictionHead(
+            self.bart.config["d_model"], self.bart.config["vocab_size"],
+            self.bart.config["activation_function"], self.bart.shared.weight,
+            weight_attr)
+
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                decoder_input_ids=None,
+                decoder_attention_mask=None,
+                masked_positions=None,
+                use_cache=False,
+                cache=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`BartModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`BartModel`.
+            position_ids (Tensor, optional):
+                See :class:`BartModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+
+        Returns:
+            tuple: Returns tuple (``encoder_prediction_scores``, ``decoder_prediction_scores``).
+
+            With the fields:
+
+            - `prediction_scores` (Tensor):
+                The scores of masked token prediction. Its data type should be float32.
+                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
+                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
+
+            - `decoder_prediction_scores` (Tensor):
+                Its data type should be float32 and its shape is [batch_size, sequence_length, vocab_size].
+
+        """
+        if attention_mask is None:
+            assert input_ids is not None, "input_ids should be " \
+                                          "specified when generating attention_mask"
+            attention_mask = paddle.cast(
+                input_ids == self.pad_token_id,
+                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+            attention_mask.stop_gradient = True
+        encoder_output = self.bart.encoder(input_ids, attention_mask)
+        encoder_prediction_scores = self.predictions(encoder_output,
+                                                     masked_positions)
+
+        if use_cache:
+            if cache is None:
+                cache = self.bart.decoder.decoder.gen_cache(encoder_output)
+        else:
+            cache = None
+        decoder_output = self.bart.decoder(
+            decoder_input_ids, decoder_attention_mask, encoder_output,
+            attention_mask, cache)
+        if use_cache:
+            output = decoder_output[0]
+            cache = decoder_output[1]
+        else:
+            output = decoder_output
+        decoder_prediction_scores = paddle.matmul(
+            output, self.bart.shared.weight, transpose_y=True)
+        return encoder_prediction_scores, decoder_prediction_scores
+
+
+class BartPretrainingCriterion(paddle.nn.Layer):
+    """
+    Criterion for BART. It calculates the final loss.
+    """
+
+    def __init__(self, topo=None):
+        super(BartPretrainingCriterion, self).__init__()
+        self.loss_func = paddle.nn.CrossEntropyLoss(
+            reduction="none", ignore_index=-1)
+
+    def forward(self, encoder_prediction_scores, encoder_labels,
+                decoder_prediction_scores, decoder_labels, loss_mask):
+        """
+        Args:
+            encoder_prediction_scores(Tensor):
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, mask_token_num, vocab_size].
+            encoder_labels(Tensor):
+                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [batch_size, mask_token_num, 1].
+            decoder_prediction_scores(Tensor):
+                The logits of masked token prediction. Its data type should be float32 and
+                its shape is [batch_size, sequence_length, vocab_size].
+            decoder_labels(Tensor):
+                The labels of the casual language modeling, the dimensionality of `decoder_labels`
+                is equal to `prediction_scores`. Its data type should be int64 and
+                its shape is [batch_size, sequence_length, 1].
+            loss_mask(Tensor):
+                Mask used for calculating the loss of the masked language modeling to avoid
+                calculating some unwanted tokens.
+                Its data type should be float32 and its shape is [batch_size, sequence_length, 1].
+
+        Returns:
+            Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
+
+        """
+        encoder_lm_loss = self.loss_func(encoder_prediction_scores,
+                                         encoder_labels)
+        decoder_lm_loss = self.loss_func(decoder_prediction_scores,
+                                         decoder_labels.unsqueeze(2))
+
+        loss_mask = loss_mask.reshape([-1])
+        decoder_lm_loss = paddle.sum(decoder_lm_loss.reshape([-1]) * loss_mask)
+        decoder_lm_loss = decoder_lm_loss / loss_mask.sum()
+
+        return paddle.mean(encoder_lm_loss) + decoder_lm_loss
