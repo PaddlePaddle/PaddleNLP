@@ -517,7 +517,7 @@ python evaluate.py \
 
 #### Python部署
 
-以下是UIE Python端基于ONNXRuntime的部署流程，包括环境准备、模型导出和使用示例。
+以下是UIE Python端的部署流程，包括环境准备、模型导出和使用示例。
 
 - 环境准备
   UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
