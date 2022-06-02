@@ -30,7 +30,7 @@ import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -55,6 +55,7 @@ def create_pretrained_dataset(
         max_seq_len,
         places=None,
         data_holders=None,
+        binary_head=True,
         current_step=0, ):
 
     train_valid_test_num_samples = [
@@ -74,7 +75,7 @@ def create_pretrained_dataset(
         short_seq_prob=args.short_seq_prob,
         seed=args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
 
@@ -136,12 +137,26 @@ def create_pretrained_dataset(
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
+                in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -166,11 +181,14 @@ def run_evaluate(data_loader,
     model.eval()
     all_loss, all_lm_loss, all_sop_loss = [], [], []
 
-    loss_global = {
-        "loss": paddle.to_tensor(0.0),
-        "lm_loss": paddle.to_tensor(0.0),
-        "sop_loss": paddle.to_tensor(0.0),
-    }
+    if args.binary_head:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+            "lm_loss": paddle.to_tensor(0.0),
+            "sop_loss": paddle.to_tensor(0.0),
+        }
+    else:
+        loss_global = {"loss": paddle.to_tensor(0.0), }
 
     local_time = time.time()
 
@@ -186,13 +204,19 @@ def run_evaluate(data_loader,
             attention_mask=input_mask,
             masked_positions=masked_lm_positions)
 
-        lm_loss, sop_loss = criterion(prediction_scores, seq_relationship_score,
-                                      masked_lm_labels, next_sentence_labels)
-        loss = lm_loss + sop_loss
+        if args.binary_head:
+            lm_loss, sop_loss = criterion(
+                prediction_scores, seq_relationship_score, masked_lm_labels,
+                next_sentence_labels)
+            loss = lm_loss + sop_loss
+        else:
+            loss = criterion(prediction_scores, seq_relationship_score,
+                             masked_lm_labels)
 
         loss_global["loss"] += loss.detach()
-        loss_global["lm_loss"] += lm_loss.detach()
-        loss_global["sop_loss"] += sop_loss.detach()
+        if args.binary_head:
+            loss_global["lm_loss"] += lm_loss.detach()
+            loss_global["sop_loss"] += sop_loss.detach()
 
         if eval_step >= iter_steps - 1:
             log_info_dict = dict()
@@ -203,12 +227,14 @@ def run_evaluate(data_loader,
                 log_info_dict[
                     "samples_per_second"] = iter_steps * args.micro_batch_size / (
                         time.time() - local_time)
-                logger.info(
-                    "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f seqs/s"
-                    % (task_name, global_step, iter_steps,
-                       log_info_dict["loss"], log_info_dict["lm_loss"],
-                       log_info_dict["sop_loss"],
-                       log_info_dict["samples_per_second"]))
+                loss_info = ", ".join([
+                    "{}: {:.6f}".format(k, log_info_dict[k])
+                    for k in log_info_dict.keys() if k.endswith("loss")
+                ])
+
+                logger.info("%s step %d, batch: %d, %s, speed: %.0f seqs/s" %
+                            (task_name, global_step, iter_steps, loss_info,
+                             log_info_dict["samples_per_second"]))
 
                 for k, v in log_info_dict.items():
                     log_writer.add_scalar("%s/%s" % (task_name, k), v,
@@ -303,6 +329,9 @@ def do_train(args):
     # Define the input data in the static mode
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
         args.model_type]
+    if args.binary_head is False:
+        model_class = ErnieForMaskedLM
+
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
@@ -333,7 +362,9 @@ def do_train(args):
             hidden_dropout_prob=args.hidden_dropout_prob,
             attention_probs_dropout_prob=args.attention_probs_dropout_prob)
 
-    criterion = criterion_class()
+    # criterion = criterion_class(with_nsp_loss=args.binary_head)
+
+    criterion = criterion_class(with_nsp_loss=args.binary_head)
 
     if worker_index == 0:
         # log the model config and args 
@@ -420,11 +451,15 @@ def do_train(args):
             logger.info("Checkpoint loaded from global step: {}".format(
                 global_step))
 
-    loss_global = {
-        "loss": paddle.to_tensor(0.0),
-        "lm_loss": paddle.to_tensor(0.0),
-        "sop_loss": paddle.to_tensor(0.0),
-    }
+    if args.binary_head:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+            "lm_loss": paddle.to_tensor(0.0),
+            "sop_loss": paddle.to_tensor(0.0),
+        }
+    else:
+        loss_global = {"loss": paddle.to_tensor(0.0), }
+
     tic_train = time.time()
     while True:
         # If not call valid_data_loader, the enumerate will call valid_data_loader
@@ -460,17 +495,26 @@ def do_train(args):
                     level='O2'):
 
                 # Create the model for the ernie pretrain
-                prediction_scores, seq_relationship_score = model(
-                    input_ids=input_ids,
-                    token_type_ids=segment_ids,
-                    position_ids=None,
-                    attention_mask=input_mask,
-                    masked_positions=masked_lm_positions)
+                if args.binary_head:
+                    prediction_scores, seq_relationship_score = model(
+                        input_ids=input_ids,
+                        token_type_ids=segment_ids,
+                        position_ids=None,
+                        attention_mask=input_mask,
+                        masked_positions=masked_lm_positions)
+                    lm_loss, sop_loss = criterion(
+                        prediction_scores, seq_relationship_score,
+                        masked_lm_labels, next_sentence_labels)
+                    loss = lm_loss + sop_loss
+                else:
+                    prediction_scores = model(
+                        input_ids=input_ids,
+                        token_type_ids=segment_ids,
+                        position_ids=None,
+                        attention_mask=input_mask,
+                        masked_positions=masked_lm_positions)
 
-                lm_loss, sop_loss = criterion(
-                    prediction_scores, seq_relationship_score, masked_lm_labels,
-                    next_sentence_labels)
-                loss = lm_loss + sop_loss
+                    loss = criterion(prediction_scores, None, masked_lm_labels)
 
             if args.use_amp:
                 scaler.scale(loss).backward()
@@ -489,8 +533,9 @@ def do_train(args):
             global_step += 1
 
             loss_global["loss"] += loss.detach()
-            loss_global["lm_loss"] += lm_loss.detach()
-            loss_global["sop_loss"] += sop_loss.detach()
+            if args.binary_head:
+                loss_global["lm_loss"] += lm_loss.detach()
+                loss_global["sop_loss"] += sop_loss.detach()
 
             if global_step % args.logging_freq == 0:
                 log_info_dict = dict()
@@ -508,10 +553,14 @@ def do_train(args):
                     for k, v in log_info_dict.items():
                         log_writer.add_scalar("train/%s" % k, v, global_step)
 
-                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, log_info_dict["loss"],
-                        log_info_dict["lm_loss"], log_info_dict["sop_loss"],
-                        speed, log_info_dict["samples_per_second"],
+                    loss_info = ", ".join([
+                        "{}: {:.6f}".format(k, log_info_dict[k])
+                        for k in log_info_dict.keys() if k.endswith("loss")
+                    ])
+
+                    common_loginfo = "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                        global_step, loss_info, speed,
+                        log_info_dict["samples_per_second"],
                         log_info_dict["learning_rate"])
 
                     addition_info = ""
@@ -521,7 +570,7 @@ def do_train(args):
                             "incr_count": scaler._incr_count,
                             "decr_count": scaler._decr_count
                         }
-                        addition_info = ", ".join("%s: %d" % (k, v)
+                        addition_info = ", ".join("%s: %.2f" % (k, v)
                                                   for k, v in amp_info.items())
                         addition_info = " " + addition_info
                         for k, v in amp_info.items():
