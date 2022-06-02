@@ -234,7 +234,7 @@ void Trie::DeleteLinkFromParent(uint32_t child_node_id) {
 }
 
 void Trie::SetWithPretokenization(bool with_pretokenization) {
-  with_pretokenization = with_pretokenization_;
+  with_pretokenization_ = with_pretokenization;
 }
 
 void Trie::SetUNKToken(const std::string& unk_token) { unk_token_ = unk_token; }
