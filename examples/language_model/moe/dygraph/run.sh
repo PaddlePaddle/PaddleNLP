@@ -1,4 +1,5 @@
 export PYTHONPATH=$PYTHONPATH:../../../../
+export FLAGS_enable_eager_mode=0
 log_dir=dp8
 rm -rf $log_dir
 
