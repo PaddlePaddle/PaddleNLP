@@ -946,9 +946,6 @@ class ProphetNetEncoder(ProphetNetPretrainedModel):
                 repeat_times=[
                     self.config["num_encoder_attention_heads"], 1, 1
                 ])) * -10000.0
-            extended_attention_mask = paddle.cast(
-                extended_attention_mask, dtype=inputs_embeds.dtype)
-            extended_attention_mask.stop_gradient = True
         else:
             extended_attention_mask = None
 
@@ -1284,16 +1281,14 @@ class ProphetNetModel(ProphetNetPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids != self.pad_token_id,
                 dtype=paddle.get_default_dtype())
-        attention_mask = self.get_extended_attention_mask(attention_mask,
-                                                          input_ids.shape)
+
         if decoder_attention_mask is None:
             assert decoder_input_ids is not None, "decoder_input_ids should be " \
                                                   "specified when generating decoder_attention_mask"
             decoder_attention_mask = paddle.cast(
                 decoder_input_ids != self.pad_token_id,
                 dtype=paddle.get_default_dtype())
-        decoder_attention_mask = self.get_extended_attention_mask(
-            decoder_attention_mask, decoder_input_ids.shape)
+
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids=input_ids, attention_mask=attention_mask)
