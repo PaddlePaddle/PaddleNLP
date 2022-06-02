@@ -193,8 +193,6 @@ class OPTAttention(nn.Layer):
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
         self.q_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
-        
-        self.init_weight()
 
     def _shape(self, tensor, seq_len: int, bsz: int):
         return tensor.reshape(bsz, seq_len, self.num_heads, self.head_dim).transpose([0, 2, 1])
@@ -239,10 +237,10 @@ class OPTAttention(nn.Layer):
             value_states = self._shape(self.v_proj(hidden_states), -1, bsz)
 
         if self.is_decoder:
-            # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+            # if cross_attention save Tuple(paddle.Tensor, paddle.Tensor) of all cross attention key/value_states.
             # Further calls to cross_attention layer can then reuse all cross-attention
             # key/value_states (first "if" case)
-            # if uni-directional self-attention (decoder) save Tuple(torch.Tensor, torch.Tensor) of
+            # if uni-directional self-attention (decoder) save Tuple(paddle.Tensor, paddle.Tensor) of
             # all previous decoder key/value_states. Further calls to uni-directional self-attention
             # can concat previous decoder key/value_states to current projected key/value_states (third "elif" case)
             # if encoder bi-directional self-attention `past_key_value` is always `None`
@@ -367,10 +365,10 @@ class OPTDecoderLayer(nn.Layer):
     ):
         """
         Args:
-            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
-            attention_mask (`torch.FloatTensor`, *optional*): attention mask of size
+            hidden_states (`paddle.Tensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
+            attention_mask (`paddle.Tensor`, *optional*): attention mask of size
                 `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
-            layer_head_mask (`torch.FloatTensor`, *optional*): mask for attention heads in a given layer of size
+            layer_head_mask (`paddle.Tensor`, *optional*): mask for attention heads in a given layer of size
                 `(encoder_attention_heads,)`.
             output_attentions (`bool`, *optional*):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under
@@ -378,7 +376,7 @@ class OPTDecoderLayer(nn.Layer):
             use_cache (`bool`, *optional*):
                 If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
                 (see `past_key_values`).
-            past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
+            past_key_value (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
 
         residual = hidden_states
@@ -623,21 +621,21 @@ class OPTDecoder(OPTPreTrainedModel):
                 [`PreTrainedTokenizer.__call__`] for details.
 
                 [What are input IDs?](../glossary#input-ids)
-            attention_mask (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+            attention_mask (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
                 Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
 
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
 
                 [What are attention masks?](../glossary#attention-mask)
-            head_mask (`torch.Tensor` of shape `(num_hidden_layers, num_attention_heads)`, *optional*):
+            head_mask (`paddle.Tensor` of shape `(num_hidden_layers, num_attention_heads)`, *optional*):
                 Mask to nullify selected heads of the attention modules. Mask values selected in `[0, 1]`:
 
                 - 1 indicates the head is **not masked**,
                 - 0 indicates the head is **masked**.
 
-            past_key_values (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-                Tuple of `tuple(torch.FloatTensor)` of length `config.n_layers`, with each tuple having 2 tensors of
+            past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+                Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of
                 shape `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of
 
                 Contains pre-computed hidden-states (key and values in the self-attention blocks and in the
@@ -647,7 +645,7 @@ class OPTDecoder(OPTPreTrainedModel):
                 that don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of
                 all `decoder_input_ids` of shape `(batch_size, sequence_length)`.
 
-            inputs_embeds (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+            inputs_embeds (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
                 Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation.
                 This is useful if you want more control over how to convert `input_ids` indices into associated vectors
                 than the model's internal embedding lookup matrix.
@@ -854,14 +852,22 @@ class OPTModel(OPTPreTrainedModel):
         output_hidden_states = None,
         return_dict = None,
     ):
-        """forward         input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        head_mask: Optional[torch.Tensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
+        """
+        the OPTModel forward method, overrides the forward method in the PreTrainedModel base class
+
+        Args:
+            input_ids (_type_, optional): the input of the . Defaults to None.
+            attention_mask (_type_, optional): _description_. Defaults to None.
+            head_mask (_type_, optional): _description_. Defaults to None.
+            past_key_values (_type_, optional): _description_. Defaults to None.
+            inputs_embeds (_type_, optional): _description_. Defaults to None.
+            use_cache (_type_, optional): _description_. Defaults to None.
+            output_attentions (_type_, optional): _description_. Defaults to None.
+            output_hidden_states (_type_, optional): _description_. Defaults to None.
+            return_dict (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
         """
         output_attentions = output_attentions or self.decoder.config["output_attentions"]
         output_hidden_states = output_hidden_states or self.decoder.config["output_hidden_states"]
@@ -946,21 +952,21 @@ class OPTForCausalLM(OPTPreTrainedModel):
                 [`PreTrainedTokenizer.__call__`] for details.
 
                 [What are input IDs?](../glossary#input-ids)
-            attention_mask (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
+            attention_mask (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
                 Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
 
                 - 1 for tokens that are **not masked**,
                 - 0 for tokens that are **masked**.
 
                 [What are attention masks?](../glossary#attention-mask)
-            head_mask (`torch.Tensor` of shape `(num_hidden_layers, num_attention_heads)`, *optional*):
+            head_mask (`paddle.Tensor` of shape `(num_hidden_layers, num_attention_heads)`, *optional*):
                 Mask to nullify selected heads of the attention modules. Mask values selected in `[0, 1]`:
 
                 - 1 indicates the head is **not masked**,
                 - 0 indicates the head is **masked**.
 
-            past_key_values (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
-                Tuple of `tuple(torch.FloatTensor)` of length `config.n_layers`, with each tuple having 2 tensors of
+            past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+                Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of
                 shape `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of
                 shape `(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`. The two additional
                 tensors are only required when the model is used as a decoder in a Sequence to Sequence model.
@@ -971,7 +977,7 @@ class OPTForCausalLM(OPTPreTrainedModel):
                 If `past_key_values` are used, the user can optionally input only the last `decoder_input_ids` (those
                 that don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of
                 all `decoder_input_ids` of shape `(batch_size, sequence_length)`.
-            inputs_embeds (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+            inputs_embeds (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
                 Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation.
                 This is useful if you want more control over how to convert `input_ids` indices into associated vectors
                 than the model's internal embedding lookup matrix.
