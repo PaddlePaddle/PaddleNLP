@@ -208,5 +208,6 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         repetitied_input_ids[batch_id] += [0] * pad_len
         repetitied_token_type_ids[batch_id] += [0] * pad_len
 
-    return paddle.to_tensor(repetitied_input_ids), paddle.to_tensor(
-        repetitied_token_type_ids)
+    return paddle.to_tensor(
+        repetitied_input_ids, dtype='int64'), paddle.to_tensor(
+            repetitied_token_type_ids, dtype='int64')

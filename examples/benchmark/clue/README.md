@@ -1,8 +1,24 @@
 # CLUE Benchmark
 
+**目录**
+   * [CLUE 评测结果](#CLUE评测结果)
+   * [一键复现模型效果](#一键复现模型效果)
+       * [启动 CLUE 分类任务](#启动CLUE分类任务)
+           * [使用 Trainer 启动 CLUE 分类任务](#使用Trainer启动CLUE分类任务)
+       * [启动 CLUE 阅读理解任务](#启动CLUE阅读理解任务)
+       * [批量启动 Grid Search](#批量启动GridSearch)
+           * [环境依赖](#环境依赖)
+           * [一键启动方法](#一键启动方法)
+           * [Grid Search 脚本说明](#GridSearch脚本说明)
+   * [参加 CLUE 竞赛](#参加CLUE竞赛)
+       * [分类任务](#分类任务)
+       * [阅读理解任务](#阅读理解任务)
+
 [CLUE](https://www.cluebenchmarks.com/) 自成立以来发布了多项 NLP 评测基准，包括分类榜单，阅读理解榜单和自然语言推断榜单等，在学术界、工业界产生了深远影响。是目前应用最广泛的中文语言测评指标之一。详细可参考 [CLUE论文](https://arxiv.org/abs/2004.05986)。
 
 本项目基于 PaddlePaddle 在 CLUE 数据集上对领先的开源预训练模型模型进行了充分评测，为开发者在预训练模型选择上提供参考，同时开发者基于本项目可以轻松一键复现模型效果，也可以参加 CLUE 竞赛取得好成绩。
+
+<a name="CLUE评测结果"></a>
 
 ## CLUE 评测结果
 
@@ -12,8 +28,8 @@
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
         <tbody>
                 <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px;">Config</span>
+                        <td style="text-align:center;vertical-align:middle">
+                                <span style="font-size:18px;">Arch</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px;">Model</span>
@@ -92,7 +108,7 @@
                         </td>
                 </tr>
                 <tr>
-			<td rowspan=6 align=center> 12L768H </td>
+            <td rowspan=6 align=center> 12L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
                         </td>
@@ -170,7 +186,7 @@
                 </tr>
                <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">Mengzi-Bert-Base</span>
+                                <span style="font-size:18px">Mengzi-BERT-Base</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">74.69</span>
@@ -321,47 +337,47 @@
                         </td>
                 </tr>
                 <tr>
-                       <td rowspan=2 align=center> 6L768H </td>
+                        <td rowspan=5 align=center> 6L768H </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>72.49</b></span>
+                                <span style="font-size:18px"><b>72.49</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>73.37</b></span>
+                                <span style="font-size:18px"><b>73.37</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>57.00</b></span>
+                                <span style="font-size:18px"><b>57.00</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>60.67</b></span>
+                                <span style="font-size:18px"><b>60.67</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>80.64</b></span>
+                                <span style="font-size:18px"><b>80.64</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>76.88</b></span>
+                                <span style="font-size:18px"><b>76.88</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>79.28</b></span>
+                                <span style="font-size:18px"><b>79.28</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>81.60</b></span>
+                                <span style="font-size:18px"><b>81.60</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>65.83/87.30</b></span>
+                                <span style="font-size:18px"><b>65.83/87.30</b></span>
                         </td>
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>79.91</b></span>
+                                <span style="font-size:18px"><b>79.91</b></span>
                         </td>  
                         <td style="text-align:center">
-                          <span style="font-size:18px"><b>69.73</b></span>
+                                <span style="font-size:18px"><b>69.73</b></span>
                         </td>
                 </tr>
                 <tr>
                         <td style="text-align:center">
-                                <span style="font-size:18px">RBT6, Chinese</span>
+                                <span style="font-size:18px">HLF/RBT6, Chinese</span>
                         </td>
                         <td style="text-align:center">
                                 <span style="font-size:18px">69.74</span>
@@ -397,12 +413,242 @@
                                 <span style="font-size:18px">59.93</span>
                         </td>
                 </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">69.58</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">72.22</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">55.70</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">54.48</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">79.12</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">74.07</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">77.63</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">80.17</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">62.63/83.72</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">77.64</span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px">62.11</span>
+                        </td>
+                </tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">RoFormerV2 Small</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">68.52</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">72.47</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">56.53</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">60.72</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">76.37</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">72.95</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">75.00</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">81.07</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">62.97/83.64</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">67.66</span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.41</span>
+                        </td>
+                </tr>
+                <tr>
+                <td style="text-align:center">
+                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">66.67</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">70.13</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">56.41</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">59.79</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">77.38</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">71.86</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">69.41</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">76.73</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">53.22/75.03</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">77.00</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">54.77</span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 6L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>66.90</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.85</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.24</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.48</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>77.19</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>73.08</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.05</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>79.30</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.53/81.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>69.71</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.60</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L384H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>64.21</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>71.15</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.05</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>53.83</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.81</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.41</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>69.08</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>76.50</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>53.77/77.82</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.26</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.53</b></span>
+                        </td>
+                </tr>
+                <tr>
+            <td rowspan=1 align=center> 4L312H </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>62.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.51</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>54.57</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>48.36</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>74.97</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>70.61</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>68.75</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>75.93</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>52.00/76.35</b></span>
+                        </td>
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>58.91</b></span>
+                        </td>  
+                        <td style="text-align:center">
+                                <span style="font-size:18px"><b>55.11</b></span>
+                        </td>
+                </tr>
         <tbody>
 </table>
 <br />
 
 
-AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
+AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM (Exact Match)/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
 
 其中前 7 项属于分类任务，后面 3 项属于阅读理解任务，这两种任务的训练过程在下面将会分开介绍。
 
@@ -424,25 +670,34 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 
 不同预训练模型在下游任务上做 Grid Search 之后的最优超参（learning_rate、batch_size）如下：
 
-| Model                 | AFQMC   | TNEWS   | IFLYTEK | CMNLI    | OCNLI    | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
-| --------------------- | ------- | ------- | ------- | -------- | -------- | ----------- | ------- | -------- | ------- | ------------- |
-| RoBERTa-wwm-ext-large | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
-| ERNIE 3.0-Base-zh     | 3e-5,16 | 3e-5,32 | 5e-5,32 | 3e-5,32  | 2e-5,64  | 2e-5,16     | 2e-5,32 | 2e-5,24  | 3e-5,24 | 3e-5,32       |
-| ERNIE-Gram-zh         | 1e-5,16 | 5e-5,16 | 5e-5,16 | 2e-5,32  | 2e-5,64  | 3e-5,16     | 3e-5,64 | 3e-5,32  | 2e-5,24 | 2e-5,24       |
-| Mengzi-Bert-Base      | 3e-5,32 | 5e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,16  | 3e-5,8      | 1e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,32       |
-| ERNIE-1.0             | 3e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5，32 | 3e-5，16 | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
-| RoBERTa-wwm-ext       | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
-| Bert-Base-Chinese     | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
-| ERNIE 3.0-Medium-zh   | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
-| RBT6, Chinese         | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
+| Model                            | AFQMC   | TNEWS   | IFLYTEK | CMNLI    | OCNLI    | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
+| -------------------------------- | ------- | ------- | ------- | -------- | -------- | ----------- | ------- | -------- | ------- | ------------- |
+| RoBERTa-wwm-ext-large            | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
+| ERNIE 3.0-Base-zh                | 3e-5,16 | 3e-5,32 | 5e-5,32 | 3e-5,32  | 2e-5,64  | 2e-5,16     | 2e-5,32 | 2e-5,24  | 3e-5,24 | 3e-5,32       |
+| ERNIE-Gram-zh                    | 1e-5,16 | 5e-5,16 | 5e-5,16 | 2e-5,32  | 2e-5,64  | 3e-5,16     | 3e-5,64 | 3e-5,32  | 2e-5,24 | 2e-5,24       |
+| Mengzi-Bert-Base                 | 3e-5,32 | 5e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,16  | 3e-5,8      | 1e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,32       |
+| ERNIE 1.0                        | 3e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5，32 | 3e-5，16 | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
+| RoBERTa-wwm-ext                  | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
+| BERT-Base-Chinese                | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
+| ERNIE 3.0-Medium-zh              | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
+| TinyBERT<sub>6</sub> ,Chinese    | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 3e-5,24 | 2e-5,24       |
+| RoFormerV2 Small                 | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
+| HLF/RBT6, Chinese                | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
+| UER/Chinese-RoBERTa (L6-H768) | 2e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 5e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
+| ERNIE 3.0-Mini-zh                | 5e-5,64 | 5e-5,64 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
+| ERNIE 3.0-Micro-zh               | 3e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,32  | 5e-5,16      | 3e-5,64 | 3e-5,24  | 3e-5,32 | 3e-5,24       |
+| ERNIE 3.0-Nano-zh                | 2e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,8      | 3e-5,32 | 3e-5,24  | 3e-5,24 | 2e-5,24       |
 
 
-其中，`ERNIE 3.0-Base`、`ERNIE 3.0-Medium`、`ERNIE-Gram-zh`、`ERNIE-1.0` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base`、`RBT6, Chinese`、`Mengzi-Bert-Base`、`ERNIE-Gram-zh`、`ERNIE-1.0` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
+<a name="一键复现模型效果"></a>
 
 ## 一键复现模型效果
 
 这一节将会对分类、阅读理解任务分别展示如何一键复现本文的评测结果。
+
+<a name="启动CLUE分类任务"></a>
 
 ### 启动 CLUE 分类任务
 以 CLUE 的 TNEWS 任务为例，启动 CLUE 任务进行 Fine-tuning 的方式如下：
@@ -475,6 +730,7 @@ python -u ./run_clue_classifier.py \
     --device gpu  \
     --dropout 0.1 \
     --gradient_accumulation_steps 1 \
+    --save_best_model True \
     --do_train \
 
 ```
@@ -482,8 +738,8 @@ python -u ./run_clue_classifier.py \
 另外，如需评估，传入参数 `--do_eval` 即可，如果只对读入的 checkpoint 进行评估不训练，则不需传入 `--do_train`。
 
 其中参数释义如下：
-- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型，可以选择[Transformer预训练模型汇总](../../../docs/model_zoo/transformers.rst)中相对应的中文预训练权重。注意 CLUE 任务应选择中文预训练权重。
 
+- `model_name_or_path` 指示了 Fine-tuning 使用的具体预训练模型，可以是 PaddleNLP 提供的预训练模型，可以选择[Transformer预训练模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 中相对应的中文预训练权重。注意 CLUE 任务应选择中文预训练权重。
 - `task_name` 表示 Fine-tuning 的分类任务，当前支持 AFQMC、TNEWS、IFLYTEK、OCNLI、CMNLI、CSL、CLUEWSC2020。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -491,6 +747,7 @@ python -u ./run_clue_classifier.py \
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
+- `save_best_model` 是否保存在评估集上效果最好的模型，默认为 True
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu' 表示使用GPU, 'xpu' 表示使用百度昆仑卡, 'cpu' 表示使用 CPU。
 
@@ -506,7 +763,10 @@ eval loss: 2.572999, acc: 0.112, eval done total : 25.67190170288086 s
 global step 400/20010, epoch: 0, batch: 399, rank_id: 0, loss: 2.631579, lr: 0.0000059970, speed: 2.6238 step/s
 eval loss: 2.476962, acc: 0.1697, eval done total : 25.794789791107178 s
 ```
-#### 使用Trainer启动 CLUE 分类任务
+
+<a name="使用Trainer启动CLUE分类任务"></a>
+
+#### 使用 Trainer 启动 CLUE 分类任务
 PaddleNLP 提供了 Trainer API，本示例新增了`run_clue_classifier_trainer.py`脚本供用户使用。
 
 ```
@@ -552,6 +812,8 @@ python -u ./run_clue_classifier_trainer.py \
 - `load_best_model_at_end` 训练结束时，时候加载评估结果最好的 ckpt。
 - `save_total_limit` 保存的ckpt数量的最大限制
 
+<a name="启动CLUE阅读理解任务"></a>
+
 ### 启动 CLUE 阅读理解任务
 以 CLUE 的 C<sup>3</sup> 任务为例，多卡启动 CLUE 任务进行 Fine-tuning 的方式如下：
 
@@ -576,11 +838,80 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 ```
 需要注意的是，如果显存无法容纳所传入的 `batch_size`，可以通过传入 `gradient_accumulation_steps` 参数来模拟该 `batch_size`。
 
+<a name="批量启动GridSearch"></a>
+
+### 批量启动 Grid Search
+
+<a name="环境依赖"></a>
+
+#### 环境依赖
+
+Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库。pynvml 库提供了 GPU 管理的 Python 接口。
+
+可启动以下命令进行安装 pynvml：
+
+```shell
+pip install pynvml
+```
+
+<a name="一键启动方法"></a>
+
+#### 一键启动方法
+
+运行下面一句命令即可启动 Grid Search 任务。前期需要注意数据集是否正常下载，否则训练任务不会正式启动。
+
+```shell
+cd grid_search_tools
+
+# 这里 ernie-3.0-nano-zh 是模型名，也可以传用户自定义的模型目录
+# 自定义的模型目录需要有 model_config.json, model_state.pdparams, tokenizer_config.json 和 vocab.txt 四个文件
+python grid_seach.py ernie-3.0-nano-zh
+
+```
+
+确认模型所有任务训练完成后，可以调用脚本 `extract_result.sh` 一键抽取 Grid Search 结果，打印出每个任务的最佳结果和对应的超参数，例如：
+
+```shell
+bash extract_result.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带'/'
+```
+```text
+AFQMC    TNEWS    IFLYTEK    CMNLI    OCNLI    CLUEWSC2020    CSL    CMRC2018    CHID    C3
+76.48    58.47    61.18    83.57    80.20    88.49    82.80    72.20/90.67    83.67    78.49
+====================================================================
+best hyper-parameters list:
+====================================================================
+afqmc's best result is 76.48, and lr, bs, dropout_p are: 3e-05 16 0.1
+tnews's best result is 58.47, and lr, bs, dropout_p are: 5e-05 16 0.1
+iflytek's best result is 61.18, and lr, bs, dropout_p are: 5e-05 16 0.0
+ocnli's best result is 80.20, and lr, bs, dropout_p are: 2e-05 16 0.1
+cluewsc2020's best result is 88.49, and lr, bs, dropout_p are: 2e-05 32 0.0
+csl's best result is 82.80, lr, bs, and dropout_p are: 5e-05 64 0.1
+cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
+```
+
+另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
+
+<a name="GridSearch脚本说明"></a>
+
+#### Grid Search 脚本说明
+
+本节介绍 grid_search_tools 目录下各个脚本的功能：
+
+- `grid_search.py` Grid Search 任务入口脚本，该脚本负责调度 GPU 资源，可自动将 7 个分类任务、3 个阅读理解下所有超参数对应的任务完成，训练完成后会自动调用抽取结果的脚本 `extract_result.sh` 打印出所有任务的最佳结果和对应的超参。
+- `warmup_dataset_and_model.py` 首次运行时，该脚本完成模型下载（如需）、数据集下载，阅读理解任务数据预处理、预处理文件缓存等工作，再次运行则会检查这些文件是否存在，存在则跳过。该脚本由 `grid_search.py` 在 Grid Search 训练前自动调用，预处理 cache 文件生成后，后面所有训练任务即可加载缓存文件避免重复进行数据预处理。如果该阶段任务失败，大多需要检查网络，解决之后需重启 `grid_search.py`，直到训练正常开始。该脚本也可手动调用，需要 1 个参数，模型名称或目录。该脚本在使用 Intel(R) Xeon(R) Gold 6271C CPU 且 `--num_proc`默认为 4 的情况下需约 30 分钟左右完成，可以更改 `run_mrc.sh` 中的 `--num_proc` 参数以改变生成 cache 的进程数。需要注意的是，若改变 num_proc，之前的缓存则不能再使用，该脚本会重新处理数据并生成新的 cache，cache 相关内容可查看[datasets.Dataset.map文档](https://huggingface.co/docs/datasets/v2.0.0/package_reference/main_classes?highlight=map#datasets.Dataset.map)。
+- `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
+- `run_mrc.sh` 阅读理解任务的启动脚本。
+- `run_cls.sh` 分类任务的启动脚本。
+
+<a name="参加CLUE竞赛"></a>
+
 ## 参加 CLUE 竞赛
 
-对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至CLUE官网进行评测。
+对各个任务运行预测脚本，汇总多个结果文件压缩之后，即可提交至 CLUE 官网进行评测。
 
 下面 2 小节会分别介绍分类、阅读理解任务产生预测结果的方法。
+
+<a name="分类任务"></a>
 
 ### 分类任务
 
@@ -597,6 +928,7 @@ python run_clue_classifier.py \
     --output_dir ${OUTPUT_DIR} \
     --do_predict \
 ```
+<a name="阅读理解任务"></a>
 
 ### 阅读理解任务
 

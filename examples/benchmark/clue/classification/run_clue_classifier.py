@@ -19,6 +19,7 @@ import random
 import time
 import math
 import json
+import distutils.util
 from functools import partial
 
 import numpy as np
@@ -31,6 +32,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -137,6 +139,11 @@ def parse_args():
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
     parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.", )
+    parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
@@ -174,7 +181,7 @@ def evaluate(model, loss_fct, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
+    logger.info("eval loss: %f, acc: %s, " % (loss.numpy(), res))
     model.train()
     return res
 
@@ -193,11 +200,7 @@ def convert_example(example,
     # Convert raw text to feature
     if 'keyword' in example:  # CSL
         sentence1 = " ".join(example['keyword'])
-        example = {
-            'sentence1': sentence1,
-            'sentence2': example['abst'],
-            'label': example['label']
-        }
+        example = {'sentence1': sentence1, 'sentence2': example['abst']}
     elif 'target' in example:  # wsc
         text, query, pronoun, query_idx, pronoun_idx = example['text'], example[
             'target']['span1_text'], example['target']['span2_text'], example[
@@ -282,7 +285,7 @@ def do_eval(args):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("acc: %s\n, " % (res), end='')
+    logger.info("acc: %s\n, " % (res))
 
 
 def do_train(args):
@@ -395,7 +398,7 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 if global_step % args.logging_steps == 0:
-                    print(
+                    logger.info(
                         "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                         % (global_step, num_training_steps, epoch, step,
                            paddle.distributed.get_rank(), loss,
@@ -405,21 +408,23 @@ def do_train(args):
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     tic_eval = time.time()
                     acc = evaluate(model, loss_fct, metric, dev_data_loader)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
+                    logger.info("eval done total : %s s" %
+                                (time.time() - tic_eval))
                     if acc > best_acc:
                         best_acc = acc
-                        output_dir = args.output_dir
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # Need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
+                        if args.save_best_model:
+                            output_dir = args.output_dir
+                            if not os.path.exists(output_dir):
+                                os.makedirs(output_dir)
+                            # Need better way to get inner model of DataParallel
+                            model_to_save = model._layers if isinstance(
+                                model, paddle.DataParallel) else model
+                            model_to_save.save_pretrained(output_dir)
+                            tokenizer.save_pretrained(output_dir)
                 if global_step >= num_training_steps:
-                    print("best_acc: ", best_acc)
+                    logger.info("best_result: %.2f" % (best_acc * 100))
                     return
-    print("best_acc: ", best_acc)
+    logger.info("best_result: %.2f" % (best_acc * 100))
 
 
 def do_predict(args):
@@ -428,6 +433,8 @@ def do_predict(args):
 
     train_ds, test_ds = load_dataset(
         'clue', args.task_name, splits=('train', 'test'))
+    if args.task_name == "cluewsc2020" or args.task_name == "tnews":
+        test_ds_10 = load_dataset('clue', args.task_name, splits="test1.0")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
@@ -448,6 +455,16 @@ def do_predict(args):
         collate_fn=batchify_fn,
         num_workers=0,
         return_list=True)
+    if args.task_name == "cluewsc2020" or args.task_name == "tnews":
+        test_ds_10 = test_ds_10.map(trans_func, lazy=True)
+        test_batch_sampler_10 = paddle.io.BatchSampler(
+            test_ds_10, batch_size=args.batch_size, shuffle=False)
+        test_data_loader_10 = DataLoader(
+            dataset=test_ds_10,
+            batch_sampler=test_batch_sampler_10,
+            collate_fn=batchify_fn,
+            num_workers=0,
+            return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
 
@@ -456,15 +473,45 @@ def do_predict(args):
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
-    if args.task_name == 'ocnli':
-        args.task_name = 'ocnli_50k'
-    f = open(
-        os.path.join(args.output_dir, args.task_name + "_predict.json"), 'w')
 
+    prediction_filename = args.task_name
+
+    if args.task_name == 'ocnli':
+        prediction_filename = 'ocnli_50k'
+    elif args.task_name == "cluewsc2020":
+        prediction_filename = "cluewsc" + "11"
+    elif args.task_name == "tnews":
+        prediction_filename = args.task_name + "11"
+
+    # For version 1.1
+    f = open(
+        os.path.join(args.output_dir, prediction_filename + "_predict.json"),
+        'w')
+    preds = []
     for step, batch in enumerate(test_data_loader):
         with paddle.no_grad():
             logits = model(**batch)
-        preds = paddle.argmax(logits, axis=1)
+        pred = paddle.argmax(logits, axis=1).numpy().tolist()
+        preds += pred
+    for idx, pred in enumerate(preds):
+        j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
+        f.write(j + "\n")
+
+    # For version 1.0
+    if args.task_name == "cluewsc2020" or args.task_name == "tnews":
+        prediction_filename = args.task_name + "10"
+        if args.task_name == "cluewsc2020":
+            prediction_filename = "cluewsc10"
+        f = open(
+            os.path.join(args.output_dir,
+                         prediction_filename + "_predict.json"), 'w')
+
+        preds = []
+        for step, batch in enumerate(test_data_loader_10):
+            with paddle.no_grad():
+                logits = model(**batch)
+            pred = paddle.argmax(logits, axis=1).numpy().tolist()
+            preds += pred
         for idx, pred in enumerate(preds):
             j = json.dumps({"id": idx, "label": train_ds.label_list[pred]})
             f.write(j + "\n")

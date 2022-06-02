@@ -87,16 +87,16 @@ class NERWordTagTask(WordTagTask):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
-                "12685d1d84c09fb851b6c1541af1146e"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_state.pdparams",
+                "a93e4074c9440cc3f1d4d29e54cf766d"
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
-                "aa47cdf7c270943a24495bd5ff59dc00"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
+                "9dcbd5d6f67792b2a2be058799a144ea"
             ],
             "tags": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
-                "87db06ae6ca42565157045ab3e9a996f"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
+                "f33feedd01d478b03bac81be19b48d00"
             ],
         }
     }

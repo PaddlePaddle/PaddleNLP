@@ -1,0 +1,71 @@
+# Default Args for all dataset 
+# You can overwrite the configs in each dataset.
+DefaultArgs:
+    learning_rate: 0.00005
+    num_train_epochs: 3
+    batch_size: 64
+    max_seq_length: 128
+    weight_decay: 0.01
+    logging_steps: 10
+    eval_steps: 200
+    minimum_eval_times: -1
+    max_steps: -1
+    warmup_steps: 0
+    warmup_ratio: 0.1
+    metric: "Accuracy"
+
+# Datasets which used for sequence classfication
+SequenceClassification:
+    clue afqmc: 
+        num_train_epochs: 4
+    clue tnews:
+        num_train_epochs: 4
+    clue iflytek:
+        num_train_epochs: 8
+    clue ocnli:
+        num_train_epochs: 8
+    clue cmnli: 
+        num_train_epochs: 3
+    clue wsc: 
+        num_train_epochs: 50
+    clue csl:
+        num_train_epochs: 10
+        max_seq_length: 256
+        batch_size: 32
+    xnli_cn:
+        learning_rate: 0.0001
+        num_train_epochs: 3
+        batch_size: 256
+    chnsenticorp_v2:
+        learning_rate: 0.00005
+        batch_size: 16
+        num_train_epochs: 8
+
+# Datasets which used for token classfication
+TokenClassification:
+    peoples_daily_ner:
+        learning_rate: 0.00005
+        num_train_epochs: 4
+        batch_size: 128
+    msra_ner:
+        num_train_epochs: 3
+
+# Datasets which used for question answersing
+QuestionAnswering:
+    cmrc2018:
+        learning_rate: 0.00005
+        num_train_epochs: 1
+        batch_size: 32
+        max_seq_length: 384
+    dureader_nlp:
+        num_train_epochs: 1
+        batch_size: 12
+        max_seq_length: 384
+    dureader_robust:
+        num_train_epochs: 1
+        batch_size: 12
+        max_seq_length: 384
+    dlbp:
+        num_train_epochs: 1
+        batch_size: 12
+        max_seq_length: 384

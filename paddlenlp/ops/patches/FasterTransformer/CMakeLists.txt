@@ -271,6 +271,12 @@ if(BUILD_PD)
   endif()
 endif()
 
+if(BUILD_GPT)
+  list(APPEND COMMON_HEADER_DIRS ${NCCL_INCLUDE_DIRS})
+  get_filename_component(NCCL_LIB_DIRS ${NCCL_LIBRARIES} DIRECTORY)
+  list(APPEND COMMON_LIB_DIRS ${NCCL_LIB_DIRS})
+endif()
+
 list(APPEND COMMON_HEADER_DIRS ${MPI_INCLUDE_PATH})
 
 include_directories(
@@ -300,7 +306,9 @@ add_library(transformer-static STATIC
   $<TARGET_OBJECTS:nvtx_utils>
   $<TARGET_OBJECTS:cuda_int8_kernels>
   $<TARGET_OBJECTS:attention_kernels>
-  $<TARGET_OBJECTS:trt_fused_multi_head_attention>
+  # trt_fused_multi_head_attention, gpt_triton_backend have been removed to
+  # resolve encoder ON_INFER compiling issue.
+  # $<TARGET_OBJECTS:trt_fused_multi_head_attention>
   $<TARGET_OBJECTS:encoder_gemm_func>
   $<TARGET_OBJECTS:encoder_igemm_func>
   $<TARGET_OBJECTS:decoder>
@@ -319,15 +327,15 @@ add_library(transformer-shared SHARED
   $<TARGET_OBJECTS:nvtx_utils>
   $<TARGET_OBJECTS:cuda_int8_kernels>
   $<TARGET_OBJECTS:attention_kernels>
-  $<TARGET_OBJECTS:trt_fused_multi_head_attention>
+  # $<TARGET_OBJECTS:trt_fused_multi_head_attention>
   $<TARGET_OBJECTS:encoder_gemm_func>
   $<TARGET_OBJECTS:encoder_igemm_func>
   $<TARGET_OBJECTS:decoder>
   $<TARGET_OBJECTS:decoding>
   $<TARGET_OBJECTS:topk>
   $<TARGET_OBJECTS:online_softmax_beamsearch>
-  $<TARGET_OBJECTS:nccl_utils>
-  $<TARGET_OBJECTS:gpt_triton_backend>)
+  $<TARGET_OBJECTS:nccl_utils>)
+  # $<TARGET_OBJECTS:gpt_triton_backend>)
 ## add_library(transformer-shared SHARED  $<TARGET_OBJECTS:encoder>)
 set_target_properties(transformer-shared PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(transformer-shared PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)

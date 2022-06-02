@@ -69,9 +69,11 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("XLNetTokenizer", "xlnet"),
     ("XLMTokenizer", "xlm"),
     ("GPTTokenizer", "gpt"),
+    ("GPTChineseTokenizer", "gpt"),
     ("T5Tokenizer", 't5'),
     ("BertTokenizer", "bert"),
     ("BartTokenizer", "bart"),
+    ("GAUAlphaTokenizer", "gau_alpha"),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict(

@@ -51,8 +51,8 @@ f1_score = (2 * P * R) / (P + R)，其中
 
 ### 快速复现基线Step1：数据预处理并加载
 
-从比赛官网下载数据集，解压存放于data/DuEE-Fin目录下，将原始数据预处理成序列标注格式数据。
-处理之后的数据同样放在data/DuEE-Fin下，触发词识别数据文件存放在data/DuEE-Fin/role下，论元角色识别数据文件存放在data/DuEE-Fin/trigger下。
+从比赛官网下载数据集，逐层解压存放于data/DuEE-fin目录下，运行以下脚本将原始数据预处理成序列标注格式数据。
+处理之后的数据放在data/DuEE-Fin下，触发词识别数据文件存放在data/DuEE-Fin/role下，论元角色识别数据文件存放在data/DuEE-Fin/trigger下。
 枚举分类数据存放在data/DuEE-Fin/enum下。
 
 ```
@@ -91,7 +91,7 @@ test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
 ```python
 from paddlenlp.transformers import ErnieForTokenClassification
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+model = ErnieForTokenClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(label_map))
 ```
 
 同时，对于枚举分类数据采用的是基于ERNIE的文本分类模型，枚举角色类型为环节。模型原理图如下：
@@ -106,7 +106,7 @@ model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len
 **同样地，PaddleNLP提供了ERNIE预训练模型常用文本分类模型，可以通过指定模型名字完成一键加载**：
 
 ```python
-model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+model = ErnieForSequenceClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(label_map))
 ```
 
 ### 快速复现基线Step3：数据处理
@@ -117,7 +117,7 @@ model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=
 ```python
 from paddlenlp.transformers import ErnieTokenizer
 
-tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0-base-zh")
 ```
 
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。
@@ -213,7 +213,7 @@ f1_score = (2 * P * R) / (P + R)，其中
 ## 进阶优化基线效果
 
 基线采用的预训练模型为ERNIE，PaddleNLP提供了丰富的预训练模型，如BERT，RoBERTa，Electra，XLNet等
-参考[PaddleNLP预训练模型介绍](../../../docs/model_zoo/transformers.rst)
+参考[PaddleNLP预训练模型介绍](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 如可以选择RoBERTa large中文模型优化模型效果，只需更换模型和tokenizer即可无缝衔接。
 

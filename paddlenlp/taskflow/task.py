@@ -17,7 +17,11 @@ import os
 import abc
 import math
 from abc import abstractmethod
+from multiprocessing import cpu_count
+
 import paddle
+from paddle.dataset.common import md5file
+
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
 from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
@@ -36,14 +40,23 @@ class Task(metaclass=abc.ABCMeta):
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
         self.task = task
-        self.priority_path = priority_path
         self.kwargs = kwargs
+        self._priority_path = priority_path
         self._usage = ""
         # The dygraph model instantce 
         self._model = None
         # The static model instantce
         self._input_spec = None
         self._config = None
+        self._custom_model = False
+        self._param_updated = False
+        self._num_threads = self.kwargs[
+            'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
+                cpu_count() / 2)
+        self._infer_precision = self.kwargs[
+            'precision'] if 'precision' in self.kwargs else 'fp32'
+        # Default to use Paddle Inference
+        self._predictor_type = 'paddle-inference'
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
         self._home_path = self.kwargs[
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
@@ -51,9 +64,10 @@ class Task(metaclass=abc.ABCMeta):
             'task_flag'] if 'task_flag' in self.kwargs else self.model
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
-        elif self.priority_path:
+            self._custom_model = True
+        elif self._priority_path:
             self._task_path = os.path.join(self._home_path, "taskflow",
-                                           self.priority_path)
+                                           self._priority_path)
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
@@ -103,21 +117,55 @@ class Task(metaclass=abc.ABCMeta):
         """
         for file_id, file_name in self.resource_files_names.items():
             path = os.path.join(self._task_path, file_name)
+            url = self.resource_files_urls[self.model][file_id][0]
+            md5 = self.resource_files_urls[self.model][file_id][1]
+
+            downloaded = True
             if not os.path.exists(path):
-                url = self.resource_files_urls[self.model][file_id]
-                download_file(self._task_path, file_name, url[0], url[1])
+                downloaded = False
+            else:
+                if not self._custom_model:
+                    if os.path.exists(path):
+                        # Check whether the file is updated
+                        if not md5file(path) == md5:
+                            downloaded = False
+                            if file_id == "model_state":
+                                self._param_updated = True
+                    else:
+                        downloaded = False
+            if not downloaded:
+                download_file(self._task_path, file_name, url, md5)
+
+    def _check_predictor_type(self):
+        if paddle.get_device() == 'cpu' and self._infer_precision == 'fp16':
+            logger.info(
+                "The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu."
+            )
+        else:
+            if self._infer_precision == 'fp16':
+                try:
+                    import onnx
+                    import onnxruntime as ort
+                    import paddle2onnx
+                    from onnxconverter_common import float16
+                    self._predictor_type = 'onnxruntime'
+                except:
+                    logger.info(
+                        "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common paddle2onnx"
+                    )
 
     def _prepare_static_mode(self):
         """
         Construct the input data and predictor in the PaddlePaddele static mode. 
         """
-        place = paddle.get_device()
-        if place == 'cpu':
+        if paddle.get_device() == 'cpu':
             self._config.disable_gpu()
+            self._config.enable_mkldnn()
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
             # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
+        self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
@@ -131,22 +179,66 @@ class Task(metaclass=abc.ABCMeta):
             for name in self.predictor.get_output_names()
         ]
 
+    def _prepare_onnx_mode(self):
+        import onnx
+        import onnxruntime as ort
+        import paddle2onnx
+        from onnxconverter_common import float16
+        onnx_dir = os.path.join(self._task_path, 'onnx')
+        if not os.path.exists(onnx_dir):
+            os.mkdir(onnx_dir)
+        float_onnx_file = os.path.join(onnx_dir, 'model.onnx')
+        if not os.path.exists(float_onnx_file):
+            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+                model_file=self._static_model_file,
+                params_file=self._static_params_file,
+                opset_version=13,
+                enable_onnx_checker=True)
+            with open(float_onnx_file, "wb") as f:
+                f.write(onnx_model)
+        fp16_model_file = os.path.join(onnx_dir, 'fp16_model.onnx')
+        if not os.path.exists(fp16_model_file):
+            onnx_model = onnx.load_model(float_onnx_file)
+            trans_model = float16.convert_float_to_float16(
+                onnx_model, keep_io_types=True)
+            onnx.save_model(trans_model, fp16_model_file)
+        providers = ['CUDAExecutionProvider']
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads = self._num_threads
+        sess_options.inter_op_num_threads = self._num_threads
+        self.predictor = ort.InferenceSession(
+            fp16_model_file, sess_options=sess_options, providers=providers)
+        try:
+            assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+        except AssertionError:
+            raise AssertionError(
+                f"The environment for GPU inference is not set properly. "
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
+                "Please run the following commands to reinstall: \n "
+                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
+            )
+
     def _get_inference_model(self):
         """
         Return the inference program, inputs and outputs in static mode. 
         """
         inference_model_path = os.path.join(self._task_path, "static",
                                             "inference")
-        if not os.path.exists(inference_model_path + ".pdiparams"):
+        if not os.path.exists(inference_model_path +
+                              ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
                 self._construct_model(self.model)
                 self._construct_input_spec()
                 self._convert_dygraph_to_static()
 
-        model_file = inference_model_path + ".pdmodel"
-        params_file = inference_model_path + ".pdiparams"
-        self._config = paddle.inference.Config(model_file, params_file)
-        self._prepare_static_mode()
+        self._static_model_file = inference_model_path + ".pdmodel"
+        self._static_params_file = inference_model_path + ".pdiparams"
+        if self._predictor_type == "paddle-inference":
+            self._config = paddle.inference.Config(self._static_model_file,
+                                                   self._static_params_file)
+            self._prepare_static_mode()
+        else:
+            self._prepare_onnx_mode()
 
     def _convert_dygraph_to_static(self):
         """

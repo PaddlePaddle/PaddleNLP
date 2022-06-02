@@ -403,7 +403,9 @@ class DownloaderCheck(threading.Thread):
             extra.update({"addition": addition})
         try:
             import paddle
+            import paddlenlp
             payload['hub_version'] = " "
+            payload['ppnlp_version'] = paddlenlp.__version__
             payload['paddle_version'] = paddle.__version__.split('-')[0]
             payload['from'] = 'ppnlp'
             payload['extra'] = json.dumps(extra)
