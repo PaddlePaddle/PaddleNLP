@@ -196,22 +196,27 @@ def run_evaluate(data_loader,
         input_ids, segment_ids, input_mask, masked_lm_positions, \
         masked_lm_labels, next_sentence_labels = batch
 
-        # Create the model for the gpt pretrain
-        prediction_scores, seq_relationship_score = model(
-            input_ids=input_ids,
-            token_type_ids=segment_ids,
-            position_ids=None,
-            attention_mask=input_mask,
-            masked_positions=masked_lm_positions)
-
         if args.binary_head:
+            prediction_scores, seq_relationship_score = model(
+                input_ids=input_ids,
+                token_type_ids=segment_ids,
+                position_ids=None,
+                attention_mask=input_mask,
+                masked_positions=masked_lm_positions)
+
             lm_loss, sop_loss = criterion(
                 prediction_scores, seq_relationship_score, masked_lm_labels,
                 next_sentence_labels)
             loss = lm_loss + sop_loss
         else:
-            loss = criterion(prediction_scores, seq_relationship_score,
-                             masked_lm_labels)
+            prediction_scores = model(
+                input_ids=input_ids,
+                token_type_ids=segment_ids,
+                position_ids=None,
+                attention_mask=input_mask,
+                masked_positions=masked_lm_positions)
+
+            loss = criterion(prediction_scores, None, masked_lm_labels)
 
         loss_global["loss"] += loss.detach()
         if args.binary_head:
