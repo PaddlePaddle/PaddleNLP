@@ -69,6 +69,9 @@ struct FailureArray {
                             const std::string& continuing_subword_prefix);
   const Failure* GetFailure(int idx) const { return &(failure_array_.at(idx)); }
   int GetFailurePop(int idx) const { return failure_pops_pool_.at(idx); }
+  void SetWithPretokenization(bool with_pretokenization) {
+    with_pretokenization_ = with_pretokenization;
+  }
 
 private:
   void BuildOutgoingEdgeLabelsForTrie(

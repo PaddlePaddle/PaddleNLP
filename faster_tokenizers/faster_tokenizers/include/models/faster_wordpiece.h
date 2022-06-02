@@ -35,6 +35,7 @@ struct FasterWordPiece : public WordPiece {
       const std::string& sequence) const override;
 
 private:
+  void InitFailureAndTrie();
   std::vector<core::Token> TokenizeWithoutPreTokenize(
       const std::string& sequence) const;
   std::vector<core::Token> TokenizeWithPreTokenize(

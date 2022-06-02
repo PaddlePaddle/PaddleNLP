@@ -233,5 +233,16 @@ void Trie::DeleteLinkFromParent(uint32_t child_node_id) {
   trie_array_[child_node_id] &= 0xFFFFFF00;
 }
 
+void Trie::SetWithPretokenization(bool with_pretokenization) {
+  with_pretokenization = with_pretokenization_;
+}
+
+void Trie::SetUNKToken(const std::string& unk_token) { unk_token_ = unk_token; }
+
+void Trie::SetContinuingSubwordPrefix(
+    const std::string& continuing_subword_prefix) {
+  continuing_subword_prefix_ = continuing_subword_prefix;
+}
+
 }  // namespace utils
 }  // namespace tokenizers

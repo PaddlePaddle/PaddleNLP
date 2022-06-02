@@ -30,11 +30,19 @@ namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
-FasterWordPiece::FasterWordPiece() : WordPiece(), with_pretokenization_(false) {
+void FasterWordPiece::InitFailureAndTrie() {
+  unk_token_id_ = vocab_.at(unk_token_);
+  trie_.SetWithPretokenization(with_pretokenization_);
+  trie_.SetUNKToken(unk_token_);
+  trie_.SetContinuingSubwordPrefix(continuing_subword_prefix_);
+  failure_array_.SetWithPretokenization(with_pretokenization_);
   failure_array_.InitFromVocabAndTrie(
       vocab_, &trie_, unk_token_, continuing_subword_prefix_);
   PrecomputeEncodeValueForSubwordPrefix();
 }
+
+FasterWordPiece::FasterWordPiece()
+    : WordPiece(), with_pretokenization_(false) {}
 
 FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
                                  const std::string& unk_token,
@@ -48,9 +56,7 @@ FasterWordPiece::FasterWordPiece(const core::Vocab& vocab,
       trie_(continuing_subword_prefix, unk_token, with_pretokenization),
       with_pretokenization_(with_pretokenization),
       failure_array_(with_pretokenization) {
-  failure_array_.InitFromVocabAndTrie(
-      vocab_, &trie_, unk_token_, continuing_subword_prefix_);
-  PrecomputeEncodeValueForSubwordPrefix();
+  InitFailureAndTrie();
 }
 
 void FasterWordPiece::PrecomputeEncodeValueForSubwordPrefix() {
@@ -387,6 +393,7 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
   j["max_input_chars_per_word"].get_to(model.max_input_chars_per_word_);
   j["continuing_subword_prefix"].get_to(model.continuing_subword_prefix_);
   j["with_pretokenization"].get_to(model.with_pretokenization_);
+  model.InitFailureAndTrie();
 }
 
 }  // models
