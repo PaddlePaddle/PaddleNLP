@@ -109,4 +109,15 @@ python -m paddle.distributed.launch --gpus 0,1 --log_dir outputs xnli_train.py \
 ## 参考资料
 - https://github.com/facebookresearch/XLM
 - https://github.com/huggingface/transformers/tree/main/src/transformers/models/xlm
-- https://arxiv.org/pdf/1901.07291.pdf
+
+## 引用
+
+Bibtex:
+```tex
+@article{lample2019cross,
+  title={Cross-lingual Language Model Pretraining},
+  author={Lample, Guillaume and Conneau, Alexis},
+  journal={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2019}
+}
+```

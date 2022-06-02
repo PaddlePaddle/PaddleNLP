@@ -87,6 +87,7 @@ def convert_example(example, tokenizer, max_seq_length=256, language="en"):
         text_pair=hypothesis,
         max_length=max_seq_length,
         return_attention_mask=True,
+        return_token_type_ids=False,
         lang=language)
     return example["input_ids"], example["attention_mask"], label
 
