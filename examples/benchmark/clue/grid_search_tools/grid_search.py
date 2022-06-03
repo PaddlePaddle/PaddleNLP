@@ -62,7 +62,7 @@ def get_mrc_tasks(model_name_or_path):
                 f"bash run_mrc.sh {model_name_or_path} chid {bs} {lr} {cls_base_grd_acc*2}"
             )
             tasks.append(
-                f"bash run_mrc.sh {model_name_or_path} cmrc2018 {bs} {lr} {cls_base_grd_acc}"
+                f"bash run_mrc.sh {model_name_or_path} cmrc {bs} {lr} {cls_base_grd_acc}"
             )
             tasks.append(
                 f"bash run_mrc.sh {model_name_or_path} c3 {bs} {lr} {bs//2}")

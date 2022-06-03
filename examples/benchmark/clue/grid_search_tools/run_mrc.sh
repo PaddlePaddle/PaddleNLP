@@ -57,7 +57,7 @@ python ../mrc/run_${TASK_NAME}.py \
     --num_train_epochs ${EPOCHS} \
     --output_dir ${MODEL_PATH}/${TASK_NAME}_model/${LR}_${BATCH_SIZE}/ \
     --do_train \
-    --seed 42 \
+    --seed 45 \
     --weight_decay 0.01 \
     --device gpu \
     --num_proc 4 \
