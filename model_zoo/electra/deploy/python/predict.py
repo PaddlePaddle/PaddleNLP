@@ -157,7 +157,7 @@ def predict(args, sentences=[], paths=[]):
     predictor = create_paddle_predictor(config)
 
     start_time = time.time()
-    output_datas = []
+    output_data = []
     count = 0
     for i, sen in enumerate(predicted_input):
         sen = np.array(sen).astype("int64")
@@ -178,7 +178,7 @@ def predict(args, sentences=[], paths=[]):
         output_tensor = predictor.get_output_tensor(output_names[0])
         output_data = output_tensor.copy_to_cpu()
         output_res = np.argmax(output_data, axis=1).tolist()
-        output_datas.append(output_res)
+        output_data.append(output_res)
 
         print("===== batch {} =====".format(i))
         for j in range(len(predicted_sens[i])):
