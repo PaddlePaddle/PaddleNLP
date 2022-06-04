@@ -107,7 +107,6 @@ def parse_args():
         "--collect_shape",
         action='store_true',
         help="Whether to collect shape info.")
-
     parser.add_argument(
         "--precision",
         default="fp32",
@@ -127,6 +126,17 @@ def parse_args():
         type=distutils.util.strtobool,
         default=False,
         help="Use onnxruntime to infer or not.")
+    parser.add_argument(
+        "--debug",
+        action='store_true',
+        help="Use onnxruntime to infer or not.")
+    parser.add_argument(
+        "--provider",
+        default='CPUExecutionProvider',
+        choices=['CPUExecutionProvider', 'DnnlExecutionProvider'],
+        type=str,
+        help="Onnx with DNNL or without DNNL")
+
     args = parser.parse_args()
     return args
 
@@ -204,23 +214,20 @@ class Predictor(object):
                     opset_version=13,
                     enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
-            providers = ['CUDAExecutionProvider']
             if args.enable_quantize:
                 from onnxruntime.quantization import QuantizationMode, quantize_dynamic
-
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
                 dynamic_quantize_model = "dynamic_quantize_model.onnx"
                 quantize_dynamic(float_onnx_file, dynamic_quantize_model)
-                providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = args.num_threads
             sess_options.inter_op_num_threads = args.num_threads
             predictor = ort.InferenceSession(
                 dynamic_quantize_model,
                 sess_options=sess_options,
-                providers=providers)
+                providers=[executionprovider])
             input_name1 = predictor.get_inputs()[1].name
             input_name2 = predictor.get_inputs()[0].name
             input_handles = [input_name1, input_name2]
@@ -238,6 +245,10 @@ class Predictor(object):
             config.disable_gpu()
             config.switch_ir_optim(True)
             config.enable_mkldnn()
+            if args.enable_quantize: 
+                config.enable_mkldnn_int8()
+            if args.debug:
+                config.switch_ir_debug(True)
             config.set_cpu_math_library_num_threads(args.num_threads)
             cls.device = paddle.set_device("cpu")
         elif args.device == "xpu":
