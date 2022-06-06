@@ -300,10 +300,10 @@ def create_pretrained_dataset(
         logger.warning(
             "You are using compatible dataset, please make new dataset as the readme!"
         )
-        process_datas = np.load(
+        process_data = np.load(
             input_prefix + "_ids.npz", mmap_mode="r+", allow_pickle=True)
-        sample_ids = process_datas["ids"]
-        sample_lens = process_datas["lens"].astype("int32")
+        sample_ids = process_data["ids"]
+        sample_lens = process_data["lens"].astype("int32")
     else:
         for suffix in ["_ids.npy", "_idx.npz"]:
             if not os.path.isfile(input_prefix + suffix):
@@ -313,10 +313,10 @@ def create_pretrained_dataset(
             input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
         # All documment ids, extend as 1-D array.
 
-        process_datas = np.load(input_prefix + "_idx.npz")
+        process_data = np.load(input_prefix + "_idx.npz")
         # The len(sample_lens) num of docs
         # The sum(sample_lens) should equal len(sample_ids)
-        sample_lens = process_datas["lens"]
+        sample_lens = process_data["lens"]
 
     splits = get_train_valid_test_split_(args.split, len(sample_lens))
     assert len(sample_lens) >= splits[
