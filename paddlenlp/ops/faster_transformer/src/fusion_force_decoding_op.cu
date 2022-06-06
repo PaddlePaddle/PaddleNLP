@@ -168,7 +168,8 @@ std::vector<paddle::Tensor> decoding_kernel(
   auto k_weight_shape = self_attn_key_weight[0].shape();
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
-  bool use_int8 = (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
+  bool use_int8 =
+      (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -193,14 +194,15 @@ std::vector<paddle::Tensor> decoding_kernel(
         self_layernorm_bias[i].data<data_t_>());
     // query
     if (use_int8) {
-        params[i].self_attention.query_weight.int8_kernel =
-            self_attn_query_weight[i].data<int8_t>();
-        params[i].self_attention.query_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            self_attn_query_weight_scale[i].data<data_t_>());
+      params[i].self_attention.query_weight.int8_kernel =
+          self_attn_query_weight[i].data<int8_t>();
+      params[i].self_attention.query_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              self_attn_query_weight_scale[i].data<data_t_>());
     } else {
-        params[i].self_attention.query_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                self_attn_query_weight[i].data<data_t_>());
+      params[i].self_attention.query_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              self_attn_query_weight[i].data<data_t_>());
     }
 
     params[i].self_attention.query_weight.bias =
@@ -208,14 +210,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             self_attn_query_bias[i].data<data_t_>());
     // key
     if (use_int8) {
-        params[i].self_attention.key_weight.int8_kernel =
-            self_attn_key_weight[i].data<int8_t>();
-        params[i].self_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            self_attn_key_weight_scale[i].data<data_t_>());
+      params[i].self_attention.key_weight.int8_kernel =
+          self_attn_key_weight[i].data<int8_t>();
+      params[i].self_attention.key_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              self_attn_key_weight_scale[i].data<data_t_>());
     } else {
-        params[i].self_attention.key_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                self_attn_key_weight[i].data<data_t_>());
+      params[i].self_attention.key_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              self_attn_key_weight[i].data<data_t_>());
     }
 
     params[i].self_attention.key_weight.bias =
@@ -223,14 +226,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             self_attn_key_bias[i].data<data_t_>());
     // value
     if (use_int8) {
-        params[i].self_attention.value_weight.int8_kernel =
-            self_attn_value_weight[i].data<int8_t>();
-        params[i].self_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            self_attn_value_weight_scale[i].data<data_t_>());
+      params[i].self_attention.value_weight.int8_kernel =
+          self_attn_value_weight[i].data<int8_t>();
+      params[i].self_attention.value_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              self_attn_value_weight_scale[i].data<data_t_>());
     } else {
-        params[i].self_attention.value_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                self_attn_value_weight[i].data<data_t_>());
+      params[i].self_attention.value_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              self_attn_value_weight[i].data<data_t_>());
     }
 
     params[i].self_attention.value_weight.bias =
@@ -238,14 +242,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             self_attn_value_bias[i].data<data_t_>());
     // out proj
     if (use_int8) {
-        params[i].self_attention.attention_output_weight.int8_kernel =
-            self_attn_output_weight[i].data<int8_t>();
-        params[i].self_attention.attention_output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            self_attn_output_weight_scale[i].data<data_t_>());
+      params[i].self_attention.attention_output_weight.int8_kernel =
+          self_attn_output_weight[i].data<int8_t>();
+      params[i].self_attention.attention_output_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              self_attn_output_weight_scale[i].data<data_t_>());
     } else {
-        params[i].self_attention.attention_output_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                self_attn_output_weight[i].data<data_t_>());
+      params[i].self_attention.attention_output_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              self_attn_output_weight[i].data<data_t_>());
     }
 
     params[i].self_attention.attention_output_weight.bias =
@@ -259,14 +264,15 @@ std::vector<paddle::Tensor> decoding_kernel(
         cross_layernorm_bias[i].data<data_t_>());
     // query
     if (use_int8) {
-        params[i].cross_attention.query_weight.int8_kernel =
-            cross_attn_query_weight[i].data<int8_t>();
-        params[i].cross_attention.query_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            cross_attn_query_weight_scale[i].data<data_t_>());
+      params[i].cross_attention.query_weight.int8_kernel =
+          cross_attn_query_weight[i].data<int8_t>();
+      params[i].cross_attention.query_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_query_weight_scale[i].data<data_t_>());
     } else {
-        params[i].cross_attention.query_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                cross_attn_query_weight[i].data<data_t_>());
+      params[i].cross_attention.query_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_query_weight[i].data<data_t_>());
     }
 
     params[i].cross_attention.query_weight.bias =
@@ -274,14 +280,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             cross_attn_query_bias[i].data<data_t_>());
     // key
     if (use_int8) {
-        params[i].cross_attention.key_weight.int8_kernel =
-            cross_attn_key_weight[i].data<int8_t>();
-        params[i].cross_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            cross_attn_key_weight_scale[i].data<data_t_>());
+      params[i].cross_attention.key_weight.int8_kernel =
+          cross_attn_key_weight[i].data<int8_t>();
+      params[i].cross_attention.key_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_key_weight_scale[i].data<data_t_>());
     } else {
-        params[i].cross_attention.key_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                cross_attn_key_weight[i].data<data_t_>());
+      params[i].cross_attention.key_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_key_weight[i].data<data_t_>());
     }
 
     params[i].cross_attention.key_weight.bias =
@@ -289,14 +296,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             cross_attn_key_bias[i].data<data_t_>());
     // value
     if (use_int8) {
-        params[i].cross_attention.value_weight.int8_kernel =
-            cross_attn_value_weight[i].data<int8_t>();
-        params[i].cross_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            cross_attn_value_weight_scale[i].data<data_t_>());
+      params[i].cross_attention.value_weight.int8_kernel =
+          cross_attn_value_weight[i].data<int8_t>();
+      params[i].cross_attention.value_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_value_weight_scale[i].data<data_t_>());
     } else {
-        params[i].cross_attention.value_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                cross_attn_value_weight[i].data<data_t_>());
+      params[i].cross_attention.value_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_value_weight[i].data<data_t_>());
     }
 
     params[i].cross_attention.value_weight.bias =
@@ -304,14 +312,15 @@ std::vector<paddle::Tensor> decoding_kernel(
             cross_attn_value_bias[i].data<data_t_>());
     // out proj
     if (use_int8) {
-        params[i].cross_attention.attention_output_weight.int8_kernel =
-            cross_attn_output_weight[i].data<int8_t>();
-        params[i].cross_attention.attention_output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            cross_attn_output_weight_scale[i].data<data_t_>());
+      params[i].cross_attention.attention_output_weight.int8_kernel =
+          cross_attn_output_weight[i].data<int8_t>();
+      params[i].cross_attention.attention_output_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_output_weight_scale[i].data<data_t_>());
     } else {
-        params[i].cross_attention.attention_output_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                cross_attn_output_weight[i].data<data_t_>());
+      params[i].cross_attention.attention_output_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              cross_attn_output_weight[i].data<data_t_>());
     }
 
     params[i].cross_attention.attention_output_weight.bias =
@@ -325,27 +334,29 @@ std::vector<paddle::Tensor> decoding_kernel(
         ffn_layernorm_bias[i].data<data_t_>());
     // intermediate proj
     if (use_int8) {
-        params[i].ffn.intermediate_weight.int8_kernel =
-            ffn_intermediate_weight[i].data<int8_t>();
-        params[i].ffn.intermediate_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            ffn_intermediate_weight_scale[i].data<data_t_>());
+      params[i].ffn.intermediate_weight.int8_kernel =
+          ffn_intermediate_weight[i].data<int8_t>();
+      params[i].ffn.intermediate_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              ffn_intermediate_weight_scale[i].data<data_t_>());
     } else {
-        params[i].ffn.intermediate_weight.kernel =
-            reinterpret_cast<const DataType_*>(
-                ffn_intermediate_weight[i].data<data_t_>());
+      params[i].ffn.intermediate_weight.kernel =
+          reinterpret_cast<const DataType_*>(
+              ffn_intermediate_weight[i].data<data_t_>());
     }
 
     params[i].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
         ffn_intermediate_bias[i].data<data_t_>());
     // out proj
     if (use_int8) {
-        params[i].ffn.output_weight.int8_kernel =
-            ffn_output_weight[i].data<int8_t>();
-        params[i].ffn.output_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-            ffn_output_weight_scale[i].data<data_t_>());
+      params[i].ffn.output_weight.int8_kernel =
+          ffn_output_weight[i].data<int8_t>();
+      params[i].ffn.output_weight.kernel_scale =
+          reinterpret_cast<const DataType_*>(
+              ffn_output_weight_scale[i].data<data_t_>());
     } else {
-        params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
-            ffn_output_weight[i].data<data_t_>());
+      params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
+          ffn_output_weight[i].data<data_t_>());
     }
 
     params[i].ffn.output_weight.bias =
@@ -388,18 +399,18 @@ std::vector<paddle::Tensor> decoding_kernel(
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
         fuse_qkv,
-        false,  // keep_alive_beam
-        0.6,  // alpha
-        true,  // normalization_before
-        0,  // pos_offset
+        false,                 // keep_alive_beam
+        0.6,                   // alpha
+        true,                  // normalization_before
+        0,                     // pos_offset
         ActivationType::RELU,  // act
-        false,  // pos_bias
-        false,  // prefix_lm
-        -1,  // finished_candidate_num
-        false,  // early_stopping
-        false,  // is_mbart
-        0,  // min_length
-        4,  // inner_coeff
+        false,                 // pos_bias
+        false,                 // prefix_lm
+        -1,                    // finished_candidate_num
+        false,                 // early_stopping
+        false,                 // is_mbart
+        0,                     // min_length
+        4,                     // inner_coeff
         use_int8);
 
     decoding_beam_search_->forward(params, decoding_params);
@@ -421,20 +432,20 @@ std::vector<paddle::Tensor> decoding_kernel(
         start_id_,
         end_id_,
         beam_search_diversity_rate_,
-        true,   // is_fuse_topk_softMax
+        true,      // is_fuse_topk_softMax
         fuse_qkv,  // is_fuse_qkv
-        true,   // keep_alive_beam
+        true,      // keep_alive_beam
         alpha,
-        true,  // normalization_before
-        0,  // pos_offset
+        true,                  // normalization_before
+        0,                     // pos_offset
         ActivationType::RELU,  // act
-        false,  // pos_bias
-        false,  // prefix_lm
-        -1,  // finished_candidate_num
-        false,  // early_stopping
-        false,  // is_mbart
-        0,  // min_length
-        4,  // inner_coeff
+        false,                 // pos_bias
+        false,                 // prefix_lm
+        -1,                    // finished_candidate_num
+        false,                 // early_stopping
+        false,                 // is_mbart
+        0,                     // min_length
+        4,                     // inner_coeff
         use_int8);
 
     decoding_beam_search_->forward(params, decoding_params);
@@ -444,32 +455,32 @@ std::vector<paddle::Tensor> decoding_kernel(
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
     DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
-    decoding_sampling_ =
-        new DecodingSampling<DecodingTraits_::OpType>(allocator_,
-                                                      batch_size_,
-                                                      max_seq_len_,
-                                                      head_num_,
-                                                      size_per_head_,
-                                                      vocab_size,
-                                                      num_layer_,
-                                                      memory_hidden_dim,
-                                                      memory_max_seq_len,
-                                                      start_id_,
-                                                      end_id_,
-                                                      candidate_num_,
-                                                      probability_threshold_,
-                                                      fuse_qkv,
-                                                      true,  // normalization_before
-                                                      0,  // pos_offset
-                                                      ActivationType::RELU,  // act
-                                                      false,  // pos_bias
-                                                      1.0,  // temperature
-                                                      1.0,  // repeat_penalty
-                                                      false,  // prefix_lm
-                                                      false,  // is_mbart
-                                                      0,  // min_length
-                                                      4,  // inner_coeff
-                                                      use_int8);
+    decoding_sampling_ = new DecodingSampling<DecodingTraits_::OpType>(
+        allocator_,
+        batch_size_,
+        max_seq_len_,
+        head_num_,
+        size_per_head_,
+        vocab_size,
+        num_layer_,
+        memory_hidden_dim,
+        memory_max_seq_len,
+        start_id_,
+        end_id_,
+        candidate_num_,
+        probability_threshold_,
+        fuse_qkv,
+        true,                  // normalization_before
+        0,                     // pos_offset
+        ActivationType::RELU,  // act
+        false,                 // pos_bias
+        1.0,                   // temperature
+        1.0,                   // repeat_penalty
+        false,                 // prefix_lm
+        false,                 // is_mbart
+        0,                     // min_length
+        4,                     // inner_coeff
+        use_int8);
 
     decoding_sampling_->forward(params, decoding_params);
 

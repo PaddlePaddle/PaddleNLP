@@ -124,11 +124,8 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
 }
 
 template <typename T>
-__global__ void quantize_channel_wise_kernel(int8_t* out,
-                                             const T* in,
-                                             const int n,
-                                             T* scale,
-                                             const T max_range) {
+__global__ void quantize_channel_wise_kernel(
+    int8_t* out, const T* in, const int n, T* scale, const T max_range) {
   int rowid = blockIdx.x;
   float local_i = -1e20f;
   for (int i = threadIdx.x; i < n; i += blockDim.x) {
@@ -155,7 +152,9 @@ inline __host__ __device__ T inverse(T s) {
 }
 
 template <typename T>
-__global__ void find_channel_abs_max_kernel_quant(const T* input, const int n, T* scale) {
+__global__ void find_channel_abs_max_kernel_quant(const T* input,
+                                                  const int n,
+                                                  T* scale) {
   int tid = threadIdx.x;
   int channel_size = n;
   extern __shared__ float sh_max_data[];
@@ -190,7 +189,8 @@ __global__ void find_channel_abs_max_kernel_quant(const T* input, const int n, T
 // using char4
 // for per-channel-quantization weight
 // template <typename T>
-__global__ void quantized_kernel(char4 *dst, const float4* src, const int size_div_4, const int n, const float* scale_ptr)
+__global__ void quantized_kernel(char4 *dst, const float4* src, const int
+size_div_4, const int n, const float* scale_ptr)
 {
   int tid = (blockIdx.x * blockDim.x + threadIdx.x);
   if (tid < size_div_4){
@@ -205,18 +205,19 @@ __global__ void quantized_kernel(char4 *dst, const float4* src, const int size_d
   }
 }
 
-__global__ void quantized_kernel(char4 *dst, const half2* src, const int size_div_4, const int n, const float* scale_ptr)
+__global__ void quantized_kernel(char4 *dst, const half2* src, const int
+size_div_4, const int n, const float* scale_ptr)
 {
   int tid = (blockIdx.x * blockDim.x + threadIdx.x);
   if (tid < size_div_4){
     const float scale = __ldg(scale_ptr[tid / (n / 4)]);
     char4 tmp;
     int src_id = tid << 1;
-    
+
     const half2 half2Tmp = __ldg(src + src_id);
     tmp.x = __float2int_rn(static_cast<float>(half2Tmp.x) * scale);
     tmp.y = __float2int_rn(static_cast<float>(half2Tmp.y) * scale);
-    
+
     const half2 half2Tmp2 = __ldg(src + src_id + 1);
     tmp.z = __float2int_rn(static_cast<float>(half2Tmp2.x) * scale);
     tmp.w = __float2int_rn(static_cast<float>(half2Tmp2.y) * scale);
@@ -225,61 +226,62 @@ __global__ void quantized_kernel(char4 *dst, const half2* src, const int size_di
 }
 */
 
-//transpose matrix & transfrom row-major to COL32
-//input matrix is (n, m) row-major 
-//output matrix is (n, m) COL32
-//m should be a mutiple of 32
-//grid((m+31)/32, (n+31)/32)
-//block(32, 32)
-template<typename T>
+// transpose matrix & transfrom row-major to COL32
+// input matrix is (n, m) row-major
+// output matrix is (n, m) COL32
+// m should be a mutiple of 32
+// grid((m+31)/32, (n+31)/32)
+// block(32, 32)
+template <typename T>
 __global__ void quantized_kernel(int8_t* dst,
-                                const T* src,
-                                const T* scale,
-                                const int m, // hidden
-                                const int n, // batch size
-                                const T max_range)
-{
-  int x = blockIdx.x * blockDim.x + threadIdx.x; // hidden
-  int y = blockIdx.y * blockDim.y + threadIdx.y; // batch size
+                                 const T* src,
+                                 const T* scale,
+                                 const int m,  // hidden
+                                 const int n,  // batch size
+                                 const T max_range) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;  // hidden
+  int y = blockIdx.y * blockDim.y + threadIdx.y;  // batch size
 
   bool check = ((x < m) && (y < n));
   if (check) {
-    // COL32_col = x >> 5 ; COL32_row = (y << 5) + (x & 31); 
-    // COL32_idx = (COL32_col << 5) * n + COL32_row = (x & 0xffffffe0)*n + (y << 5) + (x & 31)
+    // COL32_col = x >> 5 ; COL32_row = (y << 5) + (x & 31);
+    // COL32_idx = (COL32_col << 5) * n + COL32_row = (x & 0xffffffe0)*n + (y <<
+    // 5) + (x & 31)
     // float_to_int8_rn
     dst[(x & 0xffffffe0) * n + (y << 5) + (x & 31)] =
-      __float2int_rn((float)(__ldg(src + y * m + x) / scale[y] * max_range));   
+        __float2int_rn((float)(__ldg(src + y * m + x) / scale[y] * max_range));
   }
 }
 
 
-//transpose matrix & transfrom col-major to COL32 & quantize
-//input matrix is (m, n) col-major 
-//output matrix is (n, m) COL32, using char4 to write out
-//m should be a mutiple of 32
-//grid((m+31)/32, (n+31)/32)
-//block(8, 32)
-template<typename T>
-__global__
-void transposeMatrix_COL32_quantize_kernel(char4*dst,
-                                           const T* src,
-                                           const int m,
-                                           const int n,
-                                           const T* scale_ptr,
-                                           const T max_range) {
+// transpose matrix & transfrom col-major to COL32 & quantize
+// input matrix is (m, n) col-major
+// output matrix is (n, m) COL32, using char4 to write out
+// m should be a mutiple of 32
+// grid((m+31)/32, (n+31)/32)
+// block(8, 32)
+template <typename T>
+__global__ void transposeMatrix_COL32_quantize_kernel(char4* dst,
+                                                      const T* src,
+                                                      const int m,
+                                                      const int n,
+                                                      const T* scale_ptr,
+                                                      const T max_range) {
   int x = (blockIdx.x * blockDim.x + threadIdx.x) << 2;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
 
   const float scale = (float)(max_range / scale_ptr[y]);
 
   bool check = ((x < m) && (y < n));
-  if (check)
-  {
+  if (check) {
     char4 tmp4;
     tmp4.x = __float2int_rn(static_cast<float>(__ldg(src + y * m + x)) * scale);
-    tmp4.y = __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 1)) * scale);
-    tmp4.z = __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 2)) * scale);  
-    tmp4.w = __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 3)) * scale); 
+    tmp4.y =
+        __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 1)) * scale);
+    tmp4.z =
+        __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 2)) * scale);
+    tmp4.w =
+        __float2int_rn(static_cast<float>(__ldg(src + y * m + x + 3)) * scale);
 
     dst[((x & 0xffffffe0) * n + (y << 5) + (x & 31)) >> 2] = tmp4;
   }
@@ -314,9 +316,12 @@ __global__ void channel_wise_quantize_kernel(char4* dst,
     int x = tid << 2;
 
     tmp4.x = __float2int_rn(static_cast<float>(src[bid * n + x]) * scale_val);
-    tmp4.y = __float2int_rn(static_cast<float>(src[bid * n + x + 1]) * scale_val);
-    tmp4.z = __float2int_rn(static_cast<float>(src[bid * n + x + 2]) * scale_val); 
-    tmp4.w = __float2int_rn(static_cast<float>(src[bid * n + x + 3]) * scale_val);
+    tmp4.y =
+        __float2int_rn(static_cast<float>(src[bid * n + x + 1]) * scale_val);
+    tmp4.z =
+        __float2int_rn(static_cast<float>(src[bid * n + x + 2]) * scale_val);
+    tmp4.w =
+        __float2int_rn(static_cast<float>(src[bid * n + x + 3]) * scale_val);
 
     dst[((x & 0xffffffe0) * m + (bid << 5) + (x & 31)) >> 2] = tmp4;
   }
@@ -324,65 +329,62 @@ __global__ void channel_wise_quantize_kernel(char4* dst,
 
 template <typename T>
 void channel_wise_quantize_kernelLauncher(const T* input,
-                                        int8_t* ffn_quantize_input_buf_,
-                                        T* scale,
-                                        const int batch_size,
-                                        const int hidden_units,
-                                        cudaStream_t stream,
-                                        bool use_COL32) {
-
+                                          int8_t* ffn_quantize_input_buf_,
+                                          T* scale,
+                                          const int batch_size,
+                                          const int hidden_units,
+                                          cudaStream_t stream,
+                                          bool use_COL32) {
   if (use_COL32) {
     dim3 grid(batch_size);
     dim3 block(min(1024, hidden_units));
 
     channel_wise_quantize_kernel<T><<<grid, block, 0, stream>>>(
-                                          (char4 *) ffn_quantize_input_buf_,
-                                          input,
-                                          batch_size,
-                                          hidden_units,
-                                          scale,
-                                          (T)127.0f);
+        (char4*)ffn_quantize_input_buf_,
+        input,
+        batch_size,
+        hidden_units,
+        scale,
+        (T)127.0f);
   } else {
     dim3 grid(batch_size);
     dim3 block(min(1024, hidden_units));
 
     quantize_channel_wise_kernel<<<grid, block, 0, stream>>>(
-            ffn_quantize_input_buf_, input, hidden_units, scale, (T)127.0f);
+        ffn_quantize_input_buf_, input, hidden_units, scale, (T)127.0f);
   }
-
 }
 
 template <typename T>
 __global__ void dequantized_kernel(const int32_t* input,
-                           const T* scale,
-                           const T* w_scale,
-                           const T max_range,
-                           int col,
-                           T* out) {
+                                   const T* scale,
+                                   const T* w_scale,
+                                   const T max_range,
+                                   int col,
+                                   T* out) {
   int row_idx = blockIdx.x;
   for (int i = threadIdx.x; i < col; i += blockDim.x) {
     int idx = row_idx * col + i;
-    out[idx] = (T)input[idx] * scale[row_idx] / max_range * w_scale[i] / max_range;
+    out[idx] =
+        (T)input[idx] * scale[row_idx] / max_range * w_scale[i] / max_range;
   }
 }
 
-template<typename T>
-__global__
-void dequantized_tc_kernel(T* dst,
-                        const int32_t* src,
-                        const T* scale,
-                        const T* w_scale,
-                        const int m, // hidden
-                        const int n, // batch size
-                        const T max_range) {
-
-  int x = blockIdx.x * blockDim.x + threadIdx.x; // hidden
-  int y = blockIdx.y * blockDim.y + threadIdx.y; // batch size
+template <typename T>
+__global__ void dequantized_tc_kernel(T* dst,
+                                      const int32_t* src,
+                                      const T* scale,
+                                      const T* w_scale,
+                                      const int m,  // hidden
+                                      const int n,  // batch size
+                                      const T max_range) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;  // hidden
+  int y = blockIdx.y * blockDim.y + threadIdx.y;  // batch size
 
   bool check = ((x < m) && (y < n));
   if (check) {
-    dst[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)]) 
-      * scale[y] / max_range * w_scale[x] / max_range;
+    dst[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+                     scale[y] / max_range * w_scale[x] / max_range;
   }
 }
 
@@ -409,79 +411,75 @@ void channel_wise_dequantize_kernelLauncher(const int32_t* input,
   } else {
     dim3 grid(batch_size);
     dim3 block(min(1024, hidden_units));
-    dequantized_kernel<<<grid, block, 0, stream>>>(input,
-                              scale,
-                              weight_scale,
-                              (T)127.0f,
-                              hidden_units,
-                              output);
+    dequantized_kernel<<<grid, block, 0, stream>>>(
+        input, scale, weight_scale, (T)127.0f, hidden_units, output);
   }
 }
 
 template <typename T>
 __global__ void qkv_dequantized_kernel(const int32_t* input,
-                           const T* scale,
-                           const T* qw_scale,
-                           const T* kw_scale,
-                           const T* vw_scale,
-                           const T max_range,
-                           int col,
-                           T* query,
-                           T* key,
-                           T* value) {
+                                       const T* scale,
+                                       const T* qw_scale,
+                                       const T* kw_scale,
+                                       const T* vw_scale,
+                                       const T max_range,
+                                       int col,
+                                       T* query,
+                                       T* key,
+                                       T* value) {
   int row_idx = blockIdx.x;
   for (int i = threadIdx.x; i < col; i += blockDim.x) {
     int idx = row_idx * col + i;
-    query[idx] = (T)input[idx] 
-      * scale[row_idx] / max_range * qw_scale[i] / max_range;
-    key[idx] = (T)input[gridDim.x * col + idx] 
-      * scale[row_idx] / max_range * kw_scale[i] / max_range;
-    value[idx] = (T)input[2 * gridDim.x * col + idx] 
-      * scale[row_idx] / max_range * vw_scale[i] / max_range;
+    query[idx] =
+        (T)input[idx] * scale[row_idx] / max_range * qw_scale[i] / max_range;
+    key[idx] = (T)input[gridDim.x * col + idx] * scale[row_idx] / max_range *
+               kw_scale[i] / max_range;
+    value[idx] = (T)input[2 * gridDim.x * col + idx] * scale[row_idx] /
+                 max_range * vw_scale[i] / max_range;
   }
 }
 
-template<typename T>
-__global__
-void qkv_dequantized_tc_kernel(T* query,
-                        T* key,
-                        T* value,
-                        const int32_t* src,
-                        const T* scale,
-                        const T* qw_scale,
-                        const T* kw_scale,
-                        const T* vw_scale,
-                        const int m, // hidden
-                        const int n, // batch size
-                        const T max_range) {
-
-  int x = blockIdx.x * blockDim.x + threadIdx.x; // hidden
-  int y = blockIdx.y * blockDim.y + threadIdx.y; // batch size
+template <typename T>
+__global__ void qkv_dequantized_tc_kernel(T* query,
+                                          T* key,
+                                          T* value,
+                                          const int32_t* src,
+                                          const T* scale,
+                                          const T* qw_scale,
+                                          const T* kw_scale,
+                                          const T* vw_scale,
+                                          const int m,  // hidden
+                                          const int n,  // batch size
+                                          const T max_range) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;  // hidden
+  int y = blockIdx.y * blockDim.y + threadIdx.y;  // batch size
 
   bool check = ((x < m) && (y < n));
   if (check) {
-    query[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)]) 
-      * scale[y] / max_range * qw_scale[x] / max_range;
-    key[y * m + x] = (T)(src[m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)]) 
-      * scale[y] / max_range * kw_scale[x] / max_range;
-    value[y * m + x] = (T)(src[2 * m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)]) 
-      * scale[y] / max_range * vw_scale[x] / max_range;
+    query[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+                       scale[y] / max_range * qw_scale[x] / max_range;
+    key[y * m + x] =
+        (T)(src[m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+        scale[y] / max_range * kw_scale[x] / max_range;
+    value[y * m + x] =
+        (T)(src[2 * m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+        scale[y] / max_range * vw_scale[x] / max_range;
   }
 }
 
 template <typename T>
 void qkv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const T* scale,
-                                          const T* qw_scale,
-                                          const T* kw_scale,
-                                          const T* vw_scale,
-                                          T* query,
-                                          T* key,
-                                          T* value,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32) {
+                                                const T* scale,
+                                                const T* qw_scale,
+                                                const T* kw_scale,
+                                                const T* vw_scale,
+                                                T* query,
+                                                T* key,
+                                                T* value,
+                                                const int batch_size,
+                                                const int hidden_units,
+                                                cudaStream_t stream,
+                                                bool use_COL32) {
   if (use_COL32) {
     dim3 grid((hidden_units + 31) / 32, (batch_size + 31) / 32);
     dim3 block(32, 32);
@@ -502,103 +500,92 @@ void qkv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
     dim3 grid(batch_size);
     dim3 block(min(1024, hidden_units));
 
-    qkv_dequantized_kernel<<<grid, block, 0, stream>>>(
-                              input,
-                              scale,
-                              qw_scale,
-                              kw_scale,
-                              vw_scale,
-                              (T)127.0f,
-                              hidden_units,
-                              query,
-                              key,
-                              value);
-  
+    qkv_dequantized_kernel<<<grid, block, 0, stream>>>(input,
+                                                       scale,
+                                                       qw_scale,
+                                                       kw_scale,
+                                                       vw_scale,
+                                                       (T)127.0f,
+                                                       hidden_units,
+                                                       query,
+                                                       key,
+                                                       value);
   }
 }
 
 template <typename T>
 __global__ void kv_dequantized_kernel(const int32_t* input,
-                           const T* scale,
-                           const T* kw_scale,
-                           const T* vw_scale,
-                           const T max_range,
-                           int col,
-                           T* key,
-                           T* value) {
+                                      const T* scale,
+                                      const T* kw_scale,
+                                      const T* vw_scale,
+                                      const T max_range,
+                                      int col,
+                                      T* key,
+                                      T* value) {
   int row_idx = blockIdx.x;
   for (int i = threadIdx.x; i < col; i += blockDim.x) {
     int idx = row_idx * col + i;
-    key[idx] = (T)input[idx] 
-      * scale[row_idx] / max_range * kw_scale[i] / max_range;
-    value[idx] = (T)input[gridDim.x * col + idx] 
-      * scale[row_idx] / max_range * vw_scale[i] / max_range;
+    key[idx] =
+        (T)input[idx] * scale[row_idx] / max_range * kw_scale[i] / max_range;
+    value[idx] = (T)input[gridDim.x * col + idx] * scale[row_idx] / max_range *
+                 vw_scale[i] / max_range;
   }
 }
 
-template<typename T>
-__global__
-void kv_dequantized_tc_kernel(T* key,
-                        T* value,
-                        const int32_t* src,
-                        const T* scale,
-                        const T* kw_scale,
-                        const T* vw_scale,
-                        const int m, // hidden
-                        const int n, // batch size
-                        const T max_range) {
-
-  int x = blockIdx.x * blockDim.x + threadIdx.x; // hidden
-  int y = blockIdx.y * blockDim.y + threadIdx.y; // batch size
+template <typename T>
+__global__ void kv_dequantized_tc_kernel(T* key,
+                                         T* value,
+                                         const int32_t* src,
+                                         const T* scale,
+                                         const T* kw_scale,
+                                         const T* vw_scale,
+                                         const int m,  // hidden
+                                         const int n,  // batch size
+                                         const T max_range) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;  // hidden
+  int y = blockIdx.y * blockDim.y + threadIdx.y;  // batch size
 
   bool check = ((x < m) && (y < n));
   if (check) {
-    key[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)])
-      * scale[y] / max_range * kw_scale[x] / max_range;
-    value[y * m + x] = (T)(src[m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)])
-      * scale[y] / max_range * vw_scale[x] / max_range;
+    key[y * m + x] = (T)(src[(x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+                     scale[y] / max_range * kw_scale[x] / max_range;
+    value[y * m + x] =
+        (T)(src[m * n + (x & 0xffffffe0) * n + (y << 5) + (x & 31)]) *
+        scale[y] / max_range * vw_scale[x] / max_range;
   }
 }
 
 template <typename T>
 void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const T* scale,
-                                          const T* kw_scale,
-                                          const T* vw_scale,
-                                          T* key,
-                                          T* value,
-                                          const int m,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32) {
+                                                   const T* scale,
+                                                   const T* kw_scale,
+                                                   const T* vw_scale,
+                                                   T* key,
+                                                   T* value,
+                                                   const int m,
+                                                   const int hidden_units,
+                                                   cudaStream_t stream,
+                                                   bool use_COL32) {
   if (use_COL32) {
     dim3 grid((hidden_units + 31) / 32, (m + 31) / 32);
     dim3 block(32, 32);
 
     kv_dequantized_tc_kernel<<<grid, block, 0, stream>>>(key,
-                                                        value,
-                                                        input,
-                                                        scale,
-                                                        kw_scale,
-                                                        vw_scale,
-                                                        hidden_units,
-                                                        m,
-                                                        (T)127.0f);
+                                                         value,
+                                                         input,
+                                                         scale,
+                                                         kw_scale,
+                                                         vw_scale,
+                                                         hidden_units,
+                                                         m,
+                                                         (T)127.0f);
 
   } else {
     dim3 grid(m);
     dim3 block(min(1024, hidden_units));
 
     kv_dequantized_kernel<<<grid, block, 0, stream>>>(
-                              input,
-                              scale,
-                              kw_scale,
-                              vw_scale,
-                              (T)127.0f,
-                              hidden_units,
-                              key,
-                              value);
-  
+        input, scale, kw_scale, vw_scale, (T)127.0f, hidden_units, key, value);
   }
 }
 
@@ -606,9 +593,15 @@ void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
 // grid, thread = (m), (n)
 template <typename T>
 __global__ void dequant_add_bias_relu_quant_COL32_int32I_int8O(
-    int8_t *out, const int32_t* input, const T* bias, T* ffn_inner, const int m, const int n, 
-    const T* w_scale, T* scale, const T max_range) {
-
+    int8_t* out,
+    const int32_t* input,
+    const T* bias,
+    T* ffn_inner,
+    const int m,
+    const int n,
+    const T* w_scale,
+    T* scale,
+    const T max_range) {
   int bid = blockIdx.x;
 
   float local_i = -FLT_MAX;
@@ -616,8 +609,9 @@ __global__ void dequant_add_bias_relu_quant_COL32_int32I_int8O(
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
 
-    val = (float)((T)input[outIdx]
-      * scale[bid] / max_range * w_scale[tid] / max_range + bias[tid]);
+    val = (float)((T)input[outIdx] * scale[bid] / max_range * w_scale[tid] /
+                      max_range +
+                  bias[tid]);
     val = (val >= 0.0f) ? val : 0.0f;
 
     ffn_inner[outIdx] = (T)val;
@@ -634,7 +628,8 @@ __global__ void dequant_add_bias_relu_quant_COL32_int32I_int8O(
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
-    out[outIdx] = __float2int_rn((float)(ffn_inner[outIdx] / scale[bid] * max_range));
+    out[outIdx] =
+        __float2int_rn((float)(ffn_inner[outIdx] / scale[bid] * max_range));
   }
 }
 
@@ -642,9 +637,15 @@ __global__ void dequant_add_bias_relu_quant_COL32_int32I_int8O(
 // grid, thread = (m), (n)
 template <typename T>
 __global__ void dequant_add_bias_gelu_quant_COL32_int32I_int8O(
-    int8_t *out, const int32_t* input, const T* bias, T* ffn_inner, const int m, const int n, 
-    const T* w_scale, T* scale, const T max_range) {
-
+    int8_t* out,
+    const int32_t* input,
+    const T* bias,
+    T* ffn_inner,
+    const int m,
+    const int n,
+    const T* w_scale,
+    T* scale,
+    const T max_range) {
   int bid = blockIdx.x;
 
   float local_i = -FLT_MAX;
@@ -652,8 +653,9 @@ __global__ void dequant_add_bias_gelu_quant_COL32_int32I_int8O(
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
 
-    val = (float)((T)input[outIdx]
-      * scale[bid] / max_range * w_scale[tid] / max_range + bias[tid]);
+    val = (float)((T)input[outIdx] * scale[bid] / max_range * w_scale[tid] /
+                      max_range +
+                  bias[tid]);
     val = gelu<float>(val);
 
     ffn_inner[outIdx] = (T)val;
@@ -670,22 +672,23 @@ __global__ void dequant_add_bias_gelu_quant_COL32_int32I_int8O(
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
-    out[outIdx] = __float2int_rn((float)(ffn_inner[outIdx] / scale[bid] * max_range));
+    out[outIdx] =
+        __float2int_rn((float)(ffn_inner[outIdx] / scale[bid] * max_range));
   }
 }
 
 template <typename T>
-void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(int8_t *out,
-                                                                  const int32_t* input,
-                                                                  const T* bias,
-                                                                  T* ffn_inner,
-                                                                  const int batch_size,
-                                                                  const int hidden_units, 
-                                                                  const T* weight_scale,
-                                                                  T* scale,
-                                                                  ActivationType activation_type,
-                                                                  cudaStream_t stream) {
-
+void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(
+    int8_t* out,
+    const int32_t* input,
+    const T* bias,
+    T* ffn_inner,
+    const int batch_size,
+    const int hidden_units,
+    const T* weight_scale,
+    T* scale,
+    ActivationType activation_type,
+    cudaStream_t stream) {
   dim3 grid(batch_size);
   dim3 block(min(hidden_units, 1024));
 
@@ -700,8 +703,7 @@ void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(int8_t *out,
         weight_scale,
         scale,
         (T)127.0f);
-  }
-  else if (activation_type == ActivationType::GELU) {
+  } else if (activation_type == ActivationType::GELU) {
     dequant_add_bias_gelu_quant_COL32_int32I_int8O<<<grid, block, 0, stream>>>(
         out,
         input,
@@ -715,111 +717,115 @@ void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(int8_t *out,
   }
 }
 
-template void channel_wise_quantize_kernelLauncher(const float* input,
-                                        int8_t* ffn_quantize_input_buf_,
-                                        float* scale,
-                                        const int batch_size,
-                                        const int hidden_units,
-                                        cudaStream_t stream,
-                                        bool use_COL32);
+template void channel_wise_quantize_kernelLauncher(
+    const float* input,
+    int8_t* ffn_quantize_input_buf_,
+    float* scale,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream,
+    bool use_COL32);
 
-template void channel_wise_quantize_kernelLauncher(const half* input,
-                                        int8_t* ffn_quantize_input_buf_,
-                                        half* scale,
-                                        const int batch_size,
-                                        const int hidden_units,
-                                        cudaStream_t stream,
-                                        bool use_COL32);
-
-template void channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const float* scale,
-                                          const float* weight_scale,
-                                          float* output,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+template void channel_wise_quantize_kernelLauncher(
+    const half* input,
+    int8_t* ffn_quantize_input_buf_,
+    half* scale,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream,
+    bool use_COL32);
 
 template void channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const half* scale,
-                                          const half* weight_scale,
-                                          half* output,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+                                                     const float* scale,
+                                                     const float* weight_scale,
+                                                     float* output,
+                                                     const int batch_size,
+                                                     const int hidden_units,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
+
+template void channel_wise_dequantize_kernelLauncher(const int32_t* input,
+                                                     const half* scale,
+                                                     const half* weight_scale,
+                                                     half* output,
+                                                     const int batch_size,
+                                                     const int hidden_units,
+                                                     cudaStream_t stream,
+                                                     bool use_COL32);
 
 template void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(
-                                          int8_t *out,
-                                          const int32_t* input,
-                                          const float* bias,
-                                          float* ffn_inner,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          const float* weight_scale,
-                                          float* scale,
-                                          ActivationType activation_type,
-                                          cudaStream_t stream);
+    int8_t* out,
+    const int32_t* input,
+    const float* bias,
+    float* ffn_inner,
+    const int batch_size,
+    const int hidden_units,
+    const float* weight_scale,
+    float* scale,
+    ActivationType activation_type,
+    cudaStream_t stream);
 
 template void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(
-                                          int8_t *out,
-                                          const int32_t* input,
-                                          const half* bias,
-                                          half* ffn_inner,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          const half* weight_scale,
-                                          half* scale,
-                                          ActivationType activation_type,
-                                          cudaStream_t stream);
+    int8_t* out,
+    const int32_t* input,
+    const half* bias,
+    half* ffn_inner,
+    const int batch_size,
+    const int hidden_units,
+    const half* weight_scale,
+    half* scale,
+    ActivationType activation_type,
+    cudaStream_t stream);
 
 template void qkv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const float* scale,
-                                          const float* qw_scale,
-                                          const float* kw_scale,
-                                          const float* vw_scale,
-                                          float* query,
-                                          float* key,
-                                          float* value,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+                                                         const float* scale,
+                                                         const float* qw_scale,
+                                                         const float* kw_scale,
+                                                         const float* vw_scale,
+                                                         float* query,
+                                                         float* key,
+                                                         float* value,
+                                                         const int batch_size,
+                                                         const int hidden_units,
+                                                         cudaStream_t stream,
+                                                         bool use_COL32);
 
 template void qkv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const half* scale,
-                                          const half* qw_scale,
-                                          const half* kw_scale,
-                                          const half* vw_scale,
-                                          half* query,
-                                          half* key,
-                                          half* value,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+                                                         const half* scale,
+                                                         const half* qw_scale,
+                                                         const half* kw_scale,
+                                                         const half* vw_scale,
+                                                         half* query,
+                                                         half* key,
+                                                         half* value,
+                                                         const int batch_size,
+                                                         const int hidden_units,
+                                                         cudaStream_t stream,
+                                                         bool use_COL32);
 
-template void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const float* scale,
-                                          const float* kw_scale,
-                                          const float* vw_scale,
-                                          float* key,
-                                          float* value,
-                                          const int m,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+template void mem_kv_channel_wise_dequantize_kernelLauncher(
+    const int32_t* input,
+    const float* scale,
+    const float* kw_scale,
+    const float* vw_scale,
+    float* key,
+    float* value,
+    const int m,
+    const int hidden_units,
+    cudaStream_t stream,
+    bool use_COL32);
 
-template void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const half* scale,
-                                          const half* kw_scale,
-                                          const half* vw_scale,
-                                          half* key,
-                                          half* value,
-                                          const int m,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32);
+template void mem_kv_channel_wise_dequantize_kernelLauncher(
+    const int32_t* input,
+    const half* scale,
+    const half* kw_scale,
+    const half* vw_scale,
+    half* key,
+    half* value,
+    const int m,
+    const int hidden_units,
+    cudaStream_t stream,
+    bool use_COL32);
 
 template void transpose_cache_batch_major_kernelLauncher(
     float* k_dst,

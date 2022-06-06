@@ -51,7 +51,7 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
-  void* decoder_int8_buf_;
+  void *decoder_int8_buf_;
 
   // Prefix LM
   DataType_ *trans_out_buf_;
@@ -118,7 +118,6 @@ public:
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam),
         use_int8_(use_int8) {
-
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -175,7 +174,8 @@ public:
                                         args_.memory_max_seq_len_);
     decoder_->set_max_batch_size(batch_size * beam_width);
 
-    size_t decoder_int8_workspace_size = (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
+    size_t decoder_int8_workspace_size =
+        (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
@@ -423,131 +423,133 @@ public:
   void forward_context(const DecoderInitParam<DataType_> *decoder_param,
                        const DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
-      PRINT_FUNC_NAME_();
+    PRINT_FUNC_NAME_();
 #endif
-      const int input_len = decoding_params.request_input_len;
-      const int request_batch_size = decoding_params.request_batch_size;
+    const int input_len = decoding_params.request_input_len;
+    const int request_batch_size = decoding_params.request_batch_size;
 
-      const int max_input_len = decoding_params.max_input_len;
+    const int max_input_len = decoding_params.max_input_len;
 
-      const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
-      const int m = local_batch_size * input_len;
-      const int h_1 = args_.hidden_units_;
+    const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
+    const int m = local_batch_size * input_len;
+    const int h_1 = args_.hidden_units_;
 
-      DataType_* from_tensor[2];
-      DataType_* decoder_output;
-      DataType_* decoder_workspace;
-      void *buf = reinterpret_cast<void *>(allocator_.malloc(
-          decoder_->getContextWorkspaceSize(input_len, local_batch_size) + 
-          (m * h_1 + 2 * request_batch_size * input_len * h_1) * sizeof(DataType_)
-      ));
+    DataType_ *from_tensor[2];
+    DataType_ *decoder_output;
+    DataType_ *decoder_workspace;
+    void *buf = reinterpret_cast<void *>(allocator_.malloc(
+        decoder_->getContextWorkspaceSize(input_len, local_batch_size) +
+        (m * h_1 + 2 * request_batch_size * input_len * h_1) *
+            sizeof(DataType_)));
+
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
+
+    from_tensor[0] = (DataType_ *)buf;
+    from_tensor[1] = from_tensor[0] + request_batch_size * input_len * h_1;
+    decoder_output = from_tensor[1] + request_batch_size * input_len * h_1;
+    decoder_workspace = decoder_output + m * h_1;
+
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
+
+    if (args_.normalization_before_) {
+      start_ids_embeddings_kernel_launcher(
+          from_tensor[0],
+          decoding_params.embedding_table,
+          decoding_params.position_encoding_table,
+          decoding_params.type_table,
+          decoding_params.type_id,
+          decoding_params.d_start_ids,
+          decoding_params.memory_sequence_length,
+          1,
+          input_len,
+          request_batch_size,
+          h_1,
+          decoding_params.stream,
+          decoding_params.role_id,
+          decoding_params.role_embedding_table,
+          decoding_params.position_ids);
+    } else {
+      // Memory reuse. from_tensor[1].
+      start_ids_embeddings_kernel_launcher(
+          from_tensor[1],
+          decoding_params.embedding_table,
+          decoding_params.position_encoding_table,
+          decoding_params.type_table,
+          decoding_params.type_id,
+          decoding_params.d_start_ids,
+          decoding_params.memory_sequence_length,
+          1,
+          input_len,
+          request_batch_size,
+          h_1,
+          decoding_params.stream,
+          decoding_params.role_id,
+          decoding_params.role_embedding_table,
+          decoding_params.position_ids);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
 
-      from_tensor[0] = (DataType_*) buf;
-      from_tensor[1] = from_tensor[0] + request_batch_size * input_len * h_1;
-      decoder_output = from_tensor[1] + request_batch_size * input_len * h_1;
-      decoder_workspace = decoder_output + m * h_1;
+      layer_norm(from_tensor[1],
+                 decoding_params.layernorm.gamma,
+                 decoding_params.layernorm.beta,
+                 from_tensor[0],
+                 m,
+                 h_1,
+                 decoding_params.stream);
+    }
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
 
+    int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
+    size_t cache_size =
+        local_batch_size * dummy_decoder_max_seq_len * args_.hidden_units_;
+
+    int in_id, out_id;
+    for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+      in_id = layer & 0x1;
+      out_id = 1 - in_id;
+
+      decoder_->initialize(
+          decoder_param[layer], decoder_buf_, cublas_workspace_, false);
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (args_.normalization_before_) {
-        start_ids_embeddings_kernel_launcher(from_tensor[0],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
-      } else {
-        // Memory reuse. from_tensor[1].
-        start_ids_embeddings_kernel_launcher(from_tensor[1],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
+      size_t cache_offset = layer * cache_size;  // type T
+      decoder_->forward_context(decoder_workspace,
+                                from_tensor[out_id],
+                                K_cache_[1] + cache_offset,
+                                V_cache_[1] + cache_offset,
+                                from_tensor[in_id],
+                                decoding_params.d_attn_mask,
+                                local_batch_size,
+                                input_len,
+                                0,
+                                dummy_decoder_max_seq_len,
+                                layer == args_.decoder_layers_ - 1,
+                                decoding_params.memory_sequence_length);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-
-        layer_norm(from_tensor[1],
-                   decoding_params.layernorm.gamma,
-                   decoding_params.layernorm.beta,
-                   from_tensor[0],
-                   m,
-                   h_1,
-                   decoding_params.stream);
-
-      }
+    }  // end of for loop of layer
+    allocator_.free(buf);
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
-#endif
-
-      int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
-      size_t cache_size = local_batch_size * dummy_decoder_max_seq_len *
-                args_.hidden_units_;
-
-      int in_id, out_id;
-      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        in_id = layer & 0x1;
-        out_id = 1 - in_id;
-
-        decoder_->initialize(decoder_param[layer], decoder_buf_, cublas_workspace_, false);
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-
-        size_t cache_offset = layer * cache_size;  // type T
-        decoder_->forward_context(decoder_workspace,
-                                  from_tensor[out_id],
-                                  K_cache_[1] + cache_offset,
-                                  V_cache_[1] + cache_offset,
-                                  from_tensor[in_id],
-                                  decoding_params.d_attn_mask,
-                                  local_batch_size,
-                                  input_len,
-                                  0,
-                                  dummy_decoder_max_seq_len,
-                                  layer == args_.decoder_layers_ - 1,
-                                  decoding_params.memory_sequence_length);
-
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-      } // end of for loop of layer
-      allocator_.free(buf);
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
 #endif
   }
 
@@ -1017,7 +1019,8 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
+        if (decoding_params.logits_mask ||
+            (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(
               tmp_logits_buf_,
               keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
@@ -1271,10 +1274,13 @@ public:
     }  // end for decoding step for llop
 
     if (decoding_params.output_scores) {
-      cudaMemcpyAsync(decoding_params.output_scores, cum_log_buf_, 
-                      sizeof(float) * args_.batch_size_ * args_.beam_width_, cudaMemcpyDeviceToDevice, decoding_params.stream);
+      cudaMemcpyAsync(decoding_params.output_scores,
+                      cum_log_buf_,
+                      sizeof(float) * args_.batch_size_ * args_.beam_width_,
+                      cudaMemcpyDeviceToDevice,
+                      decoding_params.stream);
     }
-  }    // end of forward
+  }  // end of forward
 
   virtual ~DecodingBeamsearch() {
     delete[] K_cache_;

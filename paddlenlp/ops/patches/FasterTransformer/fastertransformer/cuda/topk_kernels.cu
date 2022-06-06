@@ -1609,12 +1609,12 @@ void topK_sampling_kernel_kernelLauncher_v2(void* workspace,
                                                     candidate_num,           \
                                                     vocab_size,              \
                                                     end_id);                 \
-    topk_stage_2_opt3_sampling_v2<T,                                            \
-                               BLOCK_SIZE_2_,                                \
-                               BLOCKS_PER_BEAM_><<<batch_size,               \
-                                                   BLOCK_SIZE_2_,            \
-                                                   K_MAX * sizeof(int),      \
-                                                   stream>>>(                \
+    topk_stage_2_opt3_sampling_v2<T,                                         \
+                                  BLOCK_SIZE_2_,                             \
+                                  BLOCKS_PER_BEAM_><<<batch_size,            \
+                                                      BLOCK_SIZE_2_,         \
+                                                      K_MAX * sizeof(int),   \
+                                                      stream>>>(             \
         topk_tmp_id_buf,                                                     \
         topk_tmp_val_buf,                                                    \
         topk_tmp2_val_buf,                                                   \
@@ -1736,29 +1736,31 @@ template void topK_sampling_kernel_kernelLauncher_v2(
     cudaStream_t stream,
     const int batch_size);
 
-template void topK_sampling_kernel_kernelLauncher_v3(void* workspace,
-                                            size_t& workspace_size,
-                                            float* log_probs,
-                                            int* ids,
-                                            int* sequence_length,
-                                            float* scores,
-                                            bool* finished_buf,
-                                            curandState_t* curandstate,
-                                            DecodingSamplingArguments args,
-                                            cudaStream_t stream,
-                                            const int batch_size);
+template void topK_sampling_kernel_kernelLauncher_v3(
+    void* workspace,
+    size_t& workspace_size,
+    float* log_probs,
+    int* ids,
+    int* sequence_length,
+    float* scores,
+    bool* finished_buf,
+    curandState_t* curandstate,
+    DecodingSamplingArguments args,
+    cudaStream_t stream,
+    const int batch_size);
 
-template void topK_sampling_kernel_kernelLauncher_v3(void* workspace,
-                                            size_t& workspace_size,
-                                            half* log_probs,
-                                            int* ids,
-                                            int* sequence_length,
-                                            float* scores,
-                                            bool* finished_buf,
-                                            curandState_t* curandstate,
-                                            DecodingSamplingArguments args,
-                                            cudaStream_t stream,
-                                            const int batch_size);
+template void topK_sampling_kernel_kernelLauncher_v3(
+    void* workspace,
+    size_t& workspace_size,
+    half* log_probs,
+    int* ids,
+    int* sequence_length,
+    float* scores,
+    bool* finished_buf,
+    curandState_t* curandstate,
+    DecodingSamplingArguments args,
+    cudaStream_t stream,
+    const int batch_size);
 
 __global__ void init_topp_id_val(int* topp_id_val_buf,
                                  int* topp_offset_buf,
@@ -2273,37 +2275,39 @@ template void topP_sampling_kernel_kernelLauncher_v2(
     cudaStream_t stream,
     const int batch_size);
 
-template void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
-                                            size_t& workspace_size,
-                                            const float* log_probs,
-                                            const int* id_vals,
-                                            int* offset_buf,
-                                            int* begin_offset_buf,
-                                            bool* finished_buf,
-                                            curandState_t* curandstate,
-                                            DecodingSamplingArguments& args,
-                                            int* output_ids,
-                                            int* sequence_length,
-                                            float* scores,
-                                            const int n,
-                                            cudaStream_t stream,
-                                            const int batch_size);
+template void topP_sampling_kernel_kernelLauncher_v3(
+    void* workspace,
+    size_t& workspace_size,
+    const float* log_probs,
+    const int* id_vals,
+    int* offset_buf,
+    int* begin_offset_buf,
+    bool* finished_buf,
+    curandState_t* curandstate,
+    DecodingSamplingArguments& args,
+    int* output_ids,
+    int* sequence_length,
+    float* scores,
+    const int n,
+    cudaStream_t stream,
+    const int batch_size);
 
-template void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
-                                            size_t& workspace_size,
-                                            const half* log_probs,
-                                            const int* id_vals,
-                                            int* offset_buf,
-                                            int* begin_offset_buf,
-                                            bool* finished_buf,
-                                            curandState_t* curandstate,
-                                            DecodingSamplingArguments& args,
-                                            int* output_ids,
-                                            int* sequence_length,
-                                            float* scores,
-                                            const int n,
-                                            cudaStream_t stream,
-                                            const int batch_size);
+template void topP_sampling_kernel_kernelLauncher_v3(
+    void* workspace,
+    size_t& workspace_size,
+    const half* log_probs,
+    const int* id_vals,
+    int* offset_buf,
+    int* begin_offset_buf,
+    bool* finished_buf,
+    curandState_t* curandstate,
+    DecodingSamplingArguments& args,
+    int* output_ids,
+    int* sequence_length,
+    float* scores,
+    const int n,
+    cudaStream_t stream,
+    const int batch_size);
 
 template <typename T, int MAX_K, int THREADBLOCK_SIZE>
 __launch_bounds__(THREADBLOCK_SIZE) __global__

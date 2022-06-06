@@ -268,7 +268,10 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     }
     output_ids_dims = {max_len, batch_size, beam_size};
     output_scores_dims = {batch_size, beam_size};
-    return {output_ids_dims, output_ids_dims, sequence_length_dims, output_scores_dims};
+    return {output_ids_dims,
+            output_ids_dims,
+            sequence_length_dims,
+            output_scores_dims};
   } else if (decoding_strategy == "beam_search_v2" ||
              decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
@@ -282,7 +285,10 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     }
     output_ids_dims = {max_len, batch_size, beam_size * 2};
     output_scores_dims = {batch_size, beam_size * 2};
-    return {output_ids_dims, output_ids_dims, sequence_length_dims, output_scores_dims};
+    return {output_ids_dims,
+            output_ids_dims,
+            sequence_length_dims,
+            output_scores_dims};
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling" ||
              decoding_strategy == "sampling") {

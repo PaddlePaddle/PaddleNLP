@@ -27,12 +27,12 @@ limitations under the License. */
 
 
 const int64_t numel(const std::vector<int64_t>& tensor_shape) {
-    int size = tensor_shape.size();
-    int64_t n = 1;
-    for (int i = 0; i < size; ++i) {
-        n *= tensor_shape[i];
-    }
-    return n;
+  int size = tensor_shape.size();
+  int64_t n = 1;
+  for (int i = 0; i < size; ++i) {
+    n *= tensor_shape[i];
+  }
+  return n;
 }
 
 template <paddle::DataType D>
@@ -140,15 +140,16 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input_ids.place());
   decoding_params.sequence_length =
       sequence_length.mutable_data<int>(input_ids.place());
-  decoding_params.output_scores = output_scores.mutable_data<float>(input_ids.place());
+  decoding_params.output_scores =
+      output_scores.mutable_data<float>(input_ids.place());
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
   fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
 
-  decoding_params.d_start_ids = const_cast<int *>(input_ids.data<int>());
-  decoding_params.d_attn_mask =
-      reinterpret_cast<DataType_*>(const_cast<data_t_ *>(attn_mask.data<data_t_>()));
+  decoding_params.d_start_ids = const_cast<int*>(input_ids.data<int>());
+  decoding_params.d_attn_mask = reinterpret_cast<DataType_*>(
+      const_cast<data_t_*>(attn_mask.data<data_t_>()));
   decoding_params.d_start_lengths = memory_sequence_length.data<int>();
 
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
@@ -281,14 +282,14 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   if (role_id_shape.size() > 0 && numel(role_id_shape) > 0) {
     decoding_params.role_id = role_id.data<int>();
     decoding_params.decoder_role_id = decoder_role_id.data<int>();
-    decoding_params.role_embedding_table =
-        reinterpret_cast<const DataType_*>(role_embedding_table.data<data_t_>());
+    decoding_params.role_embedding_table = reinterpret_cast<const DataType_*>(
+        role_embedding_table.data<data_t_>());
   }
 
   auto position_id_shape = position_ids.shape();
   if (position_id_shape.size() > 0 && numel(position_id_shape) > 0) {
-      decoding_params.position_ids = position_ids.data<int>();
-      decoding_params.decoder_position_ids = decoder_position_ids.data<int>();
+    decoding_params.position_ids = position_ids.data<int>();
+    decoding_params.decoder_position_ids = decoder_position_ids.data<int>();
   }
 
   ActivationType activate =
@@ -323,10 +324,10 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             0, /*pos_offset BART only for now*/
             activate,
             pos_bias,
-            true, /*prefix_lm*/
-            -1,  /*finished_candidate_num*/
-            false,  /*early_stopping*/
-            false,  /*is_mbart*/
+            true,  /*prefix_lm*/
+            -1,    /*finished_candidate_num*/
+            false, /*early_stopping*/
+            false, /*is_mbart*/
             min_length,
             inner_coeff);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
@@ -363,7 +364,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             true, /*prefix_lm*/
             finished_candidate_num_,
             early_stopping,
-            false,  /*is_mbart*/
+            false, /*is_mbart*/
             min_length,
             inner_coeff);
     unified_decoding_beam_search_->forward_context(params, decoding_params);
@@ -395,9 +396,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         activate,
         pos_bias,
         temperature,
-        1.0,  /*repeat_penalty*/
-        true, /*prefix_lm*/
-        false,  /*is_mbart*/
+        1.0,   /*repeat_penalty*/
+        true,  /*prefix_lm*/
+        false, /*is_mbart*/
         min_length,
         inner_coeff);
     unified_decoding_sampling_->forward_context(params, decoding_params);

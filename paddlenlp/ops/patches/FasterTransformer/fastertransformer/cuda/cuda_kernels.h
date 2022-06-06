@@ -111,21 +111,22 @@ void embeddings_kernel_launcher(T* from_tensor,
                                 const int* decoder_position_id = nullptr);
 
 template <typename T>
-void start_ids_embeddings_kernel_launcher(T* from_tensor,
-                                const T* embedding_table,
-                                const T* position_encoding_table,
-                                const T* type_table,
-                                const int* type_id,
-                                const int* word_ids,
-                                const int* memory_seq_len,
-                                const int start_step,
-                                const int max_length,
-                                const int batch_size,
-                                const int hidden_units,
-                                cudaStream_t stream,
-                                const int* role_id = nullptr,
-                                const T* role_embedding_table = nullptr,
-                                const int* position_id = nullptr);
+void start_ids_embeddings_kernel_launcher(
+    T* from_tensor,
+    const T* embedding_table,
+    const T* position_encoding_table,
+    const T* type_table,
+    const int* type_id,
+    const int* word_ids,
+    const int* memory_seq_len,
+    const int start_step,
+    const int max_length,
+    const int batch_size,
+    const int hidden_units,
+    cudaStream_t stream,
+    const int* role_id = nullptr,
+    const T* role_embedding_table = nullptr,
+    const int* position_id = nullptr);
 
 template <typename T>
 void init_cache_kernel_launcher(const float* cache_k,

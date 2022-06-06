@@ -126,7 +126,8 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
 
   DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
-  decoding_params.cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
+  decoding_params.cublaslt_handle =
+      CublasHandle::GetInstance()->cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
@@ -289,7 +290,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
 
   decoding_params.position_encoding_table = reinterpret_cast<const DataType_*>(
       position_encoding_table.data<data_t_>());
-    
+
   int finished_candidate_num_ =
       ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
@@ -321,7 +322,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
         activate,
         false,  // pos_bias
         false /*prefix_lm*/,
-        -1, /*finished_candidate_num*/
+        -1,    /*finished_candidate_num*/
         false, /*early_stopping*/
         true /*is_mbart */);
 
@@ -355,7 +356,7 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
         false,  // pos_bias
         false /*prefix_lm*/,
         finished_candidate_num_, /*finished_candidate_num*/
-        early_stopping, /*early_stopping*/
+        early_stopping,          /*early_stopping*/
         true /*is_mbart */);
 
     decoding_beam_search_->forward(params, decoding_params);
@@ -383,10 +384,10 @@ std::vector<paddle::Tensor> mbart_decoding_kernel(
         true,
         2, /*pos_offset BART and MBART only for now*/
         activate,
-        false,  // pos_bias
-        temperature,    // temperature
-        1.0,    // repeat_penalty
-        false,  // prefix_lm
+        false,        // pos_bias
+        temperature,  // temperature
+        1.0,          // repeat_penalty
+        false,        // prefix_lm
         true /*is_mbart */);
 
     decoding_sampling_->forward(params, decoding_params);
@@ -444,7 +445,7 @@ std::vector<paddle::Tensor> MBartDecodingCUDAForward(
     paddle::Tensor& parent_ids,
     paddle::Tensor& sequence_length,
     const std::string& decoding_strategy,
-    const int&  beam_size,
+    const int& beam_size,
     const int& topk,
     const float& topp,
     const int& n_head,

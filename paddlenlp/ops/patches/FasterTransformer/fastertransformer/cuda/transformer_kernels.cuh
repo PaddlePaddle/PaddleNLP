@@ -31,54 +31,54 @@ void dequant_add_bias_act_quant_kernelLauncher(int32_t* out_quant_buf,
 
 template <typename T>
 void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                     const int32_t* quant_output_buf,
-                                                     const T* input,
-                                                     const T* gamma,
-                                                     const T* beta,
-                                                     const T* bias,
-                                                     const T* w_scale,
-                                                     T* output,
-                                                     T* norm_output,
-                                                     int8_t* quantize_input_buf_,
-                                                     T* scale,
-                                                     int m,
-                                                     int n,
-                                                     cudaStream_t stream,
-                                                     bool use_COL32);
+    const int32_t* quant_output_buf,
+    const T* input,
+    const T* gamma,
+    const T* beta,
+    const T* bias,
+    const T* w_scale,
+    T* output,
+    T* norm_output,
+    int8_t* quantize_input_buf_,
+    T* scale,
+    int m,
+    int n,
+    cudaStream_t stream,
+    bool use_COL32);
 
 template <typename T>
 void add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                     const int32_t* quant_output_buf,
-                                                     const T* input,
-                                                     const T* gamma,
-                                                     const T* beta,
-                                                     const T* bias,
-                                                     const T* w_scale,
-                                                     T* output,
-                                                     T* norm_output,
-                                                     int8_t* quantize_input_buf_,
-                                                     T* scale,
-                                                     int m,
-                                                     int n,
-                                                     cudaStream_t stream,
-                                                     bool use_COL32);
+    const int32_t* quant_output_buf,
+    const T* input,
+    const T* gamma,
+    const T* beta,
+    const T* bias,
+    const T* w_scale,
+    T* output,
+    T* norm_output,
+    int8_t* quantize_input_buf_,
+    T* scale,
+    int m,
+    int n,
+    cudaStream_t stream,
+    bool use_COL32);
 
 template <typename T>
 void dequant_add_bias_input_layernorm_2_kernelLauncher(
-                                                     const int32_t* quant_output_buf,
-                                                     const T* input,
-                                                     const T* gamma,
-                                                     const T* beta,
-                                                     const T* bias,
-                                                     const T* w_scale,
-                                                     T* output,
-                                                     T* norm_output,
-                                                     int8_t* quantize_input_buf_,
-                                                     T* scale,
-                                                     int m,
-                                                     int n,
-                                                     cudaStream_t stream,
-                                                     bool use_COL32);
+    const int32_t* quant_output_buf,
+    const T* input,
+    const T* gamma,
+    const T* beta,
+    const T* bias,
+    const T* w_scale,
+    T* output,
+    T* norm_output,
+    int8_t* quantize_input_buf_,
+    T* scale,
+    int m,
+    int n,
+    cudaStream_t stream,
+    bool use_COL32);
 
 template <typename T>
 void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
@@ -93,15 +93,14 @@ void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
                                            bool use_COL32);
 
 template <typename T>
-void layer_norm_quant(const T *from_tensor,
-                      const T *gamma,
-                      const T *beta,
-                      T *norm_from_tensor_buf_,
-                      T *scale,
+void layer_norm_quant(const T* from_tensor,
+                      const T* gamma,
+                      const T* beta,
+                      T* norm_from_tensor_buf_,
+                      T* scale,
                       int8_t* quantize_input_buf_,
                       const int m,
                       const int n,
                       cudaStream_t stream,
                       bool use_COL32);
-
 }

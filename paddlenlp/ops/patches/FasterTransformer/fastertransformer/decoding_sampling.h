@@ -51,7 +51,7 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
-  void* decoder_int8_buf_;
+  void *decoder_int8_buf_;
 
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
@@ -107,9 +107,7 @@ public:
                    const int min_length = 0,
                    const int inner_coeff = 4,
                    const bool use_int8 = false)
-      : allocator_(allocator),
-        use_int8_(use_int8) {
-
+      : allocator_(allocator), use_int8_(use_int8) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
     args_.memory_max_seq_len_ = memory_max_seq_len;
@@ -172,7 +170,8 @@ public:
                                         args_.memory_max_seq_len_);
     decoder_->set_max_batch_size(batch_size);
 
-    size_t decoder_int8_workspace_size = (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
+    size_t decoder_int8_workspace_size =
+        (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.hidden_units_;                   // type T
@@ -368,131 +367,134 @@ public:
   void forward_context(const DecoderInitParam<DataType_> *decoder_param,
                        const DecodingInitParam<DataType_> decoding_params) {
 #ifndef NDEBUG
-      PRINT_FUNC_NAME_();
+    PRINT_FUNC_NAME_();
 #endif
-      const int input_len = decoding_params.request_input_len;
-      const int request_batch_size = decoding_params.request_batch_size;
+    const int input_len = decoding_params.request_input_len;
+    const int request_batch_size = decoding_params.request_batch_size;
 
-      const int max_input_len = decoding_params.max_input_len;
+    const int max_input_len = decoding_params.max_input_len;
 
-      const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
-      const int m = local_batch_size * input_len;
-      const int h_1 = args_.hidden_units_;
+    const int local_batch_size = ceil(request_batch_size * 1.0 / 1);
+    const int m = local_batch_size * input_len;
+    const int h_1 = args_.hidden_units_;
 
-      DataType_* from_tensor[2];
-      DataType_* decoder_output;
-      DataType_* decoder_workspace;
+    DataType_ *from_tensor[2];
+    DataType_ *decoder_output;
+    DataType_ *decoder_workspace;
 
-      void *buf = reinterpret_cast<void *>(allocator_.malloc(
-          decoder_->getContextWorkspaceSize(input_len, local_batch_size) + 
-          (m * h_1 + 2 * request_batch_size * input_len * h_1) * sizeof(DataType_)
-      ));
+    void *buf = reinterpret_cast<void *>(allocator_.malloc(
+        decoder_->getContextWorkspaceSize(input_len, local_batch_size) +
+        (m * h_1 + 2 * request_batch_size * input_len * h_1) *
+            sizeof(DataType_)));
+
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
+
+    from_tensor[0] = (DataType_ *)buf;
+    from_tensor[1] = from_tensor[0] + request_batch_size * input_len * h_1;
+    decoder_output = from_tensor[1] + request_batch_size * input_len * h_1;
+    decoder_workspace = decoder_output + m * h_1;
+
+#ifndef NDEBUG
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
+#endif
+    if (args_.normalization_before_) {
+      start_ids_embeddings_kernel_launcher(
+          from_tensor[0],
+          decoding_params.embedding_table,
+          decoding_params.position_encoding_table,
+          decoding_params.type_table,
+          decoding_params.type_id,
+          decoding_params.d_start_ids,
+          decoding_params.memory_sequence_length,
+          1,
+          input_len,
+          request_batch_size,
+          h_1,
+          decoding_params.stream,
+          decoding_params.role_id,
+          decoding_params.role_embedding_table,
+          decoding_params.position_ids);
+    } else {
+      // Memory reuse. from_tensor[1].
+      start_ids_embeddings_kernel_launcher(
+          from_tensor[1],
+          decoding_params.embedding_table,
+          decoding_params.position_encoding_table,
+          decoding_params.type_table,
+          decoding_params.type_id,
+          decoding_params.d_start_ids,
+          decoding_params.memory_sequence_length,
+          1,
+          input_len,
+          request_batch_size,
+          h_1,
+          decoding_params.stream,
+          decoding_params.role_id,
+          decoding_params.role_embedding_table,
+          decoding_params.position_ids);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
 
-      from_tensor[0] = (DataType_*) buf;
-      from_tensor[1] = from_tensor[0] + request_batch_size * input_len * h_1;
-      decoder_output = from_tensor[1] + request_batch_size * input_len * h_1;
-      decoder_workspace = decoder_output + m * h_1;
+      layer_norm(from_tensor[1],
+                 decoding_params.layernorm.gamma,
+                 decoding_params.layernorm.beta,
+                 from_tensor[0],
+                 m,
+                 h_1,
+                 decoding_params.stream);
+    }
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
 #endif
-      if (args_.normalization_before_) {
-        start_ids_embeddings_kernel_launcher(from_tensor[0],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
-      } else {
-        // Memory reuse. from_tensor[1].
-        start_ids_embeddings_kernel_launcher(from_tensor[1],
-                                            decoding_params.embedding_table,
-                                            decoding_params.position_encoding_table,
-                                            decoding_params.type_table,
-                                            decoding_params.type_id,
-                                            decoding_params.d_start_ids,
-                                            decoding_params.memory_sequence_length,
-                                            1,
-                                            input_len,
-                                            request_batch_size,
-                                            h_1,
-                                            decoding_params.stream,
-                                            decoding_params.role_id,
-                                            decoding_params.role_embedding_table,
-                                            decoding_params.position_ids);
 
+    int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
+    size_t cache_size =
+        local_batch_size * dummy_decoder_max_seq_len * args_.hidden_units_;
+
+    int in_id, out_id;
+    for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
+      in_id = layer & 0x1;
+      out_id = 1 - in_id;
+
+      decoder_->initialize(
+          decoder_param[layer], decoder_buf_, cublas_workspace_, false);
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
 
-        layer_norm(from_tensor[1],
-                   decoding_params.layernorm.gamma,
-                   decoding_params.layernorm.beta,
-                   from_tensor[0],
-                   m,
-                   h_1,
-                   decoding_params.stream);
-      }
+      size_t cache_offset = layer * cache_size;  // type T
+      decoder_->forward_context(decoder_workspace,
+                                from_tensor[out_id],
+                                K_cache_[0] + cache_offset,
+                                V_cache_[0] + cache_offset,
+                                from_tensor[in_id],
+                                decoding_params.d_attn_mask,
+                                local_batch_size,
+                                input_len,
+                                0,
+                                dummy_decoder_max_seq_len,
+                                layer == args_.decoder_layers_ - 1,
+                                decoding_params.memory_sequence_length);
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
       check_cuda_error(cudaGetLastError());
 #endif
-
-      int dummy_decoder_max_seq_len = args_.seq_len_ + args_.memory_max_seq_len_;
-      size_t cache_size = local_batch_size * dummy_decoder_max_seq_len *
-                args_.hidden_units_;
-
-      int in_id, out_id;
-      for (int layer = 0; layer < args_.decoder_layers_; ++layer) {
-        in_id = layer & 0x1;
-        out_id = 1 - in_id;
-
-        decoder_->initialize(decoder_param[layer], decoder_buf_, cublas_workspace_, false);
+    }  // end of for loop of layer
+    allocator_.free(buf);
 #ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-
-        size_t cache_offset = layer * cache_size;  // type T
-        decoder_->forward_context(decoder_workspace,
-                                  from_tensor[out_id],
-                                  K_cache_[0] + cache_offset,
-                                  V_cache_[0] + cache_offset,
-                                  from_tensor[in_id],
-                                  decoding_params.d_attn_mask,
-                                  local_batch_size,
-                                  input_len,
-                                  0,
-                                  dummy_decoder_max_seq_len,
-                                  layer == args_.decoder_layers_ - 1,
-                                  decoding_params.memory_sequence_length);
-
-#ifndef NDEBUG
-        cudaDeviceSynchronize();
-        check_cuda_error(cudaGetLastError());
-#endif
-      } // end of for loop of layer
-      allocator_.free(buf);
-#ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+    cudaDeviceSynchronize();
+    check_cuda_error(cudaGetLastError());
 #endif
   }
 
@@ -530,7 +532,7 @@ public:
       word_ids: start_id_
     */
     if (decoding_params.output_scores) {
-   	  cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
+      cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
     }
     if (args_.candidate_num_ != 0) {
       sampling_init_kernelLauncher(finished_buf_,
@@ -714,12 +716,11 @@ public:
 
           The decoder_buf_ is reused.
         */
-        decoder_->initialize(
-          param[layer],
-          decoder_buf_,
-          cublas_workspace_,
-          true,
-          decoder_int8_buf_);
+        decoder_->initialize(param[layer],
+                             decoder_buf_,
+                             cublas_workspace_,
+                             true,
+                             decoder_int8_buf_);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -947,17 +948,19 @@ public:
 #endif
         }
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
-          apply_logits_mask_kernelLauncher(logits_buf_,
-                                           finished_buf_,
-                                           args_.batch_size_,
-                                           1,
-                                           args_.vocab_size_padded_,
-                                           args_.vocab_size_,
-                                           decoding_params.stream,
-                                           decoding_params.logits_mask,
-                                           (args_.min_length_ != 0 && step <= args_.min_length_),
-                                           args_.end_id_);
+        if (decoding_params.logits_mask ||
+            (args_.min_length_ != 0 && step <= args_.min_length_)) {
+          apply_logits_mask_kernelLauncher(
+              logits_buf_,
+              finished_buf_,
+              args_.batch_size_,
+              1,
+              args_.vocab_size_padded_,
+              args_.vocab_size_,
+              decoding_params.stream,
+              decoding_params.logits_mask,
+              (args_.min_length_ != 0 && step <= args_.min_length_),
+              args_.end_id_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -983,13 +986,13 @@ public:
           // top k sampling
           if (decoding_params.output_scores) {
             softmax_kernelLauncher(logits_buf_,
-                                  embedding_bias_ptr,
-                                  args_.end_id_,
-                                  finished_buf_,
-                                  m,
-                                  n,
-                                  n,
-                                  decoding_params.stream);
+                                   embedding_bias_ptr,
+                                   args_.end_id_,
+                                   finished_buf_,
+                                   m,
+                                   n,
+                                   n,
+                                   decoding_params.stream);
 
             // Return Score.
             topK_sampling_kernel_kernelLauncher_v3(

@@ -176,7 +176,9 @@ public:
 #endif
 
     if (use_int8_ && memory_max_seq_len_ < 0) {
-      printf("The input of decoder is invalid. The maximum memory sequence length must be greater than 0 when using int8. ");
+      printf(
+          "The input of decoder is invalid. The maximum memory sequence length "
+          "must be greater than 0 when using int8. ");
       exit(-1);
     }
 
@@ -226,16 +228,19 @@ public:
 
   int getWorkspaceSize() {
     assert(max_batch_size_ != -1);
-    return (9 + inner_coeff_) * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
+    return (9 + inner_coeff_) * max_batch_size_ * hidden_units_ +
+           sizeof(DataType_ *) * 9;
   }
 
   int getInt8WorkspaceSize() {
     if (use_int8_) {
       assert(max_batch_size_ != -1);
 
-      return (inner_coeff_ * max_batch_size_ * hidden_units_) * (sizeof(int8_t) + sizeof(int32_t)) +
+      return (inner_coeff_ * max_batch_size_ * hidden_units_) *
+                 (sizeof(int8_t) + sizeof(int32_t)) +
              max_batch_size_ * sizeof(DataType_) +
-             max_batch_size_ * memory_max_seq_len_ * hidden_units_ * (sizeof(int8_t) + 2 * sizeof(int32_t)) +
+             max_batch_size_ * memory_max_seq_len_ * hidden_units_ *
+                 (sizeof(int8_t) + 2 * sizeof(int32_t)) +
              max_batch_size_ * memory_max_seq_len_ * sizeof(DataType_);
     }
     return 0;
@@ -284,22 +289,26 @@ public:
     norm_cross_output_buf_ =
         cross_output_buf_ + buf_size;  // norm(multi-head attention_output)
     ffn_inner_buf_ =
-        norm_cross_output_buf_ + buf_size;  // inner_coeff_(4) buf size to store inner product
+        norm_cross_output_buf_ +
+        buf_size;  // inner_coeff_(4) buf size to store inner product
 
     qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + inner_coeff_ * buf_size);
     qkv_input_ = qkv_kernel_ + 3;
     qkv_buf_ = qkv_input_ + 3;
 
     if (use_int8_ and int8_workspace != nullptr) {
-      input_quantize_buf_ = (int8_t*)int8_workspace;
-      out_quantize_buf_ = (int32_t*)(input_quantize_buf_ + inner_coeff_ * buf_size);
+      input_quantize_buf_ = (int8_t *)int8_workspace;
+      out_quantize_buf_ =
+          (int32_t *)(input_quantize_buf_ + inner_coeff_ * buf_size);
 
-      scale_ = (DataType_*)(out_quantize_buf_ + inner_coeff_ * buf_size);
+      scale_ = (DataType_ *)(out_quantize_buf_ + inner_coeff_ * buf_size);
 
-      quant_in_mem_cache_ = (int8_t*)(scale_ + max_batch_size_);
-      quant_out_mem_cache_ = (int32_t*)(quant_in_mem_cache_ + memory_max_seq_len_ * buf_size);
+      quant_in_mem_cache_ = (int8_t *)(scale_ + max_batch_size_);
+      quant_out_mem_cache_ =
+          (int32_t *)(quant_in_mem_cache_ + memory_max_seq_len_ * buf_size);
 
-      mem_scale_ = (DataType_*)(quant_out_mem_cache_ + 2 * memory_max_seq_len_ * buf_size);
+      mem_scale_ = (DataType_ *)(quant_out_mem_cache_ +
+                                 2 * memory_max_seq_len_ * buf_size);
     }
 
     if (is_fuse_QKV_in_normal_gemm_ == false &&
@@ -344,15 +353,15 @@ public:
       if (normalization_before_) {
         if (use_int8_) {
           layer_norm_quant(from_tensor,
-                      param_.self_layernorm.gamma,
-                      param_.self_layernorm.beta,
-                      norm_from_tensor_buf_,
-                      scale_,
-                      input_quantize_buf_,
-                      m,
-                      hidden_units_,
-                      param_.stream,
-                      use_COL32_);
+                           param_.self_layernorm.gamma,
+                           param_.self_layernorm.beta,
+                           norm_from_tensor_buf_,
+                           scale_,
+                           input_quantize_buf_,
+                           m,
+                           hidden_units_,
+                           param_.stream,
+                           use_COL32_);
         } else {
           layer_norm(from_tensor,
                      param_.self_layernorm.gamma,
@@ -391,20 +400,20 @@ public:
           */
           if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.cross_layernorm.gamma,
-                                                            param_.cross_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                from_tensor,
+                param_.cross_layernorm.gamma,
+                param_.cross_layernorm.beta,
+                param_.self_attention.attention_output_weight.bias,
+                param_.self_attention.attention_output_weight.kernel_scale,
+                masked_output_buf_,
+                norm_masked_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_layernorm_2_kernelLauncher(
                 from_tensor,
@@ -446,20 +455,20 @@ public:
           */
           if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            masked_output_buf_,
-                                                            param_.ffn_layernorm.gamma,
-                                                            param_.ffn_layernorm.beta,
-                                                            param_.cross_attention.attention_output_weight.bias,
-                                                            param_.cross_attention.attention_output_weight.kernel_scale,
-                                                            cross_output_buf_,
-                                                            norm_cross_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                masked_output_buf_,
+                param_.ffn_layernorm.gamma,
+                param_.ffn_layernorm.beta,
+                param_.cross_attention.attention_output_weight.bias,
+                param_.cross_attention.attention_output_weight.kernel_scale,
+                cross_output_buf_,
+                norm_cross_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_layernorm_2_kernelLauncher(
                 masked_output_buf_,
@@ -492,16 +501,17 @@ public:
 #endif
 
           if (use_int8_) {
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  decoder_output,
-                                                  param_.ffn.output_weight.bias,
-                                                  cross_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                decoder_output,
+                param_.ffn.output_weight.bias,
+                cross_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_kernelLauncher(decoder_output,
                                           param_.ffn.output_weight.bias,
@@ -514,20 +524,20 @@ public:
         } else {
           if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.ffn_layernorm.gamma,
-                                                            param_.ffn_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                from_tensor,
+                param_.ffn_layernorm.gamma,
+                param_.ffn_layernorm.beta,
+                param_.self_attention.attention_output_weight.bias,
+                param_.self_attention.attention_output_weight.kernel_scale,
+                masked_output_buf_,
+                norm_masked_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_layernorm_2_kernelLauncher(
                 from_tensor,
@@ -563,16 +573,17 @@ public:
 #endif
 
           if (use_int8_) {
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  decoder_output,
-                                                  param_.ffn.output_weight.bias,
-                                                  masked_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                decoder_output,
+                param_.ffn.output_weight.bias,
+                masked_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_kernelLauncher(decoder_output,
                                           param_.ffn.output_weight.bias,
@@ -604,25 +615,23 @@ public:
 #endif
 
         if (use_int8_) {
-
-            dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.self_layernorm.gamma,
-                                                            param_.self_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+          dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
+              out_quantize_buf_,
+              from_tensor,
+              param_.self_layernorm.gamma,
+              param_.self_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              param_.self_attention.attention_output_weight.kernel_scale,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              input_quantize_buf_,
+              scale_,
+              m,
+              hidden_units_,
+              param_.stream,
+              use_COL32_);
 
         } else {
-
           add_bias_input_layernorm_2_kernelLauncher(
               from_tensor,
               param_.self_layernorm.gamma,
@@ -633,7 +642,6 @@ public:
               m,
               hidden_units_,
               param_.stream);
-
         }
 
 #ifndef NDEBUG
@@ -664,25 +672,23 @@ public:
           //  norm(cross_otuput_buf) -> normed_last_context (input for ffn)
           //
           if (use_int8_) {
-
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            norm_masked_output_buf_,
-                                                            param_.cross_layernorm.gamma,
-                                                            param_.cross_layernorm.beta,
-                                                            param_.cross_attention.attention_output_weight.bias,
-                                                            param_.cross_attention.attention_output_weight.kernel_scale,
-                                                            cross_output_buf_,
-                                                            norm_cross_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                norm_masked_output_buf_,
+                param_.cross_layernorm.gamma,
+                param_.cross_layernorm.beta,
+                param_.cross_attention.attention_output_weight.bias,
+                param_.cross_attention.attention_output_weight.kernel_scale,
+                cross_output_buf_,
+                norm_cross_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_layernorm_2_kernelLauncher(
                 norm_masked_output_buf_,
                 param_.cross_layernorm.gamma,
@@ -693,7 +699,6 @@ public:
                 m,
                 hidden_units_,
                 param_.stream);
-
           }
 
 #ifndef NDEBUG
@@ -715,27 +720,25 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  ffn_out_buf_,
-                                                  param_.ffn.output_weight.bias,
-                                                  norm_cross_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                ffn_out_buf_,
+                param_.ffn.output_weight.bias,
+                norm_cross_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_kernelLauncher(ffn_out_buf_,
                                           param_.ffn.output_weight.bias,
                                           norm_cross_output_buf_,
                                           m,
                                           hidden_units_,
                                           param_.stream);
-
           }
 
 #ifndef NDEBUG
@@ -766,27 +769,25 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  ffn_out_buf_,
-                                                  param_.ffn.output_weight.bias,
-                                                  norm_masked_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                ffn_out_buf_,
+                param_.ffn.output_weight.bias,
+                norm_masked_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_kernelLauncher(ffn_out_buf_,
                                           param_.ffn.output_weight.bias,
                                           norm_masked_output_buf_,
                                           m,
                                           hidden_units_,
                                           param_.stream);
-
           }
 
 #ifndef NDEBUG
@@ -838,23 +839,23 @@ public:
       if (normalization_before_) {
         if (use_int8_) {
           layer_norm_quant(from_tensor,
-                      param_.self_layernorm.gamma,
-                      param_.self_layernorm.beta,
-                      norm_from_tensor_buf_,
-                      scale_,
-                      input_quantize_buf_,
-                      m,
-                      hidden_units_,
-                      param_.stream,
-                      use_COL32_);
+                           param_.self_layernorm.gamma,
+                           param_.self_layernorm.beta,
+                           norm_from_tensor_buf_,
+                           scale_,
+                           input_quantize_buf_,
+                           m,
+                           hidden_units_,
+                           param_.stream,
+                           use_COL32_);
         } else {
           layer_norm(from_tensor,
-                    param_.self_layernorm.gamma,
-                    param_.self_layernorm.beta,
-                    norm_from_tensor_buf_,
-                    m,
-                    hidden_units_,
-                    param_.stream);
+                     param_.self_layernorm.gamma,
+                     param_.self_layernorm.beta,
+                     norm_from_tensor_buf_,
+                     m,
+                     hidden_units_,
+                     param_.stream);
         }
 
 #ifndef NDEBUG
@@ -884,36 +885,35 @@ public:
               masked_output_buf_ + from_tensor -> masked_output_buf_
               norm(masked_output_buf_) -> norm_masked_output_buf_
           */
-         if (use_int8_) {
-
+          if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.cross_layernorm.gamma,
-                                                            param_.cross_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                from_tensor,
+                param_.cross_layernorm.gamma,
+                param_.cross_layernorm.beta,
+                param_.self_attention.attention_output_weight.bias,
+                param_.self_attention.attention_output_weight.kernel_scale,
+                masked_output_buf_,
+                norm_masked_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
-         } else {
-          add_bias_input_layernorm_2_kernelLauncher(
-              from_tensor,
-              param_.cross_layernorm.gamma,
-              param_.cross_layernorm.beta,
-              param_.self_attention.attention_output_weight.bias,
-              masked_output_buf_,
-              norm_masked_output_buf_,
-              m,
-              hidden_units_,
-              param_.stream);
-         }
+          } else {
+            add_bias_input_layernorm_2_kernelLauncher(
+                from_tensor,
+                param_.cross_layernorm.gamma,
+                param_.cross_layernorm.beta,
+                param_.self_attention.attention_output_weight.bias,
+                masked_output_buf_,
+                norm_masked_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream);
+          }
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -938,36 +938,35 @@ public:
               cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
               norm(cross_otuput_buf) -> normed_last_context (input for ffn)
           */
-         if (use_int8_) {
-
+          if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            masked_output_buf_,
-                                                            param_.ffn_layernorm.gamma,
-                                                            param_.ffn_layernorm.beta,
-                                                            param_.cross_attention.attention_output_weight.bias,
-                                                            param_.cross_attention.attention_output_weight.kernel_scale,
-                                                            cross_output_buf_,
-                                                            norm_cross_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                masked_output_buf_,
+                param_.ffn_layernorm.gamma,
+                param_.ffn_layernorm.beta,
+                param_.cross_attention.attention_output_weight.bias,
+                param_.cross_attention.attention_output_weight.kernel_scale,
+                cross_output_buf_,
+                norm_cross_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
-         } else {
-          add_bias_input_layernorm_2_kernelLauncher(
-              masked_output_buf_,
-              param_.ffn_layernorm.gamma,
-              param_.ffn_layernorm.beta,
-              param_.cross_attention.attention_output_weight.bias,
-              cross_output_buf_,
-              norm_cross_output_buf_,
-              m,
-              hidden_units_,
-              param_.stream);
-         }
+          } else {
+            add_bias_input_layernorm_2_kernelLauncher(
+                masked_output_buf_,
+                param_.ffn_layernorm.gamma,
+                param_.ffn_layernorm.beta,
+                param_.cross_attention.attention_output_weight.bias,
+                cross_output_buf_,
+                norm_cross_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream);
+          }
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -985,20 +984,19 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  decoder_output,
-                                                  param_.ffn.output_weight.bias,
-                                                  cross_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                decoder_output,
+                param_.ffn.output_weight.bias,
+                cross_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_kernelLauncher(decoder_output,
                                           param_.ffn.output_weight.bias,
                                           cross_output_buf_,
@@ -1008,25 +1006,23 @@ public:
           }
         } else {
           if (use_int8_) {
-
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.ffn_layernorm.gamma,
-                                                            param_.ffn_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                from_tensor,
+                param_.ffn_layernorm.gamma,
+                param_.ffn_layernorm.beta,
+                param_.self_attention.attention_output_weight.bias,
+                param_.self_attention.attention_output_weight.kernel_scale,
+                masked_output_buf_,
+                norm_masked_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_layernorm_2_kernelLauncher(
                 from_tensor,
                 param_.ffn_layernorm.gamma,
@@ -1037,7 +1033,6 @@ public:
                 m,
                 hidden_units_,
                 param_.stream);
-
           }
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1059,17 +1054,17 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  decoder_output,
-                                                  param_.ffn.output_weight.bias,
-                                                  masked_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                decoder_output,
+                param_.ffn.output_weight.bias,
+                masked_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
             add_bias_input_kernelLauncher(decoder_output,
                                           param_.ffn.output_weight.bias,
@@ -1103,35 +1098,33 @@ public:
 #endif
 
         if (use_int8_) {
-
-            dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            from_tensor,
-                                                            param_.self_layernorm.gamma,
-                                                            param_.self_layernorm.beta,
-                                                            param_.self_attention.attention_output_weight.bias,
-                                                            param_.self_attention.attention_output_weight.kernel_scale,
-                                                            masked_output_buf_,
-                                                            norm_masked_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+          dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
+              out_quantize_buf_,
+              from_tensor,
+              param_.self_layernorm.gamma,
+              param_.self_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              param_.self_attention.attention_output_weight.kernel_scale,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              input_quantize_buf_,
+              scale_,
+              m,
+              hidden_units_,
+              param_.stream,
+              use_COL32_);
 
         } else {
-
-        add_bias_input_layernorm_2_kernelLauncher(
-            from_tensor,
-            param_.self_layernorm.gamma,
-            param_.self_layernorm.beta,
-            param_.self_attention.attention_output_weight.bias,
-            masked_output_buf_,
-            norm_masked_output_buf_,
-            m,
-            hidden_units_,
-            param_.stream);
+          add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              param_.self_layernorm.gamma,
+              param_.self_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
         }
 
 #ifndef NDEBUG
@@ -1161,26 +1154,24 @@ public:
               cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
               norm(cross_otuput_buf) -> normed_last_context (input for ffn)
           */
-         if (use_int8_) {
-
+          if (use_int8_) {
             dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
-                                                            out_quantize_buf_,
-                                                            norm_masked_output_buf_,
-                                                            param_.cross_layernorm.gamma,
-                                                            param_.cross_layernorm.beta,
-                                                            param_.cross_attention.attention_output_weight.bias,
-                                                            param_.cross_attention.attention_output_weight.kernel_scale,
-                                                            cross_output_buf_,
-                                                            norm_cross_output_buf_,
-                                                            input_quantize_buf_,
-                                                            scale_,
-                                                            m,
-                                                            hidden_units_,
-                                                            param_.stream,
-                                                            use_COL32_);
+                out_quantize_buf_,
+                norm_masked_output_buf_,
+                param_.cross_layernorm.gamma,
+                param_.cross_layernorm.beta,
+                param_.cross_attention.attention_output_weight.bias,
+                param_.cross_attention.attention_output_weight.kernel_scale,
+                cross_output_buf_,
+                norm_cross_output_buf_,
+                input_quantize_buf_,
+                scale_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
-         } else {
-
+          } else {
             add_bias_input_layernorm_2_kernelLauncher(
                 norm_masked_output_buf_,
                 param_.cross_layernorm.gamma,
@@ -1191,8 +1182,7 @@ public:
                 m,
                 hidden_units_,
                 param_.stream);
-
-         }
+          }
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1212,19 +1202,18 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  ffn_out_buf_,
-                                                  param_.ffn.output_weight.bias,
-                                                  norm_cross_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                ffn_out_buf_,
+                param_.ffn.output_weight.bias,
+                norm_cross_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
           } else {
-
             add_bias_input_kernelLauncher(ffn_out_buf_,
                                           param_.ffn.output_weight.bias,
                                           norm_cross_output_buf_,
@@ -1262,27 +1251,25 @@ public:
 #endif
 
           if (use_int8_) {
-
-            dequant_add_bias_input_kernelLauncher(out_quantize_buf_,
-                                                  scale_,
-                                                  param_.ffn.output_weight.kernel_scale,
-                                                  ffn_out_buf_,
-                                                  param_.ffn.output_weight.bias,
-                                                  norm_masked_output_buf_,
-                                                  m,
-                                                  hidden_units_,
-                                                  param_.stream,
-                                                  use_COL32_);
+            dequant_add_bias_input_kernelLauncher(
+                out_quantize_buf_,
+                scale_,
+                param_.ffn.output_weight.kernel_scale,
+                ffn_out_buf_,
+                param_.ffn.output_weight.bias,
+                norm_masked_output_buf_,
+                m,
+                hidden_units_,
+                param_.stream,
+                use_COL32_);
 
           } else {
-
             add_bias_input_kernelLauncher(ffn_out_buf_,
                                           param_.ffn.output_weight.bias,
                                           norm_masked_output_buf_,
                                           m,
                                           hidden_units_,
                                           param_.stream);
-
           }
 
 #ifndef NDEBUG
@@ -1323,7 +1310,8 @@ public:
         qk_buf_size +
         2 * m * t_parallel_param_.local_hidden_units_ /* trans_attn, attn */;
     return (m * hidden_units_ * 3 + attn_work_space_size +
-            m * t_parallel_param_.local_hidden_units_ * inner_coeff_ /* ffn buffer */) *
+            m * t_parallel_param_.local_hidden_units_ *
+                inner_coeff_ /* ffn buffer */) *
            sizeof(DataType_);
   }
 
@@ -1339,7 +1327,7 @@ public:
                        const int ite,
                        const int max_seq_len,
                        const bool is_final,
-                       const int* memory_sequence_length = nullptr) {
+                       const int *memory_sequence_length = nullptr) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -1366,12 +1354,12 @@ public:
 
       if (normalization_before_) {
         layer_norm(from_tensor,
-                  param_.self_layernorm.gamma,
-                  param_.self_layernorm.beta,
-                  norm_from_tensor_buf,
-                  m,
-                  hidden_units_,
-                  param_.stream);
+                   param_.self_layernorm.gamma,
+                   param_.self_layernorm.beta,
+                   norm_from_tensor_buf,
+                   m,
+                   hidden_units_,
+                   param_.stream);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -1438,7 +1426,6 @@ public:
                                       hidden_units_,
                                       param_.stream);
       } else {
-
         PUSH_RANGE("Transformer/slf_attn")
         unfused_masked_multi_head_attention(attention_workspace,
                                             from_tensor,
@@ -1492,17 +1479,15 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        add_bias_input_layernorm_2_kernelLauncher(
-            norm_masked_output_buf,
-            param_.ffn_layernorm.gamma,
-            param_.ffn_layernorm.beta,
-            param_.ffn.output_weight.bias,
-            ffn_out_buf,
-            decoder_output,
-            m,
-            hidden_units_,
-            param_.stream);
-
+        add_bias_input_layernorm_2_kernelLauncher(norm_masked_output_buf,
+                                                  param_.ffn_layernorm.gamma,
+                                                  param_.ffn_layernorm.beta,
+                                                  param_.ffn.output_weight.bias,
+                                                  ffn_out_buf,
+                                                  decoder_output,
+                                                  m,
+                                                  hidden_units_,
+                                                  param_.stream);
       }
 
 #ifndef NDEBUG
@@ -1532,70 +1517,69 @@ public:
 
     if (is_fuse_QKV_in_normal_gemm_ == true) {
       if (use_int8_) {
-
         if (not normalization_before_) {
           channel_wise_quantize_kernelLauncher(from_tensor,
-                                              input_quantize_buf_,
-                                              scale_,
-                                              m,
-                                              k,
-                                              param_.stream,
-                                              use_COL32_);
+                                               input_quantize_buf_,
+                                               scale_,
+                                               m,
+                                               k,
+                                               param_.stream,
+                                               use_COL32_);
         }
 
         if (use_COL32_) {
+          cublasLtMM_INT8_withAlgo(
+              out_quantize_buf_,
+              1,
+              m,
+              3 * n,
+              k,
+              m * k,
+              3 * n * k,
+              m * 3 * n,
+              (int8_t *)input_quantize_buf_,
+              (int8_t *)param_.self_attention.query_weight.int8_kernel,
+              param_.cublaslt_handle,
+              param_.stream,
+              cublasAlgoMap_,
+              use_ORDER_COL32_2R_4R4_);
 
-          cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                              1,
-                              m,
-                              3 * n,
-                              k,
-                              m * k,
-                              3 * n * k,
-                              m * 3 * n,
-                              (int8_t*)input_quantize_buf_,
-                              (int8_t*)param_.self_attention.query_weight.int8_kernel,
-                              param_.cublaslt_handle,
-                              param_.stream,
-                              cublasAlgoMap_,
-                              use_ORDER_COL32_2R_4R4_);
-        
         } else {
-
           int alpha_i = 1;
           int beta_i = 0;
 
-          cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                  param_.cublas_handle,
-                                                  CUBLAS_OP_N,
-                                                  CUBLAS_OP_N,
-                                                  3 * n,
-                                                  m,
-                                                  k,
-                                                  &alpha_i,
-                                                  param_.self_attention.query_weight.int8_kernel,
-                                                  CUDA_R_8I,
-                                                  3 * n,
-                                                  input_quantize_buf_,
-                                                  CUDA_R_8I,
-                                                  k,
-                                                  &beta_i,
-                                                  out_quantize_buf_,
-                                                  CUDA_R_32I,
-                                                  3 * n,
-                                                  param_.stream,
-                                                  cublas_workspace_);
-
+          cublasMM_cublasLtMM_wrapper_int8_decoder(
+              param_.cublaslt_handle,
+              param_.cublas_handle,
+              CUBLAS_OP_N,
+              CUBLAS_OP_N,
+              3 * n,
+              m,
+              k,
+              &alpha_i,
+              param_.self_attention.query_weight.int8_kernel,
+              CUDA_R_8I,
+              3 * n,
+              input_quantize_buf_,
+              CUDA_R_8I,
+              k,
+              &beta_i,
+              out_quantize_buf_,
+              CUDA_R_32I,
+              3 * n,
+              param_.stream,
+              cublas_workspace_);
         }
 
-        channel_wise_dequantize_kernelLauncher(out_quantize_buf_,
-                                              scale_,
-                                              param_.self_attention.query_weight.kernel_scale,
-                                              query_buf_,
-                                              m,
-                                              3 * n,
-                                              param_.stream,
-                                              use_COL32_);
+        channel_wise_dequantize_kernelLauncher(
+            out_quantize_buf_,
+            scale_,
+            param_.self_attention.query_weight.kernel_scale,
+            query_buf_,
+            m,
+            3 * n,
+            param_.stream,
+            use_COL32_);
       } else {
         cublasMM_cublasLtMM_wrapper_decoder(
             param_.cublaslt_handle,
@@ -1637,9 +1621,10 @@ public:
           param_.stream);
     } else {
       if (is_fuse_QKV_in_batched_gemm_ == true) {
-
         if (use_int8_) {
-          printf("INT8 not support for is_fuse_QKV_in_batched_gemm_. Should not reach here. ");
+          printf(
+              "INT8 not support for is_fuse_QKV_in_batched_gemm_. Should not "
+              "reach here. ");
           exit(-1);
         }
 
@@ -1674,148 +1659,151 @@ public:
                                              cublasAlgo));
       } else {
         if (use_int8_) {
-
           if (not normalization_before_) {
             channel_wise_quantize_kernelLauncher(from_tensor,
-                                                input_quantize_buf_,
-                                                scale_,
-                                                m,
-                                                k,
-                                                param_.stream,
-                                                use_COL32_);
+                                                 input_quantize_buf_,
+                                                 scale_,
+                                                 m,
+                                                 k,
+                                                 param_.stream,
+                                                 use_COL32_);
           }
 
           if (use_COL32_) {
+            cublasLtMM_INT8_withAlgo(
+                out_quantize_buf_,
+                1,
+                m,
+                n,
+                k,
+                m * k,
+                n * k,
+                m * n,
+                (int8_t *)input_quantize_buf_,
+                (int8_t *)param_.self_attention.query_weight.int8_kernel,
+                param_.cublaslt_handle,
+                param_.stream,
+                cublasAlgoMap_,
+                use_ORDER_COL32_2R_4R4_);
 
-            cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                                1,
-                                m,
-                                n,
-                                k,
-                                m * k,
-                                n * k,
-                                m * n,
-                                (int8_t*)input_quantize_buf_,
-                                (int8_t*)param_.self_attention.query_weight.int8_kernel,
-                                param_.cublaslt_handle,
-                                param_.stream,
-                                cublasAlgoMap_,
-                                use_ORDER_COL32_2R_4R4_);
+            cublasLtMM_INT8_withAlgo(
+                out_quantize_buf_ + m * k,
+                1,
+                m,
+                n,
+                k,
+                m * k,
+                n * k,
+                m * n,
+                (int8_t *)input_quantize_buf_,
+                (int8_t *)param_.self_attention.key_weight.int8_kernel,
+                param_.cublaslt_handle,
+                param_.stream,
+                cublasAlgoMap_,
+                use_ORDER_COL32_2R_4R4_);
 
-            cublasLtMM_INT8_withAlgo(out_quantize_buf_ + m * k,
-                                1,
-                                m,
-                                n,
-                                k,
-                                m * k,
-                                n * k,
-                                m * n,
-                                (int8_t*)input_quantize_buf_,
-                                (int8_t*)param_.self_attention.key_weight.int8_kernel,
-                                param_.cublaslt_handle,
-                                param_.stream,
-                                cublasAlgoMap_,
-                                use_ORDER_COL32_2R_4R4_);
+            cublasLtMM_INT8_withAlgo(
+                out_quantize_buf_ + 2 * m * k,
+                1,
+                m,
+                n,
+                k,
+                m * k,
+                n * k,
+                m * n,
+                (int8_t *)input_quantize_buf_,
+                (int8_t *)param_.self_attention.value_weight.int8_kernel,
+                param_.cublaslt_handle,
+                param_.stream,
+                cublasAlgoMap_,
+                use_ORDER_COL32_2R_4R4_);
 
-            cublasLtMM_INT8_withAlgo(out_quantize_buf_ + 2 * m * k,
-                                1,
-                                m,
-                                n,
-                                k,
-                                m * k,
-                                n * k,
-                                m * n,
-                                (int8_t*)input_quantize_buf_,
-                                (int8_t*)param_.self_attention.value_weight.int8_kernel,
-                                param_.cublaslt_handle,
-                                param_.stream,
-                                cublasAlgoMap_,
-                                use_ORDER_COL32_2R_4R4_);
-          
           } else {
-
             int alpha_i = 1;
             int beta_i = 0;
 
-            cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                    param_.cublas_handle,
-                                                    CUBLAS_OP_N,
-                                                    CUBLAS_OP_N,
-                                                    n,
-                                                    m,
-                                                    k,
-                                                    &alpha_i,
-                                                    param_.self_attention.query_weight.int8_kernel,
-                                                    CUDA_R_8I,
-                                                    n,
-                                                    input_quantize_buf_,
-                                                    CUDA_R_8I,
-                                                    k,
-                                                    &beta_i,
-                                                    out_quantize_buf_,
-                                                    CUDA_R_32I,
-                                                    n,
-                                                    param_.stream,
-                                                    cublas_workspace_);
-          
-            cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                    param_.cublas_handle,
-                                                    CUBLAS_OP_N,
-                                                    CUBLAS_OP_N,
-                                                    n,
-                                                    m,
-                                                    k,
-                                                    &alpha_i,
-                                                    param_.self_attention.key_weight.int8_kernel,
-                                                    CUDA_R_8I,
-                                                    n,
-                                                    input_quantize_buf_,
-                                                    CUDA_R_8I,
-                                                    k,
-                                                    &beta_i,
-                                                    out_quantize_buf_ + m * k,
-                                                    CUDA_R_32I,
-                                                    n,
-                                                    param_.stream,
-                                                    cublas_workspace_);
+            cublasMM_cublasLtMM_wrapper_int8_decoder(
+                param_.cublaslt_handle,
+                param_.cublas_handle,
+                CUBLAS_OP_N,
+                CUBLAS_OP_N,
+                n,
+                m,
+                k,
+                &alpha_i,
+                param_.self_attention.query_weight.int8_kernel,
+                CUDA_R_8I,
+                n,
+                input_quantize_buf_,
+                CUDA_R_8I,
+                k,
+                &beta_i,
+                out_quantize_buf_,
+                CUDA_R_32I,
+                n,
+                param_.stream,
+                cublas_workspace_);
 
-            cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                    param_.cublas_handle,
-                                                    CUBLAS_OP_N,
-                                                    CUBLAS_OP_N,
-                                                    n,
-                                                    m,
-                                                    k,
-                                                    &alpha_i,
-                                                    param_.self_attention.value_weight.int8_kernel,
-                                                    CUDA_R_8I,
-                                                    n,
-                                                    input_quantize_buf_,
-                                                    CUDA_R_8I,
-                                                    k,
-                                                    &beta_i,
-                                                    out_quantize_buf_ + 2 * m * k,
-                                                    CUDA_R_32I,
-                                                    n,
-                                                    param_.stream,
-                                                    cublas_workspace_);
+            cublasMM_cublasLtMM_wrapper_int8_decoder(
+                param_.cublaslt_handle,
+                param_.cublas_handle,
+                CUBLAS_OP_N,
+                CUBLAS_OP_N,
+                n,
+                m,
+                k,
+                &alpha_i,
+                param_.self_attention.key_weight.int8_kernel,
+                CUDA_R_8I,
+                n,
+                input_quantize_buf_,
+                CUDA_R_8I,
+                k,
+                &beta_i,
+                out_quantize_buf_ + m * k,
+                CUDA_R_32I,
+                n,
+                param_.stream,
+                cublas_workspace_);
+
+            cublasMM_cublasLtMM_wrapper_int8_decoder(
+                param_.cublaslt_handle,
+                param_.cublas_handle,
+                CUBLAS_OP_N,
+                CUBLAS_OP_N,
+                n,
+                m,
+                k,
+                &alpha_i,
+                param_.self_attention.value_weight.int8_kernel,
+                CUDA_R_8I,
+                n,
+                input_quantize_buf_,
+                CUDA_R_8I,
+                k,
+                &beta_i,
+                out_quantize_buf_ + 2 * m * k,
+                CUDA_R_32I,
+                n,
+                param_.stream,
+                cublas_workspace_);
           }
 
-          qkv_channel_wise_dequantize_kernelLauncher(out_quantize_buf_,
-                                                scale_,
-                                                param_.self_attention.query_weight.kernel_scale,
-                                                param_.self_attention.key_weight.kernel_scale,
-                                                param_.self_attention.value_weight.kernel_scale,
-                                                query_buf_,
-                                                key_buf_,
-                                                value_buf_,
-                                                m,
-                                                n,
-                                                param_.stream,
-                                                use_COL32_);
+          qkv_channel_wise_dequantize_kernelLauncher(
+              out_quantize_buf_,
+              scale_,
+              param_.self_attention.query_weight.kernel_scale,
+              param_.self_attention.key_weight.kernel_scale,
+              param_.self_attention.value_weight.kernel_scale,
+              query_buf_,
+              key_buf_,
+              value_buf_,
+              m,
+              n,
+              param_.stream,
+              use_COL32_);
 
         } else {
-
           cublasMM_cublasLtMM_wrapper_decoder(
               param_.cublaslt_handle,
               param_.cublas_handle,
@@ -1910,56 +1898,55 @@ public:
     n = hidden_units_;
 
     if (use_int8_) {
-
       channel_wise_quantize_kernelLauncher(context_buf_,
-                                          input_quantize_buf_,
-                                          scale_,
-                                          m,
-                                          k,
-                                          param_.stream,
-                                          use_COL32_);
+                                           input_quantize_buf_,
+                                           scale_,
+                                           m,
+                                           k,
+                                           param_.stream,
+                                           use_COL32_);
 
       if (use_COL32_) {
-        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m,
-                            n,
-                            k,
-                            m * k,
-                            n * k,
-                            m * n,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.self_attention.attention_output_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
+        cublasLtMM_INT8_withAlgo(
+            out_quantize_buf_,
+            1,
+            m,
+            n,
+            k,
+            m * k,
+            n * k,
+            m * n,
+            (int8_t *)input_quantize_buf_,
+            (int8_t *)param_.self_attention.attention_output_weight.int8_kernel,
+            param_.cublaslt_handle,
+            param_.stream,
+            cublasAlgoMap_,
+            use_ORDER_COL32_2R_4R4_);
       } else {
+        int alpha_i = 1;
+        int beta_i = 0;
 
-            int alpha_i = 1;
-            int beta_i = 0;
-
-            cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                    param_.cublas_handle,
-                                                    CUBLAS_OP_N,
-                                                    CUBLAS_OP_N,
-                                                    n,
-                                                    m,
-                                                    k,
-                                                    &alpha_i,
-                                                    param_.self_attention.attention_output_weight.int8_kernel,
-                                                    CUDA_R_8I,
-                                                    n,
-                                                    input_quantize_buf_,
-                                                    CUDA_R_8I,
-                                                    k,
-                                                    &beta_i,
-                                                    out_quantize_buf_,
-                                                    CUDA_R_32I,
-                                                    n,
-                                                    param_.stream,
-                                                    cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n,
+            m,
+            k,
+            &alpha_i,
+            param_.self_attention.attention_output_weight.int8_kernel,
+            CUDA_R_8I,
+            n,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n,
+            param_.stream,
+            cublas_workspace_);
       }
 
     } else {
@@ -2016,72 +2003,70 @@ public:
            0);  // this is the only difference with masked_multi_head_attention
 
     if (use_int8_) {
-
       if (not normalization_before_) {
         channel_wise_quantize_kernelLauncher(from_tensor,
-                                            input_quantize_buf_,
-                                            scale_,
-                                            m,
-                                            k,
-                                            param_.stream,
-                                            use_COL32_);
+                                             input_quantize_buf_,
+                                             scale_,
+                                             m,
+                                             k,
+                                             param_.stream,
+                                             use_COL32_);
       }
 
       if (use_COL32_) {
+        cublasLtMM_INT8_withAlgo(
+            out_quantize_buf_,
+            1,
+            m,
+            3 * n,
+            k,
+            m * k,
+            3 * n * k,
+            m * 3 * n,
+            (int8_t *)input_quantize_buf_,
+            (int8_t *)param_.self_attention.query_weight.int8_kernel,
+            param_.cublaslt_handle,
+            param_.stream,
+            cublasAlgoMap_,
+            use_ORDER_COL32_2R_4R4_);
 
-        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m,
-                            3 * n,
-                            k,
-                            m * k,
-                            3 * n * k,
-                            m * 3 * n,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.self_attention.query_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
-      
       } else {
-
         int alpha_i = 1;
         int beta_i = 0;
 
-        cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                param_.cublas_handle,
-                                                CUBLAS_OP_N,
-                                                CUBLAS_OP_N,
-                                                3 * n,
-                                                m,
-                                                k,
-                                                &alpha_i,
-                                                param_.self_attention.query_weight.int8_kernel,
-                                                CUDA_R_8I,
-                                                3 * n,
-                                                input_quantize_buf_,
-                                                CUDA_R_8I,
-                                                k,
-                                                &beta_i,
-                                                out_quantize_buf_,
-                                                CUDA_R_32I,
-                                                3 * n,
-                                                param_.stream,
-                                                cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            3 * n,
+            m,
+            k,
+            &alpha_i,
+            param_.self_attention.query_weight.int8_kernel,
+            CUDA_R_8I,
+            3 * n,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            3 * n,
+            param_.stream,
+            cublas_workspace_);
       }
 
-      channel_wise_dequantize_kernelLauncher(out_quantize_buf_,
-                                            scale_,
-                                            param_.self_attention.query_weight.kernel_scale,
-                                            query_buf_,
-                                            m,
-                                            3 * n,
-                                            param_.stream,
-                                            use_COL32_);
+      channel_wise_dequantize_kernelLauncher(
+          out_quantize_buf_,
+          scale_,
+          param_.self_attention.query_weight.kernel_scale,
+          query_buf_,
+          m,
+          3 * n,
+          param_.stream,
+          use_COL32_);
     } else {
-
       DataType_ alpha = (DataType_)1.0f, beta = (DataType_)0.0f;
 
       cublasMM_cublasLtMM_wrapper_decoder(
@@ -2130,57 +2115,56 @@ public:
 
     if (use_int8_) {
       channel_wise_quantize_kernelLauncher(context_buf_,
-                                          input_quantize_buf_,
-                                          scale_,
-                                          m,
-                                          k,
-                                          param_.stream,
-                                          use_COL32_);
+                                           input_quantize_buf_,
+                                           scale_,
+                                           m,
+                                           k,
+                                           param_.stream,
+                                           use_COL32_);
 
       if (use_COL32_) {
-        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m,
-                            n,
-                            k,
-                            m * k,
-                            n * k,
-                            m * n,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.self_attention.attention_output_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
+        cublasLtMM_INT8_withAlgo(
+            out_quantize_buf_,
+            1,
+            m,
+            n,
+            k,
+            m * k,
+            n * k,
+            m * n,
+            (int8_t *)input_quantize_buf_,
+            (int8_t *)param_.self_attention.attention_output_weight.int8_kernel,
+            param_.cublaslt_handle,
+            param_.stream,
+            cublasAlgoMap_,
+            use_ORDER_COL32_2R_4R4_);
       } else {
+        int alpha_i = 1;
+        int beta_i = 0;
 
-            int alpha_i = 1;
-            int beta_i = 0;
-
-            cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                    param_.cublas_handle,
-                                                    CUBLAS_OP_N,
-                                                    CUBLAS_OP_N,
-                                                    n,
-                                                    m,
-                                                    k,
-                                                    &alpha_i,
-                                                    param_.self_attention.attention_output_weight.int8_kernel,
-                                                    CUDA_R_8I,
-                                                    n,
-                                                    input_quantize_buf_,
-                                                    CUDA_R_8I,
-                                                    k,
-                                                    &beta_i,
-                                                    out_quantize_buf_,
-                                                    CUDA_R_32I,
-                                                    n,
-                                                    param_.stream,
-                                                    cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n,
+            m,
+            k,
+            &alpha_i,
+            param_.self_attention.attention_output_weight.int8_kernel,
+            CUDA_R_8I,
+            n,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n,
+            param_.stream,
+            cublas_workspace_);
       }
     } else {
-
       DataType_ alpha = (DataType_)1.0f, beta = (DataType_)0.0f;
 
       cublasMM_cublasLtMM_wrapper_decoder(
@@ -2233,60 +2217,59 @@ public:
     DataType_ alpha = (DataType_)1.0f, beta = (DataType_)0.0f;
 
     if (use_int8_) {
-
       if (use_COL32_) {
-
-        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m,
-                            n,
-                            k,
-                            m * k,
-                            n * k,
-                            m * n,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.cross_attention.query_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
+        cublasLtMM_INT8_withAlgo(
+            out_quantize_buf_,
+            1,
+            m,
+            n,
+            k,
+            m * k,
+            n * k,
+            m * n,
+            (int8_t *)input_quantize_buf_,
+            (int8_t *)param_.cross_attention.query_weight.int8_kernel,
+            param_.cublaslt_handle,
+            param_.stream,
+            cublasAlgoMap_,
+            use_ORDER_COL32_2R_4R4_);
 
       } else {
-
         int alpha_i = 1;
         int beta_i = 0;
 
-        cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                param_.cublas_handle,
-                                                CUBLAS_OP_N,
-                                                CUBLAS_OP_N,
-                                                n,
-                                                m,
-                                                k,
-                                                &alpha_i,
-                                                param_.cross_attention.query_weight.int8_kernel,
-                                                CUDA_R_8I,
-                                                n,
-                                                input_quantize_buf_,
-                                                CUDA_R_8I,
-                                                k,
-                                                &beta_i,
-                                                out_quantize_buf_,
-                                                CUDA_R_32I,
-                                                n,
-                                                param_.stream,
-                                                cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n,
+            m,
+            k,
+            &alpha_i,
+            param_.cross_attention.query_weight.int8_kernel,
+            CUDA_R_8I,
+            n,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n,
+            param_.stream,
+            cublas_workspace_);
       }
 
-      channel_wise_dequantize_kernelLauncher(out_quantize_buf_,
-                                            scale_,
-                                            param_.cross_attention.query_weight.kernel_scale,
-                                            query_buf_,
-                                            m,
-                                            n,
-                                            param_.stream,
-                                            use_COL32_);
+      channel_wise_dequantize_kernelLauncher(
+          out_quantize_buf_,
+          scale_,
+          param_.cross_attention.query_weight.kernel_scale,
+          query_buf_,
+          m,
+          n,
+          param_.stream,
+          use_COL32_);
 
     } else {
       // reuse the query_buf
@@ -2319,109 +2302,109 @@ public:
       k = memory_hidden_units_;
 
       if (use_int8_) {
-
         channel_wise_quantize_kernelLauncher(memory_tensor,
-                                            quant_in_mem_cache_,
-                                            mem_scale_,
-                                            m,
-                                            k,
-                                            param_.stream,
-                                            use_COL32_);
+                                             quant_in_mem_cache_,
+                                             mem_scale_,
+                                             m,
+                                             k,
+                                             param_.stream,
+                                             use_COL32_);
 
         if (use_COL32_) {
+          cublasLtMM_INT8_withAlgo(
+              quant_out_mem_cache_,
+              1,
+              m,
+              n,
+              k,
+              m * k,
+              n * k,
+              m * n,
+              (int8_t *)quant_in_mem_cache_,
+              (int8_t *)param_.cross_attention.key_weight.int8_kernel,
+              param_.cublaslt_handle,
+              param_.stream,
+              cublasAlgoMap_,
+              use_ORDER_COL32_2R_4R4_);
 
-          cublasLtMM_INT8_withAlgo(quant_out_mem_cache_,
-                              1,
-                              m,
-                              n,
-                              k,
-                              m * k,
-                              n * k,
-                              m * n,
-                              (int8_t*)quant_in_mem_cache_,
-                              (int8_t*)param_.cross_attention.key_weight.int8_kernel,
-                              param_.cublaslt_handle,
-                              param_.stream,
-                              cublasAlgoMap_,
-                              use_ORDER_COL32_2R_4R4_);
-
-          cublasLtMM_INT8_withAlgo(quant_out_mem_cache_ + m * k,
-                              1,
-                              m,
-                              n,
-                              k,
-                              m * k,
-                              n * k,
-                              m * n,
-                              (int8_t*)quant_in_mem_cache_,
-                              (int8_t*)param_.cross_attention.value_weight.int8_kernel,
-                              param_.cublaslt_handle,
-                              param_.stream,
-                              cublasAlgoMap_,
-                              use_ORDER_COL32_2R_4R4_);
+          cublasLtMM_INT8_withAlgo(
+              quant_out_mem_cache_ + m * k,
+              1,
+              m,
+              n,
+              k,
+              m * k,
+              n * k,
+              m * n,
+              (int8_t *)quant_in_mem_cache_,
+              (int8_t *)param_.cross_attention.value_weight.int8_kernel,
+              param_.cublaslt_handle,
+              param_.stream,
+              cublasAlgoMap_,
+              use_ORDER_COL32_2R_4R4_);
 
         } else {
-
           int alpha_i = 1;
           int beta_i = 0;
 
-          cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                  param_.cublas_handle,
-                                                  CUBLAS_OP_N,
-                                                  CUBLAS_OP_N,
-                                                  n,
-                                                  m,
-                                                  k,
-                                                  &alpha_i,
-                                                  param_.cross_attention.key_weight.int8_kernel,
-                                                  CUDA_R_8I,
-                                                  n,
-                                                  quant_in_mem_cache_,
-                                                  CUDA_R_8I,
-                                                  k,
-                                                  &beta_i,
-                                                  quant_out_mem_cache_,
-                                                  CUDA_R_32I,
-                                                  n,
-                                                  param_.stream,
-                                                  cublas_workspace_);
+          cublasMM_cublasLtMM_wrapper_int8_decoder(
+              param_.cublaslt_handle,
+              param_.cublas_handle,
+              CUBLAS_OP_N,
+              CUBLAS_OP_N,
+              n,
+              m,
+              k,
+              &alpha_i,
+              param_.cross_attention.key_weight.int8_kernel,
+              CUDA_R_8I,
+              n,
+              quant_in_mem_cache_,
+              CUDA_R_8I,
+              k,
+              &beta_i,
+              quant_out_mem_cache_,
+              CUDA_R_32I,
+              n,
+              param_.stream,
+              cublas_workspace_);
 
-          cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                  param_.cublas_handle,
-                                                  CUBLAS_OP_N,
-                                                  CUBLAS_OP_N,
-                                                  n,
-                                                  m,
-                                                  k,
-                                                  &alpha_i,
-                                                  param_.cross_attention.value_weight.int8_kernel,
-                                                  CUDA_R_8I,
-                                                  n,
-                                                  quant_in_mem_cache_,
-                                                  CUDA_R_8I,
-                                                  k,
-                                                  &beta_i,
-                                                  quant_out_mem_cache_ + m * k,
-                                                  CUDA_R_32I,
-                                                  n,
-                                                  param_.stream,
-                                                  cublas_workspace_);
-
+          cublasMM_cublasLtMM_wrapper_int8_decoder(
+              param_.cublaslt_handle,
+              param_.cublas_handle,
+              CUBLAS_OP_N,
+              CUBLAS_OP_N,
+              n,
+              m,
+              k,
+              &alpha_i,
+              param_.cross_attention.value_weight.int8_kernel,
+              CUDA_R_8I,
+              n,
+              quant_in_mem_cache_,
+              CUDA_R_8I,
+              k,
+              &beta_i,
+              quant_out_mem_cache_ + m * k,
+              CUDA_R_32I,
+              n,
+              param_.stream,
+              cublas_workspace_);
         }
 
-        mem_kv_channel_wise_dequantize_kernelLauncher(quant_out_mem_cache_,
-                                          mem_scale_,
-                                          param_.cross_attention.key_weight.kernel_scale,
-                                          param_.cross_attention.value_weight.kernel_scale,
-                                          key_mem_cache_,
-                                          value_mem_cache_,
-                                          m,
-                                          k,
-                                          param_.stream,
-                                          use_COL32_);
+        mem_kv_channel_wise_dequantize_kernelLauncher(
+            quant_out_mem_cache_,
+            mem_scale_,
+            param_.cross_attention.key_weight.kernel_scale,
+            param_.cross_attention.value_weight.kernel_scale,
+            key_mem_cache_,
+            value_mem_cache_,
+            m,
+            k,
+            param_.stream,
+            use_COL32_);
 
       } else {
-
         cublasMM_cublasLtMM_wrapper_decoder(
             param_.cublaslt_handle,
             param_.cublas_handle,
@@ -2467,7 +2450,6 @@ public:
             param_.stream,
             cublasAlgoMap_,
             cublas_workspace_);
-
       }
 
       k = t_parallel_param_.local_hidden_units_;
@@ -2495,58 +2477,56 @@ public:
     k = t_parallel_param_.local_hidden_units_;
 
     if (use_int8_) {
-
       channel_wise_quantize_kernelLauncher(context_buf_,
-                                          input_quantize_buf_,
-                                          scale_,
-                                          m,
-                                          k,
-                                          param_.stream,
-                                          use_COL32_);
+                                           input_quantize_buf_,
+                                           scale_,
+                                           m,
+                                           k,
+                                           param_.stream,
+                                           use_COL32_);
 
       if (use_COL32_) {
-
-      cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                          1,
-                          m,
-                          n,
-                          k,
-                          m * k,
-                          n * k,
-                          m * n,
-                          (int8_t*)input_quantize_buf_,
-                          (int8_t*)param_.cross_attention.attention_output_weight.int8_kernel,
-                          param_.cublaslt_handle,
-                          param_.stream,
-                          cublasAlgoMap_,
-                          use_ORDER_COL32_2R_4R4_);
+        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
+                                 1,
+                                 m,
+                                 n,
+                                 k,
+                                 m * k,
+                                 n * k,
+                                 m * n,
+                                 (int8_t *)input_quantize_buf_,
+                                 (int8_t *)param_.cross_attention
+                                     .attention_output_weight.int8_kernel,
+                                 param_.cublaslt_handle,
+                                 param_.stream,
+                                 cublasAlgoMap_,
+                                 use_ORDER_COL32_2R_4R4_);
 
       } else {
-
         int alpha_i = 1;
         int beta_i = 0;
 
-        cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                param_.cublas_handle,
-                                                CUBLAS_OP_N,
-                                                CUBLAS_OP_N,
-                                                n,
-                                                m,
-                                                k,
-                                                &alpha_i,
-                                                param_.cross_attention.attention_output_weight.int8_kernel,
-                                                CUDA_R_8I,
-                                                n,
-                                                input_quantize_buf_,
-                                                CUDA_R_8I,
-                                                k,
-                                                &beta_i,
-                                                out_quantize_buf_,
-                                                CUDA_R_32I,
-                                                n,
-                                                param_.stream,
-                                                cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n,
+            m,
+            k,
+            &alpha_i,
+            param_.cross_attention.attention_output_weight.int8_kernel,
+            CUDA_R_8I,
+            n,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n,
+            param_.stream,
+            cublas_workspace_);
       }
 
     } else {
@@ -2586,23 +2566,22 @@ public:
     int m1 = m, k1 = n, n1 = inner_size;
 
     if (use_int8_) {
-
       if (use_COL32_) {
-
-        cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m1,
-                            n1,
-                            k1,
-                            m1 * k1,
-                            n1 * k1,
-                            m1 * n1,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.ffn.intermediate_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
+        cublasLtMM_INT8_withAlgo(
+            out_quantize_buf_,
+            1,
+            m1,
+            n1,
+            k1,
+            m1 * k1,
+            n1 * k1,
+            m1 * n1,
+            (int8_t *)input_quantize_buf_,
+            (int8_t *)param_.ffn.intermediate_weight.int8_kernel,
+            param_.cublaslt_handle,
+            param_.stream,
+            cublasAlgoMap_,
+            use_ORDER_COL32_2R_4R4_);
 
         int m2 = m, n2 = n, k2 = inner_size;
 
@@ -2619,79 +2598,81 @@ public:
             param_.stream);
 
         cublasLtMM_INT8_withAlgo(out_quantize_buf_,
-                            1,
-                            m2,
-                            n2,
-                            k2,
-                            m2 * k2,
-                            n2 * k2,
-                            m2 * n2,
-                            (int8_t*)input_quantize_buf_,
-                            (int8_t*)param_.ffn.output_weight.int8_kernel,
-                            param_.cublaslt_handle,
-                            param_.stream,
-                            cublasAlgoMap_,
-                            use_ORDER_COL32_2R_4R4_);
+                                 1,
+                                 m2,
+                                 n2,
+                                 k2,
+                                 m2 * k2,
+                                 n2 * k2,
+                                 m2 * n2,
+                                 (int8_t *)input_quantize_buf_,
+                                 (int8_t *)param_.ffn.output_weight.int8_kernel,
+                                 param_.cublaslt_handle,
+                                 param_.stream,
+                                 cublasAlgoMap_,
+                                 use_ORDER_COL32_2R_4R4_);
 
       } else {
         int alpha_i = 1;
         int beta_i = 0;
 
-        cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                param_.cublas_handle,
-                                                CUBLAS_OP_N,
-                                                CUBLAS_OP_N,
-                                                n1,
-                                                m1,
-                                                k1,
-                                                &alpha_i,
-                                                param_.ffn.intermediate_weight.int8_kernel,
-                                                CUDA_R_8I,
-                                                n1,
-                                                input_quantize_buf_,
-                                                CUDA_R_8I,
-                                                k1,
-                                                &beta_i,
-                                                out_quantize_buf_,
-                                                CUDA_R_32I,
-                                                n1,
-                                                param_.stream,
-                                                cublas_workspace_);
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n1,
+            m1,
+            k1,
+            &alpha_i,
+            param_.ffn.intermediate_weight.int8_kernel,
+            CUDA_R_8I,
+            n1,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k1,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n1,
+            param_.stream,
+            cublas_workspace_);
 
         int m2 = m, n2 = n, k2 = inner_size;
 
-        dequant_add_bias_act_quant_kernelLauncher(out_quantize_buf_,
-                                                  input_quantize_buf_,
-                                                  scale_,
-                                                  ffn_inner,
-                                                  param_.ffn.intermediate_weight.bias,
-                                                  param_.ffn.intermediate_weight.kernel_scale,
-                                                  m1,
-                                                  inner_size,
-                                                  activation_type,
-                                                  param_.stream);
+        dequant_add_bias_act_quant_kernelLauncher(
+            out_quantize_buf_,
+            input_quantize_buf_,
+            scale_,
+            ffn_inner,
+            param_.ffn.intermediate_weight.bias,
+            param_.ffn.intermediate_weight.kernel_scale,
+            m1,
+            inner_size,
+            activation_type,
+            param_.stream);
 
-        cublasMM_cublasLtMM_wrapper_int8_decoder(param_.cublaslt_handle,
-                                                param_.cublas_handle,
-                                                CUBLAS_OP_N,
-                                                CUBLAS_OP_N,
-                                                n2,
-                                                m2,
-                                                k2,
-                                                &alpha_i,
-                                                param_.ffn.output_weight.int8_kernel,
-                                                CUDA_R_8I,
-                                                n2,
-                                                input_quantize_buf_,
-                                                CUDA_R_8I,
-                                                k2,
-                                                &beta_i,
-                                                out_quantize_buf_,
-                                                CUDA_R_32I,
-                                                n2,
-                                                param_.stream,
-                                                cublas_workspace_);
-
+        cublasMM_cublasLtMM_wrapper_int8_decoder(
+            param_.cublaslt_handle,
+            param_.cublas_handle,
+            CUBLAS_OP_N,
+            CUBLAS_OP_N,
+            n2,
+            m2,
+            k2,
+            &alpha_i,
+            param_.ffn.output_weight.int8_kernel,
+            CUDA_R_8I,
+            n2,
+            input_quantize_buf_,
+            CUDA_R_8I,
+            k2,
+            &beta_i,
+            out_quantize_buf_,
+            CUDA_R_32I,
+            n2,
+            param_.stream,
+            cublas_workspace_);
       }
     } else {
       DataType_ alpha = (DataType_)1.0f;
@@ -2718,14 +2699,14 @@ public:
                                           param_.stream,
                                           cublasAlgoMap_,
                                           cublas_workspace_);
-    
+
       add_bias_act_kernelLauncher(ffn_inner,
                                   param_.ffn.intermediate_weight.bias,
                                   m1,
                                   inner_size,
                                   activation_type,
                                   param_.stream);
-    
+
       int m2 = m, n2 = n, k2 = inner_size;
       cublasMM_cublasLtMM_wrapper_decoder(param_.cublaslt_handle,
                                           param_.cublas_handle,
@@ -2754,18 +2735,19 @@ public:
     POP_RANGE
   }
 
-  void unfused_masked_multi_head_attention(DataType_ *workspace,
-                                           const DataType_ *from_tensor,
-                                           DataType_ *key_cache_,
-                                           DataType_ *value_cache_,
-                                           DataType_ *decoder_output,
-                                           const DataType_ *attr_mask,
-                                           const int local_batch_size,
-                                           const int seq_len,
-                                           const int ite,
-                                           const int max_seq_len,
-                                           const bool is_final,
-                                           const int* memory_sequence_length = nullptr) {
+  void unfused_masked_multi_head_attention(
+      DataType_ *workspace,
+      const DataType_ *from_tensor,
+      DataType_ *key_cache_,
+      DataType_ *value_cache_,
+      DataType_ *decoder_output,
+      const DataType_ *attr_mask,
+      const int local_batch_size,
+      const int seq_len,
+      const int ite,
+      const int max_seq_len,
+      const bool is_final,
+      const int *memory_sequence_length = nullptr) {
     const DataType_ scalar = 1 / sqrtf(size_per_head_ * 1.0f);
     const int m = local_batch_size * seq_len;
 
@@ -2941,18 +2923,19 @@ public:
       // put k/v_buf from shape [B, H, L, Dh]
       // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
       if (memory_sequence_length == nullptr) {
-        transpose_4d_batch_major_kernelLauncher(key_cache_,
-                                                value_cache_,
-                                                k_buf,
-                                                v_buf,
-                                                local_batch_size,
-                                                seq_len,
-                                                max_seq_len,
-                                                size_per_head_,
-                                                t_parallel_param_.local_head_num_,
-                                                param_.stream);
+        transpose_4d_batch_major_kernelLauncher(
+            key_cache_,
+            value_cache_,
+            k_buf,
+            v_buf,
+            local_batch_size,
+            seq_len,
+            max_seq_len,
+            size_per_head_,
+            t_parallel_param_.local_head_num_,
+            param_.stream);
       } else {
-        // Left pad to right pad. 
+        // Left pad to right pad.
         transpose_cache_batch_major_kernelLauncher(
             key_cache_,
             value_cache_,

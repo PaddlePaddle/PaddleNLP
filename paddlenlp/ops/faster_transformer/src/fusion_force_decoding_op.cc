@@ -107,11 +107,16 @@ std::vector<paddle::Tensor> DecodingForward(
   }
 
   if (input.is_gpu()) {
-    auto output_ids = paddle::empty(output_dims, paddle::DataType::INT32, paddle::GPUPlace());
-    auto parent_ids = paddle::empty(parent_ids_dims, paddle::DataType::INT32, paddle::GPUPlace());
-    auto sequence_length = paddle::empty(sequence_length_dims, paddle::DataType::INT32, paddle::GPUPlace());
+    auto output_ids =
+        paddle::empty(output_dims, paddle::DataType::INT32, paddle::GPUPlace());
+    auto parent_ids = paddle::empty(
+        parent_ids_dims, paddle::DataType::INT32, paddle::GPUPlace());
+    auto sequence_length = paddle::empty(
+        sequence_length_dims, paddle::DataType::INT32, paddle::GPUPlace());
 
-    auto seq_len = (!mem_seq_len.is_gpu()) ? mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU) : mem_seq_len;
+    auto seq_len = (!mem_seq_len.is_gpu())
+                       ? mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU)
+                       : mem_seq_len;
 
     return DecodingCUDAForward(input,
                                seq_len,
