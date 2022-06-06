@@ -266,7 +266,28 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
     return sorted(list(relation_prompt_set))
 
 
-def convert_cls_examples(raw_examples, prompt_prefix, options):
+def generate_cls_example(text, labels, prompt_prefix, options):
+    random.shuffle(options)
+    prompt = ""
+    sep = ","
+    for option in options:
+        prompt += option
+        prompt += sep
+    prompt = prompt_prefix + "[" + prompt.rstrip(sep) + "]"
+
+    result_list = []
+    example = {"content": text, "result_list": result_list, "prompt": prompt}
+    for label in labels:
+        start = prompt.rfind(label[0]) - len(prompt) - 1
+        end = start + len(label)
+        result = {"text": label, "start": start, "end": end}
+        example["result_list"].append(result)
+    return example
+
+
+def convert_cls_examples(raw_examples,
+                         prompt_prefix="情感倾向",
+                         options=["正向", "负向"]):
     examples = []
     logger.info(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
@@ -277,33 +298,43 @@ def convert_cls_examples(raw_examples, prompt_prefix, options):
                 text, labels = items["data"], items["label"]
             else:
                 text, labels = items["text"], items["label"]
-            random.shuffle(options)
-            prompt = ""
-            sep = ","
-            for option in options:
-                prompt += option
-                prompt += sep
-            prompt = prompt_prefix + "[" + prompt.rstrip(sep) + "]"
-
-            result_list = []
-            example = {
-                "content": text,
-                "result_list": result_list,
-                "prompt": prompt
-            }
-            for label in labels:
-                start = prompt.rfind(label[0]) - len(prompt) - 1
-                end = start + len(label)
-                result = {"text": label, "start": start, "end": end}
-                example["result_list"].append(result)
+            example = generate_cls_example(text, labels, prompt_prefix, options)
             examples.append(example)
     return examples
 
 
-def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
+def convert_ext_examples(raw_examples,
+                         negative_ratio,
+                         is_train=True,
+                         prompt_prefix="情感倾向",
+                         options=["正向", "负向"],
+                         sperator="##"):
+    def _sep_cls_label(label, sperator):
+        label_list = label.split(sperator)
+        if len(label_list) == 1:
+            return label_list[0], None
+        return label_list[0], label_list[1:]
+
+    def _concat_examples(positive_examples, negative_examples, negative_ratio):
+        examples = []
+        if math.ceil(len(negative_examples) /
+                     len(positive_examples)) <= negative_ratio:
+            examples = positive_examples + negative_examples
+        else:
+            # Random sampling the negative examples to ensure overall negative ratio unchanged.
+            idxs = random.sample(
+                range(0, len(negative_examples)),
+                negative_ratio * len(positive_examples))
+            negative_examples_sampled = []
+            for idx in idxs:
+                negative_examples_sampled.append(negative_examples[idx])
+            examples = positive_examples + negative_examples_sampled
+        return examples
+
     texts = []
     entity_examples = []
     relation_examples = []
+    entity_cls_examples = []
     entity_prompts = []
     relation_prompts = []
     entity_label_set = []
@@ -325,6 +356,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 entities = []
                 if not relation_mode:
                     # Export file in JSONL format which doccano < 1.7.0
+                    # e.g. {"data": "", "label": [ [0, 2, "ORG"], ... ]}
                     for item in items["label"]:
                         entity = {
                             "id": entity_id,
@@ -336,6 +368,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                         entity_id += 1
                 else:
                     # Export file in JSONL format for relation labeling task which doccano < 1.7.0
+                    # e.g. {"data": "", "label": {"relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}}
                     for item in items["label"]["entities"]:
                         entity = {
                             "id": entity_id,
@@ -348,6 +381,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 relations = []
             else:
                 # Export file in JSONL format which doccano >= 1.7.0
+                # e.g. {"text": "", "label": [ [0, 2, "ORG"], ... ]}
                 if "label" in items.keys():
                     text = items["text"]
                     entities = []
@@ -363,9 +397,12 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                     relations = []
                 else:
                     # Export file in JSONL (relation) format
+                    # e.g. {"text": "", "relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}
                     text, relations, entities = items["text"], items[
                         "relations"], items["entities"]
             texts.append(text)
+
+            # [{'id': 69, 'start_offset': 0, 'end_offset': 2, 'label': '评价维度##正向'}, {'id': 70, 'start_offset': 2, 'end_offset': 4, 'label': '观点词'}, {'id': 71, 'start_offset': 5, 'end_offset': 7, 'label': '评价维度##正向'}, {'id': 72, 'start_offset': 8, 'end_offset': 10, 'label': '观点词'}, {'id': 73, 'start_offset': 17, 'end_offset': 19, 'label': '评价维度##负向'}, {'id': 74, 'start_offset': 19, 'end_offset': 20, 'label': '观点词'}]
 
             entity_example = []
             entity_prompt = []
@@ -379,7 +416,21 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                     "end": entity["end_offset"]
                 }
 
-                entity_label = entity["label"]
+                entity_label, entity_cls_label = _sep_cls_label(entity["label"],
+                                                                sperator)
+                print(entity_label)
+                print(entity_cls_label)
+
+                # Define the prompt prefix for entity-level classification
+                entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
+                entity_example = generate_cls_example(
+                    text, entity_cls_label, entity_cls_prompt_prefix, options)
+
+                entity_cls_examples.append(entity_example)
+
+                print(entity_cls_examples)
+                exit()
+
                 result = {
                     "text": entity_name,
                     "start": entity["start_offset"],
@@ -407,7 +458,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
             entity_examples.append(entity_example)
             entity_prompts.append(entity_prompt)
 
-            subject_golden = []
+            subject_golden = []  # Golden entity inputs
             relation_example = []
             relation_prompt = []
             relation_example_map = {}
@@ -446,22 +497,6 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
             subject_goldens.append(subject_golden)
             pbar.update(1)
 
-    def concat_examples(positive_examples, negative_examples, negative_ratio):
-        examples = []
-        if math.ceil(len(negative_examples) /
-                     len(positive_examples)) <= negative_ratio:
-            examples = positive_examples + negative_examples
-        else:
-            # Random sampling the negative examples to ensure overall negative ratio unchanged.
-            idxs = random.sample(
-                range(0, len(negative_examples)),
-                negative_ratio * len(positive_examples))
-            negative_examples_sampled = []
-            for idx in idxs:
-                negative_examples_sampled.append(negative_examples[idx])
-            examples = positive_examples + negative_examples_sampled
-        return examples
-
     logger.info(f"Adding negative samples for first stage prompt...")
     positive_examples, negative_examples = add_negative_example(
         entity_examples, texts, entity_prompts, entity_label_set,
@@ -469,8 +504,8 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
     if len(positive_examples) == 0:
         all_entity_examples = []
     elif is_train:
-        all_entity_examples = concat_examples(positive_examples,
-                                              negative_examples, negative_ratio)
+        all_entity_examples = _concat_examples(
+            positive_examples, negative_examples, negative_ratio)
     else:
         all_entity_examples = positive_examples + negative_examples
 
@@ -483,7 +518,7 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
             positive_examples, negative_examples = add_negative_example(
                 relation_examples, texts, relation_prompts, relation_prompt_set,
                 negative_ratio)
-            all_relation_examples = concat_examples(
+            all_relation_examples = _concat_examples(
                 positive_examples, negative_examples, negative_ratio)
         else:
             logger.info(f"Adding negative samples for second stage prompt...")
@@ -496,3 +531,11 @@ def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
                 for relation_example in relation_examples
             ]
     return all_entity_examples, all_relation_examples
+
+
+if __name__ == "__main__":
+    labels = ["正向", "中立"]
+    options = ["正向", "中立", "负向"]
+    prompt_prefix = "情感倾向"
+    text = "我是谁"
+    print(generate_cls_example(text, labels, prompt_prefix, options))

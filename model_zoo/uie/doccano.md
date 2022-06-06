@@ -267,7 +267,7 @@ python doccano.py \
 #### 7.2 分类式任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSON` 形式的文件，并将其重命名为 `doccano_cls.json` 后，放入 `./data` 目录下。
-- 在数据转换阶段，我们会自动构造用于模型训练需要的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
+- 在数据转换阶段，我们会自动构造用于模型训练的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
 - 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
 
 ```shell
