@@ -114,11 +114,6 @@ def do_predict(args):
     # Set evaluate mode
     transformer.eval()
 
-    #for item in transformer.state_dict():
-    #    print(item)
-
-    #exit()
-
     if args.enable_faster_encoder:
         transformer = enable_faster_encoder(
             transformer, use_fp16=args.use_fp16_encoder)
