@@ -381,20 +381,20 @@ class UIETask(Task):
         inputs['result'] = results
         return inputs
 
-    def _multi_stage_predict(self, datas):
+    def _multi_stage_predict(self, data):
         """
         Traversal the schema tree and do multi-stage prediction.
 
         Args:
-            datas (list): a list of strings
+            data (list): a list of strings
 
         Returns:
             list: a list of predictions, where the list's length
-                equals to the length of `datas`
+                equals to the length of `data`
         """
-        results = [{} for _ in range(len(datas))]
+        results = [{} for _ in range(len(data))]
         # input check to early return
-        if len(datas) < 1 or self._schema_tree is None:
+        if len(data) < 1 or self._schema_tree is None:
             return results
 
         # copy to stay `self._schema_tree` unchanged
@@ -406,22 +406,22 @@ class UIETask(Task):
             cnt = 0
             idx = 0
             if not node.prefix:
-                for data in datas:
+                for one_data in data:
                     examples.append({
-                        "text": data,
+                        "text": one_data,
                         "prompt": dbc2sbc(node.name)
                     })
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
             else:
-                for pre, data in zip(node.prefix, datas):
+                for pre, one_data in zip(node.prefix, data):
                     if len(pre) == 0:
                         input_map[cnt] = []
                     else:
                         for p in pre:
                             examples.append({
-                                "text": data,
+                                "text": one_data,
                                 "prompt": dbc2sbc(p + node.name)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
@@ -433,7 +433,7 @@ class UIETask(Task):
                 result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
-                relations = [[] for i in range(len(datas))]
+                relations = [[] for i in range(len(data))]
                 for k, v in input_map.items():
                     for idx in v:
                         if len(result_list[idx]) == 0:
@@ -461,7 +461,7 @@ class UIETask(Task):
                         else:
                             relations[k][i]["relations"][node.name].extend(
                                 result_list[v[i]])
-                new_relations = [[] for i in range(len(datas))]
+                new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
                         if "relations" in relations[i][j].keys(
@@ -473,7 +473,7 @@ class UIETask(Task):
                                     "relations"][node.name][k])
                 relations = new_relations
 
-            prefix = [[] for _ in range(len(datas))]
+            prefix = [[] for _ in range(len(data))]
             for k, v in input_map.items():
                 for idx in v:
                     for i in range(len(result_list[idx])):

@@ -1619,8 +1619,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # does include a vocab file path in it. However, if the vocab file
             # path included in json does not exist, such as was deleted, to make
             # it still work, use the vocab file under this dir.
-            elif not os.path.isfile(init_kwargs[args_name]) and os.path.isfile(
-                    file_path):
+            elif not os.path.isfile(init_kwargs[args_name],
+                                    '') and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)

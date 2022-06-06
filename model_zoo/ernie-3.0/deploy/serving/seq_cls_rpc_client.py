@@ -41,14 +41,14 @@ def test_tnews_dataset(client):
     idx = 0
     batch_size = 32
     while idx < len(dev_ds):
-        datas = []
+        data = []
         label = []
         for i in range(batch_size):
             if idx + i >= len(dev_ds):
                 break
-            datas.append(dev_ds[idx + i]["sentence"])
+            data.append(dev_ds[idx + i]["sentence"])
             label.append(dev_ds[idx + i]["label"])
-        batches.append(datas)
+        batches.append(data)
         labels.append(np.array(label))
         idx += batch_size
     """

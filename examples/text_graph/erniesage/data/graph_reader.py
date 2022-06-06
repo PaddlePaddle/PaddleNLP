@@ -54,7 +54,7 @@ class GraphDataLoader(object):
             """
             graph_num = 1
             start_len = 0
-            datas = []
+            data = []
             graph_list = []
             for graph in range(graph_num):
                 graph_list.append(
@@ -64,7 +64,7 @@ class GraphDataLoader(object):
                 start_len += 2
 
             for i in range(start_len, len(tensors)):
-                datas.append(tensors[i])
-            return graph_list, datas
+                data.append(tensors[i])
+            return graph_list, data
 
         return construct
