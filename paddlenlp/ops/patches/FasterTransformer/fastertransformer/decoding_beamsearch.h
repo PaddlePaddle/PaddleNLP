@@ -75,7 +75,7 @@ private:
   bool is_fuse_topk_softMax_;
   bool keep_alive_beam_;
 
-  bool use_int8_ = true;
+  bool use_int8_ = false;
 
   void *topK_kernel_workspace = nullptr;
   size_t topk_workspace_size_ = 0;
@@ -113,7 +113,7 @@ public:
                      const bool is_mbart = false,
                      const int min_length = 0,
                      const int inner_coeff = 4,
-                     const bool use_int8 = true)
+                     const bool use_int8 = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam),

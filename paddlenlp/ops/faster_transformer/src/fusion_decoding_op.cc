@@ -106,7 +106,7 @@ std::vector<paddle::Tensor> DecodingForward(
     PD_THROW("Not supported decoding strategy. ");
   }
 
-  if (input.place() == paddle::PlaceType::kGPU) {
+  if (input.is_gpu()) {
     auto output_ids = paddle::empty(output_dims, paddle::DataType::INT32, paddle::GPUPlace());
     auto parent_ids = paddle::empty(parent_ids_dims, paddle::DataType::INT32, paddle::GPUPlace());
     auto sequence_length = paddle::empty(sequence_length_dims, paddle::DataType::INT32, paddle::GPUPlace());

@@ -427,7 +427,18 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       end_id_,
                                                       candidate_num_,
                                                       probability_threshold_,
-                                                      fuse_qkv);
+                                                      fuse_qkv,
+                                                      true,  // normalization_before
+                                                      0,  // pos_offset
+                                                      ActivationType::RELU,  // act
+                                                      false,  // pos_bias
+                                                      1.0,  // temperature
+                                                      1.0,  // repeat_penalty
+                                                      false,  // prefix_lm
+                                                      false,  // is_mbart
+                                                      0,  // min_length
+                                                      4,  // inner_coeff
+                                                      use_int8);
 
     decoding_sampling_->forward(params, decoding_params);
 

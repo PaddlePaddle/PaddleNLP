@@ -66,7 +66,7 @@ private:
   int *finished_count_buf_;
   bool *h_finished_buf_;
 
-  bool use_int8_ = true;
+  bool use_int8_ = false;
 
   void *topk_workspace_ = nullptr;
   size_t topk_workspace_size_ = 0;
@@ -106,7 +106,7 @@ public:
                    const bool is_mbart = false,
                    const int min_length = 0,
                    const int inner_coeff = 4,
-                   const bool use_int8 = true)
+                   const bool use_int8 = false)
       : allocator_(allocator),
         use_int8_(use_int8) {
 

@@ -164,10 +164,6 @@ def do_predict(args):
     transformer.load(init_from_params=os.path.join(args.init_from_params,
                                                    "transformer.pdparams"))
 
-    # paddle.save(transformer.state_dict(), "./int8_model/transformer.pdparams")
-    # state = paddle.load("./int8_model/transformer.pdparams")
-    # transformer.set_state_dict(state)
-
     f = open(args.output_file, "w")
     with paddle.no_grad():
         if args.profile:
