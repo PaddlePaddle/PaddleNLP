@@ -149,7 +149,8 @@ class FasterTransformer(TransformerModel):
                  use_fp16_encoder=False,
                  rel_len=False,
                  alpha=0.6,
-                 use_int8=True):
+                 use_int8=True,
+                 sm=None):
         # if decoding_lib is None:
         #     raise ValueError(
         #         "The args decoding_lib must be set to use FasterTransformer. ")
@@ -172,6 +173,7 @@ class FasterTransformer(TransformerModel):
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
         self.use_int8 = args.pop("use_int8")
+        self.sm = args.pop("sm")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -308,9 +310,10 @@ class FasterTransformer(TransformerModel):
                 [self.trg_vocab_size], dtype="float16")
 
         if self.use_int8:
-            sm = 70
+            if self.sm is None:
+                self.sm = self.decoding.get_sm()
 
-            if sm >= 75:
+            if self.sm >= 75:
                 quantize_function = partial(
                     weight_COL4_4R2_8C_channel_wise_quantize,
                     use_fp16_decoding=self.use_fp16_decoding)

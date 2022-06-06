@@ -1223,6 +1223,19 @@ class InferTransformerDecoding(nn.Layer):
         else:
             return scale
 
+    def get_sm(self):
+        try:
+            import cupy
+        except ImportError:
+            raise ImportError(
+                "The module cupy must be installed when using int8 without providing sm. "
+            )
+
+        device_id = cupy.cuda.runtime.getDevice()
+        device_prop = cupy.cuda.runtime.getDeviceProperties(device_id)
+
+        return device_prop["major"] * 10 + device_prop["minor"]
+
     def forward(self, enc_output, memory_seq_lens, trg_word=None):
         def parse_function(func_name):
             return partial(
