@@ -38,7 +38,7 @@ def do_convert():
 
     def _check_sum(splits):
         return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(
-            str(splits[2])) == Decimal(str(1))
+            str(splits[2])) == Decimal("1")
 
     if len(args.splits) == 3 and not _check_sum(args.splits):
         raise ValueError(
