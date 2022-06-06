@@ -248,12 +248,12 @@ def create_pretrained_dataset(args,
         "The distributed run, total device num:{}, distinct dataflow num:{}.".
         format(device_world_size, data_world_size))
 
-    process_datas = np.load(input_path, mmap_mode="r+", allow_pickle=True)
+    process_data = np.load(input_path, mmap_mode="r+", allow_pickle=True)
     # All documment ids, extend as 1-D array.
-    sample_ids = process_datas["ids"]
+    sample_ids = process_data["ids"]
     # The len(sample_lens) num of docs
     # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_datas["lens"]
+    sample_lens = process_data["lens"]
 
     splits = get_train_valid_test_split_(args.split, len(sample_lens))
     assert len(sample_lens) >= splits[
