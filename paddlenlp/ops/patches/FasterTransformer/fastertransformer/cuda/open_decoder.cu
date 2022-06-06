@@ -20,6 +20,34 @@
 namespace fastertransformer {
 
 template <typename T>
+__inline__ __device__ T gelu(T x) {
+  float cdf =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
+
+  // NOTE: The precision of gelu with or without approximate formulation
+  // may cause serious problem in some cases. If necessary, the following
+  // comments can be opened to use the non-approximate formulation.
+  // float cdf = 0.5f * (1.0f + erf((float)x / sqrt(2.0f)));
+  return x * cdf;
+}
+
+template <>
+__inline__ __device__ half2 gelu(half2 val) {
+  half2 val_pow3 = __hmul2(val, __hmul2(val, val));
+  float2 tmp_pow = __half22float2(val_pow3);
+  float2 tmp = __half22float2(val);
+
+  tmp.x =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (tmp.x + 0.044715f * tmp_pow.x))));
+  tmp.y =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (tmp.y + 0.044715f * tmp_pow.y))));
+  return __hmul2(val, __float22half2_rn(tmp));
+}
+
+template <typename T>
 __global__ void transpose_cache_batch_major(T* k_dst,
                                             T* v_dst,
                                             const T* k_src,
@@ -610,6 +638,42 @@ __global__ void dequant_add_bias_relu_quant_COL32_int32I_int8O(
   }
 }
 
+// add bias to matrix of m * n, CUBLASLT_ORDER_COL32
+// grid, thread = (m), (n)
+template <typename T>
+__global__ void dequant_add_bias_gelu_quant_COL32_int32I_int8O(
+    int8_t *out, const int32_t* input, const T* bias, T* ffn_inner, const int m, const int n, 
+    const T* w_scale, T* scale, const T max_range) {
+
+  int bid = blockIdx.x;
+
+  float local_i = -FLT_MAX;
+  float val;
+  for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
+    int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
+
+    val = (float)((T)input[outIdx]
+      * scale[bid] / max_range * w_scale[tid] / max_range + bias[tid]);
+    val = gelu<float>(val);
+
+    ffn_inner[outIdx] = (T)val;
+
+    // no need fabs
+    local_i = max(local_i, val);
+  }
+  float max_val = blockReduceMax<float>(local_i);
+
+  if (threadIdx.x == 0) {
+    scale[bid] = (T)max_val;
+  }
+  __syncthreads();
+
+  for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
+    int outIdx = (tid & 0xffffffe0) * m + (bid << 5) + (tid & 31);
+    out[outIdx] = __float2int_rn((float)(ffn_inner[outIdx] / scale[bid] * max_range));
+  }
+}
+
 template <typename T>
 void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(int8_t *out,
                                                                   const int32_t* input,
@@ -627,10 +691,27 @@ void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(int8_t *out,
 
   if (activation_type == ActivationType::RELU) {
     dequant_add_bias_relu_quant_COL32_int32I_int8O<<<grid, block, 0, stream>>>(
-        out, input, bias, ffn_inner, batch_size, hidden_units, weight_scale, scale, (T)127.0f);
+        out,
+        input,
+        bias,
+        ffn_inner,
+        batch_size,
+        hidden_units,
+        weight_scale,
+        scale,
+        (T)127.0f);
   }
   else if (activation_type == ActivationType::GELU) {
-    
+    dequant_add_bias_gelu_quant_COL32_int32I_int8O<<<grid, block, 0, stream>>>(
+        out,
+        input,
+        bias,
+        ffn_inner,
+        batch_size,
+        hidden_units,
+        weight_scale,
+        scale,
+        (T)127.0f);
   }
 }
 

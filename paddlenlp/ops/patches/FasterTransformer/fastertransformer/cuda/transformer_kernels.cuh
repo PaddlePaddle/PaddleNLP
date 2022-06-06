@@ -92,29 +92,6 @@ void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
                                            cudaStream_t stream,
                                            bool use_COL32);
 
-/*
-
-template <typename T>
-void channel_wise_quantize_kernelLauncher(const T* input,
-                                        int8_t* ffn_quantize_input_buf_,
-                                        T* scale,
-                                        const int batch_size,
-                                        const int hidden_units,
-                                        cudaStream_t stream,
-                                        bool use_COL32 = true);
-
-template <typename T>
-void channel_wise_dequantize_kernelLauncher(const int32_t* input,
-                                          const T* scale,
-                                          const T* weight_scale,
-                                          T* output,
-                                          const int batch_size,
-                                          const int hidden_units,
-                                          cudaStream_t stream,
-                                          bool use_COL32 = true);
-
-*/
-
 template <typename T>
 void layer_norm_quant(const T *from_tensor,
                       const T *gamma,

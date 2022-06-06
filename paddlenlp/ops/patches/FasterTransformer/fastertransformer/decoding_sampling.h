@@ -51,7 +51,7 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
-  int8_t* decoder_int8_buf_;
+  void* decoder_int8_buf_;
 
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
@@ -172,7 +172,7 @@ public:
                                         args_.memory_max_seq_len_);
     decoder_->set_max_batch_size(batch_size);
 
-    size_t decoder_int8_workspace_size = (use_int8_) ? decoder_->getInt8WorkspaceSize() : 0;
+    size_t decoder_int8_workspace_size = (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.hidden_units_;                   // type T
@@ -252,6 +252,7 @@ public:
         decoder_normed_result_buffer_size * 3;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
+        decoder_int8_workspace_size +
         ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
         sizeof(DataType_) * (datatype_buf_size + logits_buf_size) +
         sizeof(DataType_) *
@@ -260,8 +261,14 @@ public:
         sizeof(int) * finished_count_size +
         sizeof(int) * (topp_id_vals_buf_size + 2 * topp_offset_buf_size) +
         topp_workspace_size_ + topk_workspace_size_ +
-        curandState_size * sizeof(curandState_t) +
-        decoder_int8_workspace_size));
+        curandState_size * sizeof(curandState_t)));
+
+    if (use_int8_) {
+      decoder_int8_buf_ = buf_;
+      buf_ = buf_ + decoder_int8_workspace_size;
+    } else {
+      decoder_int8_buf_ = nullptr;
+    }
 
     if (sizeof(DataType_) == sizeof(half)) {
       cublas_workspace_ = buf_;
@@ -322,12 +329,6 @@ public:
         (DataType_ *)(padded_embedding_kernel + padded_embedding_kernel_size);
     curandstate_buf_ =
         (curandState_t *)(padded_embedding_bias + padded_embedding_bias_size);
-
-    if (use_int8_) {
-      decoder_int8_buf_ = (int8_t*)(curandstate_buf_ + curandState_size);
-    } else {
-      decoder_int8_buf_ = nullptr;
-    }
 
     h_finished_buf_ = new bool[finished_buf_size];
     h_trg_length_ = new int[args_.batch_size_];

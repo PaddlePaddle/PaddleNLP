@@ -118,10 +118,9 @@ std::vector<paddle::Tensor> decoding_kernel(
   decoding_params.cublaslt_handle =
       CublasHandle::GetInstance()->cublaslt_handle_;
 
-  decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
-  decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
-  decoding_params.sequence_length =
-      sequence_length.mutable_data<int>(input.place());
+  decoding_params.output_ids = output_ids.data<int>();
+  decoding_params.parent_ids = parent_ids.data<int>();
+  decoding_params.sequence_length = sequence_length.data<int>();
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
@@ -138,8 +137,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   auto k_weight_shape = self_attn_key_weight[0].shape();
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
-//   bool use_int8 = (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
-  bool use_int8 = true;
+  bool use_int8 = (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -244,28 +242,32 @@ std::vector<paddle::Tensor> decoding_kernel(
         reinterpret_cast<const DataType_*>(
             cross_attn_query_bias[i].data<data_t_>());
     // key
-    // TODO: static cache supports general int8.
-    // params[i].cross_attention.key_weight.int8_kernel =
-    //     cross_attn_key_weight[i].data<int8_t>();
-    // params[i].cross_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-    //     cross_attn_key_weight_scale[i].data<data_t_>());
+    if (use_int8) {
+        params[i].cross_attention.key_weight.int8_kernel =
+            cross_attn_key_weight[i].data<int8_t>();
+        params[i].cross_attention.key_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            cross_attn_key_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].cross_attention.key_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                cross_attn_key_weight[i].data<data_t_>());
+    }
 
-    params[i].cross_attention.key_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            cross_attn_key_weight[i].data<data_t_>());
     params[i].cross_attention.key_weight.bias =
         reinterpret_cast<const DataType_*>(
             cross_attn_key_bias[i].data<data_t_>());
     // value
-    // TODO: static cache supports general int8.
-    // params[i].cross_attention.value_weight.int8_kernel =
-    //     cross_attn_value_weight[i].data<int8_t>();
-    // params[i].cross_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
-    //     cross_attn_value_weight_scale[i].data<data_t_>());
+    if (use_int8) {
+        params[i].cross_attention.value_weight.int8_kernel =
+            cross_attn_value_weight[i].data<int8_t>();
+        params[i].cross_attention.value_weight.kernel_scale = reinterpret_cast<const DataType_*>(
+            cross_attn_value_weight_scale[i].data<data_t_>());
+    } else {
+        params[i].cross_attention.value_weight.kernel =
+            reinterpret_cast<const DataType_*>(
+                cross_attn_value_weight[i].data<data_t_>());
+    }
 
-    params[i].cross_attention.value_weight.kernel =
-        reinterpret_cast<const DataType_*>(
-            cross_attn_value_weight[i].data<data_t_>());
     params[i].cross_attention.value_weight.bias =
         reinterpret_cast<const DataType_*>(
             cross_attn_value_bias[i].data<data_t_>());

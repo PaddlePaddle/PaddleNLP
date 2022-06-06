@@ -1087,9 +1087,15 @@ class InferTransformerDecoding(nn.Layer):
                     prefix="cross_attn_q_proj_weight",
                     parameter=mod.cross_attn.q_proj.weight,
                     layer=i)
-                # TODO: static cache supports general int8.
-                # self.create_int8_parameter(prefix="cross_attn_k_proj_weight", parameter=mod.cross_attn.k_proj.weight, layer=i)
-                # self.create_int8_parameter(prefix="cross_attn_v_proj_weight", parameter=mod.cross_attn.v_proj.weight, layer=i)
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_k_proj_weight",
+                    parameter=mod.cross_attn.k_proj.weight,
+                    layer=i)
+                self.create_int8_parameter(
+                    prefix="cross_attn_v_proj_weight",
+                    parameter=mod.cross_attn.v_proj.weight,
+                    layer=i)
 
                 self.create_int8_parameter(
                     prefix="cross_attn_out_proj_weight",
@@ -1131,12 +1137,15 @@ class InferTransformerDecoding(nn.Layer):
                 self.cross_q_weight_scale.append(
                     getattr(self, "cross_attn_q_proj_weight_scale_" + str(i)))
 
-                # TODO: static cache supports general int8.
-                # self.cross_k_weight.append(getattr(self, "cross_attn_k_proj_weight_" + str(i)))
-                # self.cross_k_weight_scale.append(getattr(self, "cross_attn_k_proj_weight_scale_" + str(i)))
+                self.cross_k_weight.append(
+                    getattr(self, "cross_attn_k_proj_weight_" + str(i)))
+                self.cross_k_weight_scale.append(
+                    getattr(self, "cross_attn_k_proj_weight_scale_" + str(i)))
 
-                # self.cross_v_weight.append(getattr(self, "cross_attn_v_proj_weight_" + str(i)))
-                # self.cross_v_weight_scale.append(getattr(self, "cross_attn_v_proj_weight_scale_" + str(i)))
+                self.cross_v_weight.append(
+                    getattr(self, "cross_attn_v_proj_weight_" + str(i)))
+                self.cross_v_weight_scale.append(
+                    getattr(self, "cross_attn_v_proj_weight_scale_" + str(i)))
 
                 self.cross_out_weight.append(
                     getattr(self, "cross_attn_out_proj_weight_" + str(i)))
@@ -1165,15 +1174,6 @@ class InferTransformerDecoding(nn.Layer):
                 self.ffn_inter_weight.append(mod.linear1.weight)
                 self.ffn_out_weight.append(mod.linear2.weight)
 
-            # 
-            # self.slf_k_weight.append(mod.self_attn.k_proj.weight)
-            # self.slf_v_weight.append(mod.self_attn.v_proj.weight)
-            # self.slf_out_weight.append(mod.self_attn.out_proj.weight)
-            # self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
-            # self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
-            # self.ffn_inter_weight.append(mod.linear1.weight)
-            # self.ffn_out_weight.append(mod.linear2.weight)
-
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
             self.slf_v_bias.append(mod.self_attn.v_proj.bias)
 
@@ -1181,10 +1181,6 @@ class InferTransformerDecoding(nn.Layer):
 
             self.cross_ln_weight.append(mod.norm2.weight)
             self.cross_ln_bias.append(mod.norm2.bias)
-
-            # TODO: static cache supports general int8.
-            self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
-            self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
 
             self.cross_q_bias.append(mod.cross_attn.q_proj.bias)
             self.cross_k_bias.append(mod.cross_attn.k_proj.bias)

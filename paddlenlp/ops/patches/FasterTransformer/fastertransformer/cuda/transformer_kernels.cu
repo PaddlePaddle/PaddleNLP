@@ -384,16 +384,15 @@ __global__ void dequant_add_bias_relu_quant(int32_t* input,
                                             const T max_range) {
   float local_i = -1e20f;
   int row_idx = blockIdx.x;
-  T* ffn_inner_t = ffn_inner + row_idx * n;
 
   for (int id = threadIdx.x; id < n; id += blockDim.x) {
     T reg_bias = __ldg(&bias[id]);
 
-    T val = (T)((float)input[row_idx * n + id]) * (scale[row_idx] / max_range) * (w_scale[id] / max_range);
+    T val = (T)input[row_idx * n + id] * scale[row_idx] / max_range * w_scale[id] / max_range;
     val = val + reg_bias;
     val = val > (T)0.0f ? val : (T)0.0f;
 
-    ffn_inner_t[id] = val;
+    ffn_inner[row_idx * n + id] = val;
 
     local_i = max(fabs((float)val), local_i);
   }
@@ -404,23 +403,45 @@ __global__ void dequant_add_bias_relu_quant(int32_t* input,
   }
   __syncthreads();
 
-  int8_t *quant_out = output + blockIdx.x * n;
   for (int idx = threadIdx.x; idx < n; idx += blockDim.x) {
-    quant_out[idx] =
-        __float2int_rn(ffn_inner_t[idx] / scale[row_idx] * max_range);
+    output[row_idx * n + idx] =
+        __float2int_rn(ffn_inner[row_idx * n + idx] / scale[row_idx] * max_range);
   }
 }
 
 template <typename T>
-__global__ void dequant_add_bias_gelu_quant(T* out,
+__global__ void dequant_add_bias_gelu_quant(int32_t* input,
+                                            int8_t* output,
+                                            T* scale,
+                                            T* ffn_inner,
                                             const T* __restrict bias,
-                                            int m,
-                                            int n) {
-  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
-       id += blockDim.x * gridDim.x) {
-    T reg_bias = __ldg(&bias[id % n]);
-    T val = out[id] + reg_bias;
-    out[id] = (T)(gelu(val));
+                                            const T* __restrict w_scale,
+                                            int n,
+                                            const T max_range) {
+  float local_i = -1e20f;
+  int row_idx = blockIdx.x;
+
+  for (int id = threadIdx.x; id < n; id += blockDim.x) {
+    T reg_bias = __ldg(&bias[id]);
+
+    T val = (T)((float)input[row_idx * n + id]) * (scale[row_idx] / max_range) * (w_scale[id] / max_range);
+    val = val + reg_bias;
+    val = gelu<float>(val);
+
+    ffn_inner[row_idx * n + id] = val;
+
+    local_i = max(fabs((float)val), local_i);
+  }
+  float max_val = blockReduceMax<float>(local_i);
+
+  if (threadIdx.x == 0) {
+    scale[row_idx] = (T)max_val;
+  }
+  __syncthreads();
+
+  for (int idx = threadIdx.x; idx < n; idx += blockDim.x) {
+    output[row_idx * n + idx] =
+        __float2int_rn(ffn_inner[row_idx * n + idx] / scale[row_idx] * max_range);
   }
 }
 
@@ -440,10 +461,24 @@ void dequant_add_bias_act_quant_kernelLauncher(int32_t* out_quant_buf,
 
   if (activation_type == ActivationType::RELU) {
     dequant_add_bias_relu_quant<T><<<grid, block, 0, stream>>>(
-        out_quant_buf, input_quant_buf, scale, ffn_inner, bias, w_scale, n, (T)127.0f);
+        out_quant_buf,
+        input_quant_buf,
+        scale,
+        ffn_inner,
+        bias,
+        w_scale,
+        n,
+        (T)127.0f);
   } else if (activation_type == ActivationType::GELU) {
-    // dequant_add_bias_gelu_quant<T><<<grid, block, 0, stream>>>(
-    //     out, bias, m, n / data_type_factor);
+    dequant_add_bias_gelu_quant<T><<<grid, block, 0, stream>>>(
+        out_quant_buf,
+        input_quant_buf,
+        scale,
+        ffn_inner,
+        bias,
+        w_scale,
+        n,
+        (T)127.0f);
   }
 }
 
@@ -895,7 +930,6 @@ __global__ void add_bias_input_layernorm_2_quant(
                                                 T* output,
                                                 T* norm_output,
                                                 char4* quant_out,
-                                                // int8_t* quant_out,
                                                 T* scale,
                                                 const int m,
                                                 const int n,

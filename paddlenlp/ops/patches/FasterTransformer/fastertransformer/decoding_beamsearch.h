@@ -51,7 +51,7 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
-  int8_t* decoder_int8_buf_;
+  void* decoder_int8_buf_;
 
   // Prefix LM
   DataType_ *trans_out_buf_;
@@ -175,7 +175,7 @@ public:
                                         args_.memory_max_seq_len_);
     decoder_->set_max_batch_size(batch_size * beam_width);
 
-    size_t decoder_int8_workspace_size = (use_int8_) ? decoder_->getInt8WorkspaceSize() : 0;
+    size_t decoder_int8_workspace_size = (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
@@ -293,6 +293,7 @@ public:
         lm_head_buffer_size;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
+        decoder_int8_workspace_size +
         ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
         sizeof(DataType_) * datatype_buf_size +
         sizeof(float) * (logits_buf_size + cum_log_buf_size) +
@@ -303,8 +304,14 @@ public:
         sizeof(bool) * (finished_buf_size + alive_finished_buf_size) +
         topk_workspace_size_ +
         sizeof(float) * args_.temp_storage_size_ +  // should be always float
-        sizeof(int) * finished_count_size +
-        decoder_int8_workspace_size));
+        sizeof(int) * finished_count_size));
+
+    if (use_int8_) {
+      decoder_int8_buf_ = buf_;
+      buf_ = buf_ + decoder_int8_workspace_size;
+    } else {
+      decoder_int8_buf_ = nullptr;
+    }
 
     if (sizeof(DataType_) == sizeof(half)) {
       cublas_workspace_ = buf_;
@@ -377,12 +384,6 @@ public:
         (DataType_ *)(padded_embedding_kernel + padded_embedding_kernel_size);
     tmp_logits_buf_ =
         (DataType_ *)(padded_embedding_bias + padded_embedding_bias_size);
-
-    if (use_int8_) {
-      decoder_int8_buf_ = (int8_t*)(tmp_logits_buf_ + tmp_logits_buf_size);
-    } else {
-      decoder_int8_buf_ = nullptr;
-    }
 
     h_finished_buf_ = new bool[finished_buf_size];
     h_trg_length_ = new int[args_.batch_size_];

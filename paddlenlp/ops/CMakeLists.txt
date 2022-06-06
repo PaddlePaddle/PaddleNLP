@@ -347,7 +347,6 @@ set(FT_PATCH_COMMAND
   && cp ${standard_encoder_h_src} ${standard_encoder_h_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cp ${trans_kernels_cu_src} ${trans_kernels_cu_dst}
-  && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
   && cp ${gpt_h_src} ${gpt_h_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
@@ -363,6 +362,7 @@ set(FT_PATCH_COMMAND
   && ${MUTE_COMMAND}
   && ${OPEN_ATTENTION_MUTE_COMMAND}
 )
+# && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
 
 # TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
 # re-run always use the latest patches when the developer changes FT patch codes,

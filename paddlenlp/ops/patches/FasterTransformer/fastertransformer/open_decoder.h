@@ -2318,8 +2318,7 @@ public:
       m *= max_seq_len;
       k = memory_hidden_units_;
 
-      // TODO: static cache support general int8. 
-      if (false) {
+      if (use_int8_) {
 
         channel_wise_quantize_kernelLauncher(memory_tensor,
                                             quant_in_mem_cache_,

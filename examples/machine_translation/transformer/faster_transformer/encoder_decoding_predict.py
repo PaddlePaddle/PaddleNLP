@@ -150,6 +150,8 @@ def do_predict(args):
         eos_id=args.eos_idx,
         decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
+        topk=args.topk,
+        topp=args.topp,
         max_out_len=args.max_out_len,
         diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
@@ -187,8 +189,6 @@ def do_predict(args):
                                                    args.eos_idx)
                         word_list = to_tokens(id_list)
                         sequence = " ".join(word_list) + "\n"
-                        # print(sequence)
-                        # exit()
                         f.write(sequence)
         if args.profile:
             if args.decoding_strategy == "beam_search" or args.decoding_strategy == "beam_search_v2":

@@ -321,19 +321,6 @@ class FasterTransformer(TransformerModel):
 
             for item in self.state_dict():
                 if "decoder" in item and "weight" in item and "norm" not in item and "embedding" not in item:
-                    # TODO: static cache supports general int8.
-                    if "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
-                        continue
-                    # if "cross_attn.out_proj" in item or "cross_attn.q_proj" in item or "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
-                    #     continue
-                    # if "linear1.weight" in item or "linear2.weight" in item or "cross_attn.k_proj" in item or "cross_attn.v_proj" in item:
-                    #     continue
-                    # if "self_attn.out_proj" in item or "self_attn.k_proj" in item or "self_attn.v_proj" in item or "self_attn.q_proj" in item:
-                    #     continue
-
-                    # w_int8 = np.load("./int8_param/" + item, allow_pickle=True)
-                    # w_scale = np.load("./int8_param/" + item + ".scale", allow_pickle=True)
-
                     item_list = item.split(".")
                     num_layer = item_list[3]
 
@@ -345,12 +332,8 @@ class FasterTransformer(TransformerModel):
                     else:
                         w_int8, w_scale = quantize_function(
                             weight=model_dict[item])
-                    # w_int8.dump("./int8_param/" + item)
-                    # w_scale.dump("./int8_param/" + item + ".scale")
 
                     param_state = "_".join(item_list[4:])
-                    # model_dict[param_state + "_" + num_layer] = w_int8
-                    # model_dict[param_state + "_scale_" + num_layer] = w_scale
 
                     param = getattr(self.decoding,
                                     param_state + "_" + num_layer)
