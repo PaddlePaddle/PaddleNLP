@@ -293,9 +293,14 @@ def parse_args(MODEL_CLASSES):
         help="The hyper-parameter in beam search.")
     parser.add_argument(
         "--save_inference_model_then_exist",
-        type=bool,
+        type=str2bool,
         default=False,
         help="save_inference_model_then_exist")
+    parser.add_argument(
+        "--fuse",
+        type=str2bool,
+        default=False,
+        help="Whether to enable fused_attention and fused_feedforward.")
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10

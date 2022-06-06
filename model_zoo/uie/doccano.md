@@ -284,7 +284,7 @@ python doccano.py \
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``negative_ratio``: 负样本与正样本的比例，该参数只对抽取类型任务有效。使用负样本策略可提升模型效果，负样本数量 = negative_ratio * 正样本数量。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全负例。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
 - ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。
@@ -296,6 +296,7 @@ python doccano.py \
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
+- 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 ## References
 - **[doccano](https://github.com/doccano/doccano)**

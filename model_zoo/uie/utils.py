@@ -19,35 +19,37 @@ from tqdm import tqdm
 
 import numpy as np
 import paddle
+from paddlenlp.utils.log import logger
 
 MODEL_MAP = {
     "uie-base": {
-        "encoding_model": "ernie-3.0-base-zh",
         "resource_file_urls": {
             "model_state.pdparams":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
             "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
         }
     },
     "uie-tiny": {
-        "encoding_model": "ernie-3.0-medium-zh",
         "resource_file_urls": {
             "model_state.pdparams":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
             "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json"
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json"
         }
-    },
-    "uie-medical-base": {
-        "encoding_model": "ernie-3.0-medium-zh",
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json"
-        }
-    },
+    }
 }
 
 
@@ -197,33 +199,58 @@ def reader(data_path, max_seq_len=512):
 
 
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
+    negative_examples = []
+    positive_examples = []
     with tqdm(total=len(prompts)) as pbar:
         for i, prompt in enumerate(prompts):
-            negtive_sample = []
+            negative_sample = []
             redundants_list = list(set(label_set) ^ set(prompt))
             redundants_list.sort()
 
-            if len(examples[i]) == 0:
-                continue
+            num_positive = len(examples[i])
+            if num_positive != 0:
+                actual_ratio = math.ceil(len(redundants_list) / num_positive)
             else:
-                actual_ratio = math.ceil(
-                    len(redundants_list) / len(examples[i]))
+                # Set num_positive to 1 for text without positive example
+                num_positive, actual_ratio = 1, 0
 
-            if actual_ratio <= negative_ratio:
+            if actual_ratio <= negative_ratio or negative_ratio == -1:
                 idxs = [k for k in range(len(redundants_list))]
             else:
                 idxs = random.sample(
                     range(0, len(redundants_list)),
-                    negative_ratio * len(examples[i]))
+                    negative_ratio * num_positive)
 
             for idx in idxs:
-                negtive_result = {
+                negative_result = {
                     "content": texts[i],
                     "result_list": [],
                     "prompt": redundants_list[idx]
                 }
-                negtive_sample.append(negtive_result)
-            examples[i].extend(negtive_sample)
+                negative_examples.append(negative_result)
+            positive_examples.extend(examples[i])
+            pbar.update(1)
+    return positive_examples, negative_examples
+
+
+def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
+                              subject_goldens):
+    with tqdm(total=len(relation_prompts)) as pbar:
+        for i, relation_prompt in enumerate(relation_prompts):
+            negative_sample = []
+            for subject in subject_goldens[i]:
+                for predicate in predicate_set:
+                    # The relation prompt is constructed as follows: 
+                    # subject + "的" + predicate
+                    prompt = subject + "的" + predicate
+                    if prompt not in relation_prompt:
+                        negative_result = {
+                            "content": texts[i],
+                            "result_list": [],
+                            "prompt": prompt
+                        }
+                        negative_sample.append(negative_result)
+            examples[i].extend(negative_sample)
             pbar.update(1)
     return examples
 
@@ -241,11 +268,15 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
 
 def convert_cls_examples(raw_examples, prompt_prefix, options):
     examples = []
-    print(f"Converting doccano data...")
+    logger.info(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
-            text, labels = items["data"], items["label"]
+            # Compatible with doccano >= 1.6.2
+            if "data" in items.keys():
+                text, labels = items["data"], items["label"]
+            else:
+                text, labels = items["text"], items["label"]
             random.shuffle(options)
             prompt = ""
             sep = ","
@@ -269,7 +300,7 @@ def convert_cls_examples(raw_examples, prompt_prefix, options):
     return examples
 
 
-def convert_ext_examples(raw_examples, negative_ratio):
+def convert_ext_examples(raw_examples, negative_ratio, is_train=True):
     texts = []
     entity_examples = []
     relation_examples = []
@@ -278,8 +309,9 @@ def convert_ext_examples(raw_examples, negative_ratio):
     entity_label_set = []
     entity_name_set = []
     predicate_set = []
+    subject_goldens = []
 
-    print(f"Converting doccano data...")
+    logger.info(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
@@ -292,6 +324,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
                 text = items["data"]
                 entities = []
                 if not relation_mode:
+                    # Export file in JSONL format which doccano < 1.7.0
                     for item in items["label"]:
                         entity = {
                             "id": entity_id,
@@ -302,6 +335,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
                         entities.append(entity)
                         entity_id += 1
                 else:
+                    # Export file in JSONL format for relation labeling task which doccano < 1.7.0
                     for item in items["label"]["entities"]:
                         entity = {
                             "id": entity_id,
@@ -313,8 +347,24 @@ def convert_ext_examples(raw_examples, negative_ratio):
                         entity_id += 1
                 relations = []
             else:
-                text, relations, entities = items["text"], items[
-                    "relations"], items["entities"]
+                # Export file in JSONL format which doccano >= 1.7.0
+                if "label" in items.keys():
+                    text = items["text"]
+                    entities = []
+                    for item in items["label"]:
+                        entity = {
+                            "id": entity_id,
+                            "start_offset": item[0],
+                            "end_offset": item[1],
+                            "label": item[2]
+                        }
+                        entities.append(entity)
+                        entity_id += 1
+                    relations = []
+                else:
+                    # Export file in JSONL (relation) format
+                    text, relations, entities = items["text"], items[
+                        "relations"], items["entities"]
             texts.append(text)
 
             entity_example = []
@@ -357,6 +407,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
             entity_examples.append(entity_example)
             entity_prompts.append(entity_prompt)
 
+            subject_golden = []
             relation_example = []
             relation_prompt = []
             relation_example_map = {}
@@ -367,6 +418,8 @@ def convert_ext_examples(raw_examples, negative_ratio):
                 # The relation prompt is constructed as follows: 
                 # subject + "的" + predicate
                 prompt = entity_map[subject_id]["name"] + "的" + predicate
+                if entity_map[subject_id]["name"] not in subject_golden:
+                    subject_golden.append(entity_map[subject_id]["name"])
                 result = {
                     "text": entity_map[object_id]["name"],
                     "start": entity_map[object_id]["start"],
@@ -390,19 +443,56 @@ def convert_ext_examples(raw_examples, negative_ratio):
 
             relation_examples.append(relation_example)
             relation_prompts.append(relation_prompt)
+            subject_goldens.append(subject_golden)
             pbar.update(1)
 
-    print(f"Adding negative samples for first stage prompt...")
-    entity_examples = add_negative_example(entity_examples, texts,
-                                           entity_prompts, entity_label_set,
-                                           negative_ratio)
-    if len(predicate_set) != 0:
-        print(f"Constructing relation prompts...")
-        relation_prompt_set = construct_relation_prompt_set(entity_name_set,
-                                                            predicate_set)
+    def concat_examples(positive_examples, negative_examples, negative_ratio):
+        examples = []
+        if math.ceil(len(negative_examples) /
+                     len(positive_examples)) <= negative_ratio:
+            examples = positive_examples + negative_examples
+        else:
+            # Random sampling the negative examples to ensure overall negative ratio unchanged.
+            idxs = random.sample(
+                range(0, len(negative_examples)),
+                negative_ratio * len(positive_examples))
+            negative_examples_sampled = []
+            for idx in idxs:
+                negative_examples_sampled.append(negative_examples[idx])
+            examples = positive_examples + negative_examples_sampled
+        return examples
 
-        print(f"Adding negative samples for second stage prompt...")
-        relation_examples = add_negative_example(
-            relation_examples, texts, relation_prompts, relation_prompt_set,
-            negative_ratio)
-    return entity_examples, relation_examples
+    logger.info(f"Adding negative samples for first stage prompt...")
+    positive_examples, negative_examples = add_negative_example(
+        entity_examples, texts, entity_prompts, entity_label_set,
+        negative_ratio)
+    if len(positive_examples) == 0:
+        all_entity_examples = []
+    elif is_train:
+        all_entity_examples = concat_examples(positive_examples,
+                                              negative_examples, negative_ratio)
+    else:
+        all_entity_examples = positive_examples + negative_examples
+
+    all_relation_examples = []
+    if len(predicate_set) != 0:
+        if is_train:
+            logger.info(f"Adding negative samples for second stage prompt...")
+            relation_prompt_set = construct_relation_prompt_set(entity_name_set,
+                                                                predicate_set)
+            positive_examples, negative_examples = add_negative_example(
+                relation_examples, texts, relation_prompts, relation_prompt_set,
+                negative_ratio)
+            all_relation_examples = concat_examples(
+                positive_examples, negative_examples, negative_ratio)
+        else:
+            logger.info(f"Adding negative samples for second stage prompt...")
+            relation_examples = add_full_negative_example(
+                relation_examples, texts, relation_prompts, predicate_set,
+                subject_goldens)
+            all_relation_examples = [
+                r
+                for r in relation_example
+                for relation_example in relation_examples
+            ]
+    return all_entity_examples, all_relation_examples

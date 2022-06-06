@@ -1,5 +1,6 @@
 OCR_process/*.json
 *.png
+*.json
 answers/*
 checkpoints/*
 __pycache__/*

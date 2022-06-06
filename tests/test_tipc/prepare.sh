@@ -308,6 +308,14 @@ elif [ ${MODE} = "benchmark_train" ];then
 
         git checkout .
 
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.base.yaml
+
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
+
         # Data set prepared. 
         if [ ! -f WMT14.en-de.partial.tar.gz ]; then
             wget https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.partial.tar.gz
