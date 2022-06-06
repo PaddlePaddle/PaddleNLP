@@ -117,6 +117,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
   decoding_params.cublaslt_handle =
       CublasHandle::GetInstance()->cublaslt_handle_;
+  int sm = SMVersion::GetInstance()->sm_;
 
   decoding_params.output_ids = output_ids.data<int>();
   decoding_params.parent_ids = parent_ids.data<int>();
@@ -380,7 +381,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
-        use_int8);
+        use_int8,
+        sm);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -415,7 +417,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
-        use_int8);
+        use_int8,
+        sm);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -452,7 +455,8 @@ std::vector<paddle::Tensor> decoding_kernel(
         -1,                    // seed
         1,                     // tensor_para_size
         1,                     // layer_para_size
-        use_int8);
+        use_int8,
+        sm);
 
     decoding_sampling_->forward(params, decoding_params);
 

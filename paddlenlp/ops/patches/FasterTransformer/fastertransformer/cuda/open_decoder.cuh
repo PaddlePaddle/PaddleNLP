@@ -88,6 +88,7 @@ void dequant_add_bias_act_quant_COL32_int32I_int8O_kernelLauncher(
     ActivationType activation_type,
     cudaStream_t stream);
 
+template <typename T>
 void transpose_general_kernelLauncher(T* dst,
                                       T* src,
                                       const int batch_size,

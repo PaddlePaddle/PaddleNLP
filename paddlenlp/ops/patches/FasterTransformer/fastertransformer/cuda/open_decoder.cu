@@ -827,6 +827,7 @@ template void mem_kv_channel_wise_dequantize_kernelLauncher(
     cudaStream_t stream,
     bool use_COL32);
 
+template <typename T>
 void transpose_general_kernelLauncher(T* dst,
                                       T* src,
                                       const int batch_size,

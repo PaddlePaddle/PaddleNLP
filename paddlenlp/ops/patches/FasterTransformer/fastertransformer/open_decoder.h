@@ -109,7 +109,7 @@ private:
 
   bool use_int8_ = true;
   int memory_max_seq_len_ = -1;
-  int sm_ = 70;
+  int sm_ = -1;
 
   bool use_ORDER_COL32_2R_4R4_ = false;
   bool use_COL32_ = false;
@@ -167,7 +167,8 @@ public:
               ActivationType act = ActivationType::GELU,
               const int inner_coeff = 4,
               const bool use_int8 = true,
-              const int memory_max_seq_len = -1)
+              const int memory_max_seq_len = -1,
+              const int sm = -1)
       // Activation function default to GELU for GPT.
       : head_num_(head_num),
         size_per_head_(size_per_head),
@@ -177,7 +178,8 @@ public:
         act_(act),
         inner_coeff_(inner_coeff),
         use_int8_(use_int8),
-        memory_max_seq_len_(memory_max_seq_len) {
+        memory_max_seq_len_(memory_max_seq_len),
+        sm_(sm) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -186,6 +188,13 @@ public:
       printf(
           "The input of decoder is invalid. The maximum memory sequence length "
           "must be greater than 0 when using int8. ");
+      exit(-1);
+    }
+
+    if (use_int8_ && sm_ < 0) {
+      printf(
+          "The input of decoder is invalid. The sm must be given when using "
+          "int8. ");
       exit(-1);
     }
 

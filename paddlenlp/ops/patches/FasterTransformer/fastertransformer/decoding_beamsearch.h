@@ -115,7 +115,8 @@ public:
                      const bool is_mbart = false,
                      const int min_length = 0,
                      const int inner_coeff = 4,
-                     const bool use_int8 = false)
+                     const bool use_int8 = false,
+                     const int sm = -1)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam),
@@ -173,7 +174,8 @@ public:
                                         args_.act_,
                                         inner_coeff,
                                         use_int8_,
-                                        args_.memory_max_seq_len_);
+                                        args_.memory_max_seq_len_,
+                                        sm);
     decoder_->set_max_batch_size(batch_size * beam_width);
 
     size_t decoder_int8_workspace_size =

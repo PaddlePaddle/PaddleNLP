@@ -111,7 +111,8 @@ public:
                    const int seed = -1,
                    const int tensor_para_size = 1,
                    const int layer_para_size = 1,
-                   const bool use_int8 = false)
+                   const bool use_int8 = false,
+                   const int sm = -1)
       : allocator_(allocator), use_int8_(use_int8) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -173,7 +174,8 @@ public:
                                         args_.act_,
                                         inner_coeff,
                                         use_int8_,
-                                        args_.memory_max_seq_len_);
+                                        args_.memory_max_seq_len_,
+                                        sm);
     decoder_->set_max_batch_size(batch_size);
 
     size_t decoder_int8_workspace_size =
