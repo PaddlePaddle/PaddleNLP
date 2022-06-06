@@ -272,7 +272,7 @@ elif [ ${MODE} = "whole_infer" ];then
 elif [ ${MODE} = "benchmark_train" ];then
     if [ ${model_name} == "bigru_crf" ]; then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
-        wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
+        python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py --remote-path frame_benchmark/paddle/PaddleNLP/lexical_analysis_dataset_tiny/ --local-path ./data/ --mode download
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd .. 
     fi
 
@@ -288,21 +288,15 @@ elif [ ${MODE} = "benchmark_train" ];then
         ln -s hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5/wikicorpus_en_seqlen512/ wikicorpus_en_seqlen512
 
         cd ..
+
+        python -m pip install h5py -i https://mirror.baidu.com/pypi/simple
     fi
 
     if [[ ${model_name} =~ gpt* ]]; then
-        run_env=$BENCHMARK_ROOT/run_env
-
-        rm -rf $run_env
-        mkdir $run_env
-
-        echo `which python`
-        ln -s $(which python)m-config  $run_env/python3-config
-        ln -s $(which python)m-config  $run_env/python-config
-        ln -s $(which python) $run_env/python3
-
-        export PATH=$run_env:${PATH}
-
+        cd ../examples/language_model/gpt/data_tools/
+        sed -i "s/python3/python/g" Makefile
+        sed -i "s/python-config/python3.7m-config/g" Makefile
+        cd -
         mkdir -p data && cd data
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
@@ -313,6 +307,14 @@ elif [ ${MODE} = "benchmark_train" ];then
         cd ../examples/machine_translation/transformer/
 
         git checkout .
+
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.base.yaml
+
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
 
         # Data set prepared. 
         if [ ! -f WMT14.en-de.partial.tar.gz ]; then
@@ -356,9 +358,13 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-    python -m pip install --upgrade pip
-    python -m pip install -r ../requirements.txt -i https://mirror.baidu.com/pypi/simple
+    python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+    python -m pip install setuptools_scm 
+    python -m pip install Cython 
+    python -m pip install -r ../requirements.txt  -i https://pypi.tuna.tsinghua.edu.cn/simple
     python -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
-    python -m pip install -e ..
 
+    python -m pip install -e ../
+    # python -m pip install paddlenlp    # PDC 镜像中安装失败
+    python -m pip list
 fi

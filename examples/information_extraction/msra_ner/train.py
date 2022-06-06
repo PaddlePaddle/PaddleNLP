@@ -131,7 +131,8 @@ def do_train(args):
 
     ignore_label = -100
 
-    batchify_fn = DataCollatorForTokenClassification(tokenizer, ignore_label)
+    batchify_fn = DataCollatorForTokenClassification(
+        tokenizer=tokenizer, label_pad_token_id=ignore_label)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)

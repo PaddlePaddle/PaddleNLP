@@ -58,7 +58,7 @@ usage = r"""
 
          """
 
-TASK_MODEL_MAP = {"csc-ernie-1.0": "ernie-1.0"}
+TASK_MODEL_MAP = {"ernie-csc": "ernie-1.0"}
 
 
 class CSCTask(Task):
@@ -75,13 +75,13 @@ class CSCTask(Task):
         "pinyin_vocab": "pinyin_vocab.txt"
     }
     resource_files_urls = {
-        "csc-ernie-1.0": {
+        "ernie-csc": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/ernie-csc/model_state.pdparams",
                 "cdc53e7e3985ffc78fedcdf8e6dca6d2"
             ],
             "pinyin_vocab": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt",
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/ernie-csc/pinyin_vocab.txt",
                 "5599a8116b6016af573d08f8e686b4b2"
             ],
         }

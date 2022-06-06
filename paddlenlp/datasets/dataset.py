@@ -65,7 +65,7 @@ class DatasetTuple:
     def __init__(self, splits):
         self.identifier_map, identifiers = self._gen_identifier_map(splits)
         self.tuple_cls = namedtuple('datasets', identifiers)
-        self.tuple = self.tuple_cls(* [None for _ in splits])
+        self.tuple = self.tuple_cls(*[None for _ in splits])
 
     def __getitem__(self, key):
         if isinstance(key, (int, slice)):
@@ -121,7 +121,7 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     else:
         label_list = []
         if isinstance(hf_datasets, DatasetDict):
-            datasets = DatasetTuple(hf_datasets.keys())
+            datasets = DatasetTuple(list(hf_datasets.keys()))
             for split, ds in hf_datasets.items():
                 for feature in ds.features.values():
                     if isinstance(feature, ClassLabel):

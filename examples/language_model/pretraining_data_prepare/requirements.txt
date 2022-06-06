@@ -1,5 +1,0 @@
-datasets
-opencc-python-reimplemented
-nltk
-LAC
-tqdm

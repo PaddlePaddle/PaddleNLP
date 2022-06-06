@@ -280,6 +280,15 @@ def create_pretrained_dataset(args,
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
 
+    if device_world_size > 1 and local_rank != 0:
+        while True:
+            try:
+                import data_tools.helpers as helpers
+                break
+            except Exception as e:
+                print("> wait for helpers to be compiled!")
+                time.sleep(1)
+
     logger.info(
         "The distributed run, total device num:{}, distinct dataflow num:{}.".
         format(device_world_size, data_world_size))

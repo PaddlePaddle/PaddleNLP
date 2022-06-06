@@ -18,7 +18,9 @@ import random
 import time
 import json
 import math
+import distutils.util
 import argparse
+import contextlib
 
 from functools import partial
 import numpy as np
@@ -26,10 +28,12 @@ import paddle
 
 from paddle.io import DataLoader
 
-from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+from paddlenlp.utils.log import logger
+
 from datasets import load_dataset
 
 
@@ -43,11 +47,20 @@ def parse_args():
         help="Path to pre-trained model or shortcut name of model.")
     parser.add_argument(
         "--output_dir",
-        default=None,
+        default="best_cmrc_model",
         type=str,
-        required=True,
         help="The output directory where the model predictions and checkpoints will be written."
     )
+    parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.")
+    parser.add_argument(
+        "--overwrite_cache",
+        default=False,
+        type=distutils.util.strtobool,
+        help="Whether to overwrite cache for dataset.")
     parser.add_argument(
         "--max_seq_length",
         default=128,
@@ -60,6 +73,12 @@ def parse_args():
         type=int,
         help="Batch size per GPU/CPU for training.")
     parser.add_argument(
+        "--num_proc",
+        default=None,
+        type=int,
+        help="Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument(
         "--eval_batch_size",
         default=12,
         type=int,
@@ -71,7 +90,7 @@ def parse_args():
         help="The initial learning rate for Adam.")
     parser.add_argument(
         "--weight_decay",
-        default=0.0,
+        default=0.01,
         type=float,
         help="Weight decay if we apply some.")
     parser.add_argument(
@@ -93,21 +112,22 @@ def parse_args():
         help="If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
+        "--warmup_steps",
+        default=0,
+        type=int,
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
+    )
+    parser.add_argument(
         "--warmup_proportion",
-        default=0.0,
+        default=0.1,
         type=float,
         help="Proportion of training steps to perform linear learning rate warmup for."
     )
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=500,
+        default=100,
         help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
@@ -159,45 +179,45 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, raw_dataset, data_loader, args, do_eval=True):
+def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
     model.eval()
 
     all_start_logits = []
     all_end_logits = []
     tic_eval = time.time()
-
     for batch in data_loader:
-        input_ids, token_type_ids = batch
-        start_logits_tensor, end_logits_tensor = model(input_ids,
-                                                       token_type_ids)
-
-        for idx in range(start_logits_tensor.shape[0]):
+        start_logits, end_logits = model(**batch)
+        for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
-                print("Processing example: %d" % len(all_start_logits))
-                print('time per 1000:', time.time() - tic_eval)
+                logger.info("Processing example: %d" % len(all_start_logits))
+                logger.info('time per 1000: %s' % (time.time() - tic_eval))
                 tic_eval = time.time()
 
-            all_start_logits.append(start_logits_tensor.numpy()[idx])
-            all_end_logits.append(end_logits_tensor.numpy()[idx])
+            all_start_logits.append(start_logits.numpy()[idx])
+            all_end_logits.append(end_logits.numpy()[idx])
 
     all_predictions, _, _ = compute_prediction(
-        raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
-        False, args.n_best_size, args.max_answer_length)
+        raw_dataset, dataset, (all_start_logits, all_end_logits), False,
+        args.n_best_size, args.max_answer_length)
 
     mode = 'validation' if do_eval else 'test'
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
     if do_eval:
-        filename = 'prediction_validation.json'
+        filename = os.path.join(args.output_dir, 'prediction_validation.json')
     else:
-        filename = 'cmrc2018_predict.json'
+        filename = os.path.join(args.output_dir, 'cmrc2018_predict.json')
     with open(filename, "w", encoding='utf-8') as writer:
         writer.write(
             json.dumps(
                 all_predictions, ensure_ascii=False, indent=4) + "\n")
     if do_eval:
-        squad_evaluate(
+        res = squad_evaluate(
             examples=[raw_data for raw_data in raw_dataset],
             preds=all_predictions,
             is_whitespace_splited=False)
+        model.train()
+        return res['exact'], res['f1']
 
     model.train()
 
@@ -219,7 +239,36 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         return loss
 
 
+@contextlib.contextmanager
+def main_process_first(desc="work"):
+    if paddle.distributed.get_world_size() > 1:
+        rank = paddle.distributed.get_rank()
+        is_main_process = rank == 0
+        main_process_desc = "main local process"
+
+        try:
+            if not is_main_process:
+                # tell all replicas to wait
+                logger.debug(
+                    f"{rank}: waiting for the {main_process_desc} to perform {desc}"
+                )
+                paddle.distributed.barrier()
+            yield
+        finally:
+            if is_main_process:
+                # the wait is over
+                logger.debug(
+                    f"{rank}: {main_process_desc} completed {desc}, releasing all replicas"
+                )
+                paddle.distributed.barrier()
+    else:
+        yield
+
+
 def run(args):
+    if args.do_train:
+        assert args.batch_size % args.gradient_accumulation_steps == 0, \
+            "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -230,12 +279,12 @@ def run(args):
     set_seed(args)
 
     train_examples, dev_examples, test_examples = load_dataset(
-        'cmrc2018', split=["train", "validation", "test"])
+        'clue', 'cmrc2018', split=["train", "validation", "test"])
 
     column_names = train_examples.column_names
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
-            print("init checkpoint from %s" % args.model_name_or_path)
+            logger.info("init checkpoint from %s" % args.model_name_or_path)
 
     model = AutoModelForQuestionAnswering.from_pretrained(
         args.model_name_or_path)
@@ -368,48 +417,52 @@ def run(args):
         args.batch_size = int(args.batch_size /
                               args.gradient_accumulation_steps)
 
-        train_ds = train_examples.map(prepare_train_features,
-                                      batched=True,
-                                      remove_columns=column_names,
-                                      num_proc=1)
+        with main_process_first(desc="train dataset map pre-processing"):
+            train_ds = train_examples.map(
+                prepare_train_features,
+                batched=True,
+                remove_columns=column_names,
+                load_from_cache_file=not args.overwrite_cache,
+                num_proc=args.num_proc,
+                desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
-        train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "start_positions": Stack(dtype="int64"),
-            "end_positions": Stack(dtype="int64")
-        }): fn(samples)
+
+        batchify_fn = DataCollatorWithPadding(tokenizer)
         train_data_loader = DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
-            collate_fn=train_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
-        dev_ds = dev_examples.map(prepare_validation_features,
-                                  batched=True,
-                                  remove_columns=column_names,
-                                  num_proc=1)
+        with main_process_first(desc="evaluate dataset map pre-processing"):
+            dev_ds = dev_examples.map(
+                prepare_validation_features,
+                batched=True,
+                remove_columns=column_names,
+                num_proc=args.num_proc,
+                load_from_cache_file=args.overwrite_cache,
+                desc="Running tokenizer on validation dataset")
+        dev_ds_for_model = dev_ds.remove_columns(
+            ["example_id", "offset_mapping", "attention_mask"])
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
-        dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+
         dev_data_loader = DataLoader(
-            dataset=dev_ds,
+            dataset=dev_ds_for_model,
             batch_sampler=dev_batch_sampler,
-            collate_fn=dev_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_proportion)
+        warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps, warmup)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -424,14 +477,14 @@ def run(args):
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
-
+        best_res = (0.0, 0.0)
         global_step = 0
         tic_train = time.time()
         for epoch in range(args.num_train_epochs):
             for step, batch in enumerate(train_data_loader):
-                input_ids, token_type_ids, start_positions, end_positions = batch
-                logits = model(
-                    input_ids=input_ids, token_type_ids=token_type_ids)
+                start_positions = batch.pop("start_positions")
+                end_positions = batch.pop("end_positions")
+                logits = model(**batch)
                 loss = criterion(logits, (start_positions, end_positions))
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
@@ -443,47 +496,57 @@ def run(args):
                     optimizer.clear_grad()
 
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
                                loss,
                                args.logging_steps / (time.time() - tic_train)))
                         tic_train = time.time()
-
-                    if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                        if rank == 0:
-                            output_dir = os.path.join(args.output_dir,
-                                                      "model_%d" % global_step)
-                            if not os.path.exists(output_dir):
-                                os.makedirs(output_dir)
-                            # need better way to get inner model of DataParallel
-                            model_to_save = model._layers if isinstance(
-                                model, paddle.DataParallel) else model
-                            model_to_save.save_pretrained(output_dir)
-                            tokenizer.save_pretrained(output_dir)
-                            print('Saving checkpoint to:', output_dir)
-                        if global_step == num_training_steps:
-                            break
-            evaluate(model, dev_examples, dev_data_loader, args)
+                    if global_step >= num_training_steps:
+                        logger.info("best_result: %.2f/%.2f" %
+                                    (best_res[0], best_res[1]))
+                        return
+            em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
+                              args)
+            if paddle.distributed.get_rank() == 0 and em > best_res[0]:
+                best_res = (em, f1)
+                if args.save_best_model:
+                    output_dir = args.output_dir
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                    # need better way to get inner model of DataParallel
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
+        logger.info("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
-                                    num_proc=1)
+                                    num_proc=args.num_proc)
+        test_ds_for_model = test_ds.remove_columns(
+            ["example_id", "offset_mapping", "attention_mask"])
+        dev_batchify_fn = DataCollatorWithPadding(tokenizer)
+
         test_batch_sampler = paddle.io.BatchSampler(
-            test_ds, batch_size=args.eval_batch_size, shuffle=False)
-        test_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+            test_ds_for_model, batch_size=args.eval_batch_size, shuffle=False)
+
+        batchify_fn = DataCollatorWithPadding(tokenizer)
         test_data_loader = DataLoader(
-            dataset=test_ds,
+            dataset=test_ds_for_model,
             batch_sampler=test_batch_sampler,
-            collate_fn=test_batchify_fn,
+            collate_fn=batchify_fn,
             return_list=True)
 
-        evaluate(model, test_examples, test_data_loader, args, do_eval=False)
+        evaluate(
+            model,
+            test_examples,
+            test_ds,
+            test_data_loader,
+            args,
+            do_eval=False)
 
 
 def print_arguments(args):

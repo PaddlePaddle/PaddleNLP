@@ -449,6 +449,9 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
+        -1,                    // seed
+        1,                     // tensor_para_size
+        1,                     // layer_para_size
         use_int8);
 
     decoding_sampling_->forward(params, decoding_params);

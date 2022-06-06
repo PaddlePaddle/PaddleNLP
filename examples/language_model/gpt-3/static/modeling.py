@@ -29,10 +29,12 @@ from paddlenlp.transformers import PretrainedModel, register_base_model
 import paddlenlp
 
 __all__ = [
-    'GPTModel',
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
+    'GPTModel', 'GPTForPretraining', 'GPTPretrainingCriterion',
+    'GPTForGeneration'
 ]
+
+device = "gpu"
+int_type = "int64"
 
 
 class MultiHeadAttention(nn.Layer):
@@ -153,6 +155,11 @@ class MultiHeadAttention(nn.Layer):
             # for decoder self-attention in inference
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
+
+            ## if not assign here, assign in While loop
+            #layers.assign(k, cache.k)    # update caches
+            #layers.assign(v, cache.v)
+
         if use_cache is True:
             cache = self.Cache(k, v)
 
@@ -229,7 +236,12 @@ class MultiHeadAttention(nn.Layer):
         product = layers.matmul(
             x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
 
-        weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        if self.training:
+            weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        else:
+            if attn_mask is not None:
+                product = product + attn_mask
+            weights = F.softmax(product)
 
         if self.dropout:
             weights = F.dropout(
@@ -311,12 +323,20 @@ class TransformerDecoder(nn.Layer):
                                  cache=cache)
 
             else:
-                output, new_cache = mod(output,
-                                        memory,
-                                        tgt_mask=tgt_mask,
-                                        use_cache=use_cache,
-                                        cache=cache[i])
-                new_caches.append(new_cache)
+                if use_cache:
+                    output, new_cache = mod(output,
+                                            memory,
+                                            tgt_mask=tgt_mask,
+                                            use_cache=use_cache,
+                                            cache=cache[i])
+                    new_caches.append(new_cache)
+                else:
+                    output = mod(output,
+                                 memory,
+                                 tgt_mask=tgt_mask,
+                                 use_cache=use_cache,
+                                 cache=cache[i])
+
             self.checkpoints.append(output.name)
 
         if self.norm is not None:
@@ -344,6 +364,8 @@ class TransformerDecoderLayer(nn.Layer):
     It contains multiheadattention and some linear layers.
     """
 
+    Cache = collections.namedtuple("Cache", ["kv"])
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -355,7 +377,8 @@ class TransformerDecoderLayer(nn.Layer):
                  normalize_before=True,
                  weight_attr=None,
                  bias_attr=None,
-                 topo=None):
+                 topo=None,
+                 **kwargs):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -368,45 +391,94 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        self.self_attn = MultiHeadAttention(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
-            weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
-            topo=topo)
-        if topo is None or topo.mp_info.size == 1:
-            self.linear1 = nn.Linear(
+        self._fuse = kwargs.get('fuse', False)
+        if self._fuse:
+            nranks, ring_id = 1, -1
+            if topo is not None and topo.mp_info.size > 1:
+                nranks = topo.mp_info.size
+                ring_id = 0
+            self.self_attn = incubate.nn.FusedMultiHeadAttention(
+                d_model,
+                nhead,
+                dropout_rate=dropout,
+                attn_dropout_rate=attn_dropout,
+                normalize_before=normalize_before,
+                qkv_weight_attr=weight_attrs[0],
+                qkv_bias_attr=bias_attrs[0],
+                linear_weight_attr=weight_attrs[0],
+                linear_bias_attr=bias_attrs[0],
+                epsilon=1e-5,
+                nranks=nranks,
+                ring_id=ring_id)
+            self.ffn = incubate.nn.FusedFeedForward(
                 d_model,
                 dim_feedforward,
-                weight_attrs[2],
-                bias_attr=bias_attrs[2])
-            self.linear2 = nn.Linear(
-                dim_feedforward,
-                d_model,
-                weight_attrs[2],
-                bias_attr=bias_attrs[2])
+                dropout_rate=act_dropout,
+                epsilon=1e-5,
+                activation=activation,
+                normalize_before=normalize_before,
+                act_dropout_rate=0.0,
+                linear1_weight_attr=weight_attrs[2],
+                linear1_bias_attr=bias_attrs[2],
+                linear2_weight_attr=weight_attrs[2],
+                linear2_bias_attr=bias_attrs[2],
+                nranks=nranks,
+                ring_id=ring_id)
         else:
-            self.linear1 = paddlenlp.ops.ColumnParallelLiner(
-                (d_model, dim_feedforward),
-                topo.mp_info.size,
-                gather_out=False,
-                param_attr=weight_attrs[2],
-                bias_attr=bias_attrs[2])
-            self.linear2 = paddlenlp.ops.RowParallelLiner(
-                (dim_feedforward, d_model),
-                topo.mp_info.size,
-                input_is_parallel=True,
-                param_attr=weight_attrs[2],
-                bias_attr=bias_attrs[2])
+            self.self_attn = MultiHeadAttention(
+                d_model,
+                nhead,
+                dropout=attn_dropout,
+                weight_attr=weight_attrs[0],
+                bias_attr=bias_attrs[0],
+                topo=topo)
+            if topo is None or topo.mp_info.size == 1:
+                self.linear1 = nn.Linear(
+                    d_model,
+                    dim_feedforward,
+                    weight_attrs[2],
+                    bias_attr=bias_attrs[2])
+                self.linear2 = nn.Linear(
+                    dim_feedforward,
+                    d_model,
+                    weight_attrs[2],
+                    bias_attr=bias_attrs[2])
+            else:
+                self.linear1 = paddlenlp.ops.ColumnParallelLiner(
+                    (d_model, dim_feedforward),
+                    topo.mp_info.size,
+                    gather_out=False,
+                    param_attr=weight_attrs[2],
+                    bias_attr=bias_attrs[2])
+                self.linear2 = paddlenlp.ops.RowParallelLiner(
+                    (dim_feedforward, d_model),
+                    topo.mp_info.size,
+                    input_is_parallel=True,
+                    param_attr=weight_attrs[2],
+                    bias_attr=bias_attrs[2])
 
-        self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
-        self.activation = getattr(F, activation)
+            self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
+            self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
+            self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+            self.activation = getattr(F, activation)
 
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
+        if self._fuse:
+            if isinstance(cache, self.Cache):
+                attn_output, cache_kv_out = self.self_attn(
+                    tgt, attn_mask=tgt_mask, cache=cache.kv)
+
+                ## if not assign here, update caches in While loop
+                # layers.assign(cache_kv_out, cache.kv)
+                if use_cache:
+                    cache = self.Cache(cache_kv_out)
+            else:
+                attn_output = self.self_attn(tgt, attn_mask=tgt_mask)
+
+            enc_out = self.ffn(attn_output)
+            return (enc_out, cache) if use_cache else enc_out
+
         residual = tgt
 
         if self.normalize_before:
@@ -667,7 +739,8 @@ class GPTModel(GPTPretrainedModel):
                  eos_token_id=7,
                  bos_token_id=0,
                  eol_token_id=3,
-                 topo=None):
+                 topo=None,
+                 **kwargs):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -675,6 +748,9 @@ class GPTModel(GPTPretrainedModel):
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+        self.num_attention_heads = num_attention_heads
+        self.num_hidden_layers = num_hidden_layers
+        self.hidden_size = hidden_size
 
         self.pipline_mode = topo is not None and topo.pp_info.size > 1
         if self.pipline_mode:
@@ -704,7 +780,8 @@ class GPTModel(GPTPretrainedModel):
                         initializer=nn.initializer.Normal(
                             mean=0.0, std=self.initializer_range)),
                     bias_attr=None,
-                    topo=topo))
+                    topo=topo,
+                    fuse=kwargs.get('fuse', False)))
 
         if self.pipline_mode:
             Decoder = paddlenlp.ops.guard('gpu:{}'.format(
@@ -738,16 +815,18 @@ class GPTModel(GPTPretrainedModel):
                 paddle.shape(input_ids)[-1] + past_length,
                 dtype='int64')
             position_ids = position_ids.unsqueeze(0)
-            # .expand_as(input_ids)
             position_ids = paddle.fluid.layers.expand_as(position_ids,
                                                          input_ids)
         embedding_output = self.embeddings(
             input_ids=input_ids, position_ids=position_ids)
 
+        tgt_mask = None
+        if not self.training:
+            tgt_mask = attention_mask
         encoder_outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=None,
+            tgt_mask=tgt_mask,
             use_cache=use_cache,
             cache=cache)
         self.checkpoints.extend(self.decoder.checkpoints)
@@ -830,3 +909,265 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss
+
+
+class GPTForGeneration(GPTPretrainedModel):
+    def __init__(self,
+                 gpt,
+                 max_length=20,
+                 min_length=0,
+                 decoding_strategy='sampling',
+                 temperature=1.0,
+                 top_k=0,
+                 top_p=1.0,
+                 eos_id=None,
+                 **kwargs):
+        super(GPTForGeneration, self).__init__()
+        self.gpt = gpt
+        self.apply(self.init_weights)
+        self.vocab_size = gpt.vocab_size
+        self.eos_token_id = eos_id or 7
+
+        self.min_dec_len = min_length
+        self.max_dec_len = max_length
+        self.decoding_strategy = decoding_strategy
+        self.temperature = temperature
+        self.topk = top_k
+        self.topp = top_p
+        self._init_gen_cache = False
+        self.generation_caches = None
+        self._dtype = "float32"
+        self._fuse = kwargs.get("fuse", False)
+
+    def _init_generation_caches(self, src_ids):
+        # not fuse, return None
+        if self._init_gen_cache or self._fuse is False:
+            return self.generation_caches
+
+        self.generation_caches = []
+        num_heads = self.gpt.num_attention_heads
+        num_layers = self.gpt.num_hidden_layers
+        mp_n_head = num_heads // self.gpt.topo.mp_info.size
+        hidden_size = self.gpt.hidden_size
+        head_size = hidden_size // num_heads
+        for i in range(num_layers):
+            if self._fuse:
+                kv = layers.fill_constant_batch_size_like(
+                    input=src_ids,
+                    shape=[2, -1, mp_n_head, 0, head_size],
+                    dtype=self._dtype,
+                    value=0,
+                    output_dim_idx=1)
+                self.generation_caches.append(TransformerDecoderLayer.Cache(kv))
+            else:
+                k = layers.fill_constant_batch_size_like(
+                    input=src_ids,
+                    shape=[-1, mp_n_head, 0, head_size],
+                    dtype=self._dtype,
+                    value=0)
+                v = layers.fill_constant_batch_size_like(
+                    input=src_ids,
+                    shape=[-1, mp_n_head, 0, head_size],
+                    dtype=self._dtype,
+                    value=0)
+                self.generation_caches.append(MultiHeadAttention.Cache(k, v))
+        self._init_gen_cache = True
+        return self.generation_caches
+
+    def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
+        if topo is not None and topo.mp_info.size > 1:
+            hybrid_groups = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hybrid_groups.get_model_parallel_group()
+
+            input_parallel = paddle.distributed.collective._c_identity(
+                lm_output, group=model_parallel_group)
+
+            logits = paddle.matmul(
+                input_parallel, logit_weights, transpose_y=True)
+
+            if parallel_output:
+                return logits
+
+            return paddle.distributed.collective._c_concat(
+                logits, group=model_parallel_group)
+        else:
+            logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+            return logits
+
+    def topk_sampling(self, probs):
+        topk_probs, _ = paddle.topk(probs, self.topk)
+        ge_cond = paddle.cast(
+            paddle.greater_equal(probs,
+                                 paddle.unsqueeze(topk_probs[:, -1], [1])),
+            "float32")
+        old_probs = probs
+        probs = probs * ge_cond / paddle.sum(topk_probs, axis=-1, keepdim=True)
+        sampling_ids = layers.sampling_id(probs, dtype="int")
+        probs = old_probs
+        return probs, sampling_ids
+
+    def topp_sampling(self, probs):
+        sorted_probs, sorted_idx = layers.argsort(probs, descending=True)
+        cum_sorted_probs = layers.cumsum(sorted_probs, axis=1, exclusive=True)
+        lt_cond = paddle.cast(
+            paddle.less_than(cum_sorted_probs,
+                             layers.fill_constant_batch_size_like(
+                                 cum_sorted_probs, cum_sorted_probs.shape,
+                                 cum_sorted_probs.dtype, self.topp)), "float32")
+        old_probs = probs
+        candidate_probs = sorted_probs * lt_cond
+        probs = candidate_probs / paddle.sum(candidate_probs,
+                                             axis=-1,
+                                             keep_dim=True)
+        sampling_ids = layers.sampling_id(probs, dtype="int")
+        sampling_ids = paddle.index_sample(sorted_idx,
+                                           paddle.unsqueeze(sampling_ids, [1]))
+        sampling_ids = paddle.squeeze(sampling_ids, [1])
+        probs = old_probs
+        return probs, sampling_ids
+
+    def model(self,
+              input_ids,
+              position_ids=None,
+              attention_mask=None,
+              masked_positions=None,
+              use_cache=False,
+              cache=None):
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+        logits = self.parallel_matmul(
+            encoder_outputs, self.gpt.embeddings.word_embeddings.weight, False,
+            self.gpt.topo)
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
+
+    def forward(self, inputs, use_cache=False, cache=None):
+        """
+        Args:
+            inputs (dict): include src_ids.
+                pos_ids, input_mask and max_dec_len are optional.
+        """
+        ######### forward context #########
+        input_ids = inputs['src_ids']
+        position_ids = inputs['pos_ids'] if 'pos_ids' in inputs else None
+        attention_mask = inputs[
+            'input_mask'] if 'input_mask' in inputs else None
+
+        causal_mask = paddle.tensor.triu(
+            paddle.ones((paddle.shape(input_ids)[-1],
+                         paddle.shape(input_ids)[-1])) * -1e4,
+            diagonal=1)
+        if attention_mask is not None:
+            tgt_pos = paddle.sum(attention_mask, axis=-1,
+                                 keepdim=True).astype('int64')
+            if len(attention_mask.shape) == 2:
+                attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
+            encode_mask = attention_mask + causal_mask
+        else:
+            encode_mask = causal_mask
+
+        # if cached_kvs are assigned to next step in _prepare_qkv of MultiHeadAttention,
+        # need to init the global caches here
+        gen_caches = self._init_generation_caches(input_ids)
+
+        logits, cached_kvs = self.model(
+            input_ids,
+            position_ids,
+            encode_mask,
+            use_cache=True,
+            cache=gen_caches)
+
+        next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
+        ####################################
+
+        if 'max_dec_len' not in inputs:
+            max_len = layers.fill_constant(
+                [1], dtype=int_type, value=self.max_dec_len, force_cpu=True)
+        else:
+            max_len = inputs['max_dec_len']
+        min_len = layers.fill_constant(
+            shape=[1], dtype=int_type, value=self.min_dec_len, force_cpu=True)
+        step_idx = layers.fill_constant(
+            shape=[1], value=0, dtype='int64', force_cpu=True)
+
+        placehold_ids = layers.fill_constant_batch_size_like(
+            input=inputs["src_ids"],
+            value=0,
+            shape=[-1, 1],
+            dtype=next_id.dtype)
+        ids = layers.array_write(next_id, step_idx)
+
+        if 'max_dec_len' in inputs:
+            max_len = paddle.tensor.creation._memcpy(
+                max_len, place=paddle.CPUPlace())
+        cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
+        cond = paddle.less_than(step_idx, max_len)
+
+        if attention_mask is not None:
+            append_mask = layers.fill_constant_batch_size_like(
+                input=next_id,
+                value=1,
+                shape=[-1, 1, 1, 1],
+                dtype=attention_mask.dtype)
+
+        while_op = layers.While(cond, is_test=True)
+        with while_op.block():
+            pre_ids = layers.array_read(array=ids, i=step_idx)
+            if attention_mask:
+                decode_mask = paddle.concat(
+                    [attention_mask, append_mask], axis=-1)
+                tgt_pos = tgt_pos + step_idx
+                att_mask = (1 - decode_mask) * -1e4
+            else:
+                att_mask = None
+                tgt_pos = None
+
+            layers.increment(x=step_idx, value=1.0, in_place=True)
+            layers.array_write(placehold_ids, i=step_idx, array=ids)
+
+            logits, decode_cached_kvs = self.model(
+                pre_ids, tgt_pos, att_mask, use_cache=True, cache=cached_kvs)
+
+            logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
+            probs = F.softmax(logits / self.temperature)
+
+            if self.decoding_strategy.startswith("sampling"):
+                sampling_ids = layers.sampling_id(probs, dtype="int")
+            elif self.decoding_strategy.startswith("topk_sampling"):
+                probs, sampling_ids = self.topk_sampling(probs)
+            elif self.decoding_strategy.startswith("topp_sampling"):
+                probs, sampling_ids = self.topp_sampling(probs)
+            else:
+                raise ValueError(self.decoding_strategy)
+
+            selected_ids = paddle.unsqueeze(sampling_ids, -1)
+            layers.array_write(selected_ids, i=step_idx, array=ids)
+
+            length_cond = paddle.less_than(
+                x=step_idx, y=max_len, name="length_cond")
+            finish_cond = paddle.logical_not(
+                paddle.is_empty(x=selected_ids), name="finish_cond")
+            paddle.logical_and(
+                x=length_cond, y=finish_cond, out=cond, name="logical_and_cond")
+
+            paddle.assign(layers.cast(cond, dtype='bool'), cond)
+            if attention_mask:
+                paddle.assign(decode_mask, attention_mask)
+            for i in range(len(decode_cached_kvs)):
+                if self._fuse:
+                    paddle.assign(decode_cached_kvs[i].kv, cached_kvs[i].kv)
+                else:
+                    paddle.assign(decode_cached_kvs[i].k, cached_kvs[i].k)
+                    paddle.assign(decode_cached_kvs[i].v, cached_kvs[i].v)
+
+        ids, _ = layers.tensor_array_to_tensor(ids)
+        return ids
