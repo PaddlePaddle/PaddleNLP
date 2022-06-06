@@ -126,12 +126,12 @@ if __name__ == "__main__":
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    all_data = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
-                ["区块链投资心得，能做到就不会亏钱", ]]
+    texts = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
+             ["区块链投资心得，能做到就不会亏钱", ]]
 
-    for data in all_data:
+    for text in texts:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)
-        result = runner.Run([data])
+        result = runner.Run([text])
         print(result)
 
     test_tnews_dataset(runner)
