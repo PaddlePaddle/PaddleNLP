@@ -22,6 +22,7 @@ import inspect
 
 import paddle
 import numpy as np
+import paddle.nn as nn
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url, download_check, COMMUNITY_MODEL_PREFIX
@@ -475,3 +476,64 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
+
+    def resize_token_embeddings(self, new_num_tokens):
+        """
+        Resizes input token embeddings matrix of the model according to new_num_tokens.
+
+        Args:
+            new_num_tokens (int): The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
+                vectors at the end. Reducing the size will remove vectors from the end. If not provided or `None`, just
+                returns a pointer to the input tokens embedding module of the model without doing anything.
+        """
+        old_embeddings = self.get_input_embeddings()
+        new_embeddings = self._get_resized_embeddings(old_embeddings,
+                                                      new_num_tokens)
+        model_embeds = self.set_input_embeddings(new_embeddings)
+        if new_num_tokens is None:
+            return model_embeds
+        return model_embeds
+
+    def _get_resized_embeddings(self, old_embeddings, new_num_tokens):
+        """
+        Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
+        initialized vectors at the end. Reducing the size will remove vectors from the end
+        
+        Args:
+            old_embeddings:
+                Old embeddings to be resized.
+            new_num_tokens:
+                New number of tokens in the embedding matrix.
+                Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
+                vectors from the end. 
+        """
+        if new_num_tokens is None:
+            return old_embeddings
+
+        old_num_tokens, old_embedding_dim = old_embeddings.weight.shape
+
+        if old_num_tokens == new_num_tokens:
+            return old_embeddings
+
+        if not isinstance(old_embeddings, nn.Embedding):
+            raise TypeError(
+                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
+                " should either use a different resize function or make sure that old_embeddings are an instance of"
+                f" {nn.Embedding}.")
+
+        # Build new embeddings
+        new_embeddings = nn.Embedding(
+            new_num_tokens, old_embedding_dim, weight_attr=None)
+
+        # numbers of tokens to copy
+        n = min(old_num_tokens, new_num_tokens)
+
+        custom_weight = paddle.concat(
+            x=[
+                old_embeddings.weight[:n, :],
+                paddle.unsqueeze(new_embeddings.weight[-1, :], 0)
+            ],
+            axis=0)
+        new_embeddings.weight.set_value(custom_weight)
+
+        return new_embeddings
