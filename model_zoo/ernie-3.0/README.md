@@ -917,7 +917,8 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 ### 服务化部署
 
-服务化部署请参考：[服务化部署指南](./deploy/serving/README.md)
+- [Triton Inference Server服务化部署指南](./deploy/triton/README.md)
+- [Paddle Serving服务化部署指南](./deploy/serving/README.md)
 
 <a name="Paddle2ONNX部署"></a>
 
