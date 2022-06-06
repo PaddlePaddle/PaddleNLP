@@ -108,6 +108,7 @@ std::string WordPiece::Save(const std::string& folder,
 
 std::vector<core::Token> WordPiece::Tokenize(
     const std::string& sequence) const {
+  VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence";
   std::vector<core::Token> all_tokens;
   size_t unicode_len =
       utils::GetUnicodeLenFromUTF8(sequence.data(), sequence.length());
@@ -149,6 +150,7 @@ std::vector<core::Token> WordPiece::Tokenize(
       start = end;
     }
     if (!found_token) {
+      all_tokens.clear();
       all_tokens.emplace_back(vocab_.at(unk_token_),
                               unk_token_,
                               core::Offset{0, sequence.length()});

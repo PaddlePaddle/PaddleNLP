@@ -34,7 +34,7 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
                  mask_token="[MASK]",
                  clean_text=True,
                  handle_chinese_chars=True,
-                 strip_accents=None,
+                 strip_accents=True,
                  lowercase=True,
                  wordpieces_prefix="##",
                  max_sequence_len=None,

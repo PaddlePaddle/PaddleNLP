@@ -789,11 +789,11 @@ static PyObject* Encode(TokenizerObject* self,
           pair_array = CastPyArg2VectorOfStr(kw_pair, 1);
         }
         self->tokenizer.EncodeSingleString(
-            sequence_array, 0, core::OffsetType::BYTE, &encoding);
+            sequence_array, 0, core::OffsetType::CHAR, &encoding);
         core::Encoding* pair_encoding_ptr = nullptr;
         if (has_pair) {
           self->tokenizer.EncodeSingleString(
-              pair_array, 0, core::OffsetType::BYTE, &pair_encoding);
+              pair_array, 0, core::OffsetType::CHAR, &pair_encoding);
           pair_encoding_ptr = &pair_encoding;
         }
         self->tokenizer.PostProcess(
@@ -814,11 +814,11 @@ static PyObject* Encode(TokenizerObject* self,
         pair = CastPyArg2AttrString(kw_pair, 1);
       }
       self->tokenizer.EncodeSingleString(
-          sequence, 0, core::OffsetType::BYTE, &encoding);
+          sequence, 0, core::OffsetType::CHAR, &encoding);
       core::Encoding* pair_encoding_ptr = nullptr;
       if (has_pair) {
         self->tokenizer.EncodeSingleString(
-            pair, 1, core::OffsetType::BYTE, &pair_encoding);
+            pair, 1, core::OffsetType::CHAR, &pair_encoding);
         pair_encoding_ptr = &pair_encoding;
       }
       self->tokenizer.PostProcess(

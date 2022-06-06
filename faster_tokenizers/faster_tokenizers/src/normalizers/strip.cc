@@ -34,7 +34,8 @@ void StripNormalizer::operator()(NormalizedString* input) const {
 void StripAccentsNormalizer::operator()(NormalizedString* input) const {
   input->NFD();
   input->FilterChar([](char32_t ch) -> bool {
-    return u_charType(ch) != U_COMBINING_SPACING_MARK;
+    // equals to `unicodedata.category(char) == 'Mn'`
+    return u_charType(ch) != U_NON_SPACING_MARK;
   });
 }
 

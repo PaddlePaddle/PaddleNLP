@@ -209,8 +209,11 @@ void FasterWordPiece::HandleTheRemainingStringOnTriePath(
   }
   while (curr_node->node_id_ != trie_.GetSuffixRoot() &&
          curr_node->node_id_ != trie_.GetPuncFailureNode()) {
-    if (!TryFollowFailureLinkAndCollectTokens(
-            sequence, 0, curr_offset_in_sequence, curr_node, tokens)) {
+    if (!TryFollowFailureLinkAndCollectTokens(sequence,
+                                              sequence_offset_in_text,
+                                              curr_offset_in_sequence,
+                                              curr_node,
+                                              tokens)) {
       ResetOutputAppendUNK(sequence_offset_in_text,
                            sequence.size(),
                            original_num_tokens,

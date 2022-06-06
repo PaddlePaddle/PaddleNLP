@@ -234,15 +234,15 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
   Encoding encoding;
   if (encode_input.type() == typeid(InputString)) {
     const auto& input_string = boost::get<InputString>(encode_input);
-    EncodeSingleString(input_string, 0, OffsetType::BYTE, &encoding);
+    EncodeSingleString(input_string, 0, OffsetType::CHAR, &encoding);
     PostProcess(&encoding, nullptr, add_special_tokens, encodings);
   } else {
     Encoding pair_encoding;
     const auto& input_string_pair =
         boost::get<std::pair<InputString, InputString>>(encode_input);
-    EncodeSingleString(input_string_pair.first, 0, OffsetType::BYTE, &encoding);
+    EncodeSingleString(input_string_pair.first, 0, OffsetType::CHAR, &encoding);
     EncodeSingleString(
-        input_string_pair.second, 1, OffsetType::BYTE, &pair_encoding);
+        input_string_pair.second, 1, OffsetType::CHAR, &pair_encoding);
     PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
   }
 }

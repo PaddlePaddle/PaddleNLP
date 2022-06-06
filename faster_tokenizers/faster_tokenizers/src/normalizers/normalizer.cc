@@ -268,28 +268,37 @@ void NormalizedString::RunNormalization(const std::string& mode) {
       icu_error);
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
   std::u32string u32new_normalized = conv.from_bytes(normalized_result);
-  std::u32string u32normalized = conv.from_bytes(normalized_);
-
   // Set changes
   std::vector<int> changes;
   changes.reserve(u32new_normalized.length());
   auto iter = edits.getFineIterator();
+  int old_offset = 0;
+  int new_offset = 0;
+  // The edits record the byte level modification, so need to transform to char
+  // level
+  // using GetUnicodeLenFromUTF8
   while (iter.next(icu_error)) {
     auto old_length = iter.oldLength();
     auto new_length = iter.newLength();
-    if (old_length == new_length) {
+    auto new_unicode_len = utils::GetUnicodeLenFromUTF8(
+        normalized_result.data() + new_offset, new_length);
+    auto old_unicode_len = utils::GetUnicodeLenFromUTF8(
+        normalized_.data() + old_offset, old_length);
+    old_offset += old_length;
+    new_offset += new_length;
+    if (old_unicode_len == new_unicode_len) {
       // Just replace the char
-      changes.insert(changes.end(), old_length, 0);
-    } else if (old_length < new_length) {
+      changes.insert(changes.end(), old_unicode_len, 0);
+    } else if (old_unicode_len < new_unicode_len) {
       // Insert the char
-      changes.insert(changes.end(), new_length - old_length, 1);
-      changes.insert(changes.end(), old_length, 0);
+      changes.insert(changes.end(), old_unicode_len, 0);
+      changes.insert(changes.end(), new_unicode_len - old_unicode_len, 1);
     } else /* old_length > new_length */ {
       // Remove the char
-      changes.push_back(new_length - old_length);
-      if (new_length > 1) {
-        changes.insert(changes.end(), new_length - 1, 0);
+      if (new_unicode_len > 1) {
+        changes.insert(changes.end(), new_unicode_len - 1, 0);
       }
+      changes.push_back(new_unicode_len - old_unicode_len);
     }
   }
   OffsetMapping new_normalized_offset{u32new_normalized, changes};
@@ -341,7 +350,6 @@ NormalizedString& NormalizedString::LRStrip(bool left, bool right) {
   }
 
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-  std::u32string u32normalized = conv.from_bytes(normalized_);
   std::u32string u32new_normalized = conv.from_bytes(new_normalized);
   // Set changes
   std::vector<int> changes(u32new_normalized.length(), 0);

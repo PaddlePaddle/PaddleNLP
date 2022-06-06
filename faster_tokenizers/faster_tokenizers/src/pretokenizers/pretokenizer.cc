@@ -48,9 +48,9 @@ bool BytesToCharOffsetConverter::convert(const core::Offset& offset,
   if (offset_map_.size() > byte_end) {
     char_end = offset_map_.at(byte_end);
   } else if (offset_map_.size() > byte_end - 1) {
-    char_end = offset_map_.at(byte_end - 1);
+    char_end = offset_map_.at(byte_end - 1) + 1;
   }
-  *result = {byte_start, byte_end};
+  *result = {char_start, char_end};
   return true;
 }
 
@@ -158,17 +158,23 @@ bool PreTokenizedString::TransformToEncodingUseConvertor(
     const auto& split = splits_[i];
     const auto& normalized = split.normalized_;
     auto offset = normalized.GetOrginalOffset();
+    core::Offset tmp_offset;
+    bool has_set_offset = false;
     for (const auto& token : split.tokens_) {
       auto token_offset = token.offset_;
-      if (normalized.ConvertOffsets(&token_offset, false)) {
+      bool flag = normalized.ConvertOffsets(&token_offset, false);
+      if (flag) {
         token_offset.first += offset.first;
         token_offset.second += offset.first;
       }
-      offset = token_offset;
-      converter.convert(token_offset, &offset);
+      if (has_set_offset) {
+        offset = token_offset;
+        has_set_offset = true;
+      }
+      converter.convert(token_offset, &tmp_offset);
       token_ids[curr_idx] = token.id_;
       tokens[curr_idx] = token.value_;
-      offsets[curr_idx] = offset;
+      offsets[curr_idx] = tmp_offset;
       ++curr_idx;
     }
   }
