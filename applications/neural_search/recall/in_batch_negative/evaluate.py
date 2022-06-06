@@ -72,8 +72,6 @@ if __name__ == "__main__":
                 relevance_labels = []
 
             text, recalled_text, cosine_sim = line.rstrip().split("\t")
-            if text == recalled_text:
-                continue
             if text2similar[text] == recalled_text:
                 relevance_labels.append(1)
             else:
