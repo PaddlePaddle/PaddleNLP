@@ -14,7 +14,7 @@
 
 import paddle
 import argparse
-from ernie_health_predictor import ErnieHealthPredictor
+from ernie_predictor import ErnieHealthPredictor
 
 
 def parse_args():

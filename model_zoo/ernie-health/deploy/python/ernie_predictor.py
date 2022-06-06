@@ -20,6 +20,8 @@ from multiprocessing import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.transformers import normalize_chars, tokenize_special_chars
 
+import time
+
 
 class InferBackend(object):
     def __init__(self,
@@ -29,79 +31,103 @@ class InferBackend(object):
                  use_fp16=False,
                  use_quantize=False,
                  set_dynamic_shape=False,
-                 shape_info_file="shape_info.txt",
+                 shape_info_file='shape_info.txt',
                  num_threads=10):
-        int8_model = self.paddle_quantize_model(model_path)
-        print(">>> [InferBackend] Creating Engine ...")
-        if device == 'gpu' and int8_model or use_fp16:
-            from paddle import inference
-            self.predictor_type = "inference"
-            config = paddle.inference.Config(model_path + ".pdmodel",
-                                             model_path + ".pdiparams")
-            config.enable_use_gpu(100, 0)
-            paddle.set_device("gpu")
+
+        if device == 'gpu':
+            int8_model = self.paddle_quantize_model(model_path)
             if int8_model and use_fp16:
                 print(
-                    ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
+                    '>>> [InferBackend] load a paddle quantize model, use_fp16 has been closed...'
                 )
                 use_fp16 = False
 
-            if use_fp16:
-                assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
-                print(">>> [InferBackend] FP16 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Half,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
+            if int8_model or use_fp16:
+                from paddle import inference
+                self.predictor_type = 'inference'
+                config = inference.Config(model_path + '.pdmodel',
+                                          model_path + '.pdiparams')
+                config.enable_use_gpu(100, 0)
+                paddle.set_device("gpu")
+
+                if use_fp16:
+                    assert device == 'gpu', 'When use_fp16, please set device to gpu and install requirements_gpu.txt.'
+                    print('>>> [InferBackend] FP16 inference ...')
+                    config.enable_tensorrt_engine(
+                        workspace_size=1 << 30,
+                        precision_mode=inference.PrecisionType.Half,
+                        max_batch_size=batch_size,
+                        min_subgraph_size=5,
+                        use_static=True,
+                        use_calib_mode=False)
+
+                if int8_model:
+                    print('>>> [InferBackend] INT8 inference ...')
+                    config.enable_tensorrt_engine(
+                        workspace_size=1 << 30,
+                        precision_mode=inference.PrecisionType.Int8,
+                        max_batch_size=batch_size,
+                        min_subgraph_size=5,
+                        use_static=False,
+                        use_calib_mode=False)
+
+                if set_dynamic_shape:
+                    config.collect_shape_range_info(shape_info_file)
+                else:
+                    config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
+                                                               True)
+
+                self.predictor = inference.create_predictor(config)
+                self.input_names = [
+                    name for name in self.predictor.get_input_names()
+                ]
+                self.input_handles = [
+                    self.predictor.get_input_handle(name)
+                    for name in self.predictor.get_input_names()
+                ]
+                self.output_handles = [
+                    self.predictor.get_output_handle(name)
+                    for name in self.predictor.get_output_names()
+                ]
             else:
-                print(">>> [InferBackend] INT8 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Int8,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
-            if set_dynamic_shape:
-                config.collect_shape_range_info(shape_info_file)
-            else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
-                                                           True)
-            config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
-            self.predictor = paddle.inference.create_predictor(config)
-            self.input_names = [
-                name for name in self.predictor.get_input_names()
-            ]
-            self.input_handles = [
-                self.predictor.get_input_handle(name)
-                for name in self.predictor.get_input_names()
-            ]
-            self.output_handles = [
-                self.predictor.get_output_handle(name)
-                for name in self.predictor.get_output_names()
-            ]
+                import paddle2onnx
+                import onnxruntime as ort
+                import copy
+                self.predictor_type = 'onnxruntime'
+                onnx_model = paddle2onnx.command.c_paddle_to_onnx(
+                    model_file=model_path + '.pdmodel',
+                    params_file=model_path + '.pdiparams',
+                    opset_version=13,
+                    enable_onnx_checker=True)
+                providers = ['CUDAExecutionProvider']
+                sess_options = ort.SessionOptions()
+                sess_options.intra_op_num_threads = num_threads
+                sess_options.inter_op_num_threads = num_threads
+                self.predictor = ort.InferenceSession(
+                    onnx_model, sess_options=sess_options, providers=providers)
+                self.input_handles = [
+                    self.predictor.get_inputs()[0].name,
+                    self.predictor.get_inputs()[1].name,
+                    self.predictor.get_inputs()[2].name
+                ]
+                self.output_handles = []
         else:
             import paddle2onnx
             import onnxruntime as ort
             import copy
-            self.predictor_type = "onnxruntime"
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=model_path + ".pdmodel",
-                params_file=model_path + ".pdiparams",
+            self.predictor_type = 'onnxruntime'
+            dynamic_quantize_model = paddle2onnx.command.c_paddle_to_onnx(
+                model_file=model_path + '.pdmodel',
+                params_file=model_path + '.pdiparams',
                 opset_version=13,
                 enable_onnx_checker=True)
-            dynamic_quantize_model = onnx_model
-            providers = ['CUDAExecutionProvider']
+            providers = ['CPUExecutionProvider']
             if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
-                    f.write(onnx_model)
+                    f.write(dynamic_quantize_model)
                 dynamic_quantize_model = "dynamic_quantize_model.onnx"
                 self.dynamic_quantize(float_onnx_file, dynamic_quantize_model)
-                providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
             sess_options.inter_op_num_threads = num_threads
@@ -109,11 +135,12 @@ class InferBackend(object):
                 dynamic_quantize_model,
                 sess_options=sess_options,
                 providers=providers)
-            input_name1 = self.predictor.get_inputs()[0].name
-            input_name2 = self.predictor.get_inputs()[1].name
-            self.input_handles = [input_name1, input_name2]
+            self.input_handles = [
+                self.predictor.get_inputs()[0].name,
+                self.predictor.get_inputs()[1].name,
+                self.predictor.get_inputs()[2].name
+            ]
             self.output_handles = []
-        print(">>> [InferBackend] Engine Created ...")
 
     def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
         from onnxruntime.quantization import QuantizationMode, quantize_dynamic
@@ -222,8 +249,8 @@ class ErnieHealthPredictor(object):
             self.postprocess = self.cblue_spo_postprocess
             self.printer = self.cblue_spo_print_ret
         else:
-            print(
-                "[ErnieHealthPredictor]: task_name only support CBLUE 1.0 now.")
+            print("[ErnieHealthPredictor]: task_name only support CBLUE 1.0,",
+                  "including qic, qtr, qqr, ctc, sts, cdn, cmeee, cmeie.")
             exit(0)
 
         self.max_seq_length = args.max_seq_length
@@ -255,32 +282,35 @@ class ErnieHealthPredictor(object):
         label = infer_result["label"].squeeze()
         confidence = infer_result["confidence"].squeeze()
         for i, ret in enumerate(infer_result):
-            print("input data:", input_datas[i])
+            print("Input data:", input_datas[i])
             print(DESCRIPTIONS[self.task_name] + ":")
-            print("label:", label_list[label[i]], "  confidence:",
+            print("Label:", label_list[label[i]], "  Confidence:",
                   confidence[i])
             print("-----------------------------")
 
     def cblue_ner_print_ret(self, infer_result, input_datas):
         for i, ret in enumerate(infer_result):
-            print("input data:", input_datas[i])
-            print("The model detects all entities:")
+            print("Input data:", input_datas[i])
+            print("Detected entities:")
             for item in ret:
-                print("type:", item["type"],
-                      "position: (%d, %d)" % (item["start_id"], item["end_id"]),
-                      "entity: ", item["entity"])
+                print("Type:", item["type"],
+                      "Position: (%d, %d)" % (item["start_id"], item["end_id"]),
+                      "Entity: ", item["entity"])
             print("-----------------------------")
 
     def cblue_spo_print_ret(self, infer_result, input_datas):
+        labels = LABEL_LIST['cmeie']
         ents, spos = infer_result['entity'], infer_result['spo']
         for i, (ent, rel) in enumerate(zip(ents, spos)):
-            print("input data:", input_datas[i])
-            print("The model detects all relations:")
+            text = input_datas[i]
+            print("Input data:")
+            print(text)
+            print("Detected entities and relations:")
             for sid, eid in ent:
-                print('entity: %s, index: (%d, %d)' %
+                print('    Entity: %s, Position: (%d, %d)' %
                       (input_datas[i][sid:eid], sid, eid))
             for s, p, o in rel:
-                print('SPO:', s, p, o)
+                print('    SPO:', text[s[0]:s[1]], labels[p], text[o[0]:o[1]])
             print("-----------------------------")
 
     def cblue_cls_preprocess(self, input_data: list):
@@ -400,7 +430,7 @@ class ErnieHealthPredictor(object):
         ent_logits = np.array(infer_data[0])
         spo_logits = np.array(infer_data[1])
         ent_pred_list = []
-        spo_pred_list = []
+        ent_idxs_list = []
         for batch_id, ent_pred in enumerate(ent_logits):
             seq_len = len(ent_pred)
             start = np.where(ent_pred[:, 0] > 0.5)[0]
@@ -415,12 +445,12 @@ class ErnieHealthPredictor(object):
                     y = y[0]
                     if y > seq_len:
                         continue
-                    ent_idxs[x] = (x - 1, y - 1)
-                    ent_pred.append((x - 1, y - 1))
+                    ent_idxs[x] = (x - 1, y)
+                    ent_pred.append((x - 1, y))
             ent_pred_list.append(ent_pred)
             ent_idxs_list.append(ent_idxs)
 
-        spo_preds = spo_logits > 0
+        spo_preds = spo_logits > 0.8
         spo_pred_list = [[] for _ in range(len(spo_preds))]
         idxs, preds, subs, objs = np.nonzero(spo_preds)
         for idx, p_id, s_id, o_id in zip(idxs, preds, subs, objs):
