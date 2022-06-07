@@ -436,7 +436,7 @@ class BartModel(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None):
-        r'''
+        r"""
         The BartModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -445,22 +445,28 @@ class BartModel(BartPretrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                When the data type is int or float, the `masked` tokens have `0` values and the others have `1` values.
-                It is a tensor with shape of `[batch_size, sequence_length]` or `[batch_size, sequence_length, sequence_length]`
-                or `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                Defaults to `None` and we prevent attending to padding tokens.
+                Mask tensor used in encoder layers' multi-head attention(MHA) to avoid performing attention on some
+                unwanted encoder input positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional
+                shape `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For all shapes above, the tensor's data type can be int, float or boolean.
+                When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
             decoder_input_ids (Tensor, optional):
                 Indices of decoder input sequence tokens in the vocabulary.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
                 by shifting the `input_ids` to the right.
             decoder_attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions in `decoder_input_ids`.
-                Its data type and shape is the same as `attention_mask`. Defaults to `None`.
+                Mask tensor used in decoder layers' multi-head attention(MHA) to avoid performing attention on some
+                unwanted decoder input positions, usually the paddings or the subsequent positions.
+                It has a shape of `[batch_size, num_attention_heads, sequence_length, sequence_length]`, the data type
+                can be int, float or boolean.
+                When dtype is int, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is float, 0 for tokens that are **not masked** and -INF for tokens that are **masked**.
+                When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                Default behavior: generate a tensor that ignores pad tokens in decoder_input_ids. Causal mask will also be used by default.
             encoder_output (tuple, optional):
                 The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
                 The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, hidden_size]`.
@@ -493,7 +499,7 @@ class BartModel(BartPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
         if input_ids is None and encoder_output is None:
