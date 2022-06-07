@@ -18,9 +18,9 @@ import numpy as np
 import json
 
 
-def print_ret(rets, input_datas):
+def print_ret(rets, input_data):
     for i, ret in enumerate(rets):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
