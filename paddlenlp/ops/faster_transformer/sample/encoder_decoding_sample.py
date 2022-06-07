@@ -47,6 +47,10 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
+        "--use_int8_decoding",
+        action="store_true",
+        help="Whether to use int8 decoding to predict. ")
+    parser.add_argument(
         "--enable_faster_encoder",
         action="store_true",
         help="Whether to use faster version encoder to predict. This is experimental option for now. "
@@ -109,7 +113,8 @@ def do_predict(args):
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
         enable_faster_encoder=args.enable_faster_encoder,
-        use_fp16_encoder=args.use_fp16_encoder)
+        use_fp16_encoder=args.use_fp16_encoder,
+        use_int8=args.use_int8_decoding)
 
     # Set evaluate mode
     transformer.eval()
@@ -146,6 +151,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.use_int8_decoding = ARGS.use_int8_decoding
     args.enable_faster_encoder = ARGS.enable_faster_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
     if ARGS.batch_size is not None:

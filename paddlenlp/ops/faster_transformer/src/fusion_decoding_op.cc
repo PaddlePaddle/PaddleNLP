@@ -106,17 +106,29 @@ std::vector<paddle::Tensor> DecodingForward(
     PD_THROW("Not supported decoding strategy. ");
   }
 
-  if (input.is_gpu()) {
-    auto output_ids =
-        paddle::empty(output_dims, paddle::DataType::INT32, paddle::GPUPlace());
-    auto parent_ids = paddle::empty(
-        parent_ids_dims, paddle::DataType::INT32, paddle::GPUPlace());
-    auto sequence_length = paddle::empty(
-        sequence_length_dims, paddle::DataType::INT32, paddle::GPUPlace());
+  if (input.place() == paddle::PlaceType::kGPU) {
+    // auto output_ids =
+    //     paddle::empty(output_dims, paddle::DataType::INT32,
+    //     paddle::GPUPlace());
+    // auto parent_ids = paddle::empty(
+    //     parent_ids_dims, paddle::DataType::INT32, paddle::GPUPlace());
+    // auto sequence_length = paddle::empty(
+    //     sequence_length_dims, paddle::DataType::INT32, paddle::GPUPlace());
+    auto output_ids = paddle::Tensor(paddle::PlaceType::kGPU, output_dims);
+    auto parent_ids = paddle::Tensor(paddle::PlaceType::kGPU, parent_ids_dims);
+    auto sequence_length =
+        paddle::Tensor(paddle::PlaceType::kGPU, sequence_length_dims);
 
-    auto seq_len = (!mem_seq_len.is_gpu())
-                       ? mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU)
-                       : mem_seq_len;
+    // auto seq_len = (mem_seq_len.place() != paddle::PlaceType::kGPU)
+    //                    ? mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU)
+    //                    : mem_seq_len;
+    paddle::Tensor seq_len = paddle::Tensor(paddle::PlaceType::kGPU);
+
+    if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
+      seq_len = mem_seq_len.copy_to<int>(paddle::PlaceType::kGPU);
+    } else {
+      seq_len = mem_seq_len;
+    }
 
     return DecodingCUDAForward(input,
                                seq_len,

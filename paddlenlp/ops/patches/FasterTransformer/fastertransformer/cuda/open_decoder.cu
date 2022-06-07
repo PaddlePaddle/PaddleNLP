@@ -533,15 +533,15 @@ __global__ void kv_dequantized_kernel(const int32_t* input,
 }
 
 template <typename T>
-__global__ void kv_dequantized_tc_kernel(T* key,
-                                         T* value,
-                                         const int32_t* src,
-                                         const T* scale,
-                                         const T* kw_scale,
-                                         const T* vw_scale,
-                                         const int m,  // hidden
-                                         const int n,  // batch size
-                                         const T max_range) {
+__global__ void kv_dequantized_COL32_kernel(T* key,
+                                            T* value,
+                                            const int32_t* src,
+                                            const T* scale,
+                                            const T* kw_scale,
+                                            const T* vw_scale,
+                                            const int m,  // hidden
+                                            const int n,  // batch size
+                                            const T max_range) {
   int x = blockIdx.x * blockDim.x + threadIdx.x;  // hidden
   int y = blockIdx.y * blockDim.y + threadIdx.y;  // batch size
 
@@ -570,15 +570,15 @@ void mem_kv_channel_wise_dequantize_kernelLauncher(const int32_t* input,
     dim3 grid((hidden_units + 31) / 32, (m + 31) / 32);
     dim3 block(32, 32);
 
-    kv_dequantized_tc_kernel<<<grid, block, 0, stream>>>(key,
-                                                         value,
-                                                         input,
-                                                         scale,
-                                                         kw_scale,
-                                                         vw_scale,
-                                                         hidden_units,
-                                                         m,
-                                                         (T)127.0f);
+    kv_dequantized_COL32_kernel<<<grid, block, 0, stream>>>(key,
+                                                            value,
+                                                            input,
+                                                            scale,
+                                                            kw_scale,
+                                                            vw_scale,
+                                                            hidden_units,
+                                                            m,
+                                                            (T)127.0f);
 
   } else {
     dim3 grid(m);

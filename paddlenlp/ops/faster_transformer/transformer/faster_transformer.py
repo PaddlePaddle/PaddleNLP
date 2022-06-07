@@ -149,7 +149,7 @@ class FasterTransformer(TransformerModel):
                  use_fp16_encoder=False,
                  rel_len=False,
                  alpha=0.6,
-                 use_int8=True,
+                 use_int8=False,
                  sm=None):
         # if decoding_lib is None:
         #     raise ValueError(

@@ -252,11 +252,14 @@ public:
     if (use_int8_) {
       assert(max_batch_size_ != -1);
 
+      // int length = ceil(memory_max_seq_len_ / 32.) * 32;
+      // int length = memory_max_seq_len_;
+
       return (inner_coeff_ * max_batch_size_ * hidden_units_) *
                  (sizeof(int8_t) + sizeof(int32_t)) +
-             max_batch_size_ * sizeof(DataType_) +
              max_batch_size_ * memory_max_seq_len_ * hidden_units_ *
                  (sizeof(int8_t) + 2 * sizeof(int32_t)) +
+             max_batch_size_ * sizeof(DataType_) +
              max_batch_size_ * memory_max_seq_len_ * sizeof(DataType_);
     }
     return 0;
@@ -313,18 +316,23 @@ public:
     qkv_buf_ = qkv_input_ + 3;
 
     if (use_int8_ and int8_workspace != nullptr) {
+      // https://stackoverflow.com/questions/37323053/misaligned-address-in-cuda
+      // NOTE: Dereferencing a pointer pointing to a 32-bit value from an
+      // address
+      // NOT aligned at a 32-bit boundary is not allowed.
+
       input_quantize_buf_ = (int8_t *)int8_workspace;
       out_quantize_buf_ =
           (int32_t *)(input_quantize_buf_ + inner_coeff_ * buf_size);
 
-      scale_ = (DataType_ *)(out_quantize_buf_ + inner_coeff_ * buf_size);
-
-      quant_in_mem_cache_ = (int8_t *)(scale_ + max_batch_size_);
+      quant_in_mem_cache_ =
+          (int8_t *)(out_quantize_buf_ + inner_coeff_ * buf_size);
       quant_out_mem_cache_ =
           (int32_t *)(quant_in_mem_cache_ + memory_max_seq_len_ * buf_size);
 
-      mem_scale_ = (DataType_ *)(quant_out_mem_cache_ +
-                                 2 * memory_max_seq_len_ * buf_size);
+      scale_ = (DataType_ *)(quant_out_mem_cache_ +
+                             2 * memory_max_seq_len_ * buf_size);
+      mem_scale_ = (DataType_ *)(scale_ + max_batch_size_);
     }
 
     if (is_fuse_QKV_in_normal_gemm_ == false &&

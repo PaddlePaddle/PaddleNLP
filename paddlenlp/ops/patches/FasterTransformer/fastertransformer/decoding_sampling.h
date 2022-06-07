@@ -1171,6 +1171,9 @@ public:
     delete[] h_finished_buf_;
     delete[] h_trg_length_;
     delete decoder_;
+    if (use_int8_) {
+      buf_ = decoder_int8_buf_;
+    }
     allocator_.free(buf_);
   }
 };

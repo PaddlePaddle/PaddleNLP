@@ -119,9 +119,13 @@ std::vector<paddle::Tensor> decoding_kernel(
       CublasHandle::GetInstance()->cublaslt_handle_;
   int sm = SMVersion::GetInstance()->sm_;
 
-  decoding_params.output_ids = output_ids.data<int>();
-  decoding_params.parent_ids = parent_ids.data<int>();
-  decoding_params.sequence_length = sequence_length.data<int>();
+  //   decoding_params.output_ids = output_ids.data<int>();
+  //   decoding_params.parent_ids = parent_ids.data<int>();
+  //   decoding_params.sequence_length = sequence_length.data<int>();
+  decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
+  decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
+  decoding_params.sequence_length =
+      sequence_length.mutable_data<int>(input.place());
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
@@ -138,8 +142,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   auto k_weight_shape = self_attn_key_weight[0].shape();
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
-  bool use_int8 =
-      (ffn_intermediate_weight[0].dtype() == paddle::DataType::INT8);
+  bool use_int8 = (ffn_intermediate_weight[0].type() == paddle::DataType::INT8);
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
