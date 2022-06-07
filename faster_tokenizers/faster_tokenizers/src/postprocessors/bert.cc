@@ -83,6 +83,8 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
         (&overflow_encoding), Tokens, tokens, cls_.first, sep_.first);
     CREATE_PROCESSED_ENCODING_SEQ(
         (&overflow_encoding), WordsIdx, word_idx, -1, -1);
+    CREATE_PROCESSED_ENCODING_SEQ(
+        (&overflow_encoding), Offsets, offsets, empty_offsets, empty_offsets);
 
     std::vector<uint> special_tokens_mask(ids.size(), 0);
     special_tokens_mask.front() = special_tokens_mask.back() = 1;
