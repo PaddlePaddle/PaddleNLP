@@ -964,7 +964,7 @@ class XLMModel(XLMPretrainedModel):
 
 class XLMPredLayer(nn.Layer):
     """
-    Prediction layer (cross_entropy or adaptive_softmax).
+    Prediction layer with cross_entropy.
     """
 
     def __init__(
@@ -1333,7 +1333,7 @@ class XLMForQuestionAnswering(XLMPretrainedModel):
                                    attention_mask=attention_mask,
                                    position_ids=position_ids,
                                    lengths=lengths)[0]
-
+        sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         start_logits, end_logits = paddle.unstack(x=logits, axis=-1)
 
