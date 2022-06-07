@@ -928,7 +928,7 @@ class AlbertModel(AlbertPretrainedModel):
             head_mask=None,
             inputs_embeds=None,
             return_dict=False, ):
-        r'''
+        r"""
          The AlbertModel forward method, overrides the `__call__()` special method.
 
          Args:
@@ -937,14 +937,14 @@ class AlbertModel(AlbertPretrainedModel):
                  numerical representations of tokens that build the input sequence.
                  Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
              attention_mask (Tensor, optional):
-                 Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
-                 usually the paddings or the subsequent positions.
-                 Its data type can be int, float and bool.
-                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                 When the data type is int or float, the `masked` tokens have `0` values and the others have `1` values.
-                 It is a tensor with shape of `[batch_size, sequence_length]` or `[batch_size, sequence_length, sequence_length]`
-                 or `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                 Defaults to `None` and we prevent attending to padding tokens.
+                 Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+                 positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+                 `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                 or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                 For all shapes above, the tensor's data type can be int, float or boolean.
+                 When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                 When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                 Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
              token_type_ids (Tensor, optional):
                  Segment token indices to indicate different portions of the inputs.
                  Selected in the range ``[0, type_vocab_size - 1]``.
@@ -1014,7 +1014,7 @@ class AlbertModel(AlbertPretrainedModel):
                  inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                  output = model(**inputs)
 
-         '''
+         """
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
                 "You cannot specify both input_ids and inputs_embeds at the same time"
