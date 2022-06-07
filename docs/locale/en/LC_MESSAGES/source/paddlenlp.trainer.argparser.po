@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../source/paddlenlp.trainer.argparser.rst:2
+msgid "argparser"
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser:1
+msgid "基类：:class:`argparse.ArgumentParser`"
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser:1
+msgid ""
+"This subclass of `argparse.ArgumentParser` uses type hints on dataclasses"
+" to generate arguments."
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser:3
+msgid ""
+"The class is designed to play well with the native argparse. In "
+"particular, you can add more (non-dataclass backed) arguments to the "
+"parser after initialization and you'll get the output back after parsing "
+"as an additional namespace. Optional: To create sub argument groups use "
+"the `_argument_group_name` attribute in the dataclass."
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:1
+msgid "Parse command-line args into instances of the specified dataclass types."
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:3
+msgid ""
+"This relies on argparse's `ArgumentParser.parse_known_args`. See the doc "
+"at: "
+"docs.python.org/3.7/library/argparse.html#argparse.ArgumentParser.parse_args"
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
+msgid "参数"
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:6
+msgid ""
+"List of strings to parse. The default is taken from sys.argv. (same as "
+"argparse.ArgumentParser)"
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:7
+msgid "If true, also return a list of remaining argument strings."
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:8
+msgid ""
+"If true, will look for a \".args\" file with the same base name as the "
+"entry point script for this process, and will append its potential "
+"content to the command line args."
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:10
+msgid ""
+"If not None, will uses this file instead of the \".args\" file specified "
+"in the previous argument."
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
+msgid "返回"
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:12
+msgid ""
+"- the dataclass instances in the same order as they were passed to the "
+"initializer.abspath - if applicable, an additional namespace for more "
+"(non-dataclass backed) arguments added to the parser   after "
+"initialization. - The potential list of remaining argument strings. (same"
+" as argparse.ArgumentParser.parse_known_args)"
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:12
+msgid ""
+"the dataclass instances in the same order as they were passed to the "
+"initializer.abspath"
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:13
+msgid ""
+"if applicable, an additional namespace for more (non-dataclass backed) "
+"arguments added to the parser after initialization."
+msgstr ""
+
+#: of
+#: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:15
+msgid ""
+"The potential list of remaining argument strings. (same as "
+"argparse.ArgumentParser.parse_known_args)"
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser.parse_json_file:1
+msgid ""
+"Alternative helper method that does not use `argparse` at all, instead "
+"loading a json file and populating the dataclass types."
+msgstr ""
+
+#: of paddlenlp.trainer.argparser.PdArgumentParser.parse_dict:1
+msgid ""
+"Alternative helper method that does not use `argparse` at all, instead "
+"uses a dict and populating the dataclass types."
+msgstr ""
+

@@ -111,11 +111,13 @@ def concate_aspect_and_opinion(text, aspect, opinions):
 
     return aspect_text
 
+
 def save_examples(examples, save_path, idxs):
     with open(save_path, "w", encoding="utf-8") as f:
         for idx in idxs:
-            line = "\t".join(examples[idx])+"\n"
+            line = "\t".join(examples[idx]) + "\n"
             f.write(line)
+
 
 def save_dict(dict_path, dict_type):
     if dict_type not in ["ext", "cls"]:
@@ -128,6 +130,4 @@ def save_dict(dict_path, dict_type):
             label_list = ["负向", "正向"]
 
         for label in label_list:
-            f.write(label+"\n")
-        
-
+            f.write(label + "\n")

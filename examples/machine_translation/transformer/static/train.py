@@ -19,7 +19,7 @@ from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 import reader
-from util.record import AverageStatistical
+from tls.record import AverageStatistical
 
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'
 logging.basicConfig(level=logging.INFO, format=FORMAT)

@@ -29,7 +29,7 @@ from paddlenlp.utils import profiler
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(filepath, "../../"))
+sys.path.insert(0, os.path.join(filepath, "../"))
 
 from dataset import create_pretrained_dataset
 from args import parse_args
@@ -303,6 +303,7 @@ def do_train(args):
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,
+                max_seq_len=args.max_seq_len,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.

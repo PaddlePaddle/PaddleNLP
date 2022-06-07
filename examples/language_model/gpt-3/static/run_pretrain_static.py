@@ -38,7 +38,7 @@ from visualdl import LogWriter
 
 # Used to load the data_tools path, should import before dataset
 filepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(filepath, "../../"))
+sys.path.insert(0, os.path.join(filepath, "../"))
 from dataset import create_pretrained_dataset
 from args import parse_args
 import lr
@@ -108,10 +108,13 @@ def dist_optimizer(args, topo):
             "dp_degree": args.dp_degree,
             "optimize_offload": False,
         }
+    elif args.mp_degree > 1 and args.pp_degree == 1:
+        # For MP or MP + DP, use executor instead of parallel_executor
+        dist_strategy.without_graph_optimization = True
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
             "schedule_mode": "1F1B",
-            "micro_micro_batch_size": micro_batch_size,
+            "micro_batch_size": micro_batch_size,
             "accumulate_steps": acc_steps,
         }
     else:
@@ -266,7 +269,7 @@ def do_train(args):
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
-                    pipeline_mode=False, )
+                    pipeline_mode=True if args.pp_degree > 1 else False, )
 
                 if args.model_name_or_path in pretrained_models_list:
                     model_config = model_class.pretrained_init_configuration[
@@ -348,7 +351,10 @@ def do_train(args):
 
     with open(program_desc_dir + "/main_program.txt.%d" % worker_index,
               'w') as f:
-        f.write(str(main_program))
+        if args.pp_degree > 1:
+            f.write(str(main_program._pipeline_opt['section_program']))
+        else:
+            f.write(str(main_program))
 
     with open(program_desc_dir + "/startup_program.txt.%d" % worker_index,
               'w') as f:
@@ -397,6 +403,7 @@ def do_train(args):
     tic_train = time.time()
     epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
+    step = 0
     while True:
         fetchs = []
         if topo.is_last:
@@ -404,94 +411,170 @@ def do_train(args):
 
         # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
-        valid_data_loader = valid_data_loader()
-        test_data_loader = test_data_loader()
+        # Note: for pipeline mode, validation and test are not supported, so
+        # both valid_data_loader and test_data_loader are None.
+        valid_data_loader = None if args.pp_degree > 1 else valid_data_loader()
+        test_data_loader = None if args.pp_degree > 1 else test_data_loader()
 
         train_reader_cost = 0.0
         train_run_cost = 0.0
         reader_start = time.time()
-        for step, batch in enumerate(train_data_loader()):
-            train_reader_cost += time.time() - reader_start
-            train_start = time.time()
+        if args.pp_degree == 1:
+            for step, batch in enumerate(train_data_loader()):
+                train_reader_cost += time.time() - reader_start
+                train_start = time.time()
 
-            global_step += 1
+                global_step += 1
 
-            ret = exe.run(main_program,
-                          feed=batch,
-                          fetch_list=fetchs,
-                          use_program_cache=True)
-            # In the new 2.0 api, must call this function to change the learning_rate
-            lr_scheduler.step()
-            train_run_cost += time.time() - train_start
+                ret = exe.run(main_program,
+                              feed=batch,
+                              fetch_list=fetchs,
+                              use_program_cache=True)
+                # In the new 2.0 api, must call this function to change the learning_rate
+                lr_scheduler.step()
+                train_run_cost += time.time() - train_start
 
-            # Profile for model benchmark
-            profiler.add_profiler_step(args.profiler_options)
+                # Profile for model benchmark
+                profiler.add_profiler_step(args.profiler_options)
 
-            if global_step % args.logging_freq == 0:
-                if topo.is_last:
-                    loss_return, lr_return = ret
-                    #speed = args.logging_freq / (time.time() - tic_train)
-                    speed = args.logging_freq / (
-                        train_reader_cost + train_run_cost)
-                    avg_reader_cost = train_reader_cost / args.logging_freq
-                    logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, loss_return[0],
-                           avg_reader_cost, 1. / speed, speed,
-                           speed * args.global_batch_size * args.max_seq_len,
-                           speed * args.global_batch_size * args.max_seq_len /
-                           worker_num, lr_return[0]))
-                    log_writer.add_scalar("loss", loss_return[0], global_step)
-                    log_writer.add_scalar("learning_rate", lr_return[0],
-                                          global_step)
-                tic_train = time.time()
-                train_reader_cost = 0.0
-                train_run_cost = 0.0
+                if global_step % args.logging_freq == 0:
+                    if topo.is_last:
+                        loss_return, lr_return = ret
+                        #speed = args.logging_freq / (time.time() - tic_train)
+                        speed = args.logging_freq / (
+                            train_reader_cost + train_run_cost)
+                        avg_reader_cost = train_reader_cost / args.logging_freq
+                        logger.info(
+                            "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
+                            % (global_step, epoch, step, loss_return[0],
+                               avg_reader_cost, 1. / speed, speed, speed *
+                               args.global_batch_size * args.max_seq_len,
+                               speed * args.global_batch_size *
+                               args.max_seq_len / worker_num, lr_return[0]))
+                        log_writer.add_scalar("loss", loss_return[0],
+                                              global_step)
+                        log_writer.add_scalar("learning_rate", lr_return[0],
+                                              global_step)
+                    tic_train = time.time()
+                    train_reader_cost = 0.0
+                    train_run_cost = 0.0
 
-            if args.check_accuracy:
+                if args.check_accuracy:
+                    if global_step >= args.max_steps:
+                        return
+                    else:
+                        continue
+
+                if global_step % args.eval_freq == 0:
+                    # TODO, check the input data of validation
+                    eval_fetch = []
+                    if topo.is_last:
+                        eval_fetch = [loss]
+
+                    run_evaluate(valid_data_loader, exe, test_program,
+                                 args.eval_iters, log_writer, global_step, args,
+                                 epoch, topo.is_last, eval_fetch, "valid")
+                    tic_train = time.time()
+
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
+                    output_dir = os.path.join(args.output_dir,
+                                              "model_%d" % global_step)
+                    logger.debug("saving models to {}".format(output_dir))
+                    save_persistables(exe,
+                                      os.path.join(output_dir, "static_vars"),
+                                      main_program)
+                    if global_step <= args.save_steps:
+                        model.init_config["init_args"][0].init_config.pop(
+                            "topo", None)
+                    model.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
+                    tic_train = time.time()
+
                 if global_step >= args.max_steps:
+                    eval_fetch = []
+                    if topo.is_last:
+                        eval_fetch = [loss]
+
+                    run_evaluate(test_data_loader, exe, test_program,
+                                 args.test_iters, log_writer, global_step, args,
+                                 epoch, topo.is_last, eval_fetch, "test")
+                    del train_data_loader
                     return
-                else:
-                    continue
+                reader_start = time.time()
+            epoch += 1
+        else:  # for pipeline, use noniterable dataloader
+            train_data_loader.start()
+            try:
+                train_reader_cost += time.time() - reader_start
+                train_start = time.time()
 
-            if global_step % args.eval_freq == 0:
-                # TODO, check the input data of validation
-                eval_fetch = []
-                if topo.is_last:
-                    eval_fetch = [loss]
+                global_step += 1
 
-                run_evaluate(valid_data_loader, exe, test_program,
-                             args.eval_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "valid")
-                tic_train = time.time()
+                ret = exe.run(main_program,
+                              fetch_list=fetchs,
+                              use_program_cache=True)
+                # In the new 2.0 api, must call this function to change the learning_rate
+                lr_scheduler.step()
+                train_run_cost += time.time() - train_start
 
-            if global_step % args.save_steps == 0 or global_step >= args.max_steps:
-                output_dir = os.path.join(args.output_dir,
-                                          "model_%d" % global_step)
-                logger.debug("saving models to {}".format(output_dir))
-                save_persistables(exe,
-                                  os.path.join(output_dir, "static_vars"),
-                                  main_program)
-                if global_step <= args.save_steps:
-                    model.init_config["init_args"][0].init_config.pop("topo",
-                                                                      None)
-                model.save_pretrained(output_dir)
-                tokenizer.save_pretrained(output_dir)
-                tic_train = time.time()
+                # Profile for model benchmark
+                profiler.add_profiler_step(args.profiler_options)
 
-            if global_step >= args.max_steps:
-                eval_fetch = []
-                if topo.is_last:
-                    eval_fetch = [loss]
+                if global_step % args.logging_freq == 0:
+                    if topo.is_last:
+                        loss_return, lr_return = ret
+                        #speed = args.logging_freq / (time.time() - tic_train)
+                        speed = args.logging_freq / (
+                            train_reader_cost + train_run_cost)
+                        avg_reader_cost = train_reader_cost / args.logging_freq
+                        logger.info(
+                            "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
+                            % (global_step, epoch, step, loss_return[0],
+                               avg_reader_cost, 1. / speed, speed, speed *
+                               args.global_batch_size * args.max_seq_len,
+                               speed * args.global_batch_size *
+                               args.max_seq_len / worker_num, lr_return[0]))
+                        log_writer.add_scalar("loss", loss_return[0],
+                                              global_step)
+                        log_writer.add_scalar("learning_rate", lr_return[0],
+                                              global_step)
+                    tic_train = time.time()
+                    train_reader_cost = 0.0
+                    train_run_cost = 0.0
+                step += 1
 
-                run_evaluate(test_data_loader, exe, test_program,
-                             args.test_iters, log_writer, global_step, args,
-                             epoch, topo.is_last, eval_fetch, "test")
-                del train_data_loader
-                return
-            reader_start = time.time()
+                if args.check_accuracy:
+                    if global_step >= args.max_steps:
+                        return
+                    else:
+                        continue
 
-        epoch += 1
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
+                    output_dir = os.path.join(args.output_dir,
+                                              "model_%d" % global_step)
+                    logger.debug("saving models to {}".format(output_dir))
+                    save_persistables(
+                        exe,
+                        os.path.join(output_dir, "static_vars"),
+                        main_program._pipeline_opt['section_program'])
+                    if global_step <= args.save_steps:
+                        model.init_config["init_args"][0].init_config.pop(
+                            "topo", None)
+                    model.save_pretrained(output_dir)
+                    tokenizer.save_pretrained(output_dir)
+                    tic_train = time.time()
+
+                if global_step >= args.max_steps:
+                    train_data_loader.reset()
+                    del train_data_loader
+                    return
+
+                reader_start = time.time()
+            except paddle.fluid.core.EOFException:
+                train_data_loader.reset()
+                epoch += 1
+                step = 0
+                global_step = 0
 
 
 if __name__ == "__main__":

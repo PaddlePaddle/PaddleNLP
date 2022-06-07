@@ -81,15 +81,15 @@ class MegatronBertTokenizer(BertTokenizer):
         }
     }
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=True,
-            unk_token="[UNK]",
-            sep_token="[SEP]",
-            pad_token="[PAD]",
-            cls_token="[CLS]",
-            mask_token="[MASK]", ):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=True,
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]",
+                 **kwargs):
         super(MegatronBertTokenizer, self).__init__(
             vocab_file,
             do_lower_case=do_lower_case,

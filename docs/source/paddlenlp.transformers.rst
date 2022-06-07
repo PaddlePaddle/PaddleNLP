@@ -44,9 +44,11 @@ paddlenlp.transformers
    paddlenlp.transformers.ppminilm
    paddlenlp.transformers.prophetnet
    paddlenlp.transformers.reformer
+   paddlenlp.transformers.rembert
    paddlenlp.transformers.roberta
    paddlenlp.transformers.roformer
-   paddlenlp.transformers.semantic_indexing
+   paddlenlp.transformers.roformerv2
+   paddlenlp.transformers.semantic_search
    paddlenlp.transformers.skep
    paddlenlp.transformers.squeezebert
    paddlenlp.transformers.t5
@@ -61,9 +63,13 @@ paddlenlp.transformers
    :maxdepth: 4
 
    paddlenlp.transformers.attention_utils
+   paddlenlp.transformers.convert_slow_tokenizer
    paddlenlp.transformers.distill_utils
+   paddlenlp.transformers.export
    paddlenlp.transformers.generation_utils
    paddlenlp.transformers.model_utils
    paddlenlp.transformers.optimization
    paddlenlp.transformers.tokenizer_utils
+   paddlenlp.transformers.tokenizer_utils_base
+   paddlenlp.transformers.tokenizer_utils_faster
    paddlenlp.transformers.utils

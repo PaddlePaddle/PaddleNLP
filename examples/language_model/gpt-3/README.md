@@ -3,7 +3,7 @@
 ## 模型介绍
 GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.org/abs/1706.03762) 为基础的语言生成模型。GPT-3模型的最大参数量可以达到170B，如此大规模参数的模型对于训练使用的深度学习框架是一个巨大的挑战。
 
-本示例主要提供了GPT-3的训练过程，数据准备、预测部署等内容请参见[GPT](../gpt) 目录。
+本示例主要提供了GPT-3的训练过程，数据准备、预测部署等内容请参见[GPT](../../../model_zoo/gpt) 目录。
 本示例包含了GPT-3的[静态图](./static)和动态图的多级并行训练流程。
 用户可以根据自己的需求，训练GPT-3模型，或者参考本示例，使用模型并行、流水线并行等策略，开发训练其他大模型。
 
@@ -22,11 +22,53 @@ GPT-[3](https://arxiv.org/pdf/2005.14165.pdf) 是以[Transformer](https://arxiv.
 注：需要PaddlePaddle版本大于等于2.2rc，或者使用最新develop版本，安装方法请参见Paddle[官网](https://www.paddlepaddle.org.cn)。
 
 
+### 数据获取与制作
+
+[OpenWebTextCorpus](https://skylion007.github.io/OpenWebTextCorpus/)是一个开源的英文网页文本数据集，数据来源于Reddit，经过去重、清洗、提取，最终包含800多万个文档。
+本示例采用EleutherAI清洗好的[OpenWebText2数据](https://openwebtext2.readthedocs.io/en/latest/index.html#download-plug-and-play-version)
+
+下载以后通过以下命令解压：
+
+```shell
+wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
+tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
+```
+
+然后使用[data_tools](./data_tools)工具下的`create_pretraining_data.py`脚本进行数据集制作：
+```
+python -u  create_pretraining_data.py \
+    --model_name gpt2-en \
+    --tokenizer_name GPTTokenizer \
+    --data_format JSON \
+    --input_path /path/to/openwebtext/ \
+    --append_eos \
+    --output_prefix gpt_openwebtext  \
+    --workers 40 \
+    --log_interval 10000
+```
+处理时间约一个小时左右，就可以得到我们需要的`gpt_openwebtext_ids.npy`, `gpt_openwebtext_idx.npz`数据集文件。
+
+为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
+```shell
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+```
+
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
+
+```
+mkdir data
+mv gpt_en_dataset_300m_ids.npy ./data
+mv gpt_en_dataset_300m_idx.npz ./data
+```
+
+
 ```shell
 cd static # 或者 cd dygraph
 # 下载样例数据
 mkdir data && cd data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
 cd ..
 # 运行pretrian 脚本
 sh run.sh
@@ -101,6 +143,17 @@ python -u  -m paddle.distributed.fleet.launch \
 - 纯数据并行(Data Parallelism)
 
 除了上述混合并行策略外，飞桨还支持重计算、offload、混合精度等策略，来减少显存占用、加速训练。更多具体内容可以参考稿件:[飞桨分布式训练又推新品，4D混合并行可训千亿级AI模型](https://baijiahao.baidu.com/s?id=1697085717806202673)。
+
+### 飞桨超大模型部署
+
+飞桨超大模型部署工具：
+
+- Paddle Fleet: 飞桨训练自适应并行技术，同样适应于超大模型部署，针对推理硬件自适应切分
+- Paddle Inference: 支持模型并行、流水线并行、混合并行策略，经过极致优化，性能领先
+- Paddle Serving: 支持服务化部署，支持自动Batch、容错调度、服务监控、负载均衡
+- Paddle Slim: 支持超大模型量化、稀疏压缩
+
+具体部署示例参考[GPT-3超大模型部署教程](deploy)
 
 ### 参考文献
 - [Language Models are Few-Shot Learners](https://arxiv.org/pdf/2005.14165.pdf)
