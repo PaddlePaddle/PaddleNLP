@@ -853,23 +853,20 @@ def get_span(start_ids, end_ids, with_prob=False):
     return result
 
 
-def get_id_and_prob(spans, offset_map):
-    prompt_length = 0
-    for i in range(1, len(offset_map)):
-        if offset_map[i] != [0, 0]:
-            prompt_length += 1
-        else:
-            break
-
-    for i in range(1, prompt_length + 1):
-        offset_map[i][0] -= (prompt_length + 1)
-        offset_map[i][1] -= (prompt_length + 1)
+def get_id_and_prob(spans, offset_mapping):
+    prompt_end_token_id = offset_mapping[1:].index([0, 0])
+    bias = offset_mapping[prompt_end_token_id][1] + 1
+    for index in range(1, prompt_end_token_id + 1):
+        offset_mapping[index][0] -= bias
+        offset_mapping[index][1] -= bias
 
     sentence_id = []
     prob = []
     for start, end in spans:
         prob.append(start[1] * end[1])
-        sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
+        start_id = offset_mapping[start[0]][0]
+        end_id = offset_mapping[end[0]][1]
+        sentence_id.append((start_id, end_id))
     return sentence_id, prob
 
 
