@@ -14,7 +14,7 @@
 
 import paddle
 import argparse
-from multiprocessing import cpu_count
+from psutil import cpu_count
 from ernie_predictor import ErniePredictor
 
 
@@ -49,7 +49,7 @@ def parse_args():
         help="Whether to use quantization for acceleration.", )
     parser.add_argument(
         "--num_threads",
-        default=cpu_count(),
+        default=cpu_count(logical=False),
         type=int,
         help="num_threads for cpu.", )
     args = parser.parse_args()
