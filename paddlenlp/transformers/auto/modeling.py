@@ -209,6 +209,8 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                init_class = init_class[:-5] if init_class.endswith(
+                    "Model") else init_class
                 if init_class:
                     for model_flag, name in MAPPING_NAMES.items():
                         if model_flag in init_class:
