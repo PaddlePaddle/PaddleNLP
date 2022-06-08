@@ -1,5 +1,4 @@
-import os
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +12,9 @@ import os
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import paddle
+import numpy as np
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.taskflow.utils import dygraph_mode_guard
@@ -86,7 +87,7 @@ def predict(model,
             input_ids, position_ids, token_type_ids, attn_mask, _, qids, \
             gather_idxs, need_cal_loss = batch
             input_handles[0].copy_from_cpu(input_ids.numpy())
-            input_handles[1].copy_from_cpu(paddle.to_tensor(memories).numpy())
+            input_handles[1].copy_from_cpu(memories)
             input_handles[2].copy_from_cpu(token_type_ids.numpy())
             input_handles[3].copy_from_cpu(position_ids.numpy())
             input_handles[4].copy_from_cpu(attn_mask.numpy())
@@ -107,8 +108,8 @@ def predict(model,
 class LongDocClassifier:
     def __init__(self,
                  model_name_or_path,
-                 trainer_num,
-                 rank,
+                 trainer_num=1,
+                 rank=0,
                  batch_size=16,
                  max_seq_length=512,
                  memory_len=128,
@@ -179,17 +180,14 @@ class LongDocClassifier:
         """Load static model"""
         inference_model_path = os.path.join(self.static_path, "static",
                                             "inference")
-        if not os.path.exists(inference_model_path + ".pdiparams"):
-            with dygraph_mode_guard():
-                self._construct_model()
-                if params_path:
-                    state_dict = paddle.load(params_path)
-                    self._model.set_dict(state_dict)
-                self._construct_input_spec()
-                self._convert_dygraph_to_static()
-        else:
-            logger.info("loading static model from {}".format(
-                inference_model_path))
+        with dygraph_mode_guard():
+            self._construct_model()
+            if params_path:
+                state_dict = paddle.load(params_path)
+                self._model.set_dict(state_dict)
+            self._construct_input_spec()
+            self._convert_dygraph_to_static()
+
         model_file = inference_model_path + ".pdmodel"
         params_file = inference_model_path + ".pdiparams"
         self._config = paddle.inference.Config(model_file, params_file)
@@ -252,14 +250,19 @@ class LongDocClassifier:
         logger.info("The inference model save in the path:{}".format(save_path))
 
     def run_model(self, saved_path):
-        create_memory = partial(init_memory, self.batch_size, self.memory_len,
-                                self.model_config["hidden_size"],
-                                self.model_config["num_hidden_layers"])
-        # Copy the memory
-        memories = create_memory()
+        if not self.static_mode:
+            create_memory = partial(init_memory, self.batch_size, self.memory_len,
+                                    self.model_config["hidden_size"],
+                                    self.model_config["num_hidden_layers"])
+            # Copy the memory
+            memories = create_memory()
+        else:
+            memories = np.zeros([self.model_config["num_hidden_layers"],
+                                 self.batch_size, self.memory_len,
+                                 self.model_config["hidden_size"]], dtype="float32")
         file_path = saved_path
         if not self.static_mode:
-            self.input_handles, self.output_handle = None, None
+            self.input_handles, self.output_handle, self.predictor = None, None, self._model
         else:
             self._prepare_static_mode()
         predict(self.predictor, self.test_dataloader, file_path, memories,

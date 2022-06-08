@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -295,6 +295,7 @@ class ErnieDocEncoder(nn.Layer):
         return new_mem
 
     def forward(self, enc_input, memories, rel_pos, rel_task, attn_mask):
+        # memories shape: [N, B, M, H]
         # no need to normalize enc_input, cause it's already normalized outside.
         new_mem = None
         for _, encoder_layer in enumerate(self.layers):
@@ -598,9 +599,9 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length, 1].
-            memories (List[Tensor]):
-                A list of length `n_layers` with each Tensor being a pre-computed hidden-state for each layer.
-                Each Tensor has a dtype `float32` and a shape of [batch_size, sequence_length, hidden_size].
+            memories (Tensor):
+                Pre-computed hidden-states for each layer.
+                It's data type should be `float32` and has a shape of [num_hidden_layers, batch_size, memory_len, hidden_size].
             token_type_ids (Tensor):
                 Segment token indices to indicate first and second portions of the inputs.
                 Indices can be either 0 or 1:
