@@ -288,6 +288,9 @@ def generate_cls_example(text, labels, prompt_prefix, options):
 def convert_cls_examples(raw_examples,
                          prompt_prefix="情感倾向",
                          options=["正向", "负向"]):
+    """
+    Convert labeled data export from doccano for classification task.
+    """
     examples = []
     logger.info(f"Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
@@ -305,12 +308,16 @@ def convert_cls_examples(raw_examples,
 
 def convert_ext_examples(raw_examples,
                          negative_ratio,
-                         is_train=True,
                          prompt_prefix="情感倾向",
                          options=["正向", "负向"],
-                         sperator="##"):
-    def _sep_cls_label(label, sperator):
-        label_list = label.split(sperator)
+                         seperator="##",
+                         is_train=True):
+    """
+    Convert labeled data export from doccano for extraction and aspect-level classification task.
+    """
+
+    def _sep_cls_label(label, seperator):
+        label_list = label.split(seperator)
         if len(label_list) == 1:
             return label_list[0], None
         return label_list[0], label_list[1:]
@@ -417,19 +424,16 @@ def convert_ext_examples(raw_examples,
                 }
 
                 entity_label, entity_cls_label = _sep_cls_label(entity["label"],
-                                                                sperator)
-                print(entity_label)
-                print(entity_cls_label)
+                                                                seperator)
 
                 # Define the prompt prefix for entity-level classification
                 entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
-                entity_example = generate_cls_example(
-                    text, entity_cls_label, entity_cls_prompt_prefix, options)
+                if entity_cls_label is not None:
+                    entity_cls_example = generate_cls_example(
+                        text, entity_cls_label, entity_cls_prompt_prefix,
+                        options)
 
-                entity_cls_examples.append(entity_example)
-
-                print(entity_cls_examples)
-                exit()
+                    entity_cls_examples.append(entity_cls_example)
 
                 result = {
                     "text": entity_name,
@@ -530,12 +534,4 @@ def convert_ext_examples(raw_examples,
                 for r in relation_example
                 for relation_example in relation_examples
             ]
-    return all_entity_examples, all_relation_examples
-
-
-if __name__ == "__main__":
-    labels = ["正向", "中立"]
-    options = ["正向", "中立", "负向"]
-    prompt_prefix = "情感倾向"
-    text = "我是谁"
-    print(generate_cls_example(text, labels, prompt_prefix, options))
+    return all_entity_examples, all_relation_examples, entity_cls_examples
