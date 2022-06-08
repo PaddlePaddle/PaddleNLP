@@ -86,6 +86,16 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
+            "uer-py-roberta-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/vocab.txt",
+            "uer-py-roberta-medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/vocab.txt",
+            "uer-py-roberta-small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/vocab.txt",
+            "uer-py-roberta-mini":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/vocab.txt",
+            "uer-py-roberta-tiny":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -99,6 +109,21 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rbtl3": {
+            "do_lower_case": True
+        },
+        "uer-py-roberta-base": {
+            "do_lower_case": True
+        },
+        "uer-py-roberta-medium": {
+            "do_lower_case": True
+        },
+        "uer-py-roberta-small": {
+            "do_lower_case": True
+        },
+        "uer-py-roberta-mini": {
+            "do_lower_case": True
+        },
+        "uer-py-roberta-tiny": {
             "do_lower_case": True
         },
     }
