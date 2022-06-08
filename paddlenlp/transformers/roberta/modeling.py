@@ -246,15 +246,15 @@ class RobertaPretrainedModel(PretrainedModel):
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
             "uer-py-roberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/uer_py_roberta_base.pdparams",
             "uer-py-roberta-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/medium.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/uer_py_roberta_medium.pdparams",
             "uer-py-roberta-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/small.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/uer_py_roberta_small.pdparams",
             "uer-py-roberta-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/mini.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/uer_py_roberta_mini.pdparams",
             "uer-py-roberta-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/tiny.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer_py_roberta/uer_py_roberta_tiny.pdparams",
         }
     }
     base_model_prefix = "roberta"
