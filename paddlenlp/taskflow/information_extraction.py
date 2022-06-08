@@ -311,8 +311,8 @@ class UIETask(Task):
                     if ids[i] != 0:
                         ids = ids[:i]
                         break
-                span_list = get_span(start_ids, end_ids, with_prob=True)
-                sentence_id, prob = get_id_and_prob(span_list, offset_map)
+                span_set = get_span(start_ids, end_ids, with_prob=True)
+                sentence_id, prob = get_id_and_prob(span_set, offset_map)
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
         results = self._convert_ids_to_results(short_inputs, sentence_ids,
