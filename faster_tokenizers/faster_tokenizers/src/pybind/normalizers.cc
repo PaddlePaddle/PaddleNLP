@@ -166,6 +166,24 @@ void BindNormalizers(pybind11::module* m) {
            py::arg("handle_chinese_chars") = true,
            py::arg("strip_accents") = true,
            py::arg("lowercase") = true)
+      .def(py::init([](bool clean_text,
+                       bool handle_chinese_chars,
+                       const py::object& strip_accents_obj,
+                       bool lowercase) {
+             bool strip_accents = lowercase;
+             if (!strip_accents_obj.is(py::none())) {
+               strip_accents = strip_accents_obj.cast<bool>();
+             }
+             return std::unique_ptr<normalizers::BertNormalizer>(
+                 new normalizers::BertNormalizer(clean_text,
+                                                 handle_chinese_chars,
+                                                 strip_accents,
+                                                 lowercase));
+           }),
+           py::arg("clean_text") = true,
+           py::arg("handle_chinese_chars") = true,
+           py::arg("strip_accents") = true,
+           py::arg("lowercase") = true)
       .def("normalize_str",
            [](const normalizers::BertNormalizer& self, const std::string& str) {
              normalizers::NormalizedString normalized(str);

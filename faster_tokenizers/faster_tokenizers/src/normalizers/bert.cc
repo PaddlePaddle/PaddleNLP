@@ -45,7 +45,8 @@ static bool IsWhiteSpace(int ch) {
 static bool IsControl(int ch) {
   if (ch == '\t' || ch == '\n' || ch == '\r') return false;
   if (ch == 0 || ch == 0xfffd) return true;
-  return u_iscntrl(ch);
+  // It means (general category "C").
+  return !u_isprint(ch);
 }
 
 void BertNormalizer::DoCleanText(NormalizedString* input) const {

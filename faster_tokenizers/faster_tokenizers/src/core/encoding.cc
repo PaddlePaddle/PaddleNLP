@@ -546,7 +546,7 @@ bool TruncateEncodings(Encoding* encoding,
   if (pair_encoding != nullptr) {
     total_length += pair_encoding->GetIds().size();
   }
-  if (total_length < method.max_len_) {
+  if (total_length <= method.max_len_) {
     return true;
   }
   auto num_of_removed_ids = total_length - method.max_len_;
@@ -571,8 +571,8 @@ bool TruncateEncodings(Encoding* encoding,
       if (pair_encoding_len + encoding_len > method.max_len_) {
         // In this case, make sure the encoding_len is larger than
         // pair_encoding_len
-        pair_encoding_len = method.max_len_ / 2;
-        encoding_len = pair_encoding_len + method.max_len_ % 2;
+        encoding_len = method.max_len_ / 2;
+        pair_encoding_len = encoding_len + method.max_len_ % 2;
       }
       if (has_swapped) {
         std::swap(encoding_len, pair_encoding_len);

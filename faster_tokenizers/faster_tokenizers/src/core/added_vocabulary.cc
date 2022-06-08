@@ -359,6 +359,7 @@ void AddedVocabulary::ExtractAndNormalize(
           std::vector<pretokenizers::StringSplit>* string_splits) {
         if (normalizers != nullptr) {
           (*normalizers)(normalized);
+          VLOG(6) << "After normalized: " << normalized->GetStr();
           this->SplitWithIndices(
               *normalized, this->split_normalized_trie_, string_splits);
         }

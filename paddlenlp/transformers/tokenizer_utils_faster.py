@@ -344,7 +344,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             return_dict: bool=True,
             return_offsets_mapping: bool=False,
             return_length: bool=False,
-            verbose: bool=True, ) -> BatchEncoding:
+            verbose: bool=True,
+            **kwargs) -> BatchEncoding:
 
         if not isinstance(batch_text_or_text_pairs, list):
             raise TypeError(

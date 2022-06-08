@@ -52,6 +52,7 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
             utils::IsPunctuation, normalizers::ISOLATED, &normalized_splits);
         for (auto&& normalize : normalized_splits) {
           if (!normalize.IsEmpty()) {
+            VLOG(6) << "After pretokenized: " << normalize.GetStr();
             string_splits->emplace_back(std::move(normalize));
           }
         }
