@@ -251,15 +251,19 @@ class LongDocClassifier:
 
     def run_model(self, saved_path):
         if not self.static_mode:
-            create_memory = partial(init_memory, self.batch_size, self.memory_len,
+            create_memory = partial(init_memory, self.batch_size,
+                                    self.memory_len,
                                     self.model_config["hidden_size"],
                                     self.model_config["num_hidden_layers"])
             # Copy the memory
             memories = create_memory()
         else:
-            memories = np.zeros([self.model_config["num_hidden_layers"],
-                                 self.batch_size, self.memory_len,
-                                 self.model_config["hidden_size"]], dtype="float32")
+            memories = np.zeros(
+                [
+                    self.model_config["num_hidden_layers"], self.batch_size,
+                    self.memory_len, self.model_config["hidden_size"]
+                ],
+                dtype="float32")
         file_path = saved_path
         if not self.static_mode:
             self.input_handles, self.output_handle, self.predictor = None, None, self._model
