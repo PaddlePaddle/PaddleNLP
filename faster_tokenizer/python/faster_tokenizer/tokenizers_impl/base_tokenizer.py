@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from faster_tokenizers import Tokenizer
+from faster_tokenizer import Tokenizer
 
 __all__ = ['BaseFasterTokenizer']
 

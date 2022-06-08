@@ -17,8 +17,8 @@
 
 from typing import Dict, List, Tuple
 
-from faster_tokenizers import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizers.models import WordPiece, FasterWordPiece
+from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
+from faster_tokenizer.models import WordPiece, FasterWordPiece
 
 
 class Converter:

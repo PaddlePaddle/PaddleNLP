@@ -39,20 +39,20 @@ class InstallPlatlib(install):
 
 if os.name != 'nt':
     package_data = {
-        "faster_tokenizers": [
+        "faster_tokenizer": [
             "core_tokenizers.so", "libicuuc.so.70", "libicudata.so.70",
             "commit.log"
         ]
     }
 else:
     package_data = {
-        "faster_tokenizers":
+        "faster_tokenizer":
         ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll", "commit.log"]
     }
 
 
 def get_version():
-    f = open(os.path.join("python", "faster_tokenizers", "__init__.py"))
+    f = open(os.path.join("python", "faster_tokenizer", "__init__.py"))
     lines = f.readlines()
     version = ""
     for line in lines:
@@ -65,19 +65,19 @@ def get_version():
 
 long_description = "PaddleNLP Faster Tokenizer Library written in C++ "
 setup(
-    name="faster_tokenizers",
+    name="faster_tokenizer",
     version=get_version(),
     author="PaddlePaddle Speech and Language Team",
     author_email="paddlesl@baidu.com",
     description=long_description,
     long_description=long_description,
     zip_safe=False,
-    url="https://github.com/PaddlePaddle/PaddleNLP/faster_tokenizers",
+    url="https://github.com/PaddlePaddle/PaddleNLP/faster_tokenizer",
     package_dir={"": "python"},
     packages=[
-        "faster_tokenizers", "faster_tokenizers.tokenizers_impl",
-        "faster_tokenizers.normalizers", "faster_tokenizers.pretokenizers",
-        "faster_tokenizers.models", "faster_tokenizers.postprocessors"
+        "faster_tokenizer", "faster_tokenizer.tokenizers_impl",
+        "faster_tokenizer.normalizers", "faster_tokenizer.pretokenizers",
+        "faster_tokenizer.models", "faster_tokenizer.postprocessors"
     ],
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},

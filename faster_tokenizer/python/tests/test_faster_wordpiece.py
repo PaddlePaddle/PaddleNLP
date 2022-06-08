@@ -18,7 +18,7 @@ import unittest
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.datasets import load_dataset
-from faster_tokenizers import ErnieFasterTokenizer, models
+from faster_tokenizer import ErnieFasterTokenizer, models
 logger.logger.setLevel('ERROR')
 
 

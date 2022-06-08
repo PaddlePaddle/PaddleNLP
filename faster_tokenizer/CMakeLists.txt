@@ -53,7 +53,7 @@ include_directories(${TOKENIZERS_INSTALL_INCLUDE_DIR})
 include(generic)
 include(third_party)
 
-add_subdirectory(faster_tokenizers)
+add_subdirectory(faster_tokenizer)
 
 if(WITH_PYTHON)
 
@@ -64,14 +64,14 @@ add_custom_target(build_tokenizers_bdist_wheel ALL
 
 else(WITH_PYTHON)
 
-set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizers_cpp)
+set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer_cpp)
 add_custom_target(build_cpp_package_dir ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include)
 
     # copy headers
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${CMAKE_SOURCE_DIR}/faster_tokenizers/include ${CPP_PACKAGE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include
     DEPENDS build_cpp_package_dir)
 
 add_custom_target(copy_third_party_headers ALL
@@ -93,7 +93,7 @@ add_custom_target(remove_pybind_headers ALL
 
 # copy library
 add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizers/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizer/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${CPP_PACKAGE_DIR}/lib
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
     DEPENDS build_cpp_package_dir core_tokenizers)

@@ -27,6 +27,7 @@ ExternalProject_Add(
         ${SHALLOW_CLONE}
         GIT_REPOSITORY    ${JSON_REPOSITORY}
         GIT_TAG           ${JSON_TAG}
+        GIT_PROGRESS      1
         PREFIX            ${JSON_PREFIX_DIR}
         # If we explicitly leave the `UPDATE_COMMAND` of the ExternalProject_Add
         # function in CMakeLists blank, it will cause another parameter GIT_TAG

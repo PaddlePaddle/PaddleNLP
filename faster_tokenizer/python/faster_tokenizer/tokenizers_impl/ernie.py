@@ -14,12 +14,12 @@
 
 from .base_tokenizer import BaseFasterTokenizer
 
-from faster_tokenizers.normalizers import BertNormalizer
-from faster_tokenizers.pretokenizers import BertPreTokenizer
-from faster_tokenizers.models import WordPiece, FasterWordPiece
-from faster_tokenizers.postprocessors import BertPostProcessor
-from faster_tokenizers import decoders
-from faster_tokenizers import Tokenizer
+from faster_tokenizer.normalizers import BertNormalizer
+from faster_tokenizer.pretokenizers import BertPreTokenizer
+from faster_tokenizer.models import WordPiece, FasterWordPiece
+from faster_tokenizer.postprocessors import BertPostProcessor
+from faster_tokenizer import decoders
+from faster_tokenizer import Tokenizer
 
 __all__ = ['ErnieFasterTokenizer']
 
