@@ -84,7 +84,7 @@ def convert_example(example, tokenizer, max_seq_len):
     for index in range(1, len(offset_mapping)):
         mapping = offset_mapping[index]
         if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-            bias = offset_mapping[index - 1][1] + 1
+            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
         if mapping[0] == 0 and mapping[1] == 0:
             continue
         offset_mapping[index][0] += bias

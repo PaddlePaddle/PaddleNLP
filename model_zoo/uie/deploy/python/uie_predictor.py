@@ -514,6 +514,9 @@ def cut_chinese_sent(para):
 
 
 def get_id_and_prob(spans, offset_mapping):
+    """
+    Return text id and probability of predicted spans
+    """
     prompt_end_token_id = offset_mapping[1:].index([0, 0])
     bias = offset_mapping[prompt_end_token_id][1] + 1
     for index in range(1, prompt_end_token_id + 1):
