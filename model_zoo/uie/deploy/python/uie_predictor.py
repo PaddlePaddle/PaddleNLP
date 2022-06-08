@@ -522,8 +522,8 @@ def get_id_and_prob(span_set, offset_mapping):
         offset_mapping (list[int]): list of pair preserving the
                 index of start and end char in original text pair (prompt + text) for each token.
     Returns: 
-        text_ids (list[tuple]): index of start and end char in original text.
-        probs (list[float]): probabilities of predicted spans.
+        sentence_id (list[tuple]): index of start and end char in original text.
+        prob (list[float]): probabilities of predicted spans.
     """
     prompt_end_token_id = offset_mapping[1:].index([0, 0])
     bias = offset_mapping[prompt_end_token_id][1] + 1
@@ -531,11 +531,11 @@ def get_id_and_prob(span_set, offset_mapping):
         offset_mapping[index][0] -= bias
         offset_mapping[index][1] -= bias
 
-    text_ids = []
-    probs = []
+    sentence_id = []
+    prob = []
     for start, end in span_set:
-        probs.append(start[1] * end[1])
+        prob.append(start[1] * end[1])
         start_id = offset_mapping[start[0]][0]
         end_id = offset_mapping[end[0]][1]
-        text_ids.append((start_id, end_id))
-    return text_ids, probs
+        sentence_id.append((start_id, end_id))
+    return sentence_id, prob
