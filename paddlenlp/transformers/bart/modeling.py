@@ -93,7 +93,28 @@ class BartPretrainedModel(PretrainedModel):
             "activation_dropout": 0.1,
             "max_position_embeddings": 1024,
             "init_std": 0.02,
-        }
+        },
+        "alphacode-small": {
+            "vocab_size": 50265,
+            "bos_token_id": 0,
+            "pad_token_id": 1,
+            "eos_token_id": 2,
+            "forced_eos_token_id": 2,
+            "decoder_start_token_id": 2,
+            "d_model": 768,
+            "num_encoder_layers": 4,
+            "num_decoder_layers": 24,
+            "encoder_attention_heads": 12,
+            "decoder_attention_heads": 12,
+            "encoder_ffn_dim": 3072,
+            "decoder_ffn_dim": 3072,
+            "dropout": 0.1,
+            "activation_function": "gelu",
+            "attention_dropout": 0.1,
+            "activation_dropout": 0.1,
+            "max_position_embeddings": 2048,
+            "init_std": 0.02,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -994,7 +1015,7 @@ class BartForPretraining(BartPretrainedModel):
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating attention_mask"
             attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
+                input_ids == self.bart.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:

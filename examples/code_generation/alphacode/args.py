@@ -149,8 +149,13 @@ def parse_args(MODEL_CLASSES):
 
     # Training steps config
     parser.add_argument(
+        "--num_train_epochs",
+        default=5,
+        type=int,
+        help="set total number of training epochs to perform.")
+    parser.add_argument(
         "--max_steps",
-        default=500000,
+        default=-1,
         type=int,
         help="set total number of training steps to perform.")
     parser.add_argument(
@@ -335,6 +340,11 @@ def parse_args(MODEL_CLASSES):
         type=int,
         default=1,
         help='The number of output sequences to generation.')
+
+    # Argument for mlm
+    parser.add_argument(
+        "--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
+
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 

@@ -28,6 +28,8 @@ from paddlenlp.transformers import BartTokenizer
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='data input/output')
+    parser.add_argument(
+        '--model_name', type=str, required=True, help='What model to use.')
     group.add_argument(
         '--input_path',
         type=str,
@@ -89,8 +91,7 @@ class Converter(object):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = BartTokenizer(self.args.vocab_file,
-                                            self.args.merge_file)
+        Converter.tokenizer = BartTokenizer.from_pretrained(args.model_name)
 
         def process(text):
             tokens = Converter.tokenizer.tokenize(text)
@@ -127,7 +128,7 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = BartTokenizer(args.vocab_file, args.merge_file)
+    sample_tokenizer = BartTokenizer.from_pretrained(args.model_name)
     print(f"Vocab size: {sample_tokenizer.vocab_size}")
     print(f"Output prefix: {args.output_prefix}")
     if sample_tokenizer.vocab_size < 2**16 - 1:

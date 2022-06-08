@@ -18,13 +18,13 @@ import os
 import sys
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset
+from paddle.io import BatchSampler, DistributedBatchSampler, DataLoader, Dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 
 # Used to load data_tools path.
 sys.path.insert(0, "../")
+from data_tools.dataset_utils import create_masked_lm_predictions, pad_and_convert_to_numpy
 
 
 def get_train_valid_test_split_(splits_string, size):
@@ -59,11 +59,10 @@ def create_pretrained_dataset(
         args,
         input_path,
         tokenizer,
-        masked_lm_prob=0.15,
         encoder_max_seq_len=1536,
         decoder_max_seq_len=768, ):
 
-    assert len(input_path) == 1, "GPT only support one dataset for now."
+    assert len(input_path) == 1, "BART only support one dataset for now."
 
     input_prefix = input_path[0]
 
@@ -94,28 +93,48 @@ def create_pretrained_dataset(
         -1], "The document nums should larger than max of splits, but %s < %s" % (
             len(sample_lens), splits[-1])
 
+    def _collate_data(data, stack_fn=Stack()):
+        num_fields = len(data[0])
+        out = [None] * num_fields
+        for i in range(2, num_fields):
+            out[i] = stack_fn([x[i] for x in data])
+        batch_size, seq_length = out[2].shape
+        size = num_mask = sum(len(x[0]) for x in data)
+        # masked_lm_positions
+        # Organize as a 1D tensor for gather or use gather_nd
+        if size % 8 != 0:
+            size += 8 - (size % 8)
+        out[0] = np.full(size, 0, dtype=np.int32)
+        # masked_lm_labels
+        out[1] = np.full([size, 1], -1, dtype=np.int64)
+        mask_token_num = 0
+        for i, x in enumerate(data):
+            for j, pos in enumerate(x[0]):
+                out[0][mask_token_num] = i * seq_length + pos
+                out[1][mask_token_num] = x[1][j]
+                mask_token_num += 1
+        return out
+
     def build_dataset(index, name):
         dataset = Seq2SeqDataset(
             sample_ids=sample_ids,
             sample_lens=sample_lens,
             tokenizer=tokenizer,
             documents=np.arange(splits[index], splits[index + 1]),
-            masked_lm_prob=masked_lm_prob,
+            masked_lm_prob=args.masked_lm_prob,
             encoder_max_seq_len=encoder_max_seq_len,
             decoder_max_seq_len=decoder_max_seq_len,
             seed=args.seed)
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
-            shuffle=False if name != 'train' else True,
-            drop_last=True)
-
+            shuffle=False if name != 'train' else True)
         data_loader = DataLoader(
             dataset=dataset,
             batch_sampler=batch_sampler,
             num_workers=0,
-            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-            return_list=False)
+            collate_fn=_collate_data,
+            return_list=True)
         return data_loader
 
     # Note, data should be broardcast to all devices.
@@ -152,21 +171,26 @@ class Seq2SeqDataset(paddle.io.Dataset):
         self.vocab_id_to_token_dict = tokenizer.decoder
         self.vocab_token_to_id_dict = tokenizer.encoder
         # maybe choose another mask token
-        self.mask_id = tokenizer.encoder['MASK']
+        self.mask_id = tokenizer.mask_token_id
         self.pad_id = tokenizer.pad_token_id
         self.cumsum_lens = [0] + np.cumsum(sample_lens).tolist()
 
     def _construct_sample(self, tokens, idx):
         origin_tokens = np.array(tokens).astype("int64").tolist()
+        # Mask ont token at least
+        least_len = int(1. / self.masked_lm_prob) + 1
         pivot = np.random.choice(range(len(origin_tokens)))
-
         encoder_tokens = origin_tokens[:pivot][:self.encoder_max_seq_len]
         decoder_tokens = origin_tokens[pivot:][:self.decoder_max_seq_len]
+        while len(encoder_tokens) < least_len:
+            pivot = np.random.choice(range(len(origin_tokens)))
+            encoder_tokens = origin_tokens[:pivot][:self.encoder_max_seq_len]
+            decoder_tokens = origin_tokens[pivot:][:self.decoder_max_seq_len]
 
         labels = decoder_tokens[1:]
         tokens = decoder_tokens[:-1]
 
-        pad_length = self.encoder_max_seq_len - len(tokens)
+        pad_length = self.decoder_max_seq_len - len(tokens)
         pad_tokens = [self.pad_id] * pad_length
         tokens += pad_tokens
         labels += pad_tokens
@@ -179,19 +203,18 @@ class Seq2SeqDataset(paddle.io.Dataset):
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.pad_id)] = 0.0
-        position_ids = list(range(len(tokens) - pad_length)) + pad_tokens
+
+        position_ids = list(range(seq_length - pad_length)) + pad_tokens
         position_ids = np.array(position_ids, dtype="int64")
 
         attention_mask = (attention_mask - 1.0) * 1e9
         attention_mask = attention_mask.astype("float32")
         labels = np.array(labels, dtype="int64")
 
-        from data_tools.dataset_utils import create_masked_lm_predictions, pad_and_convert_to_numpy
-
         max_num_tokens = len(encoder_tokens)
         max_predictions_per_seq = self.masked_lm_prob * max_num_tokens
         np_rng = np.random.RandomState(seed=((self.seed + idx) % 2**32))
-        tokentypes = len(masked_tokens) * [0]
+        tokentypes = max_num_tokens * [0]
         (masked_tokens, masked_positions, masked_labels, _,
          _) = create_masked_lm_predictions(
              encoder_tokens,
@@ -204,21 +227,14 @@ class Seq2SeqDataset(paddle.io.Dataset):
              max_predictions_per_seq,
              np_rng,
              vocab_token_to_id_dict=self.vocab_token_to_id_dict,
+             do_whole_word_mask=False,
              to_chinese_char=False,
              inplace_random_mask=False)
         # Padding.
         mlm_tokens, mlm_tokentypes, mlm_labels, mlm_padding_mask, mlm_loss_mask \
             = pad_and_convert_to_numpy(masked_tokens, tokentypes, masked_positions,
                                        masked_labels, self.pad_id, self.encoder_max_seq_len)
-
-        return {
-            'encoder': [
-                mlm_tokens, mlm_tokentypes, mlm_labels, mlm_padding_mask,
-                mlm_loss_mask, masked_positions
-            ],
-            'decoder':
-            [tokens, loss_mask, attention_mask, position_ids, labels]
-        }
+        return masked_positions, masked_labels, mlm_tokens, mlm_tokentypes, mlm_padding_mask, mlm_loss_mask, tokens, loss_mask, attention_mask, position_ids, labels
 
     def __getitem__(self, index):
         start_pos = self.cumsum_lens[index]
