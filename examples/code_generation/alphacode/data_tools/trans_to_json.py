@@ -73,9 +73,13 @@ def raw_text_to_json(path, doc_spliter="", json_key="text", min_doc_length=10):
     if not os.path.exists(path):
         print("No found file %s" % path)
         return 0, None
-
-    out_filepath = path + ".jsonl"
+    # Fix too long file name
+    path_splits = path.split(os.sep)
+    prefix = float(time.time())
+    path_splits[-1] = f'{path_splits[-1][:100]}_{prefix}'
+    out_filepath = os.sep.join(path_splits) + ".jsonl"
     fout = open(out_filepath, "w", encoding="utf-8")
+
     len_files = 0
     try:
         with open(path, "r") as f:

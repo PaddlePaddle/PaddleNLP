@@ -67,16 +67,6 @@ def get_args():
         type=int,
         default=1,
         help='Number of worker processes to launch')
-    group.add_argument(
-        "--vocab_file",
-        type=str,
-        default='./data_tools/code-vocab.json',
-        help="Path to the vocab file")
-    group.add_argument(
-        "--merge_file",
-        type=str,
-        default='./data_tools/code-merges.txt',
-        help="Path to the BPE merge file (if necessary).", )
     args = parser.parse_args()
     return args
 
@@ -91,7 +81,8 @@ class Converter(object):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = BartTokenizer.from_pretrained(args.model_name)
+        Converter.tokenizer = BartTokenizer.from_pretrained(
+            self.args.model_name)
 
         def process(text):
             tokens = Converter.tokenizer.tokenize(text)

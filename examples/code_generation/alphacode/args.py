@@ -75,7 +75,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument(
         "--split",
         type=str,
-        default='900,50,50',
+        default='949,50,1',
         help="Train/valid/test data split.")
 
     parser.add_argument(
