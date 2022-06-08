@@ -20,10 +20,10 @@ import sentencepiece as spm
 
 from .. import PretrainedTokenizer
 
-__all__ = ['RembertTokenizer']
+__all__ = ['RemBertTokenizer']
 
 
-class RembertTokenizer(PretrainedTokenizer):
+class RemBertTokenizer(PretrainedTokenizer):
     """
     Construct a RemBertTokenizer.
     For more information regarding those methods, please refer to this superclass.
@@ -57,8 +57,8 @@ class RembertTokenizer(PretrainedTokenizer):
     Examples:
         .. code-block::
 
-            from paddlenlp.transformers import RembertTokenizer
-            tokenizer = RembertTokenizer.from_pretrained('rembert')
+            from paddlenlp.transformers import RemBertTokenizer
+            tokenizer = RemBertTokenizer.from_pretrained('rembert')
 
             inputs = tokenizer('欢迎使用飞桨！')
             print(inputs)
