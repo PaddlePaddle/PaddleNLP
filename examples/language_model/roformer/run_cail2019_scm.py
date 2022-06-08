@@ -212,8 +212,8 @@ def convert_example(example, tokenizer, max_seq_length=512):
         text2 = example["text_c"]
         text3 = example["text_b"]
 
-    data1 = tokenizer(text1, text_pair=text2, max_seq_len=max_seq_length)
-    data2 = tokenizer(text1, text_pair=text3, max_seq_len=max_seq_length)
+    data1 = tokenizer(text1, text_pair=text2, max_length=max_seq_length)
+    data2 = tokenizer(text1, text_pair=text3, max_length=max_seq_length)
 
     return [data1["input_ids"], data1["token_type_ids"],
             1], [data2["input_ids"], data2["token_type_ids"], 0]

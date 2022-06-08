@@ -1,0 +1,65 @@
+version: '1.1.0'
+
+components:    # define all the building-blocks for Pipeline
+  - name: DocumentStore
+    type: ElasticsearchDocumentStore  # consider using MilvusDocumentStore or WeaviateDocumentStore for scaling to large number of documents
+    params:
+      host: localhost
+      port: 9200
+      index: dureader_robust_query_encoder
+  - name: Retriever
+    type: DensePassageRetriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      top_k: 10
+      query_embedding_model: rocketqa-zh-dureader-query-encoder
+      passage_embedding_model: rocketqa-zh-dureader-query-encoder
+      embed_title: False
+  - name: Ranker       # custom-name for the component; helpful for visualization & debugging
+    type: ErnieRanker    # pipelines Class name for the component
+    params:
+      model_name_or_path: rocketqa-zh-dureader-cross-encoder
+      top_k: 3
+  - name: TextFileConverter
+    type: TextConverter
+  - name: ImageFileConverter
+    type: ImageToTextConverter
+  - name: PDFFileConverter
+    type: PDFToTextConverter
+  - name: DocxFileConverter
+    type: DocxToTextConverter
+  - name: Preprocessor
+    type: PreProcessor
+    params:
+      split_by: word
+      split_length: 1000
+  - name: FileTypeClassifier
+    type: FileTypeClassifier
+
+pipelines:
+  - name: query    # a sample extractive-qa Pipeline
+    type: Query
+    nodes:
+      - name: Retriever
+        inputs: [Query]
+      - name: Ranker
+        inputs: [Retriever]
+  - name: indexing
+    type: Indexing
+    nodes:
+      - name: FileTypeClassifier
+        inputs: [File]
+      - name: TextFileConverter
+        inputs: [FileTypeClassifier.output_1]
+      - name: PDFFileConverter
+        inputs: [FileTypeClassifier.output_2]
+      - name: DocxFileConverter
+        inputs: [FileTypeClassifier.output_4]
+      - name: ImageFileConverter
+        inputs: [FileTypeClassifier.output_6]
+      - name: Preprocessor
+        inputs: [PDFFileConverter, TextFileConverter, DocxFileConverter, ImageFileConverter]
+      - name: Retriever
+        inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [Retriever]

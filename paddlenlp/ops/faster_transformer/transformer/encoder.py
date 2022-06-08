@@ -26,6 +26,7 @@ from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
 
 def infer_transformer_encoder(
         input,
+        attn_mask,
         q_weight,
         q_bias,
         k_weight,
@@ -34,7 +35,6 @@ def infer_transformer_encoder(
         v_bias,
         attn_out_weight,
         attn_out_bias,
-        attn_mask,
         norm1_weight,
         norm1_bias,
         norm2_weight,
@@ -64,24 +64,24 @@ def infer_transformer_encoder(
     helper = LayerHelper('fusion_encoder', **locals())
     inputs = {
         'Input': input,
-        'SelfQueryWeight': q_weight,
-        'SelfQueryBias': q_bias,
-        'SelfKeyWeight': k_weight,
-        'SelfKeyBias': k_bias,
-        'SelfValueWeight': v_weight,
-        'SelfValueBias': v_bias,
-        'SelfAttnOutputWeight': attn_out_weight,
-        'SelfAttnOutputBias': attn_out_bias,
-        "SelfAttnMask": attn_mask,
-        'SelfAttnOutputLayernormWeight': norm1_weight,
-        'SelfAttnOutputLayernormBias': norm1_bias,
-        'OutputLayernormWeight': norm2_weight,
-        'OutputLayernormBias': norm2_bias,
-        'FFNInterWeight': ffn_inter_weight,
-        'FFNInterBias': ffn_inter_bias,
-        'FFNOutputWeight': ffn_out_weight,
-        'FFNOutputBias': ffn_out_bias,
-        # "SequenceIdOffset": sequence_id_offset,
+        'SelfAttnMask': attn_mask,
+        'SelfQueryWeight@VECTOR': q_weight,
+        'SelfQueryBias@VECTOR': q_bias,
+        'SelfKeyWeight@VECTOR': k_weight,
+        'SelfKeyBias@VECTOR': k_bias,
+        'SelfValueWeight@VECTOR': v_weight,
+        'SelfValueBias@VECTOR': v_bias,
+        'SelfAttnOutputWeight@VECTOR': attn_out_weight,
+        'SelfAttnOutputBias@VECTOR': attn_out_bias,
+        'SelfAttnOutputLayernormWeight@VECTOR': norm1_weight,
+        'SelfAttnOutputLayernormBias@VECTOR': norm1_bias,
+        'OutputLayernormWeight@VECTOR': norm2_weight,
+        'OutputLayernormBias@VECTOR': norm2_bias,
+        'FFNInterWeight@VECTOR': ffn_inter_weight,
+        'FFNInterBias@VECTOR': ffn_inter_bias,
+        'FFNOutputWeight@VECTOR': ffn_out_weight,
+        'FFNOutputBias@VECTOR': ffn_out_bias,
+        # 'SequenceIdOffset': sequence_id_offset,
         # "TRTSeqLenOffset": trt_seqlen_offset,
         # 'AmaxList': amax_list
     }
@@ -97,7 +97,9 @@ def infer_transformer_encoder(
         'use_trt_kernel': use_trt_kernel,
         'normalize_before': normalize_before
     }
-    encoder_out = helper.create_variable(dtype=input.dtype)
+
+    encoder_out = helper.create_variable(dtype=input[0].dtype)
+
     outputs = {"EncoderOut": encoder_out}
 
     helper.append_op(
@@ -154,24 +156,24 @@ def encoder_layer_forward(self,
         raise NotImplementedError("cache in encoder is not supported now")
 
     src = infer_transformer_encoder(
-        input=src,
-        q_weight=self.self_attn.q_proj.weight,
-        q_bias=self.self_attn.q_proj.bias,
-        k_weight=self.self_attn.k_proj.weight,
-        k_bias=self.self_attn.k_proj.bias,
-        v_weight=self.self_attn.v_proj.weight,
-        v_bias=self.self_attn.v_proj.bias,
-        attn_out_weight=self.self_attn.out_proj.weight,
-        attn_out_bias=self.self_attn.out_proj.bias,
-        attn_mask=src_mask,
-        norm1_weight=self.norm1.weight,
-        norm1_bias=self.norm1.bias,
-        norm2_weight=self.norm2.weight,
-        norm2_bias=self.norm2.bias,
-        ffn_inter_weight=self.linear1.weight,
-        ffn_inter_bias=self.linear1.bias,
-        ffn_out_weight=self.linear2.weight,
-        ffn_out_bias=self.linear2.bias,
+        input=[src],
+        attn_mask=[src_mask],
+        q_weight=[self.self_attn.q_proj.weight],
+        q_bias=[self.self_attn.q_proj.bias],
+        k_weight=[self.self_attn.k_proj.weight],
+        k_bias=[self.self_attn.k_proj.bias],
+        v_weight=[self.self_attn.v_proj.weight],
+        v_bias=[self.self_attn.v_proj.bias],
+        attn_out_weight=[self.self_attn.out_proj.weight],
+        attn_out_bias=[self.self_attn.out_proj.bias],
+        norm1_weight=[self.norm1.weight],
+        norm1_bias=[self.norm1.bias],
+        norm2_weight=[self.norm2.weight],
+        norm2_bias=[self.norm2.bias],
+        ffn_inter_weight=[self.linear1.weight],
+        ffn_inter_bias=[self.linear1.bias],
+        ffn_out_weight=[self.linear2.weight],
+        ffn_out_bias=[self.linear2.bias],
         # sequence_id_offset=paddle.to_tensor([]),
         # trt_seqlen_offset=paddle.to_tensor([]),
         # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
@@ -218,21 +220,84 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             `paddle.nn.MultiHeadAttention.gen_cache` and
             `paddle.nn.MultiHeadAttention.forward` for more details.
     """
+    if cache is not None:
+        raise NotImplementedError("cache in encoder is not supported now")
 
     if src_mask.dtype == paddle.float16:
-        src_mask = paddle.cast(src_mask, "float32")
-
+        src_mask = paddle.cast(src_mask, dtype="float32")
     src_mask = src_mask == 0.0
-    src_mask = paddle.cast(src_mask, src.dtype)
+    if src_mask.dtype != src.dtype:
+        src_mask = paddle.cast(src_mask, src.dtype)
 
-    # transpose_src_mask: [batch_size, 1, sequence_length, 1]
-    transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
+    if len(src_mask.shape) == 4:
+        # transpose_src_mask: [batch_size, 1, sequence_length, 1]
+        transpose_src_mask = paddle.transpose(src_mask, perm=[0, 1, 3, 2])
+        # src_mask: [batch_size, 1, sequence_length, sequence_length]
+        src_mask = src_mask * transpose_src_mask
 
-    # src_mask: [batch_size, 1, sequence_length, sequence_length]
-    src_mask = src_mask * transpose_src_mask
-    output = src
-    for i, layer in enumerate(self.layers):
-        output = layer(output, src_mask)
+    if getattr(self, "q_weight", None) is None:
+        self.q_weight = []
+        self.q_bias = []
+        self.k_weight = []
+        self.k_bias = []
+        self.v_weight = []
+        self.v_bias = []
+        self.attn_out_weight = []
+        self.attn_out_bias = []
+        self.norm1_weight = []
+        self.norm1_bias = []
+        self.norm2_weight = []
+        self.norm2_bias = []
+        self.ffn_inter_weight = []
+        self.ffn_inter_bias = []
+        self.ffn_out_weight = []
+        self.ffn_out_bias = []
+        for layer in self.layers:
+            self.q_weight.append(layer.self_attn.q_proj.weight)
+            self.q_bias.append(layer.self_attn.q_proj.bias)
+            self.k_weight.append(layer.self_attn.k_proj.weight)
+            self.k_bias.append(layer.self_attn.k_proj.bias)
+            self.v_weight.append(layer.self_attn.v_proj.weight)
+            self.v_bias.append(layer.self_attn.v_proj.bias)
+            self.attn_out_weight.append(layer.self_attn.out_proj.weight)
+            self.attn_out_bias.append(layer.self_attn.out_proj.bias)
+            self.norm1_weight.append(layer.norm1.weight)
+            self.norm1_bias.append(layer.norm1.bias)
+            self.norm2_weight.append(layer.norm2.weight)
+            self.norm2_bias.append(layer.norm2.bias)
+            self.ffn_inter_weight.append(layer.linear1.weight)
+            self.ffn_inter_bias.append(layer.linear1.bias)
+            self.ffn_out_weight.append(layer.linear2.weight)
+            self.ffn_out_bias.append(layer.linear2.bias)
+
+    output = infer_transformer_encoder(
+        input=[src],
+        attn_mask=[src_mask],
+        q_weight=self.q_weight,
+        q_bias=self.q_bias,
+        k_weight=self.k_weight,
+        k_bias=self.k_bias,
+        v_weight=self.v_weight,
+        v_bias=self.v_bias,
+        attn_out_weight=self.attn_out_weight,
+        attn_out_bias=self.attn_out_bias,
+        norm1_weight=self.norm1_weight,
+        norm1_bias=self.norm1_bias,
+        norm2_weight=self.norm2_weight,
+        norm2_bias=self.norm2_bias,
+        ffn_inter_weight=self.ffn_inter_weight,
+        ffn_inter_bias=self.ffn_inter_bias,
+        ffn_out_weight=self.ffn_out_weight,
+        ffn_out_bias=self.ffn_out_bias,
+        # sequence_id_offset=paddle.to_tensor([]),
+        # trt_seqlen_offset=paddle.to_tensor([]),
+        # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
+        n_head=self.layers[0]._config['nhead'],
+        size_per_head=self.layers[0]._config['d_model'] //
+        self.layers[0]._config['nhead'],
+        use_gelu=self.layers[0]._config['activation'] == 'gelu',
+        normalize_before=self.layers[0]._config['normalize_before'] == True)
+
     if self.norm is not None:
         output = self.norm(output)
     return output

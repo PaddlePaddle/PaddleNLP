@@ -31,7 +31,10 @@ def convert_example(example,
     inputs = example[text_column]
     targets = example[summary_column]
     labels = tokenizer(
-        targets, max_seq_len=max_target_length, pad_to_max_seq_len=True)
+        targets,
+        max_length=max_target_length,
+        padding='max_length',
+        truncation=True)
     decoder_input_ids = [decoder_start_token_id] + labels["input_ids"][:-1]
     if ignore_pad_token_for_loss:
         labels["input_ids"] = [(l if l != tokenizer.pad_token_id else -100)
@@ -39,19 +42,23 @@ def convert_example(example,
     if is_train:
         model_inputs = tokenizer(
             inputs,
-            max_seq_len=max_source_length,
-            pad_to_max_seq_len=True,
+            max_length=max_source_length,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
             return_length=False)
         return model_inputs["input_ids"], model_inputs[
             "attention_mask"], decoder_input_ids, labels["input_ids"]
     else:
         model_inputs = tokenizer(
             inputs,
-            max_seq_len=max_source_length,
-            pad_to_max_seq_len=True,
+            max_length=max_source_length,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
             return_length=True)
-        return model_inputs["input_ids"], model_inputs["attention_mask"], model_inputs["seq_len"], decoder_input_ids, \
-               labels["input_ids"]
+        return model_inputs["input_ids"], model_inputs["attention_mask"], \
+        model_inputs["length"], decoder_input_ids, labels["input_ids"]
 
 
 def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):

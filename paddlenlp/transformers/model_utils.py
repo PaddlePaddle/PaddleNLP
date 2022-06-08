@@ -24,7 +24,7 @@ import paddle
 import numpy as np
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
+from paddlenlp.utils.downloader import get_path_from_url, download_check, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -35,6 +35,12 @@ __all__ = [
     'PretrainedModel',
     'register_base_model',
 ]
+
+
+def unwrap_model(model, *args, **kwargs):
+    raw_model = model._layers if isinstance(model,
+                                            paddle.DataParallel) else model
+    return raw_model
 
 
 def register_base_model(cls):
@@ -332,6 +338,13 @@ class PretrainedModel(Layer, GenerationMixin):
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
 
+        # NOTE: Allow to load partial model for model parallel.
+        # TODO(guosheng): To make model loading for the model parallel automatic,
+        # maybe we should make rank 0 worker load weights of the full model on
+        # CPU, then split weights into multiple parts and pickle separately.
+        # The other workers wait util pickle finish and then load the corresponding
+        # partial weights. Also we can directly use separate weight files for
+        # simplicity.
         state_dict = paddle.load(weight_path, return_numpy=load_state_as_np)
 
         # Make sure we are able to load base models as well as derived models
@@ -374,10 +387,42 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
+        # Logging model download statistics
+        download_check(pretrained_model_name_or_path, "from_pretrained")
+        # For model parallel if FasterGeneration
+        # To avoid recursive import temporarily.
+        import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
+        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(
+            model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model
         return model, state_to_load
+
+    def get_model_config(self):
+        """Get model configuration.
+
+        Returns:
+            config: The config of the model.
+        """
+
+        # If init_config contains a Layer, use the layer's init_config to save
+        def get_config(model):
+            model_config = model.init_config
+            for key, value in model_config.items():
+                if key == "init_args":
+                    args = []
+                    for arg in value:
+                        args.append(
+                            get_config(arg)
+                            if isinstance(arg, PretrainedModel) else arg)
+                    model_config[key] = tuple(args)
+                elif isinstance(value, PretrainedModel):
+                    model_config[key] = value.init_config
+            return model_config
+
+        model_config = get_config(self)
+        return model_config
 
     def save_model_config(self, save_dir):
         """
@@ -388,20 +433,9 @@ class PretrainedModel(Layer, GenerationMixin):
         """
         # Save model config
         model_config_file = os.path.join(save_dir, self.model_config_file)
-        model_config = self.init_config
-        # If init_config contains a Layer, use the layer's init_config to save
-        for key, value in model_config.items():
-            if key == "init_args":
-                args = []
-                for arg in value:
-                    args.append(
-                        arg.init_config
-                        if isinstance(arg, PretrainedModel) else arg)
-                model_config[key] = tuple(args)
-            elif isinstance(value, PretrainedModel):
-                model_config[key] = value.init_config
+        model_config = self.get_model_config()
         with io.open(model_config_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(model_config, ensure_ascii=False))
+            f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
     def save_pretrained(self, save_dir):
         """

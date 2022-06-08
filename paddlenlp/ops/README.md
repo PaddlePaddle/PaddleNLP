@@ -42,10 +42,10 @@
 
 目前支持 JIT 的预测加速 API 有：
 * `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./faster_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/faster_transformer/)。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../model_zoo/gpt/faster_gpt/)。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/) 以及 PLATO-XL 的使用示例可以参考 [PLATO-XL 11B 使用示例](../../examples/dialogue/plato-xl/)。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。
-  * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/faster/faster_generation/samples/unimo_text_sample.py)。
+  * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../faster_generation/samples/unimo_text_sample.py)。
   * 同样，我们提供了动转静以及 Paddle Inference 使用的示例，详细可以参考 [动转静导出](./faster_transformer/sample/unimo_text_export_model_sample.py) 和 [Paddle Inference 使用示例](./faster_transformer/sample/unimo_text_inference.py)。
 * `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./faster_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
 

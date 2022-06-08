@@ -84,7 +84,7 @@ class DDParserTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "word_vocab": "vocab.json",
+        "word_vocab": "word_vocab.json",
         "rel_vocab": "rel_vocab.json",
     }
     resource_files_urls = {
@@ -337,7 +337,7 @@ class DDParserTask(Task):
         arcs = inputs['arcs']
         rels = inputs['rels']
         words = inputs['words']
-        arcs = [[s for s in seq] for seq in arcs]
+        arcs = [[s.item() for s in seq] for seq in arcs]
         rels = [self.rel_vocab.to_tokens(seq) for seq in rels]
 
         results = []

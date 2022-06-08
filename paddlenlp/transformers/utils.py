@@ -35,6 +35,9 @@ def fn_args_to_dict(func, *args, **kwargs):
     # add default argument values
     kwargs_dict = dict(zip(spec_args[-len(spec_defaults):],
                            spec_defaults)) if spec_defaults else {}
+    for k in list(kwargs_dict.keys()):
+        if k in init_dict:
+            kwargs_dict.pop(k)
     kwargs_dict.update(kwargs)
     init_dict.update(kwargs_dict)
     return init_dict

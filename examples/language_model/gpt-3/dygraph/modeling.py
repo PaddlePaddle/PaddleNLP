@@ -21,7 +21,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
@@ -1011,8 +1010,10 @@ class EmbeddingPipe(GPTEmbeddings):
     def embedding_weight(self):
         return self.word_embeddings.weight
 
-    def forward(self, input_ids):
-        embeddings = super().forward(input_ids=input_ids, position_ids=None)
+    def forward(self, tensors):
+        input_ids, position_ids = tensors
+        embeddings = super().forward(
+            input_ids=input_ids, position_ids=position_ids)
         return embeddings
 
 

@@ -17,7 +17,6 @@
 from functools import partial
 import argparse
 import os
-import six
 import random
 import time
 import sys
@@ -31,7 +30,9 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 sys.path.append('..')
+sys.path.append('../../..')
 from roberta.modeling import RobertaForSequenceClassification
+sys.path.remove('../../..')
 sys.path.remove('..')
 from utils import convert_example
 
@@ -94,11 +95,6 @@ parser.add_argument(
     default=None,
     help="Language that the model is built for")
 args = parser.parse_args()
-
-print('\n-----------  Configuration Arguments -----------')
-for arg, value in sorted(six.iteritems(vars(args))):
-    print('%s: %s\n' % (arg, value))
-print('------------------------------------------------\n')
 
 
 def set_seed(seed):

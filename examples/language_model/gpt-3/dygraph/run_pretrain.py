@@ -29,7 +29,7 @@ from paddlenlp.utils import profiler
 
 # to import data_tools
 filepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(filepath, "../../"))
+sys.path.insert(0, os.path.join(filepath, "../"))
 
 from dataset import create_pretrained_dataset
 from args import parse_args
@@ -303,6 +303,7 @@ def do_train(args):
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,
+                max_seq_len=args.max_seq_len,
                 eos_id=tokenizer.eos_token_id)
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -394,7 +395,7 @@ def do_train(args):
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips: %.0f tokens/s, ips_per_card: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, avg_reader_cost,
                            1. / speed, speed, speed * default_global_tokens_num,
                            speed * default_global_tokens_num / nranks,

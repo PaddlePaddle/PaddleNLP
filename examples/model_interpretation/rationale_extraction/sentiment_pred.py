@@ -182,20 +182,10 @@ def truncate_offset(seg, start_offset, end_offset):
 
 
 def init_lstm_var(args):
-    #different language has different tokenizer
-    if args.language == "ch":
-        tokenizer = ErnieTokenizer.from_pretrained(args.vocab_path)
-        padding_idx = tokenizer.vocab.get('[PAD]')
-        tokenizer.inverse_vocab = [
-            item[0]
-            for item in sorted(
-                tokenizer.vocab.items(), key=lambda x: x[1])
-        ]
-    else:
-        vocab = Vocab.load_vocabulary(
-            args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
-        tokenizer = CharTokenizer(vocab)
-        padding_idx = vocab.token_to_idx.get('[PAD]', 0)
+    vocab = Vocab.load_vocabulary(
+        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    tokenizer = CharTokenizer(vocab, args.language, '../punctuations')
+    padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
     trans_fn = partial(
         convert_example,
@@ -299,23 +289,13 @@ if __name__ == "__main__":
                     input_ids[0, 1:-1].tolist())  # list
 
             elif args.base_model == 'lstm':
-                if args.language == 'ch':
-                    input_ids, seq_lens = d
-                    #input_ids = paddle.to_tensor([input_ids[0][0]])
-                    fwd_args = [input_ids, seq_lens]
-                    fwd_kwargs = {}
-                    tokens = [
-                        tokenizer.inverse_vocab[input_id]
-                        for input_id in input_ids.tolist()[0]
-                    ]
-                else:
-                    input_ids, seq_lens = d
-                    fwd_args = [input_ids, seq_lens]
-                    fwd_kwargs = {}
-                    tokens = [
-                        tokenizer.vocab.idx_to_token[input_id]
-                        for input_id in input_ids.tolist()[0]
-                    ]
+                input_ids, seq_lens = d
+                fwd_args = [input_ids, seq_lens]
+                fwd_kwargs = {}
+                tokens = [
+                    tokenizer.vocab.idx_to_token[input_id]
+                    for input_id in input_ids.tolist()[0]
+                ]
 
             result['id'] = dataloader.dataset.data[step]['id']
 

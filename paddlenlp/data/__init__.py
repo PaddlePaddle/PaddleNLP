@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from .collate import *
+from .data_collator import *
 from .vocab import *
 from .sampler import *
 from .tokenizer import *

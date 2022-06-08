@@ -29,10 +29,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokenizer
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
@@ -51,17 +48,9 @@ METRIC_CLASSES = {
     "rte": Accuracy,
 }
 
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "electra": (ElectraForSequenceClassification, ElectraTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-    "albert": (AlbertForSequenceClassification, AlbertTokenizer),
-}
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
     # Required parameters
     parser.add_argument(
         "--task_name",
@@ -74,20 +63,20 @@ def parse_args():
         "--model_type",
         default=None,
         type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        required=False,
+        help="should be remove later")
     parser.add_argument(
         "--model_name_or_path",
         default=None,
         type=str,
         required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        help="Path to pre-trained model")
+    parser.add_argument(
+        "--tokenizer_name_or_path",
+        default=None,
+        type=str,
+        required=False,
+        help="Path to tokenizer")
     parser.add_argument(
         "--output_dir",
         default=None,
@@ -244,11 +233,12 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    if args.tokenizer_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
@@ -304,7 +294,7 @@ def do_train(args):
             return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

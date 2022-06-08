@@ -210,7 +210,7 @@ def load_ds(datafiles):
         MapDataset
     '''
 
-    datas = []
+    data = []
 
     def read(ds_file):
         with open(ds_file, 'r', encoding='utf-8') as fp:
@@ -229,7 +229,7 @@ def load_ds(datafiles):
 
 
 def load_ds_xnli(datafiles):
-    datas = []
+    data = []
 
     def read(ds_file):
         with open(ds_file, 'r', encoding='utf-8') as fp:

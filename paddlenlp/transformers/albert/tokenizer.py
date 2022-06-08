@@ -18,7 +18,8 @@ import os
 import unicodedata
 from shutil import copyfile
 
-from paddle.utils import try_import
+import sentencepiece as spm
+
 from .. import PretrainedTokenizer, BertTokenizer, AddedToken
 
 __all__ = ['AlbertTokenizer']
@@ -581,8 +582,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sentencepiece_model_file = sentencepiece_model_file
-
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
 
@@ -597,7 +596,6 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.sentencepiece_model_file)
 

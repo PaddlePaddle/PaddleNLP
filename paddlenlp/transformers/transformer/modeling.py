@@ -3,7 +3,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -58,9 +57,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
 
 
 class WordEmbedding(nn.Layer):
-    """
-    Word Embedding layer of Transformer. 
-
+    r"""
+    Word Embedding Layer of Transformer.
     This layer automatically constructs a 2D embedding matrix based on the
     input the size of vocabulary (`vocab_size`) and the size of each embedding
     vector (`emb_dim`). This layer lookups embeddings vector of ids provided
@@ -91,7 +89,7 @@ class WordEmbedding(nn.Layer):
             embedding_dim=emb_dim,
             padding_idx=bos_id,
             weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Normal(0., emb_dim**-0.5)))
+                initializer=nn.initializer.Normal(0., emb_dim**(-0.5))))
 
     def forward(self, word):
         r"""
@@ -542,7 +540,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             beam_state=states)
 
         if kwargs.get("trg_word", None) is not None:
-            if in_dygraph_mode():
+            if paddle.in_dynamic_mode():
                 if paddle.shape(kwargs.get("trg_word"))[1] > time:
                     beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state,

@@ -123,7 +123,7 @@ if __name__ == "__main__":
         Stack(dtype="int64"),  # title_seq_lens
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    tokenizer = CharTokenizer(vocab, args.language)
+    tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
     trans_fn = partial(
         convert_example,
         tokenizer=tokenizer,

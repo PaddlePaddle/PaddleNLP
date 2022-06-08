@@ -16,6 +16,7 @@ from .dataset import *
 from .chnsenticorp import *
 from .cmrc2018 import *
 from .drcd import *
+from .drcd_cn import *
 from .dureader_robust import *
 from .glue import *
 from .lcqmc import *
@@ -34,6 +35,7 @@ from .imdb import *
 from .seabsa16 import *
 from .cote import *
 from .clue import *
+from .nlpcc_dbqa import *
 from .nlpcc14_sc import *
 from .nlpcc13_evsam05_thu import *
 from .nlpcc13_evsam05_hit import *

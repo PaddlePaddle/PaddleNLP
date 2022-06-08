@@ -127,6 +127,7 @@ Linear-based（[Ribeiro et al.. 2016](https://arxiv.org/pdf/1602.04938.pdf)）�
 * 操作系统 CentOS 7.5
 * Python 3.8.12
 * PaddlePaddle 2.1.0
+* PaddleNLP 2.2.4
 
 除此之外，需要使用支持 GPU 的硬件环境。
 
@@ -198,12 +199,17 @@ pip3 install paddlepaddle-gpu
     sample_type： 数据的类性，分为原始数据（ori）和扰动数据（disturb）；
     rel_ids：与原始数据关联的扰动数据的id列表（只有原始数据有）；
 ## 模型运行
-### 证据抽取运行：
+### 模型预测：
 
       model_interpretation/task/{task}/run_inter_all.sh (生成所有结果)
       model_interpretation/task/{task}/run_inter.sh (生成单个配置的结果，配置可以选择不同的评估模型，以及不同的证据抽取方法、语言)
 
 (注：{task}可取值为["senti","similarity","mrc"]，其中senti代表情感分析，similarity代表相似度计算，mrc代表阅读理解)
+
+### 证据抽取:
+      cd model_interpretation/rationale_extraction
+      ./generate.sh
+
 ### 可解释评估：
 #### 合理性（plausibility）：
     model_interpretation/evaluation/plausibility/run_f1.sh

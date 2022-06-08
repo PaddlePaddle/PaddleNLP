@@ -1,6 +1,6 @@
 # Defining the exact version will make sure things don't break
 
-Jinja2<3.1
+jinja2==3.0.3
 sphinx==3.5.2
 sphinx_rtd_theme==0.5.2
 readthedocs-sphinx-search==0.1.0
