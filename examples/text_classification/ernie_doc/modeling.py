@@ -666,7 +666,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
 
-                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                memories = paddle.zeros([12, 1, 128, 768], dtype="float32")
                 position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
                 attn_mask = paddle.ones([1, 128, 1])
 
@@ -688,7 +688,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         # [B, N, T, M + T]
         n_head_self_attn_mask = self._create_n_head_attn_mask(attn_mask,
                                                               batch_size)
-        # memories contains n_layer memory whose shape is [B, M, H]
+        # memories contain n_layer memory whose shape is [B, M, H]
         encoder_output, new_mem = self.encoder(
             enc_input=input_embeddings,
             memories=memories,
@@ -729,7 +729,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieDocModel`.
-            memories (List[Tensor]):
+            memories (Tensor):
                 See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
                 See :class:`ErnieDocModel`.
@@ -772,7 +772,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
 
-                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                memories = paddle.zeros([12, 1, 128, 768], dtype="float32")
                 position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
                 attn_mask = paddle.ones([1, 128, 1])
 
@@ -824,7 +824,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieDocModel`.
-            memories (List[Tensor]):
+            memories (Tensor):
                 See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
                 See :class:`ErnieDocModel`.
@@ -868,7 +868,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
 
-                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                memories = paddle.zeros([12, 1, 128, 768], dtype="float32")
                 position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
                 attn_mask = paddle.ones([1, 128, 1])
 
@@ -917,7 +917,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieDocModel`.
-            memories (List[Tensor]):
+            memories (Tensor):
                 See :class:`ErnieDocModel`.
             token_type_ids (Tensor):
                 See :class:`ErnieDocModel`.
@@ -964,7 +964,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
 
-                memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
+                memories = paddle.zeros([12, 1, 128, 768], dtype="float32")
                 position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
                 attn_mask = paddle.ones([1, 128, 1])
 
