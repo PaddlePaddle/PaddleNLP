@@ -95,8 +95,6 @@ void NormalizedString::UpdateNormalizedRange(
   auto n_range = range;
   if (origin_range) {
     ConvertOffsets(&n_range, origin_range);
-  } else {
-    n_range = {0, GetLen()};
   }
   // Retrieve the original characters that are being replaced. This let us
   // compute the change in byte sizes along the way.
@@ -466,7 +464,6 @@ NormalizedString& NormalizedString::Replace(const re2::RE2& pattern,
       size_t uoffset = -offset;
       start = (curr_end >= uoffset) ? curr_end - uoffset : 0;
     }
-
     // Calculate the number of chars that needs to be removed
     size_t removed_chars =
         conv.from_bytes(normalized_.substr(curr_start, result.length()))

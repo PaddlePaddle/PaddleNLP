@@ -19,15 +19,30 @@ namespace normalizers {
 
 ReplaceNormalizer::ReplaceNormalizer(const std::string& pattern,
                                      const std::string& content)
-    : pattern_(pattern), content_(content) {}
+    : pattern_(new re2::RE2(pattern)), content_(content) {}
 
 ReplaceNormalizer::ReplaceNormalizer(
     const ReplaceNormalizer& replace_normalizer)
-    : pattern_(replace_normalizer.pattern_.pattern()),
+    : pattern_(new re2::RE2(replace_normalizer.pattern_->pattern())),
       content_(replace_normalizer.content_) {}
 
 void ReplaceNormalizer::operator()(NormalizedString* input) const {
-  input->Replace(pattern_, content_);
+  input->Replace(*pattern_, content_);
 }
+
+void to_json(nlohmann::json& j, const ReplaceNormalizer& replace_normalizer) {
+  j = {
+      {"type", "ReplaceNormalizer"},
+      {"pattern", replace_normalizer.pattern_->pattern()},
+      {"content", replace_normalizer.content_},
+  };
+}
+
+void from_json(const nlohmann::json& j, ReplaceNormalizer& replace_normalizer) {
+  replace_normalizer.pattern_ =
+      std::unique_ptr<re2::RE2>(new re2::RE2(std::string(j.at("pattern"))));
+  j.at("content").get_to(replace_normalizer.content_);
+}
+
 }  // normalizers
 }  // tokenizers

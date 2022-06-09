@@ -448,6 +448,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
         typeid(normalizers::BertNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::BertNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::ReplaceNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::ReplaceNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -498,6 +502,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::BertNormalizer bert_normalizer;
         normalizer.get_to(bert_normalizer);
         tokenizer.SetNormalizer(bert_normalizer);
+      } else if (normalizer.at("type") == "ReplaceNormalizer") {
+        normalizers::ReplaceNormalizer replace_normalizer;
+        normalizer.get_to(replace_normalizer);
+        tokenizer.SetNormalizer(replace_normalizer);
       }
     }
 

@@ -212,7 +212,12 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::ReplaceNormalizer::operator());
+      .def("__call__", &normalizers::ReplaceNormalizer::operator())
+      .def("__getstate__", [](const normalizers::ReplaceNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
+
   py::class_<normalizers::StripNormalizer, PyStripNormalizer>(submodule,
                                                               "StripNormalizer")
       .def(py::init<bool, bool>(),

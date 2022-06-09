@@ -14,7 +14,9 @@ limitations under the License. */
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 #include "re2/re2.h"
 
@@ -22,12 +24,17 @@ namespace tokenizers {
 namespace normalizers {
 
 struct ReplaceNormalizer : public Normalizer {
+  ReplaceNormalizer() = default;
   ReplaceNormalizer(const std::string& pattern, const std::string& content);
   ReplaceNormalizer(const ReplaceNormalizer& replace_normalizer);
   virtual void operator()(NormalizedString* mut_str) const override;
+  friend void to_json(nlohmann::json& j,
+                      const ReplaceNormalizer& replace_normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        ReplaceNormalizer& replace_normalizer);
 
 private:
-  re2::RE2 pattern_;
+  std::unique_ptr<re2::RE2> pattern_;
   std::string content_;
 };
 
