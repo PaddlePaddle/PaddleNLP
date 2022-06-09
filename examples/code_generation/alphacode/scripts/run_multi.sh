@@ -13,15 +13,15 @@ python -m paddle.distributed.launch \
     --output_dir "output/$task_name"\
     --encoder_max_seq_len 1536 \
     --decoder_max_seq_len 768 \
-    --micro_batch_size 2 \
+    --micro_batch_size 3 \
     --num_train_epochs 10 \
     --max_lr 0.00015\
     --min_lr 0.00001\
-    --save_steps 500 \
+    --save_steps 10000 \
     --weight_decay 0.01\
     --warmup_rate 0.01\
     --grad_clip 1.0\
     --logging_freq 1\
-    --eval_freq 10 \
+    --eval_freq 10000 \
     --device "gpu" \
     --use_amp true

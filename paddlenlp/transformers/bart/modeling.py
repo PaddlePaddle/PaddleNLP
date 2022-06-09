@@ -136,8 +136,8 @@ class BartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else
-                        self.bart.config["init_std"],
+                        std=self.init_std if hasattr(
+                            self, "init_std") else self.bart.config["init_std"],
                         shape=layer.weight.shape))
 
 
@@ -155,10 +155,9 @@ class BartLearnedPositionalEmbedding(Embedding):
     def forward(self, input_ids_shape, past_key_values_length=0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
-        positions = paddle.arange(
-            past_key_values_length,
-            past_key_values_length + seq_len,
-            dtype="int64")
+        positions = paddle.arange(past_key_values_length,
+                                  past_key_values_length + seq_len,
+                                  dtype="int64")
         return super().forward(positions + self.offset)
 
 
@@ -313,27 +312,24 @@ class BartDecoder(BartPretrainedModel):
         """
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.full(
-                    (decoder_length, decoder_length),
-                    -np.inf,
-                    dtype=paddle.get_default_dtype())),
-                1)
+            decoder_attention_mask = paddle.tensor.triu((paddle.full(
+                (decoder_length, decoder_length),
+                -np.inf,
+                dtype=paddle.get_default_dtype())), 1)
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
-        past_key_values_length = paddle.shape(cache[0][0].k)[
-            2] if cache is not None else 0
+        past_key_values_length = paddle.shape(
+            cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
             decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
 
-        decoder_output = self.decoder(
-            tgt=decoder_input,
-            memory=encoder_output,
-            tgt_mask=decoder_attention_mask,
-            memory_mask=memory_mask,
-            cache=cache)
+        decoder_output = self.decoder(tgt=decoder_input,
+                                      memory=encoder_output,
+                                      tgt_mask=decoder_attention_mask,
+                                      memory_mask=memory_mask,
+                                      cache=cache)
         return decoder_output
 
 
@@ -432,17 +428,19 @@ class BartModel(BartPretrainedModel):
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
         self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = BartEncoder(
-            self.shared, vocab_size, pad_token_id, d_model, num_encoder_layers,
-            encoder_attention_heads, encoder_ffn_dim, dropout,
-            activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std)
+        self.encoder = BartEncoder(self.shared, vocab_size, pad_token_id,
+                                   d_model, num_encoder_layers,
+                                   encoder_attention_heads, encoder_ffn_dim,
+                                   dropout, activation_function,
+                                   attention_dropout, activation_dropout,
+                                   max_position_embeddings, init_std)
 
-        self.decoder = BartDecoder(
-            self.shared, vocab_size, pad_token_id, d_model, num_decoder_layers,
-            decoder_attention_heads, decoder_ffn_dim, dropout,
-            activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std)
+        self.decoder = BartDecoder(self.shared, vocab_size, pad_token_id,
+                                   d_model, num_decoder_layers,
+                                   decoder_attention_heads, decoder_ffn_dim,
+                                   dropout, activation_function,
+                                   attention_dropout, activation_dropout,
+                                   max_position_embeddings, init_std)
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -559,10 +557,7 @@ class BartClassificationHead(Layer):
     Perform sentence-level classification tasks.
     """
 
-    def __init__(self,
-                 input_dim: int,
-                 inner_dim: int,
-                 num_classes: int,
+    def __init__(self, input_dim: int, inner_dim: int, num_classes: int,
                  pooler_dropout: float):
         super().__init__()
         self.dense = nn.Linear(input_dim, inner_dim)
@@ -656,8 +651,8 @@ class BartForSequenceClassification(BartPretrainedModel):
                            cache)
         if use_cache:
             output = output[0]
-        eos_mask = paddle.cast(
-            input_ids == self.bart.config['eos_token_id'], dtype='int64')
+        eos_mask = paddle.cast(input_ids == self.bart.config['eos_token_id'],
+                               dtype='int64')
         if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
             raise ValueError(
                 'All examples must have the same number of <eos> tokens.')
@@ -665,8 +660,8 @@ class BartForSequenceClassification(BartPretrainedModel):
         output_shape = paddle.shape(output)
         # TODO(gongenlei): support bool tensor index
         output = output.masked_select(
-            eos_mask.unsqueeze(-1).astype('bool').tile(
-                [1, 1, output_shape[-1]]))
+            eos_mask.unsqueeze(-1).astype('bool').tile([1, 1,
+                                                        output_shape[-1]]))
         sentence_representation = output.reshape(
             [output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
@@ -766,9 +761,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
         super().__init__()
         self.bart = bart
         self.lm_head_weight = self.create_parameter(
-            shape=[
-                self.bart.config['vocab_size'], self.bart.config['d_model']
-            ],
+            shape=[self.bart.config['vocab_size'], self.bart.config['d_model']],
             dtype=self.bart.shared.weight.dtype,
             is_bias=False)
         self.register_buffer("final_logits_bias",
@@ -923,16 +916,18 @@ class BartEncoderPredictionHead(nn.Layer):
     """
 
     def __init__(
-            self,
-            hidden_size,
-            vocab_size,
-            activation,
-            embedding_weights=None,
-            weight_attr=None, ):
+        self,
+        hidden_size,
+        vocab_size,
+        activation,
+        embedding_weights=None,
+        weight_attr=None,
+    ):
         super(BartEncoderPredictionHead, self).__init__()
 
-        self.transform = nn.Linear(
-            hidden_size, hidden_size, weight_attr=weight_attr)
+        self.transform = nn.Linear(hidden_size,
+                                   hidden_size,
+                                   weight_attr=weight_attr)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
@@ -969,8 +964,8 @@ class BartForPretraining(BartPretrainedModel):
         super(BartForPretraining, self).__init__()
         self.bart = bart
         weight_attr = paddle.ParamAttr(
-            initializer=nn.initializer.TruncatedNormal(
-                mean=0.0, std=self.bart.init_std))
+            initializer=nn.initializer.TruncatedNormal(mean=0.0,
+                                                       std=self.bart.init_std))
         self.predictions = BartEncoderPredictionHead(
             self.bart.config["d_model"], self.bart.config["vocab_size"],
             self.bart.config["activation_function"], self.bart.shared.weight,
@@ -1032,16 +1027,18 @@ class BartForPretraining(BartPretrainedModel):
                 cache = self.bart.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
-        decoder_output = self.bart.decoder(
-            decoder_input_ids, decoder_attention_mask, encoder_output,
-            attention_mask, cache)
+        decoder_output = self.bart.decoder(decoder_input_ids,
+                                           decoder_attention_mask,
+                                           encoder_output, attention_mask,
+                                           cache)
         if use_cache:
             output = decoder_output[0]
             cache = decoder_output[1]
         else:
             output = decoder_output
-        decoder_prediction_scores = paddle.matmul(
-            output, self.bart.shared.weight, transpose_y=True)
+        decoder_prediction_scores = paddle.matmul(output,
+                                                  self.bart.shared.weight,
+                                                  transpose_y=True)
         return encoder_prediction_scores, decoder_prediction_scores
 
 
@@ -1052,8 +1049,8 @@ class BartPretrainingCriterion(paddle.nn.Layer):
 
     def __init__(self, topo=None):
         super(BartPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(
-            reduction="none", ignore_index=-1)
+        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none",
+                                                    ignore_index=-1)
 
     def forward(self, encoder_prediction_scores, encoder_labels,
                 decoder_prediction_scores, decoder_labels, loss_mask):

@@ -45,8 +45,8 @@ def get_train_valid_test_split_(splits_string, size):
     splits = [split / splits_sum for split in splits]
     splits_index = [0]
     for index, split in enumerate(splits):
-        splits_index.append(splits_index[index] + int(
-            round(split * float(size))))
+        splits_index.append(splits_index[index] +
+                            int(round(split * float(size))))
     diff = splits_index[-1] - size
     for index in range(1, len(splits_index)):
         splits_index[index] -= diff
@@ -56,11 +56,12 @@ def get_train_valid_test_split_(splits_string, size):
 
 
 def create_pretrained_dataset(
-        args,
-        input_path,
-        tokenizer,
-        encoder_max_seq_len=1536,
-        decoder_max_seq_len=768, ):
+    args,
+    input_path,
+    tokenizer,
+    encoder_max_seq_len=1536,
+    decoder_max_seq_len=768,
+):
 
     assert len(input_path) == 1, "BART only support one dataset for now."
 
@@ -70,8 +71,9 @@ def create_pretrained_dataset(
         logger.warning(
             "You are using compatible dataset, please make new dataset as the readme!"
         )
-        process_datas = np.load(
-            input_prefix + "_ids.npz", mmap_mode="r+", allow_pickle=True)
+        process_datas = np.load(input_prefix + "_ids.npz",
+                                mmap_mode="r+",
+                                allow_pickle=True)
         sample_ids = process_datas["ids"]
         sample_lens = process_datas["lens"].astype("int32")
     else:
@@ -79,8 +81,9 @@ def create_pretrained_dataset(
             if not os.path.isfile(input_prefix + suffix):
                 raise ValueError("File Not found, %s" % (input_prefix + suffix))
 
-        sample_ids = np.load(
-            input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        sample_ids = np.load(input_prefix + "_ids.npy",
+                             mmap_mode="r",
+                             allow_pickle=True)
         # All documment ids, extend as 1-D array.
 
         process_datas = np.load(input_prefix + "_idx.npz")
@@ -116,25 +119,24 @@ def create_pretrained_dataset(
         return out
 
     def build_dataset(index, name):
-        dataset = Seq2SeqDataset(
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            tokenizer=tokenizer,
-            documents=np.arange(splits[index], splits[index + 1]),
-            masked_lm_prob=args.masked_lm_prob,
-            encoder_max_seq_len=encoder_max_seq_len,
-            decoder_max_seq_len=decoder_max_seq_len,
-            seed=args.seed)
+        dataset = Seq2SeqDataset(sample_ids=sample_ids,
+                                 sample_lens=sample_lens,
+                                 tokenizer=tokenizer,
+                                 documents=np.arange(splits[index],
+                                                     splits[index + 1]),
+                                 masked_lm_prob=args.masked_lm_prob,
+                                 encoder_max_seq_len=encoder_max_seq_len,
+                                 decoder_max_seq_len=decoder_max_seq_len,
+                                 seed=args.seed)
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
             shuffle=False if name != 'train' else True)
-        data_loader = DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            num_workers=0,
-            collate_fn=_collate_data,
-            return_list=True)
+        data_loader = DataLoader(dataset=dataset,
+                                 batch_sampler=batch_sampler,
+                                 num_workers=0,
+                                 collate_fn=_collate_data,
+                                 return_list=True)
         return data_loader
 
     # Note, data should be broardcast to all devices.
@@ -146,6 +148,7 @@ def create_pretrained_dataset(
 
 
 class Seq2SeqDataset(paddle.io.Dataset):
+
     def __init__(self,
                  sample_ids,
                  sample_lens,
@@ -197,8 +200,8 @@ class Seq2SeqDataset(paddle.io.Dataset):
         seq_length = len(tokens)
 
         # Attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-                                                                 seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape(
+            (1, seq_length, seq_length))
 
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
