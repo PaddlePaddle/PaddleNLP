@@ -1071,11 +1071,8 @@ class InferTransformerDecoding(nn.Layer):
 
                 self.slf_q_bias.append(mod.self_attn.q_proj.bias)
 
-            self.fake_scale = [
-                paddle.zeros(
-                    shape=[0],
-                    dtype="float16" if use_fp16_decoding else "float32")
-            ]
+            self.fake_scale = paddle.zeros(
+                shape=[0], dtype="float16" if use_fp16_decoding else "float32")
             if use_int8:
                 self.create_int8_parameter(
                     prefix="self_attn_k_proj_weight",
@@ -1226,7 +1223,7 @@ class InferTransformerDecoding(nn.Layer):
     def get_scale(self, scale):
         if (len(scale) == 0):
             # Reuse the same param to prevent performance issue. 
-            return self.fake_scale
+            return [self.fake_scale]
         else:
             return scale
 

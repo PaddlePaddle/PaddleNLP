@@ -318,8 +318,7 @@ public:
     if (use_int8_ and int8_workspace != nullptr) {
       // https://stackoverflow.com/questions/37323053/misaligned-address-in-cuda
       // NOTE: Dereferencing a pointer pointing to a 32-bit value from an
-      // address
-      // NOT aligned at a 32-bit boundary is not allowed.
+      // address NOT aligned at a 32-bit boundary is not allowed.
 
       input_quantize_buf_ = (int8_t *)int8_workspace;
       out_quantize_buf_ =
