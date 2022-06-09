@@ -460,6 +460,26 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::StripAccentsNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::StripAccentsNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::NFCNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::NFCNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::NFDNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::NFDNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::NFKCNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::NFKCNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::NFKDNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::NFKDNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::NmtNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::NmtNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -522,6 +542,26 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::StripAccentsNormalizer strip_normalizer;
         normalizer.get_to(strip_normalizer);
         tokenizer.SetNormalizer(strip_normalizer);
+      } else if (normalizer.at("type") == "NFCNormalizer") {
+        normalizers::NFCNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "NFDNormalizer") {
+        normalizers::NFDNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "NFKCNormalizer") {
+        normalizers::NFKCNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "NFKDNormalizer") {
+        normalizers::NFKDNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "NmtNormalizer") {
+        normalizers::NmtNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
       }
     }
 

@@ -262,7 +262,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::NFCNormalizer::operator());
+      .def("__call__", &normalizers::NFCNormalizer::operator())
+      .def("__getstate__", [](const normalizers::NFCNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::NFDNormalizer, PyNFDNormalizer>(submodule,
                                                           "NFDNormalizer")
       .def(py::init<>())
@@ -273,7 +277,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::NFDNormalizer::operator());
+      .def("__call__", &normalizers::NFDNormalizer::operator())
+      .def("__getstate__", [](const normalizers::NFDNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::NFKCNormalizer, PyNFKCNormalizer>(submodule,
                                                             "NFKCNormalizer")
       .def(py::init<>())
@@ -284,7 +292,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::NFKCNormalizer::operator());
+      .def("__call__", &normalizers::NFKCNormalizer::operator())
+      .def("__getstate__", [](const normalizers::NFKCNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::NFKDNormalizer, PyNFKDNormalizer>(submodule,
                                                             "NFKDNormalizer")
       .def(py::init<>())
@@ -295,7 +307,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::NFKDNormalizer::operator());
+      .def("__call__", &normalizers::NFKDNormalizer::operator())
+      .def("__getstate__", [](const normalizers::NFKDNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::NmtNormalizer, PyNmtNormalizer>(submodule,
                                                           "NmtNormalizer")
       .def(py::init<>())
@@ -306,7 +322,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::NmtNormalizer::operator());
+      .def("__call__", &normalizers::NmtNormalizer::operator())
+      .def("__getstate__", [](const normalizers::NmtNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::LowercaseNormalizer, PyLowercaseNormalizer>(
       submodule, "LowercaseNormalizer")
       .def(py::init<>())

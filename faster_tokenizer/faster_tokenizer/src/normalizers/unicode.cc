@@ -28,15 +28,47 @@ namespace normalizers {
 
 void NFCNormalizer::operator()(NormalizedString* input) const { input->NFC(); }
 
+void to_json(nlohmann::json& j, const NFCNormalizer& normalizer) {
+  j = {
+      {"type", "NFCNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, NFCNormalizer& normalizer) {}
+
 void NFKCNormalizer::operator()(NormalizedString* input) const {
   input->NFKC();
 }
 
+void to_json(nlohmann::json& j, const NFKCNormalizer& normalizer) {
+  j = {
+      {"type", "NFKCNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, NFKCNormalizer& normalizer) {}
+
 void NFDNormalizer::operator()(NormalizedString* input) const { input->NFD(); }
+
+void to_json(nlohmann::json& j, const NFDNormalizer& normalizer) {
+  j = {
+      {"type", "NFDNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, NFDNormalizer& normalizer) {}
 
 void NFKDNormalizer::operator()(NormalizedString* input) const {
   input->NFKD();
 }
+
+void to_json(nlohmann::json& j, const NFKDNormalizer& normalizer) {
+  j = {
+      {"type", "NFKDNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, NFKDNormalizer& normalizer) {}
 
 void NmtNormalizer::operator()(NormalizedString* input) const {
   input->FilterChar([](char32_t ch) -> bool {
@@ -56,6 +88,14 @@ void NmtNormalizer::operator()(NormalizedString* input) const {
     return ch;
   });
 }
+
+void to_json(nlohmann::json& j, const NmtNormalizer& normalizer) {
+  j = {
+      {"type", "NmtNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, NmtNormalizer& normalizer) {}
 
 }  // normalizers
 }  // tokenizers

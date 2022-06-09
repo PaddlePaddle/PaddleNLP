@@ -53,6 +53,26 @@ class TestNormalizerJson(TestTokenizerJson):
         strip_normalizer = faster_tokenizer.normalizers.StripAccentsNormalizer()
         self.check_normalizer_json(strip_normalizer)
 
+    def test_nfc(self):
+        nfc_normalizer = faster_tokenizer.normalizers.NFCNormalizer()
+        self.check_normalizer_json(nfc_normalizer)
+
+    def test_nfkc(self):
+        nfkc_normalizer = faster_tokenizer.normalizers.NFKCNormalizer()
+        self.check_normalizer_json(nfkc_normalizer)
+
+    def test_nfd(self):
+        nfd_normalizer = faster_tokenizer.normalizers.NFDNormalizer()
+        self.check_normalizer_json(nfd_normalizer)
+
+    def test_nfkd(self):
+        nfkd_normalizer = faster_tokenizer.normalizers.NFKDNormalizer()
+        self.check_normalizer_json(nfkd_normalizer)
+
+    def test_strip_accent(self):
+        nmt_normalizer = faster_tokenizer.normalizers.NmtNormalizer()
+        self.check_normalizer_json(nmt_normalizer)
+
 
 if __name__ == "__main__":
     unittest.main()
