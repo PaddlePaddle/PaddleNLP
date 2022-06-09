@@ -62,6 +62,7 @@ MAPPING_NAMES = OrderedDict([
     ("PPMiniLM", "ppminilm"),
     ("ProphetNet", "prophetnet"),
     ("Reformer", "reformer"),
+    ("RemBert", "rembert"),
     ("Roberta", "roberta"),
     ("RoFormerv2", "roformerv2"),
     ("RoFormer", "roformer"),
