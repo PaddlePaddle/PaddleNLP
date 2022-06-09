@@ -37,7 +37,7 @@
   * 🏥 发布中文医疗领域预训练模型[**ERNIE-Health**](./model_zoo/ernie-health)，[CBLUE](https://github.com/CBLUEbenchmark/CBLUE)中文医疗信息处理评测冠军模型。
   * 💬 发布大规模百亿开放域对话预训练模型[**PLATO-XL**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl) ，配合⚡**FasterGeneration**⚡快速实现高性能GPU并行推理加速。
 
-* 📬 2022.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 📬 2021.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
 ## 特性
 
