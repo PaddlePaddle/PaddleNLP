@@ -1,0 +1,49 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import numpy as np
+import os
+import unittest
+from paddlenlp.utils.log import logger
+from paddlenlp.transformers import AutoTokenizer
+import faster_tokenizer
+from faster_tokenizer import ErnieFasterTokenizer, models
+logger.logger.setLevel('ERROR')
+
+
+class TestTokenizerJson(unittest.TestCase):
+    def setUp(self):
+        wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
+        ernie_vocab = wordpiece_tokenizer.vocab.token_to_idx
+        self.faster_tokenizer = ErnieFasterTokenizer(ernie_vocab)
+
+
+class TestNormalizerJson(TestTokenizerJson):
+    def check_normalizer_json(self, normalizer):
+        self.faster_tokenizer.normalizer = normalizer
+        json_file = str(normalizer.__class__) + ".json"
+        self.faster_tokenizer.save(json_file)
+        tokenizer = ErnieFasterTokenizer.from_file(json_file)
+        os.remove(json_file)
+        self.assertEqual(normalizer.__getstate__(),
+                         tokenizer.normalizer.__getstate__())
+
+    def test_replace(self):
+        replace_normalizer = faster_tokenizer.normalizers.ReplaceNormalizer(
+            "''", "\"")
+        self.check_normalizer_json(replace_normalizer)
+
+
+if __name__ == "__main__":
+    unittest.main()
