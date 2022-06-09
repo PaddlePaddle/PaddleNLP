@@ -138,7 +138,7 @@ class Task(metaclass=abc.ABCMeta):
 
     def _check_predictor_type(self):
         if paddle.get_device() == 'cpu' and self._infer_precision == 'fp16':
-            logger.info(
+            logger.warning(
                 "The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu."
             )
         else:
