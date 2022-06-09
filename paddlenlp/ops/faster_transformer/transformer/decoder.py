@@ -18,7 +18,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddle.fluid.layer_helper import LayerHelper
+from paddle.common_ops_import import LayerHelper
 from paddlenlp.transformers import WordEmbedding, PositionalEmbedding, position_encoding_init
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load, LOADED_EXT

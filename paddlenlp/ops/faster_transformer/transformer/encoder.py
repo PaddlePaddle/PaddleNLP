@@ -14,7 +14,7 @@
 import os
 
 import paddle
-from paddle.fluid.layer_helper import LayerHelper
+from paddle.common_ops_import import LayerHelper
 import paddle.nn as nn
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
