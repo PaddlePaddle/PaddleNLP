@@ -107,6 +107,7 @@ def parse_args():
         "--collect_shape",
         action='store_true',
         help="Whether to collect shape info.")
+
     parser.add_argument(
         "--precision",
         default="fp32",
@@ -127,9 +128,7 @@ def parse_args():
         default=False,
         help="Use onnxruntime to infer or not.")
     parser.add_argument(
-        "--debug",
-        action='store_true',
-        help="Use onnxruntime to infer or not.")
+        "--debug", action='store_true', help="Use onnxruntime to infer or not.")
     parser.add_argument(
         "--provider",
         default='CPUExecutionProvider',
@@ -245,7 +244,7 @@ class Predictor(object):
             config.disable_gpu()
             config.switch_ir_optim(True)
             config.enable_mkldnn()
-            if args.enable_quantize: 
+            if args.enable_quantize:
                 config.enable_mkldnn_int8()
             if args.debug:
                 config.switch_ir_debug(True)
