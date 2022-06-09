@@ -19,6 +19,7 @@ import random
 import time
 import math
 import json
+import distutils.util
 from functools import partial
 
 import numpy as np
@@ -31,6 +32,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -137,6 +139,11 @@ def parse_args():
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
     parser.add_argument(
+        "--save_best_model",
+        default=True,
+        type=distutils.util.strtobool,
+        help="Whether to save best model.", )
+    parser.add_argument(
         "--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
@@ -174,7 +181,7 @@ def evaluate(model, loss_fct, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
+    logger.info("eval loss: %f, acc: %s, " % (loss.numpy(), res))
     model.train()
     return res
 
@@ -278,7 +285,7 @@ def do_eval(args):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     res = metric.accumulate()
-    print("acc: %s\n, " % (res), end='')
+    logger.info("acc: %s\n, " % (res))
 
 
 def do_train(args):
@@ -391,7 +398,7 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 if global_step % args.logging_steps == 0:
-                    print(
+                    logger.info(
                         "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                         % (global_step, num_training_steps, epoch, step,
                            paddle.distributed.get_rank(), loss,
@@ -401,21 +408,23 @@ def do_train(args):
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     tic_eval = time.time()
                     acc = evaluate(model, loss_fct, metric, dev_data_loader)
-                    print("eval done total : %s s" % (time.time() - tic_eval))
+                    logger.info("eval done total : %s s" %
+                                (time.time() - tic_eval))
                     if acc > best_acc:
                         best_acc = acc
-                        output_dir = args.output_dir
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # Need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
+                        if args.save_best_model:
+                            output_dir = args.output_dir
+                            if not os.path.exists(output_dir):
+                                os.makedirs(output_dir)
+                            # Need better way to get inner model of DataParallel
+                            model_to_save = model._layers if isinstance(
+                                model, paddle.DataParallel) else model
+                            model_to_save.save_pretrained(output_dir)
+                            tokenizer.save_pretrained(output_dir)
                 if global_step >= num_training_steps:
-                    print("best_acc: ", best_acc)
+                    logger.info("best_result: %.2f" % (best_acc * 100))
                     return
-    print("best_acc: ", best_acc)
+    logger.info("best_result: %.2f" % (best_acc * 100))
 
 
 def do_predict(args):

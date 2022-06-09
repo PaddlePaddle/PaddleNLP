@@ -82,7 +82,10 @@ class UIETask(Task):
     }
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json"
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
     }
     resource_files_urls = {
         "uie-base": {
@@ -93,6 +96,18 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-tiny": {
@@ -103,18 +118,42 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
                 "6f1ee399398d4f218450fbbf5f212b15"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-medical-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
-                "56c2b7d02403f2ede513cedaabc8212a"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
+                "569b4bc1abf80eedcdad5a6e774d46bf"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        },
+        }
     }
 
     def __init__(self, task, model, schema, **kwargs):
@@ -127,6 +166,7 @@ class UIETask(Task):
         self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
+        self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._max_seq_len = self.kwargs[
@@ -170,7 +210,7 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._encoding_model)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):
         """
@@ -242,13 +282,22 @@ class UIETask(Task):
         probs = []
         for batch in infer_data_loader:
             input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
-            self.input_handles[0].copy_from_cpu(input_ids.numpy())
-            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-            self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-            self.input_handles[3].copy_from_cpu(att_mask.numpy())
-            self.predictor.run()
-            start_prob = self.output_handle[0].copy_to_cpu().tolist()
-            end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            if self._predictor_type == "paddle-inference":
+                self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                self.predictor.run()
+                start_prob = self.output_handle[0].copy_to_cpu().tolist()
+                end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            else:
+                input_dict = {
+                    "input_ids": input_ids.numpy(),
+                    "token_type_ids": token_type_ids.numpy(),
+                    "pos_ids": pos_ids.numpy(),
+                    "att_mask": att_mask.numpy()
+                }
+                start_prob, end_prob = self.predictor.run(None, input_dict)
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
@@ -332,20 +381,20 @@ class UIETask(Task):
         inputs['result'] = results
         return inputs
 
-    def _multi_stage_predict(self, datas):
+    def _multi_stage_predict(self, data):
         """
         Traversal the schema tree and do multi-stage prediction.
 
         Args:
-            datas (list): a list of strings
+            data (list): a list of strings
 
         Returns:
             list: a list of predictions, where the list's length
-                equals to the length of `datas`
+                equals to the length of `data`
         """
-        results = [{} for _ in range(len(datas))]
+        results = [{} for _ in range(len(data))]
         # input check to early return
-        if len(datas) < 1 or self._schema_tree is None:
+        if len(data) < 1 or self._schema_tree is None:
             return results
 
         # copy to stay `self._schema_tree` unchanged
@@ -357,22 +406,22 @@ class UIETask(Task):
             cnt = 0
             idx = 0
             if not node.prefix:
-                for data in datas:
+                for one_data in data:
                     examples.append({
-                        "text": data,
+                        "text": one_data,
                         "prompt": dbc2sbc(node.name)
                     })
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
             else:
-                for pre, data in zip(node.prefix, datas):
+                for pre, one_data in zip(node.prefix, data):
                     if len(pre) == 0:
                         input_map[cnt] = []
                     else:
                         for p in pre:
                             examples.append({
-                                "text": data,
+                                "text": one_data,
                                 "prompt": dbc2sbc(p + node.name)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
@@ -384,7 +433,7 @@ class UIETask(Task):
                 result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
-                relations = [[] for i in range(len(datas))]
+                relations = [[] for i in range(len(data))]
                 for k, v in input_map.items():
                     for idx in v:
                         if len(result_list[idx]) == 0:
@@ -412,7 +461,7 @@ class UIETask(Task):
                         else:
                             relations[k][i]["relations"][node.name].extend(
                                 result_list[v[i]])
-                new_relations = [[] for i in range(len(datas))]
+                new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
                         if "relations" in relations[i][j].keys(
@@ -424,7 +473,7 @@ class UIETask(Task):
                                     "relations"][node.name][k])
                 relations = new_relations
 
-            prefix = [[] for _ in range(len(datas))]
+            prefix = [[] for _ in range(len(data))]
             for k, v in input_map.items():
                 for idx in v:
                     for i in range(len(result_list[idx])):

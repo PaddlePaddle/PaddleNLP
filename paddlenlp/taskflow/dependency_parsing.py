@@ -337,7 +337,7 @@ class DDParserTask(Task):
         arcs = inputs['arcs']
         rels = inputs['rels']
         words = inputs['words']
-        arcs = [[s for s in seq] for seq in arcs]
+        arcs = [[s.item() for s in seq] for seq in arcs]
         rels = [self.rel_vocab.to_tokens(seq) for seq in rels]
 
         results = []

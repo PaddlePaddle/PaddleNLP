@@ -1010,8 +1010,10 @@ class EmbeddingPipe(GPTEmbeddings):
     def embedding_weight(self):
         return self.word_embeddings.weight
 
-    def forward(self, input_ids):
-        embeddings = super().forward(input_ids=input_ids, position_ids=None)
+    def forward(self, tensors):
+        input_ids, position_ids = tensors
+        embeddings = super().forward(
+            input_ids=input_ids, position_ids=position_ids)
         return embeddings
 
 
