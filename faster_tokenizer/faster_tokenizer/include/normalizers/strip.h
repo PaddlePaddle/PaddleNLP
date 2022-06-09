@@ -28,10 +28,18 @@ struct StripNormalizer : public Normalizer {
 private:
   bool left_;
   bool right_;
+  friend void to_json(nlohmann::json& j,
+                      const StripNormalizer& strip_normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        StripNormalizer& strip_normalizer);
 };
 
 struct StripAccentsNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
+  friend void to_json(nlohmann::json& j,
+                      const StripAccentsNormalizer& strip_normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        StripAccentsNormalizer& strip_normalizer);
 };
 
 }  // normalizers

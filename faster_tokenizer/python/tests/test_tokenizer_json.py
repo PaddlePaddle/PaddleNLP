@@ -44,6 +44,15 @@ class TestNormalizerJson(TestTokenizerJson):
             "''", "\"")
         self.check_normalizer_json(replace_normalizer)
 
+    def test_strip(self):
+        strip_normalizer = faster_tokenizer.normalizers.StripNormalizer(True,
+                                                                        True)
+        self.check_normalizer_json(strip_normalizer)
+
+    def test_strip_accent(self):
+        strip_normalizer = faster_tokenizer.normalizers.StripAccentsNormalizer()
+        self.check_normalizer_json(strip_normalizer)
+
 
 if __name__ == "__main__":
     unittest.main()

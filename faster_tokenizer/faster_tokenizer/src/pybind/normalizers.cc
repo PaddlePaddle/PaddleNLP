@@ -231,7 +231,11 @@ void BindNormalizers(pybind11::module* m) {
             return normalized.GetStr();
           },
           py::arg("sequence"))
-      .def("__call__", &normalizers::StripNormalizer::operator());
+      .def("__call__", &normalizers::StripNormalizer::operator())
+      .def("__getstate__", [](const normalizers::StripNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::StripAccentsNormalizer, PyStripAccentsNormalizer>(
       submodule, "StripAccentsNormalizer")
       .def(py::init<>())
@@ -243,7 +247,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::StripAccentsNormalizer::operator());
+      .def("__call__", &normalizers::StripAccentsNormalizer::operator())
+      .def("__getstate__", [](const normalizers::StripAccentsNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::NFCNormalizer, PyNFCNormalizer>(submodule,
                                                           "NFCNormalizer")
       .def(py::init<>())

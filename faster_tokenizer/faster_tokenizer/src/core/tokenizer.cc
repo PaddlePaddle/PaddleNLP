@@ -452,6 +452,14 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::ReplaceNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::ReplaceNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::StripNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::StripNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::StripAccentsNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::StripAccentsNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -506,6 +514,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::ReplaceNormalizer replace_normalizer;
         normalizer.get_to(replace_normalizer);
         tokenizer.SetNormalizer(replace_normalizer);
+      } else if (normalizer.at("type") == "StripNormalizer") {
+        normalizers::StripNormalizer strip_normalizer;
+        normalizer.get_to(strip_normalizer);
+        tokenizer.SetNormalizer(strip_normalizer);
+      } else if (normalizer.at("type") == "StripAccentsNormalizer") {
+        normalizers::StripAccentsNormalizer strip_normalizer;
+        normalizer.get_to(strip_normalizer);
+        tokenizer.SetNormalizer(strip_normalizer);
       }
     }
 

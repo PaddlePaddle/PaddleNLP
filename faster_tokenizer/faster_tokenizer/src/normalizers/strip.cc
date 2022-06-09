@@ -31,6 +31,19 @@ void StripNormalizer::operator()(NormalizedString* input) const {
   }
 }
 
+void to_json(nlohmann::json& j, const StripNormalizer& strip_normalizer) {
+  j = {
+      {"type", "StripNormalizer"},
+      {"left", strip_normalizer.left_},
+      {"right", strip_normalizer.right_},
+  };
+}
+
+void from_json(const nlohmann::json& j, StripNormalizer& strip_normalizer) {
+  j.at("left").get_to(strip_normalizer.left_);
+  j.at("right").get_to(strip_normalizer.right_);
+}
+
 void StripAccentsNormalizer::operator()(NormalizedString* input) const {
   input->NFD();
   input->FilterChar([](char32_t ch) -> bool {
@@ -38,6 +51,16 @@ void StripAccentsNormalizer::operator()(NormalizedString* input) const {
     return u_charType(ch) != U_NON_SPACING_MARK;
   });
 }
+
+void to_json(nlohmann::json& j,
+             const StripAccentsNormalizer& strip_normalizer) {
+  j = {
+      {"type", "StripAccentsNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j,
+               StripAccentsNormalizer& strip_normalizer) {}
 
 }  // normalizers
 }  // tokenizers
