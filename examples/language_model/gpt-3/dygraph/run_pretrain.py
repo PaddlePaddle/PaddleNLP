@@ -37,6 +37,8 @@ import lr
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
+from paddle.fluid.dygraph.parallel import sync_params_buffers
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
 # add sharding stage2/3
 from paddle.distributed.sharding import group_sharded_parallel
@@ -152,7 +154,9 @@ def do_train(args):
 
     # sharding stage2/3 not support hybrid parallel
     if args.sharding_stage in [2, 3]:
-        assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support hybrid parallel later"
+        assert args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support tensor/pipeline parallel later"
+        dp_group = hcg.get_data_parallel_group()
+        sharding_group = hcg.get_sharding_parallel_group()
 
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
@@ -275,6 +279,9 @@ def do_train(args):
         scaler = scaler if args.use_pure_fp16 else None
         model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
                                                      args.sharding_offload)
+        if args.dp_degree > 1:
+            sync_params_buffers(
+                model, comm_group=dp_group, src_rank=dp_group.ranks[0])
 
     elif paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -352,6 +359,9 @@ def do_train(args):
                         else:
                             loss_mbs.backward()
                         loss = loss + loss_mbs
+
+                    if args.sharding_stage in [2, 3] and args.dp_degree > 1:
+                        fused_allreduce_gradients(model.parameters(), hcg)
 
                     if args.use_pure_fp16:
                         if args.sharding_stage in [2, 3]:
