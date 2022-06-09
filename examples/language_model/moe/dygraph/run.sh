@@ -1,4 +1,6 @@
 export PYTHONPATH=$PYTHONPATH:../../../../
+export FLAGS_enable_eager_mode=0
+
 log_dir=dp8
 rm -rf $log_dir
 
@@ -19,6 +21,8 @@ python -m paddle.distributed.launch --log_dir $log_dir --gpus "0,1,2,3,4,5,6,7" 
     --dp_degree 8\
     --mp_degree 1\
     --pp_degree 1\
+    --sharding_degree 1\
+    --sharding_offload False\
     --expert_mode True\
     --logging_freq 1 \
     --num_experts 8\

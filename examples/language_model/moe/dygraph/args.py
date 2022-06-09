@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,13 +22,19 @@ def process_batch_size(args):
     if args.global_batch_size is None and args.local_batch_size is None:
         raise ValueError("global_batch_size or local_batch_size should be set.")
     elif args.global_batch_size is not None and args.local_batch_size is not None:
-        assert args.global_batch_size // args.local_batch_size == args.dp_degree, \
-            "global_batch_size[{}] should be divided by local_batch_size[{}] when dp_degree is [{}]"\
-                .format(args.global_batch_size, args.local_batch_size, args.dp_degree)
+        assert args.global_batch_size // args.local_batch_size == (args.dp_degree *
+            args.sharding_degree), "global_batch_size[{}] should be "\
+            "divided by local_batch_size[{}] when dp_degree is [{}], sharding_degree is [{}]. ".format(
+            args.global_batch_size, args.local_batch_size, args.dp_degree, args.sharding_degree)
     elif args.global_batch_size is not None and args.local_batch_size is None:
-        args.local_batch_size = args.global_batch_size // args.dp_degree
+        assert args.global_batch_size % (
+            args.dp_degree * args.sharding_degree
+        ) == 0, "global_batch_size[{}] should be divided by dp_degree[{}] times sharding_degree[{}].".format(
+            args.global_batch_size, args.dp_degree, args.sharding_degree)
+        args.local_batch_size = args.global_batch_size // (args.dp_degree *
+                                                           args.sharding_degree)
     else:
-        args.global_batch_size = args.local_batch_size * args.dp_degree
+        args.global_batch_size = args.local_batch_size * args.dp_degree * args.sharding_degree
     assert args.local_batch_size % args.micro_batch_size == 0
 
 
@@ -196,7 +202,8 @@ def parse_args(MODEL_CLASSES):
         "--sharding_degree",
         type=int,
         default=1,
-        help="Sharding degree. Share the parameters to many cards.")
+        help="Group Sharded degree. Spliting the model parameters to many cards."
+    )
 
     parser.add_argument(
         "--dp_degree", type=int, default=1, help="Data Parallelism degree.")
@@ -210,7 +217,7 @@ def parse_args(MODEL_CLASSES):
         "--pp_degree",
         type=int,
         default=1,
-        help="Pipeline Parallelism degree.  Spliting the the model layers to different parts."
+        help="Pipeline Parallelism degree.  Spliting the model layers to different parts."
     )
     parser.add_argument(
         "--use_recompute",
@@ -256,6 +263,13 @@ def parse_args(MODEL_CLASSES):
         default=32768,
         help="The value of scale_loss for fp16. This is only used for AMP training."
     )
+
+    parser.add_argument(
+        "--sharding_offload",
+        type=str2bool,
+        nargs='?',
+        const=False,
+        help="use sharding stage2 cpu offload strategy.")
 
     parser.add_argument(
         "--hidden_dropout_prob",
