@@ -185,6 +185,8 @@ class UIEPredictor(object):
         offset_maps = np.array(offset_maps, dtype="int64")
 
         start_prob, end_prob = self._infer(input_dict)
+        start_prob = start_prob.tolist()
+        end_prob = end_prob.tolist()
 
         start_ids_list = get_bool_ids_greater_than(
             start_prob, limit=self._position_prob, return_prob=True)
