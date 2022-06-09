@@ -409,8 +409,6 @@ def convert_ext_examples(raw_examples,
                         "relations"], items["entities"]
             texts.append(text)
 
-            # [{'id': 69, 'start_offset': 0, 'end_offset': 2, 'label': '评价维度##正向'}, {'id': 70, 'start_offset': 2, 'end_offset': 4, 'label': '观点词'}, {'id': 71, 'start_offset': 5, 'end_offset': 7, 'label': '评价维度##正向'}, {'id': 72, 'start_offset': 8, 'end_offset': 10, 'label': '观点词'}, {'id': 73, 'start_offset': 17, 'end_offset': 19, 'label': '评价维度##负向'}, {'id': 74, 'start_offset': 19, 'end_offset': 20, 'label': '观点词'}]
-
             entity_example = []
             entity_prompt = []
             entity_example_map = {}
