@@ -298,6 +298,8 @@ class UIETask(Task):
                     "att_mask": att_mask.numpy()
                 }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
+                start_prob = start_prob.tolist()
+                end_prob = end_prob.tolist()
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
