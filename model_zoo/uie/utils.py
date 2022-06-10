@@ -81,12 +81,10 @@ def convert_example(example, tokenizer, max_seq_len):
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
-    for index in range(len(offset_mapping)):
-        if index == 0:
-            continue
+    for index in range(1, len(offset_mapping)):
         mapping = offset_mapping[index]
         if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-            bias = index
+            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
         if mapping[0] == 0 and mapping[1] == 0:
             continue
         offset_mapping[index][0] += bias
