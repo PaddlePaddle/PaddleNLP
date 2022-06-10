@@ -138,7 +138,7 @@ class Task(metaclass=abc.ABCMeta):
 
     def _check_predictor_type(self):
         if paddle.get_device() == 'cpu' and self._infer_precision == 'fp16':
-            logger.info(
+            logger.warning(
                 "The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu."
             )
         else:
@@ -150,8 +150,8 @@ class Task(metaclass=abc.ABCMeta):
                     from onnxconverter_common import float16
                     self._predictor_type = 'onnxruntime'
                 except:
-                    logger.info(
-                        "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common paddle2onnx"
+                    logger.warning(
+                        "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
                     )
 
     def _prepare_static_mode(self):

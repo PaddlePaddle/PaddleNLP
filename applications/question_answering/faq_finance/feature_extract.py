@@ -167,8 +167,8 @@ class Predictor(object):
         """
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # segment
         ): fn(samples)
 
         all_embeddings = []
@@ -180,7 +180,7 @@ class Predictor(object):
                 max_seq_length=self.max_seq_length,
                 pad_to_max_seq_len=True)
             examples.append((input_ids, segment_ids))
-            if (len(examples) >= 100):
+            if (len(examples) >= self.batch_size):
                 input_ids, segment_ids = batchify_fn(examples)
                 self.input_handles[0].copy_from_cpu(input_ids)
                 self.input_handles[1].copy_from_cpu(segment_ids)
