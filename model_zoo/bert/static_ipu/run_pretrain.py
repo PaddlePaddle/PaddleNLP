@@ -367,9 +367,9 @@ def main(args):
 
         if global_step % args.save_steps == 0:
             ipu_compiler._backend.weights_to_host()
-            paddle.static.save(main_program.org_program,
-                               os.path.join(args.output_dir,
-                                            'step_{}'.format(global_step)))
+            paddle.static.save(
+                main_program.org_program,
+                os.path.join(args.output_dir, 'step_{}'.format(global_step)))
 
         if global_step >= args.max_steps:
             ipu_compiler._backend.weights_to_host()

@@ -16,24 +16,48 @@ import json
 import logging
 import os
 import pickle
-import time
+import random
 from functools import partial
-
 import numpy as np
+from scipy.stats import truncnorm
+
 import paddle
 import paddle.optimizer
 import paddle.static
-from datasets import load_dataset
-from paddle.io import BatchSampler, DataLoader
-from paddlenlp.data import Dict, Stack
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import BertTokenizer, LinearDecayWithWarmup
+from paddlenlp.IPU import IPUTrainer
+from paddlenlp.IPU import (AutoModel, AutoConfig, AutoPipeline)
 
-from modeling import (BertModel, DeviceScope, IpuBertConfig,
-                      IpuBertForQuestionAnswering, IpuBertQAAccAndLoss)
-from run_pretrain import (create_ipu_strategy, reset_program_state_dict,
-                          set_seed)
-from utils import load_custom_ops, parse_args
+from datasets import load_dataset
+from args import load_custom_ops, parse_args
+from modeling_trainer import (IpuBertForQuestionAnswering, IpuBertQAAccAndLoss)
+
+
+class Squadtrainer(IPUTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def log(self):
+        logging.info({
+            "global_step": self.global_step,
+            "loss": np.mean(self.loss[0]),
+            "accuracy": np.mean(self.loss[1:]),
+            "train_cost": self.train_cost,
+            "total_cost": self.total_cost,
+            "throughput": self.tput,
+            "learning_rate": self.lr_scheduler(),
+        })
+
+
+def set_seed(seed):
+    """
+    Use the same data seed(for data shuffle) for all procs to guarantee data
+    consistency after sharding.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
 
 
 def create_data_holder(args):
@@ -56,6 +80,38 @@ def create_data_holder(args):
         return [
             indices, segments, positions, input_mask, start_labels, end_labels
         ]
+
+
+def reset_program_state_dict(state_dict, mean=0, scale=0.02):
+    """
+    Initialize the parameter from the bert config, and set the parameter by
+    reseting the state dict."
+    """
+    new_state_dict = dict()
+    for n, p in state_dict.items():
+        if  n.endswith('_moment1_0') or n.endswith('_moment2_0') \
+            or n.endswith('_beta2_pow_acc_0') or n.endswith('_beta1_pow_acc_0'):
+            continue
+        if 'learning_rate' in n:
+            continue
+
+        dtype_str = "float32"
+        if p._dtype == paddle.float64:
+            dtype_str = "float64"
+
+        if "layer_norm" in n and n.endswith('.w_0'):
+            new_state_dict[n] = np.ones(p.shape()).astype(dtype_str)
+            continue
+
+        if n.endswith('.b_0'):
+            new_state_dict[n] = np.zeros(p.shape()).astype(dtype_str)
+        else:
+            new_state_dict[n] = truncnorm.rvs(-2,
+                                              2,
+                                              loc=mean,
+                                              scale=scale,
+                                              size=p.shape()).astype(dtype_str)
+    return new_state_dict
 
 
 def prepare_train_features(examples, tokenizer, args):
@@ -227,36 +283,7 @@ def load_squad_dataset(args):
 
     bs = args.micro_batch_size * args.grad_acc_factor * args.batches_per_step * args.num_replica
     args.batch_size = bs
-    if args.is_training:
-        train_batch_sampler = BatchSampler(
-            dataset, batch_size=bs, shuffle=args.shuffle, drop_last=True)
-    else:
-        train_batch_sampler = BatchSampler(
-            dataset, batch_size=bs, shuffle=args.shuffle, drop_last=False)
-
-    if args.is_training:
-        collate_fn = lambda samples, fn=Dict({
-            "input_ids": Stack(),
-            "token_type_ids": Stack(),
-            "position_ids": Stack(),
-            "input_mask": Stack(),
-            "start_positions": Stack(),
-            "end_positions": Stack()
-        }): fn(samples)
-    else:
-        collate_fn = lambda samples, fn=Dict({
-            "input_ids": Stack(),
-            "token_type_ids": Stack(),
-            "position_ids": Stack(),
-            "input_mask": Stack()
-        }): fn(samples)
-
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_sampler=train_batch_sampler,
-        collate_fn=collate_fn,
-        return_list=True)
-    return raw_dataset, data_loader
+    return raw_dataset, dataset
 
 
 def main(args):
@@ -266,35 +293,10 @@ def main(args):
     main_program = paddle.static.default_main_program()
     startup_program = paddle.static.default_startup_program()
 
-    # The sharding of encoder layers
-    if args.num_hidden_layers == 12:
-        attn_ipu_index = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
-        ff_ipu_index = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
-    else:
-        raise Exception("Only support num_hidden_layers = 12")
-
-    bert_config = {
-        k: getattr(args, k)
-        for k in IpuBertConfig._fields if hasattr(args, k)
-    }
-    bert_config['embeddings_scope'] = DeviceScope(0, 0, "Embedding")
-    bert_config['attn_scopes'] = [
-        DeviceScope(attn_ipu_index[i], attn_ipu_index[i])
-        for i in range(args.num_hidden_layers)
-    ]
-    bert_config['ff_scopes'] = [
-        DeviceScope(ff_ipu_index[i], ff_ipu_index[i])
-        for i in range(args.num_hidden_layers)
-    ]
-    bert_config['layers_per_ipu'] = [6, 6]
-
-    config = IpuBertConfig(**bert_config)
-
     # custom_ops
     custom_ops = load_custom_ops()
 
     logging.info("building model")
-
     if args.is_training:
         [indices, segments, positions, input_mask, start_labels,
          end_labels] = create_data_holder(args)
@@ -302,11 +304,13 @@ def main(args):
         [indices, segments, positions, input_mask] = create_data_holder(args)
 
     # Encoder Layers
-    bert_model = BertModel(config, custom_ops)
+    config = AutoConfig(args)
+    bert_model = AutoModel(args, config, custom_ops)
+    AutoPipeline(args, config, bert_model)
     encoders, _ = bert_model(indices, segments, positions, input_mask)
 
-    squad_scope = DeviceScope(args.num_ipus - 1, args.num_ipus - 1, "squad")
-    with squad_scope:
+    # squad_scope = DeviceScope(args.num_ipus - 1, args.num_ipus - 1, "squad")
+    with config.squad_scope:
         qa_cls = IpuBertForQuestionAnswering(args.hidden_size, args.seq_len)
         start_logits, end_logits = qa_cls(encoders)
 
@@ -316,9 +320,9 @@ def main(args):
                                         end_labels)
 
     # load squad dataset
-    raw_dataset, data_loader = load_squad_dataset(args)
+    raw_dataset, dataset = load_squad_dataset(args)
 
-    total_samples = len(data_loader.dataset)
+    total_samples = len(dataset)
     max_steps = total_samples // args.batch_size * args.epochs
     logging.info("total samples: %d, total batch_size: %d, max steps: %d" %
                  (total_samples, args.batch_size, max_steps))
@@ -343,6 +347,13 @@ def main(args):
     reset_state_dict = reset_program_state_dict(state_dict)
     paddle.static.set_program_state(main_program, reset_state_dict)
 
+    amp_list = paddle.static.amp.CustomOpLists()
+    amp_list.unsupported_list = {}
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+        main_program, amp_list, use_fp16_guard=False)
+    paddle.static.amp.cast_parameters_to_fp16(
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
+
     if args.enable_load_params:
         logging.info(f'loading weights from: {args.load_params_path}')
         if not args.load_params_path.endswith('pdparams'):
@@ -361,9 +372,6 @@ def main(args):
         initializers, _ = load_initializers_from_tf(args.tf_checkpoint, args)
         paddle.static.set_program_state(main_program, initializers)
 
-    # Create ipu_strategy
-    ipu_strategy = create_ipu_strategy(args)
-
     if args.is_training:
         feed_list = [
             "indices", "segments", "positions", "input_mask", "start_labels",
@@ -374,112 +382,33 @@ def main(args):
         feed_list = ["indices", "segments", "positions", "input_mask"]
         fetch_list = [start_logits.name, end_logits.name]
 
-    ipu_compiler = paddle.static.IpuCompiledProgram(
-        main_program, ipu_strategy=ipu_strategy)
-    logging.info(f'start compiling, please wait some minutes')
-    cur_time = time.time()
-    main_program = ipu_compiler.compile(feed_list, fetch_list)
-    time_cost = time.time() - cur_time
-    logging.info(f'finish compiling! time cost: {time_cost}')
-
     if args.is_training:
-        global_step = 0
-        batch_start = time.time()
-        for epoch in range(args.epochs):
-            for batch in data_loader:
-                global_step += 1
-
-                feed = {
-                    "indices": batch[0],
-                    "segments": batch[1],
-                    "positions": batch[2],
-                    "input_mask": batch[3],
-                    "start_labels": batch[4],
-                    "end_labels": batch[5],
-                }
-                lr_scheduler.step()
-
-                train_start = time.time()
-                outputs = exe.run(main_program,
-                                  feed=feed,
-                                  fetch_list=fetch_list,
-                                  use_program_cache=True)
-                train_cost = time.time() - train_start
-                total_cost = time.time() - batch_start
-
-                tput = args.batch_size / total_cost
-                if args.wandb:
-                    wandb.log({
-                        "epoch": epoch,
-                        "global_step": global_step,
-                        "loss": np.mean(outputs[0]),
-                        "accuracy": np.mean(outputs[1:]),
-                        "train_cost": train_cost,
-                        "total_cost": total_cost,
-                        "throughput": tput,
-                        "learning_rate": lr_scheduler(),
-                    })
-
-                if global_step % args.logging_steps == 0:
-                    logging.info({
-                        "epoch": epoch,
-                        "global_step": global_step,
-                        "loss": np.mean(outputs[0]),
-                        "accuracy": np.mean(outputs[1:]),
-                        "train_cost": train_cost,
-                        "total_cost": total_cost,
-                        "throughput": tput,
-                        "learning_rate": lr_scheduler(),
-                    })
-
-                batch_start = time.time()
-
-        # save final state
-        ipu_compiler._backend.weights_to_host()
-        paddle.static.save(main_program.org_program,
-                           os.path.join(args.output_dir, 'Final_model'))
+        # Initialize Trainer
+        trainer = Squadtrainer(
+            args=args,
+            dataset=dataset,
+            exe=exe,
+            tensor_list=[feed_list, fetch_list],
+            program=[main_program, startup_program],
+            optimizers=[optimizer, lr_scheduler])
+        trainer.train()
+        trainer.save_model()
 
     if not args.is_training:
-        all_start_logits = []
-        all_end_logits = []
-        for step, batch in enumerate(data_loader):
-            if step % args.logging_steps == 0:
-                logging.info(f'running step: {step}')
+        # Initialize Trainer
+        trainer = IPUTrainer(
+            args=args,
+            dataset=dataset,
+            exe=exe,
+            tensor_list=[feed_list, fetch_list],
+            program=[main_program, startup_program])
 
-            real_len = np.array(batch[0]).shape[0]
-            # padding zeros if needed
-            if real_len < args.batch_size:
-                batch = [np.asarray(x) for x in batch]
-                pad0 = np.zeros([args.batch_size - real_len,
-                                 args.seq_len]).astype(batch[0].dtype)
-                batch[0] = np.vstack((batch[0], pad0))
-                batch[1] = np.vstack((batch[1], pad0))
-                batch[2] = np.vstack((batch[2], pad0))
-                pad1 = np.zeros(
-                    [args.batch_size - real_len, 1, 1, args.seq_len]) - 1e3
-                pad1 = pad1.astype(batch[3].dtype)
-                batch[3] = np.vstack((batch[3], pad1))
-
-            feed = {
-                "indices": batch[0],
-                "segments": batch[1],
-                "positions": batch[2],
-                "input_mask": batch[3],
-            }
-            start_logits, end_logits = exe.run(main_program,
-                                               feed=feed,
-                                               fetch_list=fetch_list)
-
-            start_logits = start_logits.reshape([-1, args.seq_len])
-            end_logits = end_logits.reshape([-1, args.seq_len])
-            for idx in range(real_len):
-                all_start_logits.append(start_logits[idx])
-                all_end_logits.append(end_logits[idx])
+        trainer.eval()
 
         # evaluate results
         all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
-            raw_dataset, data_loader.dataset,
-            (all_start_logits, all_end_logits))
+            raw_dataset, dataset,
+            (trainer.all_start_logits, trainer.all_end_logits))
         squad_evaluate(
             examples=[raw_data for raw_data in raw_dataset],
             preds=all_predictions,
