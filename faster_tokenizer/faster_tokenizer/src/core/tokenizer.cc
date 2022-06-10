@@ -480,6 +480,14 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::NmtNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::NmtNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::LowercaseNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::LowercaseNormalizer*>(
+          tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::SequenceNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::SequenceNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -560,6 +568,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         tokenizer.SetNormalizer(unicode_normalizer);
       } else if (normalizer.at("type") == "NmtNormalizer") {
         normalizers::NmtNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "LowercaseNormalizer") {
+        normalizers::LowercaseNormalizer unicode_normalizer;
+        normalizer.get_to(unicode_normalizer);
+        tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "SequenceNormalizer") {
+        normalizers::SequenceNormalizer unicode_normalizer;
         normalizer.get_to(unicode_normalizer);
         tokenizer.SetNormalizer(unicode_normalizer);
       }

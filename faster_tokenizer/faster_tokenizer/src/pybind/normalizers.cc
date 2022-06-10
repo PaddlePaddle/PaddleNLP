@@ -338,10 +338,22 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::LowercaseNormalizer::operator());
+      .def("__call__", &normalizers::LowercaseNormalizer::operator())
+      .def("__getstate__", [](const normalizers::LowercaseNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
   py::class_<normalizers::SequenceNormalizer, PySequenceNormalizer>(
       submodule, "SequenceNormalizer")
-      .def(py::init<const std::vector<normalizers::Normalizer*>&>())
+      // .def(py::init<const std::vector<normalizers::Normalizer*>&>())
+      .def("__init__",
+           [](const normalizers::SequenceNormalizer& self,
+              const py::list& py_list) {
+             for (py::handle normalizer : py_list) {
+               //
+             }
+           },
+           py::arg("normalizers"))
       .def("normalize_str",
            [](const normalizers::SequenceNormalizer& self,
               const std::string& str) {
@@ -350,7 +362,11 @@ void BindNormalizers(pybind11::module* m) {
              return normalized.GetStr();
            },
            py::arg("sequence"))
-      .def("__call__", &normalizers::SequenceNormalizer::operator());
+      .def("__call__", &normalizers::SequenceNormalizer::operator())
+      .def("__getstate__", [](const normalizers::SequenceNormalizer& self) {
+        nlohmann::json j = self;
+        return j.dump();
+      });
 }
 
 }  // pybind

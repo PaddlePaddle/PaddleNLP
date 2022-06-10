@@ -22,15 +22,22 @@ namespace tokenizers {
 namespace normalizers {
 
 struct SequenceNormalizer : public Normalizer {
+  SequenceNormalizer() = default;
   SequenceNormalizer(const std::vector<Normalizer*>& normalizers);
   virtual void operator()(NormalizedString* input) const override;
 
 private:
   std::vector<Normalizer*> normalizer_ptrs_;
+  friend void to_json(nlohmann::json& j, const SequenceNormalizer& normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        SequenceNormalizer& normalizer);
 };
 
 struct LowercaseNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
+  friend void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        LowercaseNormalizer& normalizer);
 };
 
 }  // normalizers

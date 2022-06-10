@@ -31,5 +31,20 @@ void LowercaseNormalizer::operator()(NormalizedString* input) const {
   input->Lowercase();
 }
 
+void to_json(nlohmann::json& j, const SequenceNormalizer& normalizer) {
+  j = {{"type", "SequenceNormalizer"},
+       {"normalizers", normalizer.normalizer_ptrs_}};
+}
+
+void from_json(const nlohmann::json& j, SequenceNormalizer& normalizer) {}
+
+void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer) {
+  j = {
+      {"type", "LowercaseNormalizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j, LowercaseNormalizer& normalizer) {}
+
 }  // normalizers
 }  // tokenizers

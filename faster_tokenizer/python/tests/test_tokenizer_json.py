@@ -69,9 +69,14 @@ class TestNormalizerJson(TestTokenizerJson):
         nfkd_normalizer = faster_tokenizer.normalizers.NFKDNormalizer()
         self.check_normalizer_json(nfkd_normalizer)
 
-    def test_strip_accent(self):
+    def test_nmt(self):
         nmt_normalizer = faster_tokenizer.normalizers.NmtNormalizer()
         self.check_normalizer_json(nmt_normalizer)
+
+    def test_lowercase(self):
+        lowercase_normalizer = faster_tokenizer.normalizers.LowercaseNormalizer(
+        )
+        self.check_normalizer_json(lowercase_normalizer)
 
 
 if __name__ == "__main__":
