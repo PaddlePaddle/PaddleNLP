@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@ from paddle.fluid.framework import Variable
 from paddle.fluid.dygraph import base as imperative_base
 from collections.abc import Callable
 import paddle
-
-_C_ops = core.ops
+from paddle import _C_ops
 
 __all__ = []
 
@@ -292,14 +291,24 @@ class AdamW(Adam):
                 self._beta2, Variable) else self._beta2.numpy().item(0)
 
             lr = paddle.cast(lr, dtype="float32")
-            _, _, _, _, _, _ = _C_ops.adamw(
-                param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
-                beta1_pow_acc, beta2_pow_acc, master_weight, param_and_grad[0],
-                moment1, moment2, beta1_pow_acc, beta2_pow_acc, master_weight,
-                'epsilon', self._epsilon, 'lazy_mode', self._lazy_mode,
-                'min_row_size_to_use_multithread', 1000, 'beta1', _beta1,
-                'beta2', _beta2, "with_decay", with_decay, 'coeff', self._coeff,
-                'multi_precision', find_master, 'lr_ratio', lr_ratio_)
+            if framework.in_dygraph_mode():
+                found_inf = self._get_auxiliary_var('found_inf')
+                _, _, _, _, _, _ = _C_ops.final_state_adamw(
+                    param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
+                    beta1_pow_acc, beta2_pow_acc, master_weight, found_inf,
+                    _beta1, _beta2, self._epsilon, lr_ratio_, self._coeff,
+                    with_decay, self._lazy_mode, 1000, find_master, False)
+            else:
+                _, _, _, _, _, _ = _C_ops.adamw(
+                    param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
+                    beta1_pow_acc, beta2_pow_acc, master_weight,
+                    param_and_grad[0], moment1, moment2, beta1_pow_acc,
+                    beta2_pow_acc, master_weight, 'epsilon', self._epsilon,
+                    'lazy_mode', self._lazy_mode,
+                    'min_row_size_to_use_multithread', 1000, 'beta1', _beta1,
+                    'beta2', _beta2, "with_decay", with_decay, 'coeff',
+                    self._coeff, 'multi_precision', find_master, 'lr_ratio',
+                    lr_ratio_)
             return None
 
         inputs = {

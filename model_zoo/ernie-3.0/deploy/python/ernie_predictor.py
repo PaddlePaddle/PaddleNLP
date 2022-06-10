@@ -16,7 +16,7 @@ import six
 import os
 import numpy as np
 import paddle
-from multiprocessing import cpu_count
+from psutil import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -143,10 +143,10 @@ class InferBackend(object):
         return result
 
 
-def token_cls_print_ret(infer_result, input_datas):
+def token_cls_print_ret(infer_result, input_data):
     rets = infer_result["value"]
     for i, ret in enumerate(rets):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
@@ -154,7 +154,7 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
-def seq_cls_print_ret(infer_result, input_datas):
+def seq_cls_print_ret(infer_result, input_data):
     label_list = [
         "news_story", "news_culture", "news_entertainment", "news_sports",
         "news_finance", "news_house", "news_car", "news_edu", "news_tech",
@@ -164,7 +164,7 @@ def seq_cls_print_ret(infer_result, input_datas):
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i, ret in enumerate(infer_result):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
@@ -213,7 +213,7 @@ class ErniePredictor(object):
             args.batch_size = 32
             args.shape_info_file = None
         if args.device == 'gpu':
-            args.num_threads = cpu_count()
+            args.num_threads = cpu_count(logical=False)
             args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,

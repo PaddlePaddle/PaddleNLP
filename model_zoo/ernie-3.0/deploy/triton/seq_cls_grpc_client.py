@@ -102,14 +102,14 @@ def test_tnews_dataset(runner):
     idx = 0
     batch_size = 32
     while idx < len(dev_ds):
-        datas = []
+        data = []
         label = []
         for i in range(batch_size):
             if idx + i >= len(dev_ds):
                 break
-            datas.append(dev_ds[idx + i]["sentence"])
+            data.append(dev_ds[idx + i]["sentence"])
             label.append(dev_ds[idx + i]["label"])
-        batches.append(datas)
+        batches.append(data)
         labels.append(np.array(label))
         idx += batch_size
 
@@ -126,12 +126,12 @@ if __name__ == "__main__":
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    datas = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
+    texts = [["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
              ["区块链投资心得，能做到就不会亏钱", ]]
 
-    for data in datas:
+    for text in texts:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)
-        result = runner.Run([data])
+        result = runner.Run([text])
         print(result)
 
     test_tnews_dataset(runner)
