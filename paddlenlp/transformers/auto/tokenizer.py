@@ -57,6 +57,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("PPMiniLMTokenizer", "ppminilm"),
     ("ProphetNetTokenizer", "prophetnet"),
     ("ReformerTokenizer", "reformer"),
+    ("RemBertTokenizer", "rembert"),
     ("RobertaChineseTokenizer", "roberta"),
     ("RobertaBPETokenizer", "roberta"),
     ("RoFormerTokenizer", "roformer"),
