@@ -17,8 +17,8 @@
 
 from typing import Dict, List, Tuple
 
-from faster_tokenizers import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizers.models import WordPiece
+from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
+from faster_tokenizer.models import WordPiece, FasterWordPiece
 
 
 class Converter:
@@ -33,9 +33,10 @@ class BertConverter(Converter):
     def converted(self) -> Tokenizer:
         vocab = self.original_tokenizer.vocab
         tokenizer = Tokenizer(
-            WordPiece(
+            FasterWordPiece(
                 vocab._token_to_idx,
-                unk_token=str(self.original_tokenizer.unk_token)))
+                unk_token=str(self.original_tokenizer.unk_token),
+                with_pretokenization=True))
 
         tokenize_chinese_chars = True
         strip_accents = True
