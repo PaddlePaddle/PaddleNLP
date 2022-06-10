@@ -345,15 +345,64 @@ void BindNormalizers(pybind11::module* m) {
       });
   py::class_<normalizers::SequenceNormalizer, PySequenceNormalizer>(
       submodule, "SequenceNormalizer")
-      // .def(py::init<const std::vector<normalizers::Normalizer*>&>())
-      .def("__init__",
-           [](const normalizers::SequenceNormalizer& self,
-              const py::list& py_list) {
-             for (py::handle normalizer : py_list) {
-               //
-             }
-           },
-           py::arg("normalizers"))
+      .def(
+          "__init__",
+          [](normalizers::SequenceNormalizer& self, const py::list& py_list) {
+            normalizers::Normalizer* normalizer_ptr;
+            for (py::handle py_normalizer : py_list) {
+              if (pybind11::type::of(py_normalizer)
+                      .is(py::type::of<normalizers::LowercaseNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::LowercaseNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::BertNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::BertNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::NFCNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::NFCNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::NFKCNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::NFKCNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::NFDNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::NFDNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::NFKDNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::NFKDNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<normalizers::NmtNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::NmtNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::ReplaceNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::ReplaceNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::SequenceNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::SequenceNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::StripAccentsNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::StripAccentsNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::StripNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::StripNormalizer*>();
+              }
+              self.AppendNormalizer(normalizer_ptr);
+            }
+          },
+          py::arg("normalizers"))
       .def("normalize_str",
            [](const normalizers::SequenceNormalizer& self,
               const std::string& str) {

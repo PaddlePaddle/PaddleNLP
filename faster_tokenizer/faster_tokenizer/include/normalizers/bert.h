@@ -26,6 +26,8 @@ struct BertNormalizer : public Normalizer {
                  bool strip_accents = true,
                  bool lowercase = true);
   virtual void operator()(NormalizedString* input) const override;
+  BertNormalizer(const BertNormalizer&) = default;
+  BertNormalizer(BertNormalizer&&) = default;
 
 private:
   bool clean_text_;

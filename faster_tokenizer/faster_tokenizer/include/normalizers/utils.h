@@ -14,6 +14,7 @@ limitations under the License. */
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 #include "normalizers/normalizer.h"
@@ -23,11 +24,13 @@ namespace normalizers {
 
 struct SequenceNormalizer : public Normalizer {
   SequenceNormalizer() = default;
+  SequenceNormalizer(const SequenceNormalizer&) = default;
   SequenceNormalizer(const std::vector<Normalizer*>& normalizers);
   virtual void operator()(NormalizedString* input) const override;
+  void AppendNormalizer(Normalizer* normalizer);
 
 private:
-  std::vector<Normalizer*> normalizer_ptrs_;
+  std::vector<std::shared_ptr<Normalizer>> normalizer_ptrs_;
   friend void to_json(nlohmann::json& j, const SequenceNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j,
                         SequenceNormalizer& normalizer);

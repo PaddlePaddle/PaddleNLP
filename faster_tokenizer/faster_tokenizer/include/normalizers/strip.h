@@ -24,6 +24,8 @@ namespace normalizers {
 struct StripNormalizer : public Normalizer {
   StripNormalizer(bool left = true, bool right = true);
   virtual void operator()(NormalizedString* input) const override;
+  StripNormalizer(StripNormalizer&&) = default;
+  StripNormalizer(const StripNormalizer&) = default;
 
 private:
   bool left_;
