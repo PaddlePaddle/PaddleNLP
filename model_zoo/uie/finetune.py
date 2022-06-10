@@ -22,6 +22,7 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.utils.log import logger
 
 from model import UIE
 from evaluate import evaluate
@@ -36,15 +37,15 @@ def do_train():
 
     set_seed(args.seed)
 
-    encoding_model = MODEL_MAP[args.model]['encoding_model']
     resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
 
+    logger.info("Downloading resource files...")
     for key, val in resource_file_urls.items():
         file_path = os.path.join(args.model, key)
         if not os.path.exists(file_path):
             get_path_from_url(val, args.model)
 
-    tokenizer = AutoTokenizer.from_pretrained(encoding_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(
@@ -79,6 +80,9 @@ def do_train():
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
 
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
+
     optimizer = paddle.optimizer.AdamW(
         learning_rate=args.learning_rate, parameters=model.parameters())
 
@@ -109,7 +113,7 @@ def do_train():
             if global_step % args.logging_steps == 0 and rank == 0:
                 time_diff = time.time() - tic_train
                 loss_avg = sum(loss_list) / len(loss_list)
-                print(
+                logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, loss_avg,
                        args.logging_steps / time_diff))
@@ -119,18 +123,24 @@ def do_train():
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                model.save_pretrained(save_dir)
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(save_dir)
+                tokenizer.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
-                print("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
-                      (precision, recall, f1))
+                logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f"
+                            % (precision, recall, f1))
                 if f1 > best_f1:
-                    print(
+                    logger.info(
                         f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
                     )
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
-                    model.save_pretrained(save_dir)
+                    model_to_save = model._layers if isinstance(
+                        model, paddle.DataParallel) else model
+                    model_to_save.save_pretrained(save_dir)
+                    tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
 
 
@@ -144,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
-        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+        "Sequences longer than this will be split automatically.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")

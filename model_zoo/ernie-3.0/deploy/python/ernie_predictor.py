@@ -16,7 +16,7 @@ import six
 import os
 import numpy as np
 import paddle
-from multiprocessing import cpu_count
+from psutil import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -94,6 +94,8 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
+            if device == 'cpu':
+                providers = ['CPUExecutionProvider']
             if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -103,7 +105,6 @@ class InferBackend(object):
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            sess_options.inter_op_num_threads = num_threads
             self.predictor = ort.InferenceSession(
                 dynamic_quantize_model,
                 sess_options=sess_options,
@@ -142,10 +143,10 @@ class InferBackend(object):
         return result
 
 
-def token_cls_print_ret(infer_result, input_datas):
+def token_cls_print_ret(infer_result, input_data):
     rets = infer_result["value"]
     for i, ret in enumerate(rets):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
@@ -153,7 +154,7 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
-def seq_cls_print_ret(infer_result, input_datas):
+def seq_cls_print_ret(infer_result, input_data):
     label_list = [
         "news_story", "news_culture", "news_entertainment", "news_sports",
         "news_finance", "news_house", "news_car", "news_edu", "news_tech",
@@ -163,7 +164,7 @@ def seq_cls_print_ret(infer_result, input_datas):
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i, ret in enumerate(infer_result):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
@@ -184,7 +185,8 @@ class ErniePredictor(object):
             exit(0)
 
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name_or_path, use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -211,7 +213,7 @@ class ErniePredictor(object):
             args.batch_size = 32
             args.shape_info_file = None
         if args.device == 'gpu':
-            args.num_threads = cpu_count()
+            args.num_threads = cpu_count(logical=False)
             args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
@@ -283,7 +285,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.label_names[label] == "O" and start >= 0:
+                if (self.label_names[label] == "O" or
+                        "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -293,7 +296,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.label_names[label]:
+                if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

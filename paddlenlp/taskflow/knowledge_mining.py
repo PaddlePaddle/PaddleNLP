@@ -167,12 +167,12 @@ class WordTagTask(Task):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_state.pdparams",
-                "12685d1d84c09fb851b6c1541af1146e"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_state.pdparams",
+                "a93e4074c9440cc3f1d4d29e54cf766d"
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/model_config.json",
-                "aa47cdf7c270943a24495bd5ff59dc00"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
+                "9dcbd5d6f67792b2a2be058799a144ea"
             ],
             "termtree_schema": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
@@ -183,8 +183,8 @@ class WordTagTask(Task):
                 "a0efe723f84cf90540ac727be5b62e59"
             ],
             "tags": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/tags.txt",
-                "87db06ae6ca42565157045ab3e9a996f"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
+                "f33feedd01d478b03bac81be19b48d00"
             ],
         }
     }
@@ -296,7 +296,7 @@ class WordTagTask(Task):
                     list(text),
                     return_length=True,
                     is_split_into_words=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 yield tokenized_output['input_ids'], tokenized_output[
                     'token_type_ids'], tokenized_output['seq_len']
 
@@ -689,8 +689,7 @@ class NPTagTask(Task):
                     tokens,
                     return_length=True,
                     is_split_into_words=True,
-                    pad_to_max_seq_len=True,
-                    max_seq_len=self._max_seq_len)
+                    max_length=self._max_seq_len)
                 label_indices = list(
                     range(tokenized_output["seq_len"] - 1 - self._max_cls_len,
                           tokenized_output["seq_len"] - 1))

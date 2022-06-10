@@ -103,7 +103,7 @@ class XLNetRelativeAttention(Layer):
     @staticmethod
     def rel_shift_bnij(x, klen=-1):
         # Relative shift of the attention matrix from bd~ to bd (refer to Appendix B in the Transformer-XL paper)
-        x_size = x.shape
+        x_size = paddle.shape(x)
 
         x = paddle.reshape(x, [x_size[0], x_size[1], x_size[3], x_size[2]])
         x = x[:, :, 1:, :]
@@ -134,7 +134,7 @@ class XLNetRelativeAttention(Layer):
         # q_head = Exi * Wq; self.r_r_bias = v; k_head_r = Wkr * Rij
         # b = Exi * Wq * Wkr * Rij; d = v * Wkr * Rij; bd = b + d
         bd = paddle.einsum("ibnd,jbnd->bnij", q_head + self.r_r_bias, k_head_r)
-        bd = self.rel_shift_bnij(bd, klen=ac.shape[3])
+        bd = self.rel_shift_bnij(bd, klen=paddle.shape(ac)[3])
 
         # Segment based attention score
         if seg_mat is None:
@@ -170,8 +170,9 @@ class XLNetRelativeAttention(Layer):
         """Post-attention processing."""
         # Post-attention projection (back to 'd_model')
         # Compute einsum4x4("ibnd,hnd->ibh", attn_vec, self.o)
-        shape = attn_vec.shape
-        attn_vec = attn_vec.reshape([shape[0], shape[1], -1])
+        shape = paddle.shape(attn_vec)
+        attn_vec = attn_vec.reshape(
+            [shape[0], shape[1], attn_vec.shape[2] * attn_vec.shape[3]])
         attn_out = paddle.einsum("ibm,hm->ibh", attn_vec, self.o)
 
         attn_out = self.dropout(attn_out)
@@ -206,21 +207,30 @@ class XLNetRelativeAttention(Layer):
             k_head_h = paddle.matmul(cat, self.k)
             k_head_h = paddle.reshape(
                 k_head_h,
-                shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(cat)[0], paddle.shape(cat)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Content-based value head
             # Compute v_head_h = einsum4x4("ibh,h(n*d)->ibnd", cat, self.v)
             v_head_h = paddle.matmul(cat, self.v)
             v_head_h = paddle.reshape(
                 v_head_h,
-                shape=[cat.shape[0], cat.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(cat)[0], paddle.shape(cat)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Position-based key head
             # Compute k_head_r = einsum4x4("ibh,h(n*d)->ibnd", r, self.r)
             k_head_r = paddle.matmul(r, self.r)
             k_head_r = paddle.reshape(
                 k_head_r,
-                shape=[r.shape[0], r.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(r)[0], paddle.shape(r)[1], self.n_head,
+                    self.d_head
+                ])
 
             # H-stream
             # Content-stream query head
@@ -228,7 +238,10 @@ class XLNetRelativeAttention(Layer):
             q_head_h = paddle.matmul(h, self.q)  # shape
             q_head_h = paddle.reshape(
                 q_head_h,
-                shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(h)[0], paddle.shape(h)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Core attention ops
             attn_vec_h = self.rel_attn_core(
@@ -308,26 +321,37 @@ class XLNetRelativeAttention(Layer):
             q_head_h = paddle.matmul(h, self.q)
             q_head_h = paddle.reshape(
                 q_head_h,
-                shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(h)[0], paddle.shape(h)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Compute k_head_h = einsum4x4("ibh,hnd->ibnd", cat, self.k)
             k_head_h = paddle.matmul(cat, self.k)
             k_head_h = paddle.reshape(
                 k_head_h,
-                shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(h)[0], paddle.shape(h)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Compute v_head_h = einsum4x4("ibh,hnd->ibnd", cat, self.v)
             v_head_h = paddle.matmul(cat, self.v)
             v_head_h = paddle.reshape(
                 v_head_h,
-                shape=[h.shape[0], h.shape[1], self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(h)[0], paddle.shape(h)[1], self.n_head,
+                    self.d_head
+                ])
 
             # Position-based key head
             # Compute k_head_r = einsum4x4("ibh,hnd->ibnd", r, self.r)
             k_head_r = paddle.matmul(r, self.r)
             k_head_r = paddle.reshape(
                 k_head_r,
-                shape=[k_head_r.shape[0], -1, self.n_head, self.d_head])
+                shape=[
+                    paddle.shape(k_head_r)[0], -1, self.n_head, self.d_head
+                ])
 
             # Core attention ops
             attn_vec = self.rel_attn_core(
@@ -986,10 +1010,11 @@ class XLNetModel(XLNetPretrainedModel):
             )
         elif input_ids is not None:
             input_ids = paddle.transpose(input_ids, perm=[1, 0])
-            qlen, bsz = input_ids.shape[0], input_ids.shape[1]
+            qlen, bsz = paddle.shape(input_ids)[0], paddle.shape(input_ids)[1]
         elif inputs_embeds is not None:
             inputs_embeds = paddle.transpose(inputs_embeds, perm=[1, 0])
-            qlen, bsz = inputs_embeds.shape[0], inputs_embeds.shape[1]
+            qlen, bsz = paddle.shape(inputs_embeds)[0], paddle.shape(
+                inputs_embeds)[1]
         else:
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
@@ -1005,7 +1030,7 @@ class XLNetModel(XLNetPretrainedModel):
         target_mapping = target_mapping.transpose(
             [1, 2, 0]) if target_mapping is not None else None
 
-        mlen = mems[0].shape[0] if mems is not None and mems[
+        mlen = paddle.shape(mems[0])[0] if mems is not None and mems[
             0] is not None else 0
         klen = mlen + qlen
 
@@ -1038,7 +1063,7 @@ class XLNetModel(XLNetPretrainedModel):
             # All mems can be attended to
             if mlen > 0:
                 mems_mask = paddle.cast(
-                    paddle.zeros([data_mask.shape[0], mlen, bsz]),
+                    paddle.zeros([paddle.shape(data_mask)[0], mlen, bsz]),
                     dtype=dtype_float)
                 data_mask = paddle.concat([mems_mask, data_mask], axis=1)
             if attn_mask is None:
@@ -1050,8 +1075,9 @@ class XLNetModel(XLNetPretrainedModel):
             attn_mask = paddle.cast((attn_mask > 0), dtype=dtype_float)
 
         if attn_mask is not None:
-            non_tgt_mask = paddle.cast(-paddle.eye(qlen), dtype=dtype_float)
-
+            fill_val = paddle.ones(qlen)
+            non_tgt_mask = paddle.cast(
+                -paddle.diag(fill_val), dtype=dtype_float)
             if mlen > 0:
                 non_tgt_mask = paddle.concat(
                     [
@@ -1076,7 +1102,7 @@ class XLNetModel(XLNetPretrainedModel):
         output_h = self.dropout(word_emb_k)
         if target_mapping is not None:
             word_emb_q = self.mask_emb.expand(
-                [target_mapping.shape[0], bsz, -1])
+                [paddle.shape(target_mapping)[0], bsz, -1])
             output_g = self.dropout(word_emb_q)
         else:
             output_g = None
@@ -1712,22 +1738,24 @@ class XLNetForMultipleChoice(XLNetPretrainedModel):
                 print(reshaped_logits.shape)
                 # [2, 2]
         """
-        num_choices = input_ids.shape[
-            1] if input_ids is not None else inputs_embeds.shape[1]
-        input_ids = input_ids.reshape(shape=(
-            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        num_choices = paddle.shape(input_ids)[
+            1] if input_ids is not None else paddle.shape(inputs_embeds)[1]
+        input_ids = input_ids.reshape(
+            shape=(-1, paddle.shape(input_ids)[-1]
+                   ))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(shape=(
-                -1, attention_mask.shape[-1]))
+                -1, paddle.shape(attention_mask)[-1]))
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(shape=(
-                -1, token_type_ids.shape[-1]))
+                -1, paddle.shape(token_type_ids)[-1]))
 
         if inputs_embeds is not None:
-            inputs_embeds = inputs_embeds.reshape(shape=(
-                inputs_embeds.shape[0], -1, inputs_embeds.shape[-1]))
+            inputs_embeds = inputs_embeds.reshape(
+                shape=(paddle.shape(inputs_embeds)[0], -1,
+                       paddle.shape(inputs_embeds)[-1]))
 
         transformer_outputs = self.transformer(
             input_ids,

@@ -53,7 +53,7 @@ python -u ./train.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/model_zoo/transformers.rst)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。
@@ -101,7 +101,7 @@ python -u ./eval.py \
 ```
 
 参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](../../../docs/model_zoo/transformers.rst)中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer类预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 中的所有模型，但只有`ernie-gen-base-en, ernie-gen-large-en, ernie-gen-large-en-430g`三种模型会加载最后输出层的参数，其余模型只会加载transformer参数作热启动。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_encode_len` 表示最大输入句子长度，超过该长度将被截断。
 - `max_decode_len` 表示最大输出句子长度，超过该长度将被截断。
 - `batch_size` 表示每次迭代**每张卡**上的样本数目。

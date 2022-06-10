@@ -36,7 +36,7 @@ python -u ./train.py \
 
 其中参数释义如下：
 - `model_type`: 指定模型的类型，可选的有 bert、ernie、ernie-ctm。
-- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](../../../docs/model_zoo/transformers.rst)中除ernie-gen以外的所有模型。若使用其他系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
+- `model_name_or_path`: 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer，支持[PaddleNLP Transformer API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 中除ernie-gen以外的所有模型。若使用其他系列模型，需修改脚本导入相应的Task和Tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `dataset`: 目前支持 msra_ner 和 peoples_daily_ner 数据集。
 - `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
 - `batch_size`: 表示每次迭代**每张卡**上的样本数目。
@@ -118,7 +118,7 @@ python -u ./predict.py \
 
 ### 使用其它预训练模型
 
-请参考[Transformer API文档](../../../docs/model_zoo/transformers.rst)了解更多PaddleNLP支持的预训练模型信息，并更换`--model_name_or_path`参数即可对比其他预训练模型的效果。
+请参考[Transformer API文档](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer) 了解更多PaddleNLP支持的预训练模型信息，并更换`--model_name_or_path`参数即可对比其他预训练模型的效果。
 
 ## Reference
 

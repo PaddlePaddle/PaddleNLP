@@ -338,10 +338,10 @@ class ELMoEmbedder(object):
         Each sentence is a list of tokens without <s> or </s>, e.g.
         [['The', 'first', 'sentence', '.'], ['Second', '.']]
         """
-        batch_datas = create_batches(sentences, self._batch_size, self._vocab,
-                                     self._max_seq_len)
+        batch_data = create_batches(sentences, self._batch_size, self._vocab,
+                                    self._max_seq_len)
         embeddings = []
-        for data in batch_datas:
+        for data in batch_data:
             ids, ids_reverse, seq_lens = data
             # [batch_size, num_lstm_layers + 1, max_seq_len, projection_dim * 2]
             outputs = self._elmo([ids, ids_reverse])

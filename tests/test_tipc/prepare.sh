@@ -272,7 +272,7 @@ elif [ ${MODE} = "whole_infer" ];then
 elif [ ${MODE} = "benchmark_train" ];then
     if [ ${model_name} == "bigru_crf" ]; then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
-        wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
+        python ${BENCHMARK_ROOT}/paddlecloud/file_upload_download.py --remote-path frame_benchmark/paddle/PaddleNLP/lexical_analysis_dataset_tiny/ --local-path ./data/ --mode download
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd .. 
     fi
 
@@ -288,10 +288,12 @@ elif [ ${MODE} = "benchmark_train" ];then
         ln -s hdf5_lower_case_1_seq_len_512_max_pred_80_masked_lm_prob_0.15_random_seed_12345_dupe_factor_5/wikicorpus_en_seqlen512/ wikicorpus_en_seqlen512
 
         cd ..
+
+        python -m pip install h5py -i https://mirror.baidu.com/pypi/simple
     fi
 
     if [[ ${model_name} =~ gpt* ]]; then
-        cd ../examples/language_model/data_tools/
+        cd ../examples/language_model/gpt/data_tools/
         sed -i "s/python3/python/g" Makefile
         sed -i "s/python-config/python3.7m-config/g" Makefile
         cd -
@@ -305,6 +307,14 @@ elif [ ${MODE} = "benchmark_train" ];then
         cd ../examples/machine_translation/transformer/
 
         git checkout .
+
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.base.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.base.yaml
+
+        sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle_batch:.*/shuffle_batch: False/g" configs/transformer.big.yaml
+        sed -i "s/^shuffle:.*/shuffle: False/g" configs/transformer.big.yaml
 
         # Data set prepared. 
         if [ ! -f WMT14.en-de.partial.tar.gz ]; then

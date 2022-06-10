@@ -1,4 +1,4 @@
-# Ernie 1.0: Enhanced Representation through kNowledge IntEgration
+# ERNIE: Enhanced Representation through kNowledge IntEgration
 
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
@@ -73,7 +73,7 @@ python data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --outpu
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
 python -u  data_tools/create_pretraining_data.py \
-    --model_name ernie-1.0 \
+    --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
     --split_sentences\
@@ -100,7 +100,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/ernie-1.0-dp8-gb512/log" \
     run_pretrain.py \
     --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
+    --model_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
     --max_seq_len 512 \
@@ -180,8 +180,11 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
 
 ### 预训练模型贡献
-PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
-使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
+PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到`zhui/ernie-1.0-cluecorpussmall`参数，可直接使用。
+```python
+model = AutoModelForMaskedLM.from_pretrained('zhui/ernie-1.0-cluecorpussmall')
+```
 
 贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
@@ -201,7 +204,7 @@ python run_seq_cls.py \
     --do_train \
     --do_eval \
     --do_predict \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -214,7 +217,7 @@ python run_ner.py \
     --do_train \
     --do_eval \
     --do_predict \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -226,7 +229,7 @@ dataset="cmrc2018"
 python run_qa.py \
     --do_train \
     --do_eval \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -251,7 +254,7 @@ python run_seq_cls.py \
     --do_eval \
     --do_predict \
     --do_export \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset \
     --eval_steps 200 \

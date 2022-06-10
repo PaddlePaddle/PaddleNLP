@@ -8,14 +8,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.0\n"
+"Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.ops.ext_utils.rst:2
 msgid "ext\\_utils"
@@ -30,6 +30,20 @@ msgstr ""
 msgid ""
 "Custom `build_ext.build_extension` in `Extension` instead of `Command`. "
 "`ext_builder` is the instance of `build_ext` command."
+msgstr ""
+
+#: of paddlenlp.ops.ext_utils.CMakeExtension.get_target_filename:1
+#: paddlenlp.ops.ext_utils.FasterTransformerExtension.get_target_filename:1
+msgid ""
+"The file names of libraries. Currently only support one library for one "
+"extension."
+msgstr ""
+
+#: of paddlenlp.ops.ext_utils.CMakeExtension.get_output_filename:1
+#: paddlenlp.ops.ext_utils.FasterTransformerExtension.get_output_filename:1
+msgid ""
+"The file names of outputs, which mostly is the same with "
+"`get_target_filename`."
 msgstr ""
 
 #: of paddlenlp.ops.ext_utils.FasterTransformerExtension:1

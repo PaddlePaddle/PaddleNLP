@@ -21,16 +21,33 @@ from paddlenlp.transformers import AutoTokenizer
 
 
 class InferBackend(object):
-    def __init__(self, model_path):
+    def __init__(self, model_path, use_fp16):
         print(">>> [InferBackend] Creating Engine ...")
         providers = ['CUDAExecutionProvider']
         sess_options = ort.SessionOptions()
-        self.predictor = ort.InferenceSession(
+        predictor = ort.InferenceSession(
             model_path, sess_options=sess_options, providers=providers)
-        if "CUDAExecutionProvider" in self.predictor.get_providers():
+        if "CUDAExecutionProvider" in predictor.get_providers():
             print(">>> [InferBackend] Use GPU to inference ...")
+            if use_fp16:
+                from onnxconverter_common import float16
+                import onnx
+                print(">>> [InferBackend] Use FP16 to inference ...")
+                fp16_model = "fp16_model.onnx"
+                onnx_model = onnx.load_model(model_path)
+                trans_model = float16.convert_float_to_float16(
+                    onnx_model, keep_io_types=True)
+                onnx.save_model(trans_model, fp16_model)
+                sess_options = ort.SessionOptions()
+                predictor = ort.InferenceSession(
+                    fp16_model, sess_options=sess_options, providers=providers)
         else:
             print(">>> [InferBackend] Use CPU to inference ...")
+            if use_fp16:
+                print(
+                    ">>> [InferBackend] use_fp16 only takes effect when deploying on gpu ..."
+                )
+        self.predictor = predictor
         input_name1 = self.predictor.get_inputs()[1].name
         input_name2 = self.predictor.get_inputs()[0].name
         self.input_handles = [input_name1, input_name2]
@@ -41,10 +58,10 @@ class InferBackend(object):
         return result
 
 
-def token_cls_print_ret(infer_result, input_datas):
+def token_cls_print_ret(infer_result, input_data):
     rets = infer_result["value"]
     for i, ret in enumerate(rets):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
@@ -52,7 +69,7 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
-def seq_cls_print_ret(infer_result, input_datas):
+def seq_cls_print_ret(infer_result, input_data):
     label_list = [
         "news_story", "news_culture", "news_entertainment", "news_sports",
         "news_finance", "news_house", "news_car", "news_edu", "news_tech",
@@ -62,7 +79,7 @@ def seq_cls_print_ret(infer_result, input_datas):
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i, ret in enumerate(infer_result):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
@@ -71,7 +88,8 @@ def seq_cls_print_ret(infer_result, input_datas):
 class ErniePredictor(object):
     def __init__(self, args):
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name_or_path, use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -91,7 +109,7 @@ class ErniePredictor(object):
             exit(0)
 
         self.max_seq_length = args.max_seq_length
-        self.inference_backend = InferBackend(args.model_path)
+        self.inference_backend = InferBackend(args.model_path, args.use_fp16)
 
     def seq_cls_preprocess(self, input_data: list):
         data = input_data
@@ -149,7 +167,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.label_names[label] == "O" and start >= 0:
+                if (self.label_names[label] == "O" or
+                        "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -159,7 +178,7 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.label_names[label]:
+                if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:

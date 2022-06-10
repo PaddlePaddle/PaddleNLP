@@ -117,10 +117,10 @@ def do_train():
         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
     ): [data for data in fn(samples)]
 
 

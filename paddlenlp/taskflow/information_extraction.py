@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import numpy as np
 import paddle
 from ..datasets import load_dataset
@@ -84,7 +82,10 @@ class UIETask(Task):
     }
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json"
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
     }
     resource_files_urls = {
         "uie-base": {
@@ -95,6 +96,18 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-tiny": {
@@ -105,22 +118,47 @@ class UIETask(Task):
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
                 "6f1ee399398d4f218450fbbf5f212b15"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
         "uie-medical-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base/model_state.pdparams",
-                "56c2b7d02403f2ede513cedaabc8212a"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
+                "569b4bc1abf80eedcdad5a6e774d46bf"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
                 "a36c185bfc17a83b6cfef6f98b29c909"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        },
+        }
     }
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+        self._schema_tree = None
         self.set_schema(schema)
         if model not in self.encoding_model_map.keys():
             raise ValueError(
@@ -128,6 +166,7 @@ class UIETask(Task):
         self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
+        self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._max_seq_len = self.kwargs[
@@ -142,8 +181,7 @@ class UIETask(Task):
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
             schema = [schema]
-        self._schema = schema
-        self._build_tree(self._schema)
+        self._schema_tree = self._build_tree(schema)
 
     def _construct_input_spec(self):
         """
@@ -172,7 +210,7 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._encoding_model)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):
         """
@@ -244,13 +282,22 @@ class UIETask(Task):
         probs = []
         for batch in infer_data_loader:
             input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
-            self.input_handles[0].copy_from_cpu(input_ids.numpy())
-            self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-            self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-            self.input_handles[3].copy_from_cpu(att_mask.numpy())
-            self.predictor.run()
-            start_prob = self.output_handle[0].copy_to_cpu().tolist()
-            end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            if self._predictor_type == "paddle-inference":
+                self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                self.predictor.run()
+                start_prob = self.output_handle[0].copy_to_cpu().tolist()
+                end_prob = self.output_handle[1].copy_to_cpu().tolist()
+            else:
+                input_dict = {
+                    "input_ids": input_ids.numpy(),
+                    "token_type_ids": token_type_ids.numpy(),
+                    "pos_ids": pos_ids.numpy(),
+                    "att_mask": att_mask.numpy()
+                }
+                start_prob, end_prob = self.predictor.run(None, input_dict)
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
@@ -330,44 +377,55 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
-        schema_tree = self._build_tree(self._schema)
-        results = self._multi_stage_predict(raw_inputs, schema_tree)
+        results = self._multi_stage_predict(raw_inputs)
         inputs['result'] = results
         return inputs
 
-    def _multi_stage_predict(self, datas, schema_tree):
+    def _multi_stage_predict(self, data):
         """
         Traversal the schema tree and do multi-stage prediction.
+
+        Args:
+            data (list): a list of strings
+
+        Returns:
+            list: a list of predictions, where the list's length
+                equals to the length of `data`
         """
-        results = [{} for i in range(len(datas))]
-        schema_list = schema_tree.children
+        results = [{} for _ in range(len(data))]
+        # input check to early return
+        if len(data) < 1 or self._schema_tree is None:
+            return results
+
+        # copy to stay `self._schema_tree` unchanged
+        schema_list = self._schema_tree.children[:]
         while len(schema_list) > 0:
             node = schema_list.pop(0)
             examples = []
             input_map = {}
             cnt = 0
-            id = 0
+            idx = 0
             if not node.prefix:
-                for data in datas:
+                for one_data in data:
                     examples.append({
-                        "text": data,
+                        "text": one_data,
                         "prompt": dbc2sbc(node.name)
                     })
-                    input_map[cnt] = [id]
-                    id += 1
+                    input_map[cnt] = [idx]
+                    idx += 1
                     cnt += 1
             else:
-                for pre, data in zip(node.prefix, datas):
+                for pre, one_data in zip(node.prefix, data):
                     if len(pre) == 0:
                         input_map[cnt] = []
                     else:
                         for p in pre:
                             examples.append({
-                                "text": data,
+                                "text": one_data,
                                 "prompt": dbc2sbc(p + node.name)
                             })
-                        input_map[cnt] = [i + id for i in range(len(pre))]
-                        id += len(pre)
+                        input_map[cnt] = [i + idx for i in range(len(pre))]
+                        idx += len(pre)
                     cnt += 1
             if len(examples) == 0:
                 result_list = []
@@ -375,15 +433,15 @@ class UIETask(Task):
                 result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
-                relations = [[] for i in range(len(datas))]
+                relations = [[] for i in range(len(data))]
                 for k, v in input_map.items():
-                    for id in v:
-                        if len(result_list[id]) == 0:
+                    for idx in v:
+                        if len(result_list[idx]) == 0:
                             continue
                         if node.name not in results[k].keys():
-                            results[k][node.name] = result_list[id]
+                            results[k][node.name] = result_list[idx]
                         else:
-                            results[k][node.name].extend(result_list[id])
+                            results[k][node.name].extend(result_list[idx])
                     if node.name in results[k].keys():
                         relations[k].extend(results[k][node.name])
             else:
@@ -403,7 +461,7 @@ class UIETask(Task):
                         else:
                             relations[k][i]["relations"][node.name].extend(
                                 result_list[v[i]])
-                new_relations = [[] for i in range(len(datas))]
+                new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
                         if "relations" in relations[i][j].keys(
@@ -415,11 +473,11 @@ class UIETask(Task):
                                     "relations"][node.name][k])
                 relations = new_relations
 
-            prefix = [[] for i in range(len(datas))]
+            prefix = [[] for _ in range(len(data))]
             for k, v in input_map.items():
-                for id in v:
-                    for i in range(len(result_list[id])):
-                        prefix[k].append(result_list[id][i]["text"] + "的")
+                for idx in v:
+                    for i in range(len(result_list[idx])):
+                        prefix[k].append(result_list[idx][i]["text"] + "的")
 
             for child in node.children:
                 child.prefix = prefix
@@ -459,7 +517,8 @@ class UIETask(Task):
             results.append(result_list)
         return results
 
-    def _build_tree(self, schema, name='root'):
+    @classmethod
+    def _build_tree(cls, schema, name='root'):
         """
         Build the schema tree.
         """
@@ -477,7 +536,7 @@ class UIETask(Task):
                         raise TypeError(
                             "Invalid schema, value for each key:value pairs should be list or string"
                             "but {} received".format(type(v)))
-                    schema_tree.add_child(self._build_tree(child, name=k))
+                    schema_tree.add_child(cls._build_tree(child, name=k))
             else:
                 raise TypeError(
                     "Invalid schema, element should be string or dict, "
