@@ -158,12 +158,12 @@ class MMapIndexedDataset(paddle.io.Dataset):
 
         self._token_ids = np.load(
             path + "_ids.npy", mmap_mode="r", allow_pickle=True)
-        process_datas = np.load(path + "_idx.npz")
-        self._sizes = process_datas["lens"]
+        process_data = np.load(path + "_idx.npz")
+        self._sizes = process_data["lens"]
         self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
         self._pointers[0] = 0
         np.cumsum(self._sizes, out=self._pointers[1:])
-        self._doc_idx = process_datas["docs"]
+        self._doc_idx = process_data["docs"]
 
     def __getstate__(self):
         return self._path

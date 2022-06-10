@@ -146,7 +146,6 @@ def predict(args, sentences=[], paths=[]):
         predicted_data, tokenizer, args.max_seq_length, args.batch_size)
 
     start_time = time.time()
-    output_datas = []
     count = 0
     for i, sen in enumerate(predicted_input):
         sen = np.array(sen).astype("int64")
