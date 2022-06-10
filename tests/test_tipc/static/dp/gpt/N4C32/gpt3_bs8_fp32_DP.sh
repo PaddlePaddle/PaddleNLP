@@ -4,7 +4,7 @@ bs_item=8
 fp_item=fp32
 run_mode=DP
 device_num=N4C32
-max_epochs=1000000
+max_epochs=200
 num_workers=0
 
 # get data
