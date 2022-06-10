@@ -527,7 +527,7 @@ def convert_ext_examples(raw_examples,
                 subject_goldens)
             all_relation_examples = [
                 r
-                for r in relation_example
                 for relation_example in relation_examples
+                for r in relation_example
             ]
     return all_entity_examples, all_relation_examples, entity_cls_examples
