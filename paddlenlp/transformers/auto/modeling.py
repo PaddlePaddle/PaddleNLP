@@ -62,9 +62,10 @@ MAPPING_NAMES = OrderedDict([
     ("PPMiniLM", "ppminilm"),
     ("ProphetNet", "prophetnet"),
     ("Reformer", "reformer"),
+    ("RemBert", "rembert"),
     ("Roberta", "roberta"),
-    ("RoFormer", "roformer"),
     ("RoFormerv2", "roformerv2"),
+    ("RoFormer", "roformer"),
     ("Skep", "skep"),
     ("SqueezeBert", "squeezebert"),
     ("TinyBert", "tinybert"),
@@ -75,6 +76,7 @@ MAPPING_NAMES = OrderedDict([
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
+    ("GAUAlpha", "gau_alpha"),
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -208,6 +210,8 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                init_class = init_class[:-5] if init_class.endswith(
+                    "Model") else init_class
                 if init_class:
                     for model_flag, name in MAPPING_NAMES.items():
                         if model_flag in init_class:

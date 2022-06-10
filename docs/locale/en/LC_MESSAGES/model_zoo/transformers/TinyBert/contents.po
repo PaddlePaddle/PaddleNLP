@@ -1,0 +1,91 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:5
+msgid "TinyBert模型汇总"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:9
+msgid "下表汇总介绍了目前PaddleNLP支持的TinyBert模型以及对应预训练权重。 关于模型的具体细节可以参考对应链接。"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:13
+msgid "Pretrained Weight"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:13
+msgid "Language"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:13
+msgid "Details of the model"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:15
+msgid "``tinybert-4l-312d``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:15
+#: ../model_zoo/transformers/TinyBert/contents.rst:20
+#: ../model_zoo/transformers/TinyBert/contents.rst:25
+#: ../model_zoo/transformers/TinyBert/contents.rst:30
+msgid "English"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:15
+#: ../model_zoo/transformers/TinyBert/contents.rst:25
+#: ../model_zoo/transformers/TinyBert/contents.rst:35
+msgid ""
+"4-layer, 312-hidden, 12-heads, 14.5M parameters. The TinyBert model "
+"distilled from the BERT model ``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:20
+msgid "``tinybert-6l-768d``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:20
+#: ../model_zoo/transformers/TinyBert/contents.rst:30
+#: ../model_zoo/transformers/TinyBert/contents.rst:40
+msgid ""
+"6-layer, 768-hidden, 12-heads, 67M parameters. The TinyBert model "
+"distilled from the BERT model ``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:25
+msgid "``tinybert-4l-312d-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:30
+msgid "``tinybert-6l-768d-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:35
+msgid "``tinybert-4l-312d-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:35
+#: ../model_zoo/transformers/TinyBert/contents.rst:40
+msgid "Chinese"
+msgstr ""
+
+#: ../model_zoo/transformers/TinyBert/contents.rst:40
+msgid "``tinybert-6l-768d-zh``"
+msgstr ""
+

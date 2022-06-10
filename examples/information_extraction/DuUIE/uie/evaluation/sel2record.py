@@ -764,9 +764,9 @@ def fix_unk_from_text_without_tokenizer(span, text, unk='<unk>'):
 def fix_unk_from_text_with_tokenizer(span, text, tokenizer, unk='<unk>'):
     unk_id = tokenizer.vocab.to_indices(unk)
     tokenized_span = tokenizer.encode(
-        span, add_special_tokens=False)['input_ids']
+        span, add_special_tokens=False, return_token_type_ids=None)['input_ids']
     tokenized_text = tokenizer.encode(
-        text, add_special_tokens=False)['input_ids']
+        text, add_special_tokens=False, return_token_type_ids=None)['input_ids']
 
     matched = match_sublist(tokenized_text, tokenized_span)
     if len(matched) == 0:

@@ -34,6 +34,7 @@ from paddlenlp.data import Pad
 from paddlenlp.transformers import AutoModelForSequenceClassification
 from paddlenlp.transformers import AutoModelForQuestionAnswering
 from paddlenlp.transformers import AutoModelForTokenClassification
+from paddlenlp.transformers import export_model
 
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
@@ -166,19 +167,20 @@ def compress(self,
     elif quantization:
         input_dir = compress_config.quantization_config.input_dir
         if input_dir is None:
-            compress_config.quantization_config.input_filename_prefix = "infer"
+            compress_config.quantization_config.input_filename_prefix = "model"
             input_spec = [
                 paddle.static.InputSpec(
                     shape=[None, None], dtype="int64"),  # input_ids
                 paddle.static.InputSpec(
                     shape=[None, None], dtype="int64")  # segment_ids
             ]
-            self.export_model(
+            original_inference_model_dir = os.path.join(output_dir, "inference")
+            export_model(
+                model=self.model,
                 input_spec=input_spec,
-                load_best_model=True,
-                output_dir=output_dir)
-            input_dir = os.path.join(output_dir, "inference")
-        self.quant(input_dir, output_dir, compress_config.quantization_config)
+                path=original_inference_model_dir)
+        self.quant(original_inference_model_dir, output_dir,
+                   compress_config.quantization_config)
 
 
 def prune(self, task_name, output_dir, prune_config=DynabertConfig()):

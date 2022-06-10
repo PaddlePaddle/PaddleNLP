@@ -281,11 +281,11 @@ if __name__ == "__main__":
 
     if args.profile:
         import importlib
-        import util.recorder as recorder
+        import tls.recorder as recorder
         try:
             mod = importlib.import_module("auto_log")
         except ImportError:
-            mod = importlib.import_module("util.recorder")
+            mod = importlib.import_module("tls.recorder")
         args.mod = mod
 
     do_inference(args)

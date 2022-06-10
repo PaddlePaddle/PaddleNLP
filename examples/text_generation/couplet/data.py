@@ -72,7 +72,7 @@ def create_infer_loader(batch_size=128):
 def prepare_input(insts, pad_id):
     src, src_length = Pad(pad_val=pad_id, ret_length=True)(
         [inst[0] for inst in insts])
-    tgt, tgt_length = Pad(pad_val=pad_id, ret_length=True)(
+    tgt, tgt_length = Pad(pad_val=pad_id, ret_length=True, dtype="int64")(
         [inst[1] for inst in insts])
     tgt_mask = (tgt[:, :-1] != pad_id).astype(paddle.get_default_dtype())
     return src, src_length, tgt[:, :-1], tgt[:, 1:, np.newaxis], tgt_mask
