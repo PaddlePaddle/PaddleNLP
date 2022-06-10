@@ -156,7 +156,6 @@ def do_train(args):
     if args.sharding_stage in [2, 3]:
         assert args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support tensor/pipeline parallel later"
         dp_group = hcg.get_data_parallel_group()
-        sharding_group = hcg.get_sharding_parallel_group()
 
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
@@ -276,12 +275,13 @@ def do_train(args):
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
-        scaler = scaler if args.use_pure_fp16 else None
-        model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
-                                                     args.sharding_offload)
         if args.dp_degree > 1:
             sync_params_buffers(
                 model, comm_group=dp_group, src_rank=dp_group.ranks[0])
+
+        scaler = scaler if args.use_pure_fp16 else None
+        model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
+                                                     args.sharding_offload)
 
     elif paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -362,6 +362,13 @@ def do_train(args):
 
                     if args.sharding_stage in [2, 3] and args.dp_degree > 1:
                         fused_allreduce_gradients(model.parameters(), hcg)
+                        if args.sharding_stage == 3:
+                            for p in model.parameters():
+                                if hasattr(p, "bw_storage"):
+                                    assert p.grad is None, "This case shouldn't happen."
+                                    p.bw_storage.scale_(1.0 / dp_group.nranks)
+                                    paddle.distributed.all_reduce(
+                                        p.bw_storage, group=dp_group)
 
                     if args.use_pure_fp16:
                         if args.sharding_stage in [2, 3]:
