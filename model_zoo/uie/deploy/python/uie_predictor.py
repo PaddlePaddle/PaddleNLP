@@ -63,15 +63,10 @@ class InferBackend(object):
         self.predictor = ort.InferenceSession(
             onnx_model, sess_options=sess_options, providers=providers)
         if device == "gpu":
-            try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
-            except AssertionError:
-                raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
-                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                    "Please run the following commands to reinstall: \n "
-                    "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-                )
+            assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
+                "Please run the following commands to reinstall: \n " \
+                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
         print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
@@ -190,6 +185,8 @@ class UIEPredictor(object):
         offset_maps = np.array(offset_maps, dtype="int64")
 
         start_prob, end_prob = self._infer(input_dict)
+        start_prob = start_prob.tolist()
+        end_prob = end_prob.tolist()
 
         start_ids_list = get_bool_ids_greater_than(
             start_prob, limit=self._position_prob, return_prob=True)
@@ -513,21 +510,29 @@ def cut_chinese_sent(para):
     return para.split("\n")
 
 
-def get_id_and_prob(spans, offset_map):
-    prompt_length = 0
-    for i in range(1, len(offset_map)):
-        if offset_map[i] != [0, 0]:
-            prompt_length += 1
-        else:
-            break
+def get_id_and_prob(span_set, offset_mapping):
+    """
+    Return text id and probability of predicted spans
 
-    for i in range(1, prompt_length + 1):
-        offset_map[i][0] -= (prompt_length + 1)
-        offset_map[i][1] -= (prompt_length + 1)
+    Args: 
+        span_set (set): set of predicted spans.
+        offset_mapping (list[int]): list of pair preserving the
+                index of start and end char in original text pair (prompt + text) for each token.
+    Returns: 
+        sentence_id (list[tuple]): index of start and end char in original text.
+        prob (list[float]): probabilities of predicted spans.
+    """
+    prompt_end_token_id = offset_mapping[1:].index([0, 0])
+    bias = offset_mapping[prompt_end_token_id][1] + 1
+    for index in range(1, prompt_end_token_id + 1):
+        offset_mapping[index][0] -= bias
+        offset_mapping[index][1] -= bias
 
     sentence_id = []
     prob = []
-    for start, end in spans:
+    for start, end in span_set:
         prob.append(start[1] * end[1])
-        sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
+        start_id = offset_mapping[start[0]][0]
+        end_id = offset_mapping[end[0]][1]
+        sentence_id.append((start_id, end_id))
     return sentence_id, prob
