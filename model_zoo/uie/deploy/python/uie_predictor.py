@@ -403,8 +403,10 @@ class UIEPredictor(object):
                     for idx in v:
                         if len(result_list[idx]) == 0:
                             continue
-                        results[k].setdefault(node.name,
-                                              []).append(result_list[idx])
+                        if node.name not in results[k].keys():
+                            results[k][node.name] = result_list[idx]
+                        else:
+                            results[k][node.name].extend(result_list[idx])
                     if node.name in results[k].keys():
                         relations[k].extend(results[k][node.name])
             else:
@@ -417,9 +419,13 @@ class UIEPredictor(object):
                             relations[k][i]["relations"] = {
                                 node.name: result_list[v[i]]
                             }
+                        elif node.name not in relations[k][i]["relations"].keys(
+                        ):
+                            relations[k][i]["relations"][
+                                node.name] = result_list[v[i]]
                         else:
-                            relations[k][i]["relations"].setdefault(
-                                node.name, []).append(result_list[v[i]])
+                            relations[k][i]["relations"][node.name].extend(
+                                result_list[v[i]])
                 new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
