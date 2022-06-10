@@ -121,20 +121,20 @@ def parse_args():
     parser.add_argument(
         "--enable_quantize",
         action='store_true',
-        help="Whether to enable quantization for acceleration.", )
+        help="Whether to enable quantization for acceleration. Valid for both onnx and dnnl", )
     parser.add_argument(
         "--use_onnxruntime",
         type=distutils.util.strtobool,
         default=False,
         help="Use onnxruntime to infer or not.")
     parser.add_argument(
-        "--debug", action='store_true', help="Use onnxruntime to infer or not.")
+        "--debug", action='store_true', help="With debug it will save graph and model after each pass.")
     parser.add_argument(
         "--provider",
         default='CPUExecutionProvider',
         choices=['CPUExecutionProvider', 'DnnlExecutionProvider'],
         type=str,
-        help="Onnx with DNNL or without DNNL")
+        help="Onnx ExecutionProvider with DNNL or without DNNL")
 
     args = parser.parse_args()
     return args
@@ -223,6 +223,7 @@ class Predictor(object):
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = args.num_threads
             sess_options.inter_op_num_threads = args.num_threads
+            executionprovider=args.provider
             predictor = ort.InferenceSession(
                 dynamic_quantize_model,
                 sess_options=sess_options,
