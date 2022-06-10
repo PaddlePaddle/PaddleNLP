@@ -208,15 +208,10 @@ class Task(metaclass=abc.ABCMeta):
         sess_options.inter_op_num_threads = self._num_threads
         self.predictor = ort.InferenceSession(
             fp16_model_file, sess_options=sess_options, providers=providers)
-        try:
-            assert 'CUDAExecutionProvider' in self.predictor.get_providers()
-        except AssertionError:
-            raise AssertionError(
-                f"The environment for GPU inference is not set properly. "
-                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                "Please run the following commands to reinstall: \n "
-                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-            )
+        assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
+            "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
+            "Please run the following commands to reinstall: \n " \
+            "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
 
     def _get_inference_model(self):
         """

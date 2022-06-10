@@ -137,19 +137,19 @@ class XNLI(DatasetBuilder):
                         yield data
             else:
                 for idx, file in enumerate(files):
-                    f = open(file, 'r', encoding="utf-8")
-                    reader = csv.DictReader(
-                        f, delimiter="\t", quoting=csv.QUOTE_NONE)
-                    for row_idx, row in enumerate(reader):
-                        if not row["premise"] or not row["hypo"] or not row[
-                                "label"]:
-                            continue
-                        yield {
-                            "premise": row["premise"],
-                            "hypothesis": row["hypo"],
-                            "label": row["label"].replace("contradictory",
-                                                          "contradiction"),
-                        }
+                    with open(file, 'r', encoding="utf-8") as f:
+                        reader = csv.DictReader(
+                            f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                        for row_idx, row in enumerate(reader):
+                            if not row["premise"] or not row["hypo"] or not row[
+                                    "label"]:
+                                continue
+                            yield {
+                                "premise": row["premise"],
+                                "hypothesis": row["hypo"],
+                                "label": row["label"].replace("contradictory",
+                                                              "contradiction"),
+                            }
         else:
             if language == "all_languages":
                 rows_per_pair_id = collections.defaultdict(list)

@@ -16,6 +16,7 @@ import os
 import time
 import argparse
 import json
+from decimal import Decimal
 import numpy as np
 from paddlenlp.utils.log import logger
 
@@ -35,7 +36,11 @@ def do_convert():
     if len(args.splits) != 0 and len(args.splits) != 3:
         raise ValueError("Only []/ len(splits)==3 accepted for splits.")
 
-    if args.splits and sum(args.splits) != 1:
+    def _check_sum(splits):
+        return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(
+            str(splits[2])) == Decimal("1")
+
+    if len(args.splits) == 3 and not _check_sum(args.splits):
         raise ValueError(
             "Please set correct splits, sum of elements in splits should be equal to 1."
         )
