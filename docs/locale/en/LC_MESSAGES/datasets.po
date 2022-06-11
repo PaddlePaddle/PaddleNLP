@@ -19,37 +19,37 @@ msgstr ""
 
 #: ../datasets.md:1
 msgid "PaddleNLP Datasets API"
-msgstr ""
+msgstr "PaddleNLP Datasets API"
 
 #: ../datasets.md:3
 msgid "PaddleNLP提供了以下数据集的快速读取API，实际使用时请根据需要添加splits信息："
-msgstr ""
+msgstr "PaddleNLP provides a fast read API for the following datasets. Please add splits information as needed when actually using it："
 
 #: ../datasets.md:5
 msgid "阅读理解"
-msgstr ""
+msgstr "Reading Comprehension"
 
 #: ../datasets.md:44
 msgid "文本分类"
-msgstr ""
+msgstr "Text Clasification"
 
 #: ../datasets.md:114
 msgid "序列标注"
-msgstr ""
+msgstr "Sequence Annotation"
 
 #: ../datasets.md:139
 msgid "机器翻译"
-msgstr ""
+msgstr "Machine Translation"
 
 #: ../datasets.md:164
 msgid "机器同传"
-msgstr ""
+msgstr "Machine Interpretation"
 
 #: ../datasets.md:184
 msgid "文本生成"
-msgstr ""
+msgstr "Text Generation"
 
 #: ../datasets.md:208
 msgid "语料库"
-msgstr ""
+msgstr "Corpus"
 
