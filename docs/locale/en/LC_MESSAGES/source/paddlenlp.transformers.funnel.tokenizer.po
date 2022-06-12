@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.vocab_size:1
 msgid ""
@@ -45,7 +45,7 @@ msgstr ""
 #: paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.tokenize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.tokenize:5
 msgid "A list of string representing converted tokens."
@@ -58,7 +58,7 @@ msgstr ""
 #: paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.tokenize
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.funnel.tokenizer.FunnelTokenizer.convert_tokens_to_string:1

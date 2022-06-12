@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer:1
 msgid ""
@@ -59,7 +59,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:9
@@ -78,7 +78,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.build_inputs_with_special_tokens:14
@@ -90,7 +90,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.mpnet.tokenizer.MPNetTokenizer.get_special_tokens_mask:1

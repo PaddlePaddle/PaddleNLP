@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer:1
 msgid ""
@@ -38,7 +38,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.save_vocabulary
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer:4
 msgid ""
@@ -86,7 +86,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer:29
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.convert_tokens_to_string:1
@@ -106,7 +106,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.get_special_tokens_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.convert_tokens_to_string:7
@@ -119,7 +119,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.get_special_tokens_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.rembert.tokenizer.RemBertTokenizer.build_inputs_with_special_tokens:1

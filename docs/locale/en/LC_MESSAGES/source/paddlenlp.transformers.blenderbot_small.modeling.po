@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:1
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:1
 msgid "基类：:class:`paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel`"
 
 #: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:1
 msgid "Construct a bare BlenderbotSmall Model."
@@ -56,7 +56,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel:10
 msgid "Vocabulary size of the BlenderbotSmall model."
@@ -258,7 +258,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:33
@@ -277,14 +277,14 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForCausalLM.forward:32
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallForConditionalGeneration:11
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:40
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallModel.forward:43
@@ -323,7 +323,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.modeling.BlenderbotSmallPretrainedModel:1

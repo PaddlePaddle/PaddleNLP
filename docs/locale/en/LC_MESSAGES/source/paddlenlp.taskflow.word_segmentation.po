@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.word_segmentation.SegJiebaTask:1
 msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.task.Task`"
 
 #: of paddlenlp.taskflow.word_segmentation.SegJiebaTask:1
 msgid ""
@@ -36,7 +36,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.word_segmentation.SegLACTask:1
 msgid "基类：:class:`paddlenlp.taskflow.lexical_analysis.LacTask`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.lexical_analysis.LacTask`"
 
 #: of paddlenlp.taskflow.word_segmentation.SegLACTask:1
 msgid ""
@@ -48,7 +48,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.word_segmentation.SegWordTagTask:1
 msgid "基类：:class:`paddlenlp.taskflow.named_entity_recognition.NERWordTagTask`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.named_entity_recognition.NERWordTagTask`"
 
 #: of paddlenlp.taskflow.word_segmentation.SegWordTagTask:1
 msgid ""

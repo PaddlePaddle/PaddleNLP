@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.lexical_analysis.LacTask:1
 msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.task.Task`"
 
 #: of paddlenlp.taskflow.lexical_analysis.LacTask:1
 msgid ""

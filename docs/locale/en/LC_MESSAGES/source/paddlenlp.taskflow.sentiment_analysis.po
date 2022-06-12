@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.taskflow.sentiment_analysis.SentaTask:1
 #: paddlenlp.taskflow.sentiment_analysis.SkepTask:1
 msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.task.Task`"
 
 #: of paddlenlp.taskflow.sentiment_analysis.SentaTask:1
 msgid ""

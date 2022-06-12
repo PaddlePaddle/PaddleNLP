@@ -28,7 +28,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel:1
@@ -45,7 +45,7 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel:1
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel:1
 msgid "基类：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel:1
@@ -75,7 +75,7 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel:11
@@ -339,7 +339,7 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward:48
@@ -359,13 +359,13 @@ msgstr ""
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel.forward:31
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerModel.forward:60
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerLMHeadModel:1

@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.modeling.RemBertForTokenClassification:1
 #: paddlenlp.transformers.rembert.modeling.RemBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.rembert.modeling.RembertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.rembert.modeling.RembertPretrainedModel`"
 
 #: of paddlenlp.transformers.rembert.modeling.RemBertModel:1
 msgid "The bare RemBERT Model transformer outputting raw hidden-states."
@@ -63,7 +63,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.modeling.RemBertModel
 #: paddlenlp.transformers.rembert.modeling.RemBertModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.rembert.modeling.RemBertModel:10
 msgid ""
@@ -228,7 +228,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.modeling.RemBertForTokenClassification.forward
 #: paddlenlp.transformers.rembert.modeling.RemBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.rembert.modeling.RemBertModel.forward:32
 msgid ""
@@ -281,7 +281,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.modeling.RemBertForTokenClassification.forward
 #: paddlenlp.transformers.rembert.modeling.RemBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.rembert.modeling.RemBertForMaskedLM.forward:15
 #: paddlenlp.transformers.rembert.modeling.RemBertForMultipleChoice.forward:17
@@ -290,7 +290,7 @@ msgstr ""
 #: paddlenlp.transformers.rembert.modeling.RemBertForTokenClassification.forward:17
 #: paddlenlp.transformers.rembert.modeling.RemBertModel.forward:47
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.rembert.modeling.RemBertForMaskedLM:1
 msgid "RemBert Model with a `masked language modeling` head on top."
@@ -454,7 +454,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.rembert.modeling.RembertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.rembert.modeling.RembertPretrainedModel.init_weights:1

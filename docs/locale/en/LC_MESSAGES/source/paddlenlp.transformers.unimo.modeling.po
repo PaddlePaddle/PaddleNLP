@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel:1
 msgid ""
@@ -42,7 +42,7 @@ msgstr ""
 #: of paddlenlp.transformers.unimo.modeling.UNIMOLMHeadModel:1
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel:1
 msgid "基类：:class:`paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel`"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOModel:1
 msgid "The bare UNIMO Model outputting raw hidden-states."
@@ -68,7 +68,7 @@ msgstr ""
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOModel:10
 msgid ""
@@ -280,7 +280,7 @@ msgstr ""
 #: of paddlenlp.transformers.unimo.modeling.UNIMOLMHeadModel.forward
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOModel.forward:42
 msgid ""
@@ -297,12 +297,12 @@ msgstr ""
 #: of paddlenlp.transformers.unimo.modeling.UNIMOLMHeadModel.forward
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOLMHeadModel.forward:26
 #: paddlenlp.transformers.unimo.modeling.UNIMOModel.forward:51
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.unimo.modeling.UNIMOLMHeadModel:1
 msgid ""

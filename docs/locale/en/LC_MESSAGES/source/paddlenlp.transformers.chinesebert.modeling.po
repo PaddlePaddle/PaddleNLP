@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertForTokenClassification:1
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainedModel`"
 
 #: of paddlenlp.transformers.chinesebert.modeling.ChineseBertModel:1
 msgid "The bare ChineseBert Model transformer outputting raw hidden-states."
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.chinesebert.modeling.ChineseBertModel:10
 msgid ""
@@ -257,7 +257,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertModel.forward
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion.forward
 msgid "返回"
-msgstr ""
+msgstr "Return "
 
 #: of paddlenlp.transformers.chinesebert.modeling.ChineseBertModel.forward:42
 msgid ""
@@ -331,7 +331,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertModel.forward
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertForQuestionAnswering.forward:24
@@ -339,11 +339,11 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertForTokenClassification.forward:19
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertModel.forward:62
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainedModel:1
 msgid ""
@@ -442,7 +442,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of
 #: paddlenlp.transformers.chinesebert.modeling.ChineseBertPretrainingCriterion:1

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.task.Task:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.taskflow.task.Task:1
 msgid ""
@@ -37,7 +37,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.task.Task
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.task.Task:3
 msgid "The name of task."

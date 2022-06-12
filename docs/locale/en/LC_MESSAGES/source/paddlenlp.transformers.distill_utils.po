@@ -48,7 +48,7 @@ msgstr ""
 #: of paddlenlp.transformers.distill_utils.calc_minilm_loss
 #: paddlenlp.transformers.distill_utils.calc_multi_relation_loss
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.distill_utils.calc_minilm_loss:15
 msgid "MiniLM loss value."
@@ -57,7 +57,7 @@ msgstr ""
 #: of paddlenlp.transformers.distill_utils.calc_minilm_loss
 #: paddlenlp.transformers.distill_utils.calc_multi_relation_loss
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:1
 msgid ""
@@ -68,7 +68,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.distill_utils.calc_multi_relation_loss:5
 msgid "Loss function for distillation. It only supports kl_div loss now."

@@ -30,7 +30,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForTokenClassification:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdModel:1
 msgid "基类：:class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel`"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:1
 msgid "The bare BigBird Model outputting raw hidden-states."
@@ -73,7 +73,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdModel:10
 msgid "Number of hidden layers in the Transformer encoder."
@@ -242,7 +242,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:30
 msgid ""
@@ -301,17 +301,17 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdForPretraining.forward:31
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification.forward:17
 #: paddlenlp.transformers.bigbird.modeling.BigBirdModel.forward:45
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainedModel:1
 msgid ""
@@ -420,7 +420,7 @@ msgstr ""
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
 msgid "BigBird Criterion for a pretraining task on top."
@@ -502,7 +502,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForTokenClassification.forward:17
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion.forward:29
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.bigbird.modeling.BigBirdForSequenceClassification:1

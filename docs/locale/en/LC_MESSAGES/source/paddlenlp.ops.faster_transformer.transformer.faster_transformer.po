@@ -24,7 +24,7 @@ msgstr ""
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:1
 msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:1
@@ -46,7 +46,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer:5
@@ -248,7 +248,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:13
@@ -262,14 +262,14 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:10
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.forward:19
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator.forward:21
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterTransformer.export_params:1
@@ -291,7 +291,7 @@ msgstr ""
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.TransformerGenerator:1
@@ -470,7 +470,7 @@ msgstr ""
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterGPT:1
 msgid "基类：:class:`paddlenlp.transformers.gpt.modeling.GPTPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.gpt.modeling.GPTPretrainedModel`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART.forward:1
@@ -504,20 +504,20 @@ msgstr ""
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUnifiedTransformer:1
 msgid "基类：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.unified_transformer.modeling.UnifiedTransformerPretrainedModel`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterUNIMOText:1
 msgid "基类：:class:`paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.unimo.modeling.UNIMOPretrainedModel`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterBART:1
 msgid "基类：:class:`paddlenlp.transformers.bart.modeling.BartPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bart.modeling.BartPretrainedModel`"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.faster_transformer.FasterMBART:1
 msgid "基类：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
 

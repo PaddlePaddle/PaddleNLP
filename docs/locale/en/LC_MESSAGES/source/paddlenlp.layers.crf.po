@@ -39,7 +39,7 @@ msgstr ""
 #: paddlenlp.layers.crf.ViterbiDecoder
 #: paddlenlp.layers.crf.ViterbiDecoder.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.layers.crf.LinearChainCrf:5
 msgid "The label number."
@@ -113,7 +113,7 @@ msgstr ""
 #: paddlenlp.layers.crf.LinearChainCrfLoss.forward
 #: paddlenlp.layers.crf.ViterbiDecoder.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.layers.crf.LinearChainCrf.forward:26
 msgid ""
@@ -126,7 +126,7 @@ msgstr ""
 #: paddlenlp.layers.crf.LinearChainCrfLoss.forward
 #: paddlenlp.layers.crf.ViterbiDecoder.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.layers.crf.LinearChainCrf.gold_score:1
 msgid ""

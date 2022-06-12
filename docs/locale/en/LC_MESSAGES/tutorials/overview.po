@@ -19,115 +19,136 @@ msgstr ""
 
 #: ../tutorials/overview.rst:3
 msgid "整体介绍"
-msgstr ""
+msgstr "Overview"
 
 #: ../tutorials/overview.rst:7
 msgid "案例集"
-msgstr ""
+msgstr "Case Study"
 
 #: ../tutorials/overview.rst:9
 msgid "词向量"
-msgstr ""
+msgstr "Word Vector"
 
 #: ../tutorials/overview.rst:11
 msgid ""
 "`使用预训练词向量改善模型效果 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1535355>`_"
 msgstr ""
+"`Improve model performance with pre-trained word vectors"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1535355>`_"
 
 #: ../tutorials/overview.rst:13
 msgid "文本分类"
-msgstr ""
+msgstr "Text Classification"
 
 #: ../tutorials/overview.rst:15
 msgid ""
 "`基于LSTM等RNN网络的文本分类 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1283423>`_"
 msgstr ""
+"`Text classification based on RNN networks such as LSTM"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1283423>`_"
 
 #: ../tutorials/overview.rst:16
 msgid ""
 "`基于预训练模型的文本分类 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1294333>`_"
 msgstr ""
+"`Text classification based on pre-trained models"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1294333>`_"
 
 #: ../tutorials/overview.rst:17
 msgid ""
 "`自定义数据集实现文本多分类任务 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1468469>`_"
 msgstr ""
+"`Custom datasets for text multi-classification tasks"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1468469>`_"
 
 #: ../tutorials/overview.rst:19
 msgid "信息抽取"
-msgstr ""
+msgstr "Information Extraction"
 
 #: ../tutorials/overview.rst:21
 msgid ""
 "`使用BiGRU-CRF模型完成快递单信息抽取 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1317771>`_"
 msgstr ""
+"`Use BiGRU-CRF model to complete express information extraction"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1317771>`_"
 
 #: ../tutorials/overview.rst:22
 msgid ""
 "`使用预训练模型ERNIE优化快递单信息抽取 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1329361>`_"
 msgstr ""
+"`Use pre-trained model ERNIE to optimize the extraction of express order information"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1329361>`_"
 
 #: ../tutorials/overview.rst:23
 msgid "`关系抽取 <https://aistudio.baidu.com/aistudio/projectdetail/1639963>`_"
-msgstr ""
+msgstr "`Relation Extraction <https://aistudio.baidu.com/aistudio/projectdetail/1639963>`_"
 
 #: ../tutorials/overview.rst:24
 msgid "`事件抽取 <https://aistudio.baidu.com/aistudio/projectdetail/1639964>`_"
-msgstr ""
+msgstr "`Event Etraction <https://aistudio.baidu.com/aistudio/projectdetail/1639964>`_"
 
 #: ../tutorials/overview.rst:26
 msgid "阅读理解式问答"
-msgstr ""
+msgstr "Reading comprehension questions and answers"
 
 #: ../tutorials/overview.rst:28
 msgid ""
 "`使用预训练模型完成阅读理解 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1339612>`_"
 msgstr ""
+"`Completing reading comprehension using pre-trained models"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1339612>`_"
 
 #: ../tutorials/overview.rst:30
 msgid "对话"
-msgstr ""
+msgstr "Dialogue"
 
 #: ../tutorials/overview.rst:32
 msgid "`多技能对话 <https://aistudio.baidu.com/aistudio/projectdetail/1640180>`_"
-msgstr ""
+msgstr "`Multi-skilled dialogue <https://aistudio.baidu.com/aistudio/projectdetail/1640180>`_"
 
 #: ../tutorials/overview.rst:34
 msgid "文本生成"
-msgstr ""
+msgstr "Text Generation"
 
 #: ../tutorials/overview.rst:36
 msgid ""
 "`使用Seq2Seq模型完成自动对联 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1321118>`_"
 msgstr ""
+"`Complete automatic pairing using the Seq2Seq model"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1321118>`_"
 
 #: ../tutorials/overview.rst:37
 msgid ""
 "`使用预训练模型ERNIE-GEN实现智能写诗 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1339888>`_"
 msgstr ""
+"`Using the pre-trained model ERNIE-GEN for intelligent poetry writing"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1339888>`_"
+
 
 #: ../tutorials/overview.rst:39
 msgid "时序预测"
-msgstr ""
+msgstr "Time Series Prediction"
 
 #: ../tutorials/overview.rst:41
 msgid ""
 "`使用TCN网络完成新冠疫情病例数预测 "
 "<https://aistudio.baidu.com/aistudio/projectdetail/1290873>`_"
 msgstr ""
+"`Use the TCN network to complete the prediction of the number of COVID cases"
+"<https://aistudio.baidu.com/aistudio/projectdetail/1290873>`_"
 
 #: ../tutorials/overview.rst:43
 msgid ""
 "更多教程参见 `PaddleNLP on AI Studio "
 "<https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995>`_"
-msgstr ""
+msgstr "Please refer to `PaddleNLP on AI Studio <https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995>`_ for more tutorials"
 

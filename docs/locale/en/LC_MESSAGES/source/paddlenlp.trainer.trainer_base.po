@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.trainer_base.Trainer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.trainer.trainer_base.Trainer:1
 msgid ""
@@ -44,7 +44,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_base.Trainer.prediction_step
 #: paddlenlp.trainer.trainer_base.Trainer.training_step
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.trainer.trainer_base.Trainer:3
 msgid ""
@@ -187,7 +187,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_base.Trainer.training_step
 #: paddlenlp.trainer.trainer_utils.metrics_format
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.trainer.trainer_utils.metrics_format:5
 msgid "The reformatted metrics"
@@ -198,7 +198,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_base.Trainer.training_step
 #: paddlenlp.trainer.trainer_utils.metrics_format
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.trainer.trainer_utils.metrics_format:6
 msgid "metrics (`Dict[str, float]`)"

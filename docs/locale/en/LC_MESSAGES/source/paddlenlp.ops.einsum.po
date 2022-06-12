@@ -30,7 +30,7 @@ msgstr ""
 
 #: of paddlenlp.ops.einsum.einsum
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.ops.einsum.einsum:5
 msgid ""
@@ -51,7 +51,7 @@ msgstr ""
 
 #: of paddlenlp.ops.einsum.einsum
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.ops.einsum.einsum:16
 msgid "The result of Einstein sum product."
@@ -59,7 +59,7 @@ msgstr ""
 
 #: of paddlenlp.ops.einsum.einsum
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.ops.einsum.einsum:17
 msgid "`Tensor`"
@@ -67,5 +67,5 @@ msgstr ""
 
 #: of paddlenlp.ops.einsum.einsum:20
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 

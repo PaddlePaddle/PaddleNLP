@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer:1
 msgid ""
@@ -45,7 +45,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer.batch_encode
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer.batch_encode:4
@@ -145,7 +145,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer.batch_encode
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer.batch_encode:58
@@ -252,5 +252,5 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.mobilebert.tokenizer.MobileBertTokenizer.batch_encode
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

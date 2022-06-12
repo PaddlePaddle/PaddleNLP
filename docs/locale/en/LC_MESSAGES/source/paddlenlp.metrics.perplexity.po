@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.perplexity.Perplexity:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class：:class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.perplexity.Perplexity:1
 msgid ""
@@ -52,7 +52,7 @@ msgstr ""
 #: paddlenlp.metrics.perplexity.Perplexity.compute
 #: paddlenlp.metrics.perplexity.Perplexity.update
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.metrics.perplexity.Perplexity:16
 msgid ""
@@ -66,7 +66,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.perplexity.Perplexity:23
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.metrics.perplexity.Perplexity.compute:1
 msgid "Computes cross entropy loss."
@@ -95,7 +95,7 @@ msgstr ""
 #: paddlenlp.metrics.perplexity.Perplexity.compute
 #: paddlenlp.metrics.perplexity.Perplexity.name
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.perplexity.Perplexity.compute:14
 msgid ""
@@ -108,7 +108,7 @@ msgstr ""
 #: paddlenlp.metrics.perplexity.Perplexity.compute
 #: paddlenlp.metrics.perplexity.Perplexity.name
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.metrics.perplexity.Perplexity.update:1
 msgid "Updates metric states."

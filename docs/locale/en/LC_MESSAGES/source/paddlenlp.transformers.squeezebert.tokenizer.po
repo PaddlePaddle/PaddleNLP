@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:1
 msgid ""
@@ -37,7 +37,7 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.build_offset_mapping_with_special_tokens
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:5
 msgid "file path of the vocabulary"
@@ -71,7 +71,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:23
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.vocab_size:1
@@ -97,7 +97,7 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.convert_tokens_to_string:7
@@ -111,7 +111,7 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.get_special_tokens_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer.num_special_tokens_to_add:1

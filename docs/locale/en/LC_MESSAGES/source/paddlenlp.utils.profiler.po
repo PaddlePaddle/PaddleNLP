@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.utils.profiler.ProfilerOptions:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.utils.profiler.ProfilerOptions:1
 msgid ""
@@ -84,7 +84,7 @@ msgstr ""
 
 #: of paddlenlp.utils.profiler.add_profiler_step
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.utils.profiler.add_profiler_step:5
 msgid "Default is None, and the profiler is disabled."

@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.transformers.funnel.modeling.FunnelForTokenClassification:1
 #: paddlenlp.transformers.funnel.modeling.FunnelModel:1
 msgid "基类：:class:`paddlenlp.transformers.funnel.modeling.FunnelPreTrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.funnel.modeling.FunnelPreTrainedModel`"
 
 #: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward:1
 msgid ""
@@ -36,7 +36,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.funnel.modeling.FunnelModel.forward:4
 msgid "unpacked tuple arguments"

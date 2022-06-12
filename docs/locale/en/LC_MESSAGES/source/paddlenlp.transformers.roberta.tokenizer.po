@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer:1
 msgid ""
@@ -34,7 +34,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer:1
 msgid ""
@@ -66,7 +66,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer:9
 msgid ""
@@ -114,7 +114,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer:34
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.vocab_size:1
@@ -136,7 +136,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.vocab_size:3
@@ -158,7 +158,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.roberta.tokenizer.RobertaChineseTokenizer.convert_tokens_to_string:1
@@ -351,7 +351,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
 
 #: of paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer:1
 msgid "Constructs a Roberta tokenizer based on byte-level Byte-Pair-Encoding."

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer:1
 msgid ""
@@ -46,7 +46,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.save_resources
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer:9
 msgid ""
@@ -96,7 +96,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer:39
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -108,7 +108,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.skep.tokenizer.SkepTokenizer.vocab_size:3
 msgid "the size of vocabulary."
@@ -120,7 +120,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.skep.tokenizer.SkepTokenizer.num_special_tokens_to_add:1

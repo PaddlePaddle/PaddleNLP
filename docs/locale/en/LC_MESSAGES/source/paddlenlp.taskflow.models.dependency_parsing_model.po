@@ -41,7 +41,7 @@ msgstr ""
 #: paddlenlp.taskflow.models.dependency_parsing_model.LSTMByWPEncoder.forward
 #: paddlenlp.taskflow.models.dependency_parsing_model.MLP.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.models.dependency_parsing_model.BiAffine.forward:4
 #: paddlenlp.taskflow.models.dependency_parsing_model.BiAffineParser.forward:4
@@ -73,7 +73,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.models.dependency_parsing_model.index_sample
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.taskflow.models.dependency_parsing_model.index_sample:6
 msgid "output"

@@ -126,7 +126,7 @@ msgstr ""
 #: paddlenlp.transformers.model_utils.PretrainedModel.save_pretrained
 #: paddlenlp.transformers.model_utils.register_base_model
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:5
 msgid ""
@@ -185,7 +185,7 @@ msgstr ""
 #: paddlenlp.transformers.model_utils.PretrainedModel.get_model_config
 #: paddlenlp.transformers.model_utils.register_base_model
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:32
 msgid "An instance of `PretrainedModel`."
@@ -195,13 +195,13 @@ msgstr ""
 #: paddlenlp.transformers.model_utils.PretrainedModel.get_model_config
 #: paddlenlp.transformers.model_utils.register_base_model
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.from_pretrained:36
 #: paddlenlp.transformers.model_utils.PretrainedModel.save_pretrained:13
 #: paddlenlp.transformers.model_utils.register_base_model:13
 msgid "示例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.transformers.model_utils.PretrainedModel.get_model_config:1
 msgid "Get model configuration."

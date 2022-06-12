@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.megatronbert.tokenizer.MegatronBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.megatronbert.tokenizer.MegatronBertTokenizer:1
 msgid ""
@@ -38,7 +38,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.megatronbert.tokenizer.MegatronBertTokenizer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.megatronbert.tokenizer.MegatronBertTokenizer:5
 msgid ""
@@ -84,5 +84,5 @@ msgstr ""
 
 #: of paddlenlp.transformers.megatronbert.tokenizer.MegatronBertTokenizer:30
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
