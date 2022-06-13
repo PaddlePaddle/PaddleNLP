@@ -346,7 +346,7 @@ class RobertaBPETokenizer(GPTTokenizer):
         .. code-block::
 
             from paddlenlp.transformers import RobertaBPETokenizer
-            tokenizer = RobertaBPETokenizer.from_pretrained('roberta-en-base')
+            tokenizer = RobertaBPETokenizer.from_pretrained('roberta-base')
 
             tokens = tokenizer('This is a simple Paddle')
             #{'input_ids': [0, 713, 16, 10, 2007, 221, 33151, 2],

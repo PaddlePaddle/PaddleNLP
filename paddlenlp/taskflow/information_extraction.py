@@ -298,6 +298,8 @@ class UIETask(Task):
                     "att_mask": att_mask.numpy()
                 }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
+                start_prob = start_prob.tolist()
+                end_prob = end_prob.tolist()
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
@@ -311,8 +313,8 @@ class UIETask(Task):
                     if ids[i] != 0:
                         ids = ids[:i]
                         break
-                span_list = get_span(start_ids, end_ids, with_prob=True)
-                sentence_id, prob = get_id_and_prob(span_list, offset_map)
+                span_set = get_span(start_ids, end_ids, with_prob=True)
+                sentence_id, prob = get_id_and_prob(span_set, offset_map)
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
         results = self._convert_ids_to_results(short_inputs, sentence_ids,

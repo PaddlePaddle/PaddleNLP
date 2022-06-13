@@ -14,7 +14,7 @@
 安装指令如下，更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 ```
 # 安装client和serving app，用于向服务发送请求
-pip install paddle_serving_app paddle_serving_clinet
+pip install paddle_serving_app paddle_serving_client
 
 # 安装serving，用于启动服务
 # CPU server
