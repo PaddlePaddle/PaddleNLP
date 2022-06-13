@@ -300,6 +300,20 @@ class BertPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
+        "uer/chinese-roberta-6l-768h": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
         "uer/chinese-roberta-small": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
@@ -374,6 +388,8 @@ class BertPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
             "uer/chinese-roberta-medium":
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
+            "uer/chinese-roberta-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
             "uer/chinese-roberta-small":
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
             "uer/chinese-roberta-mini":

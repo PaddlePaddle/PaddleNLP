@@ -334,6 +334,8 @@ class BertTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
             "uer/chinese-roberta-medium":
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
             "uer/chinese-roberta-small":
             "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
             "uer/chinese-roberta-mini":
@@ -383,6 +385,9 @@ class BertTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "uer/chinese-roberta-medium": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-6l-768h": {
             "do_lower_case": True
         },
         "uer/chinese-roberta-small": {

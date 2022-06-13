@@ -77,7 +77,8 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict(
-    [("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie")])
+    [("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie"),
+     ("TinyBertFasterTokenizer", "tinybert")])
 # For FasterTokenizer
 if is_faster_tokenizers_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)

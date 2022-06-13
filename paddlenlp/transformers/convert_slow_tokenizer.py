@@ -67,9 +67,14 @@ class ErnieConverter(BertConverter):
     pass
 
 
+class TinyBertConverter(BertConverter):
+    pass
+
+
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
+    "TinyBertTokenizer": TinyBertConverter,
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 
