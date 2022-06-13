@@ -48,33 +48,37 @@ def do_train():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)
 
-    train_ds = load_dataset(
-        reader,
-        data_path=args.train_path,
-        max_seq_len=args.max_seq_len,
-        lazy=False)
-    dev_ds = load_dataset(
-        reader,
-        data_path=args.dev_path,
-        max_seq_len=args.max_seq_len,
-        lazy=False)
+    train_ds = load_dataset(reader,
+                            data_path=args.train_path,
+                            max_seq_len=args.max_seq_len,
+                            lazy=False)
+    dev_ds = load_dataset(reader,
+                          data_path=args.dev_path,
+                          max_seq_len=args.max_seq_len,
+                          lazy=False)
 
     train_ds = train_ds.map(
-        partial(
-            convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))
+        partial(convert_example,
+                tokenizer=tokenizer,
+                max_seq_len=args.max_seq_len))
     dev_ds = dev_ds.map(
-        partial(
-            convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))
+        partial(convert_example,
+                tokenizer=tokenizer,
+                max_seq_len=args.max_seq_len))
 
-    train_batch_sampler = paddle.io.BatchSampler(
-        dataset=train_ds, batch_size=args.batch_size, shuffle=True)
-    train_data_loader = paddle.io.DataLoader(
-        dataset=train_ds, batch_sampler=train_batch_sampler, return_list=True)
+    train_batch_sampler = paddle.io.BatchSampler(dataset=train_ds,
+                                                 batch_size=args.batch_size,
+                                                 shuffle=True)
+    train_data_loader = paddle.io.DataLoader(dataset=train_ds,
+                                             batch_sampler=train_batch_sampler,
+                                             return_list=True)
 
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dataset=dev_ds, batch_size=args.batch_size, shuffle=False)
-    dev_data_loader = paddle.io.DataLoader(
-        dataset=dev_ds, batch_sampler=dev_batch_sampler, return_list=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dataset=dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                           batch_sampler=dev_batch_sampler,
+                                           return_list=True)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -83,8 +87,8 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate, parameters=model.parameters())
+    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate,
+                                       parameters=model.parameters())
 
     criterion = paddle.nn.BCELoss()
     metric = SpanEvaluator()
@@ -129,8 +133,9 @@ def do_train():
                 tokenizer.save_pretrained(save_dir)
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
-                logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f"
-                            % (precision, recall, f1))
+                logger.info(
+                    "Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
+                    (precision, recall, f1))
                 if f1 > best_f1:
                     logger.info(
                         f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"

@@ -129,11 +129,10 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         title_input_ids = paddle.to_tensor(title_input_ids)
         title_token_type_ids = paddle.to_tensor(title_token_type_ids)
 
-        probs = model(
-            query_input_ids,
-            title_input_ids,
-            query_token_type_ids=query_token_type_ids,
-            title_token_type_ids=title_token_type_ids)
+        probs = model(query_input_ids,
+                      title_input_ids,
+                      query_token_type_ids=query_token_type_ids,
+                      title_token_type_ids=title_token_type_ids)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
@@ -164,7 +163,10 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = predict(
-        model, data, tokenizer, label_map, batch_size=args.batch_size)
+    results = predict(model,
+                      data,
+                      tokenizer,
+                      label_map,
+                      batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Lable: {}'.format(text, results[idx]))

@@ -71,8 +71,8 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                 num_samples_per_epoch = (tokens_per_epoch - 1) // seq_length
                 assert last_epoch_num_samples < (num_samples_per_epoch + 1), \
                     'last epoch number of samples exceeded max value.'
-                separate_last_epoch = (
-                    last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
+                separate_last_epoch = (last_epoch_num_samples < int(
+                    0.80 * num_samples_per_epoch))
             # Note. len(doc_idx) = num_epochs * len(doc)
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
                                      separate_last_epoch)
@@ -112,8 +112,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     # Load mappings.
     doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode='r')
     sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode='r')
-    shuffle_idx = np.load(
-        shuffle_idx_filename, allow_pickle=True, mmap_mode='r')
+    shuffle_idx = np.load(shuffle_idx_filename,
+                          allow_pickle=True,
+                          mmap_mode='r')
     return doc_idx, sample_idx, shuffle_idx
 
 
@@ -190,14 +191,18 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     if total_size >= (np.iinfo(np.uint32).max - 1):
         dtype_ = np.int64
 
-    shuffle_idx_first = np.arange(
-        start=0, stop=num_samples, step=1, dtype=dtype_)
+    shuffle_idx_first = np.arange(start=0,
+                                  stop=num_samples,
+                                  step=1,
+                                  dtype=dtype_)
     np_rng.shuffle(shuffle_idx_first)
     if num_samples == total_size:
         return shuffle_idx_first
 
-    shuffle_idx_last = np.arange(
-        start=num_samples, stop=total_size, step=1, dtype=dtype_)
+    shuffle_idx_last = np.arange(start=num_samples,
+                                 stop=total_size,
+                                 step=1,
+                                 dtype=dtype_)
     np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
@@ -221,8 +226,8 @@ def get_train_valid_test_split_(splits_string, size):
     splits = [split / splits_sum for split in splits]
     splits_index = [0]
     for index, split in enumerate(splits):
-        splits_index.append(splits_index[index] + int(
-            round(split * float(size))))
+        splits_index.append(splits_index[index] +
+                            int(round(split * float(size))))
     diff = splits_index[-1] - size
     for index in range(1, len(splits_index)):
         splits_index[index] -= diff
@@ -261,17 +266,17 @@ def create_pretrained_dataset(args,
             len(sample_lens), splits[-1])
 
     def build_dataset(index, name, num_samples):
-        dataset = GPTDataset(
-            file_path=input_path,
-            build_data_file=local_rank == 0,
-            name="gpt_" + name,
-            max_seq_len=max_seq_len,
-            num_samples=num_samples,
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=eos_id,
-            seed=args.seed)
+        dataset = GPTDataset(file_path=input_path,
+                             build_data_file=local_rank == 0,
+                             name="gpt_" + name,
+                             max_seq_len=max_seq_len,
+                             num_samples=num_samples,
+                             documents=np.arange(splits[index],
+                                                 splits[index + 1]),
+                             sample_ids=sample_ids,
+                             sample_lens=sample_lens,
+                             eos_id=eos_id,
+                             seed=args.seed)
 
         batch_sampler = DistributedBatchSampler(
             dataset,
@@ -295,19 +300,21 @@ def create_pretrained_dataset(args,
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_data_loader = build_dataset(0, "train", args.local_batch_size *
-                                      args.max_steps * data_world_size)
+    train_data_loader = build_dataset(
+        0, "train", args.local_batch_size * args.max_steps * data_world_size)
 
-    valid_data_loader = build_dataset(1, "valid", args.local_batch_size *
-                                      (args.max_steps // args.eval_freq + 1) *
-                                      args.eval_iters * data_world_size)
-    test_data_loader = build_dataset(2, "test", args.local_batch_size *
-                                     args.test_iters * data_world_size)
+    valid_data_loader = build_dataset(
+        1, "valid",
+        args.local_batch_size * (args.max_steps // args.eval_freq + 1) *
+        args.eval_iters * data_world_size)
+    test_data_loader = build_dataset(
+        2, "test", args.local_batch_size * args.test_iters * data_world_size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
 
 class GPTDataset(paddle.io.Dataset):
+
     def __init__(self,
                  file_path,
                  num_samples,
@@ -375,13 +382,13 @@ class GPTDataset(paddle.io.Dataset):
         else:
             current_start_pos = self.start_pos[self.doc_idx[doc_index_f]]
             next_start_pos = self.start_pos[self.doc_idx[doc_index_f] + 1]
-            tokens = self.sample_ids[current_start_pos + offset_f:
-                                     next_start_pos].tolist()
+            tokens = self.sample_ids[current_start_pos +
+                                     offset_f:next_start_pos].tolist()
             for i in range(doc_index_f + 1, doc_index_l):
                 current_start_pos = self.start_pos[self.doc_idx[i]]
                 next_start_pos = self.start_pos[self.doc_idx[i] + 1]
-                tokens.extend(self.sample_ids[current_start_pos:next_start_pos]
-                              .tolist())
+                tokens.extend(
+                    self.sample_ids[current_start_pos:next_start_pos].tolist())
             last_start_pos = self.start_pos[self.doc_idx[doc_index_l]]
             tokens.extend(self.sample_ids[last_start_pos:last_start_pos +
                                           offset_l + 1].tolist())

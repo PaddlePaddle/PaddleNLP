@@ -47,27 +47,25 @@ def prepare_input(tokenizer, sentences, pad_id):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_name_or_path",
-        default="mbart-large-50-one-to-many-mmt",
-        type=str,
-        help="The model name to specify the bart to use. ",
-        choices=[
-            "mbart-large-50-one-to-many-mmt", "mbart-large-50-many-to-one-mmt",
-            "mbart-large-50-many-to-many-mmt", "mbart-large-cc25",
-            "mbart-large-en-ro"
-        ])
-    parser.add_argument(
-        "--decoding_strategy",
-        default="beam_search",
-        type=str,
-        help="The decoding strategy.",
-        choices=["greedy_search", "beam_search", "sampling"])
-    parser.add_argument(
-        "--beam_size",
-        default=4,
-        type=int,
-        help="The parameters for beam search. ")
+    parser.add_argument("--model_name_or_path",
+                        default="mbart-large-50-one-to-many-mmt",
+                        type=str,
+                        help="The model name to specify the bart to use. ",
+                        choices=[
+                            "mbart-large-50-one-to-many-mmt",
+                            "mbart-large-50-many-to-one-mmt",
+                            "mbart-large-50-many-to-many-mmt",
+                            "mbart-large-cc25", "mbart-large-en-ro"
+                        ])
+    parser.add_argument("--decoding_strategy",
+                        default="beam_search",
+                        type=str,
+                        help="The decoding strategy.",
+                        choices=["greedy_search", "beam_search", "sampling"])
+    parser.add_argument("--beam_size",
+                        default=4,
+                        type=int,
+                        help="The parameters for beam search. ")
     parser.add_argument(
         "--top_k",
         default=4,
@@ -78,26 +76,24 @@ def parse_args():
         default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
-    parser.add_argument(
-        "--max_length", default=50, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity of beam search. ")
-    parser.add_argument(
-        "--length_penalty",
-        default=0.0,
-        type=float,
-        help="The power number in length penalty calculation")
-    parser.add_argument(
-        "--use_fp16_decoding",
-        action="store_true",
-        help="Whether to use fp16 decoding to predict. ")
-    parser.add_argument(
-        "--not_use_faster",
-        action="store_false",
-        help="Whether to use FasterGeneration. ")
+    parser.add_argument("--max_length",
+                        default=50,
+                        type=int,
+                        help="Maximum output length. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity of beam search. ")
+    parser.add_argument("--length_penalty",
+                        default=0.0,
+                        type=float,
+                        help="The power number in length penalty calculation")
+    parser.add_argument("--use_fp16_decoding",
+                        action="store_true",
+                        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--not_use_faster",
+                        action="store_false",
+                        help="Whether to use FasterGeneration. ")
     args = parser.parse_args()
     return args
 
@@ -142,16 +138,17 @@ def do_predict(args):
                 length_penalty=args.length_penalty,
                 use_faster=args.not_use_faster)
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        logger.info("Average test time for decoding is %f ms" %
+                    ((time.perf_counter() - start) / 50 * 1000))
 
         # Output
         finished_seqs = finished_seqs.numpy().tolist()
         for idx, finished_seq in enumerate(finished_seqs):
             finished_seq = finished_seq
             print(f"source: {sentences[idx]}")
-            finished_seq = post_process_seq(
-                finished_seq, tokenizer.lang_code_to_id["zh_CN"], eos_id)
+            finished_seq = post_process_seq(finished_seq,
+                                            tokenizer.lang_code_to_id["zh_CN"],
+                                            eos_id)
             print(f"target: {tokenizer.convert_ids_to_string(finished_seq)}\n")
 
 

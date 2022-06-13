@@ -19,12 +19,14 @@ from typing import Tuple, Union, Tuple, List
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]
 
-TextEncodeInput = Union[TextInputSequence, Tuple[
-    TextInputSequence, TextInputSequence], List[TextInputSequence], ]
+TextEncodeInput = Union[TextInputSequence, Tuple[TextInputSequence,
+                                                 TextInputSequence],
+                        List[TextInputSequence], ]
 
-PreTokenizedEncodeInput = Union[PreTokenizedInputSequence, Tuple[
-    PreTokenizedInputSequence, PreTokenizedInputSequence], List[
-        PreTokenizedInputSequence], ]
+PreTokenizedEncodeInput = Union[PreTokenizedInputSequence,
+                                Tuple[PreTokenizedInputSequence,
+                                      PreTokenizedInputSequence],
+                                List[PreTokenizedInputSequence], ]
 
 InputSequence = Union[TextInputSequence, PreTokenizedInputSequence]
 

@@ -16,26 +16,28 @@ from utils import mandarin_asr_api
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--audio_file', type=str, required=True, help='The audio file name.')
-    parser.add_argument(
-        '--api_key',
-        type=str,
-        required=True,
-        help='The app key applied on Baidu AI Platform.')
+    parser.add_argument('--audio_file',
+                        type=str,
+                        required=True,
+                        help='The audio file name.')
+    parser.add_argument('--api_key',
+                        type=str,
+                        required=True,
+                        help='The app key applied on Baidu AI Platform.')
     parser.add_argument(
         '--secret_key',
         type=str,
         required=True,
         help='The app secret key generated on Baidu AI Platform.')
-    parser.add_argument(
-        '--uie_model', type=str, default=None, help='The path to uie model.')
-    parser.add_argument(
-        '--schema',
-        type=str,
-        nargs='+',
-        default=['时间', '出发地', '目的地', '费用'],
-        help='The type of entities expected to extract.')
+    parser.add_argument('--uie_model',
+                        type=str,
+                        default=None,
+                        help='The path to uie model.')
+    parser.add_argument('--schema',
+                        type=str,
+                        nargs='+',
+                        default=['时间', '出发地', '目的地', '费用'],
+                        help='The type of entities expected to extract.')
     parser.add_argument(
         '--save_file',
         type=str,
@@ -59,10 +61,9 @@ if __name__ == '__main__':
     if args.uie_model is None:
         parser = Taskflow('information_extraction', schema=args.schema)
     else:
-        parser = Taskflow(
-            'information_extraction',
-            schema=args.schema,
-            task_path=args.uie_model)
+        parser = Taskflow('information_extraction',
+                          schema=args.schema,
+                          task_path=args.uie_model)
 
     with open(args.save_file, 'w') as fp:
         for audio_file in tqdm(audios):

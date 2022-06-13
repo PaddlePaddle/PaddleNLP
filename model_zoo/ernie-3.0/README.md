@@ -806,7 +806,7 @@
 ├── run_qa.py                    # 阅读理解任务的微调脚本
 ├── compress_seq_cls.py          # 分类任务的压缩脚本
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
-├── compress_qa.py               # 阅读理解任务的压缩脚本  
+├── compress_qa.py               # 阅读理解任务的压缩脚本
 ├── config.yml                   # 压缩配置文件
 ├── infer.py                     # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
 ├── deploy                       # 部署目录
@@ -816,15 +816,15 @@
 │   └── infer_gpu.py
 │   └── README.md
 │ └── serving
-│   └── seq_cls_rpc_client.py  
-│   └── seq_cls_service.py  
-│   └── seq_cls_config.yml  
-│   └── token_cls_rpc_client.py  
-│   └── token_cls_service.py  
+│   └── seq_cls_rpc_client.py
+│   └── seq_cls_service.py
+│   └── seq_cls_config.yml
+│   └── token_cls_rpc_client.py
+│   └── token_cls_service.py
 │   └── token_cls_config.yml
 │   └── README.md
 │ └── paddle2onnx
-│   └── ernie_predictor.py  
+│   └── ernie_predictor.py
 │   └── infer.py
 │   └── README.md
 └── README.md                    # 文档，本文件
@@ -1057,7 +1057,7 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 <a name="部署"></a>
 
 ## 部署
-我们为ERNIE 3.0提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。  
+我们为ERNIE 3.0提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
 <p align="center">
         <img width="700" alt="image" src="https://user-images.githubusercontent.com/30516196/168466069-e8162235-2f06-4a2d-b78f-d9afd437c620.png">
 </p>
@@ -1079,7 +1079,7 @@ Python部署请参考：[Python部署指南](./deploy/python/README.md)
 
 ### Paddle2ONNX 部署
 
-ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)  
+ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)
 
 
 <a name="参考文献"></a>

@@ -24,15 +24,15 @@ pip install -r requirements_cpu.txt
 ```
 pip install -r requirements_gpu.txt
 ```
-如需使用半精度（FP16）或量化（INT8）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。同时需额外安装TensorRT和Paddle Inference。  
+如需使用半精度（FP16）或量化（INT8）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。同时需额外安装TensorRT和Paddle Inference。
 更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
-1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux端简要步骤如下：  
-    (1)下载TensorRT8.2版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
-    (2)解压得到TensorRT-XXX文件夹  
-    (3)通过export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH将lib路径加入到LD_LIBRARY_PATH中  
+1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux端简要步骤如下：
+    (1)下载TensorRT8.2版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)
+    (2)解压得到TensorRT-XXX文件夹
+    (3)通过export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH将lib路径加入到LD_LIBRARY_PATH中
     (4)使用pip install安装TensorRT-XXX/python中对应的tensorrt安装包
-2. Paddle Inference的安装请参考：[Paddle Inference的安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux端简要步骤如下：  
-    (1)根据CUDA环境和Python版本下载对应的Paddle Inference预测库，注意须下载支持TensorRT的预测包，如linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[Paddle Inference下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)  
+2. Paddle Inference的安装请参考：[Paddle Inference的安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux端简要步骤如下：
+    (1)根据CUDA环境和Python版本下载对应的Paddle Inference预测库，注意须下载支持TensorRT的预测包，如linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[Paddle Inference下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)
     (2)使用pip install安装下载好的Paddle Inference安装包
 
 
@@ -75,7 +75,7 @@ infer_cpu.py脚本中的参数说明：
 |--use_quantize | 是否使用动态量化进行加速，默认关闭 |
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 
-**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启use_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。  
+**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启use_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。
 CPU端，开启动态量化的命令如下：
 ```
 python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_quantize
@@ -110,20 +110,20 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_m
 # 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16 --shape_info_file dynamic_shape_info.txt
 ```
-如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：
 ```
 # 获取序列标注INT8量化模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_quant_infer_model.zip
 unzip msra_ner_quant_infer_model.zip
 ```
-量化模型的部署命令为：  
+量化模型的部署命令为：
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
 # 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt
 ```
-FP16和INT8推理的运行结果和FP32的运行结果一致。  
+FP16和INT8推理的运行结果和FP32的运行结果一致。
 infer_gpu.py脚本中的参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
@@ -209,13 +209,13 @@ seq cls result:
 label: news_entertainment   confidence: 0.9494127035140991
 -----------------------------
 ```
-如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：  
+如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：
 ```
 # 获取序列标注INT8量化模型
 wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_quant_infer_model.zip
 unzip tnews_quant_infer_model.zip
 ```
-量化模型的部署命令为：  
+量化模型的部署命令为：
 ```
 # 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
 python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape

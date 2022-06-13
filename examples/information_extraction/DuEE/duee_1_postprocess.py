@@ -27,8 +27,8 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
     trigger_data = read_by_lines(trigger_file)
     role_data = read_by_lines(role_file)
     schema_data = read_by_lines(schema_file)
-    print("trigger predict {} load from {}".format(
-        len(trigger_data), trigger_file))
+    print("trigger predict {} load from {}".format(len(trigger_data),
+                                                   trigger_file))
     print("role predict {} load from {}".format(len(role_data), role_file))
     print("schema {} load from {}".format(len(schema_data), schema_file))
 
@@ -80,10 +80,12 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Official evaluation script for DuEE version 1.0")
-    parser.add_argument(
-        "--trigger_file", help="trigger model predict data path", required=True)
-    parser.add_argument(
-        "--role_file", help="role model predict data path", required=True)
+    parser.add_argument("--trigger_file",
+                        help="trigger model predict data path",
+                        required=True)
+    parser.add_argument("--role_file",
+                        help="role model predict data path",
+                        required=True)
     parser.add_argument("--schema_file", help="schema file path", required=True)
     parser.add_argument("--save_path", help="save file path", required=True)
     args = parser.parse_args()

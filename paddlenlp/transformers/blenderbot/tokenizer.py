@@ -105,24 +105,23 @@ class BlenderbotTokenizer(GPTTokenizer):
                  add_prefix=True,
                  **kwargs):
 
-        sep_token = AddedToken(
-            sep_token,
-            lstrip=False,
-            rstrip=False,
-            single_word=False,
-            normalized=True) if isinstance(sep_token, str) else sep_token
+        sep_token = AddedToken(sep_token,
+                               lstrip=False,
+                               rstrip=False,
+                               single_word=False,
+                               normalized=True) if isinstance(
+                                   sep_token, str) else sep_token
 
         self._build_special_tokens_map_extended(sep_token=sep_token)
 
-        super(BlenderbotTokenizer, self).__init__(
-            vocab_file=vocab_file,
-            merges_file=merges_file,
-            errors=errors,
-            max_len=max_len,
-            special_tokens=special_tokens,
-            pad_token=pad_token,
-            eos_token=eos_token,
-            eol_token=eol_token)
+        super(BlenderbotTokenizer, self).__init__(vocab_file=vocab_file,
+                                                  merges_file=merges_file,
+                                                  errors=errors,
+                                                  max_len=max_len,
+                                                  special_tokens=special_tokens,
+                                                  pad_token=pad_token,
+                                                  eos_token=eos_token,
+                                                  eol_token=eol_token)
         self.add_prefix = add_prefix
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -155,8 +154,8 @@ class BlenderbotTokenizer(GPTTokenizer):
         re = try_import("regex")
         for token in re.findall(self.pat, text):
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(
-                bpe_token for bpe_token in self.bpe(token).split(' '))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def prepare_for_tokenization(self,

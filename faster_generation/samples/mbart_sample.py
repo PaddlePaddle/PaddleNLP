@@ -17,8 +17,8 @@ from paddlenlp.transformers import MBartForConditionalGeneration, MBartTokenizer
 model_name = "mbart-large-50-one-to-many-mmt"
 
 tokenizer = MBartTokenizer.from_pretrained(model_name)
-model = MBartForConditionalGeneration.from_pretrained(
-    model_name, src_lang="en_XX")
+model = MBartForConditionalGeneration.from_pretrained(model_name,
+                                                      src_lang="en_XX")
 model.eval()
 
 
@@ -43,13 +43,12 @@ inputs = "PaddleNLP is a powerful NLP library with Awesome pre-trained models an
 input_ids = tokenizer(inputs)["input_ids"]
 input_ids = paddle.to_tensor(input_ids, dtype='int64').unsqueeze(0)
 
-outputs, _ = model.generate(
-    input_ids=input_ids,
-    forced_bos_token_id=bos_id,
-    decode_strategy="beam_search",
-    num_beams=4,
-    max_length=50,
-    use_faster=True)
+outputs, _ = model.generate(input_ids=input_ids,
+                            forced_bos_token_id=bos_id,
+                            decode_strategy="beam_search",
+                            num_beams=4,
+                            max_length=50,
+                            use_faster=True)
 
 result = postprocess_response(outputs[0].numpy().tolist(), bos_id, eos_id)
 

@@ -57,7 +57,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
 ### Awesome Chinese Model Zoo
 
-#### 🀄 Comprehensive Chinese Transformer Models  
+#### 🀄 Comprehensive Chinese Transformer Models
 
 We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 

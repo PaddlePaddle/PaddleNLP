@@ -24,7 +24,8 @@ from pipelines.pipelines.config import (
     build_component_dependency_graph,
     get_component_definitions,
     get_pipeline_definition,
-    validate_config, )
+    validate_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,13 @@ def camel_to_snake_case(input: str) -> str:
 
 
 def generate_code(
-        pipeline_config: Dict[str, Any],
-        pipeline_variable_name: str="pipeline",
-        pipeline_name: Optional[str]=None,
-        generate_imports: bool=True,
-        comment: Optional[str]=None,
-        add_pipeline_cls_import: bool=True, ) -> str:
+    pipeline_config: Dict[str, Any],
+    pipeline_variable_name: str = "pipeline",
+    pipeline_name: Optional[str] = None,
+    generate_imports: bool = True,
+    comment: Optional[str] = None,
+    add_pipeline_cls_import: bool = True,
+) -> str:
     """
     Generates code to create a pipeline.
 
@@ -87,11 +89,13 @@ def generate_code(
     components_code = _generate_components_code(
         component_definitions=component_definitions,
         component_variable_names=component_variable_names,
-        dependency_graph=component_dependency_graph, )
+        dependency_graph=component_dependency_graph,
+    )
     pipeline_code = _generate_pipeline_code(
         pipeline_definition=pipeline_definition,
         component_variable_names=component_variable_names,
-        pipeline_variable_name=pipeline_variable_name, )
+        pipeline_variable_name=pipeline_variable_name,
+    )
 
     code_parts.append(components_code)
     code_parts.append(pipeline_code)
@@ -211,8 +215,8 @@ def _format_pipeline_node(node: str, calculated_metrics: dict):
 
     node_metrics_formatted = "\n".join(
         sorted(
-            map(format_node_metric, node_metrics.keys(), node_metrics.values(
-            ))))
+            map(format_node_metric, node_metrics.keys(),
+                node_metrics.values())))
     node_metrics_formatted = f"{node_metrics_formatted}\n" if len(
         node_metrics_formatted) > 0 else ""
     s = (f"                      {node}\n"

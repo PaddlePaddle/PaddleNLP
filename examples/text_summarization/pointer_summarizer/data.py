@@ -14,6 +14,7 @@ import numpy as np
 
 import random
 from random import shuffle
+
 random.seed(123)
 
 import config
@@ -32,6 +33,7 @@ STOP_DECODING = '[STOP]'  # This has a vocab id, which is used at the end of unt
 
 
 class Example(object):
+
     def __init__(self, article, abstract_sentences, vocab):
         # Get ids of special tokens
         start_decoding = vocab.word2id(data.START_DECODING)
@@ -71,9 +73,10 @@ class Example(object):
                                                      self.article_oovs)
 
             # Overwrite decoder target sequence so it uses the temp article OOV ids
-            _, self.target = self.get_dec_inp_targ_seqs(
-                abs_ids_extend_vocab, config.max_dec_steps, start_decoding,
-                stop_decoding)
+            _, self.target = self.get_dec_inp_targ_seqs(abs_ids_extend_vocab,
+                                                        config.max_dec_steps,
+                                                        start_decoding,
+                                                        stop_decoding)
 
         # Store the original strings
         self.original_article = article
@@ -106,6 +109,7 @@ class Example(object):
 
 
 class Batch(object):
+
     def __init__(self, example_list, vocab, batch_size):
         self.batch_size = batch_size
         self.pad_id = vocab.word2id(
@@ -126,11 +130,11 @@ class Batch(object):
 
         # Initialize the numpy arrays
         # Note: our enc_batch can have different length (second dimension) for each batch because we use dynamic_rnn for the encoder.
-        self.enc_batch = np.zeros(
-            (self.batch_size, max_enc_seq_len), dtype=np.int32)
+        self.enc_batch = np.zeros((self.batch_size, max_enc_seq_len),
+                                  dtype=np.int32)
         self.enc_lens = np.zeros((self.batch_size), dtype=np.int32)
-        self.enc_padding_mask = np.zeros(
-            (self.batch_size, max_enc_seq_len), dtype=np.float32)
+        self.enc_padding_mask = np.zeros((self.batch_size, max_enc_seq_len),
+                                         dtype=np.float32)
 
         # Fill in the numpy arrays
         for i, ex in enumerate(example_list):
@@ -158,10 +162,10 @@ class Batch(object):
             ex.pad_decoder_inp_targ(config.max_dec_steps, self.pad_id)
 
         # Initialize the numpy arrays.
-        self.dec_batch = np.zeros(
-            (self.batch_size, config.max_dec_steps), dtype=np.int32)
-        self.target_batch = np.zeros(
-            (self.batch_size, config.max_dec_steps), dtype=np.int32)
+        self.dec_batch = np.zeros((self.batch_size, config.max_dec_steps),
+                                  dtype=np.int32)
+        self.target_batch = np.zeros((self.batch_size, config.max_dec_steps),
+                                     dtype=np.int32)
         self.dec_padding_mask = np.zeros(
             (self.batch_size, config.max_dec_steps), dtype=np.float32)
         self.dec_lens = np.zeros((self.batch_size), dtype=np.int32)
@@ -177,9 +181,8 @@ class Batch(object):
     def store_orig_strings(self, example_list):
         self.original_articles = [ex.original_article
                                   for ex in example_list]  # list of lists
-        self.original_abstracts = [
-            ex.original_abstract for ex in example_list
-        ]  # list of lists
+        self.original_abstracts = [ex.original_abstract
+                                   for ex in example_list]  # list of lists
         self.original_abstracts_sents = [
             ex.original_abstract_sents for ex in example_list
         ]  # list of list of lists
@@ -297,8 +300,8 @@ class Batcher(object):
                 if not self._single_pass:
                     shuffle(batches)
                 for b in batches:  # each b is a list of Example objects
-                    self._batch_queue.put(
-                        Batch(b, self._vocab, self.batch_size))
+                    self._batch_queue.put(Batch(b, self._vocab,
+                                                self.batch_size))
 
     def watch_threads(self):
         while True:
@@ -340,6 +343,7 @@ class Batcher(object):
 
 
 class Vocab(object):
+
     def __init__(self, vocab_file, max_size):
         self._word_to_id = {}
         self._id_to_word = {}
@@ -409,8 +413,8 @@ class Vocab(object):
 def example_generator(data_path, single_pass):
     while True:
         filelist = glob.glob(data_path)  # get the list of datafiles
-        assert filelist, ('Error: Empty filelist at %s' %
-                          data_path)  # check filelist isn't empty
+        assert filelist, ('Error: Empty filelist at %s' % data_path
+                          )  # check filelist isn't empty
         if single_pass:
             filelist = sorted(filelist)
         else:

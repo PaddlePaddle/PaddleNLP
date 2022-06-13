@@ -117,8 +117,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
                 .format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -142,13 +142,12 @@ class UNIMOTokenizer(PretrainedTokenizer):
             for line in f:
                 token, index = line.rstrip('\n').split('\t')
                 token_to_idx[token] = int(index)
-        vocab = Vocab.from_dict(
-            token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
+        vocab = Vocab.from_dict(token_to_idx,
+                                unk_token=unk_token,
+                                pad_token=pad_token,
+                                bos_token=bos_token,
+                                eos_token=eos_token,
+                                **kwargs)
         return vocab
 
     def _tokenize(self, text):
@@ -211,8 +210,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -466,8 +465,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
         target_ids = []
         if target is not None:
             tokens = self._tokenize(target)
-            target_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
-                tokens)
+            target_ids = [self.cls_token_id
+                          ] + self.convert_tokens_to_ids(tokens)
             if len(target_ids) > max_target_len - 1:
                 target_ids = target_ids[:max_target_len - 1]
             target_ids += [self.mask_token_id]
@@ -494,8 +493,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
         sequence_length = len(encoded_inputs["input_ids"])
         assert sequence_length <= max_seq_len
 
-        # Considering that the logits at the last time step in the API of 
-        # generative task are taken to generate the next token. In order to 
+        # Considering that the logits at the last time step in the API of
+        # generative task are taken to generate the next token. In order to
         # avoid the last time step being a pad, so take padding on the left.
         pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
         if pad_length > 0:
@@ -504,8 +503,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
             ] * pad_length + encoded_inputs["input_ids"]
         if return_tensors:
             # Add dimention for batch_size
-            encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs[
-                "input_ids"]).unsqueeze(0)
+            encoded_inputs["input_ids"] = paddle.to_tensor(
+                encoded_inputs["input_ids"]).unsqueeze(0)
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = [0] * len(
@@ -526,8 +525,8 @@ class UNIMOTokenizer(PretrainedTokenizer):
             if continuous_position:
                 encoded_inputs["position_ids"] = list(range(sequence_length))
             else:
-                encoded_inputs["position_ids"] = list(range(len(
-                    source_ids))) + list(range(len(target_ids)))
+                encoded_inputs["position_ids"] = list(range(
+                    len(source_ids))) + list(range(len(target_ids)))
             if pad_length > 0:
                 encoded_inputs["position_ids"] = [
                     self.pad_token_id
@@ -545,8 +544,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
             attention_mask[:end, :start] = 0.0
             # Generate the lower triangular matrix using the slice of matrix
             tmp = np.triu(
-                np.ones(
-                    [end - start, end - start], dtype='float32') * -1e4, 1)
+                np.ones([end - start, end - start], dtype='float32') * -1e4, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask
             if pad_length > 0:

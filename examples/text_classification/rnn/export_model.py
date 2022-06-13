@@ -44,55 +44,48 @@ def main():
     if network == 'bow':
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'bigru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'bilstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='bidirect',
+                          padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(
-            attention_layer=attention,
-            vocab_size=vocab_size,
-            lstm_hidden_size=lstm_hidden_size,
-            num_classes=num_classes,
-            padding_idx=pad_token_id)
+        model = BiLSTMAttentionModel(attention_layer=attention,
+                                     vocab_size=vocab_size,
+                                     lstm_hidden_size=lstm_hidden_size,
+                                     num_classes=num_classes,
+                                     padding_idx=pad_token_id)
     elif network == 'birnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'cnn':
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'gru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     elif network == 'lstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='forward',
+                          padding_idx=pad_token_id,
+                          pooling_type='max')
     elif network == 'rnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
@@ -108,8 +101,8 @@ def main():
     if args.network in [
             "lstm", "bilstm", "gru", "bigru", "rnn", "birnn", "bilstm_attn"
     ]:
-        inputs.append(paddle.static.InputSpec(
-            shape=[None], dtype="int64"))  # seq_len
+        inputs.append(paddle.static.InputSpec(shape=[None],
+                                              dtype="int64"))  # seq_len
 
     model = paddle.jit.to_static(model, input_spec=inputs)
     # Save in static graph model.

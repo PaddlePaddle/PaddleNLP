@@ -41,6 +41,7 @@ def _obtain_optimizer_parameters_list(optimizer):
 
 
 class HybridParallelClipGrad:
+
     def __init__(self, clip, hcg):
         self._clip = clip
         self._hcg = hcg
@@ -64,8 +65,8 @@ class HybridParallelClipGrad:
             sum_square = layers.reduce_sum(square)
 
             not_shared_enable = (not hasattr(p, 'is_firstly_shared')) or (
-                hasattr(p, 'is_firstly_shared') and
-                getattr(p, 'is_firstly_shared', True))
+                hasattr(p, 'is_firstly_shared')
+                and getattr(p, 'is_firstly_shared', True))
 
             if not_shared_enable:
                 if p.is_distributed:
@@ -79,9 +80,9 @@ class HybridParallelClipGrad:
         global_norm_var_dist = layers.reduce_sum(global_norm_var_dist)
 
         global_norm_var_not_dist = layers.concat(
-            sum_square_list_not_dist) if len(
-                sum_square_list_not_dist) != 0 else layers.concat(
-                    [paddle.to_tensor([0.])])
+            sum_square_list_not_dist
+        ) if len(sum_square_list_not_dist) != 0 else layers.concat(
+            [paddle.to_tensor([0.])])
         global_norm_var_not_dist = layers.reduce_sum(global_norm_var_not_dist)
 
         # add all reduce to get global norm of distributed params_and_grads
@@ -106,12 +107,13 @@ class HybridParallelClipGrad:
         global_norm_var = layers.sqrt(global_norm_var_dist +
                                       global_norm_var_not_dist)
 
-        max_global_norm = layers.fill_constant(
-            shape=[1], dtype=global_norm_var.dtype, value=self.clip_norm)
-        clip_var = layers.elementwise_div(
-            x=max_global_norm,
-            y=layers.elementwise_max(
-                x=global_norm_var, y=max_global_norm))
+        max_global_norm = layers.fill_constant(shape=[1],
+                                               dtype=global_norm_var.dtype,
+                                               value=self.clip_norm)
+        clip_var = layers.elementwise_div(x=max_global_norm,
+                                          y=layers.elementwise_max(
+                                              x=global_norm_var,
+                                              y=max_global_norm))
         for p, g in params_grads:
             if g is None:
                 continue

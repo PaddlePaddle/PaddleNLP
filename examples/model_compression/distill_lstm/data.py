@@ -82,8 +82,9 @@ def apply_data_augmentation(data,
             ]
         else:
             for word in data.split():
-                words += [[tokenizer.mask_token]] if np.random.rand(
-                ) < p_mask else [tokenizer.tokenize(word)]
+                words += [[
+                    tokenizer.mask_token
+                ]] if np.random.rand() < p_mask else [tokenizer.tokenize(word)]
         # 2. N-gram sampling
         words = ngram_sampling(words, p_ng=p_ng, ngram_range=ngram_range)
         words = flatten(words) if isinstance(words[0], list) else words
@@ -191,27 +192,28 @@ def create_data_loader_for_small_model(task_name,
     if task_name == 'chnsenticorp':
         train_ds, dev_ds = load_dataset(task_name, splits=["train", "dev"])
     else:
-        train_ds, dev_ds = load_dataset(
-            'glue', task_name, splits=["train", "dev"])
+        train_ds, dev_ds = load_dataset('glue',
+                                        task_name,
+                                        splits=["train", "dev"])
     if task_name == 'chnsenticorp':
         vocab = Vocab.load_vocabulary(
             vocab_path,
             unk_token='[UNK]',
             pad_token='[PAD]',
             bos_token=None,
-            eos_token=None, )
+            eos_token=None,
+        )
         pad_val = vocab['[PAD]']
 
     else:
         vocab = BertTokenizer.from_pretrained(model_name)
         pad_val = vocab.pad_token_id
 
-    trans_fn = partial(
-        convert_example_for_lstm,
-        task_name=task_name,
-        vocab=vocab,
-        max_seq_length=max_seq_length,
-        is_test=False)
+    trans_fn = partial(convert_example_for_lstm,
+                       task_name=task_name,
+                       vocab=vocab,
+                       max_seq_length=max_seq_length,
+                       is_test=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_val),  # input_ids
@@ -249,45 +251,43 @@ def create_distill_loader(task_name,
             unk_token='[UNK]',
             pad_token='[PAD]',
             bos_token=None,
-            eos_token=None, )
+            eos_token=None,
+        )
         pad_val = vocab['[PAD]']
-        data_aug_fn = partial(
-            apply_data_augmentation_for_cn,
-            tokenizer=tokenizer,
-            vocab=vocab,
-            n_iter=n_iter,
-            seed=seed)
+        data_aug_fn = partial(apply_data_augmentation_for_cn,
+                              tokenizer=tokenizer,
+                              vocab=vocab,
+                              n_iter=n_iter,
+                              seed=seed)
     else:
-        train_ds, dev_ds = load_dataset(
-            'glue', task_name, splits=["train", "dev"])
+        train_ds, dev_ds = load_dataset('glue',
+                                        task_name,
+                                        splits=["train", "dev"])
         vocab = tokenizer
         pad_val = tokenizer.pad_token_id
-        data_aug_fn = partial(
-            apply_data_augmentation,
-            task_name=task_name,
-            tokenizer=tokenizer,
-            n_iter=n_iter,
-            whole_word_mask=whole_word_mask,
-            seed=seed)
+        data_aug_fn = partial(apply_data_augmentation,
+                              task_name=task_name,
+                              tokenizer=tokenizer,
+                              n_iter=n_iter,
+                              whole_word_mask=whole_word_mask,
+                              seed=seed)
     train_ds = train_ds.map(data_aug_fn, batched=True)
     print("Data augmentation has been applied.")
 
-    trans_fn = partial(
-        convert_example_for_distill,
-        task_name=task_name,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=max_seq_length,
-        vocab=vocab)
+    trans_fn = partial(convert_example_for_distill,
+                       task_name=task_name,
+                       tokenizer=tokenizer,
+                       label_list=train_ds.label_list,
+                       max_seq_length=max_seq_length,
+                       vocab=vocab)
 
-    trans_fn_dev = partial(
-        convert_example_for_distill,
-        task_name=task_name,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=max_seq_length,
-        vocab=vocab,
-        is_tokenized=False)
+    trans_fn_dev = partial(convert_example_for_distill,
+                           task_name=task_name,
+                           tokenizer=tokenizer,
+                           label_list=train_ds.label_list,
+                           max_seq_length=max_seq_length,
+                           vocab=vocab,
+                           is_tokenized=False)
 
     if task_name == 'qqp':
         batchify_fn = lambda samples, fn=Tuple(
@@ -330,15 +330,15 @@ def create_pair_loader_for_small_model(task_name,
         unk_token='[UNK]',
         pad_token='[PAD]',
         bos_token=None,
-        eos_token=None, )
+        eos_token=None,
+    )
 
-    trans_func = partial(
-        convert_pair_example,
-        task_name=task_name,
-        vocab=tokenizer,
-        is_tokenized=False,
-        max_seq_length=max_seq_length,
-        is_test=is_test)
+    trans_func = partial(convert_pair_example,
+                         task_name=task_name,
+                         vocab=tokenizer,
+                         is_tokenized=False,
+                         max_seq_length=max_seq_length,
+                         is_test=is_test)
     train_ds = train_ds.map(trans_func, lazy=True)
     dev_ds = dev_ds.map(trans_func, lazy=True)
 
@@ -359,21 +359,20 @@ def create_dataloader(train_ds, dev_ds, batch_size, batchify_fn, shuffle=True):
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=batch_size, shuffle=shuffle)
 
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=batch_size, shuffle=False)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=batch_size,
+                                               shuffle=False)
 
-    train_data_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = paddle.io.DataLoader(dataset=train_ds,
+                                             batch_sampler=train_batch_sampler,
+                                             collate_fn=batchify_fn,
+                                             num_workers=0,
+                                             return_list=True)
 
-    dev_data_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                           batch_sampler=dev_batch_sampler,
+                                           collate_fn=batchify_fn,
+                                           num_workers=0,
+                                           return_list=True)
 
     return train_data_loader, dev_data_loader

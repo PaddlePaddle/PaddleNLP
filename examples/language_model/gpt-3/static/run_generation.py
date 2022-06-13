@@ -68,8 +68,7 @@ def create_data_holder(args):
     #names = ['src_ids']  # one input
 
     inputs = [
-        paddle.static.data(
-            name=names[i], shape=shapes[i], dtype=dtypes[i])
+        paddle.static.data(name=names[i], shape=shapes[i], dtype=dtypes[i])
         for i in range(len(names))
     ]
     return inputs
@@ -83,8 +82,8 @@ def debug_program(name, program):
 def get_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -95,8 +94,8 @@ def get_data_file(args):
         return files
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
     files = [x.replace("_ids.npz", "") for x in files]
     return files
@@ -158,13 +157,12 @@ def do_generation(args):
     worker_index = fleet.worker_index()
     local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=args.dp_degree,
+                    pp_degree=args.pp_degree,
+                    sharding_degree=args.sharding_degree,
+                    mp_degree=args.mp_degree)
 
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
@@ -236,10 +234,7 @@ def do_generation(args):
             else:
                 logger.info("Loading parameters from %s" % dygraph_path)
                 init_static_with_params(
-                    model,
-                    paddle.load(
-                        dygraph_path, return_numpy=True),
-                    topo,
+                    model, paddle.load(dygraph_path, return_numpy=True), topo,
                     main_program)
                 flag_loaded = True
         if not flag_loaded:
@@ -254,11 +249,10 @@ def do_generation(args):
         "Question: Where is the capital of China? Answer:",
         "Question:Who is the CEO of Apple? Answer:"
     ]
-    inputs = tokenizer(
-        text,
-        padding=True,
-        return_attention_mask=True,
-        return_position_ids=True)
+    inputs = tokenizer(text,
+                       padding=True,
+                       return_attention_mask=True,
+                       return_position_ids=True)
     ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype('int64')
     position_ids = np.array(inputs["position_ids"]).reshape(len(text),
                                                             -1).astype('int64')
@@ -296,8 +290,11 @@ def do_generation(args):
         feed_names = [v.name for v in feeds]
         fetchs_names = [v.name for v in fetchs]
         print('feeds: ', feed_names, 'fetches: ', fetchs_names)
-        paddle.static.save_inference_model(
-            inference_save_path, feeds, fetchs, exe, program=main_program)
+        paddle.static.save_inference_model(inference_save_path,
+                                           feeds,
+                                           fetchs,
+                                           exe,
+                                           program=main_program)
 
 
 if __name__ == '__main__':

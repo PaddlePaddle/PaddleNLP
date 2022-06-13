@@ -42,6 +42,7 @@ def _convert_attention_mask(attention_mask, inputs):
 
 
 class SqueezeBertEmbeddings(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  hidden_size=768,
@@ -50,8 +51,9 @@ class SqueezeBertEmbeddings(nn.Layer):
                  type_vocab_size=16,
                  layer_norm_eps=1e-12):
         super().__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=None)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=None)
 
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
@@ -60,9 +62,9 @@ class SqueezeBertEmbeddings(nn.Layer):
         self.LayerNorm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-        self.register_buffer("position_ids",
-                             paddle.arange(max_position_embeddings).expand(
-                                 (1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(max_position_embeddings).expand((1, -1)))
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None):
         input_shape = input_ids.shape
@@ -74,7 +76,8 @@ class SqueezeBertEmbeddings(nn.Layer):
         if token_type_ids is None:
             token_type_ids = paddle.zeros(
                 input_shape,
-                dtype=paddle.int64, )
+                dtype=paddle.int64,
+            )
 
         inputs_embeds = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
@@ -87,6 +90,7 @@ class SqueezeBertEmbeddings(nn.Layer):
 
 
 class MatMulWrapper(nn.Layer):
+
     def __init__(self):
         super().__init__()
 
@@ -100,6 +104,7 @@ class MatMulWrapper(nn.Layer):
 
 
 class SqueezeBertLayerNorm(nn.LayerNorm):
+
     def __init__(self, hidden_size, epsilon=1e-12):
         nn.LayerNorm.__init__(
             self, normalized_shape=hidden_size,
@@ -112,11 +117,14 @@ class SqueezeBertLayerNorm(nn.LayerNorm):
 
 
 class ConvDropoutLayerNorm(nn.Layer):
+
     def __init__(self, cin, cout, groups, dropout_prob):
         super().__init__()
 
-        self.conv1d = nn.Conv1D(
-            in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
+        self.conv1d = nn.Conv1D(in_channels=cin,
+                                out_channels=cout,
+                                kernel_size=1,
+                                groups=groups)
         self.layernorm = SqueezeBertLayerNorm(cout)
         self.dropout = nn.Dropout(dropout_prob)
 
@@ -129,10 +137,13 @@ class ConvDropoutLayerNorm(nn.Layer):
 
 
 class ConvActivation(nn.Layer):
+
     def __init__(self, cin, cout, groups, act):
         super().__init__()
-        self.conv1d = nn.Conv1D(
-            in_channels=cin, out_channels=cout, kernel_size=1, groups=groups)
+        self.conv1d = nn.Conv1D(in_channels=cin,
+                                out_channels=cout,
+                                kernel_size=1,
+                                groups=groups)
         self.act = ACT2FN[act]
 
     def forward(self, x):
@@ -141,6 +152,7 @@ class ConvActivation(nn.Layer):
 
 
 class SqueezeBertSelfAttention(nn.Layer):
+
     def __init__(self,
                  num_attention_heads,
                  attention_probs_dropout_prob,
@@ -157,12 +169,18 @@ class SqueezeBertSelfAttention(nn.Layer):
         self.attention_head_size = int(cin / num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Conv1D(
-            in_channels=cin, out_channels=cin, kernel_size=1, groups=q_groups)
-        self.key = nn.Conv1D(
-            in_channels=cin, out_channels=cin, kernel_size=1, groups=k_groups)
-        self.value = nn.Conv1D(
-            in_channels=cin, out_channels=cin, kernel_size=1, groups=v_groups)
+        self.query = nn.Conv1D(in_channels=cin,
+                               out_channels=cin,
+                               kernel_size=1,
+                               groups=q_groups)
+        self.key = nn.Conv1D(in_channels=cin,
+                             out_channels=cin,
+                             kernel_size=1,
+                             groups=k_groups)
+        self.value = nn.Conv1D(in_channels=cin,
+                               out_channels=cin,
+                               kernel_size=1,
+                               groups=v_groups)
 
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
         self.softmax = nn.Softmax(axis=-1)
@@ -236,6 +254,7 @@ class SqueezeBertSelfAttention(nn.Layer):
 
 
 class SqueezeBertLayer(nn.Layer):
+
     def __init__(self, hidden_size, intermediate_size, num_attention_heads,
                  attention_probs_dropout_prob, q_groups, k_groups, v_groups,
                  output_groups, intermediate_groups, post_attention_groups,
@@ -254,25 +273,25 @@ class SqueezeBertLayer(nn.Layer):
         c2 = intermediate_size
         c3 = hidden_size
 
-        self.attention = SqueezeBertSelfAttention(
-            num_attention_heads,
-            attention_probs_dropout_prob,
-            cin=c0,
-            q_groups=q_groups,
-            k_groups=k_groups,
-            v_groups=v_groups)
+        self.attention = SqueezeBertSelfAttention(num_attention_heads,
+                                                  attention_probs_dropout_prob,
+                                                  cin=c0,
+                                                  q_groups=q_groups,
+                                                  k_groups=k_groups,
+                                                  v_groups=v_groups)
         self.post_attention = ConvDropoutLayerNorm(
             cin=c0,
             cout=c1,
             groups=post_attention_groups,
             dropout_prob=hidden_dropout_prob)
-        self.intermediate = ConvActivation(
-            cin=c1, cout=c2, groups=intermediate_groups, act=hidden_act)
-        self.output = ConvDropoutLayerNorm(
-            cin=c2,
-            cout=c3,
-            groups=output_groups,
-            dropout_prob=hidden_dropout_prob)
+        self.intermediate = ConvActivation(cin=c1,
+                                           cout=c2,
+                                           groups=intermediate_groups,
+                                           act=hidden_act)
+        self.output = ConvDropoutLayerNorm(cin=c2,
+                                           cout=c3,
+                                           groups=output_groups,
+                                           dropout_prob=hidden_dropout_prob)
 
     def forward(self, hidden_states, attention_mask, output_attentions):
         att = self.attention(hidden_states, attention_mask, output_attentions)
@@ -291,6 +310,7 @@ class SqueezeBertLayer(nn.Layer):
 
 
 class SqueezeBertEncoder(nn.Layer):
+
     def __init__(self, embedding_size, hidden_size, intermediate_size,
                  num_attention_heads, attention_probs_dropout_prob, q_groups,
                  k_groups, v_groups, output_groups, intermediate_groups,
@@ -345,6 +365,7 @@ class SqueezeBertEncoder(nn.Layer):
 
 
 class SqueezeBertPooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -358,6 +379,7 @@ class SqueezeBertPooler(nn.Layer):
 
 
 class SqueezeBertPredictionHeadTransform(nn.Layer):
+
     def __init__(self, hidden_size, hidden_act, layer_norm_eps):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -375,13 +397,15 @@ class SqueezeBertPredictionHeadTransform(nn.Layer):
 
 
 class SqueezeBertLMPredictionHead(nn.Layer):
+
     def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
         super().__init__()
         self.transform = SqueezeBertPredictionHeadTransform(
             hidden_size, hidden_act, layer_norm_eps)
         self.decoder = nn.Linear(hidden_size, vocab_size, bias_attr=False)
-        self.bias = paddle.create_parameter(
-            [vocab_size], dtype='float32', is_bias=True)
+        self.bias = paddle.create_parameter([vocab_size],
+                                            dtype='float32',
+                                            is_bias=True)
         self.decoder.bias = self.bias
 
     def forward(self, hidden_states):
@@ -391,10 +415,12 @@ class SqueezeBertLMPredictionHead(nn.Layer):
 
 
 class SqueezeBertPreTrainingHeads(nn.Layer):
+
     def __init__(self, hidden_size, hidden_act, layer_norm_eps, vocab_size):
         super().__init__()
-        self.predictions = SqueezeBertLMPredictionHead(
-            hidden_size, hidden_act, layer_norm_eps, vocab_size)
+        self.predictions = SqueezeBertLMPredictionHead(hidden_size, hidden_act,
+                                                       layer_norm_eps,
+                                                       vocab_size)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
@@ -508,8 +534,8 @@ class SqueezeBertPreTrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.squeezebert.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -597,9 +623,10 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
                  **kwargs):
         super().__init__()
         self.initializer_range = initializer_range
-        self.embeddings = SqueezeBertEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, layer_norm_eps)
+        self.embeddings = SqueezeBertEmbeddings(vocab_size, hidden_size,
+                                                hidden_dropout_prob,
+                                                max_position_embeddings,
+                                                type_vocab_size, layer_norm_eps)
         self.encoder = SqueezeBertEncoder(
             embedding_size, hidden_size, intermediate_size, num_attention_heads,
             attention_probs_dropout_prob, q_groups, k_groups, v_groups,
@@ -680,17 +707,17 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
-        extended_attention_mask = _convert_attention_mask(attention_mask,
-                                                          embedding_output)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
+        extended_attention_mask = _convert_attention_mask(
+            attention_mask, embedding_output)
         encoder_outputs = self.encoder(
             hidden_states=embedding_output,
             attention_mask=extended_attention_mask,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, )
+            output_hidden_states=output_hidden_states,
+        )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
 
@@ -743,11 +770,10 @@ class SqueezeBertForSequenceClassification(SqueezeBertPreTrainedModel):
             Shape as `[batch_size, num_classes]` and dtype as float32.
         """
 
-        _, pooled_output = self.squeezebert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.squeezebert(input_ids,
+                                            token_type_ids=token_type_ids,
+                                            position_ids=position_ids,
+                                            attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -792,11 +818,10 @@ class SqueezeBertForQuestionAnswering(SqueezeBertPreTrainedModel):
                 A tensor of the input token classification logits, indicates the end position of the labelled span.
                 Its data type should be float32 and its shape is [batch_size, sequence_length].
         '''
-        sequence_output, _ = self.squeezebert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=None,
-            attention_mask=None)
+        sequence_output, _ = self.squeezebert(input_ids,
+                                              token_type_ids=token_type_ids,
+                                              position_ids=None,
+                                              attention_mask=None)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
@@ -849,11 +874,10 @@ class SqueezeBertForTokenClassification(SqueezeBertPreTrainedModel):
             Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
         """
 
-        sequence_output, _ = self.squeezebert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.squeezebert(input_ids,
+                                              token_type_ids=token_type_ids,
+                                              position_ids=position_ids,
+                                              attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
