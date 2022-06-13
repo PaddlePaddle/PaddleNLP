@@ -62,13 +62,13 @@ class ErnieSageForLinkPrediction(ErniePretrainedModel):
                                [user_index, pos_item_index, neg_item_index])
         user_feat, pos_item_feat, neg_item_feat = outputs
 
-        # calc loss 
+        # calc loss
         if self.config_file.neg_type == "batch_neg":
             neg_item_feat = pos_item_feat
 
         pos = paddle.sum(user_feat * pos_item_feat, -1, keepdim=True)  # [B, 1]
-        neg = paddle.matmul(
-            user_feat, neg_item_feat, transpose_y=True)  # [B, B]
+        neg = paddle.matmul(user_feat, neg_item_feat,
+                            transpose_y=True)  # [B, B]
         loss = self.loss_func(pos, neg)
         # return loss, outputs
         return loss, outputs + [user_real_index, pos_item_real_index]

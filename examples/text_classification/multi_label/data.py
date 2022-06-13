@@ -70,17 +70,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def read_custom_data(filename, is_test=False):

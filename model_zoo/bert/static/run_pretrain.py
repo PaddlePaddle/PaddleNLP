@@ -47,7 +47,8 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -58,19 +59,22 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--input_dir",
         default=None,
         type=str,
         required=True,
-        help="The input directory where the data will be read from.", )
+        help="The input directory where the data will be read from.",
+    )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--max_predictions_per_seq",
@@ -82,73 +86,70 @@ def parse_args():
         "--batch_size",
         default=8,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=5e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+        help="Batch size per GPU/CPU for training.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=5e-5,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="Max gradient norm.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps.")
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=500,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument(
-        "--use_amp",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable mixed precision training.")
+    parser.add_argument("--warmup_steps",
+                        default=0,
+                        type=int,
+                        help="Linear warmup over warmup_steps.")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=500,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=500,
+                        help="Save checkpoint every X updates steps.")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=42,
+                        help="Random seed for initialization")
+    parser.add_argument("--use_amp",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Enable mixed precision training.")
     parser.add_argument(
         "--enable_addto",
         type=distutils.util.strtobool,
         default=False,
-        help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
+        help=
+        "Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training."
     )
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=2**15,
-        help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--use_pure_fp16",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Whether to use pure fp16 training.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        help="Device for selecting for the training.")
+    parser.add_argument("--scale_loss",
+                        type=float,
+                        default=2**15,
+                        help="The value of scale_loss for fp16.")
+    parser.add_argument("--use_pure_fp16",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Whether to use pure fp16 training.")
+    parser.add_argument("--device",
+                        type=str,
+                        default="gpu",
+                        help="Device for selecting for the training.")
     parser.add_argument(
         "--gradient_merge_steps",
         type=int,
@@ -161,7 +162,8 @@ def parse_args():
         '--profiler_options',
         type=str,
         default=None,
-        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+        help=
+        'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
     args = parser.parse_args()
     return args
@@ -175,9 +177,8 @@ def select_dataset_file_for_each_worker(files, f_start_id, worker_num,
     num_files = len(files)
     if worker_num > num_files:
         remainder = worker_num % num_files
-        data_file = files[(
-            f_start_id * worker_num + worker_index + remainder * f_start_id) %
-                          num_files]
+        data_file = files[(f_start_id * worker_num + worker_index +
+                           remainder * f_start_id) % num_files]
     else:
         data_file = files[(f_start_id * worker_num + worker_index) % num_files]
     return data_file
@@ -230,8 +231,8 @@ def dist_optimizer(args, optimizer):
     if args.use_amp:
         dist_strategy.amp = True
 
-        custom_black_list = ['lookup_table',
-                             'lookup_table_v2'] if args.use_pure_fp16 else None
+        custom_black_list = ['lookup_table', 'lookup_table_v2'
+                             ] if args.use_pure_fp16 else None
         dist_strategy.amp_configs = {
             'custom_white_list': ['softmax', 'layer_norm', 'gelu'],
             'init_loss_scaling': args.scale_loss,
@@ -354,8 +355,8 @@ def do_train(args):
     while True:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "training" in
-            f
+            if os.path.isfile(os.path.join(args.input_dir, f))
+            and "training" in f
         ]
         files.sort()
         num_files = len(files)
@@ -363,8 +364,9 @@ def do_train(args):
         f_start_id = 0
 
         # Select one file for each worker and create the DataLoader for the file
-        data_file = select_dataset_file_for_each_worker(
-            files, f_start_id, worker_num, worker_index)
+        data_file = select_dataset_file_for_each_worker(files, f_start_id,
+                                                        worker_num,
+                                                        worker_index)
         train_data_loader, _ = create_pretraining_dataset(
             data_file, args.max_predictions_per_seq, args, data_holders,
             worker_init, paddle.static.cuda_places())
@@ -405,10 +407,10 @@ def do_train(args):
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                         % (global_step, epoch, step, loss_return[0],
                            reader_cost_avg.get_average(),
-                           train_cost_avg.get_average(), total_samples /
-                           args.logging_steps, args.batch_size / (
-                               reader_cost_avg.get_average() +
-                               train_cost_avg.get_average())))
+                           train_cost_avg.get_average(),
+                           total_samples / args.logging_steps, args.batch_size /
+                           (reader_cost_avg.get_average() +
+                            train_cost_avg.get_average())))
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
@@ -419,9 +421,9 @@ def do_train(args):
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
                         model.save_model_config(output_dir)
-                        paddle.static.save(main_program,
-                                           os.path.join(output_dir,
-                                                        "model_state"))
+                        paddle.static.save(
+                            main_program, os.path.join(output_dir,
+                                                       "model_state"))
                         tokenizer.save_pretrained(output_dir)
                 if global_step >= args.max_steps:
                     reader_start = time.time()

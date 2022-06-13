@@ -27,12 +27,13 @@ LOG_PATH_ROOT = f"{CUR_DIR}/../../output"
 
 
 class PaddleInferBenchmark(object):
+
     def __init__(self,
                  config,
-                 model_info: dict={},
-                 data_info: dict={},
-                 perf_info: dict={},
-                 resource_info: dict={},
+                 model_info: dict = {},
+                 data_info: dict = {},
+                 perf_info: dict = {},
+                 resource_info: dict = {},
                  **kwargs):
         """
         Construct PaddleInferBenchmark Class to format logs.
@@ -129,14 +130,13 @@ class PaddleInferBenchmark(object):
         FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         log_output = f"{LOG_PATH_ROOT}/{self.model_name}.log"
         Path(f"{LOG_PATH_ROOT}").mkdir(parents=True, exist_ok=True)
-        logging.basicConfig(
-            level=logging.INFO,
-            format=FORMAT,
-            handlers=[
-                logging.FileHandler(
-                    filename=log_output, mode='w'),
-                logging.StreamHandler(),
-            ])
+        logging.basicConfig(level=logging.INFO,
+                            format=FORMAT,
+                            handlers=[
+                                logging.FileHandler(filename=log_output,
+                                                    mode='w'),
+                                logging.StreamHandler(),
+                            ])
         self.logger = logging.getLogger(__name__)
         self.logger.info(
             f"Paddle Inference benchmark log will be saved to {log_output}")
@@ -208,7 +208,8 @@ class PaddleInferBenchmark(object):
             f"{identifier} enable_tensorrt: {self.config_status['enable_tensorrt']}"
         )
         self.logger.info(
-            f"{identifier} enable_mkldnn: {self.config_status['enable_mkldnn']}")
+            f"{identifier} enable_mkldnn: {self.config_status['enable_mkldnn']}"
+        )
         self.logger.info(
             f"{identifier} cpu_math_library_num_threads: {self.config_status['cpu_math_library_num_threads']}"
         )

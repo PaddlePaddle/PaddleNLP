@@ -89,9 +89,10 @@ def run_evaluate(args,
             break
 
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                % (task_name, global_step, epoch, eval_step, average_loss,
-                   iter_steps / (time.time() - local_time)))
+    logger.info(
+        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
+        (task_name, global_step, epoch, eval_step, average_loss, iter_steps /
+         (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
     model.train()
 
@@ -99,8 +100,8 @@ def run_evaluate(args,
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -112,8 +113,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
@@ -266,8 +267,9 @@ def do_train(args):
         # level O2 means converting the network to FP16
         if args.sharding_stage not in [2, 3]:
             scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(
-            models=model, level='O2', save_dtype='float32')
+        model = paddle.amp.decorate(models=model,
+                                    level='O2',
+                                    save_dtype='float32')
 
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
@@ -390,8 +392,8 @@ def do_train(args):
 
                 if global_step % args.logging_freq == 0:
                     avg_loss = loss.numpy()
-                    speed = args.logging_freq / (
-                        train_reader_cost + train_run_cost)
+                    speed = args.logging_freq / (train_reader_cost +
+                                                 train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
@@ -401,8 +403,8 @@ def do_train(args):
                            speed * default_global_tokens_num / nranks,
                            optimizer.get_lr()))
                     log_writer.add_scalar("loss", float(loss), global_step)
-                    log_writer.add_scalar("learning_rate",
-                                          optimizer.get_lr(), global_step)
+                    log_writer.add_scalar("learning_rate", optimizer.get_lr(),
+                                          global_step)
 
                     tic_train = time.time()
                     train_reader_cost = 0.0
@@ -422,8 +424,8 @@ def do_train(args):
 
                 # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
                 # only dp_rank = 0 save model
-                if (global_step % args.save_steps == 0 or
-                        global_step >= args.max_steps) and dp_rank == 0:
+                if (global_step % args.save_steps == 0
+                        or global_step >= args.max_steps) and dp_rank == 0:
 
                     model_to_save = model._layers if paddle.distributed.get_world_size(
                     ) > 1 and args.sharding_stage not in [2, 3] else model
@@ -441,8 +443,8 @@ def do_train(args):
                             optimizer.state_dict(),
                             os.path.join(
                                 output_dir,
-                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt".
-                                format(mp_rank, sharding_rank, pp_rank)))
+                                "model_state_mp_{:0>2d}_sharding_{:0>2d}_pp_{:0>2d}.pdopt"
+                                .format(mp_rank, sharding_rank, pp_rank)))
                     else:
                         if args.sharding_stage == 3:
                             # If parameter need to convert to cpu, please add convert2cpu=True
@@ -473,13 +475,12 @@ def do_train(args):
 def wrap_sharding_2_3(model, optimizer, scaler, sharding_offload):
     group = fleet.get_hybrid_communicate_group().get_sharding_parallel_group()
     level = "p_g_os" if args.sharding_stage == 3 else "os_g"
-    return group_sharded_parallel(
-        model=model,
-        optimizer=optimizer,
-        level=level,
-        scaler=scaler,
-        group=group,
-        offload=sharding_offload)
+    return group_sharded_parallel(model=model,
+                                  optimizer=optimizer,
+                                  level=level,
+                                  scaler=scaler,
+                                  group=group,
+                                  offload=sharding_offload)
 
 
 if __name__ == "__main__":

@@ -66,10 +66,8 @@ class Stack(object):
                  [5, 6, 7, 8]]
                 '''
         """
-        data = np.stack(
-            data,
-            axis=self._axis).astype(self._dtype) if self._dtype else np.stack(
-                data, axis=self._axis)
+        data = np.stack(data, axis=self._axis).astype(
+            self._dtype) if self._dtype else np.stack(data, axis=self._axis)
         return data
 
 
@@ -142,8 +140,8 @@ class Pad(object):
         """
 
         # return data itself for rare unexpected cases when 1-D array is passed to Pad
-        if not isinstance(data[0], list) and not isinstance(data[0],
-                                                            np.ndarray):
+        if not isinstance(data[0], list) and not isinstance(
+                data[0], np.ndarray):
             return np.asarray(
                 data,
                 dtype=self._dtype if self._dtype is not None else np.int64)

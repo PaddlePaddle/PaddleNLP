@@ -39,6 +39,7 @@ def read_config(fp=None):
 
 
 class Conv2d(nn.Conv2D):
+
     def __init__(self, *args, **kwargs):
         norm = kwargs.pop("norm", None)
         activation = kwargs.pop("activation", None)
@@ -57,6 +58,7 @@ class Conv2d(nn.Conv2D):
 
 
 class CNNBlockBase(Layer):
+
     def __init__(self, in_channels, out_channels, stride):
         """
         The `__init__` method of any subclass should also contain these arguments.
@@ -80,6 +82,7 @@ ResNetBlockBase = CNNBlockBase
 
 class ShapeSpec(
         namedtuple("_ShapeSpec", ["channels", "height", "width", "stride"])):
+
     def __new__(cls, channels=None, height=None, width=None, stride=None):
         return super().__new__(cls, channels, height, width, stride)
 
@@ -108,17 +111,18 @@ def get_norm(norm, out_channels):
 
 
 class FrozenBatchNorm(nn.BatchNorm):
+
     def __init__(self, num_channels):
         param_attr = ParamAttr(learning_rate=0.0, trainable=False)
         bias_attr = ParamAttr(learning_rate=0.0, trainable=False)
-        super(FrozenBatchNorm, self).__init__(
-            num_channels,
-            param_attr=param_attr,
-            bias_attr=bias_attr,
-            use_global_stats=True)
+        super(FrozenBatchNorm, self).__init__(num_channels,
+                                              param_attr=param_attr,
+                                              bias_attr=bias_attr,
+                                              use_global_stats=True)
 
 
 class Backbone(nn.Layer):
+
     def __init__(self):
         super(Backbone, self).__init__()
 
@@ -133,9 +137,8 @@ class Backbone(nn.Layer):
     def output_shape(self):
         # this is a backward-compatible default
         return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name],
-                stride=self._out_feature_strides[name])
+            name: ShapeSpec(channels=self._out_feature_channels[name],
+                            stride=self._out_feature_strides[name])
             for name in self._out_features
         }
 
@@ -158,16 +161,17 @@ class BottleneckBlock(CNNBlockBase):
     """
 
     def __init__(
-            self,
-            in_channels,
-            out_channels,
-            *,
-            bottleneck_channels,
-            stride=1,
-            num_groups=1,
-            norm="BN",
-            stride_in_1x1=False,
-            dilation=1, ):
+        self,
+        in_channels,
+        out_channels,
+        *,
+        bottleneck_channels,
+        stride=1,
+        num_groups=1,
+        norm="BN",
+        stride_in_1x1=False,
+        dilation=1,
+    ):
         super(BottleneckBlock, self).__init__(in_channels, out_channels, stride)
 
         if in_channels != out_channels:
@@ -177,7 +181,8 @@ class BottleneckBlock(CNNBlockBase):
                 kernel_size=1,
                 stride=stride,
                 bias_attr=False,
-                norm=get_norm(norm, out_channels), )
+                norm=get_norm(norm, out_channels),
+            )
         else:
             self.shortcut = None
 
@@ -189,7 +194,8 @@ class BottleneckBlock(CNNBlockBase):
             kernel_size=1,
             stride=stride_1x1,
             bias_attr=False,
-            norm=get_norm(norm, bottleneck_channels), )
+            norm=get_norm(norm, bottleneck_channels),
+        )
 
         self.conv2 = Conv2d(
             bottleneck_channels,
@@ -200,14 +206,16 @@ class BottleneckBlock(CNNBlockBase):
             bias_attr=False,
             groups=num_groups,
             dilation=dilation,
-            norm=get_norm(norm, bottleneck_channels), )
+            norm=get_norm(norm, bottleneck_channels),
+        )
 
         self.conv3 = Conv2d(
             bottleneck_channels,
             out_channels,
             kernel_size=1,
             bias_attr=False,
-            norm=get_norm(norm, out_channels), )
+            norm=get_norm(norm, out_channels),
+        )
         # init code is removed cause pretrained model will be loaded
 
     def forward(self, x):
@@ -236,18 +244,19 @@ class DeformBottleneckBlock(CNNBlockBase):
     """
 
     def __init__(
-            self,
-            in_channels,
-            out_channels,
-            *,
-            bottleneck_channels,
-            stride=1,
-            num_groups=1,
-            norm="BN",
-            stride_in_1x1=False,
-            dilation=1,
-            deform_modulated=False,
-            deform_num_groups=1, ):
+        self,
+        in_channels,
+        out_channels,
+        *,
+        bottleneck_channels,
+        stride=1,
+        num_groups=1,
+        norm="BN",
+        stride_in_1x1=False,
+        dilation=1,
+        deform_modulated=False,
+        deform_num_groups=1,
+    ):
         raise NotImplementedError
 
 
@@ -272,7 +281,8 @@ class BasicStem(CNNBlockBase):
             stride=2,
             padding=3,
             bias_attr=False,
-            norm=get_norm(norm, out_channels), )
+            norm=get_norm(norm, out_channels),
+        )
 
     def forward(self, x):
         x = self.conv1(x)
@@ -282,6 +292,7 @@ class BasicStem(CNNBlockBase):
 
 
 class ResNet(Backbone):
+
     def __init__(self,
                  stem,
                  stages,
@@ -367,9 +378,8 @@ class ResNet(Backbone):
 
     def output_shape(self):
         return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name],
-                stride=self._out_feature_strides[name])
+            name: ShapeSpec(channels=self._out_feature_channels[name],
+                            stride=self._out_feature_strides[name])
             for name in self._out_features
         }
 
@@ -423,10 +433,9 @@ class ResNet(Backbone):
                     curr_kwargs[k] = v
 
             blocks.append(
-                block_class(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    **curr_kwargs))
+                block_class(in_channels=in_channels,
+                            out_channels=out_channels,
+                            **curr_kwargs))
             in_channels = out_channels
         return blocks
 
@@ -478,7 +487,8 @@ class ResNet(Backbone):
                     stride_per_block=[s] + [1] * (n - 1),
                     in_channels=i,
                     out_channels=o,
-                    **kwargs, ))
+                    **kwargs,
+                ))
         return ret
 
     def freeze(self, freeze_at=0):
@@ -517,6 +527,7 @@ def _assert_strides_are_log2_contiguous(strides):
 
 
 class FPN(Backbone):
+
     def __init__(self,
                  bottom_up,
                  in_features,
@@ -544,12 +555,11 @@ class FPN(Backbone):
             lateral_norm = get_norm(norm, out_channels)
             output_norm = get_norm(norm, out_channels)
 
-            lateral_conv = Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size=1,
-                bias_attr=use_bias,
-                norm=lateral_norm)
+            lateral_conv = Conv2d(in_channels,
+                                  out_channels,
+                                  kernel_size=1,
+                                  bias_attr=use_bias,
+                                  norm=lateral_norm)
             output_conv = Conv2d(
                 out_channels,
                 out_channels,
@@ -557,7 +567,8 @@ class FPN(Backbone):
                 stride=1,
                 padding=1,
                 bias_attr=use_bias,
-                norm=output_norm, )
+                norm=output_norm,
+            )
             stage = int(math.log2(strides[idx]))
             self.add_sublayer("fpn_lateral{}".format(stage), lateral_conv)
             self.add_sublayer("fpn_output{}".format(stage), output_conv)
@@ -609,18 +620,19 @@ class FPN(Backbone):
         """
         bottom_up_features = self.bottom_up(x)
         results = []
-        prev_features = self.lateral_convs[0](bottom_up_features[
-            self.in_features[-1]])
+        prev_features = self.lateral_convs[0](
+            bottom_up_features[self.in_features[-1]])
         results.append(self.output_convs[0](prev_features))
 
         # Reverse feature maps into top-down order (from low to high resolution)
-        for idx, (lateral_conv, output_conv
-                  ) in enumerate(zip(self.lateral_convs, self.output_convs)):
+        for idx, (lateral_conv, output_conv) in enumerate(
+                zip(self.lateral_convs, self.output_convs)):
             if idx > 0:
                 features = self.in_features[-idx - 1]
                 features = bottom_up_features[features]
-                top_down_features = F.interpolate(
-                    prev_features, scale_factor=2.0, mode="nearest")
+                top_down_features = F.interpolate(prev_features,
+                                                  scale_factor=2.0,
+                                                  mode="nearest")
                 lateral_features = lateral_conv(features)
                 prev_features = lateral_features + top_down_features
                 if self._fuse_type == "avg":
@@ -640,9 +652,8 @@ class FPN(Backbone):
 
     def output_shape(self):
         return {
-            name: ShapeSpec(
-                channels=self._out_feature_channels[name],
-                stride=self._out_feature_strides[name])
+            name: ShapeSpec(channels=self._out_feature_channels[name],
+                            stride=self._out_feature_strides[name])
             for name in self._out_features
         }
 
@@ -670,7 +681,8 @@ def build_resnet_backbone(cfg, input_shape=None):
     stem = BasicStem(
         in_channels=ch,
         out_channels=cfg.MODEL.RESNETS.STEM_OUT_CHANNELS,
-        norm=norm, )
+        norm=norm,
+    )
 
     # fmt: off
     freeze_at = cfg.MODEL.BACKBONE.FREEZE_AT  # default as 2
@@ -687,8 +699,9 @@ def build_resnet_backbone(cfg, input_shape=None):
     deform_modulated = cfg.MODEL.RESNETS.DEFORM_MODULATED
     deform_num_groups = cfg.MODEL.RESNETS.DEFORM_NUM_GROUPS
     # fmt: on
-    assert res5_dilation in {1, 2}, "res5_dilation cannot be {}.".format(
-        res5_dilation)
+    assert res5_dilation in {
+        1, 2
+    }, "res5_dilation cannot be {}.".format(res5_dilation)
 
     num_blocks_per_stage = {
         18: [2, 2, 2, 2],
@@ -711,15 +724,19 @@ def build_resnet_backbone(cfg, input_shape=None):
     for idx, stage_idx in enumerate(range(2, 6)):
         # res5_dilation is used this way as a convention in R-FCN & Deformable Conv paper
         dilation = res5_dilation if stage_idx == 5 else 1
-        first_stride = 1 if idx == 0 or (stage_idx == 5 and
-                                         dilation == 2) else 2
+        first_stride = 1 if idx == 0 or (stage_idx == 5
+                                         and dilation == 2) else 2
         stage_kargs = {
-            "num_blocks": num_blocks_per_stage[idx],
+            "num_blocks":
+            num_blocks_per_stage[idx],
             "stride_per_block":
             [first_stride] + [1] * (num_blocks_per_stage[idx] - 1),
-            "in_channels": in_channels,
-            "out_channels": out_channels,
-            "norm": norm,
+            "in_channels":
+            in_channels,
+            "out_channels":
+            out_channels,
+            "norm":
+            norm,
         }
         # Use BasicBlock for R18 and R34.
         if depth in [18, 34]:
@@ -753,11 +770,13 @@ def build_resnet_fpn_backbone(cfg, input_shape=None):
         out_channels=out_channels,
         norm=cfg.MODEL.FPN.NORM,
         top_block=LastLevelMaxPool(),
-        fuse_type=cfg.MODEL.FPN.FUSE_TYPE, )
+        fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+    )
     return backbone
 
 
 class VisualBackbone(Layer):
+
     def __init__(self, config):
         super(VisualBackbone, self).__init__()
         self.cfg = read_config()
@@ -770,22 +789,23 @@ class VisualBackbone(Layer):
             "pixel_mean",
             paddle.to_tensor(self.cfg.MODEL.PIXEL_MEAN).reshape(
                 [num_channels, 1, 1]))
-        self.register_buffer("pixel_std",
-                             paddle.to_tensor(self.cfg.MODEL.PIXEL_STD).reshape(
-                                 [num_channels, 1, 1]))
+        self.register_buffer(
+            "pixel_std",
+            paddle.to_tensor(self.cfg.MODEL.PIXEL_STD).reshape(
+                [num_channels, 1, 1]))
         self.out_feature_key = "p2"
         # is_deterministic is disabled here.
         self.pool = nn.AdaptiveAvgPool2D(config["image_feature_pool_shape"][:2])
         if len(config["image_feature_pool_shape"]) == 2:
             config["image_feature_pool_shape"].append(
                 self.backbone.output_shape()[self.out_feature_key].channels)
-        assert self.backbone.output_shape(
-        )[self.out_feature_key].channels == config["image_feature_pool_shape"][
-            2]
+        assert self.backbone.output_shape()[
+            self.
+            out_feature_key].channels == config["image_feature_pool_shape"][2]
 
     def forward(self, images):
-        images_input = (
-            paddle.to_tensor(images) - self.pixel_mean) / self.pixel_std
+        images_input = (paddle.to_tensor(images) -
+                        self.pixel_mean) / self.pixel_std
         features = self.backbone(images_input)
         features = features[self.out_feature_key]
         features = self.pool(features).flatten(start_axis=2).transpose(

@@ -28,11 +28,13 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
-    Trainer, )
+    Trainer,
+)
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
-    AutoModelForSequenceClassification, )
+    AutoModelForSequenceClassification,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -56,13 +58,15 @@ class DataArguments:
             "help":
             "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
-        }, )
+        },
+    )
     do_lower_case: bool = field(
         default=False,
         metadata={
             "help":
             "Whether to lower case the input text. Should be True for uncased models and False for cased models."
-        }, )
+        },
+    )
 
 
 @dataclass
@@ -71,10 +75,11 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
 
-    model_name_or_path: str = field(metadata={
-        "help":
-        "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-    })
+    model_name_or_path: str = field(
+        metadata={
+            "help":
+            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        })
     config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -89,12 +94,14 @@ class ModelArguments:
         })
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Path to directory to store the dataset cache."}, )
+        metadata={"help": "Path to directory to store the dataset cache."},
+    )
     export_model_dir: Optional[str] = field(
         default=None,
         metadata={
             "help": "Path to directory to store the exported inference model."
-        }, )
+        },
+    )
 
 
 # Data pre-process function for clue benchmark datatset
@@ -114,8 +121,9 @@ def convert_clue(example,
         # print("label_list", label_list)
         # Get the label
         # example['label'] = np.array(example["label"], dtype="int64")
-        example['label'] = int(example[
-            "label"]) if label_dtype != "float32" else float(example["label"])
+        example['label'] = int(
+            example["label"]) if label_dtype != "float32" else float(
+                example["label"])
         label = example['label']
     # Convert raw text to feature
     if 'keyword' in example:  # CSL
@@ -130,10 +138,11 @@ def convert_clue(example,
             'target']['span1_text'], example['target']['span2_text'], example[
                 'target']['span1_index'], example['target']['span2_index']
         text_list = list(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
+        assert text[pronoun_idx:(
+            pronoun_idx +
+            len(pronoun))] == pronoun, "pronoun: {}".format(pronoun)
+        assert text[query_idx:(query_idx +
+                               len(query))] == query, "query: {}".format(query)
         if pronoun_idx > query_idx:
             text_list.insert(query_idx, "_")
             text_list.insert(query_idx + len(query) + 1, "_")
@@ -152,10 +161,9 @@ def convert_clue(example,
     if 'sentence' in example:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length)
 
     if not is_test:
         return {
@@ -171,11 +179,10 @@ def convert_clue(example,
 
 
 def clue_trans_fn(example, tokenizer, args):
-    return convert_clue(
-        example,
-        tokenizer=tokenizer,
-        label_list=args.label_list,
-        max_seq_length=args.max_seq_length)
+    return convert_clue(example,
+                        tokenizer=tokenizer,
+                        label_list=args.label_list,
+                        max_seq_length=args.max_seq_length)
 
 
 def main():
@@ -202,8 +209,8 @@ def main():
             training_args.output_dir
     ) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(
-                os.listdir(training_args.output_dir)) > 0:
+        if last_checkpoint is None and len(os.listdir(
+                training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
                 "Use --overwrite_output_dir to overcome.")
@@ -226,7 +233,7 @@ def main():
     num_classes = 1 if raw_datasets["train"].label_list == None else len(
         raw_datasets['train'].label_list)
 
-    # Define tokenizer, model, loss function. 
+    # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
@@ -272,7 +279,8 @@ def main():
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics, )
+        compute_metrics=compute_metrics,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -308,18 +316,17 @@ def main():
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
                                                        "export")
-        paddlenlp.transformers.export_model(
-            model=trainer.model,
-            input_spec=input_spec,
-            path=model_args.export_model_dir)
+        paddlenlp.transformers.export_model(model=trainer.model,
+                                            input_spec=input_spec,
+                                            path=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

@@ -99,30 +99,33 @@ def do_convert():
         p2 = int(len(raw_examples) * (i1 + i2))
 
         if args.task_type == "ext":
-            train_examples = _create_ext_examples(
-                raw_examples[:p1], args.negative_ratio, args.prompt_prefix,
-                args.options, args.seperator, args.is_shuffle)
-            dev_examples = _create_ext_examples(
-                raw_examples[p1:p2],
-                -1,
-                args.prompt_prefix,
-                args.options,
-                args.seperator,
-                is_train=False)
-            test_examples = _create_ext_examples(
-                raw_examples[p2:],
-                -1,
-                args.prompt_prefix,
-                args.options,
-                args.seperator,
-                is_train=False)
+            train_examples = _create_ext_examples(raw_examples[:p1],
+                                                  args.negative_ratio,
+                                                  args.prompt_prefix,
+                                                  args.options, args.seperator,
+                                                  args.is_shuffle)
+            dev_examples = _create_ext_examples(raw_examples[p1:p2],
+                                                -1,
+                                                args.prompt_prefix,
+                                                args.options,
+                                                args.seperator,
+                                                is_train=False)
+            test_examples = _create_ext_examples(raw_examples[p2:],
+                                                 -1,
+                                                 args.prompt_prefix,
+                                                 args.options,
+                                                 args.seperator,
+                                                 is_train=False)
         else:
-            train_examples = _create_cls_examples(
-                raw_examples[:p1], args.prompt_prefix, args.options)
-            dev_examples = _create_cls_examples(
-                raw_examples[p1:p2], args.prompt_prefix, args.options)
-            test_examples = _create_cls_examples(
-                raw_examples[p2:], args.prompt_prefix, args.options)
+            train_examples = _create_cls_examples(raw_examples[:p1],
+                                                  args.prompt_prefix,
+                                                  args.options)
+            dev_examples = _create_cls_examples(raw_examples[p1:p2],
+                                                args.prompt_prefix,
+                                                args.options)
+            test_examples = _create_cls_examples(raw_examples[p2:],
+                                                 args.prompt_prefix,
+                                                 args.options)
 
         _save_examples(args.save_dir, "train.txt", train_examples)
         _save_examples(args.save_dir, "dev.txt", dev_examples)

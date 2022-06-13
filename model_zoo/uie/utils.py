@@ -68,16 +68,15 @@ def convert_example(example, tokenizer, max_seq_len):
         result_list
     }
     """
-    encoded_inputs = tokenizer(
-        text=[example["prompt"]],
-        text_pair=[example["content"]],
-        stride=len(example["prompt"]),
-        truncation=True,
-        max_seq_len=max_seq_len,
-        pad_to_max_seq_len=True,
-        return_attention_mask=True,
-        return_position_ids=True,
-        return_dict=False)
+    encoded_inputs = tokenizer(text=[example["prompt"]],
+                               text_pair=[example["content"]],
+                               stride=len(example["prompt"]),
+                               truncation=True,
+                               max_seq_len=max_seq_len,
+                               pad_to_max_seq_len=True,
+                               return_attention_mask=True,
+                               return_position_ids=True,
+                               return_dict=False)
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -215,9 +214,8 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
             if actual_ratio <= negative_ratio or negative_ratio == -1:
                 idxs = [k for k in range(len(redundants_list))]
             else:
-                idxs = random.sample(
-                    range(0, len(redundants_list)),
-                    negative_ratio * num_positive)
+                idxs = random.sample(range(0, len(redundants_list)),
+                                     negative_ratio * num_positive)
 
             for idx in idxs:
                 negative_result = {
@@ -238,7 +236,7 @@ def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
             negative_sample = []
             for subject in subject_goldens[i]:
                 for predicate in predicate_set:
-                    # The relation prompt is constructed as follows: 
+                    # The relation prompt is constructed as follows:
                     # subject + "的" + predicate
                     prompt = subject + "的" + predicate
                     if prompt not in relation_prompt:
@@ -257,7 +255,7 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
     relation_prompt_set = set()
     for entity_name in entity_name_set:
         for predicate in predicate_set:
-            # The relation prompt is constructed as follows: 
+            # The relation prompt is constructed as follows:
             # subject + "的" + predicate
             relation_prompt = entity_name + "的" + predicate
             relation_prompt_set.add(relation_prompt)
@@ -327,9 +325,8 @@ def convert_ext_examples(raw_examples,
             examples = positive_examples + negative_examples
         else:
             # Random sampling the negative examples to ensure overall negative ratio unchanged.
-            idxs = random.sample(
-                range(0, len(negative_examples)),
-                negative_ratio * len(positive_examples))
+            idxs = random.sample(range(0, len(negative_examples)),
+                                 negative_ratio * len(positive_examples))
             negative_examples_sampled = []
             for idx in idxs:
                 negative_examples_sampled.append(negative_examples[idx])
@@ -419,8 +416,8 @@ def convert_ext_examples(raw_examples,
                     "end": entity["end_offset"]
                 }
 
-                entity_label, entity_cls_label = _sep_cls_label(entity["label"],
-                                                                seperator)
+                entity_label, entity_cls_label = _sep_cls_label(
+                    entity["label"], seperator)
 
                 # Define the prompt prefix for entity-level classification
                 entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
@@ -466,7 +463,7 @@ def convert_ext_examples(raw_examples,
                 predicate = relation["type"]
                 subject_id = relation["from_id"]
                 object_id = relation["to_id"]
-                # The relation prompt is constructed as follows: 
+                # The relation prompt is constructed as follows:
                 # subject + "的" + predicate
                 prompt = entity_map[subject_id]["name"] + "的" + predicate
                 if entity_map[subject_id]["name"] not in subject_golden:
@@ -504,8 +501,9 @@ def convert_ext_examples(raw_examples,
     if len(positive_examples) == 0:
         all_entity_examples = []
     elif is_train:
-        all_entity_examples = _concat_examples(
-            positive_examples, negative_examples, negative_ratio)
+        all_entity_examples = _concat_examples(positive_examples,
+                                               negative_examples,
+                                               negative_ratio)
     else:
         all_entity_examples = positive_examples + negative_examples
 
@@ -513,21 +511,21 @@ def convert_ext_examples(raw_examples,
     if len(predicate_set) != 0:
         if is_train:
             logger.info(f"Adding negative samples for second stage prompt...")
-            relation_prompt_set = construct_relation_prompt_set(entity_name_set,
-                                                                predicate_set)
+            relation_prompt_set = construct_relation_prompt_set(
+                entity_name_set, predicate_set)
             positive_examples, negative_examples = add_negative_example(
                 relation_examples, texts, relation_prompts, relation_prompt_set,
                 negative_ratio)
-            all_relation_examples = _concat_examples(
-                positive_examples, negative_examples, negative_ratio)
+            all_relation_examples = _concat_examples(positive_examples,
+                                                     negative_examples,
+                                                     negative_ratio)
         else:
             logger.info(f"Adding negative samples for second stage prompt...")
             relation_examples = add_full_negative_example(
                 relation_examples, texts, relation_prompts, predicate_set,
                 subject_goldens)
             all_relation_examples = [
-                r
-                for relation_example in relation_examples
+                r for relation_example in relation_examples
                 for r in relation_example
             ]
     return all_entity_examples, all_relation_examples, entity_cls_examples

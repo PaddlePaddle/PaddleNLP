@@ -21,6 +21,7 @@ from utils import index_sample
 
 
 class ParserCriterion(nn.Layer):
+
     def __init__(self, *args, **kwargs):
         super(ParserCriterion, self).__init__(*args, **kwargs)
 

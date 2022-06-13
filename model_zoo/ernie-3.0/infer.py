@@ -53,81 +53,78 @@ def parse_args():
         type=str,
         help="The name of the task to perform predict, selected in the list: " +
         ", ".join(METRIC_CLASSES.keys()))
-    parser.add_argument(
-        "--model_name_or_path",
-        default="ernie-3.0-medium-zh",
-        type=str,
-        help="The directory or name of model.")
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        required=True,
-        help="The path prefix of inference model to be used.")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.")
-    parser.add_argument(
-        "--batch_size", default=32, type=int, help="Batch size for predict.")
+    parser.add_argument("--model_name_or_path",
+                        default="ernie-3.0-medium-zh",
+                        type=str,
+                        help="The directory or name of model.")
+    parser.add_argument("--model_path",
+                        type=str,
+                        required=True,
+                        help="The path prefix of inference model to be used.")
+    parser.add_argument("--device",
+                        default="gpu",
+                        choices=["gpu", "cpu", "xpu"],
+                        help="Device selected for inference.")
+    parser.add_argument("--batch_size",
+                        default=32,
+                        type=int,
+                        help="Batch size for predict.")
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.")
-    parser.add_argument(
-        "--perf_warmup_steps",
-        default=20,
-        type=int,
-        help="Warmup steps for performance test.")
+    parser.add_argument("--perf_warmup_steps",
+                        default=20,
+                        type=int,
+                        help="Warmup steps for performance test.")
     parser.add_argument(
         "--n_best_size",
         default=20,
         type=int,
-        help="The total number of n-best predictions to generate in the nbest_predictions.json output file."
+        help=
+        "The total number of n-best predictions to generate in the nbest_predictions.json output file."
     )
-    parser.add_argument(
-        "--max_answer_length",
-        default=50,
-        type=int,
-        help="Max answer length for question answering task.")
-    parser.add_argument(
-        "--shape_file",
-        default="shape_info.txt",
-        type=str,
-        help="Shape info filename.")
-    parser.add_argument(
-        "--use_trt",
-        action='store_true',
-        help="Whether to use inference engin TensorRT.")
-    parser.add_argument(
-        "--perf", action='store_true', help="Whether to test performance.")
-    parser.add_argument(
-        "--collect_shape",
-        action='store_true',
-        help="Whether to collect shape info.")
+    parser.add_argument("--max_answer_length",
+                        default=50,
+                        type=int,
+                        help="Max answer length for question answering task.")
+    parser.add_argument("--shape_file",
+                        default="shape_info.txt",
+                        type=str,
+                        help="Shape info filename.")
+    parser.add_argument("--use_trt",
+                        action='store_true',
+                        help="Whether to use inference engin TensorRT.")
+    parser.add_argument("--perf",
+                        action='store_true',
+                        help="Whether to test performance.")
+    parser.add_argument("--collect_shape",
+                        action='store_true',
+                        help="Whether to collect shape info.")
 
-    parser.add_argument(
-        "--precision",
-        default="fp32",
-        choices=["fp32", "fp16", "int8"],
-        help="Precision for inference.")
+    parser.add_argument("--precision",
+                        default="fp32",
+                        choices=["fp32", "fp16", "int8"],
+                        help="Precision for inference.")
     parser.add_argument(
         "--num_threads",
         default=cpu_count(),
         type=int,
-        help="num_threads for cpu.", )
+        help="num_threads for cpu.",
+    )
     parser.add_argument(
         "--enable_quantize",
         action='store_true',
-        help="Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
+        help=
+        "Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
     )
-    parser.add_argument(
-        "--use_onnxruntime",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Use onnxruntime to infer or not.")
+    parser.add_argument("--use_onnxruntime",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Use onnxruntime to infer or not.")
     parser.add_argument(
         "--debug",
         action='store_true',
@@ -167,10 +164,11 @@ def convert_example(example,
             'target']['span1_text'], example['target']['span2_text'], example[
                 'target']['span1_index'], example['target']['span2_index']
         text_list = list(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
+        assert text[pronoun_idx:(
+            pronoun_idx +
+            len(pronoun))] == pronoun, "pronoun: {}".format(pronoun)
+        assert text[query_idx:(query_idx +
+                               len(query))] == query, "query: {}".format(query)
         if pronoun_idx > query_idx:
             text_list.insert(query_idx, "_")
             text_list.insert(query_idx + len(query) + 1, "_")
@@ -186,10 +184,9 @@ def convert_example(example,
     if 'sentence' in example:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length)
 
     if not is_test:
         example["labels"] = label
@@ -197,6 +194,7 @@ def convert_example(example,
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -228,10 +226,9 @@ class Predictor(object):
             sess_options.inter_op_num_threads = args.num_threads
             executionprovider = args.provider
             print("ExecutionProvider is: ", executionprovider)
-            predictor = ort.InferenceSession(
-                dynamic_quantize_model,
-                sess_options=sess_options,
-                providers=[executionprovider])
+            predictor = ort.InferenceSession(dynamic_quantize_model,
+                                             sess_options=sess_options,
+                                             providers=[executionprovider])
             input_name1 = predictor.get_inputs()[1].name
             input_name2 = predictor.get_inputs()[0].name
             input_handles = [input_name1, input_name2]
@@ -301,19 +298,16 @@ class Predictor(object):
         min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
             [
-                np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64"), np.zeros(
-                        [min_batch_size, min_seq_len], dtype="int64")
+                np.zeros([min_batch_size, min_seq_len], dtype="int64"),
+                np.zeros([min_batch_size, min_seq_len], dtype="int64")
             ],
             [
-                np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64"), np.zeros(
-                        [max_batch_size, max_seq_len], dtype="int64")
+                np.zeros([max_batch_size, max_seq_len], dtype="int64"),
+                np.zeros([max_batch_size, max_seq_len], dtype="int64")
             ],
             [
-                np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64"), np.zeros(
-                        [opt_batch_size, opt_seq_len], dtype="int64")
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64"),
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64")
             ],
         ]
         for batch in batches:
@@ -367,8 +361,8 @@ class Predictor(object):
         if args.perf:
             for i, batch in enumerate(batches):
                 batch = batchify_fn(batch)
-                input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                    "token_type_ids"].numpy()
+                input_ids, segment_ids = batch["input_ids"].numpy(
+                ), batch["token_type_ids"].numpy()
                 output = self.predict_batch([input_ids, segment_ids])
                 if i > args.perf_warmup_steps:
                     break
@@ -376,8 +370,8 @@ class Predictor(object):
             nums = 0
             for batch in batches:
                 batch = batchify_fn(batch)
-                input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                    "token_type_ids"].numpy()
+                input_ids, segment_ids = batch["input_ids"].numpy(
+                ), batch["token_type_ids"].numpy()
                 nums = nums + input_ids.shape[0]
                 output = self.predict_batch([input_ids, segment_ids])
             total_time = time.time() - time1
@@ -392,14 +386,14 @@ class Predictor(object):
                 batch_num = len(dataset['input_ids'])
                 for batch in batches:
                     batch = batchify_fn(batch)
-                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                        "token_type_ids"].numpy()
+                    input_ids, segment_ids = batch["input_ids"].numpy(
+                    ), batch["token_type_ids"].numpy()
                     output = self.predict_batch([input_ids, segment_ids])[0]
                     preds = np.argmax(output, axis=2)
                     all_predictions.append(preds.tolist())
                     num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-                        batch["seq_len"],
-                        paddle.to_tensor(preds), batch["labels"])
+                        batch["seq_len"], paddle.to_tensor(preds),
+                        batch["labels"])
                     metric.update(num_infer_chunks.numpy(),
                                   num_label_chunks.numpy(),
                                   num_correct_chunks.numpy())
@@ -411,8 +405,8 @@ class Predictor(object):
                 all_end_logits = []
                 for batch in batches:
                     batch = batchify_fn(batch)
-                    input_ids, segment_ids = batch["input_ids"].numpy(), batch[
-                        "token_type_ids"].numpy()
+                    input_ids, segment_ids = batch["input_ids"].numpy(
+                    ), batch["token_type_ids"].numpy()
                     start_logits, end_logits = self.predict_batch(
                         [input_ids, segment_ids])
                     for idx in range(start_logits.shape[0]):
@@ -439,13 +433,13 @@ class Predictor(object):
                 for i, batch in enumerate(batches):
                     batch = batchify_fn(batch)
                     output = self.predict_batch([
-                        batch["input_ids"].numpy(), batch["token_type_ids"]
-                        .numpy()
+                        batch["input_ids"].numpy(),
+                        batch["token_type_ids"].numpy()
                     ])[0]
                     preds = np.argmax(output, axis=1)
                     all_predictions.append(preds.tolist())
-                    correct = metric.compute(
-                        paddle.to_tensor(output), batch["labels"])
+                    correct = metric.compute(paddle.to_tensor(output),
+                                             batch["labels"])
                     metric.update(correct)
                 res = metric.accumulate()
 
@@ -453,7 +447,9 @@ class Predictor(object):
                 return all_predictions
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
+def tokenize_and_align_labels(example,
+                              tokenizer,
+                              no_entity_id,
                               max_seq_len=512):
     if example['tokens'] == []:
         tokenized_input = {
@@ -475,8 +471,8 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
         label_ids = label_ids[:len(tokenized_input['input_ids']) - 2]
     label_ids = [no_entity_id] + label_ids + [no_entity_id]
 
-    label_ids += [no_entity_id] * (
-        len(tokenized_input['input_ids']) - len(label_ids))
+    label_ids += [no_entity_id
+                  ] * (len(tokenized_input['input_ids']) - len(label_ids))
     tokenized_input["labels"] = label_ids
     return tokenized_input
 
@@ -486,12 +482,11 @@ def prepare_validation_features(examples, tokenizer, doc_stride,
     contexts = examples['context']
     questions = examples['question']
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=doc_stride,
-        max_seq_len=max_seq_length,
-        return_attention_mask=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=doc_stride,
+                                   max_seq_len=max_seq_length,
+                                   return_attention_mask=True)
 
     sample_mapping = tokenized_examples.pop("overflow_to_sample")
 
@@ -506,8 +501,8 @@ def prepare_validation_features(examples, tokenizer, doc_stride,
         sample_index = sample_mapping[i]
         tokenized_examples["example_id"].append(examples["id"][sample_index])
         tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index and
-             k != len(sequence_ids) - 1 else None)
+            (o if sequence_ids[k] == context_index
+             and k != len(sequence_ids) - 1 else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 
@@ -525,18 +520,18 @@ def main():
 
     if args.task_name == "msra_ner":
 
-        def ner_trans_fn(example, tokenizer, max_seq_length=128,
+        def ner_trans_fn(example,
+                         tokenizer,
+                         max_seq_length=128,
                          no_entity_id=0):
-            return tokenize_and_align_labels(
-                example,
-                tokenizer=tokenizer,
-                no_entity_id=no_entity_id,
-                max_seq_len=max_seq_length)
+            return tokenize_and_align_labels(example,
+                                             tokenizer=tokenizer,
+                                             no_entity_id=no_entity_id,
+                                             max_seq_len=max_seq_length)
 
-        trans_fn = partial(
-            ner_trans_fn,
-            tokenizer=tokenizer,
-            max_seq_length=args.max_seq_length)
+        trans_fn = partial(ner_trans_fn,
+                           tokenizer=tokenizer,
+                           max_seq_length=args.max_seq_length)
         dev_ds = load_dataset("msra_ner", split="test")
         label_list = dev_ds.features['ner_tags'].feature.names
         args.label_list = label_list
@@ -549,16 +544,16 @@ def main():
         dev_example = load_dataset("cmrc2018", split="validation")
         column_names = dev_example.column_names
         dev_ds = dev_example.map(
-            partial(
-                prepare_validation_features,
-                tokenizer=tokenizer,
-                doc_stride=128,
-                max_seq_length=args.max_seq_length),
+            partial(prepare_validation_features,
+                    tokenizer=tokenizer,
+                    doc_stride=128,
+                    max_seq_length=args.max_seq_length),
             batched=True,
             num_proc=4,
             remove_columns=column_names,
             load_from_cache_file=True,
-            desc="Running tokenizer on validation dataset", )
+            desc="Running tokenizer on validation dataset",
+        )
 
         batchify_fn = DataCollatorWithPadding(tokenizer)
         outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args,
@@ -566,12 +561,11 @@ def main():
     else:
         dev_ds = ppnlp_load_dataset('clue', args.task_name, splits='dev')
 
-        trans_func = partial(
-            convert_example,
-            label_list=dev_ds.label_list,
-            tokenizer=tokenizer,
-            max_seq_length=args.max_seq_length,
-            is_test=False)
+        trans_func = partial(convert_example,
+                             label_list=dev_ds.label_list,
+                             tokenizer=tokenizer,
+                             max_seq_length=args.max_seq_length,
+                             is_test=False)
         dev_ds = dev_ds.map(trans_func, lazy=False)
         batchify_fn = DataCollatorWithPadding(tokenizer)
 

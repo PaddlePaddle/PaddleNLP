@@ -115,38 +115,37 @@ class BartTokenizer(GPTTokenizer):
                  mask_token="<mask>",
                  **kwargs):
 
-        bos_token = AddedToken(
-            bos_token, lstrip=False,
-            rstrip=False) if isinstance(bos_token, str) else bos_token
-        eos_token = AddedToken(
-            eos_token, lstrip=False,
-            rstrip=False) if isinstance(eos_token, str) else eos_token
-        sep_token = AddedToken(
-            sep_token, lstrip=False,
-            rstrip=False) if isinstance(sep_token, str) else sep_token
-        cls_token = AddedToken(
-            cls_token, lstrip=False,
-            rstrip=False) if isinstance(cls_token, str) else cls_token
-        unk_token = AddedToken(
-            unk_token, lstrip=False,
-            rstrip=False) if isinstance(unk_token, str) else unk_token
-        pad_token = AddedToken(
-            pad_token, lstrip=False,
-            rstrip=False) if isinstance(pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   cls_token, str) else cls_token
+        unk_token = AddedToken(unk_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   pad_token, str) else pad_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
 
-        self._build_special_tokens_map_extended(
-            bos_token=bos_token,
-            eos_token=eos_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            mask_token=mask_token)
+        self._build_special_tokens_map_extended(bos_token=bos_token,
+                                                eos_token=eos_token,
+                                                sep_token=sep_token,
+                                                cls_token=cls_token,
+                                                unk_token=unk_token,
+                                                pad_token=pad_token,
+                                                mask_token=mask_token)
 
         super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
                                             max_len, pad_token, eos_token)
@@ -156,8 +155,8 @@ class BartTokenizer(GPTTokenizer):
         re = try_import("regex")
         for token in re.findall(self.pat, text):
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(
-                bpe_token for bpe_token in self.bpe(token).split(' '))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -186,8 +185,8 @@ class BartTokenizer(GPTTokenizer):
                 already_has_special_tokens=True)
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
-                                                          ) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
+            [0] * len(token_ids_1)) + [1]
 
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,

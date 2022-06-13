@@ -52,19 +52,20 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
-        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
+        help=
+        "The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
     )
     parser.add_argument(
         "--decoding_strategy",
         default='sampling',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
+        help=
+        "The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
-    parser.add_argument(
-        "--beam_size",
-        default=4,
-        type=int,
-        help="The parameters for beam search. ")
+    parser.add_argument("--beam_size",
+                        default=4,
+                        type=int,
+                        help="The parameters for beam search. ")
     parser.add_argument(
         "--top_k",
         default=4,
@@ -75,22 +76,21 @@ def parse_args():
         default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
-    parser.add_argument(
-        "--max_length", default=50, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity of beam search. ")
-    parser.add_argument(
-        "--length_penalty",
-        default=0.6,
-        type=float,
-        help="The power number in length penalty calculation")
-    parser.add_argument(
-        "--use_fp16_decoding",
-        action="store_true",
-        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--max_length",
+                        default=50,
+                        type=int,
+                        help="Maximum output length. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity of beam search. ")
+    parser.add_argument("--length_penalty",
+                        default=0.6,
+                        type=float,
+                        help="The power number in length penalty calculation")
+    parser.add_argument("--use_fp16_decoding",
+                        action="store_true",
+                        help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
@@ -142,8 +142,8 @@ def do_predict(args):
                 use_faster=True)
 
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        logger.info("Average test time for decoding is %f ms" %
+                    ((time.perf_counter() - start) / 50 * 1000))
 
         # Output
         finished_seq = finished_seq.numpy()

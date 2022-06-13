@@ -14,6 +14,7 @@
 import numpy as np
 from paddlenlp.data import JiebaTokenizer, Vocab
 import jieba
+
 tokenizer = jieba
 
 

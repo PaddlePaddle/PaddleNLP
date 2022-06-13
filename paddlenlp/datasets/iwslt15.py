@@ -33,28 +33,29 @@ class IWSLT15(DatasetBuilder):
     '''
 
     URL = "https://bj.bcebos.com/paddlenlp/datasets/iwslt15.en-vi.tar.gz"
-    META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
-                                                     'src_md5', 'tgt_md5'))
+    META_INFO = collections.namedtuple(
+        'META_INFO', ('src_file', 'tgt_file', 'src_md5', 'tgt_md5'))
     MD5 = 'aca22dc3f90962e42916dbb36d8f3e8e'
     SPLITS = {
-        'train': META_INFO(
-            os.path.join("iwslt15.en-vi", "train.en"),
-            os.path.join("iwslt15.en-vi", "train.vi"),
-            "5b6300f46160ab5a7a995546d2eeb9e6",
-            "858e884484885af5775068140ae85dab"),
-        'dev': META_INFO(
-            os.path.join("iwslt15.en-vi", "tst2012.en"),
-            os.path.join("iwslt15.en-vi", "tst2012.vi"),
-            "c14a0955ed8b8d6929fdabf4606e3875",
-            "dddf990faa149e980b11a36fca4a8898"),
-        'test': META_INFO(
-            os.path.join("iwslt15.en-vi", "tst2013.en"),
-            os.path.join("iwslt15.en-vi", "tst2013.vi"),
-            "c41c43cb6d3b122c093ee89608ba62bd",
-            "a3185b00264620297901b647a4cacf38")
+        'train':
+        META_INFO(os.path.join("iwslt15.en-vi", "train.en"),
+                  os.path.join("iwslt15.en-vi",
+                               "train.vi"), "5b6300f46160ab5a7a995546d2eeb9e6",
+                  "858e884484885af5775068140ae85dab"),
+        'dev':
+        META_INFO(os.path.join("iwslt15.en-vi", "tst2012.en"),
+                  os.path.join("iwslt15.en-vi", "tst2012.vi"),
+                  "c14a0955ed8b8d6929fdabf4606e3875",
+                  "dddf990faa149e980b11a36fca4a8898"),
+        'test':
+        META_INFO(os.path.join("iwslt15.en-vi", "tst2013.en"),
+                  os.path.join("iwslt15.en-vi", "tst2013.vi"),
+                  "c41c43cb6d3b122c093ee89608ba62bd",
+                  "a3185b00264620297901b647a4cacf38")
     }
-    VOCAB_INFO = (os.path.join("iwslt15.en-vi", "vocab.en"), os.path.join(
-        "iwslt15.en-vi", "vocab.vi"), "98b5011e1f579936277a273fd7f4e9b4",
+    VOCAB_INFO = (os.path.join("iwslt15.en-vi", "vocab.en"),
+                  os.path.join("iwslt15.en-vi",
+                               "vocab.vi"), "98b5011e1f579936277a273fd7f4e9b4",
                   "e8b05f8c26008a798073c619236712b4")
     UNK_TOKEN = '<unk>'
     BOS_TOKEN = '<s>'
@@ -74,14 +75,13 @@ class IWSLT15(DatasetBuilder):
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
-                (tgt_data_hash and
-                 not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(src_vocab_fullname) or
-                     (src_vocab_hash and
-                      not md5file(src_vocab_fullname) == src_vocab_hash)) or (
-                          not os.path.exists(tgt_vocab_fullname) or
-                          (tgt_vocab_hash and
-                           not md5file(tgt_vocab_fullname) == tgt_vocab_hash)):
+                (tgt_data_hash and not md5file(tgt_fullname) == tgt_data_hash)
+            ) or (not os.path.exists(src_vocab_fullname) or
+                  (src_vocab_hash
+                   and not md5file(src_vocab_fullname) == src_vocab_hash)) or (
+                       not os.path.exists(tgt_vocab_fullname) or
+                       (tgt_vocab_hash
+                        and not md5file(tgt_vocab_fullname) == tgt_vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname

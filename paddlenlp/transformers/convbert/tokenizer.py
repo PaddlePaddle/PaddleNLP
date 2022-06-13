@@ -15,7 +15,9 @@
 
 from ..electra.tokenizer import ElectraTokenizer
 
-__all__ = ['ConvBertTokenizer', ]
+__all__ = [
+    'ConvBertTokenizer',
+]
 
 
 class ConvBertTokenizer(ElectraTokenizer):

@@ -139,13 +139,12 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = ErnieTinyTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
-        self.vocab = self.load_vocabulary(
-            vocab_file,
-            unk_token,
-            pad_token,
-            cls_token,
-            sep_token,
-            mask_token=mask_token)
+        self.vocab = self.load_vocabulary(vocab_file,
+                                          unk_token,
+                                          pad_token,
+                                          cls_token,
+                                          sep_token,
+                                          mask_token=mask_token)
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model
         if os.path.isfile(sentencepiece_model_file):
@@ -236,10 +235,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Returns:
             list: A list of string representing converted tokens.
         """
-        text = self.preprocess_text(
-            text,
-            lower=self.do_lower_case,
-            is_split_into_words=is_split_into_words)
+        text = self.preprocess_text(text,
+                                    lower=self.do_lower_case,
+                                    is_split_into_words=is_split_into_words)
         tokens = []
         for match in self.pat.finditer(text):
             part_text = match.group(0)
@@ -340,8 +338,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         _cls = [self.cls_token_id]
@@ -380,7 +378,9 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
@@ -421,13 +421,12 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         # Rewrite the :meth:`load_vocabulary` method of superclass to deal with
         # the inconsistency of the vocabulary format.
         token_to_idx = UnifiedTransformerTokenizer.read_file(filepath)
-        vocab = Vocab.from_dict(
-            token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
+        vocab = Vocab.from_dict(token_to_idx,
+                                unk_token=unk_token,
+                                pad_token=pad_token,
+                                bos_token=bos_token,
+                                eos_token=eos_token,
+                                **kwargs)
         # Filtered the tokens that are mapped to the same id
         idx_to_token = {v: k for k, v in vocab._token_to_idx.items()}
         vocab._idx_to_token = [
@@ -568,8 +567,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         # Input type checking for clearer error
         assert isinstance(history, str) or (
             isinstance(history, (list, tuple)) and
-            (len(history) == 0 or len(history) != 0 and
-             isinstance(history[0], str))), (
+            (len(history) == 0
+             or len(history) != 0 and isinstance(history[0], str))), (
                  "The input `history` must be with type `str` (single context) "
                  "or `List[str]` (multi-turn context). But received: {}".format(
                      history))
@@ -577,8 +576,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "The input `response` must of be with type `str`. But received: {}".
             format(response))
         assert knowledge is None or isinstance(knowledge, str), (
-            "The input `knowledge` must of be with type `str`. But received: {}".
-            format(knowledge))
+            "The input `knowledge` must of be with type `str`. But received: {}"
+            .format(knowledge))
         assert task_type is None or task_type in self.TASK_TO_SPECIAL_TOKEN, (
             "The input `task_type` must be None or one of {}.".format(", ".join(
                 self.TASK_TO_SPECIAL_TOKEN.keys())))
@@ -613,8 +612,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                     role_id = 0
 
             tokens = self._tokenize(response, is_split_into_words)
-            response_ids = [self.cls_token_id] + self.convert_tokens_to_ids(
-                tokens)
+            response_ids = [self.cls_token_id
+                            ] + self.convert_tokens_to_ids(tokens)
             if len(response_ids) > max_response_len - 1:
                 response_ids = response_ids[:max_response_len - 1]
             response_ids += [self.sep_token_id]
@@ -670,8 +669,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
 
             if role_id is not None:
                 # 1 stands for [SEP]
-                history_role_ids = [role_id] * (len(tokens) + 1
-                                                ) + history_role_ids
+                history_role_ids = [role_id
+                                    ] * (len(tokens) + 1) + history_role_ids
             elif return_role_ids:
                 individual_history_length = [len(tokens) + 1
                                              ] + individual_history_length
@@ -711,8 +710,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             ] * pad_length + encoded_inputs["input_ids"]
         if return_tensors:
             # Add dimention for batch_size
-            encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs[
-                "input_ids"]).unsqueeze(0)
+            encoded_inputs["input_ids"] = paddle.to_tensor(
+                encoded_inputs["input_ids"]).unsqueeze(0)
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = [0] * len(
@@ -739,8 +738,8 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 ] + list(range(len(response_ids)))
             else:
                 raise ValueError(
-                    "Expected position_style is one of [continuous, relative], but received {}".
-                    format(position_style))
+                    "Expected position_style is one of [continuous, relative], but received {}"
+                    .format(position_style))
             if pad_length > 0:
                 encoded_inputs["position_ids"] = [
                     self.pad_token_id
@@ -758,8 +757,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             attention_mask[:end, :start] = 0.0
             # Generate the lower triangular matrix using the slice of matrix
             tmp = np.triu(
-                np.ones(
-                    [end - start, end - start], dtype='float32') * -1e4, 1)
+                np.ones([end - start, end - start], dtype='float32') * -1e4, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask
             if pad_length > 0:

@@ -76,24 +76,28 @@ def do_eval(args):
 
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'seq_len': Stack(dtype='int64'),
-        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
+        'input_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
+        'token_type_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'
+            ),  # segment
+        'seq_len':
+        Stack(dtype='int64'),
+        'labels':
+        Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
 
     eval_ds = eval_ds.select(range(len(eval_ds) - 1))
     eval_ds = eval_ds.map(tokenize_and_align_labels, batched=True)
-    eval_data_loader = DataLoader(
-        dataset=eval_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+    eval_data_loader = DataLoader(dataset=eval_ds,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  batch_size=args.batch_size,
+                                  return_list=True)
 
     # Define the model netword and its loss
-    model = BertForTokenClassification.from_pretrained(
-        args.model_name_or_path, num_classes=label_num)
+    model = BertForTokenClassification.from_pretrained(args.model_name_or_path,
+                                                       num_classes=label_num)
     if args.init_checkpoint_path:
         model_dict = paddle.load(args.init_checkpoint_path)
         model.set_dict(model_dict)
@@ -111,8 +115,8 @@ def do_eval(args):
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             length, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
     print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (avg_loss, precision, recall, f1_score))
