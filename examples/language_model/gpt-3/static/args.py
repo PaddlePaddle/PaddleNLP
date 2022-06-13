@@ -296,6 +296,13 @@ def parse_args(MODEL_CLASSES):
         type=str2bool,
         default=False,
         help="Whether to enable fused_attention and fused_feedforward.")
+    parser.add_argument(
+        "--fuse_mt",
+        type=str2bool,
+        default=False,
+        help=
+        "Whether to enable fused_multi_transformer, need open fuse. This is only used for inference"
+    )
 
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
