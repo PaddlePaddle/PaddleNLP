@@ -103,8 +103,8 @@ class ASTWrapper(object):
         self.product_types = visitor.product_types
         self.seq_fragment_constructors = {}
         self.primitive_type_checkers = {
-            ** self.default_primitive_type_checkers, **
-            custom_primitive_type_checkers
+            **self.default_primitive_type_checkers,
+            **custom_primitive_type_checkers
         }
         self.custom_primitive_types = set(custom_primitive_type_checkers.keys())
         self.primitive_types = set(self.primitive_type_checkers.keys())
@@ -258,7 +258,11 @@ class ASTWrapper(object):
                 check = self.primitive_type_checkers[field.type]
             else:
                 # pylint: disable=line-too-long
-                check = lambda n: self.verify_ast(n, field.type, field_path + (field.name,), is_seq=field.seq)  # noqa: E731,E501
+                check = lambda n: self.verify_ast(n,
+                                                  field.type,
+                                                  field_path + (field.name, ),
+                                                  is_seq=field.seq
+                                                  )  # noqa: E731,E501
 
             for item in items:
                 assert check(item)

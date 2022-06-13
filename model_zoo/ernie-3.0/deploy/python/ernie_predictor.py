@@ -16,11 +16,12 @@ import six
 import os
 import numpy as np
 import paddle
-from multiprocessing import cpu_count
+from psutil import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 
 
 class InferBackend(object):
+
     def __init__(self,
                  model_path,
                  batch_size=32,
@@ -30,16 +31,17 @@ class InferBackend(object):
                  set_dynamic_shape=False,
                  shape_info_file="shape_info.txt",
                  num_threads=10):
-        int8_model = self.paddle_quantize_model(model_path)
+        model_path = self.model_path_correction(model_path)
+        is_int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
-        if device == 'gpu' and int8_model or use_fp16:
+        if device == 'gpu' and is_int8_model or use_fp16:
             from paddle import inference
             self.predictor_type = "inference"
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
             config.enable_use_gpu(100, 0)
             paddle.set_device("gpu")
-            if int8_model and use_fp16:
+            if is_int8_model and use_fp16:
                 print(
                     ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
                 )
@@ -67,8 +69,8 @@ class InferBackend(object):
             if set_dynamic_shape:
                 config.collect_shape_range_info(shape_info_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
-                                                           True)
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    shape_info_file, True)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -94,6 +96,8 @@ class InferBackend(object):
                 enable_onnx_checker=True)
             dynamic_quantize_model = onnx_model
             providers = ['CUDAExecutionProvider']
+            if device == 'cpu':
+                providers = ['CPUExecutionProvider']
             if use_quantize:
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -103,11 +107,9 @@ class InferBackend(object):
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            sess_options.inter_op_num_threads = num_threads
-            self.predictor = ort.InferenceSession(
-                dynamic_quantize_model,
-                sess_options=sess_options,
-                providers=providers)
+            self.predictor = ort.InferenceSession(dynamic_quantize_model,
+                                                  sess_options=sess_options,
+                                                  providers=providers)
             input_name1 = self.predictor.get_inputs()[0].name
             input_name2 = self.predictor.get_inputs()[1].name
             self.input_handles = [input_name1, input_name2]
@@ -117,6 +119,17 @@ class InferBackend(object):
     def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
         from onnxruntime.quantization import QuantizationMode, quantize_dynamic
         quantize_dynamic(input_float_model, dynamic_quantized_model)
+
+    def model_path_correction(self, model_path):
+        if os.path.isfile(model_path + ".pdmodel"):
+            return model_path
+        new_model_path = None
+        for file in os.listdir(model_path):
+            if (file.count(".pdmodel")):
+                filename = file[:-8]
+                new_model_path = os.path.join(model_path, filename)
+                return new_model_path
+        assert new_model_path is not None, "Can not find model file in your path."
 
     def paddle_quantize_model(self, model_path):
         model = paddle.jit.load(model_path)
@@ -142,10 +155,10 @@ class InferBackend(object):
         return result
 
 
-def token_cls_print_ret(infer_result, input_datas):
+def token_cls_print_ret(infer_result, input_data):
     rets = infer_result["value"]
     for i, ret in enumerate(rets):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
             print("entity:", iterm["entity"], "  label:", iterm["label"],
@@ -153,7 +166,7 @@ def token_cls_print_ret(infer_result, input_datas):
         print("-----------------------------")
 
 
-def seq_cls_print_ret(infer_result, input_datas):
+def seq_cls_print_ret(infer_result, input_data):
     label_list = [
         "news_story", "news_culture", "news_entertainment", "news_sports",
         "news_finance", "news_house", "news_car", "news_edu", "news_tech",
@@ -163,13 +176,14 @@ def seq_cls_print_ret(infer_result, input_datas):
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
     for i, ret in enumerate(infer_result):
-        print("input data:", input_datas[i])
+        print("input data:", input_data[i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
         print("-----------------------------")
 
 
 class ErniePredictor(object):
+
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
             print(
@@ -184,8 +198,8 @@ class ErniePredictor(object):
             exit(0)
 
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
+                                                       use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -212,7 +226,7 @@ class ErniePredictor(object):
             args.batch_size = 32
             args.shape_info_file = None
         if args.device == 'gpu':
-            args.num_threads = cpu_count()
+            args.num_threads = cpu_count(logical=False)
             args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
@@ -231,15 +245,15 @@ class ErniePredictor(object):
     def seq_cls_preprocess(self, input_data: list):
         data = input_data
         # tokenizer + pad
-        data = self.tokenizer(
-            data, max_length=self.max_seq_length, padding=True, truncation=True)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def seq_cls_postprocess(self, infer_data, input_data):
@@ -258,20 +272,17 @@ class ErniePredictor(object):
         is_split_into_words = False
         if isinstance(data[0], list):
             is_split_into_words = True
-        data = self.tokenizer(
-            data,
-            max_length=self.max_seq_length,
-            padding=True,
-            truncation=True,
-            is_split_into_words=is_split_into_words)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True,
+                              is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def token_cls_postprocess(self, infer_data, input_data):
@@ -284,7 +295,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if self.label_names[label] == "O" and start >= 0:
+                if (self.label_names[label] == "O"
+                        or "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -294,14 +306,16 @@ class ErniePredictor(object):
                         "label": label_name,
                     })
                     start = -1
-                elif "B-" in self.label_names[label]:
+                if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
-                    "entity": input_data[batch][start:len(token_label) - 1],
-                    "label": ""
+                    "entity":
+                    input_data[batch][start:len(token_label) - 1],
+                    "label":
+                    ""
                 })
             value.append(items)
 
@@ -314,22 +328,22 @@ class ErniePredictor(object):
         min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
             {
-                "input_ids": np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([min_batch_size, min_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([min_batch_size, min_seq_len], dtype="int64")
             },
             {
-                "input_ids": np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([max_batch_size, max_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([max_batch_size, max_seq_len], dtype="int64")
             },
             {
-                "input_ids": np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64")
             },
         ]
         for batch in batches:

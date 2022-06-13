@@ -17,8 +17,8 @@ def from_built_in_model():
     # pretraining test
     #model = AutoModelForPretraining.from_pretrained('roformer-chinese-small')
 
-    model = AutoModel.from_pretrained(
-        'roformer-chinese-small', task='ForPretraining')
+    model = AutoModel.from_pretrained('roformer-chinese-small',
+                                      task='ForPretraining')
     print(type(model))
 
     #model = AutoModelForPretraining.from_pretrained('tinybert-4l-312d')
@@ -55,8 +55,8 @@ def from_built_in_model():
     #model = AutoModelForQuestionAnswering.from_pretrained('ernie-gram-zh')
 
     # token_classification test
-    model = AutoModelForTokenClassification.from_pretrained(
-        'electra-small', num_classes=2)
+    model = AutoModelForTokenClassification.from_pretrained('electra-small',
+                                                            num_classes=2)
     print(type(model))
     #model = AutoModelForTokenClassification.from_pretrained('rbt3')
     #model = AutoModelForTokenClassification.from_pretrained('skep_ernie_1.0_large_ch')

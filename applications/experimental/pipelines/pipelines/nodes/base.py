@@ -68,8 +68,7 @@ class BaseComponent:
         return instance
 
     @classmethod
-    def load_from_pipeline_config(cls,
-                                  pipeline_config: dict,
+    def load_from_pipeline_config(cls, pipeline_config: dict,
                                   component_name: str):
         """
         Load an individual component from a YAML config for Pipelines.
@@ -99,11 +98,12 @@ class BaseComponent:
 
     @abstractmethod
     def run(
-            self,
-            query: Optional[str]=None,
-            file_paths: Optional[List[str]]=None,
-            documents: Optional[List[Document]]=None,
-            meta: Optional[dict]=None, ) -> Tuple[Dict, str]:
+        self,
+        query: Optional[str] = None,
+        file_paths: Optional[List[str]] = None,
+        documents: Optional[List[Document]] = None,
+        meta: Optional[dict] = None,
+    ) -> Tuple[Dict, str]:
         """
         Method that will be executed when the node in the graph is called.
 
@@ -162,7 +162,7 @@ class BaseComponent:
         debug_info = {}
         if getattr(self, "debug", None):
             # Include input
-            debug_info["input"] = { ** run_inputs, ** run_params}
+            debug_info["input"] = {**run_inputs, **run_params}
             debug_info["input"]["debug"] = self.debug
             # Include output
             filtered_output = {

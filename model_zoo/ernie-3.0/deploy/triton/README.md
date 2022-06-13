@@ -77,7 +77,7 @@ Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明
 models
 ├── ernie_seqcls                      # 分类任务的pipeline
 │   ├── 1
-│   └── config.pbtxt                  # 通过这个配置文件组合预处理、模型推理和后处理
+│   └── config.pbtxt                  # 通过这个文件组合前后处理和模型推理
 ├── ernie_seqcls_model                # 分类任务的模型推理
 │   ├── 1
 │   │   └── model.onnx

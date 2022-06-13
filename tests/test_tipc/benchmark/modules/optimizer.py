@@ -3,6 +3,7 @@ import paddle.nn as nn
 
 
 class OptimizerBenchmarkBase(object):
+
     def __init__(self):
         pass
 
@@ -15,13 +16,16 @@ class OptimizerBenchmarkBase(object):
 
 
 class SGDBenchmark(OptimizerBenchmarkBase):
+
     def __init__(self):
         super().__init__()
 
     @staticmethod
     def add_args(args, parser):
-        parser.add_argument(
-            '--max_grad_norm', type=float, default=None, help='Norm clip. ')
+        parser.add_argument('--max_grad_norm',
+                            type=float,
+                            default=None,
+                            help='Norm clip. ')
 
     def build_optimizer(self, args, learning_rate, model, **kwargs):
         if getattr(args, "max_grad_norm", None) is not None:
@@ -37,13 +41,16 @@ class SGDBenchmark(OptimizerBenchmarkBase):
 
 
 class AdamBenchmark(OptimizerBenchmarkBase):
+
     def __init__(self):
         super().__init__()
 
     @staticmethod
     def add_args(args, parser):
-        parser.add_argument(
-            '--max_grad_norm', type=float, default=None, help='Norm clip. ')
+        parser.add_argument('--max_grad_norm',
+                            type=float,
+                            default=None,
+                            help='Norm clip. ')
 
     def build_optimizer(self, args, learning_rate, model, **kwargs):
         if getattr(args, "max_grad_norm", None) is not None:
@@ -51,15 +58,15 @@ class AdamBenchmark(OptimizerBenchmarkBase):
         else:
             grad_clip = None
 
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=learning_rate,
-            parameters=model.parameters(),
-            grad_clip=grad_clip)
+        optimizer = paddle.optimizer.Adam(learning_rate=learning_rate,
+                                          parameters=model.parameters(),
+                                          grad_clip=grad_clip)
 
         return optimizer
 
 
 class AdamWBenchmark(OptimizerBenchmarkBase):
+
     def __init__(self):
         super().__init__()
 
@@ -68,10 +75,14 @@ class AdamWBenchmark(OptimizerBenchmarkBase):
         parser.add_argument('--beta1', type=float, default=0.9, help='. ')
         parser.add_argument('--beta2', type=float, default=0.999, help='. ')
         parser.add_argument('--epsilon', type=float, default=1e-8, help='. ')
-        parser.add_argument(
-            '--max_grad_norm', type=float, default=None, help='. ')
-        parser.add_argument(
-            '--weight_decay', type=float, default=0.0, help='. ')
+        parser.add_argument('--max_grad_norm',
+                            type=float,
+                            default=None,
+                            help='. ')
+        parser.add_argument('--weight_decay',
+                            type=float,
+                            default=0.0,
+                            help='. ')
 
     def build_optimizer(self, args, learning_rate, model, **kwargs):
         if getattr(args, "max_grad_norm", None) is not None:

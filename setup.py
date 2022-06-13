@@ -22,9 +22,8 @@ with open("requirements.txt") as fin:
 
 
 def read(*names, **kwargs):
-    with io.open(
-            os.path.join(os.path.dirname(__file__), *names),
-            encoding=kwargs.get("encoding", "utf8")) as fp:
+    with io.open(os.path.join(os.path.dirname(__file__), *names),
+                 encoding=kwargs.get("encoding", "utf8")) as fp:
         return fp.read()
 
 
@@ -55,7 +54,8 @@ setuptools.setup(
     version=paddlenlp.__version__,
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
-    description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
+    description=
+    "Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
     long_description=read("README_en.md"),
     long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PaddleNLP",
@@ -64,12 +64,14 @@ setuptools.setup(
         exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*',
                  'faster_generation*', 'model_zoo*')),
     package_data={
-        'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
+        'paddlenlp.ops':
+        get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
             'patches', 'optimizer'
         ]),
-        'paddlenlp.transformers.layoutxlm': get_package_data_files(
-            'paddlenlp.transformers.layoutxlm', ['visual_backbone.yaml']),
+        'paddlenlp.transformers.layoutxlm':
+        get_package_data_files('paddlenlp.transformers.layoutxlm',
+                               ['visual_backbone.yaml']),
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,

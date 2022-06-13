@@ -41,9 +41,9 @@ class SpanEvaluator(Metric):
         num_label_spans = 0
         for predict_start_ids, predict_end_ids, label_start_ids, label_end_ids in zip(
                 pred_start_ids, pred_end_ids, gold_start_ids, gold_end_ids):
-            [_correct, _infer, _label] = self.eval_span(
-                predict_start_ids, predict_end_ids, label_start_ids,
-                label_end_ids)
+            [_correct, _infer,
+             _label] = self.eval_span(predict_start_ids, predict_end_ids,
+                                      label_start_ids, label_end_ids)
             num_correct_spans += _correct
             num_infer_spans += _infer
             num_label_spans += _label

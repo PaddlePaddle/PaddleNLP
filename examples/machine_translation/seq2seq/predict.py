@@ -49,17 +49,16 @@ def do_predict(args):
     tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info['vi'])
 
     model = paddle.Model(
-        Seq2SeqAttnInferModel(
-            src_vocab_size,
-            tgt_vocab_size,
-            args.hidden_size,
-            args.hidden_size,
-            args.num_layers,
-            args.dropout,
-            bos_id=bos_id,
-            eos_id=eos_id,
-            beam_size=args.beam_size,
-            max_out_len=256))
+        Seq2SeqAttnInferModel(src_vocab_size,
+                              tgt_vocab_size,
+                              args.hidden_size,
+                              args.hidden_size,
+                              args.num_layers,
+                              args.dropout,
+                              bos_id=bos_id,
+                              eos_id=eos_id,
+                              beam_size=args.beam_size,
+                              max_out_len=256))
 
     model.prepare()
 

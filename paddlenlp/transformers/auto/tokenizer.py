@@ -23,7 +23,9 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.import_utils import is_faster_tokenizers_available
 
-__all__ = ["AutoTokenizer", ]
+__all__ = [
+    "AutoTokenizer",
+]
 
 TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("AlbertEnglishTokenizer", "albert"),
@@ -57,6 +59,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("PPMiniLMTokenizer", "ppminilm"),
     ("ProphetNetTokenizer", "prophetnet"),
     ("ReformerTokenizer", "reformer"),
+    ("RemBertTokenizer", "rembert"),
     ("RobertaChineseTokenizer", "roberta"),
     ("RobertaBPETokenizer", "roberta"),
     ("RoFormerTokenizer", "roformer"),
@@ -75,8 +78,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("GAUAlphaTokenizer", "gau_alpha"),
 ])
 
-FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict(
-    [("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie")])
+FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFasterTokenizer", "bert"),
+                                              ("ErnieFasterTokenizer", "ernie")
+                                              ])
 # For FasterTokenizer
 if is_faster_tokenizers_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
@@ -202,7 +206,7 @@ class AutoTokenizer():
                                 logger.warning(
                                     "Can't find the faster_tokenizers package, "
                                     "please ensure install faster_tokenizers correctly. "
-                                    "You can install faster_tokenizers by `pip install faster_tokenizers`"
+                                    "You can install faster_tokenizer by `pip install faster_tokenizer`"
                                     "(Currently only work for linux platform).")
 
                         logger.info("We are using %s to load '%s'." %
@@ -242,10 +246,12 @@ class AutoTokenizer():
                             init_class = key
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
-                                f"paddlenlp.transformers.{class_name}.tokenizer")
+                                f"paddlenlp.transformers.{class_name}.tokenizer"
+                            )
                             tokenizer_class = getattr(import_class, init_class)
-                            logger.info("We are using %s to load '%s'." % (
-                                tokenizer_class, pretrained_model_name_or_path))
+                            logger.info("We are using %s to load '%s'." %
+                                        (tokenizer_class,
+                                         pretrained_model_name_or_path))
                             return tokenizer_class.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs)
@@ -295,10 +301,12 @@ class AutoTokenizer():
                             init_class = key
                             class_name = cls._name_mapping[init_class]
                             import_class = importlib.import_module(
-                                f"paddlenlp.transformers.{class_name}.tokenizer")
+                                f"paddlenlp.transformers.{class_name}.tokenizer"
+                            )
                             tokenizer_class = getattr(import_class, init_class)
-                            logger.info("We are using %s to load '%s'." % (
-                                tokenizer_class, pretrained_model_name_or_path))
+                            logger.info("We are using %s to load '%s'." %
+                                        (tokenizer_class,
+                                         pretrained_model_name_or_path))
                             return tokenizer_class.from_pretrained(
                                 pretrained_model_name_or_path, *model_args,
                                 **kwargs)

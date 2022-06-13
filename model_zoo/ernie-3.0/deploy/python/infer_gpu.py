@@ -24,42 +24,51 @@ def parse_args():
         "--task_name",
         default='seq_cls',
         type=str,
-        help="The name of the task to perform predict, selected in: seq_cls and token_cls"
+        help=
+        "The name of the task to perform predict, selected in: seq_cls and token_cls"
     )
     parser.add_argument(
         "--model_name_or_path",
         default="ernie-3.0-medium-zh",
         type=str,
-        help="The directory or name of model.", )
+        help="The directory or name of model.",
+    )
     parser.add_argument(
         "--model_path",
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size for predict.", )
+        help="Batch size for predict.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--set_dynamic_shape",
         action='store_true',
-        help="Whether to automatically set dynamic shape.", )
+        help="Whether to automatically set dynamic shape.",
+    )
     parser.add_argument(
         "--shape_info_file",
         default="shape_info.txt",
         type=str,
-        help="The collected dynamic shape info file.", )
+        help="The collected dynamic shape info file.",
+    )
     parser.add_argument(
         "--use_fp16",
         action='store_true',
-        help="Whether to use fp16 inference.", )
+        help="Whether to use fp16 inference.",
+    )
     args = parser.parse_args()
     return args
 

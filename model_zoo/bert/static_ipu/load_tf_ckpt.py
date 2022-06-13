@@ -54,7 +54,8 @@ def get_tf_mapping(args):
             f"linear_{i*6+2}.b_0",
             f"bert/encoder/layer_{i}/output/dense/kernel":
             f"linear_{i*6+3}.w_0",
-            f"bert/encoder/layer_{i}/output/dense/bias": f"linear_{i*6+3}.b_0",
+            f"bert/encoder/layer_{i}/output/dense/bias":
+            f"linear_{i*6+3}.b_0",
             f"bert/encoder/layer_{i}/output/LayerNorm/gamma":
             f"layer_norm_{(i+1)*4}.w_0",
             f"bert/encoder/layer_{i}/output/LayerNorm/beta":
@@ -112,8 +113,8 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
             qkv_part = name.split("/")[5]
             if mapping[name] not in initializers.keys():
                 qkv_shape = (array.shape[0] * 3)
-                initializers[mapping[name]] = np.empty(
-                    qkv_shape, dtype=array.dtype)
+                initializers[mapping[name]] = np.empty(qkv_shape,
+                                                       dtype=array.dtype)
 
             start_idx = qkv_tensor_range[qkv_part][0]
             end_idx = qkv_tensor_range[qkv_part][1]
@@ -156,8 +157,8 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
                 logger.warning(
                     f"Not enough positional embeddings in checkpoint, copying to match length..."
                 )
-                array = array[np.mod(
-                    np.arange(args.max_position_embeddings), max_pos)]
+                array = array[np.mod(np.arange(args.max_position_embeddings),
+                                     max_pos)]
 
         initializers[mapping[name]] = array.copy()
         for k in initializers:

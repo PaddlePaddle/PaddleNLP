@@ -99,9 +99,8 @@ _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 def get_last_checkpoint(folder):
     content = os.listdir(folder)
     checkpoints = [
-        path for path in content
-        if _re_checkpoint.search(path) is not None and os.path.isdir(
-            os.path.join(folder, path))
+        path for path in content if _re_checkpoint.search(path) is not None
+        and os.path.isdir(os.path.join(folder, path))
     ]
     if len(checkpoints) == 0:
         return
@@ -299,9 +298,8 @@ def has_length(dataset):
 def get_last_checkpoint(folder):
     content = os.listdir(folder)
     checkpoints = [
-        path for path in content
-        if _re_checkpoint.search(path) is not None and os.path.isdir(
-            os.path.join(folder, path))
+        path for path in content if _re_checkpoint.search(path) is not None
+        and os.path.isdir(os.path.join(folder, path))
     ]
     if len(checkpoints) == 0:
         return

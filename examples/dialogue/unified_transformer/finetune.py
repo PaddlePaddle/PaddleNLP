@@ -80,12 +80,11 @@ def train(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    optimizer = AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
 
     step = 0
     total_time = 0.0
@@ -107,9 +106,10 @@ def train(args):
             total_time += (time.time() - batch_start_time)
             if step % args.logging_steps == 0:
                 ppl = paddle.exp(loss)
-                print('step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
-                      % (step, loss, ppl, optimizer.get_lr(),
-                         total_time / args.logging_steps))
+                print(
+                    'step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step' %
+                    (step, loss, ppl, optimizer.get_lr(),
+                     total_time / args.logging_steps))
                 total_time = 0.0
             if step % args.save_steps == 0:
                 ppl = evaluation(model, dev_data_loader)

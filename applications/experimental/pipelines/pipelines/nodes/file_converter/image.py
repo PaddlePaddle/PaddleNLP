@@ -33,10 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 class ImageToTextConverter(BaseConverter):
+
     def __init__(
-            self,
-            remove_numeric_tables: bool=False,
-            valid_languages: Optional[List[str]]=["eng"], ):
+        self,
+        remove_numeric_tables: bool = False,
+        valid_languages: Optional[List[str]] = ["eng"],
+    ):
         """
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
                                       The tabular structures in documents might be noise for the reader model if it
@@ -53,21 +55,20 @@ class ImageToTextConverter(BaseConverter):
         """
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(
-            remove_numeric_tables=remove_numeric_tables,
-            valid_languages=valid_languages)
+        self.set_config(remove_numeric_tables=remove_numeric_tables,
+                        valid_languages=valid_languages)
         self.recognize = PaddleOCR(use_angle_cls=True, lang='ch')
-        super().__init__(
-            remove_numeric_tables=remove_numeric_tables,
-            valid_languages=valid_languages)
+        super().__init__(remove_numeric_tables=remove_numeric_tables,
+                         valid_languages=valid_languages)
 
     def convert(
-            self,
-            file_path: Path,
-            meta: Optional[Dict[str, str]]=None,
-            remove_numeric_tables: Optional[bool]=None,
-            valid_languages: Optional[List[str]]=None,
-            encoding: Optional[str]="utf-8", ) -> List[Dict[str, Any]]:
+        self,
+        file_path: Path,
+        meta: Optional[Dict[str, str]] = None,
+        remove_numeric_tables: Optional[bool] = None,
+        valid_languages: Optional[List[str]] = None,
+        encoding: Optional[str] = "utf-8",
+    ) -> List[Dict[str, Any]]:
         """
         Extract text from image file using the pytesseract library (https://github.com/madmaze/pytesseract)
 

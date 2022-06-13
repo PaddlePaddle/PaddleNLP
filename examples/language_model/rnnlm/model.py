@@ -10,6 +10,7 @@ import paddle.nn.initializer as I
 
 
 class RnnLm(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  hidden_size,
@@ -27,26 +28,26 @@ class RnnLm(nn.Layer):
         self.embedder = nn.Embedding(
             vocab_size,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.lstm = nn.LSTM(
             input_size=hidden_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout,
-            weight_ih_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)),
-            weight_hh_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_ih_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)),
+            weight_hh_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.fc = nn.Linear(
             hidden_size,
             vocab_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)),
-            bias_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)),
+            bias_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -72,13 +73,15 @@ class RnnLm(nn.Layer):
 
 
 class CrossEntropyLossForLm(nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForLm, self).__init__()
 
     def forward(self, y, label):
         label = paddle.unsqueeze(label, axis=2)
-        loss = paddle.nn.functional.cross_entropy(
-            input=y, label=label, reduction='none')
+        loss = paddle.nn.functional.cross_entropy(input=y,
+                                                  label=label,
+                                                  reduction='none')
         loss = paddle.squeeze(loss, axis=[2])
         loss = paddle.mean(loss, axis=[0])
         loss = paddle.sum(loss)
@@ -86,6 +89,6 @@ class CrossEntropyLossForLm(nn.Layer):
 
 
 class UpdateModel(paddle.callbacks.Callback):
-    # This callback reset model hidden states and update learning rate before each epoch begins 
+    # This callback reset model hidden states and update learning rate before each epoch begins
     def on_epoch_begin(self, epoch=None, logs=None):
         self.model.network.reset_states()

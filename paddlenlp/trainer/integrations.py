@@ -96,12 +96,13 @@ class VisualDLCallback(TrainerCallback):
                 model = kwargs["model"]
                 if hasattr(model,
                            "init_config") and model.init_config is not None:
-                    model_config_json = json.dumps(
-                        model.get_model_config(), ensure_ascii=False, indent=2)
+                    model_config_json = json.dumps(model.get_model_config(),
+                                                   ensure_ascii=False,
+                                                   indent=2)
                     self.vdl_writer.add_text("model_config", model_config_json)
             if hasattr(self.vdl_writer, "add_hparams"):
-                self.vdl_writer.add_hparams(
-                    args.to_sanitized_dict(), metrics_list=[])
+                self.vdl_writer.add_hparams(args.to_sanitized_dict(),
+                                            metrics_list=[])
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         if not state.is_world_process_zero:
@@ -129,7 +130,9 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer = None
 
 
-INTEGRATION_TO_CALLBACK = {"visualdl": VisualDLCallback, }
+INTEGRATION_TO_CALLBACK = {
+    "visualdl": VisualDLCallback,
+}
 
 
 def get_reporting_integration_callbacks(report_to):

@@ -59,7 +59,9 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 # yapf: enable
 args = parser.parse_args()
 
-DATASET_INFO = {"c3": (ErnieDocTokenizer, "dev", "test", Accuracy()), }
+DATASET_INFO = {
+    "c3": (ErnieDocTokenizer, "dev", "test", Accuracy()),
+}
 
 
 def set_seed(args):
@@ -70,8 +72,7 @@ def set_seed(args):
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return [
-        paddle.zeros(
-            [batch_size, memory_length, d_model], dtype="float32")
+        paddle.zeros([batch_size, memory_length, d_model], dtype="float32")
         for _ in range(n_layers)
     ]
 
@@ -113,8 +114,8 @@ def evaluate(model, metric, data_loader, memories0, choice_num):
 
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
-                        (step, np.mean(losses),
-                         eval_logging_step / (time.time() - tic_train)))
+                        (step, np.mean(losses), eval_logging_step /
+                         (time.time() - tic_train)))
             tic_train = time.time()
 
     # Collect predicted labels
@@ -150,7 +151,7 @@ def do_train(args):
 
     num_classes = len(train_ds.label_list)
 
-    # Initialize model 
+    # Initialize model
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
@@ -165,49 +166,46 @@ def do_train(args):
     if trainer_num > 1:
         model = paddle.DataParallel(model)
     batch_size = int(args.batch_size / args.gradient_accumulation_steps)
-    train_ds_iter = MCQIterator(
-        train_ds,
-        batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        random_seed=args.seed,
-        choice_num=num_classes)
+    train_ds_iter = MCQIterator(train_ds,
+                                batch_size,
+                                tokenizer,
+                                trainer_num,
+                                trainer_id=rank,
+                                memory_len=model_config["memory_len"],
+                                max_seq_length=args.max_seq_length,
+                                random_seed=args.seed,
+                                choice_num=num_classes)
 
-    eval_ds_iter = MCQIterator(
-        eval_ds,
-        batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        random_seed=args.seed,
-        mode="eval",
-        choice_num=num_classes)
+    eval_ds_iter = MCQIterator(eval_ds,
+                               batch_size,
+                               tokenizer,
+                               trainer_num,
+                               trainer_id=rank,
+                               memory_len=model_config["memory_len"],
+                               max_seq_length=args.max_seq_length,
+                               random_seed=args.seed,
+                               mode="eval",
+                               choice_num=num_classes)
 
-    test_ds_iter = MCQIterator(
-        test_ds,
-        batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        random_seed=args.seed,
-        mode="test",
-        choice_num=num_classes)
+    test_ds_iter = MCQIterator(test_ds,
+                               batch_size,
+                               tokenizer,
+                               trainer_num,
+                               trainer_id=rank,
+                               memory_len=model_config["memory_len"],
+                               max_seq_length=args.max_seq_length,
+                               random_seed=args.seed,
+                               mode="test",
+                               choice_num=num_classes)
 
-    train_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                           return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -215,8 +213,8 @@ def do_train(args):
     logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
-    logger.info("Num warmup steps: %d" % int(num_training_steps *
-                                             args.warmup_proportion))
+    logger.info("Num warmup steps: %d" %
+                int(num_training_steps * args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -232,14 +230,13 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        n_layers=model_config["num_hidden_layers"],
-        layerwise_decay=args.layerwise_decay,
-        name_dict=name_dict)
+    optimizer = AdamWDL(learning_rate=lr_scheduler,
+                        parameters=model.parameters(),
+                        weight_decay=args.weight_decay,
+                        apply_decay_param_fun=lambda x: x in decay_params,
+                        n_layers=model_config["num_hidden_layers"],
+                        layerwise_decay=args.layerwise_decay,
+                        name_dict=name_dict)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
@@ -281,8 +278,8 @@ def do_train(args):
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
                     % (global_steps, epoch, loss, metric.accumulate(),
-                       lr_scheduler.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
+                       lr_scheduler.get_lr(), args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0 and step % args.gradient_accumulation_steps == 0:
@@ -312,8 +309,8 @@ def do_train(args):
             if args.max_steps > 0 and global_steps >= args.max_steps:
                 return
     logger.info("Final test result:")
-    eval_acc = evaluate(model, eval_metric, test_dataloader,
-                        create_memory(), num_classes)
+    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory(),
+                        num_classes)
 
 
 if __name__ == "__main__":

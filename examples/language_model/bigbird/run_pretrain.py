@@ -27,10 +27,13 @@ from paddlenlp.transformers import BigBirdTokenizer, LinearDecayWithWarmup, crea
 from paddlenlp.utils.log import logger
 import args
 
-MODEL_CLASSES = {"bigbird": (BigBirdForPretraining, BigBirdTokenizer), }
+MODEL_CLASSES = {
+    "bigbird": (BigBirdForPretraining, BigBirdTokenizer),
+}
 
 
 class WorkerInitObj(object):
+
     def __init__(self, seed):
         self.seed = seed
 
@@ -40,6 +43,7 @@ class WorkerInitObj(object):
 
 
 class PretrainingDataset(Dataset):
+
     def __init__(self,
                  input_file,
                  tokenizer,
@@ -60,9 +64,10 @@ class PretrainingDataset(Dataset):
             max_seq_len=self.max_encoder_length,
             max_pred_len=self.max_pred_length)
         return [
-            subtokens, np.zeros_like(subtokens), masked_lm_positions,
-            masked_lm_ids, masked_lm_weights, np.zeros(
-                [1], dtype="int64")
+            subtokens,
+            np.zeros_like(subtokens), masked_lm_positions, masked_lm_ids,
+            masked_lm_weights,
+            np.zeros([1], dtype="int64")
         ]
 
     def __len__(self):
@@ -115,12 +120,11 @@ def create_dataloader(input_file, tokenizer, worker_init, batch_size,
         out.extend(rand_mask_idx_list)
         return out
 
-    dataloader = DataLoader(
-        dataset=pretrain_dataset,
-        batch_sampler=train_batch_sampler,
-        collate_fn=_collate_data,
-        worker_init_fn=worker_init,
-        return_list=True)
+    dataloader = DataLoader(dataset=pretrain_dataset,
+                            batch_sampler=train_batch_sampler,
+                            collate_fn=_collate_data,
+                            worker_init_fn=worker_init,
+                            return_list=True)
     return dataloader
 
 
@@ -183,9 +187,10 @@ def do_train(args):
         files.sort()
         num_files = len(files)
         for f_id in range(num_files):
-            train_data_loader = create_dataloader(
-                files[f_id], tokenizer, worker_init, args.batch_size,
-                args.max_encoder_length, args.max_pred_length, config)
+            train_data_loader = create_dataloader(files[f_id], tokenizer,
+                                                  worker_init, args.batch_size,
+                                                  args.max_encoder_length,
+                                                  args.max_pred_length, config)
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 (input_ids, segment_ids, masked_lm_positions, masked_lm_ids,

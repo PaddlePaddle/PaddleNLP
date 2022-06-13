@@ -119,11 +119,12 @@ class ChunkEvaluator(paddle.metric.Metric):
         return num_infer_chunks, num_label_chunks, num_correct_chunks
 
     def _is_number_or_matrix(self, var):
+
         def _is_number_(var):
-            return isinstance(
-                var, int) or isinstance(var, np.int64) or isinstance(
-                    var, float) or (isinstance(var, np.ndarray) and
-                                    var.shape == (1, ))
+            return isinstance(var,
+                              int) or isinstance(var, np.int64) or isinstance(
+                                  var, float) or (isinstance(var, np.ndarray)
+                                                  and var.shape == (1, ))
 
         return _is_number_(var) or isinstance(var, np.ndarray)
 
@@ -171,8 +172,9 @@ class ChunkEvaluator(paddle.metric.Metric):
             self.num_infer_chunks) if self.num_infer_chunks else 0.
         recall = float(self.num_correct_chunks /
                        self.num_label_chunks) if self.num_label_chunks else 0.
-        f1_score = float(2 * precision * recall / (
-            precision + recall)) if self.num_correct_chunks else 0.
+        f1_score = float(
+            2 * precision * recall /
+            (precision + recall)) if self.num_correct_chunks else 0.
         return precision, recall, f1_score
 
     def reset(self):
