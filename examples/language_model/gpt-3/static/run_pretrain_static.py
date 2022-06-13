@@ -51,14 +51,18 @@ MODEL_CLASSES = {
 
 def create_data_holder(args):
     """creat data holder"""
-    tokens = paddle.static.data(
-        name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
-    loss_mask = paddle.static.data(
-        name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
-    position_ids = paddle.static.data(
-        name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
-    labels = paddle.static.data(
-        name="labels", shape=[-1, args.max_seq_len], dtype="int64")
+    tokens = paddle.static.data(name="tokens",
+                                shape=[-1, args.max_seq_len],
+                                dtype="int64")
+    loss_mask = paddle.static.data(name="loss_mask",
+                                   shape=[-1, args.max_seq_len],
+                                   dtype="float32")
+    position_ids = paddle.static.data(name="position_ids",
+                                      shape=[-1, args.max_seq_len],
+                                      dtype="int64")
+    labels = paddle.static.data(name="labels",
+                                shape=[-1, args.max_seq_len],
+                                dtype="int64")
     return [tokens, loss_mask, position_ids, labels]
 
 
@@ -93,10 +97,14 @@ def dist_optimizer(args, topo):
             ],
             "custom_black_list":
             ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"],
-            "init_loss_scaling": 32768,
-            "use_dynamic_loss_scaling": True,
-            "use_pure_fp16": args.amp_level == "O2",
-            "use_fp16_guard": False
+            "init_loss_scaling":
+            32768,
+            "use_dynamic_loss_scaling":
+            True,
+            "use_pure_fp16":
+            args.amp_level == "O2",
+            "use_fp16_guard":
+            False
         }
     if args.use_sharding:
         dist_strategy.sharding = True
@@ -127,8 +135,8 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -140,8 +148,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
@@ -216,13 +224,12 @@ def do_train(args):
     worker_index = fleet.worker_index()
     local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=args.dp_degree,
+                    pp_degree=args.pp_degree,
+                    sharding_degree=args.sharding_degree,
+                    mp_degree=args.mp_degree)
 
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
@@ -269,7 +276,8 @@ def do_train(args):
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
-                    pipeline_mode=True if args.pp_degree > 1 else False, )
+                    pipeline_mode=True if args.pp_degree > 1 else False,
+                )
 
                 if args.model_name_or_path in pretrained_models_list:
                     model_config = model_class.pretrained_init_configuration[
@@ -282,8 +290,8 @@ def do_train(args):
                     model_config["topo"] = topo
 
                     model = guard(f'gpu:{args.pp_degree -1}')(
-                        GPTForPretraining)(guard(f'gpu:0')(GPTModel)(
-                            **model_config))
+                        GPTForPretraining)(
+                            guard(f'gpu:0')(GPTModel)(**model_config))
                 else:
                     model, _ = GPTForPretraining.from_pretrained(
                         args.model_name_or_path,
@@ -337,8 +345,8 @@ def do_train(args):
                 }
 
             # Use the fleet api to compile the distributed optimizer
-            optimizer = fleet.distributed_optimizer(
-                optimizer, strategy=dist_strategy)
+            optimizer = fleet.distributed_optimizer(optimizer,
+                                                    strategy=dist_strategy)
 
             optimizer.minimize(loss)
             logger.info(f'final strategy: {fleet._final_strategy()}')
@@ -389,10 +397,7 @@ def do_train(args):
             else:
                 logger.info("Loading parameters from %s" % dygrah_path)
                 init_static_with_params(
-                    model,
-                    paddle.load(
-                        dygrah_path, return_numpy=True),
-                    topo,
+                    model, paddle.load(dygrah_path, return_numpy=True), topo,
                     main_program)
                 flag_loaded = True
 
@@ -441,8 +446,8 @@ def do_train(args):
                     if topo.is_last:
                         loss_return, lr_return = ret
                         #speed = args.logging_freq / (time.time() - tic_train)
-                        speed = args.logging_freq / (
-                            train_reader_cost + train_run_cost)
+                        speed = args.logging_freq / (train_reader_cost +
+                                                     train_run_cost)
                         avg_reader_cost = train_reader_cost / args.logging_freq
                         logger.info(
                             "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
@@ -524,8 +529,8 @@ def do_train(args):
                     if topo.is_last:
                         loss_return, lr_return = ret
                         #speed = args.logging_freq / (time.time() - tic_train)
-                        speed = args.logging_freq / (
-                            train_reader_cost + train_run_cost)
+                        speed = args.logging_freq / (train_reader_cost +
+                                                     train_run_cost)
                         avg_reader_cost = train_reader_cost / args.logging_freq
                         logger.info(
                             "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f steps/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
@@ -554,8 +559,7 @@ def do_train(args):
                                               "model_%d" % global_step)
                     logger.debug("saving models to {}".format(output_dir))
                     save_persistables(
-                        exe,
-                        os.path.join(output_dir, "static_vars"),
+                        exe, os.path.join(output_dir, "static_vars"),
                         main_program._pipeline_opt['section_program'])
                     if global_step <= args.save_steps:
                         model.init_config["init_args"][0].init_config.pop(

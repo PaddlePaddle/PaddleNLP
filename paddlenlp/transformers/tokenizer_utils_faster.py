@@ -37,7 +37,8 @@ from .tokenizer_utils_base import (
     TextInput,
     TextInputPair,
     TruncationStrategy,
-    PaddingStrategy, )
+    PaddingStrategy,
+)
 from .tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -129,16 +130,16 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return self._tokenizer
 
     def _convert_encoding(
-            self,
-            encoding: FasterEncoding,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True, ) -> Tuple[Dict[str, Any], List[
-                FasterEncoding]]:
+        self,
+        encoding: FasterEncoding,
+        return_token_type_ids: Optional[bool] = None,
+        return_attention_mask: Optional[bool] = None,
+        return_overflowing_tokens: bool = False,
+        return_special_tokens_mask: bool = False,
+        return_offsets_mapping: bool = False,
+        return_length: bool = False,
+        verbose: bool = True,
+    ) -> Tuple[Dict[str, Any], List[FasterEncoding]]:
         """
         Convert the encoding representation (from low-level PaddleNLP FasterTokenizer output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
@@ -216,12 +217,13 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
 
         return self._tokenizer.add_tokens(new_tokens)
 
-    def num_special_tokens_to_add(self, pair: bool=False) -> int:
+    def num_special_tokens_to_add(self, pair: bool = False) -> int:
         return self._tokenizer.num_special_tokens_to_add(pair)
 
     def convert_ids_to_tokens(
-            self, ids: Union[int, List[int]],
-            skip_special_tokens: bool=False) -> Union[str, List[str]]:
+            self,
+            ids: Union[int, List[int]],
+            skip_special_tokens: bool = False) -> Union[str, List[str]]:
         """
         Converts a single index or a sequence of indices in a token or a sequence of tokens, using the vocabulary and
         added tokens.
@@ -247,22 +249,22 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
 
     def tokenize(self,
                  text: str,
-                 pair: Optional[str]=None,
-                 add_special_tokens: bool=False,
+                 pair: Optional[str] = None,
+                 add_special_tokens: bool = False,
                  **kwargs) -> List[str]:
-        return self.encode(
-            text=text,
-            text_pair=pair,
-            add_special_tokens=add_special_tokens,
-            **kwargs).tokens()
+        return self.encode(text=text,
+                           text_pair=pair,
+                           add_special_tokens=add_special_tokens,
+                           **kwargs).tokens()
 
     def set_truncation_and_padding(
-            self,
-            padding_strategy: PaddingStrategy,
-            truncation_strategy: TruncationStrategy,
-            max_length: int,
-            stride: int,
-            pad_to_multiple_of: Optional[int], ):
+        self,
+        padding_strategy: PaddingStrategy,
+        truncation_strategy: TruncationStrategy,
+        max_length: int,
+        stride: int,
+        pad_to_multiple_of: Optional[int],
+    ):
         """
         Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's faster_tokenizers
         library) and restore the tokenizer settings afterwards.
@@ -323,28 +325,30 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
 
     def _batch_encode_plus(
             self,
-            batch_text_or_text_pairs: Union[List[TextInput], List[
-                TextInputPair], List[PreTokenizedInput], List[
-                    PreTokenizedInputPair], List[EncodedInput], List[
-                        EncodedInputPair], ],
-            add_special_tokens: bool=True,
-            padding_strategy: PaddingStrategy=PaddingStrategy.DO_NOT_PAD,
-            truncation_strategy: TruncationStrategy=TruncationStrategy.
-            DO_NOT_TRUNCATE,
-            max_length: Optional[int]=None,
-            stride: int=0,
-            is_split_into_words: bool=False,
-            pad_to_multiple_of: Optional[int]=None,
-            return_position_ids: Optional[bool]=None,
-            return_tensors: Optional[str]=None,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_dict: bool=True,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True,
+            batch_text_or_text_pairs: Union[List[TextInput],
+                                            List[TextInputPair],
+                                            List[PreTokenizedInput],
+                                            List[PreTokenizedInputPair],
+                                            List[EncodedInput],
+                                            List[EncodedInputPair], ],
+            add_special_tokens: bool = True,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            truncation_strategy: TruncationStrategy = TruncationStrategy.
+        DO_NOT_TRUNCATE,
+            max_length: Optional[int] = None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            pad_to_multiple_of: Optional[int] = None,
+            return_position_ids: Optional[bool] = None,
+            return_tensors: Optional[str] = None,
+            return_token_type_ids: Optional[bool] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_overflowing_tokens: bool = False,
+            return_special_tokens_mask: bool = False,
+            return_dict: bool = True,
+            return_offsets_mapping: bool = False,
+            return_length: bool = False,
+            verbose: bool = True,
             **kwargs) -> BatchEncoding:
 
         if not isinstance(batch_text_or_text_pairs, list):
@@ -358,7 +362,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             truncation_strategy=truncation_strategy,
             max_length=max_length,
             stride=stride,
-            pad_to_multiple_of=pad_to_multiple_of, )
+            pad_to_multiple_of=pad_to_multiple_of,
+        )
         encodings = self._tokenizer.encode_batch(
             batch_text_or_text_pairs,
             add_special_tokens=add_special_tokens,
@@ -379,7 +384,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 return_special_tokens_mask=return_special_tokens_mask,
                 return_offsets_mapping=return_offsets_mapping,
                 return_length=return_length,
-                verbose=verbose, ) for encoding in encodings
+                verbose=verbose,
+            ) for encoding in encodings
         ]
 
         # Convert the output to have dict[list] from list[dict] and remove the additional overflows dimension
@@ -408,31 +414,32 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         for input_ids in sanitized_tokens["input_ids"]:
             self._eventual_warn_about_too_long_sequence(input_ids, max_length,
                                                         verbose)
-        return BatchEncoding(
-            sanitized_tokens, sanitized_encodings, tensor_type=return_tensors)
+        return BatchEncoding(sanitized_tokens,
+                             sanitized_encodings,
+                             tensor_type=return_tensors)
 
     def _encode_plus(
             self,
             text: Union[TextInput, PreTokenizedInput, EncodedInput],
             text_pair: Optional[Union[TextInput, PreTokenizedInput,
-                                      EncodedInput]]=None,
-            add_special_tokens: bool=True,
-            padding_strategy: PaddingStrategy=PaddingStrategy.DO_NOT_PAD,
-            truncation_strategy: TruncationStrategy=TruncationStrategy.
-            DO_NOT_TRUNCATE,
-            max_length: Optional[int]=None,
-            stride: int=0,
-            is_split_into_words: bool=False,
-            pad_to_multiple_of: Optional[int]=None,
-            return_position_ids: Optional[bool]=None,
-            return_tensors: Optional[bool]=None,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True,
+                                      EncodedInput]] = None,
+            add_special_tokens: bool = True,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            truncation_strategy: TruncationStrategy = TruncationStrategy.
+        DO_NOT_TRUNCATE,
+            max_length: Optional[int] = None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            pad_to_multiple_of: Optional[int] = None,
+            return_position_ids: Optional[bool] = None,
+            return_tensors: Optional[bool] = None,
+            return_token_type_ids: Optional[bool] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_overflowing_tokens: bool = False,
+            return_special_tokens_mask: bool = False,
+            return_offsets_mapping: bool = False,
+            return_length: bool = False,
+            verbose: bool = True,
             **kwargs) -> BatchEncoding:
 
         batched_input = [(text, text_pair)] if text_pair else [text]
@@ -454,7 +461,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             return_offsets_mapping=return_offsets_mapping,
             return_length=return_length,
             verbose=verbose,
-            **kwargs, )
+            **kwargs,
+        )
 
         # Return tensor is None, then we can remove the leading batch axis
         # Overflowing tokens are returned as a batch of output so we keep them in this case
@@ -465,7 +473,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                     if len(value) > 0 and isinstance(value[0], list) else value
                     for key, value in batched_output.items()
                 },
-                batched_output.encodings, )
+                batched_output.encodings,
+            )
 
         self._eventual_warn_about_too_long_sequence(batched_output["input_ids"],
                                                     max_length, verbose)
@@ -473,11 +482,12 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return batched_output
 
     def _save_pretrained(
-            self,
-            save_directory: Union[str, os.PathLike],
-            file_names: Tuple[str],
-            legacy_format: Optional[bool]=None,
-            filename_prefix: Optional[str]=None, ) -> Tuple[str]:
+        self,
+        save_directory: Union[str, os.PathLike],
+        file_names: Tuple[str],
+        legacy_format: Optional[bool] = None,
+        filename_prefix: Optional[str] = None,
+    ) -> Tuple[str]:
         """
         Save a tokenizer using the slow-tokenizer/legacy format: vocabulary + added tokens as well as in a unique JSON
         file containing {config + vocab + added-tokens}.
@@ -490,30 +500,31 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 "might consider leaving the legacy_format at `None` or setting it to `False`."
             )
 
-        save_slow = ((legacy_format is None or legacy_format is True) and
-                     self.slow_tokenizer_class is not None and
-                     self.can_save_slow_tokenizer)
+        save_slow = ((legacy_format is None or legacy_format is True)
+                     and self.slow_tokenizer_class is not None
+                     and self.can_save_slow_tokenizer)
         save_fast = legacy_format is None or legacy_format is False
 
         if save_slow:
             added_tokens_file = os.path.join(
                 save_directory,
-                (filename_prefix + "-"
-                 if filename_prefix else "") + ADDED_TOKENS_FILE)
+                (filename_prefix + "-" if filename_prefix else "") +
+                ADDED_TOKENS_FILE)
             added_vocab = self.get_added_vocab()
             if added_vocab:
                 with open(added_tokens_file, "w", encoding="utf-8") as f:
                     out_str = json.dumps(added_vocab, ensure_ascii=False)
                     f.write(out_str)
 
-            vocab_files = self.save_vocabulary(
-                save_directory, filename_prefix=filename_prefix)
+            vocab_files = self.save_vocabulary(save_directory,
+                                               filename_prefix=filename_prefix)
             file_names = file_names + vocab_files + (added_tokens_file, )
 
         if save_fast:
             tokenizer_file = os.path.join(
-                save_directory, (filename_prefix + "-"
-                                 if filename_prefix else "") + TOKENIZER_FILE)
+                save_directory,
+                (filename_prefix + "-" if filename_prefix else "") +
+                TOKENIZER_FILE)
             self.backend_tokenizer.save(tokenizer_file)
             file_names = file_names + (tokenizer_file, )
         return file_names
@@ -533,16 +544,16 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
 
     def _decode(self,
                 token_ids: Union[int, List[int]],
-                skip_special_tokens: bool=False,
-                clean_up_tokenization_spaces: bool=True,
+                skip_special_tokens: bool = False,
+                clean_up_tokenization_spaces: bool = True,
                 **kwargs) -> str:
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer",
                                                        False)
 
         if isinstance(token_ids, int):
             token_ids = [token_ids]
-        text = self._tokenizer.decode(
-            token_ids, skip_special_tokens=skip_special_tokens)
+        text = self._tokenizer.decode(token_ids,
+                                      skip_special_tokens=skip_special_tokens)
 
         if clean_up_tokenization_spaces:
             clean_text = self.clean_up_tokenization(text)

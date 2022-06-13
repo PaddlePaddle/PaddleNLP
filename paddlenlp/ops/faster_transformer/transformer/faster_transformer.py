@@ -182,14 +182,15 @@ class FasterTransformer(TransformerModel):
         elif self.use_fp16_encoder:
             self.use_fp16_encoder = False
 
-        self.decoding_linear = nn.Linear(
-            in_features=d_model, out_features=trg_vocab_size)
+        self.decoding_linear = nn.Linear(in_features=d_model,
+                                         out_features=trg_vocab_size)
 
         if weight_sharing:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
+                                                    emb_dim=d_model,
+                                                    bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                         max_length=max_length)
 
         self.decoding = InferTransformerDecoding(
             decoder=self.transformer.decoder,
@@ -217,17 +218,16 @@ class FasterTransformer(TransformerModel):
         src_slf_attn_bias = paddle.cast(
             src_word == self.bos_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
-                start=0, end=src_max_len)
+        src_pos = paddle.cast(src_word != self.bos_id,
+                              dtype=src_word.dtype) * paddle.arange(
+                                  start=0, end=src_max_len)
 
         # Run encoder
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
-        enc_input = F.dropout(
-            src_emb, p=self.dropout,
-            training=False) if self.dropout else src_emb
+        enc_input = F.dropout(src_emb, p=self.dropout,
+                              training=False) if self.dropout else src_emb
 
         if self.enable_faster_encoder and self.use_fp16_encoder:
             enc_input = paddle.cast(enc_input, dtype="float16")
@@ -239,8 +239,8 @@ class FasterTransformer(TransformerModel):
         elif not self.use_fp16_decoding and enc_output.dtype != paddle.float32:
             enc_output = paddle.cast(enc_output, dtype="float32")
 
-        mem_seq_lens = paddle.sum(paddle.cast(
-            src_word != self.bos_id, dtype="int32"),
+        mem_seq_lens = paddle.sum(paddle.cast(src_word != self.bos_id,
+                                              dtype="int32"),
                                   dtype="int32",
                                   axis=1)
         ids = self.decoding(enc_output, mem_seq_lens, trg_word=trg_word)
@@ -260,8 +260,8 @@ class FasterTransformer(TransformerModel):
 
         # Dealing with weight sharing.
         if self.weight_sharing:
-            model_dict["decoding_linear.weight"] = np.transpose(model_dict[
-                "trg_word_embedding.word_embedding.weight"])
+            model_dict["decoding_linear.weight"] = np.transpose(
+                model_dict["trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
 
@@ -280,26 +280,29 @@ class FasterTransformer(TransformerModel):
 
                     model_dict["decoding.slf_q_" + param_type + "_" +
                                num_layer] = np.concatenate(
-                                   (model_dict[item], model_dict[
-                                       "transformer.decoder.layers." + num_layer
-                                       + ".self_attn.k_proj." + param_type],
+                                   (model_dict[item],
                                     model_dict["transformer.decoder.layers." +
-                                               num_layer + ".self_attn.v_proj."
-                                               + param_type]),
+                                               num_layer +
+                                               ".self_attn.k_proj." +
+                                               param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer +
+                                               ".self_attn.v_proj." +
+                                               param_type]),
                                    axis=-1)
 
         if self.use_fp16_decoding:
             for item in self.state_dict():
                 if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
-            model_dict["decoding_linear.weight"] = np.float16(model_dict[
-                "decoding_linear.weight"])
+            model_dict["decoding_linear.weight"] = np.float16(
+                model_dict["decoding_linear.weight"])
             model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
-            model_dict["decoding_linear.bias"] = np.zeros(
-                [self.trg_vocab_size], dtype="float16")
+            model_dict["decoding_linear.bias"] = np.zeros([self.trg_vocab_size],
+                                                          dtype="float16")
 
         self.load_dict(model_dict)
 
@@ -385,8 +388,8 @@ class FasterTransformer(TransformerModel):
 
         # Dealing with weight sharing.
         if self.weight_sharing:
-            model_dict["decoding_linear.weight"] = np.transpose(model_dict[
-                "trg_word_embedding.word_embedding.weight"])
+            model_dict["decoding_linear.weight"] = np.transpose(
+                model_dict["trg_word_embedding.word_embedding.weight"])
         else:
             model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
 
@@ -405,26 +408,29 @@ class FasterTransformer(TransformerModel):
 
                     model_dict["decoding.slf_q_" + param_type + "_" +
                                num_layer] = np.concatenate(
-                                   (model_dict[item], model_dict[
-                                       "transformer.decoder.layers." + num_layer
-                                       + ".self_attn.k_proj." + param_type],
+                                   (model_dict[item],
                                     model_dict["transformer.decoder.layers." +
-                                               num_layer + ".self_attn.v_proj."
-                                               + param_type]),
+                                               num_layer +
+                                               ".self_attn.k_proj." +
+                                               param_type],
+                                    model_dict["transformer.decoder.layers." +
+                                               num_layer +
+                                               ".self_attn.v_proj." +
+                                               param_type]),
                                    axis=-1)
 
         if self.use_fp16_decoding:
             for item in self.state_dict():
                 if "decoder" in item or "decoding.slf" in item:
                     model_dict[item] = np.float16(model_dict[item])
-            model_dict["decoding_linear.weight"] = np.float16(model_dict[
-                "decoding_linear.weight"])
+            model_dict["decoding_linear.weight"] = np.float16(
+                model_dict["decoding_linear.weight"])
             model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
                 model_dict["trg_word_embedding.word_embedding.weight"])
             model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
                 model_dict["trg_pos_embedding.pos_encoder.weight"])
-            model_dict["decoding_linear.bias"] = np.zeros(
-                [self.trg_vocab_size], dtype="float16")
+            model_dict["decoding_linear.bias"] = np.zeros([self.trg_vocab_size],
+                                                          dtype="float16")
 
         for item in self.state_dict():
             param = self
@@ -533,7 +539,8 @@ class TransformerGenerator(paddle.nn.Layer):
                  max_out_len=256,
                  **kwargs):
         logger.warning(
-            "TransformerGenerator is an experimental API and subject to change.")
+            "TransformerGenerator is an experimental API and subject to change."
+        )
         # `kwargs` can include output_time_major, use_fp16_decoding, topk, topp.
         # The later three arguments can only work when using FasterTransformer,
         # and expose topk, topp later.
@@ -552,9 +559,8 @@ class TransformerGenerator(paddle.nn.Layer):
 
         if use_ft:
             try:
-                decoding_strategy = ("beam_search_v2"
-                                     if beam_search_version == "v2" else
-                                     "beam_search")
+                decoding_strategy = ("beam_search_v2" if beam_search_version
+                                     == "v2" else "beam_search")
                 self.transformer = FasterTransformer(
                     src_vocab_size=src_vocab_size,
                     trg_vocab_size=trg_vocab_size,
@@ -696,14 +702,14 @@ class TransformerGenerator(paddle.nn.Layer):
 
 
 class FasterGPT(GPTPretrainedModel):
+
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterGPT, self).__init__()
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
-        self.decoding = InferGptDecoding(
-            model=model,
-            decoding_lib=decoding_lib,
-            use_fp16_decoding=use_fp16_decoding)
+        self.decoding = InferGptDecoding(model=model,
+                                         decoding_lib=decoding_lib,
+                                         use_fp16_decoding=use_fp16_decoding)
 
     def forward(self,
                 input_ids,
@@ -730,8 +736,8 @@ class FasterGPT(GPTPretrainedModel):
         if top_p == 1.0:
             top_p = 0.0
         if seq_len is None:
-            seq_len = paddle.sum(paddle.cast(
-                input_ids != pad_token_id, dtype="int32"),
+            seq_len = paddle.sum(paddle.cast(input_ids != pad_token_id,
+                                             dtype="int32"),
                                  axis=-1,
                                  dtype="int32")
 
@@ -748,18 +754,17 @@ class FasterGPT(GPTPretrainedModel):
             seq_len = model_kwargs["seq_len"]
             attention_mask = model_kwargs.get("attention_mask", None)
 
-        return self.decoding(
-            input_ids,
-            mem_seq_len=seq_len,
-            attention_mask=attention_mask,
-            topk=top_k,
-            topp=top_p,
-            max_out_len=max_length,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            pad_token_id=pad_token_id,
-            forced_eos_token_id=forced_eos_token_id,
-            temperature=temperature)
+        return self.decoding(input_ids,
+                             mem_seq_len=seq_len,
+                             attention_mask=attention_mask,
+                             topk=top_k,
+                             topp=top_p,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             forced_eos_token_id=forced_eos_token_id,
+                             temperature=temperature)
 
     def export_params(self, state_to_load, place):
         for item in state_to_load:
@@ -791,6 +796,7 @@ class FasterGPT(GPTPretrainedModel):
 
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
+
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUnifiedTransformer, self).__init__()
         self._model = model
@@ -842,9 +848,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         # TODO(guosheng): attention_mask of UnifiedTransformer uses 0/-INF
         # and is 4D. While now we want to use 1/0 to unify all models and
         # tokenizers.
-        attention_mask = (attention_mask[:, :, :-1, :-1]
-                          if attention_mask.ndim == 4 else
-                          attention_mask[:, :-1, :-1])
+        attention_mask = (attention_mask[:, :, :-1, :-1] if attention_mask.ndim
+                          == 4 else attention_mask[:, :-1, :-1])
         attention_mask = paddle.cast(
             attention_mask == 0,
             dtype="float16" if self._use_fp16_decoding else "float32")
@@ -927,8 +932,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
-            seq_len = paddle.sum(paddle.cast(
-                input_ids != self.pad_token_id, dtype="int32"),
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
+                                             dtype="int32"),
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
@@ -962,8 +967,8 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
+        model_inputs = self.prepare_inputs_for_generation(
+            input_ids, **model_kwargs)
 
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
@@ -972,36 +977,36 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
         position_ids = model_inputs.pop('position_ids', None)
         decoder_position_ids = model_inputs.pop('decoder_position_ids', None)
 
-        return self.decoding(
-            input_ids=model_inputs["input_ids"],
-            attn_mask=model_inputs["attention_mask"],
-            memory_seq_lens=seq_len,
-            type_id=model_inputs["token_type_ids"],
-            decoder_type_id=decoder_type_ids,
-            role_id=role_ids,
-            decoder_role_id=decoder_role_ids,
-            position_id=position_ids,
-            decoder_position_id=decoder_position_ids,
-            beam_size=num_beams,
-            diversity_rate=diversity_rate,
-            topk=top_k,
-            topp=top_p,
-            decoding_strategy=decode_strategy,
-            max_out_len=max_length,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            pad_token_id=pad_token_id,
-            temperature=temperature,
-            length_penalty=length_penalty,
-            pos_bias=True,
-            forced_eos_token_id=forced_eos_token_id,
-            early_stopping=early_stopping,
-            min_length=min_length)
+        return self.decoding(input_ids=model_inputs["input_ids"],
+                             attn_mask=model_inputs["attention_mask"],
+                             memory_seq_lens=seq_len,
+                             type_id=model_inputs["token_type_ids"],
+                             decoder_type_id=decoder_type_ids,
+                             role_id=role_ids,
+                             decoder_role_id=decoder_role_ids,
+                             position_id=position_ids,
+                             decoder_position_id=decoder_position_ids,
+                             beam_size=num_beams,
+                             diversity_rate=diversity_rate,
+                             topk=top_k,
+                             topp=top_p,
+                             decoding_strategy=decode_strategy,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             temperature=temperature,
+                             length_penalty=length_penalty,
+                             pos_bias=True,
+                             forced_eos_token_id=forced_eos_token_id,
+                             early_stopping=early_stopping,
+                             min_length=min_length)
 
     generate = forward
 
 
 class FasterUNIMOText(UNIMOPretrainedModel):
+
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterUNIMOText, self).__init__()
         self._model = model
@@ -1106,8 +1111,8 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
-            seq_len = paddle.sum(paddle.cast(
-                input_ids != self.pad_token_id, dtype="int32"),
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
+                                             dtype="int32"),
                                  axis=-1,
                                  dtype="int32")
         if decode_strategy.startswith("beam_search"):
@@ -1137,37 +1142,37 @@ class FasterUNIMOText(UNIMOPretrainedModel):
             raise ValueError(
                 "Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(input_ids,
-                                                          **model_kwargs)
+        model_inputs = self.prepare_inputs_for_generation(
+            input_ids, **model_kwargs)
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
 
-        return self.decoding(
-            input_ids=model_inputs["input_ids"],
-            attn_mask=model_inputs["attention_mask"],
-            memory_seq_lens=seq_len,
-            type_id=model_inputs["token_type_ids"],
-            decoder_type_id=decoder_type_ids,
-            beam_size=num_beams,
-            diversity_rate=diversity_rate,
-            topk=top_k,
-            topp=top_p,
-            decoding_strategy=decode_strategy,
-            max_out_len=max_length,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            pad_token_id=pad_token_id,
-            temperature=temperature,
-            length_penalty=length_penalty,
-            forced_eos_token_id=forced_eos_token_id,
-            pos_bias=False,
-            early_stopping=early_stopping,
-            min_length=min_length)
+        return self.decoding(input_ids=model_inputs["input_ids"],
+                             attn_mask=model_inputs["attention_mask"],
+                             memory_seq_lens=seq_len,
+                             type_id=model_inputs["token_type_ids"],
+                             decoder_type_id=decoder_type_ids,
+                             beam_size=num_beams,
+                             diversity_rate=diversity_rate,
+                             topk=top_k,
+                             topp=top_p,
+                             decoding_strategy=decode_strategy,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             temperature=temperature,
+                             length_penalty=length_penalty,
+                             forced_eos_token_id=forced_eos_token_id,
+                             pos_bias=False,
+                             early_stopping=early_stopping,
+                             min_length=min_length)
 
     generate = forward
 
 
 class FasterBART(BartPretrainedModel):
+
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
@@ -1182,10 +1187,9 @@ class FasterBART(BartPretrainedModel):
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
 
-        self.decoding = InferBartDecoding(
-            model=self._model,
-            decoding_lib=decoding_lib,
-            use_fp16_decoding=use_fp16_decoding)
+        self.decoding = InferBartDecoding(model=self._model,
+                                          decoding_lib=decoding_lib,
+                                          use_fp16_decoding=use_fp16_decoding)
 
     def get_encoder(self):
         return self.encoder
@@ -1221,8 +1225,8 @@ class FasterBART(BartPretrainedModel):
             self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
-            seq_len = paddle.sum(paddle.cast(
-                input_ids != self.pad_token_id, dtype="int32"),
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
+                                             dtype="int32"),
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
@@ -1240,26 +1244,26 @@ class FasterBART(BartPretrainedModel):
             seq_len = expanded_kwargs["seq_len"]
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
-        return self.decoding(
-            enc_output=encoder_output,
-            memory_seq_lens=seq_len,
-            beam_size=num_beams,
-            top_k=top_k,
-            decoding_strategy=decode_strategy,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            pad_token_id=pad_token_id,
-            top_p=top_p,
-            max_out_len=max_length,
-            diversity_rate=diversity_rate,
-            alpha=length_penalty,
-            early_stopping=early_stopping,
-            forced_eos_token_id=forced_eos_token_id)
+        return self.decoding(enc_output=encoder_output,
+                             memory_seq_lens=seq_len,
+                             beam_size=num_beams,
+                             top_k=top_k,
+                             decoding_strategy=decode_strategy,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             top_p=top_p,
+                             max_out_len=max_length,
+                             diversity_rate=diversity_rate,
+                             alpha=length_penalty,
+                             early_stopping=early_stopping,
+                             forced_eos_token_id=forced_eos_token_id)
 
     generate = forward
 
 
 class FasterMBART(MBartPretrainedModel):
+
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         super(FasterMBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
@@ -1327,8 +1331,8 @@ class FasterMBART(MBartPretrainedModel):
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
-            seq_len = paddle.sum(paddle.cast(
-                input_ids != self.pad_token_id, dtype="int32"),
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
+                                             dtype="int32"),
                                  axis=-1,
                                  keepdim=True,
                                  dtype="int32")
@@ -1349,31 +1353,30 @@ class FasterMBART(MBartPretrainedModel):
 
         if forced_bos_token_id is not None:
             if decode_strategy == "sampling":
-                trg_word = paddle.full(
-                    [batch_size * num_return_sequences, 1],
-                    forced_bos_token_id,
-                    dtype="int32")
+                trg_word = paddle.full([batch_size * num_return_sequences, 1],
+                                       forced_bos_token_id,
+                                       dtype="int32")
             else:
-                trg_word = paddle.full(
-                    [batch_size, 1], forced_bos_token_id, dtype="int32")
+                trg_word = paddle.full([batch_size, 1],
+                                       forced_bos_token_id,
+                                       dtype="int32")
         else:
             trg_word = paddle.zeros([0])
 
-        return self.decoding(
-            enc_output=encoder_output,
-            memory_seq_lens=seq_len,
-            beam_size=num_beams,
-            trg_word=trg_word,
-            top_k=top_k,
-            top_p=top_p,
-            decoding_strategy=decode_strategy,
-            diversity_rate=diversity_rate,
-            max_out_len=max_length,
-            bos_token_id=bos_token_id,
-            eos_token_id=eos_token_id,
-            pad_token_id=pad_token_id,
-            alpha=length_penalty,
-            temperature=temperature,
-            early_stopping=early_stopping)
+        return self.decoding(enc_output=encoder_output,
+                             memory_seq_lens=seq_len,
+                             beam_size=num_beams,
+                             trg_word=trg_word,
+                             top_k=top_k,
+                             top_p=top_p,
+                             decoding_strategy=decode_strategy,
+                             diversity_rate=diversity_rate,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             alpha=length_penalty,
+                             temperature=temperature,
+                             early_stopping=early_stopping)
 
     generate = forward

@@ -63,7 +63,7 @@ parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total
 # yapf: enable
 args = parser.parse_args()
 
-# eval_dataset, test_dataset, 
+# eval_dataset, test_dataset,
 DATASET_INFO = {
     "dureader_robust": ["dev", "dev", ErnieDocTokenizer],
     "cmrc2018": ["dev", "dev", ErnieDocTokenizer],
@@ -79,13 +79,13 @@ def set_seed(args):
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return [
-        paddle.zeros(
-            [batch_size, memory_length, d_model], dtype="float32")
+        paddle.zeros([batch_size, memory_length, d_model], dtype="float32")
         for _ in range(n_layers)
     ]
 
 
 class CrossEntropyLossForQA(paddle.nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForQA, self).__init__()
         self.criterion = paddle.nn.CrossEntropyLoss()
@@ -118,8 +118,9 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
         input_ids, position_ids, token_type_ids, attn_mask, start_position, \
             end_position, qids, gather_idx, need_cal_loss = batch
 
-        start_logits, end_logits, memories = model(
-            input_ids, memories, token_type_ids, position_ids, attn_mask)
+        start_logits, end_logits, memories = model(input_ids, memories,
+                                                   token_type_ids, position_ids,
+                                                   attn_mask)
 
         start_logits, end_logits, qids = list(
             map(lambda x: paddle.gather(x, gather_idx),
@@ -142,10 +143,9 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
                 ]
                 end_logits_each = [float(x) for x in np_end_logits[idx].flat]
                 all_results.append(
-                    RawResult(
-                        unique_id=qid_each,
-                        start_logits=start_logits_each,
-                        end_logits=end_logits_each))
+                    RawResult(unique_id=qid_each,
+                              start_logits=start_logits_each,
+                              end_logits=end_logits_each))
 
     # Compute_predictions
     all_predictions_eval, all_nbest_eval = compute_qa_predictions(
@@ -157,7 +157,8 @@ def evaluate(args, model, criterion, metric, data_loader, memories0, tokenizer):
                                 data_loader._batch_reader.dataset)
 
     logger.info("EM: {}, F1: {}, AVG: {}, TOTAL: {}, TIME: {}".format(
-        EM, F1, AVG, TOTAL, time.time() - tic_start))
+        EM, F1, AVG, TOTAL,
+        time.time() - tic_start))
     model.train()
     return EM, F1, AVG
 
@@ -189,48 +190,45 @@ def do_train(args):
     if trainer_num > 1:
         model = paddle.DataParallel(model)
 
-    train_ds_iter = MRCIterator(
-        train_ds,
-        args.batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+    train_ds_iter = MRCIterator(train_ds,
+                                args.batch_size,
+                                tokenizer,
+                                trainer_num,
+                                trainer_id=rank,
+                                memory_len=model_config["memory_len"],
+                                max_seq_length=args.max_seq_length,
+                                random_seed=args.seed)
 
-    eval_ds_iter = MRCIterator(
-        eval_ds,
-        args.batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        mode="eval",
-        random_seed=args.seed)
+    eval_ds_iter = MRCIterator(eval_ds,
+                               args.batch_size,
+                               tokenizer,
+                               trainer_num,
+                               trainer_id=rank,
+                               memory_len=model_config["memory_len"],
+                               max_seq_length=args.max_seq_length,
+                               mode="eval",
+                               random_seed=args.seed)
 
-    test_ds_iter = MRCIterator(
-        test_ds,
-        args.batch_size,
-        tokenizer,
-        trainer_num,
-        trainer_id=rank,
-        memory_len=model_config["memory_len"],
-        max_seq_length=args.max_seq_length,
-        mode="test",
-        random_seed=args.seed)
+    test_ds_iter = MRCIterator(test_ds,
+                               args.batch_size,
+                               tokenizer,
+                               trainer_num,
+                               trainer_id=rank,
+                               memory_len=model_config["memory_len"],
+                               max_seq_length=args.max_seq_length,
+                               mode="test",
+                               random_seed=args.seed)
 
-    train_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                           return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
 
-    eval_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
 
-    test_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -238,8 +236,8 @@ def do_train(args):
     logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
-    logger.info("Num warmup steps: %d" % int(num_training_steps *
-                                             args.warmup_proportion))
+    logger.info("Num warmup steps: %d" %
+                int(num_training_steps * args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -255,14 +253,13 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        n_layers=model_config["num_hidden_layers"],
-        layerwise_decay=args.layerwise_decay,
-        name_dict=name_dict)
+    optimizer = AdamWDL(learning_rate=lr_scheduler,
+                        parameters=model.parameters(),
+                        weight_decay=args.weight_decay,
+                        apply_decay_param_fun=lambda x: x in decay_params,
+                        n_layers=model_config["num_hidden_layers"],
+                        layerwise_decay=args.layerwise_decay,
+                        name_dict=name_dict)
 
     global_steps = 0
     create_memory = partial(init_memory, args.batch_size, args.memory_length,
@@ -282,8 +279,9 @@ def do_train(args):
             global_steps += 1
             input_ids, position_ids, token_type_ids, attn_mask, start_position, \
                 end_position, qids, gather_idx, need_cal_loss = batch
-            start_logits, end_logits, memories = model(
-                input_ids, memories, token_type_ids, position_ids, attn_mask)
+            start_logits, end_logits, memories = model(input_ids, memories,
+                                                       token_type_ids,
+                                                       position_ids, attn_mask)
 
             start_logits, end_logits, qids, start_position, end_position = list(
                 map(lambda x: paddle.gather(x, gather_idx), [
@@ -335,8 +333,8 @@ def do_train(args):
         if stop_training:
             break
     logger.info("Test:")
-    evaluate(args, model, criterion,
-             EM_AND_F1(), test_dataloader, create_memory(), tokenizer)
+    evaluate(args, model, criterion, EM_AND_F1(), test_dataloader,
+             create_memory(), tokenizer)
     if rank == 0:
         output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
         if not os.path.exists(output_dir):

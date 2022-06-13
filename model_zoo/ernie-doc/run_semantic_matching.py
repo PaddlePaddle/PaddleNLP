@@ -74,8 +74,7 @@ def set_seed(args):
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return [
-        paddle.zeros(
-            [batch_size, memory_length, d_model], dtype="float32")
+        paddle.zeros([batch_size, memory_length, d_model], dtype="float32")
         for _ in range(n_layers)
     ]
 
@@ -98,10 +97,12 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
             pair_input_ids, pair_position_ids, pair_token_type_ids, pair_attn_mask, \
             labels, qids, gather_idx, need_cal_loss = batch
 
-        logits, memories, pair_memories = model(
-            input_ids, pair_input_ids, memories, pair_memories, token_type_ids,
-            position_ids, attn_mask, pair_token_type_ids, pair_position_ids,
-            pair_attn_mask)
+        logits, memories, pair_memories = model(input_ids, pair_input_ids,
+                                                memories, pair_memories,
+                                                token_type_ids, position_ids,
+                                                attn_mask, pair_token_type_ids,
+                                                pair_position_ids,
+                                                pair_attn_mask)
         logits, labels, qids = list(
             map(lambda x: paddle.gather(x, gather_idx), [logits, labels, qids]))
         # Need to collect probs for each qid, so use softmax_with_cross_entropy
@@ -119,8 +120,8 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
 
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
-                        (step, np.mean(losses),
-                         eval_logging_step / (time.time() - tic_train)))
+                        (step, np.mean(losses), eval_logging_step /
+                         (time.time() - tic_train)))
             tic_train = time.time()
 
     # Collect predicted labels
@@ -155,7 +156,7 @@ def do_train(args):
 
     num_classes = len(train_ds.label_list)
 
-    # Initialize model 
+    # Initialize model
     paddle.set_device(args.device)
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
@@ -165,8 +166,8 @@ def do_train(args):
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-    ernie_doc = ErnieDocModel.from_pretrained(
-        args.model_name_or_path, cls_token_idx=0)
+    ernie_doc = ErnieDocModel.from_pretrained(args.model_name_or_path,
+                                              cls_token_idx=0)
     model = ErnieDocForTextMatching(ernie_doc, num_classes, args.dropout)
 
     model_config = model.ernie_doc.config
@@ -205,14 +206,14 @@ def do_train(args):
         random_seed=args.seed,
         mode="test")
 
-    train_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                           return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -220,8 +221,8 @@ def do_train(args):
     logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
-    logger.info("Num warmup steps: %d" % int(num_training_steps *
-                                             args.warmup_proportion))
+    logger.info("Num warmup steps: %d" %
+                int(num_training_steps * args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -237,14 +238,13 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        n_layers=model_config["num_hidden_layers"],
-        layerwise_decay=args.layerwise_decay,
-        name_dict=name_dict)
+    optimizer = AdamWDL(learning_rate=lr_scheduler,
+                        parameters=model.parameters(),
+                        weight_decay=args.weight_decay,
+                        apply_decay_param_fun=lambda x: x in decay_params,
+                        n_layers=model_config["num_hidden_layers"],
+                        layerwise_decay=args.layerwise_decay,
+                        name_dict=name_dict)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
@@ -289,8 +289,8 @@ def do_train(args):
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
                     % (global_steps, epoch, mean_loss, metric.accumulate(),
-                       lr_scheduler.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
+                       lr_scheduler.get_lr(), args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
@@ -326,8 +326,8 @@ def do_train(args):
             if args.max_steps > 0 and global_steps >= args.max_steps:
                 return
     logger.info("Final test result:")
-    eval_acc = evaluate(model, eval_metric, test_dataloader,
-                        create_memory(), create_memory())
+    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory(),
+                        create_memory())
 
 
 if __name__ == "__main__":

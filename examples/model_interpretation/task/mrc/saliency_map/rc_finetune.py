@@ -30,8 +30,10 @@ import paddle
 from squad import DuReaderChecklist
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
 from roberta.modeling import RobertaForQuestionAnswering
+
 sys.path.append('../../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
+
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -41,28 +43,31 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def get_args():
     parser = argparse.ArgumentParser('mrc task with roberta')
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=128,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument(
         '--doc_stride',
         type=int,
         default=128,
-        help='When splitting up a long document into chunks, how much stride to take between chunks.'
+        help=
+        'When splitting up a long document into chunks, how much stride to take between chunks.'
     )
     parser.add_argument('--bsz', type=int, default=32, help='batchsize')
     parser.add_argument('--epoch', type=int, default=3, help='epoch')
-    parser.add_argument(
-        '--train_data_dir', type=str, required=True, help='train data file')
-    parser.add_argument(
-        '--dev_data_dir', type=str, required=True, help='develop data file')
+    parser.add_argument('--train_data_dir',
+                        type=str,
+                        required=True,
+                        help='train data file')
+    parser.add_argument('--dev_data_dir',
+                        type=str,
+                        required=True,
+                        help='develop data file')
     parser.add_argument(
         '--max_steps',
         type=int,
@@ -70,28 +75,28 @@ def get_args():
         help='max_train_steps, set this to EPOCH * NUM_SAMPLES / BATCH_SIZE')
     parser.add_argument('--warmup_proportion', type=float, default=0.1)
     parser.add_argument('--lr', type=float, default=5e-5, help='learning rate')
-    parser.add_argument(
-        '--save_dir', type=Path, required=True, help='model output directory')
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
-    parser.add_argument(
-        '--wd',
-        type=float,
-        default=0.01,
-        help='weight decay, aka L2 regularizer')
+    parser.add_argument('--save_dir',
+                        type=Path,
+                        required=True,
+                        help='model output directory')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
+    parser.add_argument('--wd',
+                        type=float,
+                        default=0.01,
+                        help='weight decay, aka L2 regularizer')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
-    parser.add_argument(
-        '--language',
-        type=str,
-        required=True,
-        help='language that the model based on')
+    parser.add_argument('--language',
+                        type=str,
+                        required=True,
+                        help='language that the model based on')
     args = parser.parse_args()
     return args
 
@@ -106,11 +111,10 @@ def map_fn_DuCheckList_finetune(examples):
         for i in range(len(examples))
     ]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_len)
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -152,8 +156,8 @@ def map_fn_DuCheckList_finetune(examples):
             if args.language == 'en':
                 # Start token index of the current span in the text.
                 token_start_index = 0
-                while not (offsets[token_start_index] ==
-                           (0, 0) and offsets[token_start_index + 1] == (0, 0)):
+                while not (offsets[token_start_index] == (0, 0)
+                           and offsets[token_start_index + 1] == (0, 0)):
                     token_start_index += 1
                 token_start_index += 2
 
@@ -171,8 +175,8 @@ def map_fn_DuCheckList_finetune(examples):
                     token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char and
-                    offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char):
                 tokenized_examples[i]["start_positions"] = cls_index
                 tokenized_examples[i]["end_positions"] = cls_index
                 tokenized_examples[i]['answerable_label'] = 0
@@ -198,8 +202,8 @@ if __name__ == "__main__":
         tokenizer = RobertaTokenizer.from_pretrained(args.from_pretrained)
     else:
         tokenizer = RobertaBPETokenizer.from_pretrained(args.from_pretrained)
-    model = RobertaForQuestionAnswering.from_pretrained(
-        args.from_pretrained, num_classes=2)
+    model = RobertaForQuestionAnswering.from_pretrained(args.from_pretrained,
+                                                        num_classes=2)
 
     train_ds = DuReaderChecklist().read(args.train_data_dir)
     dev_ds = DuReaderChecklist().read(args.dev_data_dir)
@@ -210,29 +214,30 @@ if __name__ == "__main__":
     log.debug('train set: %d' % len(train_ds))
     log.debug('dev set: %d' % len(dev_ds))
 
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.bsz, shuffle=True)
-    dev_batch_sample = paddle.io.DistributedBatchSampler(
-        dev_ds, batch_size=args.bsz, shuffle=False)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds,
+                                                            batch_size=args.bsz,
+                                                            shuffle=True)
+    dev_batch_sample = paddle.io.DistributedBatchSampler(dev_ds,
+                                                         batch_size=args.bsz,
+                                                         shuffle=False)
 
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        'start_positions': Stack(dtype='int64'),
-        'end_positions': Stack(dtype='int64'),
-        'answerable_label': Stack(dtype='int64')
-    }): fn(samples)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            'start_positions': Stack(dtype='int64'),
+            'end_positions': Stack(dtype='int64'),
+            'answerable_label': Stack(dtype='int64')
+        }): fn(samples)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
-    dev_data_loader = DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sample,
-        collate_fn=batchify_fn,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   return_list=True)
+    dev_data_loader = DataLoader(dataset=dev_ds,
+                                 batch_sampler=dev_batch_sample,
+                                 collate_fn=batchify_fn,
+                                 return_list=True)
 
     max_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.epoch
@@ -248,7 +253,8 @@ if __name__ == "__main__":
         lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.wd,
-        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
+        apply_decay_param_fun=lambda n:
+        not param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=paddle.nn.ClipGradByGlobalNorm(1.0)
         if args.language == 'ch' else None)
 
@@ -268,12 +274,11 @@ if __name__ == "__main__":
                     # end_positions:    paddle.Tensor(bsz)
                     # answerable_label:    paddle.Tensor(bsz)
                     input_ids, token_type_ids, start_positions, end_positions, answerable_label = d
-                    loss, _, _, _ = model(
-                        input_ids=input_ids,
-                        token_type_ids=token_type_ids,
-                        start_pos=start_positions,
-                        end_pos=end_positions,
-                        labels=answerable_label)
+                    loss, _, _, _ = model(input_ids=input_ids,
+                                          token_type_ids=token_type_ids,
+                                          start_pos=start_positions,
+                                          end_pos=end_positions,
+                                          labels=answerable_label)
                     loss = scaler.scale(loss)
                     loss.backward()
                     scaler.minimize(opt, loss)

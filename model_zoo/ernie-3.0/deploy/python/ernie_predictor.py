@@ -21,6 +21,7 @@ from paddlenlp.transformers import AutoTokenizer
 
 
 class InferBackend(object):
+
     def __init__(self,
                  model_path,
                  batch_size=32,
@@ -68,8 +69,8 @@ class InferBackend(object):
             if set_dynamic_shape:
                 config.collect_shape_range_info(shape_info_file)
             else:
-                config.enable_tuned_tensorrt_dynamic_shape(shape_info_file,
-                                                           True)
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    shape_info_file, True)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -106,10 +107,9 @@ class InferBackend(object):
                 providers = ['CPUExecutionProvider']
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            self.predictor = ort.InferenceSession(
-                dynamic_quantize_model,
-                sess_options=sess_options,
-                providers=providers)
+            self.predictor = ort.InferenceSession(dynamic_quantize_model,
+                                                  sess_options=sess_options,
+                                                  providers=providers)
             input_name1 = self.predictor.get_inputs()[0].name
             input_name2 = self.predictor.get_inputs()[1].name
             self.input_handles = [input_name1, input_name2]
@@ -183,6 +183,7 @@ def seq_cls_print_ret(infer_result, input_data):
 
 
 class ErniePredictor(object):
+
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
             print(
@@ -197,8 +198,8 @@ class ErniePredictor(object):
             exit(0)
 
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
+                                                       use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -244,15 +245,15 @@ class ErniePredictor(object):
     def seq_cls_preprocess(self, input_data: list):
         data = input_data
         # tokenizer + pad
-        data = self.tokenizer(
-            data, max_length=self.max_seq_length, padding=True, truncation=True)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def seq_cls_postprocess(self, infer_data, input_data):
@@ -271,20 +272,17 @@ class ErniePredictor(object):
         is_split_into_words = False
         if isinstance(data[0], list):
             is_split_into_words = True
-        data = self.tokenizer(
-            data,
-            max_length=self.max_seq_length,
-            padding=True,
-            truncation=True,
-            is_split_into_words=is_split_into_words)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True,
+                              is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def token_cls_postprocess(self, infer_data, input_data):
@@ -297,8 +295,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if (self.label_names[label] == "O" or
-                        "B-" in self.label_names[label]) and start >= 0:
+                if (self.label_names[label] == "O"
+                        or "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -314,8 +312,10 @@ class ErniePredictor(object):
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
-                    "entity": input_data[batch][start:len(token_label) - 1],
-                    "label": ""
+                    "entity":
+                    input_data[batch][start:len(token_label) - 1],
+                    "label":
+                    ""
                 })
             value.append(items)
 
@@ -328,22 +328,22 @@ class ErniePredictor(object):
         min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
         batches = [
             {
-                "input_ids": np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [min_batch_size, min_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([min_batch_size, min_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([min_batch_size, min_seq_len], dtype="int64")
             },
             {
-                "input_ids": np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [max_batch_size, max_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([max_batch_size, max_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([max_batch_size, max_seq_len], dtype="int64")
             },
             {
-                "input_ids": np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64"),
-                "token_type_ids": np.zeros(
-                    [opt_batch_size, opt_seq_len], dtype="int64")
+                "input_ids":
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64"),
+                "token_type_ids":
+                np.zeros([opt_batch_size, opt_seq_len], dtype="int64")
             },
         ]
         for batch in batches:

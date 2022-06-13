@@ -23,17 +23,20 @@ _LOGGER = logging.getLogger()
 
 
 class ErnieTokenClsOp(Op):
+
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-medium-zh", use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
+                                                       use_faster=True)
         # The label names of NER models trained by different data sets may be different
         self.label_names = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
         ]
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
-        self.fetch_names = ["linear_113.tmp_1", ]
+        self.fetch_names = [
+            "linear_113.tmp_1",
+        ]
 
     def get_input_data(self, input_dicts):
         (_, input_dict), = input_dicts.items()
@@ -66,20 +69,17 @@ class ErnieTokenClsOp(Op):
         is_split_into_words = False
         if isinstance(data[0], list):
             is_split_into_words = True
-        data = self.tokenizer(
-            data,
-            max_length=128,
-            padding=True,
-            truncation=True,
-            is_split_into_words=is_split_into_words)
+        data = self.tokenizer(data,
+                              max_length=128,
+                              padding=True,
+                              truncation=True,
+                              is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
@@ -106,8 +106,8 @@ class ErnieTokenClsOp(Op):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if (self.label_names[label] == "O" or
-                        "B-" in self.label_names[label]) and start >= 0:
+                if (self.label_names[label] == "O"
+                        or "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -123,7 +123,8 @@ class ErnieTokenClsOp(Op):
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
-                    "entity": input_data[batch][start:len(token_label) - 1],
+                    "entity":
+                    input_data[batch][start:len(token_label) - 1],
                 })
             value.append(items)
         out_dict = {
@@ -135,6 +136,7 @@ class ErnieTokenClsOp(Op):
 
 
 class ErnieTokenClsService(WebService):
+
     def get_pipeline_response(self, read_op):
         return ErnieTokenClsOp(name="token_cls", input_ops=[read_op])
 

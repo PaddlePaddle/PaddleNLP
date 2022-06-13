@@ -21,6 +21,7 @@ def reverse_sequence(x, sequence_lengths):
 
 
 class ELMo(nn.Layer):
+
     def __init__(self,
                  batch_size=None,
                  char_embed_dim=16,
@@ -58,8 +59,9 @@ class ELMo(nn.Layer):
         if task == 'pre-train':
             paramAttr = paddle.ParamAttr(initializer=I.Normal(
                 mean=0.0, std=1.0 / np.sqrt(projection_dim)))
-            self._linear_layer = nn.Linear(
-                projection_dim, vocab_size, weight_attr=paramAttr)
+            self._linear_layer = nn.Linear(projection_dim,
+                                           vocab_size,
+                                           weight_attr=paramAttr)
 
     @property
     def embedding_dim(self):
@@ -86,20 +88,19 @@ class ELMo(nn.Layer):
             mask = paddle.any(ids > 0, axis=2)
             seq_lens = paddle.sum(paddle.cast(mask, dtype=ids.dtype), axis=1)
             outputs = [
-                paddle.concat(
-                    [token_embedding, token_embedding], axis=2)
+                paddle.concat([token_embedding, token_embedding], axis=2)
             ]
             for fw_h, bw_h in zip(outs[0], outs[1]):
                 bw_h = reverse_sequence(bw_h, seq_lens)
                 outputs.append(paddle.concat([fw_h, bw_h], axis=2))
             # [batch_size, num_lstm_layers + 1, max_seq_len, projection_dim * 2]
             outputs = paddle.concat(
-                [paddle.unsqueeze(
-                    emb, axis=1) for emb in outputs], axis=1)
+                [paddle.unsqueeze(emb, axis=1) for emb in outputs], axis=1)
             return outputs
 
 
 class ELMoBiLM(nn.Layer):
+
     def __init__(self,
                  batch_size,
                  input_size,
@@ -117,24 +118,23 @@ class ELMoBiLM(nn.Layer):
         for direction in ['forward', 'backward']:
             layers = []
             for i in range(num_layers):
-                lstm = nn.LSTM(
-                    input_size=input_size,
-                    hidden_size=hidden_size,
-                    num_layers=1,
-                    direction='forward',
-                    weight_hh_attr=paddle.ParamAttr(
-                        initializer=I.XavierUniform()),
-                    weight_ih_attr=paddle.ParamAttr(
-                        initializer=I.XavierUniform()),
-                    bias_hh_attr=False,
-                    bias_ih_attr=paddle.ParamAttr(initializer=I.Constant(
-                        value=0.0)))
+                lstm = nn.LSTM(input_size=input_size,
+                               hidden_size=hidden_size,
+                               num_layers=1,
+                               direction='forward',
+                               weight_hh_attr=paddle.ParamAttr(
+                                   initializer=I.XavierUniform()),
+                               weight_ih_attr=paddle.ParamAttr(
+                                   initializer=I.XavierUniform()),
+                               bias_hh_attr=False,
+                               bias_ih_attr=paddle.ParamAttr(
+                                   initializer=I.Constant(value=0.0)))
                 self.add_sublayer('{}_lstm_layer_{}'.format(direction, i), lstm)
 
-                hidden_state = paddle.zeros(
-                    shape=[1, batch_size, hidden_size], dtype='float32')
-                cell_state = paddle.zeros(
-                    shape=[1, batch_size, hidden_size], dtype='float32')
+                hidden_state = paddle.zeros(shape=[1, batch_size, hidden_size],
+                                            dtype='float32')
+                cell_state = paddle.zeros(shape=[1, batch_size, hidden_size],
+                                          dtype='float32')
                 layers.append({
                     'lstm': lstm,
                     'hidden_state': hidden_state,
@@ -176,6 +176,7 @@ class ELMoBiLM(nn.Layer):
 
 
 class ELMoCharacterEncoderLayer(nn.Layer):
+
     def __init__(self, char_vocab_size, char_embed_dim, projection_dim,
                  num_highways, cnn_filters, max_characters_per_token):
         super(ELMoCharacterEncoderLayer, self).__init__()
@@ -193,20 +194,19 @@ class ELMoCharacterEncoderLayer(nn.Layer):
 
         self._convolution_layers = []
         for i, (width, num) in enumerate(cnn_filters):
-            paramAttr = paddle.ParamAttr(initializer=I.Uniform(
-                low=-0.05, high=0.05))
-            conv2d = nn.Conv2D(
-                in_channels=char_embed_dim,
-                out_channels=num,
-                kernel_size=(1, width),
-                padding='Valid',
-                data_format='NHWC',
-                weight_attr=paramAttr)
-            max_pool = nn.MaxPool2D(
-                kernel_size=(1, max_characters_per_token - width + 1),
-                stride=(1, 1),
-                padding='Valid',
-                data_format='NHWC')
+            paramAttr = paddle.ParamAttr(
+                initializer=I.Uniform(low=-0.05, high=0.05))
+            conv2d = nn.Conv2D(in_channels=char_embed_dim,
+                               out_channels=num,
+                               kernel_size=(1, width),
+                               padding='Valid',
+                               data_format='NHWC',
+                               weight_attr=paramAttr)
+            max_pool = nn.MaxPool2D(kernel_size=(1, max_characters_per_token -
+                                                 width + 1),
+                                    stride=(1, 1),
+                                    padding='Valid',
+                                    data_format='NHWC')
             self.add_sublayer('cnn_layer_{}'.format(i), conv2d)
             self.add_sublayer('maxpool_layer_{}'.format(i), max_pool)
             self._convolution_layers.append([width, conv2d, max_pool])
@@ -217,8 +217,9 @@ class ELMoCharacterEncoderLayer(nn.Layer):
         if self._use_proj:
             paramAttr = paddle.ParamAttr(initializer=I.Normal(
                 mean=0.0, std=1.0 / np.sqrt(self._n_filters)))
-            self._linear_layer = nn.Linear(
-                self._n_filters, projection_dim, weight_attr=paramAttr)
+            self._linear_layer = nn.Linear(self._n_filters,
+                                           projection_dim,
+                                           weight_attr=paramAttr)
 
     def forward(self, x):
         # [batch_size, seq_len, max_characters_per_token, embed_dim]
@@ -251,6 +252,7 @@ class ELMoCharacterEncoderLayer(nn.Layer):
 
 
 class Highway(nn.Layer):
+
     def __init__(self, input_dim, num_layers):
         super(Highway, self).__init__()
 
@@ -258,20 +260,20 @@ class Highway(nn.Layer):
 
         self._highway_layers = []
         for i in range(num_layers):
-            paramAttr = paddle.ParamAttr(initializer=I.Normal(
-                mean=0.0, std=1.0 / np.sqrt(input_dim)))
+            paramAttr = paddle.ParamAttr(
+                initializer=I.Normal(mean=0.0, std=1.0 / np.sqrt(input_dim)))
             paramAttr_b = paddle.ParamAttr(initializer=I.Constant(value=-2.0))
-            carry_linear = nn.Linear(
-                input_dim,
-                input_dim,
-                weight_attr=paramAttr,
-                bias_attr=paramAttr_b)
+            carry_linear = nn.Linear(input_dim,
+                                     input_dim,
+                                     weight_attr=paramAttr,
+                                     bias_attr=paramAttr_b)
             self.add_sublayer('carry_linear_{}'.format(i), carry_linear)
 
-            paramAttr = paddle.ParamAttr(initializer=I.Normal(
-                mean=0.0, std=1.0 / np.sqrt(input_dim)))
-            transform_linear = nn.Linear(
-                input_dim, input_dim, weight_attr=paramAttr)
+            paramAttr = paddle.ParamAttr(
+                initializer=I.Normal(mean=0.0, std=1.0 / np.sqrt(input_dim)))
+            transform_linear = nn.Linear(input_dim,
+                                         input_dim,
+                                         weight_attr=paramAttr)
             self.add_sublayer('transform_linear_{}'.format(i), transform_linear)
 
             self._highway_layers.append([carry_linear, transform_linear])
@@ -289,6 +291,7 @@ class Highway(nn.Layer):
 
 
 class ELMoLoss(nn.Layer):
+
     def __init__(self):
         super(ELMoLoss, self).__init__()
 
@@ -326,6 +329,7 @@ def get_elmo_layer(params_file, batch_size, trainable=False):
 
 
 class ELMoEmbedder(object):
+
     def __init__(self, params_file, batch_size=128, max_seq_len=256):
         self._max_seq_len = max_seq_len
         self._batch_size = batch_size

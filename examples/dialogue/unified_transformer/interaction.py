@@ -43,11 +43,10 @@ def interaction(args, model, tokenizer):
             cprint(start_info, "yellow", attrs=["bold"])
         else:
             history.append(user_utt)
-            inputs = tokenizer.dialogue_encode(
-                history,
-                add_start_token_as_response=True,
-                return_tensors=True,
-                is_split_into_words=False)
+            inputs = tokenizer.dialogue_encode(history,
+                                               add_start_token_as_response=True,
+                                               return_tensors=True,
+                                               is_split_into_words=False)
             inputs['input_ids'] = inputs['input_ids'].astype('int64')
             ids, scores = model.generate(
                 input_ids=inputs['input_ids'],
@@ -65,18 +64,14 @@ def interaction(args, model, tokenizer):
                 early_stopping=args.early_stopping,
                 num_return_sequences=args.num_return_sequences,
                 use_faster=True)
-            bot_response = select_response(
-                ids,
-                scores,
-                tokenizer,
-                args.max_dec_len,
-                args.num_return_sequences,
-                keep_space=False)[0]
-            print(
-                colored(
-                    "[Bot]:", "blue", attrs=["bold"]),
-                colored(
-                    bot_response, attrs=["bold"]))
+            bot_response = select_response(ids,
+                                           scores,
+                                           tokenizer,
+                                           args.max_dec_len,
+                                           args.num_return_sequences,
+                                           keep_space=False)[0]
+            print(colored("[Bot]:", "blue", attrs=["bold"]),
+                  colored(bot_response, attrs=["bold"]))
             history.append(bot_response)
     return
 

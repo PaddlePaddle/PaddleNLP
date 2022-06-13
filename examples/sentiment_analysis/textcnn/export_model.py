@@ -44,11 +44,10 @@ def main():
     num_classes = len(label_map)
     pad_token_id = vocab.to_indices('[PAD]')
 
-    model = TextCNNModel(
-        vocab_size,
-        num_classes,
-        padding_idx=pad_token_id,
-        ngram_filter_sizes=(1, 2, 3))
+    model = TextCNNModel(vocab_size,
+                         num_classes,
+                         padding_idx=pad_token_id,
+                         ngram_filter_sizes=(1, 2, 3))
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)

@@ -25,6 +25,7 @@ from model import UIE
 
 
 class InferBackend(object):
+
     def __init__(self,
                  model_path_prefix,
                  device='cpu',
@@ -60,8 +61,9 @@ class InferBackend(object):
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
-        self.predictor = ort.InferenceSession(
-            onnx_model, sess_options=sess_options, providers=providers)
+        self.predictor = ort.InferenceSession(onnx_model,
+                                              sess_options=sess_options,
+                                              providers=providers)
         if device == "gpu":
             assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
                 "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
@@ -75,6 +77,7 @@ class InferBackend(object):
 
 
 class UIEPredictor(object):
+
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
             print(
@@ -87,16 +90,17 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-base-zh", use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
+                                                        use_faster=True)
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        self.inference_backend = InferBackend(
-            args.model_path_prefix, device=args.device, use_fp16=args.use_fp16)
+        self.inference_backend = InferBackend(args.model_path_prefix,
+                                              device=args.device,
+                                              use_fp16=args.use_fp16)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -154,16 +158,15 @@ class UIEPredictor(object):
         attention_mask = []
         offset_maps = []
         for example in short_inputs:
-            encoded_inputs = self._tokenizer(
-                text=[example["prompt"]],
-                text_pair=[example["text"]],
-                stride=len(example["prompt"]),
-                truncation=True,
-                max_seq_len=self._max_seq_len,
-                pad_to_max_seq_len=True,
-                return_attention_mask=True,
-                return_position_ids=True,
-                return_dict=False)
+            encoded_inputs = self._tokenizer(text=[example["prompt"]],
+                                             text_pair=[example["text"]],
+                                             stride=len(example["prompt"]),
+                                             truncation=True,
+                                             max_seq_len=self._max_seq_len,
+                                             pad_to_max_seq_len=True,
+                                             return_attention_mask=True,
+                                             return_position_ids=True,
+                                             return_dict=False)
             encoded_inputs = encoded_inputs[0]
 
             input_ids.append(encoded_inputs["input_ids"])
@@ -173,14 +176,10 @@ class UIEPredictor(object):
             offset_maps.append(encoded_inputs["offset_mapping"])
 
         input_dict = {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64"),
-            "pos_ids": np.array(
-                position_ids, dtype="int64"),
-            "att_mask": np.array(
-                attention_mask, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64"),
+            "pos_ids": np.array(position_ids, dtype="int64"),
+            "att_mask": np.array(attention_mask, dtype="int64")
         }
         offset_maps = np.array(offset_maps, dtype="int64")
 
@@ -188,10 +187,12 @@ class UIEPredictor(object):
         start_prob = start_prob.tolist()
         end_prob = end_prob.tolist()
 
-        start_ids_list = get_bool_ids_greater_than(
-            start_prob, limit=self._position_prob, return_prob=True)
-        end_ids_list = get_bool_ids_greater_than(
-            end_prob, limit=self._position_prob, return_prob=True)
+        start_ids_list = get_bool_ids_greater_than(start_prob,
+                                                   limit=self._position_prob,
+                                                   return_prob=True)
+        end_ids_list = get_bool_ids_greater_than(end_prob,
+                                                 limit=self._position_prob,
+                                                 return_prob=True)
 
         input_ids = input_dict['input_ids']
         sentence_ids = []
@@ -282,8 +283,9 @@ class UIEPredictor(object):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0][
-                            'text']] = [1, short_results[v][0]['probability']]
+                        cls_options[short_results[v][0]['text']] = [
+                            1, short_results[v][0]['probability']
+                        ]
                     else:
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
@@ -292,8 +294,10 @@ class UIEPredictor(object):
                     cls_res, cls_info = max(cls_options.items(),
                                             key=lambda x: x[1])
                     concat_results.append([{
-                        'text': cls_res,
-                        'probability': cls_info[1] / cls_info[0]
+                        'text':
+                        cls_res,
+                        'probability':
+                        cls_info[1] / cls_info[0]
                     }])
                 else:
                     concat_results.append([])
@@ -434,8 +438,8 @@ class UIEPredictor(object):
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
-                                new_relations[i].append(relations[i][j][
-                                    "relations"][node.name][k])
+                                new_relations[i].append(
+                                    relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]

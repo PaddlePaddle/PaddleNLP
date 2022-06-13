@@ -31,6 +31,7 @@ class BinaryDistribution(Distribution):
 
 
 class InstallPlatlib(install):
+
     def finalize_options(self):
         install.finalize_options(self)
         if self.distribution.has_ext_modules():
@@ -97,4 +98,5 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
-    ], )
+    ],
+)

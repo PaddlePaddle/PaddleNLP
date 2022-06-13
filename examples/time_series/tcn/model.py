@@ -39,14 +39,13 @@ class TCNNetwork(nn.Layer):
 
         self.last_num_channel = num_channels[-1]
 
-        self.tcn = TCNEncoder(
-            input_size=input_size,
-            num_channels=num_channels,
-            kernel_size=kernel_size,
-            dropout=dropout)
+        self.tcn = TCNEncoder(input_size=input_size,
+                              num_channels=num_channels,
+                              kernel_size=kernel_size,
+                              dropout=dropout)
 
-        self.linear = nn.Linear(
-            in_features=self.last_num_channel, out_features=next_k)
+        self.linear = nn.Linear(in_features=self.last_num_channel,
+                                out_features=next_k)
 
     def forward(self, x):
         tcn_out = self.tcn(x)

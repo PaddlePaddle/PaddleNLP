@@ -56,13 +56,14 @@ class ErnieFasterTokenizer(PretrainedFasterTokenizer):
             mask_token=mask_token,
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            **kwargs, )
+            **kwargs,
+        )
 
         normalizer_state = json.loads(
             self.backend_tokenizer.normalizer.__getstate__())
-        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case or
-                normalizer_state.get("strip_accents", strip_accents) !=
-                strip_accents or normalizer_state.get(
+        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case
+                or normalizer_state.get("strip_accents", strip_accents)
+                != strip_accents or normalizer_state.get(
                     "handle_chinese_chars",
                     tokenize_chinese_chars) != tokenize_chinese_chars):
             normalizer_class = getattr(normalizers,
@@ -77,6 +78,6 @@ class ErnieFasterTokenizer(PretrainedFasterTokenizer):
 
     def save_vocabulary(self,
                         save_directory: str,
-                        filename_prefix: Optional[str]=None) -> Tuple[str]:
+                        filename_prefix: Optional[str] = None) -> Tuple[str]:
         files = self._tokenizer.model.save(save_directory, filename_prefix)
         return tuple(files)

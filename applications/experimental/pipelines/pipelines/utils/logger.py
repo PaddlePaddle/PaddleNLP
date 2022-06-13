@@ -1,5 +1,5 @@
 import logging
-# import 
+# import
 from requests.exceptions import ConnectionError
 
 logger = logging.getLogger(__name__)

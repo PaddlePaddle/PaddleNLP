@@ -91,7 +91,9 @@ class FNetTokenizer(AlbertEnglishTokenizer):
             sp_model (:obj:`SentencePieceProcessor`):
                 The `SentencePiece` processor that is used for every conversion (string, tokens and IDs).
         """
-    resource_files_names = {"sentencepiece_model_file": "spiece.model", }
+    resource_files_names = {
+        "sentencepiece_model_file": "spiece.model",
+    }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "fnet-base":
@@ -120,7 +122,7 @@ class FNetTokenizer(AlbertEnglishTokenizer):
                  pad_token="<pad>",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
-                 sp_model_kwargs: Optional[Dict[str, Any]]=None,
+                 sp_model_kwargs: Optional[Dict[str, Any]] = None,
                  **kwargs):
         # Mask token behave like a normal word, i.e. include the space before it
         # mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
@@ -222,8 +224,9 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         return out_string
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. An FNet sequence has the following format:
@@ -258,7 +261,9 @@ class FNetTokenizer(AlbertEnglishTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
@@ -267,8 +272,9 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. An FNet sequence
         pair mask has the following format: ::

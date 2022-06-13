@@ -29,25 +29,24 @@ def gen_bias(encoder_inputs, decoder_inputs, step):
     decoder_bsz, decoder_seqlen = decoder_inputs.shape[:2]
     encoder_bsz, encoder_seqlen = encoder_inputs.shape[:2]
     attn_bias = paddle.reshape(
-        paddle.arange(
-            0, decoder_seqlen, 1, dtype='float32') + 1, [1, -1, 1])
+        paddle.arange(0, decoder_seqlen, 1, dtype='float32') + 1, [1, -1, 1])
     decoder_bias = paddle.cast(
-        (paddle.matmul(
-            attn_bias, 1. / attn_bias, transpose_y=True) >= 1.),
+        (paddle.matmul(attn_bias, 1. / attn_bias, transpose_y=True) >= 1.),
         'float32')  #[1, decoderlen, decoderlen]
     encoder_bias = paddle.unsqueeze(
         paddle.cast(paddle.ones_like(encoder_inputs), 'float32'),
         [1])  #[bsz, 1, encoderlen]
-    encoder_bias = paddle.expand(
-        encoder_bias, [encoder_bsz, decoder_seqlen,
-                       encoder_seqlen])  #[bsz,decoderlen, encoderlen]
-    decoder_bias = paddle.expand(
-        decoder_bias, [decoder_bsz, decoder_seqlen,
-                       decoder_seqlen])  #[bsz, decoderlen, decoderlen]
+    encoder_bias = paddle.expand(encoder_bias,
+                                 [encoder_bsz, decoder_seqlen, encoder_seqlen
+                                  ])  #[bsz,decoderlen, encoderlen]
+    decoder_bias = paddle.expand(decoder_bias,
+                                 [decoder_bsz, decoder_seqlen, decoder_seqlen
+                                  ])  #[bsz, decoderlen, decoderlen]
     if step > 0:
         bias = paddle.concat([
-            encoder_bias, paddle.ones([decoder_bsz, decoder_seqlen, step],
-                                      'float32'), decoder_bias
+            encoder_bias,
+            paddle.ones([decoder_bsz, decoder_seqlen, step], 'float32'),
+            decoder_bias
         ], -1)
     else:
         bias = paddle.concat([encoder_bias, decoder_bias], -1)
@@ -82,16 +81,13 @@ def greedy_search_infilling(model,
     for step in range(max_decode_len):
         bias = gen_bias(token_ids, ids, step)
         pos_ids = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[step, step + 1]], dtype=np.int64), [d_batch, 1]))
+            np.tile(np.array([[step, step + 1]], dtype=np.int64), [d_batch, 1]))
         pos_ids += seqlen
-        _, logits, info = model(
-            ids,
-            paddle.ones_like(ids) * tgt_type_id,
-            pos_ids=pos_ids,
-            attn_bias=bias,
-            past_cache=past_cache)
+        _, logits, info = model(ids,
+                                paddle.ones_like(ids) * tgt_type_id,
+                                pos_ids=pos_ids,
+                                attn_bias=bias,
+                                past_cache=past_cache)
 
         if logits.shape[-1] > vocab_size:
             logits[:, :, vocab_size:] = 0
@@ -106,7 +102,7 @@ def greedy_search_infilling(model,
         cached_k = [
             paddle.concat([pk, k[:, :1, :]], 1)
             for pk, k in zip(past_cached_k, cached_k)
-        ]  # concat cached 
+        ]  # concat cached
         cached_v = [
             paddle.concat([pv, v[:, :1, :]], 1)
             for pv, v in zip(past_cached_v, cached_v)
@@ -180,14 +176,15 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
     next_word_id = idx % vocab_size
 
     gather_idx = paddle.concat(
-        [paddle.nonzero(idx != -1)[:, :1], paddle.reshape(idx, [-1, 1])], 1)
-    next_probs = paddle.reshape(
-        paddle.gather_nd(allprobs, gather_idx), idx.shape)
+        [paddle.nonzero(idx != -1)[:, :1],
+         paddle.reshape(idx, [-1, 1])], 1)
+    next_probs = paddle.reshape(paddle.gather_nd(allprobs, gather_idx),
+                                idx.shape)
     next_len = paddle.reshape(paddle.gather_nd(alllen, gather_idx), idx.shape)
 
     gather_idx = paddle.concat([
-        paddle.nonzero(next_beam_id != -1)[:, :1], paddle.reshape(next_beam_id,
-                                                                  [-1, 1])
+        paddle.nonzero(next_beam_id != -1)[:, :1],
+        paddle.reshape(next_beam_id, [-1, 1])
     ], 1)
     next_finished = paddle.reshape(
         paddle.gather_nd(state.finished, gather_idx),
@@ -196,10 +193,12 @@ def beam_search_step(state, logits, eos_id, beam_width, is_first_step,
     next_finished += paddle.cast(next_word_id == eos_id, 'int64')
     next_finished = paddle.cast(next_finished > 0, 'int64')
 
-    next_state = BeamSearchState(
-        log_probs=next_probs, lengths=next_len, finished=next_finished)
-    output = BeamSearchOutput(
-        scores=scores, predicted_ids=next_word_id, beam_parent_ids=next_beam_id)
+    next_state = BeamSearchState(log_probs=next_probs,
+                                 lengths=next_len,
+                                 finished=next_finished)
+    output = BeamSearchOutput(scores=scores,
+                              predicted_ids=next_word_id,
+                              beam_parent_ids=next_beam_id)
 
     return output, next_state
 
@@ -222,26 +221,29 @@ def beam_search_infilling(model,
     _, __, info = model(token_ids, token_type_ids)
     d_batch, d_seqlen = token_ids.shape
 
-    state = BeamSearchState(
-        log_probs=paddle.zeros([d_batch, beam_width], 'float32'),
-        lengths=paddle.zeros([d_batch, beam_width], 'int64'),
-        finished=paddle.zeros([d_batch, beam_width], 'int64'))
+    state = BeamSearchState(log_probs=paddle.zeros([d_batch, beam_width],
+                                                   'float32'),
+                            lengths=paddle.zeros([d_batch, beam_width],
+                                                 'int64'),
+                            finished=paddle.zeros([d_batch, beam_width],
+                                                  'int64'))
     outputs = []
 
     def reorder_(t, parent_id):
         """reorder cache according to parent beam id"""
         gather_idx = paddle.nonzero(
-            parent_id != -1)[:, 0] * beam_width + paddle.reshape(parent_id,
-                                                                 [-1])
+            parent_id != -1)[:, 0] * beam_width + paddle.reshape(
+                parent_id, [-1])
         t = paddle.gather(t, gather_idx)
         return t
 
     def tile_(t, times):
         _shapes = list(t.shape[1:])
         new_shape = [t.shape[0], times] + list(t.shape[1:])
-        ret = paddle.reshape(
-            paddle.expand(paddle.unsqueeze(t, [1]), new_shape),
-            [-1, ] + _shapes)
+        ret = paddle.reshape(paddle.expand(paddle.unsqueeze(t, [1]), new_shape),
+                             [
+                                 -1,
+                             ] + _shapes)
         return ret
 
     cached_k, cached_v = info['caches']
@@ -254,49 +256,45 @@ def beam_search_infilling(model,
     #log.debug(token_ids.shape)
 
     cls_ids = paddle.ones([d_batch * beam_width], dtype='int64') * sos_id
-    attn_ids = paddle.ones(
-        [d_batch * beam_width], dtype='int64') * attn_id  # SOS
+    attn_ids = paddle.ones([d_batch * beam_width],
+                           dtype='int64') * attn_id  # SOS
     ids = paddle.stack([cls_ids, attn_ids], -1)
     for step in range(max_decode_len):
         #log.debug('decode step %d' % step)
         bias = gen_bias(token_ids, ids, step)
         pos_ids = paddle.to_tensor(
-            np.tile(
-                np.array(
-                    [[step, step + 1]], dtype=np.int64),
-                [d_batch * beam_width, 1]))
+            np.tile(np.array([[step, step + 1]], dtype=np.int64),
+                    [d_batch * beam_width, 1]))
         pos_ids += seqlen
-        _, logits, info = model(
-            ids,
-            paddle.ones_like(ids) * tgt_type_id,
-            pos_ids=pos_ids,
-            attn_bias=bias,
-            past_cache=past_cache)
+        _, logits, info = model(ids,
+                                paddle.ones_like(ids) * tgt_type_id,
+                                pos_ids=pos_ids,
+                                attn_bias=bias,
+                                past_cache=past_cache)
         if logits.shape[-1] > vocab_size:
             logits[:, :, vocab_size:] = 0
         logits[:, :, pad_id] = 0
         logits[:, :, unk_id] = 0
         logits[:, :, attn_id] = 0
 
-        output, state = beam_search_step(
-            state,
-            logits[:, 1],
-            eos_id=eos_id,
-            beam_width=beam_width,
-            is_first_step=(step == 0),
-            length_penalty=length_penalty)
+        output, state = beam_search_step(state,
+                                         logits[:, 1],
+                                         eos_id=eos_id,
+                                         beam_width=beam_width,
+                                         is_first_step=(step == 0),
+                                         length_penalty=length_penalty)
         outputs.append(output)
 
         past_cached_k, past_cached_v = past_cache
         cached_k, cached_v = info['caches']
         cached_k = [
-            reorder_(
-                paddle.concat([pk, k[:, :1, :]], 1), output.beam_parent_ids)
+            reorder_(paddle.concat([pk, k[:, :1, :]], 1),
+                     output.beam_parent_ids)
             for pk, k in zip(past_cached_k, cached_k)
-        ]  # concat cached 
+        ]  # concat cached
         cached_v = [
-            reorder_(
-                paddle.concat([pv, v[:, :1, :]], 1), output.beam_parent_ids)
+            reorder_(paddle.concat([pv, v[:, :1, :]], 1),
+                     output.beam_parent_ids)
             for pv, v in zip(past_cached_v, cached_v)
         ]
         past_cache = (cached_k, cached_v)
@@ -310,10 +308,11 @@ def beam_search_infilling(model,
 
     final_ids = paddle.stack([o.predicted_ids for o in outputs], 0)
     final_parent_ids = paddle.stack([o.beam_parent_ids for o in outputs], 0)
-    final_ids = nn.functional.gather_tree(
-        final_ids, final_parent_ids)[:, :, 0]  #pick best beam
-    final_ids = paddle.transpose(
-        paddle.reshape(final_ids, [-1, d_batch * 1]), [1, 0])
+    final_ids = nn.functional.gather_tree(final_ids,
+                                          final_parent_ids)[:, :,
+                                                            0]  #pick best beam
+    final_ids = paddle.transpose(paddle.reshape(final_ids, [-1, d_batch * 1]),
+                                 [1, 0])
 
     return final_ids.numpy()
 
