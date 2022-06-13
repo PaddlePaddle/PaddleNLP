@@ -47,7 +47,7 @@ python train_dense_encoder.py \
    --epoches 40 \
    --max_grad_norm 2.0 \
    --train_data_path {data_path} \
-   --chunk_size 40 \
+   --chunk_size 16 \
 ```
 
 参数含义说明
