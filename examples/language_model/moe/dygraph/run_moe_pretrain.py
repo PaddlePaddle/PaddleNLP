@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,8 +38,11 @@ from paddle import _C_ops
 from paddle.fluid import core
 from paddle.fluid.dygraph import to_variable
 import paddle.distributed as dist
-from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW
+from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
+from paddle.fluid.framework import in_dygraph_mode
+from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
 
 from checkpointing import save_checkpoint, load_checkpoint
 
@@ -51,19 +54,20 @@ MODEL_CLASSES = {
 set_timers()
 
 
-def set_hyrbid_parallel_seed(basic_seed, dp_rank, mp_rank, pp_rank):
+def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
-    random.seed(basic_seed + dp_rank)
-    np.random.seed(basic_seed + dp_rank)
-    paddle.seed(basic_seed + dp_rank)
+    random.seed(basic_seed + data_world_rank)
+    np.random.seed(basic_seed + data_world_rank)
+    paddle.seed(basic_seed + data_world_rank)
+
     from paddle.distributed.fleet import meta_parallel
-    meta_parallel.model_parallel_random_seed(basic_seed + dp_rank + 1000 *
-                                             mp_rank)
+    meta_parallel.model_parallel_random_seed(basic_seed + data_world_rank + 1000
+                                             * mp_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + dp_rank
+    global_seed = basic_seed + data_world_rank
     tracker = get_rng_state_tracker()
     tracker.add('global_seed', global_seed)
     tracker.add('local_seed', local_seed)
@@ -197,14 +201,15 @@ def unscale_method(self, optimizer):
 def all_reduce_parameters(params, group):
     if group.nranks < 2:
         return
-    nranks = group.nranks
+
+    div_factor = 1.0 / group.nranks
     with paddle.framework.no_grad():
         for p in params:
-            grad = p.grad.scale_(group.nranks)
+            grad = p.grad.scale_(div_factor)
             paddle.distributed.all_reduce(grad, use_calc_stream=True)
 
 
-def parameters_classify(model):
+def parameters_classify(model, use_sharding=False):
     decay_gate_params = []
     decay_expert_params = []
     decay_other_params = []
@@ -246,8 +251,9 @@ def parameters_classify(model):
     d_expert = obtain_storage(decay_expert_params)
     expert = obtain_storage(expert_params)
 
-    d_other = obtain_storage(decay_other_params)
-    other = obtain_storage(other_params)
+    d_other = decay_other_params if use_sharding else obtain_storage(
+        decay_other_params)
+    other = other_params if use_sharding else obtain_storage(other_params)
 
     opt_fused_tensors = []
     decay_fused_tensors = []
@@ -260,8 +266,12 @@ def parameters_classify(model):
     gate_fused_tensors = d_gate + gate
 
     expert_fusion_names = []
-    for p in d_expert + expert:
+    for i, p in enumerate(d_expert + expert):
+        p.name = "fused_expert_tensor_{}".format(i)
         expert_fusion_names.append(p.name)
+
+    for i, p in enumerate(d_gate + gate):
+        p.name = "fused_gate_tensor_{}".format(i)
 
     return opt_fused_tensors, decay_fused_tensors, reduce_fused_tensors, gate_fused_tensors, expert_fusion_names
 
@@ -316,7 +326,8 @@ def do_train(args):
     strategy.hybrid_configs = {
         "dp_degree": args.dp_degree,
         "mp_degree": args.mp_degree,
-        "pp_degree": args.pp_degree
+        "pp_degree": args.pp_degree,
+        "sharding_degree": args.sharding_degree
     }
 
     accumulate_steps = args.local_batch_size // args.micro_batch_size
@@ -333,10 +344,19 @@ def do_train(args):
     mp_rank = hcg.get_model_parallel_rank()
     pp_rank = hcg.get_stage_id()
     dp_rank = hcg.get_data_parallel_rank()
+    sharding_rank = hcg.get_sharding_parallel_rank()
+    sharding_group = hcg.get_sharding_parallel_group()
+
+    if args.sharding_degree > 1:
+        assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2 will support hybrid parallel later"
+
+    sharding_size = hcg.get_sharding_parallel_world_size()
+    data_world_rank = dp_rank * sharding_size + sharding_rank
+    data_world_size = args.dp_degree * args.sharding_degree
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     # seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, dp_rank, mp_rank, pp_rank)
+    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank, pp_rank)
 
     default_global_tokens_num = args.global_batch_size * args.max_seq_len
 
@@ -416,17 +436,23 @@ def do_train(args):
             warmup_step=warmup_step,
             decay_step=args.decay_steps)
 
-# Generate parameter names needed to perform weight decay.
-# All bias and LayerNorm parameters are excluded.
+    # Generate parameter names needed to perform weight decay.
+    # All bias and LayerNorm parameters are excluded.
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
-        scaler._unscale = MethodType(unscale_method, scaler)
+        if args.sharding_degree == 1:
+            scaler = fleet.distributed_scaler(scaler)
+            scaler._unscale = MethodType(unscale_method, scaler)
+        else:
+            wrap_scale_func = GroupShardedScaler if in_dygraph_mode(
+            ) else ShardingScaler
+            scaler = wrap_scale_func(scaler)
+
         model = paddle.amp.decorate(
             models=model, optimizers=None, level='O2', save_dtype='float32')
 
     opt_fused_tensors, decay_fused_tensors, reduce_fused_tensors, gate_fused_tensors, \
-        expert_fusion_names = parameters_classify(model)
+        expert_fusion_names = parameters_classify(model, use_sharding=(args.sharding_degree > 1))
     decay_params = [p.name for p in decay_fused_tensors]
 
     clip = None
@@ -447,15 +473,27 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params,  #decay_params,
         multi_precision=args.use_pure_fp16)
 
-    if paddle.distributed.get_world_size() > 1 and args.resume_dir is None:
-        print(">> initialize....")
-        initialize_mp_dp_parameters(model, hcg)
-
     #in order to restore reader. 
     pass_num = 0
     file_id = 0
     start_epoch = 0
     args.resume_dir = None if len(args.resume_dir) <= 0 else args.resume_dir
+
+    if paddle.distributed.get_world_size() > 1 and args.resume_dir is None:
+        print(">> initialize....")
+        if args.sharding_degree > 1:
+            model, optimizer = group_sharded_parallel(
+                model, optimizer, sharding_group, args.sharding_offload)
+            for p in gate_fused_tensors:
+                dist.broadcast(
+                    p,
+                    src=sharding_group.ranks[0],
+                    group=sharding_group,
+                    use_calc_stream=True)
+            # Multi stream operation will be supported later
+            dist.wait(tensor=p, group=sharding_group, use_calc_stream=True)
+        else:
+            initialize_mp_dp_parameters(model, hcg)
 
     if args.resume_dir is not None:
         global_step, loss_scale, data_meta = load_checkpoint(
@@ -464,18 +502,6 @@ def do_train(args):
         pass_num = data_meta["pass_num"]
         file_id = data_meta["file_id"]
         start_epoch = data_meta["start_epoch"]
-
-    if args.use_pure_fp16:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=loss_scale
-                                       if args.resume_dir is not None else
-                                       args.scale_loss)
-        scaler = fleet.distributed_scaler(scaler)
-        scaler._unscale = MethodType(unscale_method, scaler)
-        model, optimizer = paddle.amp.decorate(
-            models=model,
-            optimizers=optimizer,
-            level='O2',
-            save_dtype='float32')
 
     if args.model_name_or_path not in pretrained_models_list:
         logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
@@ -504,8 +530,8 @@ def do_train(args):
                 args,
                 data_file,
                 local_rank=local_rank,
-                data_world_size=args.dp_degree,
-                data_world_rank=dp_rank,
+                data_world_size=data_world_size,
+                data_world_rank=data_world_rank,
                 eos_id=tokenizer.eos_token_id)
 
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
@@ -567,12 +593,14 @@ def do_train(args):
                 timers('backward-params-all-reduce').start()
                 all_reduce_parameters(gate_fused_tensors,
                                       hcg.get_expert_parallel_group())
-                all_reduce_parameters(reduce_fused_tensors,
-                                      hcg.get_data_parallel_group())
+                if args.sharding_degree == 1:
+                    all_reduce_parameters(reduce_fused_tensors,
+                                          hcg.get_data_parallel_group())
                 timers('backward-params-all-reduce').stop()
 
                 if args.use_pure_fp16:
-                    scaler.minimize(optimizer, loss)
+                    scaler.step(optimizer)
+                    scaler.update()
                 else:
                     optimizer.step()
                 learning_rate = optimizer.get_lr()
@@ -627,6 +655,7 @@ def do_train(args):
             # to record sum of the length of train_data_loader that has been read. 
             pass_num += len(train_data_loader())
             del train_data_loader
+
 
 if __name__ == "__main__":
     args = parse_args(MODEL_CLASSES)

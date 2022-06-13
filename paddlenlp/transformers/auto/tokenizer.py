@@ -57,6 +57,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("PPMiniLMTokenizer", "ppminilm"),
     ("ProphetNetTokenizer", "prophetnet"),
     ("ReformerTokenizer", "reformer"),
+    ("RemBertTokenizer", "rembert"),
     ("RobertaChineseTokenizer", "roberta"),
     ("RobertaBPETokenizer", "roberta"),
     ("RoFormerTokenizer", "roformer"),
@@ -202,7 +203,7 @@ class AutoTokenizer():
                                 logger.warning(
                                     "Can't find the faster_tokenizers package, "
                                     "please ensure install faster_tokenizers correctly. "
-                                    "You can install faster_tokenizers by `pip install faster_tokenizers`"
+                                    "You can install faster_tokenizer by `pip install faster_tokenizer`"
                                     "(Currently only work for linux platform).")
 
                         logger.info("We are using %s to load '%s'." %

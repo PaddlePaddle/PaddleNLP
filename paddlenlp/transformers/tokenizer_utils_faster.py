@@ -20,8 +20,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 import six
 
-from faster_tokenizers import Encoding as FasterEncoding
-from faster_tokenizers import Tokenizer as FasterTokenizer
+from faster_tokenizer import Encoding as FasterEncoding
+from faster_tokenizer import Tokenizer as FasterTokenizer
 
 from .utils import InitTrackerMeta, fn_args_to_dict
 from .convert_slow_tokenizer import convert_slow_tokenizer
@@ -344,7 +344,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             return_dict: bool=True,
             return_offsets_mapping: bool=False,
             return_length: bool=False,
-            verbose: bool=True, ) -> BatchEncoding:
+            verbose: bool=True,
+            **kwargs) -> BatchEncoding:
 
         if not isinstance(batch_text_or_text_pairs, list):
             raise TypeError(
