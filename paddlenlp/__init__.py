@@ -88,8 +88,8 @@ def _patch_data_loader_init(self,
     self.places = _convert_places(places)
 
     assert num_workers >= 0, "num_workers should be a non-negative value"
-    if num_workers > 0 and (sys.platform == 'darwin' or
-                            sys.platform == 'win32'):
+    if num_workers > 0 and (sys.platform == 'darwin'
+                            or sys.platform == 'win32'):
         warnings.warn(
             "DataLoader with multi-process mode is not supported on MacOs and Windows currently." \
             " Please use signle-process mode with num_workers = 0 instead")
@@ -131,11 +131,10 @@ def _patch_data_loader_init(self,
         if isinstance(dataset, IterableDataset):
             self.batch_sampler = _InfiniteIterableSampler(dataset, batch_size)
         else:
-            self.batch_sampler = BatchSampler(
-                dataset=dataset,
-                batch_size=batch_size,
-                shuffle=shuffle,
-                drop_last=drop_last)
+            self.batch_sampler = BatchSampler(dataset=dataset,
+                                              batch_size=batch_size,
+                                              shuffle=shuffle,
+                                              drop_last=drop_last)
 
     self.drop_last = drop_last
     self.auto_collate_batch = self.batch_sampler is not None

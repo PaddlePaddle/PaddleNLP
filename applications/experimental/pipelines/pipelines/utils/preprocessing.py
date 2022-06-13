@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 def convert_files_to_dicts(dir_path: str,
-                           clean_func: Optional[Callable]=None,
-                           split_paragraphs: bool=False,
-                           encoding: Optional[str]=None) -> List[dict]:
+                           clean_func: Optional[Callable] = None,
+                           split_paragraphs: bool = False,
+                           encoding: Optional[str] = None) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
     Document Store.
@@ -81,11 +81,12 @@ def convert_files_to_dicts(dir_path: str,
 
 
 def tika_convert_files_to_dicts(
-        dir_path: str,
-        clean_func: Optional[Callable]=None,
-        split_paragraphs: bool=False,
-        merge_short: bool=True,
-        merge_lowercase: bool=True, ) -> List[dict]:
+    dir_path: str,
+    clean_func: Optional[Callable] = None,
+    split_paragraphs: bool = False,
+    merge_short: bool = True,
+    merge_lowercase: bool = True,
+) -> List[dict]:
     """
     Convert all files(.txt, .pdf) in the sub-directories of the given path to Python dicts that can be written to a
     Document Store.
@@ -154,13 +155,14 @@ def tika_convert_files_to_dicts(
                         para_is_short = len(para) < 10 or len(
                             re.findall(r"\s+", para)) < 2
                         # this paragraph starts with a lower case and last paragraph does not end with a punctuation
-                        para_is_lowercase = (para and para[0].islower() and
-                                             last_para and
-                                             last_para[-1] not in r'.?!"\'\]\)')
+                        para_is_lowercase = (para and para[0].islower()
+                                             and last_para and last_para[-1]
+                                             not in r'.?!"\'\]\)')
 
                         # merge paragraphs to improve qa
-                        if (merge_short and para_is_short) or (
-                                merge_lowercase and para_is_lowercase):
+                        if (merge_short
+                                and para_is_short) or (merge_lowercase
+                                                       and para_is_lowercase):
                             last_para += " " + para
                         else:
                             if last_para:

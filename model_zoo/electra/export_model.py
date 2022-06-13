@@ -80,30 +80,25 @@ def main():
         exit(1)
 
     # save static model to disk
-    paddle.jit.save(
-        layer=model,
-        path=os.path.join(args.output_model_dir, args.model_name),
-        input_spec=[InputSpec(
-            shape=[None, None], dtype='int64')])
+    paddle.jit.save(layer=model,
+                    path=os.path.join(args.output_model_dir, args.model_name),
+                    input_spec=[InputSpec(shape=[None, None], dtype='int64')])
     print("save electra inference model success")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--input_model_dir",
-        required=True,
-        default=None,
-        help="Directory for storing Electra pretraining model")
-    parser.add_argument(
-        "--output_model_dir",
-        required=True,
-        default=None,
-        help="Directory for output Electra inference model")
-    parser.add_argument(
-        "--model_name",
-        default="electra-deploy",
-        type=str,
-        help="prefix name of output model and parameters")
+    parser.add_argument("--input_model_dir",
+                        required=True,
+                        default=None,
+                        help="Directory for storing Electra pretraining model")
+    parser.add_argument("--output_model_dir",
+                        required=True,
+                        default=None,
+                        help="Directory for output Electra inference model")
+    parser.add_argument("--model_name",
+                        default="electra-deploy",
+                        type=str,
+                        help="prefix name of output model and parameters")
     args, unparsed = parser.parse_known_args()
     main()

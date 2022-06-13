@@ -25,6 +25,7 @@ from model import UIE
 
 
 class InferBackend(object):
+
     def __init__(self,
                  model_path_prefix,
                  device='cpu',
@@ -60,18 +61,14 @@ class InferBackend(object):
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
-        self.predictor = ort.InferenceSession(
-            onnx_model, sess_options=sess_options, providers=providers)
+        self.predictor = ort.InferenceSession(onnx_model,
+                                              sess_options=sess_options,
+                                              providers=providers)
         if device == "gpu":
-            try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
-            except AssertionError:
-                raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
-                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                    "Please run the following commands to reinstall: \n "
-                    "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-                )
+            assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
+                "Please run the following commands to reinstall: \n " \
+                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
         print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
@@ -80,6 +77,7 @@ class InferBackend(object):
 
 
 class UIEPredictor(object):
+
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
             print(
@@ -92,16 +90,17 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-base-zh", use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
+                                                        use_faster=True)
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        self.inference_backend = InferBackend(
-            args.model_path_prefix, device=args.device, use_fp16=args.use_fp16)
+        self.inference_backend = InferBackend(args.model_path_prefix,
+                                              device=args.device,
+                                              use_fp16=args.use_fp16)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -159,16 +158,15 @@ class UIEPredictor(object):
         attention_mask = []
         offset_maps = []
         for example in short_inputs:
-            encoded_inputs = self._tokenizer(
-                text=[example["prompt"]],
-                text_pair=[example["text"]],
-                stride=len(example["prompt"]),
-                truncation=True,
-                max_seq_len=self._max_seq_len,
-                pad_to_max_seq_len=True,
-                return_attention_mask=True,
-                return_position_ids=True,
-                return_dict=False)
+            encoded_inputs = self._tokenizer(text=[example["prompt"]],
+                                             text_pair=[example["text"]],
+                                             stride=len(example["prompt"]),
+                                             truncation=True,
+                                             max_seq_len=self._max_seq_len,
+                                             pad_to_max_seq_len=True,
+                                             return_attention_mask=True,
+                                             return_position_ids=True,
+                                             return_dict=False)
             encoded_inputs = encoded_inputs[0]
 
             input_ids.append(encoded_inputs["input_ids"])
@@ -178,23 +176,23 @@ class UIEPredictor(object):
             offset_maps.append(encoded_inputs["offset_mapping"])
 
         input_dict = {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64"),
-            "pos_ids": np.array(
-                position_ids, dtype="int64"),
-            "att_mask": np.array(
-                attention_mask, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64"),
+            "pos_ids": np.array(position_ids, dtype="int64"),
+            "att_mask": np.array(attention_mask, dtype="int64")
         }
         offset_maps = np.array(offset_maps, dtype="int64")
 
         start_prob, end_prob = self._infer(input_dict)
+        start_prob = start_prob.tolist()
+        end_prob = end_prob.tolist()
 
-        start_ids_list = get_bool_ids_greater_than(
-            start_prob, limit=self._position_prob, return_prob=True)
-        end_ids_list = get_bool_ids_greater_than(
-            end_prob, limit=self._position_prob, return_prob=True)
+        start_ids_list = get_bool_ids_greater_than(start_prob,
+                                                   limit=self._position_prob,
+                                                   return_prob=True)
+        end_ids_list = get_bool_ids_greater_than(end_prob,
+                                                 limit=self._position_prob,
+                                                 return_prob=True)
 
         input_ids = input_dict['input_ids']
         sentence_ids = []
@@ -285,8 +283,9 @@ class UIEPredictor(object):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0][
-                            'text']] = [1, short_results[v][0]['probability']]
+                        cls_options[short_results[v][0]['text']] = [
+                            1, short_results[v][0]['probability']
+                        ]
                     else:
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
@@ -295,8 +294,10 @@ class UIEPredictor(object):
                     cls_res, cls_info = max(cls_options.items(),
                                             key=lambda x: x[1])
                     concat_results.append([{
-                        'text': cls_res,
-                        'probability': cls_info[1] / cls_info[0]
+                        'text':
+                        cls_res,
+                        'probability':
+                        cls_info[1] / cls_info[0]
                     }])
                 else:
                     concat_results.append([])
@@ -351,18 +352,18 @@ class UIEPredictor(object):
             results.append(result_list)
         return results
 
-    def _multi_stage_predict(self, datas):
+    def _multi_stage_predict(self, data):
         """
         Traversal the schema tree and do multi-stage prediction.
         Args:
-            datas (list): a list of strings
+            data (list): a list of strings
         Returns:
             list: a list of predictions, where the list's length
-                equals to the length of `datas`
+                equals to the length of `data`
         """
-        results = [{} for _ in range(len(datas))]
+        results = [{} for _ in range(len(data))]
         # input check to early return
-        if len(datas) < 1 or self._schema_tree is None:
+        if len(data) < 1 or self._schema_tree is None:
             return results
 
         # copy to stay `self._schema_tree` unchanged
@@ -374,22 +375,22 @@ class UIEPredictor(object):
             cnt = 0
             idx = 0
             if not node.prefix:
-                for data in datas:
+                for one_data in data:
                     examples.append({
-                        "text": data,
+                        "text": one_data,
                         "prompt": dbc2sbc(node.name)
                     })
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
             else:
-                for pre, data in zip(node.prefix, datas):
+                for pre, one_data in zip(node.prefix, data):
                     if len(pre) == 0:
                         input_map[cnt] = []
                     else:
                         for p in pre:
                             examples.append({
-                                "text": data,
+                                "text": one_data,
                                 "prompt": dbc2sbc(p + node.name)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
@@ -401,7 +402,7 @@ class UIEPredictor(object):
                 result_list = self._single_stage_predict(examples)
 
             if not node.parent_relations:
-                relations = [[] for i in range(len(datas))]
+                relations = [[] for i in range(len(data))]
                 for k, v in input_map.items():
                     for idx in v:
                         if len(result_list[idx]) == 0:
@@ -429,7 +430,7 @@ class UIEPredictor(object):
                         else:
                             relations[k][i]["relations"][node.name].extend(
                                 result_list[v[i]])
-                new_relations = [[] for i in range(len(datas))]
+                new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
                         if "relations" in relations[i][j].keys(
@@ -437,11 +438,11 @@ class UIEPredictor(object):
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
-                                new_relations[i].append(relations[i][j][
-                                    "relations"][node.name][k])
+                                new_relations[i].append(
+                                    relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
-            prefix = [[] for _ in range(len(datas))]
+            prefix = [[] for _ in range(len(data))]
             for k, v in input_map.items():
                 for idx in v:
                     for i in range(len(result_list[idx])):
@@ -513,21 +514,29 @@ def cut_chinese_sent(para):
     return para.split("\n")
 
 
-def get_id_and_prob(spans, offset_map):
-    prompt_length = 0
-    for i in range(1, len(offset_map)):
-        if offset_map[i] != [0, 0]:
-            prompt_length += 1
-        else:
-            break
+def get_id_and_prob(span_set, offset_mapping):
+    """
+    Return text id and probability of predicted spans
 
-    for i in range(1, prompt_length + 1):
-        offset_map[i][0] -= (prompt_length + 1)
-        offset_map[i][1] -= (prompt_length + 1)
+    Args: 
+        span_set (set): set of predicted spans.
+        offset_mapping (list[int]): list of pair preserving the
+                index of start and end char in original text pair (prompt + text) for each token.
+    Returns: 
+        sentence_id (list[tuple]): index of start and end char in original text.
+        prob (list[float]): probabilities of predicted spans.
+    """
+    prompt_end_token_id = offset_mapping[1:].index([0, 0])
+    bias = offset_mapping[prompt_end_token_id][1] + 1
+    for index in range(1, prompt_end_token_id + 1):
+        offset_mapping[index][0] -= bias
+        offset_mapping[index][1] -= bias
 
     sentence_id = []
     prob = []
-    for start, end in spans:
+    for start, end in span_set:
         prob.append(start[1] * end[1])
-        sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
+        start_id = offset_mapping[start[0]][0]
+        end_id = offset_mapping[end[0]][1]
+        sentence_id.append((start_id, end_id))
     return sentence_id, prob

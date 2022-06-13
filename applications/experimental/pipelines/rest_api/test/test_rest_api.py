@@ -54,9 +54,9 @@ def exclude_no_answer(responses):
 
 @pytest.fixture()
 def client() -> TestClient:
-    os.environ["PIPELINE_YAML_PATH"] = str((Path(
-        __file__).parent / "samples" / "pipeline" / "test_pipeline.yaml"
-                                            ).absolute())
+    os.environ["PIPELINE_YAML_PATH"] = str(
+        (Path(__file__).parent / "samples" / "pipeline" /
+         "test_pipeline.yaml").absolute())
     os.environ["INDEXING_PIPELINE_NAME"] = "indexing_text_pipeline"
     client = TestClient(app)
 
@@ -119,17 +119,15 @@ def test_delete_documents(populated_client: TestClient):
     initial_docs = len(response_json)
 
     # Check how many docs we will delete
-    response = populated_client.post(
-        url="/documents/get_by_filters",
-        data='{"filters": {"meta_index": ["0"]}}')
+    response = populated_client.post(url="/documents/get_by_filters",
+                                     data='{"filters": {"meta_index": ["0"]}}')
     assert 200 == response.status_code
     response_json = response.json()
     docs_to_delete = len(response_json)
 
     # Delete one doc
-    response = populated_client.post(
-        url="/documents/delete_by_filters",
-        data='{"filters": {"meta_index": ["0"]}}')
+    response = populated_client.post(url="/documents/delete_by_filters",
+                                     data='{"filters": {"meta_index": ["0"]}}')
     assert 200 == response.status_code
 
     # Now there should be less document
@@ -141,24 +139,22 @@ def test_delete_documents(populated_client: TestClient):
     assert len(response_json) == initial_docs - docs_to_delete
 
     # Make sure the right docs were deleted
-    response = populated_client.post(
-        url="/documents/get_by_filters",
-        data='{"filters": {"meta_index": ["0"]}}')
+    response = populated_client.post(url="/documents/get_by_filters",
+                                     data='{"filters": {"meta_index": ["0"]}}')
     assert 200 == response.status_code
     response_json = response.json()
     assert len(response_json) == 0
 
-    response = populated_client.post(
-        url="/documents/get_by_filters",
-        data='{"filters": {"meta_index": ["1"]}}')
+    response = populated_client.post(url="/documents/get_by_filters",
+                                     data='{"filters": {"meta_index": ["1"]}}')
     assert 200 == response.status_code
     response_json = response.json()
     assert len(response_json) >= 1
 
 
 def test_file_upload(client: TestClient):
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) == 0
 
     file_to_upload = {
@@ -171,17 +167,18 @@ def test_file_upload(client: TestClient):
         data={
             "meta":
             '{"meta_key": "meta_value", "non-existing-field": "wrong-value"}'
-        }, )
+        },
+    )
     assert 200 == response.status_code
 
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) > 0
 
 
 def test_file_upload_with_no_meta(client: TestClient):
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) == 0
 
     file_to_upload = {
@@ -191,17 +188,18 @@ def test_file_upload_with_no_meta(client: TestClient):
     response = client.post(
         url="/file-upload",
         files=file_to_upload,
-        data={"meta": ""}, )
+        data={"meta": ""},
+    )
     assert 200 == response.status_code
 
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) > 0
 
 
 def test_file_upload_with_wrong_meta(client: TestClient):
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) == 0
 
     file_to_upload = {
@@ -211,18 +209,19 @@ def test_file_upload_with_wrong_meta(client: TestClient):
     response = client.post(
         url="/file-upload",
         files=file_to_upload,
-        data={"meta": "1"}, )
+        data={"meta": "1"},
+    )
     assert 500 == response.status_code
 
-    response = client.post(
-        url="/documents/get_by_filters", data='{"filters": {}}')
+    response = client.post(url="/documents/get_by_filters",
+                           data='{"filters": {}}')
     assert len(response.json()) == 0
 
 
 def test_query_with_no_filter(populated_client: TestClient):
     query_with_no_filter_value = {"query": "Who made the PDF specification?"}
-    response = populated_client.post(
-        url="/query", json=query_with_no_filter_value)
+    response = populated_client.post(url="/query",
+                                     json=query_with_no_filter_value)
     assert 200 == response.status_code
     response_json = response.json()
     response_json = exclude_no_answer(response_json)
@@ -292,8 +291,8 @@ def test_query_with_invalid_filter(populated_client: TestClient):
             }
         },
     }
-    response = populated_client.post(
-        url="/query", json=query_with_invalid_filter)
+    response = populated_client.post(url="/query",
+                                     json=query_with_invalid_filter)
     assert 200 == response.status_code
     response_json = response.json()
     response_json = exclude_no_answer(response_json)
@@ -301,9 +300,9 @@ def test_query_with_invalid_filter(populated_client: TestClient):
 
 
 def test_query_with_no_documents_and_no_answers():
-    os.environ["PIPELINE_YAML_PATH"] = str((Path(
-        __file__).parent / "samples" / "pipeline" / "test_pipeline.yaml"
-                                            ).absolute())
+    os.environ["PIPELINE_YAML_PATH"] = str(
+        (Path(__file__).parent / "samples" / "pipeline" /
+         "test_pipeline.yaml").absolute())
     os.environ["INDEXING_PIPELINE_NAME"] = "indexing_text_pipeline"
     client = TestClient(app)
 

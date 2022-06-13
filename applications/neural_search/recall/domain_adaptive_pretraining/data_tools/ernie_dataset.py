@@ -25,12 +25,14 @@ from .dataset_utils import (
     create_tokens_and_tokentypes,
     create_masked_lm_predictions,
     make_indexed_dataset,
-    get_indexed_dataset_, )
+    get_indexed_dataset_,
+)
 
 from paddlenlp.transformers import ErnieTokenizer
 
 
 class ErnieDataset(paddle.io.Dataset):
+
     def __init__(self,
                  name,
                  tokenizer,
@@ -139,8 +141,8 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
 
     # Divide sample into two segments (A and B).
     if binary_head:
-        tokens_a, tokens_b, is_next_random = get_a_and_b_segments(sample,
-                                                                  np_rng)
+        tokens_a, tokens_b, is_next_random = get_a_and_b_segments(
+            sample, np_rng)
     else:
         tokens_a = []
         for j in range(len(sample)):
@@ -150,8 +152,7 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
 
     # Truncate to `target_sequence_length`.
     max_num_tokens = target_seq_length
-    truncated = truncate_segments(tokens_a, tokens_b,
-                                  len(tokens_a),
+    truncated = truncate_segments(tokens_a, tokens_b, len(tokens_a),
                                   len(tokens_b), max_num_tokens, np_rng)
 
     # Build tokens and toketypes.
@@ -173,7 +174,8 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          np_rng,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
          to_chinese_char=True,
-         inplace_random_mask=False, )
+         inplace_random_mask=False,
+     )
 
     # Padding.
     tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np \
@@ -201,8 +203,8 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     tokentypes_np = np.array(tokentypes + filler, dtype=np.int64)
 
     # Padding mask.
-    padding_mask_np = np.array(
-        [1] * num_tokens + [0] * padding_length, dtype=np.float32)
+    padding_mask_np = np.array([1] * num_tokens + [0] * padding_length,
+                               dtype=np.float32)
     padding_mask_np = padding_mask_np.reshape([1, 1, -1])
     # Lables and loss mask.
     labels = [-1] * max_seq_length

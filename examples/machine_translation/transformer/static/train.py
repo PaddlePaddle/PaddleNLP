@@ -28,68 +28,72 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="../configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="../configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
-    parser.add_argument(
-        "--distributed",
-        action="store_true",
-        help="Whether to use fleet to launch. ")
-    parser.add_argument(
-        "--max_iter",
-        default=None,
-        type=int,
-        help="The maximum iteration for training. ")
+    parser.add_argument("--distributed",
+                        action="store_true",
+                        help="Whether to use fleet to launch. ")
+    parser.add_argument("--max_iter",
+                        default=None,
+                        type=int,
+                        help="The maximum iteration for training. ")
     parser.add_argument(
         "--train_file",
         nargs='+',
         default=None,
         type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+        help=
+        "The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
     )
     parser.add_argument(
         "--dev_file",
         nargs='+',
         default=None,
         type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+        help=
+        "The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
     )
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help=
+        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
+        help=
+        "The unknown token. It should be provided when use custom vocab_file. ")
     parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
+        help="The bos token. It should be provided when use custom vocab_file. "
+    )
     parser.add_argument(
         "--eos_token",
         default=None,
         type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
+        help="The eos token. It should be provided when use custom vocab_file. "
+    )
 
     # For benchmark.
     parser.add_argument(
         '--profiler_options',
         type=str,
         default=None,
-        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+        help=
+        'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
     args = parser.parse_args()
     return args
@@ -120,33 +124,35 @@ def do_train(args):
         paddle.seed(random_seed)
 
     # Define data loader
-    (train_loader), (eval_loader) = reader.create_data_loader(
-        args, places=places)
+    (train_loader), (eval_loader) = reader.create_data_loader(args,
+                                                              places=places)
 
     train_program = paddle.static.Program()
     startup_program = paddle.static.Program()
     with paddle.static.program_guard(train_program, startup_program):
-        src_word = paddle.static.data(
-            name="src_word", shape=[None, None], dtype=args.input_dtype)
-        trg_word = paddle.static.data(
-            name="trg_word", shape=[None, None], dtype=args.input_dtype)
-        lbl_word = paddle.static.data(
-            name="lbl_word", shape=[None, None, 1], dtype=args.input_dtype)
+        src_word = paddle.static.data(name="src_word",
+                                      shape=[None, None],
+                                      dtype=args.input_dtype)
+        trg_word = paddle.static.data(name="trg_word",
+                                      shape=[None, None],
+                                      dtype=args.input_dtype)
+        lbl_word = paddle.static.data(name="lbl_word",
+                                      shape=[None, None, 1],
+                                      dtype=args.input_dtype)
 
         # Define model
-        transformer = TransformerModel(
-            src_vocab_size=args.src_vocab_size,
-            trg_vocab_size=args.trg_vocab_size,
-            max_length=args.max_length + 1,
-            num_encoder_layers=args.n_layer,
-            num_decoder_layers=args.n_layer,
-            n_head=args.n_head,
-            d_model=args.d_model,
-            d_inner_hid=args.d_inner_hid,
-            dropout=args.dropout,
-            weight_sharing=args.weight_sharing,
-            bos_id=args.bos_idx,
-            eos_id=args.eos_idx)
+        transformer = TransformerModel(src_vocab_size=args.src_vocab_size,
+                                       trg_vocab_size=args.trg_vocab_size,
+                                       max_length=args.max_length + 1,
+                                       num_encoder_layers=args.n_layer,
+                                       num_decoder_layers=args.n_layer,
+                                       n_head=args.n_head,
+                                       d_model=args.d_model,
+                                       d_inner_hid=args.d_inner_hid,
+                                       dropout=args.dropout,
+                                       weight_sharing=args.weight_sharing,
+                                       bos_id=args.bos_idx,
+                                       eos_id=args.eos_idx)
         # Define loss
         criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
 
@@ -154,16 +160,17 @@ def do_train(args):
 
         sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-        scheduler = paddle.optimizer.lr.NoamDecay(
-            args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
+        scheduler = paddle.optimizer.lr.NoamDecay(args.d_model,
+                                                  args.warmup_steps,
+                                                  args.learning_rate,
+                                                  last_epoch=0)
 
         # Define optimizer
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=scheduler,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=float(args.eps),
-            parameters=transformer.parameters())
+        optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
+                                          beta1=args.beta1,
+                                          beta2=args.beta2,
+                                          epsilon=float(args.eps),
+                                          parameters=transformer.parameters())
 
         if args.is_distributed:
             build_strategy = paddle.static.BuildStrategy()
@@ -182,8 +189,8 @@ def do_train(args):
                     'use_pure_fp16': args.use_pure_fp16
                 }
 
-            optimizer = fleet.distributed_optimizer(
-                optimizer, strategy=dist_strategy)
+            optimizer = fleet.distributed_optimizer(optimizer,
+                                                    strategy=dist_strategy)
         else:
             if args.use_amp:
                 amp_list = paddle.static.amp.AutoMixedPrecisionLists(
@@ -205,10 +212,9 @@ def do_train(args):
         exec_strategy = paddle.static.ExecutionStrategy()
 
         compiled_train_program = paddle.static.CompiledProgram(
-            train_program).with_data_parallel(
-                loss_name=avg_cost.name,
-                build_strategy=build_strategy,
-                exec_strategy=exec_strategy)
+            train_program).with_data_parallel(loss_name=avg_cost.name,
+                                              build_strategy=build_strategy,
+                                              exec_strategy=exec_strategy)
     exe.run(startup_program)
 
     if args.use_amp:
@@ -216,9 +222,9 @@ def do_train(args):
 
     # the best cross-entropy value with label smoothing
     loss_normalizer = -(
-        (1. - args.label_smooth_eps) * np.log(
-            (1. - args.label_smooth_eps)) + args.label_smooth_eps *
-        np.log(args.label_smooth_eps / (args.trg_vocab_size - 1) + 1e-20))
+        (1. - args.label_smooth_eps) * np.log((1. - args.label_smooth_eps)) +
+        args.label_smooth_eps * np.log(args.label_smooth_eps /
+                                       (args.trg_vocab_size - 1) + 1e-20))
 
     step_idx = 0
 
@@ -270,11 +276,12 @@ def do_train(args):
             if args.profiler_options is not None:
                 profiler.add_profiler_step(args.profiler_options)
 
-            if step_idx % args.print_step == 0 and (args.benchmark or (
-                    args.is_distributed and dist.get_rank() == 0) or
-                                                    not args.is_distributed):
-                sum_cost_val, token_num_val = np.array(outs[0]), np.array(outs[
-                    1])
+            if step_idx % args.print_step == 0 and (args.benchmark or
+                                                    (args.is_distributed
+                                                     and dist.get_rank() == 0)
+                                                    or not args.is_distributed):
+                sum_cost_val, token_num_val = np.array(outs[0]), np.array(
+                    outs[1])
                 # Sum the cost from multi-devices
                 total_sum_cost = sum_cost_val.sum()
                 total_token_num = token_num_val.sum()
@@ -308,8 +315,9 @@ def do_train(args):
 
             if step_idx % args.save_step == 0 and step_idx != 0:
                 if args.save_model and dist.get_rank() == 0:
-                    model_path = os.path.join(
-                        args.save_model, "step_" + str(step_idx), "transformer")
+                    model_path = os.path.join(args.save_model,
+                                              "step_" + str(step_idx),
+                                              "transformer")
                     paddle.static.save(train_program, model_path)
 
             batch_id += 1

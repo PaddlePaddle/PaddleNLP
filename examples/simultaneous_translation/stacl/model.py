@@ -23,19 +23,19 @@ from paddlenlp.transformers import WordEmbedding, PositionalEmbedding
 
 
 class CrossEntropyCriterion(nn.Layer):
+
     def __init__(self, label_smooth_eps, pad_idx=0):
         super(CrossEntropyCriterion, self).__init__()
         self.label_smooth_eps = label_smooth_eps
         self.pad_idx = pad_idx
 
     def forward(self, predict, label):
-        weights = paddle.cast(
-            label != self.pad_idx, dtype=paddle.get_default_dtype())
+        weights = paddle.cast(label != self.pad_idx,
+                              dtype=paddle.get_default_dtype())
         if self.label_smooth_eps:
-            label = F.label_smooth(
-                label=F.one_hot(
-                    x=label, num_classes=predict.shape[-1]),
-                epsilon=self.label_smooth_eps)
+            label = F.label_smooth(label=F.one_hot(
+                x=label, num_classes=predict.shape[-1]),
+                                   epsilon=self.label_smooth_eps)
 
         cost = F.cross_entropy(
             input=predict,
@@ -51,6 +51,7 @@ class CrossEntropyCriterion(nn.Layer):
 
 
 class DecoderLayer(nn.TransformerDecoderLayer):
+
     def __init__(self, *args, **kwargs):
         super(DecoderLayer, self).__init__(*args, **kwargs)
 
@@ -83,8 +84,9 @@ class DecoderLayer(nn.TransformerDecoderLayer):
                 else:
                     e = memory[i]
                 cross_attn_outputs.append(
-                    self.cross_attn(q, e, e, memory_mask[:, :, i:i + 1, :
-                                                         e.shape[1]], None))
+                    self.cross_attn(q, e, e, memory_mask[:, :,
+                                                         i:i + 1, :e.shape[1]],
+                                    None))
             tgt = paddle.concat(cross_attn_outputs, axis=1)
         tgt = residual + self.dropout2(tgt)
         if not self.normalize_before:
@@ -159,10 +161,11 @@ class SimultaneousTransformer(nn.Layer):
         self.n_head = n_head
         self.d_model = d_model
 
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length)
+        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
+                                                emb_dim=d_model,
+                                                bos_id=self.bos_id)
+        self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                     max_length=max_length)
         if weight_sharing:
             assert src_vocab_size == trg_vocab_size, (
                 "Vocabularies in source and target should be same for weight sharing."
@@ -170,43 +173,45 @@ class SimultaneousTransformer(nn.Layer):
             self.trg_word_embedding = self.src_word_embedding
             self.trg_pos_embedding = self.src_pos_embedding
         else:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
+                                                    emb_dim=d_model,
+                                                    bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                         max_length=max_length)
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            activation='relu',
-            normalize_before=True,
-            bias_attr=[False, True])
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model,
+                                                   nhead=n_head,
+                                                   dim_feedforward=d_inner_hid,
+                                                   dropout=dropout,
+                                                   activation='relu',
+                                                   normalize_before=True,
+                                                   bias_attr=[False, True])
         encoder_norm = nn.LayerNorm(d_model)
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer, num_layers=n_layer, norm=encoder_norm)
+        self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer,
+                                             num_layers=n_layer,
+                                             norm=encoder_norm)
 
-        decoder_layer = DecoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=d_inner_hid,
-            dropout=dropout,
-            activation='relu',
-            normalize_before=True,
-            bias_attr=[False, False, True])
+        decoder_layer = DecoderLayer(d_model=d_model,
+                                     nhead=n_head,
+                                     dim_feedforward=d_inner_hid,
+                                     dropout=dropout,
+                                     activation='relu',
+                                     normalize_before=True,
+                                     bias_attr=[False, False, True])
         decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = Decoder(
-            decoder_layer=decoder_layer, num_layers=n_layer, norm=decoder_norm)
+        self.decoder = Decoder(decoder_layer=decoder_layer,
+                               num_layers=n_layer,
+                               norm=decoder_norm)
 
         if weight_sharing:
-            self.linear = lambda x: paddle.matmul(
-                x=x, y=self.trg_word_embedding.word_embedding.weight, transpose_y=True)
+            self.linear = lambda x: paddle.matmul(x=x,
+                                                  y=self.trg_word_embedding.
+                                                  word_embedding.weight,
+                                                  transpose_y=True)
         else:
-            self.linear = nn.Linear(
-                in_features=d_model,
-                out_features=trg_vocab_size,
-                bias_attr=False)
+            self.linear = nn.Linear(in_features=d_model,
+                                    out_features=trg_vocab_size,
+                                    bias_attr=False)
 
     def forward(self, src_word, trg_word):
         src_max_len = paddle.shape(src_word)[-1]
@@ -216,19 +221,17 @@ class SimultaneousTransformer(nn.Layer):
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         src_slf_attn_bias = base_attn_bias
         src_slf_attn_bias.stop_gradient = True
-        trg_slf_attn_bias = paddle.tensor.triu(
-            (paddle.ones(
-                (trg_max_len, trg_max_len),
-                dtype=paddle.get_default_dtype()) * -np.inf),
-            1)
+        trg_slf_attn_bias = paddle.tensor.triu((paddle.ones(
+            (trg_max_len, trg_max_len), dtype=paddle.get_default_dtype()) *
+                                                -np.inf), 1)
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = paddle.tile(base_attn_bias, [1, 1, trg_max_len, 1])
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
-        trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=trg_max_len)
+        src_pos = paddle.cast(src_word != self.bos_id,
+                              dtype="int64") * paddle.arange(start=0,
+                                                             end=src_max_len)
+        trg_pos = paddle.cast(trg_word != self.bos_id,
+                              dtype="int64") * paddle.arange(start=0,
+                                                             end=trg_max_len)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
@@ -239,8 +242,7 @@ class SimultaneousTransformer(nn.Layer):
             if self.waitk >= src_max_len or self.waitk == -1:
                 # Full sentence
                 enc_outputs = [
-                    self.encoder(
-                        enc_input, src_mask=src_slf_attn_bias)
+                    self.encoder(enc_input, src_mask=src_slf_attn_bias)
                 ]
             else:
                 # Wait-k policy
@@ -257,11 +259,10 @@ class SimultaneousTransformer(nn.Layer):
             dec_input = F.dropout(
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
-            dec_output = self.decoder(
-                dec_input,
-                enc_outputs,
-                tgt_mask=trg_slf_attn_bias,
-                memory_mask=trg_src_attn_bias)
+            dec_output = self.decoder(dec_input,
+                                      enc_outputs,
+                                      tgt_mask=trg_slf_attn_bias,
+                                      memory_mask=trg_src_attn_bias)
 
             predict = self.linear(dec_output)
 
@@ -279,9 +280,9 @@ class SimultaneousTransformer(nn.Layer):
         src_slf_attn_bias = base_attn_bias
         src_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = paddle.tile(base_attn_bias, [1, 1, 1, 1])
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
+        src_pos = paddle.cast(src_word != self.bos_id,
+                              dtype="int64") * paddle.arange(start=0,
+                                                             end=src_max_len)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
@@ -300,23 +301,27 @@ class SimultaneousTransformer(nn.Layer):
 
         # constant number
         batch_size = enc_outputs[-1].shape[0]
-        max_len = (
-            enc_outputs[-1].shape[1] + 20) if max_len is None else max_len
-        end_token_tensor = paddle.full(
-            shape=[batch_size, 1], fill_value=self.eos_id, dtype="int64")
+        max_len = (enc_outputs[-1].shape[1] +
+                   20) if max_len is None else max_len
+        end_token_tensor = paddle.full(shape=[batch_size, 1],
+                                       fill_value=self.eos_id,
+                                       dtype="int64")
 
         predict_ids = []
-        log_probs = paddle.full(
-            shape=[batch_size, 1], fill_value=0, dtype="float32")
-        trg_word = paddle.full(
-            shape=[batch_size, 1], fill_value=self.bos_id, dtype="int64")
+        log_probs = paddle.full(shape=[batch_size, 1],
+                                fill_value=0,
+                                dtype="float32")
+        trg_word = paddle.full(shape=[batch_size, 1],
+                               fill_value=self.bos_id,
+                               dtype="int64")
 
         # init states (caches) for transformer
         caches = self.decoder.gen_cache(enc_outputs[-1], do_zip=False)
 
         for i in range(max_len):
-            trg_pos = paddle.full(
-                shape=trg_word.shape, fill_value=i, dtype="int64")
+            trg_pos = paddle.full(shape=trg_word.shape,
+                                  fill_value=i,
+                                  dtype="int64")
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
@@ -339,8 +344,8 @@ class SimultaneousTransformer(nn.Layer):
                     dec_input, [_e], None,
                     trg_src_attn_bias[:, :, :, :_e.shape[1]], caches)
 
-            dec_output = paddle.reshape(
-                dec_output, shape=[-1, dec_output.shape[-1]])
+            dec_output = paddle.reshape(dec_output,
+                                        shape=[-1, dec_output.shape[-1]])
 
             logits = self.linear(dec_output)
             step_log_probs = paddle.log(F.softmax(logits, axis=-1))

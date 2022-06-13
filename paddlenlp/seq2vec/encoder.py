@@ -224,11 +224,10 @@ class CNNEncoder(nn.Layer):
         self._output_dim = output_dim
 
         self.convs = paddle.nn.LayerList([
-            nn.Conv2D(
-                in_channels=1,
-                out_channels=self._num_filter,
-                kernel_size=(i, self._emb_dim),
-                **kwargs) for i in self._ngram_filter_sizes
+            nn.Conv2D(in_channels=1,
+                      out_channels=self._num_filter,
+                      kernel_size=(i, self._emb_dim),
+                      **kwargs) for i in self._ngram_filter_sizes
         ])
 
         maxpool_output_dim = self._num_filter * len(self._ngram_filter_sizes)
@@ -287,8 +286,8 @@ class CNNEncoder(nn.Layer):
             self._activation(conv(inputs)).squeeze(3) for conv in self.convs
         ]
         maxpool_out = [
-            F.adaptive_max_pool1d(
-                t, output_size=1).squeeze(2) for t in convs_out
+            F.adaptive_max_pool1d(t, output_size=1).squeeze(2)
+            for t in convs_out
         ]
         result = paddle.concat(maxpool_out, axis=1)
 
@@ -459,9 +458,9 @@ class GRUEncoder(nn.Layer):
         if not self._pooling_type:
             # We exploit the `last_hidden` (the hidden state at the last time step for every layer)
             # to create a single vector.
-            # If gru is not bidirection, then output is the hidden state of the last time step 
+            # If gru is not bidirection, then output is the hidden state of the last time step
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
-            # If gru is bidirection, then output is concatenation of the forward and backward hidden state 
+            # If gru is bidirection, then output is concatenation of the forward and backward hidden state
             # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
@@ -471,7 +470,7 @@ class GRUEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional GRU, 
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional GRU,
             # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
@@ -599,13 +598,12 @@ class LSTMEncoder(nn.Layer):
         self._direction = direction
         self._pooling_type = pooling_type
 
-        self.lstm_layer = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            direction=direction,
-            dropout=dropout,
-            **kwargs)
+        self.lstm_layer = nn.LSTM(input_size=input_size,
+                                  hidden_size=hidden_size,
+                                  num_layers=num_layers,
+                                  direction=direction,
+                                  dropout=dropout,
+                                  **kwargs)
 
     def get_input_dim(self):
         r"""
@@ -649,9 +647,9 @@ class LSTMEncoder(nn.Layer):
         if not self._pooling_type:
             # We exploit the `last_hidden` (the hidden state at the last time step for every layer)
             # to create a single vector.
-            # If lstm is not bidirection, then output is the hidden state of the last time step 
+            # If lstm is not bidirection, then output is the hidden state of the last time step
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
-            # If lstm is bidirection, then output is concatenation of the forward and backward hidden state 
+            # If lstm is bidirection, then output is concatenation of the forward and backward hidden state
             # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
@@ -661,7 +659,7 @@ class LSTMEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional LSTM, 
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional LSTM,
             # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
@@ -789,13 +787,12 @@ class RNNEncoder(nn.Layer):
         self._direction = direction
         self._pooling_type = pooling_type
 
-        self.rnn_layer = nn.SimpleRNN(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            direction=direction,
-            dropout=dropout,
-            **kwargs)
+        self.rnn_layer = nn.SimpleRNN(input_size=input_size,
+                                      hidden_size=hidden_size,
+                                      num_layers=num_layers,
+                                      direction=direction,
+                                      dropout=dropout,
+                                      **kwargs)
 
     def get_input_dim(self):
         r"""
@@ -839,9 +836,9 @@ class RNNEncoder(nn.Layer):
         if not self._pooling_type:
             # We exploit the `last_hidden` (the hidden state at the last time step for every layer)
             # to create a single vector.
-            # If rnn is not bidirection, then output is the hidden state of the last time step 
+            # If rnn is not bidirection, then output is the hidden state of the last time step
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
-            # If rnn is bidirection, then output is concatenation of the forward and backward hidden state 
+            # If rnn is bidirection, then output is concatenation of the forward and backward hidden state
             # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
             if self._direction != 'bidirect':
                 output = last_hidden[-1, :, :]
@@ -851,7 +848,7 @@ class RNNEncoder(nn.Layer):
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
-            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional RNN, 
+            # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional RNN,
             # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self._pooling_type == 'sum':
                 output = paddle.sum(encoded_text, axis=1)
@@ -909,28 +906,26 @@ class TemporalBlock(nn.Layer):
 
         super(TemporalBlock, self).__init__()
         self.conv1 = weight_norm(
-            nn.Conv1D(
-                n_inputs,
-                n_outputs,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation))
+            nn.Conv1D(n_inputs,
+                      n_outputs,
+                      kernel_size,
+                      stride=stride,
+                      padding=padding,
+                      dilation=dilation))
         # Chomp1d is used to make sure the network is causal.
-        # We pad by (k-1)*d on the two sides of the input for convolution, 
+        # We pad by (k-1)*d on the two sides of the input for convolution,
         # and then use Chomp1d to remove the (k-1)*d output elements on the right.
         self.chomp1 = Chomp1d(padding)
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
 
         self.conv2 = weight_norm(
-            nn.Conv1D(
-                n_outputs,
-                n_outputs,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation))
+            nn.Conv1D(n_outputs,
+                      n_outputs,
+                      kernel_size,
+                      stride=stride,
+                      padding=padding,
+                      dilation=dilation))
         self.chomp2 = Chomp1d(padding)
         self.relu2 = nn.ReLU()
         self.dropout2 = nn.Dropout(dropout)
@@ -992,14 +987,13 @@ class TCNEncoder(nn.Layer):
             in_channels = input_size if i == 0 else num_channels[i - 1]
             out_channels = num_channels[i]
             layers.append(
-                TemporalBlock(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=1,
-                    dilation=dilation_size,
-                    padding=(kernel_size - 1) * dilation_size,
-                    dropout=dropout))
+                TemporalBlock(in_channels,
+                              out_channels,
+                              kernel_size,
+                              stride=1,
+                              dilation=dilation_size,
+                              padding=(kernel_size - 1) * dilation_size,
+                              dropout=dropout))
 
         self.network = nn.Sequential(*layers)
 

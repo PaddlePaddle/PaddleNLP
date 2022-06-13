@@ -34,4 +34,5 @@ setup(
         "uvicorn<1",
         "gunicorn<21",
         "python-multipart<1",  # optional FastAPI dependency for form data
-    ], )
+    ],
+)

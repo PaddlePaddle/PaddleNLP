@@ -15,6 +15,7 @@
 from functools import partial
 import argparse
 import sys
+
 sys.path.append("../../..")
 import paddle
 import paddle.nn.functional as F
@@ -69,7 +70,8 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
         Pad(axis=0, pad_val=pad_token_id),  # title_ids
         Stack(dtype="int64"),  # query_seq_lens
         Stack(dtype="int64"),  # title_seq_lens
-        Stack(dtype='int64'), ): [data for data in fn(samples)]
+        Stack(dtype='int64'),
+    ): [data for data in fn(samples)]
 
     model.train()
     results = []
@@ -111,14 +113,16 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
 if __name__ == "__main__":
     paddle.set_device(args.device + ':1')
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     tokenizer = CharTokenizer(vocab, args.language)
     label_map = {0: 'dissimilar', 1: 'similar'}
 
     # Constructs the newtork.
-    model = SimNet(
-        network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
+    model = SimNet(network=args.network,
+                   vocab_size=len(vocab),
+                   num_classes=len(label_map))
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
@@ -131,13 +135,12 @@ if __name__ == "__main__":
 
     dev_examples = preprocess_data(dev_ds.data, tokenizer, args.language)
     test_examples = preprocess_data(test_ds.data, tokenizer, args.language)
-    results = interpret(
-        model,
-        dev_examples,
-        label_map=label_map,
-        batch_size=args.batch_size,
-        pad_token_id=vocab.token_to_idx.get('[PAD]', 0),
-        vocab=vocab)
+    results = interpret(model,
+                        dev_examples,
+                        label_map=label_map,
+                        batch_size=args.batch_size,
+                        pad_token_id=vocab.token_to_idx.get('[PAD]', 0),
+                        vocab=vocab)
 
     # for idx, text in enumerate(data):
     #     print('Data: {} \t Label: {}'.format(text, results[idx]))
