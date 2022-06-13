@@ -6,34 +6,26 @@ from NQdataset import BiEncoderPassage, BiEncoderSample, BiENcoderBatch, BertTen
 from paddlenlp.transformers.bert.modeling import BertModel
 import numpy as np
 import os
+import argparse
+from paddle.optimizer.lr import LambdaDecay
 
-global batch_size
-global learning_rate
-global weight_decay
-global drop_out
-global embedding_output_size
-global data_path
-global dataset
-global chunk_numbers
-global global_step
-global save_steps
-global save_direc
+parser = argparse.ArgumentParser()
 
-"""上面这些拿进来就行"""
+parser.add_argument('--batch_size',required=True,type=int,default=None)
+parser.add_argument('--learning_rate',required=True,type=int,default=None)
+parser.add_argument('--save_dir',required=True,type=str,default=None)
+parser.add_argument('--warmup_steps',required=True,type=int)
+parser.add_argument('--epoches',required=True,type=int)
+parser.add_argument('--max_grad_norm',required=True,type=int)
+parser.add_argument('--train_data_path',required=True,type=str)
+parser.add_argument('chunk_size',required=True,type=int)
+args = parser.parse_args()
 
-global_step = 0
-
-data_path = "./biencoder-nq-train.json"
-
-batch_size = 64
-drop_out = 0.1
-
-embedding_output_size = 768
-
-learning_rate = 1e-5
-
-epoch = 5
-
+chunk_nums = args.batch_size // args.chunk_size
+data_path = args.train_data_path
+batch_size = args.batch_size
+learning_rate = args.learning_rate
+epoches = args.epoches
 
 def dataLoader_for_DPR(batch_size, source_data: list, epochs):
     index = np.arange(0, len(source_data))
@@ -56,14 +48,24 @@ def dataLoader_for_DPR(batch_size, source_data: list, epochs):
 question_encoder = BertModel.from_pretrained("bert-base-uncased")
 context_encoder = BertModel.from_pretrained("bert-base-uncased")
 
-model = BiEncoder(question_encoder=question_encoder, context_encoder=context_encoder, dropout=drop_out,
-                  output_emb_size=embedding_output_size)
+model = BiEncoder(question_encoder=question_encoder, context_encoder=context_encoder)
 
 # dataset = NQdataSetForDPR(data_path)
 # data_loader = paddle.io.DataLoader(dataset,batch_size=batch_size,shuffle=True)
 
+def get_linear_scheduler(warmup_steps,training_steps):
+    def lr_lambda(current_step):
+        if current_step < warmup_steps:
+            return float(current_step) / float(max(1, warmup_steps))
+        return max(
+            0.0, float(training_steps - current_step) / float(max(1, training_steps - warmup_steps))
+        )
+    return LambdaDecay(learning_rate=args.learning_rate,lr_lambda=lr_lambda(),last_epoch=-1,verbose=False)
+
+training_steps = 58880  * args.epoches / args.batch_sizes
+scheduler = get_linear_scheduler(args.warmup_steps,training_steps)
 optimizer = paddle.optimizer.AdamW(
-    learning_rate=learning_rate,
+    learning_rate=scheduler,
     parameters=model.parameters()
 )
 
@@ -79,9 +81,8 @@ dataset = data.new_data
 
 
 def train():
-    global_step = 0
 
-    for _ in range(epoch):
+    for epoch in range(epoches):
 
         index = np.arange(0, len(dataset))
         np.random.shuffle(index)
@@ -90,10 +91,8 @@ def train():
 
         for i in index:
             # dataLoader
-
             batch_data.append(dataset[i])
             if (len(batch_data) == batch_size):
-
                 all_questions = []
                 all_contexts = []
                 # all_positions = []
@@ -109,10 +108,10 @@ def train():
                 all_inputs_contexts_id = all_batch_input.context_ids
                 all_inputs_contexts_segment = all_batch_input.ctx_segments
 
-                sub_q_ids = paddle.split(all_inputs_questions_id, 8, axis=0)
-                sub_c_ids = paddle.split(all_inputs_contexts_id, 8, axis=0)
-                sub_q_segments = paddle.split(all_inputs_questions_segment, 8, axis=0)
-                sub_c_segments = paddle.split(all_inputs_contexts_segment, 8, axis=0)
+                sub_q_ids = paddle.split(all_inputs_questions_id, chunk_nums, axis=0)
+                sub_c_ids = paddle.split(all_inputs_contexts_id, chunk_nums, axis=0)
+                sub_q_segments = paddle.split(all_inputs_questions_segment, chunk_nums, axis=0)
+                sub_c_segments = paddle.split(all_inputs_contexts_segment, chunk_nums, axis=0)
 
                 # chunked_x = [paddle.split(t, chunk_numbers, axis=0) for t in batch_data]
 
@@ -173,8 +172,8 @@ def train():
                 """grads_for_questions = [question for question in model_questions.grad]
                 grads_for_contexts = [context for context in model_contexts.grad]"""
 
-                grads_for_questions = paddle.split(model_questions.grad, 8, 0)
-                grads_for_contexts = paddle.split(model_contexts.grad, 8, 0)
+                grads_for_questions = paddle.split(model_questions.grad, chunk_nums, axis=0)
+                grads_for_contexts = paddle.split(model_contexts.grad, chunk_nums, axis=0)
 
                 # all_grads = [repos.grad for repos in model_reps]
                 # all_grads.append(model_reps.grad)
@@ -212,11 +211,15 @@ def train():
 
 
 
+                paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm, group_name=model.parameters())
                 optimizer.step()
+                scheduler.step()
                 optimizer.clear_grad()
                 all_CUDA_rnd_state = []
-                global_step = global_step + 1
+
                 batch_data = []
+
+
 
 
         EPOCH = str(epoch)
@@ -240,7 +243,6 @@ def train():
 # tokenizer.save_pretrained(save_dir)
 # pass
 # save models
-
 
 if __name__ == '__main__':
     train()
