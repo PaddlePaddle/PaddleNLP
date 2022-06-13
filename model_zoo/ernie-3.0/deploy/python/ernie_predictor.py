@@ -40,7 +40,7 @@ class InferBackend(object):
                                              model_path + ".pdiparams")
             config.enable_use_gpu(100, 0)
             paddle.set_device("gpu")
-            if is_int8_modele and use_fp16:
+            if is_int8_model and use_fp16:
                 print(
                     ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
                 )
