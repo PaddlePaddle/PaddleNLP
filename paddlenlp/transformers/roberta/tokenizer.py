@@ -82,6 +82,8 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/vocab.txt",
             "roberta-wwm-ext-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/vocab.txt",
+            "rbt6":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt6/vocab.txt",
             "rbt4":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt4/vocab.txt",
             "rbt3":
@@ -95,6 +97,9 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "roberta-wwm-ext-large": {
+            "do_lower_case": True
+        },
+        "rbt6": {
             "do_lower_case": True
         },
         "rbt4": {

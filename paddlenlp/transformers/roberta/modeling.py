@@ -135,6 +135,20 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
+        "rbt6": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0,
+        },
         "rbt4": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
@@ -185,10 +199,12 @@ class RobertaPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
             "roberta-wwm-ext-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
-            "rbt3":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
+            "rbt6":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt6/rbt6_chn_large.pdparams",
             "rbt4":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt4/rbt4_chn_large.pdparams",
+            "rbt3":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
             "rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
         }
