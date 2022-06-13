@@ -175,7 +175,8 @@ def do_generation(args):
     startup_program = paddle.static.default_startup_program()
     with paddle.static.program_guard(main_program, startup_program):
         with paddle.utils.unique_name.guard():
-            with paddle.static.device_guard('gpu:0'):
+            with paddle.static.device_guard(
+                    'gpu:0' if topo.pp_info.size > 1 else None):
                 feeds = create_data_holder(args)
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
@@ -202,6 +203,7 @@ def do_generation(args):
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
                     model_config["fuse"] = args.fuse
+                    model_config["fuse_mt"] = args.fuse_mt
                     model = GPTForGeneration(
                         GPTModel(**model_config),
                         max_length=args.max_dec_len,
@@ -210,7 +212,8 @@ def do_generation(args):
                         top_k=args.topk,
                         top_p=args.topp,
                         eos_id=eos_id,
-                        fuse=args.fuse)
+                        fuse=args.fuse,
+                        fuse_mt=args.fuse_mt)
                 else:
                     logger.error("No checkpoint load.")
                 model.eval()
@@ -221,6 +224,7 @@ def do_generation(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     main_program = main_program.clone(for_test=True)
+    #debug_program('main_program', main_program)
 
     model_urls = model.pretrained_resource_files_map['model_state']
     model_path = args.model_name_or_path
