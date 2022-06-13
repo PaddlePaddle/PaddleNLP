@@ -307,7 +307,8 @@ class TransformerDecoder(nn.Layer):
                 tgt_mask=None,
                 memory_mask=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                time_step=None):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
@@ -317,38 +318,48 @@ class TransformerDecoder(nn.Layer):
         new_caches = []
         self.checkpoints = []
 
-        for i, mod in enumerate(self.layers):
-            if cache is None:
-                if use_cache:
-                    output, new_cache = mod(output,
-                                            memory,
-                                            tgt_mask=tgt_mask,
-                                            use_cache=use_cache,
-                                            cache=cache)
-                    new_caches.append(new_cache)
-                else:
-                    output = mod(output,
-                                 memory,
-                                 tgt_mask=tgt_mask,
-                                 use_cache=use_cache,
-                                 cache=cache)
+        if isinstance(self.layers, nn.LayerList):
+            for i, mod in enumerate(self.layers):
+                if cache is None:
+                    if use_cache:
+                        output, new_cache = mod(output,
+                                                memory,
+                                                tgt_mask=tgt_mask,
+                                                use_cache=use_cache,
+                                                cache=cache)
+                        new_caches.append(new_cache)
+                    else:
+                        output = mod(output,
+                                     memory,
+                                     tgt_mask=tgt_mask,
+                                     use_cache=use_cache,
+                                     cache=cache)
 
-            else:
-                if use_cache:
-                    output, new_cache = mod(output,
-                                            memory,
-                                            tgt_mask=tgt_mask,
-                                            use_cache=use_cache,
-                                            cache=cache[i])
-                    new_caches.append(new_cache)
                 else:
-                    output = mod(output,
-                                 memory,
-                                 tgt_mask=tgt_mask,
-                                 use_cache=use_cache,
-                                 cache=cache[i])
+                    if use_cache:
+                        output, new_cache = mod(output,
+                                                memory,
+                                                tgt_mask=tgt_mask,
+                                                use_cache=use_cache,
+                                                cache=cache[i])
+                        new_caches.append(new_cache)
+                    else:
+                        output = mod(output,
+                                     memory,
+                                     tgt_mask=tgt_mask,
+                                     use_cache=use_cache,
+                                     cache=cache[i])
 
-            self.checkpoints.append(output.name)
+                self.checkpoints.append(output.name)
+        else:
+            # fused_multi_transformer
+            output = self.layers(output,
+                                 attn_mask=tgt_mask,
+                                 caches=cache,
+                                 time_step=time_step)
+            if cache:
+                new_caches = output[1]
+                output = output[0]
 
         if self.norm is not None:
             output = self.norm(output)
@@ -768,26 +779,61 @@ class GPTModel(GPTPretrainedModel):
                                         type_vocab_size, self.initializer_range,
                                         topo)
 
-        decoder_layers = nn.LayerList()
-        for i in range(num_hidden_layers):
-            DecoderLayer = TransformerDecoderLayer
-            if self.pipline_mode:
-                DecoderLayer = paddlenlp.ops.guard('gpu:{}'.format(
-                    i // self.layer_per_stage))(TransformerDecoderLayer)
-            decoder_layers.append(
-                DecoderLayer(d_model=hidden_size,
-                             nhead=num_attention_heads,
-                             dim_feedforward=intermediate_size,
-                             dropout=hidden_dropout_prob,
-                             activation=hidden_act,
-                             attn_dropout=attention_probs_dropout_prob,
-                             act_dropout=hidden_dropout_prob,
-                             weight_attr=paddle.ParamAttr(
-                                 initializer=nn.initializer.Normal(
-                                     mean=0.0, std=self.initializer_range)),
-                             bias_attr=None,
-                             topo=topo,
-                             fuse=kwargs.get('fuse', False)))
+        if kwargs.get('fuse_mt', False):
+            nranks, ring_id = 1, -1
+            if topo is not None and topo.mp_info.size > 1:
+                nranks = topo.mp_info.size
+                ring_id = 0
+
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Normal(
+                mean=0.0, std=self.initializer_range))
+            bias_attr = None
+            decoder_layers = incubate.nn.FusedMultiTransformer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                dropout_rate=hidden_dropout_prob,
+                activation=hidden_act,
+                qkv_weight_attrs=_convert_param_attr_to_list(
+                    weight_attr, num_hidden_layers),
+                qkv_bias_attrs=_convert_param_attr_to_list(
+                    bias_attr, num_hidden_layers),
+                linear_weight_attrs=_convert_param_attr_to_list(
+                    weight_attr, num_hidden_layers),
+                linear_bias_attrs=_convert_param_attr_to_list(
+                    bias_attr, num_hidden_layers),
+                ffn1_weight_attrs=_convert_param_attr_to_list(
+                    weight_attr, num_hidden_layers),
+                ffn1_bias_attrs=_convert_param_attr_to_list(
+                    bias_attr, num_hidden_layers),
+                ffn2_weight_attrs=_convert_param_attr_to_list(
+                    weight_attr, num_hidden_layers),
+                ffn2_bias_attrs=_convert_param_attr_to_list(
+                    bias_attr, num_hidden_layers),
+                epsilon=1e-5,
+                nranks=nranks,
+                ring_id=ring_id)
+        else:
+            decoder_layers = nn.LayerList()
+            for i in range(num_hidden_layers):
+                DecoderLayer = TransformerDecoderLayer
+                if self.pipline_mode:
+                    DecoderLayer = paddlenlp.ops.guard('gpu:{}'.format(
+                        i // self.layer_per_stage))(TransformerDecoderLayer)
+                decoder_layers.append(
+                    DecoderLayer(d_model=hidden_size,
+                                 nhead=num_attention_heads,
+                                 dim_feedforward=intermediate_size,
+                                 dropout=hidden_dropout_prob,
+                                 activation=hidden_act,
+                                 attn_dropout=attention_probs_dropout_prob,
+                                 act_dropout=hidden_dropout_prob,
+                                 weight_attr=paddle.ParamAttr(
+                                     initializer=nn.initializer.Normal(
+                                         mean=0.0, std=self.initializer_range)),
+                                 bias_attr=None,
+                                 topo=topo,
+                                 fuse=kwargs.get('fuse', False)))
 
         if self.pipline_mode:
             Decoder = paddlenlp.ops.guard(
@@ -809,7 +855,8 @@ class GPTModel(GPTPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                time_step=None):
         self.checkpoints = []
         if position_ids is None:
             past_length = 0
@@ -832,7 +879,8 @@ class GPTModel(GPTPretrainedModel):
                                        memory=None,
                                        tgt_mask=tgt_mask,
                                        use_cache=use_cache,
-                                       cache=cache)
+                                       cache=cache,
+                                       time_step=time_step)
         self.checkpoints.extend(self.decoder.checkpoints)
         return encoder_outputs
 
@@ -872,12 +920,14 @@ class GPTForPretraining(GPTPretrainedModel):
                 attention_mask=None,
                 masked_positions=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                time_step=None):
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
                            use_cache=use_cache,
-                           cache=cache)
+                           cache=cache,
+                           time_step=time_step)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
@@ -942,10 +992,17 @@ class GPTForGeneration(GPTPretrainedModel):
         self.topp = top_p
         self._init_gen_cache = False
         self.generation_caches = None
+        # for fused_multi_transformer
+        self.generation_time_step = None
         self._dtype = "float32"
         self._fuse = kwargs.get("fuse", False)
+        self._fuse_mt = kwargs.get("fuse_mt", False)
 
     def _init_generation_caches(self, src_ids):
+        if self._fuse and self._fuse_mt:
+            # output tensor is on CPUPlace
+            self.generation_time_step = paddle.shape(src_ids)[1]
+
         # not fuse, return None
         if self._init_gen_cache or self._fuse is False:
             return self.generation_caches
@@ -956,15 +1013,23 @@ class GPTForGeneration(GPTPretrainedModel):
         mp_n_head = num_heads // self.gpt.topo.mp_info.size
         hidden_size = self.gpt.hidden_size
         head_size = hidden_size // num_heads
+        seq_len = 0
+        if self._fuse_mt:
+            # FIXME(wangxi): dynamic get max_seq_len + dec_len
+            seq_len = 1024
         for i in range(num_layers):
             if self._fuse:
                 kv = layers.fill_constant_batch_size_like(
                     input=src_ids,
-                    shape=[2, -1, mp_n_head, 0, head_size],
+                    shape=[2, -1, mp_n_head, seq_len, head_size],
                     dtype=self._dtype,
                     value=0,
                     output_dim_idx=1)
-                self.generation_caches.append(TransformerDecoderLayer.Cache(kv))
+                if self._fuse_mt:
+                    self.generation_caches.append(kv)
+                else:
+                    self.generation_caches.append(
+                        TransformerDecoderLayer.Cache(kv))
             else:
                 k = layers.fill_constant_batch_size_like(
                     input=src_ids,
@@ -1040,12 +1105,14 @@ class GPTForGeneration(GPTPretrainedModel):
               attention_mask=None,
               masked_positions=None,
               use_cache=False,
-              cache=None):
+              cache=None,
+              time_step=None):
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
                            use_cache=use_cache,
-                           cache=cache)
+                           cache=cache,
+                           time_step=time_step)
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
@@ -1145,11 +1212,13 @@ class GPTForGeneration(GPTPretrainedModel):
             layers.increment(x=step_idx, value=1.0, in_place=True)
             layers.array_write(placehold_ids, i=step_idx, array=ids)
 
-            logits, decode_cached_kvs = self.model(pre_ids,
-                                                   tgt_pos,
-                                                   att_mask,
-                                                   use_cache=True,
-                                                   cache=cached_kvs)
+            logits, decode_cached_kvs = self.model(
+                pre_ids,
+                tgt_pos,
+                att_mask,
+                use_cache=True,
+                cache=cached_kvs,
+                time_step=self.generation_time_step)
 
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)
@@ -1181,10 +1250,13 @@ class GPTForGeneration(GPTPretrainedModel):
                 paddle.assign(decode_mask, attention_mask)
             for i in range(len(decode_cached_kvs)):
                 if self._fuse:
-                    paddle.assign(decode_cached_kvs[i].kv, cached_kvs[i].kv)
+                    if not self._fuse_mt:
+                        paddle.assign(decode_cached_kvs[i].kv, cached_kvs[i].kv)
                 else:
                     paddle.assign(decode_cached_kvs[i].k, cached_kvs[i].k)
                     paddle.assign(decode_cached_kvs[i].v, cached_kvs[i].v)
+            if self.generation_time_step:
+                paddle.increment(self.generation_time_step, value=1.0)
 
         ids, _ = layers.tensor_array_to_tensor(ids)
         return ids
