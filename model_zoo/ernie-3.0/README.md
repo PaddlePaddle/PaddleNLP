@@ -104,10 +104,10 @@
         <tr>
             <td rowspan=2 align=center> 24L1024H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 2.0-Large-zh</span>
+                <span style="font-size:18px"><b>ERNIE 2.0-Large-zh</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">77.03</span>
+                <span style="font-size:18px"><b>77.03</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">76.41</span>
