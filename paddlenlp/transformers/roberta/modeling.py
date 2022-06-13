@@ -162,7 +162,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 21128,
             "pad_token_id": 0
-        },
+        }
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
