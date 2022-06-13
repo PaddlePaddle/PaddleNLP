@@ -69,45 +69,6 @@
             </td>
         </tr>
         <tr>
-            <td rowspan=1 align=center> 20L1024H </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 3.0-Xbase-zh</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">78.71</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">76.85</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">59.89</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">62.41</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">84.76</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">82.51</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">89.80</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">84.47</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">75.49/92.67</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">86.36</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">84.59</span>
-            </td>
-        </tr>
-        <tr>
             <td rowspan=2 align=center> 24L1024H </td>
             <td style="text-align:center">
                 <span style="font-size:18px">ERNIE 2.0-Large-zh</span>
@@ -182,6 +143,45 @@
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">75.26</span>
+            </td>
+        </tr>
+              <tr>
+            <td rowspan=1 align=center> 20L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Xbase-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>78.71</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.85</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.89</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.76</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.51</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">89.80</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.47</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.49/92.67</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">86.36</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.59</span>
             </td>
         </tr>
         <tr>
