@@ -123,6 +123,7 @@ class ErnieTokenClsOp(Op):
                 items.append({
                     "pos": [start, len(token_label) - 1],
                     "entity": input_data[batch][start:len(token_label) - 1],
+                    "label": label_name,
                 })
             value.append(items)
         out_dict = {
