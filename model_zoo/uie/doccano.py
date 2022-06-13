@@ -49,12 +49,16 @@ def do_convert():
         raw_examples = f.readlines()
 
     def _create_ext_examples(examples,
-                             negative_ratio=0,
+                             negative_ratio,
+                             prompt_prefix="情感倾向",
+                             options=["正向", "负向"],
+                             seperator="##",
                              shuffle=False,
                              is_train=True):
-        entities, relations = convert_ext_examples(
-            examples, negative_ratio, is_train=is_train)
-        examples = entities + relations
+        entities, relations, aspects = convert_ext_examples(
+            examples, negative_ratio, prompt_prefix, options, seperator,
+            is_train)
+        examples = entities + relations + aspects
         if shuffle:
             indexes = np.random.permutation(len(examples))
             examples = [examples[i] for i in indexes]
@@ -79,7 +83,8 @@ def do_convert():
     if len(args.splits) == 0:
         if args.task_type == "ext":
             examples = _create_ext_examples(raw_examples, args.negative_ratio,
-                                            args.is_shuffle)
+                                            args.prompt_prefix, args.options,
+                                            args.seperator, args.is_shuffle)
         else:
             examples = _create_cls_examples(raw_examples, args.prompt_prefix,
                                             args.options, args.is_shuffle)
@@ -95,11 +100,22 @@ def do_convert():
 
         if args.task_type == "ext":
             train_examples = _create_ext_examples(
-                raw_examples[:p1], args.negative_ratio, args.is_shuffle)
+                raw_examples[:p1], args.negative_ratio, args.prompt_prefix,
+                args.options, args.seperator, args.is_shuffle)
             dev_examples = _create_ext_examples(
-                raw_examples[p1:p2], -1, is_train=False)
+                raw_examples[p1:p2],
+                -1,
+                args.prompt_prefix,
+                args.options,
+                args.seperator,
+                is_train=False)
             test_examples = _create_ext_examples(
-                raw_examples[p2:], -1, is_train=False)
+                raw_examples[p2:],
+                -1,
+                args.prompt_prefix,
+                args.options,
+                args.seperator,
+                is_train=False)
         else:
             train_examples = _create_cls_examples(
                 raw_examples[:p1], args.prompt_prefix, args.options)
@@ -127,7 +143,8 @@ if __name__ == "__main__":
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")
     parser.add_argument("--prompt_prefix", default="情感倾向", type=str, help="Used only for the classification task, the prompt prefix for classification")
     parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
-    parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
+    parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
+    parser.add_argument("--seperator", type=str, default='##', help="Used only for entity/aspect-level classification task, seperator for entity label and classification label")
 
     args = parser.parse_args()
     # yapf: enable
