@@ -5,7 +5,7 @@ pp_degree=2
 bs_item=16
 fp_item=fp16
 run_mode=DP2-MP8-PP2
-device_num=N4C8
+device_num=N4C32
 
 model=gpt
 micro_bs=${bs_item}
