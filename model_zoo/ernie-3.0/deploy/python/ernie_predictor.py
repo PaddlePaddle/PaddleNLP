@@ -30,16 +30,17 @@ class InferBackend(object):
                  set_dynamic_shape=False,
                  shape_info_file="shape_info.txt",
                  num_threads=10):
-        int8_model = self.paddle_quantize_model(model_path)
+        model_path = self.model_path_correction(model_path)
+        is_int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
-        if device == 'gpu' and int8_model or use_fp16:
+        if device == 'gpu' and is_int8_model or use_fp16:
             from paddle import inference
             self.predictor_type = "inference"
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
             config.enable_use_gpu(100, 0)
             paddle.set_device("gpu")
-            if int8_model and use_fp16:
+            if is_int8_model and use_fp16:
                 print(
                     ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
                 )
@@ -118,6 +119,17 @@ class InferBackend(object):
     def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
         from onnxruntime.quantization import QuantizationMode, quantize_dynamic
         quantize_dynamic(input_float_model, dynamic_quantized_model)
+
+    def model_path_correction(self, model_path):
+        if os.path.isfile(model_path + ".pdmodel"):
+            return model_path
+        new_model_path = None
+        for file in os.listdir(model_path):
+            if (file.count(".pdmodel")):
+                filename = file[:-8]
+                new_model_path = os.path.join(model_path, filename)
+                return new_model_path
+        assert new_model_path is not None, "Can not find model file in your path."
 
     def paddle_quantize_model(self, model_path):
         model = paddle.jit.load(model_path)
