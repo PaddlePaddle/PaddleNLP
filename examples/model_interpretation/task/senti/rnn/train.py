@@ -73,13 +73,16 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
@@ -90,15 +93,17 @@ if __name__ == "__main__":
     if args.language == 'ch':
         train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
     else:
-        train_ds, dev_ds = load_dataset(
-            "glue", "sst-2", splits=["train", "dev"])
+        train_ds, dev_ds = load_dataset("glue",
+                                        "sst-2",
+                                        splits=["train", "dev"])
 
     # Loads vocab.
     if not os.path.exists(args.vocab_path):
         raise RuntimeError('The vocab_path  can not be found in the path %s' %
                            args.vocab_path)
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
 
     tokenizer = CharTokenizer(vocab, args.language, '../../../punctuations')
 
@@ -110,21 +115,19 @@ if __name__ == "__main__":
 
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(
-        attention_layer=attention,
-        vocab_size=vocab_size,
-        lstm_hidden_size=lstm_hidden_size,
-        num_classes=num_classes,
-        padding_idx=pad_token_id)
+    model = BiLSTMAttentionModel(attention_layer=attention,
+                                 vocab_size=vocab_size,
+                                 lstm_hidden_size=lstm_hidden_size,
+                                 num_classes=num_classes,
+                                 padding_idx=pad_token_id)
 
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
-    trans_fn = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        is_test=False,
-        language=args.language)
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       is_test=False,
+                       language=args.language)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_value),  # input_ids
@@ -132,21 +135,19 @@ if __name__ == "__main__":
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
-    train_loader = create_dataloader(
-        train_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='train',
-        batchify_fn=batchify_fn)
-    dev_loader = create_dataloader(
-        dev_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='validation',
-        batchify_fn=batchify_fn)
+    train_loader = create_dataloader(train_ds,
+                                     trans_fn=trans_fn,
+                                     batch_size=args.batch_size,
+                                     mode='train',
+                                     batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dev_ds,
+                                   trans_fn=trans_fn,
+                                   batch_size=args.batch_size,
+                                   mode='validation',
+                                   batchify_fn=batchify_fn)
 
-    optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(), learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
+                                      learning_rate=args.lr)
 
     # Defines loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()

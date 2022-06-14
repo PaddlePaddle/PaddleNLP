@@ -41,12 +41,12 @@ class TextCNNModel(nn.Layer):
                  ngram_filter_sizes=(1, 2, 3),
                  fc_hidden_size=96):
         super().__init__()
-        self.embedder = nn.Embedding(
-            vocab_size, emb_dim, padding_idx=padding_idx)
-        self.encoder = CNNEncoder(
-            emb_dim=emb_dim,
-            num_filter=num_filter,
-            ngram_filter_sizes=ngram_filter_sizes)
+        self.embedder = nn.Embedding(vocab_size,
+                                     emb_dim,
+                                     padding_idx=padding_idx)
+        self.encoder = CNNEncoder(emb_dim=emb_dim,
+                                  num_filter=num_filter,
+                                  ngram_filter_sizes=ngram_filter_sizes)
         self.fc = nn.Linear(self.encoder.get_output_dim(), fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
 

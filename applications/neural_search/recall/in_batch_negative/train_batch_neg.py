@@ -84,38 +84,40 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(
-        read_text_pair, data_path=args.train_set_file, lazy=False)
+    train_ds = load_dataset(read_text_pair,
+                            data_path=args.train_set_file,
+                            lazy=False)
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    model = SemanticIndexBatchNeg(
-        pretrained_model,
-        margin=args.margin,
-        scale=args.scale,
-        output_emb_size=args.output_emb_size)
+    model = SemanticIndexBatchNeg(pretrained_model,
+                                  margin=args.margin,
+                                  scale=args.scale,
+                                  output_emb_size=args.output_emb_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -147,18 +149,17 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
 
-            loss = model(
-                query_input_ids=query_input_ids,
-                title_input_ids=title_input_ids,
-                query_token_type_ids=query_token_type_ids,
-                title_token_type_ids=title_token_type_ids)
+            loss = model(query_input_ids=query_input_ids,
+                         title_input_ids=title_input_ids,
+                         query_token_type_ids=query_token_type_ids,
+                         title_token_type_ids=title_token_type_ids)
 
             global_step += 1
             if global_step % 50 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()

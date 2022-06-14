@@ -73,8 +73,8 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                 num_samples_per_epoch = (tokens_per_epoch - 1) // seq_length
                 assert last_epoch_num_samples < (num_samples_per_epoch + 1), \
                     'last epoch number of samples exceeded max value.'
-                separate_last_epoch = (
-                    last_epoch_num_samples < int(0.80 * num_samples_per_epoch))
+                separate_last_epoch = (last_epoch_num_samples < int(
+                    0.80 * num_samples_per_epoch))
             # Note. len(doc_idx) = num_epochs * len(doc)
             start_time = time.time()
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
@@ -118,8 +118,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
                 time.sleep(3)
             else:
                 try:
-                    np.load(
-                        shuffle_idx_filename, allow_pickle=True, mmap_mode='r')
+                    np.load(shuffle_idx_filename,
+                            allow_pickle=True,
+                            mmap_mode='r')
                     break
                 except Exception as e:
                     print(
@@ -134,8 +135,9 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
     # Load mappings.
     doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode='r')
     sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode='r')
-    shuffle_idx = np.load(
-        shuffle_idx_filename, allow_pickle=True, mmap_mode='r')
+    shuffle_idx = np.load(shuffle_idx_filename,
+                          allow_pickle=True,
+                          mmap_mode='r')
     return doc_idx, sample_idx, shuffle_idx
 
 
@@ -212,14 +214,18 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     if total_size >= (np.iinfo(np.uint32).max - 1):
         dtype_ = np.int64
 
-    shuffle_idx_first = np.arange(
-        start=0, stop=num_samples, step=1, dtype=dtype_)
+    shuffle_idx_first = np.arange(start=0,
+                                  stop=num_samples,
+                                  step=1,
+                                  dtype=dtype_)
     np_rng.shuffle(shuffle_idx_first)
     if num_samples == total_size:
         return shuffle_idx_first
 
-    shuffle_idx_last = np.arange(
-        start=num_samples, stop=total_size, step=1, dtype=dtype_)
+    shuffle_idx_last = np.arange(start=num_samples,
+                                 stop=total_size,
+                                 step=1,
+                                 dtype=dtype_)
     np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
@@ -243,8 +249,8 @@ def get_train_valid_test_split_(splits_string, size):
     splits = [split / splits_sum for split in splits]
     splits_index = [0]
     for index, split in enumerate(splits):
-        splits_index.append(splits_index[index] + int(
-            round(split * float(size))))
+        splits_index.append(splits_index[index] +
+                            int(round(split * float(size))))
     diff = splits_index[-1] - size
     for index in range(1, len(splits_index)):
         splits_index[index] -= diff
@@ -254,27 +260,27 @@ def get_train_valid_test_split_(splits_string, size):
 
 
 def create_pretrained_dataset(
-        args,
-        input_path,
-        local_rank,
-        data_world_rank,
-        data_world_size,
-        eos_id,
-        worker_init=None,
-        max_seq_len=1024,
-        places=None,
-        data_holders=None,
-        pipeline_mode=False, ):
+    args,
+    input_path,
+    local_rank,
+    data_world_rank,
+    data_world_size,
+    eos_id,
+    worker_init=None,
+    max_seq_len=1024,
+    places=None,
+    data_holders=None,
+    pipeline_mode=False,
+):
 
     if local_rank == 0:
         start_time = time.time()
         print('> compiling dataset index builder ...')
         from data_tools.dataset_utils import compile_helper
         compile_helper()
-        print(
-            '>>> done with dataset index builder. Compilation time: {:.3f} '
-            'seconds'.format(time.time() - start_time),
-            flush=True)
+        print('>>> done with dataset index builder. Compilation time: {:.3f} '
+              'seconds'.format(time.time() - start_time),
+              flush=True)
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -300,8 +306,9 @@ def create_pretrained_dataset(
         logger.warning(
             "You are using compatible dataset, please make new dataset as the readme!"
         )
-        process_data = np.load(
-            input_prefix + "_ids.npz", mmap_mode="r+", allow_pickle=True)
+        process_data = np.load(input_prefix + "_ids.npz",
+                               mmap_mode="r+",
+                               allow_pickle=True)
         sample_ids = process_data["ids"]
         sample_lens = process_data["lens"].astype("int32")
     else:
@@ -309,8 +316,9 @@ def create_pretrained_dataset(
             if not os.path.isfile(input_prefix + suffix):
                 raise ValueError("File Not found, %s" % (path + suffix))
 
-        sample_ids = np.load(
-            input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        sample_ids = np.load(input_prefix + "_ids.npy",
+                             mmap_mode="r",
+                             allow_pickle=True)
         # All documment ids, extend as 1-D array.
 
         process_data = np.load(input_prefix + "_idx.npz")
@@ -324,18 +332,18 @@ def create_pretrained_dataset(
             len(sample_lens), splits[-1])
 
     def build_dataset(index, name, num_samples):
-        dataset = GPTDataset(
-            file_prefix=input_prefix,
-            build_data_file=local_rank == 0,
-            micro_batch_size=args.micro_batch_size,
-            name="gpt_" + name,
-            max_seq_len=max_seq_len,
-            num_samples=num_samples,
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=eos_id,
-            seed=args.seed)
+        dataset = GPTDataset(file_prefix=input_prefix,
+                             build_data_file=local_rank == 0,
+                             micro_batch_size=args.micro_batch_size,
+                             name="gpt_" + name,
+                             max_seq_len=max_seq_len,
+                             num_samples=num_samples,
+                             documents=np.arange(splits[index],
+                                                 splits[index + 1]),
+                             sample_ids=sample_ids,
+                             sample_lens=sample_lens,
+                             eos_id=eos_id,
+                             seed=args.seed)
         batch_sampler = DistributedBatchSampler(
             dataset,
             batch_size=args.micro_batch_size,
@@ -349,41 +357,43 @@ def create_pretrained_dataset(
             def data_gen():
                 for data in dataset:
                     yield tuple(
-                        [np.expand_dims(
-                            np.array(x), axis=0) for x in data])
+                        [np.expand_dims(np.array(x), axis=0) for x in data])
 
             data_loader = paddle.fluid.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
             data_loader.set_batch_generator(data_gen, places)
         else:
-            data_loader = DataLoader(
-                dataset=dataset,
-                places=places,
-                feed_list=data_holders,
-                batch_sampler=batch_sampler,
-                num_workers=0,
-                worker_init_fn=worker_init,
-                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-                return_list=False)
+            data_loader = DataLoader(dataset=dataset,
+                                     places=places,
+                                     feed_list=data_holders,
+                                     batch_sampler=batch_sampler,
+                                     num_workers=0,
+                                     worker_init_fn=worker_init,
+                                     collate_fn=Tuple(Stack(), Stack(), Stack(),
+                                                      Stack(), Stack()),
+                                     return_list=False)
         return data_loader
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_data_loader = build_dataset(0, "train", args.micro_batch_size *
-                                      args.max_steps * data_world_size)
+    train_data_loader = build_dataset(
+        0, "train", args.micro_batch_size * args.max_steps * data_world_size)
     if pipeline_mode:
         valid_data_loader, test_data_loader = None, None
     else:
-        valid_data_loader = build_dataset(1, "valid", args.micro_batch_size *
-                                          (args.max_steps // args.eval_freq + 1)
-                                          * args.eval_iters * data_world_size)
-        test_data_loader = build_dataset(2, "test", args.micro_batch_size *
-                                         args.test_iters * data_world_size)
+        valid_data_loader = build_dataset(
+            1, "valid",
+            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
+            args.eval_iters * data_world_size)
+        test_data_loader = build_dataset(
+            2, "test",
+            args.micro_batch_size * args.test_iters * data_world_size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
 
 class GPTDataset(paddle.io.Dataset):
+
     def __init__(self,
                  file_prefix,
                  micro_batch_size,
@@ -422,8 +432,8 @@ class GPTDataset(paddle.io.Dataset):
         tokens = tokens[:-1]
         seq_length = len(tokens)
         # Attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-                                                                 seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape(
+            (1, seq_length, seq_length))
 
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
@@ -454,13 +464,13 @@ class GPTDataset(paddle.io.Dataset):
         else:
             current_start_pos = self.start_pos[self.doc_idx[doc_index_f]]
             next_start_pos = self.start_pos[self.doc_idx[doc_index_f] + 1]
-            tokens = self.sample_ids[current_start_pos + offset_f:
-                                     next_start_pos].tolist()
+            tokens = self.sample_ids[current_start_pos +
+                                     offset_f:next_start_pos].tolist()
             for i in range(doc_index_f + 1, doc_index_l):
                 current_start_pos = self.start_pos[self.doc_idx[i]]
                 next_start_pos = self.start_pos[self.doc_idx[i] + 1]
-                tokens.extend(self.sample_ids[current_start_pos:next_start_pos]
-                              .tolist())
+                tokens.extend(
+                    self.sample_ids[current_start_pos:next_start_pos].tolist())
             last_start_pos = self.start_pos[self.doc_idx[doc_index_l]]
             tokens.extend(self.sample_ids[last_start_pos:last_start_pos +
                                           offset_l + 1].tolist())

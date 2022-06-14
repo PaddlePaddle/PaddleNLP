@@ -25,6 +25,7 @@ __all__ = ['DetectionF1', 'CorrectionF1']
 
 
 class DetectionF1(Metric):
+
     def __init__(self, pos_label=1, name='DetectionF1', *args, **kwargs):
         super(DetectionF1, self).__init__(*args, **kwargs)
         self.pos_label = pos_label
@@ -80,6 +81,7 @@ class DetectionF1(Metric):
 
 
 class CorrectionF1(DetectionF1):
+
     def __init__(self, pos_label=1, name='CorrectionF1', *args, **kwargs):
         super(CorrectionF1, self).__init__(pos_label, name, *args, **kwargs)
 

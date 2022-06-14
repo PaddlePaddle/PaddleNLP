@@ -18,6 +18,7 @@ __all__ = ['BaseFasterTokenizer']
 
 
 class BaseFasterTokenizer:
+
     def __init__(self, tokenizer_impl, parma_dict=None):
         self._tokenizer = tokenizer_impl
         self._parma_dict = parma_dict if parma_dict is not None else {}
@@ -25,7 +26,8 @@ class BaseFasterTokenizer:
     def __repr__(self):
         return "Tokenizer(vocabulary_size={}, {})".format(
             self._tokenizer.get_vocab_size(),
-            ", ".join(k + "=" + str(v) for k, v in self._parma_dict.items()), )
+            ", ".join(k + "=" + str(v) for k, v in self._parma_dict.items()),
+        )
 
     def num_special_tokens_to_add(self, is_pair):
         return self._tokenizer.num_special_tokens_to_add(is_pair)
@@ -38,20 +40,22 @@ class BaseFasterTokenizer:
             with_added_tokens=with_added_tokens)
 
     def enable_padding(
-            self,
-            direction="right",
-            pad_id=0,
-            pad_type_id=0,
-            pad_token="[PAD]",
-            pad_to_multiple_of=None,
-            length=None, ):
+        self,
+        direction="right",
+        pad_id=0,
+        pad_type_id=0,
+        pad_token="[PAD]",
+        pad_to_multiple_of=None,
+        length=None,
+    ):
         return self._tokenizer.enable_padding(
             direction=direction,
             pad_to_multiple_of=pad_to_multiple_of,
             pad_id=pad_id,
             pad_type_id=pad_type_id,
             pad_token=pad_token,
-            length=length, )
+            length=length,
+        )
 
     def disable_padding(self):
         self._tokenizer.disable_padding()
@@ -81,11 +85,12 @@ class BaseFasterTokenizer:
         return self._tokenizer.add_special_tokens(tokens)
 
     def encode(
-            self,
-            sequence,
-            pair=None,
-            is_pretokenized=False,
-            add_special_tokens=True, ):
+        self,
+        sequence,
+        pair=None,
+        is_pretokenized=False,
+        add_special_tokens=True,
+    ):
         if sequence is None:
             raise ValueError("encode: `sequence` can't be `None`")
         return self._tokenizer.encode(sequence, pair, is_pretokenized,
@@ -105,8 +110,8 @@ class BaseFasterTokenizer:
             raise ValueError(
                 "None input is not valid. Should be a list of integers.")
 
-        return self._tokenizer.decode(
-            ids, skip_special_tokens=skip_special_tokens)
+        return self._tokenizer.decode(ids,
+                                      skip_special_tokens=skip_special_tokens)
 
     def decode_batch(self, sequences, skip_special_tokens=True) -> str:
         if sequences is None:

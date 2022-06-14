@@ -24,6 +24,7 @@ import unittest
 
 
 class TestBasicTokenizer(CpuCommonTest):
+
     def set_attr(self):
         self.do_lower_case = True
 
@@ -42,12 +43,14 @@ class TestBasicTokenizer(CpuCommonTest):
 
 
 class TestBasicTokenizerChinese(TestBasicTokenizer):
+
     def set_test_case(self):
         self.text = "这是个Simple的文本。"
         self.expected_text_array = ['这', '是', '个', 'simple', '的', '文', '本', '。']
 
 
 class TestBasicTokenizerCased(TestBasicTokenizer):
+
     def set_attr(self):
         self.do_lower_case = False
 
@@ -57,24 +60,28 @@ class TestBasicTokenizerCased(TestBasicTokenizer):
 
 
 class TestBasicTokenizerChineseCased(TestBasicTokenizerCased):
+
     def set_test_case(self):
         self.text = "这是个Simple的文本。"
         self.expected_text_array = ['这', '是', '个', 'Simple', '的', '文', '本', '。']
 
 
 class TestBasicTokenizerControlChar(TestBasicTokenizer):
+
     def set_test_case(self):
         self.text = "This\11  is a SImple\10 text"
         self.expected_text_array = ['this', 'is', 'a', 'simple', 'text']
 
 
 class TestBasicTokenizerStripAccents(TestBasicTokenizer):
+
     def set_test_case(self):
         self.text = "This  is ä SImple text"
         self.expected_text_array = ['this', 'is', 'a', 'simple', 'text']
 
 
 class TestBasicTokenizerPunctuation(TestBasicTokenizer):
+
     def set_test_case(self):
         self.text = "This ^ is ä SImple text$\u00A0"
         self.expected_text_array = [
@@ -83,6 +90,7 @@ class TestBasicTokenizerPunctuation(TestBasicTokenizer):
 
 
 class TestBasicTokenizerBytes(TestBasicTokenizer):
+
     def set_test_case(self):
         self.text = "This ^ is ä SImple text$\u00A0".encode('utf-8')
         self.expected_text_array = [
@@ -91,6 +99,7 @@ class TestBasicTokenizerBytes(TestBasicTokenizer):
 
 
 class TestBasicTokenizerErrorStr(CpuCommonTest):
+
     @assert_raises(ValueError)
     def test_tokenize(self):
         self.tokenizer = BasicTokenizer()
@@ -99,6 +108,7 @@ class TestBasicTokenizerErrorStr(CpuCommonTest):
 
 
 class TestWordpieceTokenizer(CpuCommonTest):
+
     def setUp(self):
         vocab = [
             "[UNK]", "[CLS]", "[SEP]", "th", "##is", "is", "simple", "text"
@@ -123,6 +133,7 @@ class TestWordpieceTokenizer(CpuCommonTest):
 
 
 class TestBertTokenizer(CpuCommonTest):
+
     def set_attr(self):
         self.do_lower_case = True
 
@@ -161,11 +172,10 @@ class TestBertTokenizer(CpuCommonTest):
         expected_token_type_ids = [0, 0, 0, 0, 0, 0, 0, 0]
         expected_attention_mask = [1] * len(expected_input_ids)
         expected_tokens_mask = [1, 0, 0, 0, 0, 0, 0, 1]
-        result = self.tokenizer(
-            "This  is a simple text",
-            return_attention_mask=True,
-            return_length=True,
-            return_special_tokens_mask=True)
+        result = self.tokenizer("This  is a simple text",
+                                return_attention_mask=True,
+                                return_length=True,
+                                return_special_tokens_mask=True)
         self.check_output_equal(result['input_ids'], expected_input_ids)
         self.check_output_equal(result['token_type_ids'],
                                 expected_token_type_ids)
@@ -264,10 +274,10 @@ class TestBertTokenizer(CpuCommonTest):
             self.tokenizer.cls_token, self.tokenizer.unk_token,
             self.tokenizer.sep_token
         ])
-        self.check_output_equal(
-            set(self.tokenizer.all_special_tokens), expected_special_tokens_set)
-        self.check_output_equal(
-            set(self.tokenizer.all_special_ids), set([0, 1, 2, 14, 15]))
+        self.check_output_equal(set(self.tokenizer.all_special_tokens),
+                                expected_special_tokens_set)
+        self.check_output_equal(set(self.tokenizer.all_special_ids),
+                                set([0, 1, 2, 14, 15]))
 
     @assert_raises(ValueError)
     def test_non_exist_vocab_file(self):
@@ -275,6 +285,7 @@ class TestBertTokenizer(CpuCommonTest):
 
 
 class TestBertTokenizerFromPretrained(CpuCommonTest):
+
     @slow
     def test_from_pretrained(self):
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -294,13 +305,12 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],
@@ -335,13 +345,12 @@ class TestBertTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],

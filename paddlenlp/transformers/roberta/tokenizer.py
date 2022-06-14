@@ -122,8 +122,8 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -195,8 +195,8 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -307,7 +307,9 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
@@ -375,38 +377,37 @@ class RobertaBPETokenizer(GPTTokenizer):
                  mask_token="<mask>",
                  **kwargs):
 
-        bos_token = AddedToken(
-            bos_token, lstrip=False,
-            rstrip=False) if isinstance(bos_token, str) else bos_token
-        eos_token = AddedToken(
-            eos_token, lstrip=False,
-            rstrip=False) if isinstance(eos_token, str) else eos_token
-        sep_token = AddedToken(
-            sep_token, lstrip=False,
-            rstrip=False) if isinstance(sep_token, str) else sep_token
-        cls_token = AddedToken(
-            cls_token, lstrip=False,
-            rstrip=False) if isinstance(cls_token, str) else cls_token
-        unk_token = AddedToken(
-            unk_token, lstrip=False,
-            rstrip=False) if isinstance(unk_token, str) else unk_token
-        pad_token = AddedToken(
-            pad_token, lstrip=False,
-            rstrip=False) if isinstance(pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   cls_token, str) else cls_token
+        unk_token = AddedToken(unk_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   pad_token, str) else pad_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
 
-        self._build_special_tokens_map_extended(
-            bos_token=bos_token,
-            eos_token=eos_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            mask_token=mask_token)
+        self._build_special_tokens_map_extended(bos_token=bos_token,
+                                                eos_token=eos_token,
+                                                sep_token=sep_token,
+                                                cls_token=cls_token,
+                                                unk_token=unk_token,
+                                                pad_token=pad_token,
+                                                mask_token=mask_token)
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
@@ -511,8 +512,8 @@ class RobertaBPETokenizer(GPTTokenizer):
 
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
-                                                          ) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
+            [0] * len(token_ids_1)) + [1]
 
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
@@ -526,8 +527,8 @@ class RobertaBPETokenizer(GPTTokenizer):
 
     def convert_tokens_to_string(self, tokens):
         text = ''.join(tokens)
-        text = bytearray([self.byte_decoder[c] for c in text]).decode(
-            'utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
         return text
 
     def num_special_tokens_to_add(self, pair=False):
@@ -545,8 +546,8 @@ class RobertaBPETokenizer(GPTTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
 
 class RobertaTokenizer:
@@ -601,8 +602,8 @@ class RobertaTokenizer:
             default_root = os.path.join(MODEL_HOME,
                                         pretrained_model_name_or_path)
             try:
-                resolved_config_file = get_path_from_url(config_file,
-                                                         default_root)
+                resolved_config_file = get_path_from_url(
+                    config_file, default_root)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

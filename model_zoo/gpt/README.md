@@ -12,7 +12,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── dataset.py              # 数据处理
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
-├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample  
+├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample
 ├── lr.py                   # 学习率控制
 ├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档

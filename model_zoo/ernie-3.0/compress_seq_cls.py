@@ -24,11 +24,13 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
-    Trainer, )
+    Trainer,
+)
 
 from paddlenlp.transformers import (
     AutoTokenizer,
-    AutoModelForSequenceClassification, )
+    AutoModelForSequenceClassification,
+)
 from paddlenlp.utils.log import logger
 
 from compress_trainer import CompressConfig, PTQConfig
@@ -39,7 +41,8 @@ from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import (
     ALL_DATASETS,
     DataArguments,
-    ModelArguments, )
+    ModelArguments,
+)
 
 
 def main():
@@ -78,7 +81,7 @@ def main():
         raw_datasets['train'].label_list)
 
     criterion = paddle.nn.CrossEntropyLoss()
-    # Define tokenizer, model, loss function. 
+    # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
@@ -95,14 +98,13 @@ def main():
     train_dataset = raw_datasets["train"].map(trans_fn)
     eval_dataset = raw_datasets["dev"].map(trans_fn)
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer,
-        criterion=criterion)
+    trainer = Trainer(model=model,
+                      args=training_args,
+                      data_collator=data_collator,
+                      train_dataset=train_dataset,
+                      eval_dataset=eval_dataset,
+                      tokenizer=tokenizer,
+                      criterion=criterion)
 
     output_dir = os.path.join(model_args.model_name_or_path, "compress")
     if not os.path.exists(output_dir):
@@ -111,12 +113,11 @@ def main():
     compress_config = CompressConfig(quantization_config=PTQConfig(
         algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
 
-    trainer.compress(
-        data_args.dataset,
-        output_dir,
-        pruning=True,
-        quantization=True,
-        compress_config=compress_config)
+    trainer.compress(data_args.dataset,
+                     output_dir,
+                     pruning=True,
+                     quantization=True,
+                     compress_config=compress_config)
 
 
 if __name__ == "__main__":

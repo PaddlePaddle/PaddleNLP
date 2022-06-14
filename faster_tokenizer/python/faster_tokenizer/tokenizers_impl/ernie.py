@@ -25,6 +25,7 @@ __all__ = ['ErnieFasterTokenizer']
 
 
 class ErnieFasterTokenizer(BaseFasterTokenizer):
+
     def __init__(self,
                  vocab=None,
                  unk_token="[UNK]",

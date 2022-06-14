@@ -78,8 +78,8 @@ class TritonPythonModel:
             probs = probs.max(axis=-1)
             # print("label:", data.argmax(axis=-1))
             # print("probs:", probs)
-            out_tensor1 = pb_utils.Tensor(
-                self.output_names[0], data.argmax(axis=-1))
+            out_tensor1 = pb_utils.Tensor(self.output_names[0],
+                                          data.argmax(axis=-1))
             out_tensor2 = pb_utils.Tensor(self.output_names[1], probs)
             inference_response = pb_utils.InferenceResponse(
                 output_tensors=[out_tensor1, out_tensor2])
