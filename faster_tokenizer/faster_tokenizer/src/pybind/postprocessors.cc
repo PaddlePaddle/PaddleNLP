@@ -169,39 +169,34 @@ void BindPostProcessors(pybind11::module* m) {
   py::class_<postprocessors::TemplatePostProcessor, PyTemplatePostProcessor>(
       submodule, "TemplatePostProcessor")
       .def(
-          "__init__",
-          [](postprocessors::TemplatePostProcessor* self,
-             const py::object& single_obj,
-             const py::object& pair_obj,
-             const py::object& special_tokens_obj) {
-            VLOG(0) << "Setting single";
+          py::init([](const py::object& single_obj,
+                      const py::object& pair_obj,
+                      const py::object& special_tokens_obj) {
+            postprocessors::TemplatePostProcessor self;
             // Setting single
             if (py::isinstance<py::list>(single_obj)) {
               std::vector<std::string> template_piece =
                   CastPyArg2VectorOfStr(single_obj.ptr(), 0);
-              self->single_.GetPiecesFromVec(template_piece);
+              self.single_.GetPiecesFromVec(template_piece);
             } else if (py::isinstance<py::str>(single_obj)) {
-              self->single_.GetPiecesFromStr(
+              self.single_.GetPiecesFromStr(
                   CastPyArg2AttrString(single_obj.ptr(), 0));
             } else {
               throw py::value_error(
                   "Type of args single need to be List[str] or str.");
             }
             // Setting pair
-            VLOG(0) << "Setting pair";
             if (py::isinstance<py::list>(pair_obj)) {
               std::vector<std::string> template_piece =
                   CastPyArg2VectorOfStr(pair_obj.ptr(), 0);
-              self->pair_.GetPiecesFromVec(template_piece);
+              self.pair_.GetPiecesFromVec(template_piece);
             } else if (py::isinstance<py::str>(pair_obj)) {
-              self->pair_.GetPiecesFromStr(
+              self.pair_.GetPiecesFromStr(
                   CastPyArg2AttrString(pair_obj.ptr(), 0));
             } else {
               throw py::value_error(
                   "Type of args pair need to be List[str] or str.");
             }
-
-            VLOG(0) << "Setting special_tokens";
             // Setting special_tokens
             if (py::isinstance<py::list>(special_tokens_obj)) {
               std::vector<postprocessors::SpecialToken> special_tokens;
@@ -287,14 +282,14 @@ void BindPostProcessors(pybind11::module* m) {
                       "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
                 }
               }
-              VLOG(0) << "Before setting special_tokens_map_";
-              self->special_tokens_map_.SetTokensMap(special_tokens);
+              self.special_tokens_map_.SetTokensMap(special_tokens);
             } else {
               throw py::value_error(
                   "Type of args special_tokens need to be "
                   "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
             }
-          },
+            return self;
+          }),
           py::arg("single"),
           py::arg("pair"),
           py::arg("special_tokens"))
