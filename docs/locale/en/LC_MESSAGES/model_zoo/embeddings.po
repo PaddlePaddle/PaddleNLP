@@ -23,31 +23,31 @@ msgstr ""
 
 #: ../model_zoo/embeddings.md:3 ../model_zoo/embeddings.md:24
 msgid "介绍"
-msgstr ""
+msgstr "Introduction"
 
 #: ../model_zoo/embeddings.md:4 ../model_zoo/embeddings.md:28
 msgid "用法"
-msgstr ""
+msgstr "Usage"
 
 #: ../model_zoo/embeddings.md:5 ../model_zoo/embeddings.md:30
 msgid "TokenEmbedding参数"
-msgstr ""
+msgstr "TokenEmbedding Parameters"
 
 #: ../model_zoo/embeddings.md:6 ../model_zoo/embeddings.md:69
 msgid "初始化"
-msgstr ""
+msgstr "Initialization"
 
 #: ../model_zoo/embeddings.md:7 ../model_zoo/embeddings.md:101
 msgid "查询embedding结果"
-msgstr ""
+msgstr "Search embedding results"
 
 #: ../model_zoo/embeddings.md:8 ../model_zoo/embeddings.md:115
 msgid "可视化embedding结果"
-msgstr ""
+msgstr "Visualizing embedding results"
 
 #: ../model_zoo/embeddings.md:9 ../model_zoo/embeddings.md:140
 msgid "计算词向量cosine相似度"
-msgstr ""
+msgstr "Calculate the similarity of cosine for vectors"
 
 #: ../model_zoo/embeddings.md:10 ../model_zoo/embeddings.md:147
 msgid "计算词向量内积"

@@ -23,5 +23,5 @@ msgstr ""
 
 #: ../metrics/metrics.md:3
 msgid "目前PaddleNLP提供以下模型评价指标："
-msgstr ""
+msgstr "Currently available metrics in PaddleNLP:"
 
