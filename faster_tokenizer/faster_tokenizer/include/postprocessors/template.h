@@ -174,7 +174,12 @@ struct TemplatePostProcessor : public PostProcessor {
                           core::Encoding* result_encoding) const override;
   virtual size_t AddedTokensNum(bool is_pair) const override;
 
-
+  void UpdateSinglePieces(const std::string& template_str);
+  void UpdateSinglePieces(const std::vector<std::string>& pieces);
+  void UpdatePairPieces(const std::string& template_str);
+  void UpdatePairPieces(const std::vector<std::string>& pieces);
+  void UpdateAddedTokensNum();
+  void SetTokensMap(const std::vector<SpecialToken>& special_tokens);
   size_t CountAdded(Template* template_,
                     const SpecialTokensMap& special_tokens_map);
   size_t DefaultAdded(bool is_single = true);

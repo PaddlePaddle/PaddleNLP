@@ -177,9 +177,9 @@ void BindPostProcessors(pybind11::module* m) {
             if (py::isinstance<py::list>(single_obj)) {
               std::vector<std::string> template_piece =
                   CastPyArg2VectorOfStr(single_obj.ptr(), 0);
-              self.single_.GetPiecesFromVec(template_piece);
+              self.UpdateSinglePieces(template_piece);
             } else if (py::isinstance<py::str>(single_obj)) {
-              self.single_.GetPiecesFromStr(
+              self.UpdateSinglePieces(
                   CastPyArg2AttrString(single_obj.ptr(), 0));
             } else {
               throw py::value_error(
@@ -189,10 +189,9 @@ void BindPostProcessors(pybind11::module* m) {
             if (py::isinstance<py::list>(pair_obj)) {
               std::vector<std::string> template_piece =
                   CastPyArg2VectorOfStr(pair_obj.ptr(), 0);
-              self.pair_.GetPiecesFromVec(template_piece);
+              self.UpdatePairPieces(template_piece);
             } else if (py::isinstance<py::str>(pair_obj)) {
-              self.pair_.GetPiecesFromStr(
-                  CastPyArg2AttrString(pair_obj.ptr(), 0));
+              self.UpdatePairPieces(CastPyArg2AttrString(pair_obj.ptr(), 0));
             } else {
               throw py::value_error(
                   "Type of args pair need to be List[str] or str.");
@@ -282,7 +281,7 @@ void BindPostProcessors(pybind11::module* m) {
                       "List[Union[Tuple[int, str], Tuple[str, int], dict]]");
                 }
               }
-              self.special_tokens_map_.SetTokensMap(special_tokens);
+              self.SetTokensMap(special_tokens);
             } else {
               throw py::value_error(
                   "Type of args special_tokens need to be "

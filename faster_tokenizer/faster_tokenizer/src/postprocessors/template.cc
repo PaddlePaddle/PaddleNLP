@@ -187,18 +187,42 @@ size_t TemplatePostProcessor::DefaultAdded(bool is_single) {
   return CountAdded(target, special_tokens_map_);
 }
 
-TemplatePostProcessor::TemplatePostProcessor() {
+void TemplatePostProcessor::UpdateAddedTokensNum() {
   added_single_ = DefaultAdded(true);
   added_pair_ = DefaultAdded(false);
 }
+
+void TemplatePostProcessor::UpdateSinglePieces(
+    const std::string& template_str) {
+  single_.GetPiecesFromStr(template_str);
+  added_single_ = DefaultAdded(true);
+}
+
+void TemplatePostProcessor::UpdateSinglePieces(
+    const std::vector<std::string>& pieces) {
+  single_.GetPiecesFromVec(pieces);
+  added_single_ = DefaultAdded(true);
+}
+
+void TemplatePostProcessor::UpdatePairPieces(const std::string& template_str) {
+  pair_.GetPiecesFromStr(template_str);
+  added_pair_ = DefaultAdded(false);
+}
+
+void TemplatePostProcessor::UpdatePairPieces(
+    const std::vector<std::string>& pieces) {
+  pair_.GetPiecesFromVec(pieces);
+  added_pair_ = DefaultAdded(false);
+}
+
+TemplatePostProcessor::TemplatePostProcessor() { UpdateAddedTokensNum(); }
 
 TemplatePostProcessor::TemplatePostProcessor(
     const Template& single,
     const Template& pair,
     const std::vector<SpecialToken>& special_tokens_map)
     : single_(single), pair_(pair), special_tokens_map_(special_tokens_map) {
-  added_single_ = DefaultAdded(true);
-  added_pair_ = DefaultAdded(false);
+  UpdateAddedTokensNum();
 }
 
 size_t TemplatePostProcessor::AddedTokensNum(bool is_pair) const {
@@ -206,6 +230,12 @@ size_t TemplatePostProcessor::AddedTokensNum(bool is_pair) const {
     return added_pair_;
   }
   return added_single_;
+}
+
+void TemplatePostProcessor::SetTokensMap(
+    const std::vector<SpecialToken>& special_tokens) {
+  special_tokens_map_.SetTokensMap(special_tokens);
+  UpdateAddedTokensNum();
 }
 
 void TemplatePostProcessor::ApplyTemplate(
@@ -255,6 +285,8 @@ void TemplatePostProcessor::ApplyTemplate(
   std::unordered_map<uint, core::Range> sequence_ranges;
   std::vector<core::Encoding> result_overflowings;
   auto& overflowings = encoding->GetMutableOverflowing();
+
+  core::Encoding result_overflowing_encoding;
   for (auto& overflow_encoding : overflowings) {
     core::Encoding encoding_copy = overflow_encoding;
     core::Encoding pair_encoding_copy;
@@ -264,39 +296,41 @@ void TemplatePostProcessor::ApplyTemplate(
                     &encoding_copy,
                     &pair_encoding_copy,
                     add_special_tokens,
-                    &overflow_encoding);
-      result_overflowings.push_back(overflow_encoding);
-      for (auto& encoding : pair_encoding->GetMutableOverflowing()) {
-        core::Encoding tmp_encoding;
+                    &result_overflowing_encoding);
+      result_overflowings.push_back(result_overflowing_encoding);
+      for (auto& pair_overflow_encoding :
+           pair_encoding->GetMutableOverflowing()) {
+        core::Encoding pair_encoding_copy = pair_overflow_encoding;
         ApplyTemplate(pieces,
                       &encoding_copy,
-                      &encoding,
+                      &pair_encoding_copy,
                       add_special_tokens,
-                      &tmp_encoding);
-        result_overflowings.push_back(tmp_encoding);
+                      &result_overflowing_encoding);
+        result_overflowings.push_back(result_overflowing_encoding);
       }
     } else {
       ApplyTemplate(pieces,
                     &encoding_copy,
                     pair_encoding,
                     add_special_tokens,
-                    &overflow_encoding);
-      result_overflowings.push_back(overflow_encoding);
+                    &result_overflowing_encoding);
+      result_overflowings.push_back(result_overflowing_encoding);
     }
   }
   if (pair_encoding != nullptr) {
     for (auto& pair_overflow_encoding :
          pair_encoding->GetMutableOverflowing()) {
       core::Encoding encoding_copy = *encoding;
-      core::Encoding tmp_encoding;
+      core::Encoding pair_encoding_copy = pair_overflow_encoding;
       ApplyTemplate(pieces,
                     &encoding_copy,
-                    pair_encoding,
+                    &pair_encoding_copy,
                     add_special_tokens,
-                    &tmp_encoding);
-      result_overflowings.push_back(tmp_encoding);
+                    &result_overflowing_encoding);
+      result_overflowings.push_back(result_overflowing_encoding);
     }
   }
+  VLOG(6) << "Template pieces num: " << pieces.pieces_.size();
   for (auto& piece : pieces.pieces_) {
     if (boost::get<TemplateSequence>(&piece) != nullptr) {
       auto& template_sequence = boost::get<TemplateSequence>(piece);
@@ -308,6 +342,9 @@ void TemplatePostProcessor::ApplyTemplate(
             ids.end(), encoding->GetIds().begin(), encoding->GetIds().end());
         type_ids.insert(
             type_ids.end(), encoding->GetLen(), template_sequence.second);
+        tokens.insert(tokens.end(),
+                      encoding->GetTokens().begin(),
+                      encoding->GetTokens().end());
         words_idx.insert(words_idx.end(),
                          encoding->GetWordsIdx().begin(),
                          encoding->GetWordsIdx().end());
@@ -332,6 +369,9 @@ void TemplatePostProcessor::ApplyTemplate(
                    pair_encoding->GetIds().end());
         type_ids.insert(
             type_ids.end(), pair_encoding->GetLen(), template_sequence.second);
+        tokens.insert(tokens.end(),
+                      pair_encoding->GetTokens().begin(),
+                      pair_encoding->GetTokens().end());
         words_idx.insert(words_idx.end(),
                          pair_encoding->GetWordsIdx().begin(),
                          pair_encoding->GetWordsIdx().end());
@@ -371,7 +411,7 @@ void TemplatePostProcessor::ApplyTemplate(
                                     std::move(offsets),
                                     std::move(special_tokens_mask),
                                     std::move(attention_mask),
-                                    std::move(overflowings),
+                                    std::move(result_overflowings),
                                     std::move(sequence_ranges));
 }
 
