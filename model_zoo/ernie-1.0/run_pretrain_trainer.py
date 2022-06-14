@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -403,9 +403,7 @@ def main():
 
             else:
                 prediction_scores = output
-                print(prediction_scores)
                 loss = self.criterion(prediction_scores, None, masked_lm_labels)
-                print(loss)
 
             return loss
 
