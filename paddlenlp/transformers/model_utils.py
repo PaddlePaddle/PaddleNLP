@@ -477,14 +477,17 @@ class PretrainedModel(Layer, GenerationMixin):
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
 
-    def resize_token_embeddings(self, new_num_tokens):
+    def resize_token_embeddings(self, new_num_tokens=None):
         """
         Resizes input token embeddings matrix of the model according to new_num_tokens.
 
         Args:
             new_num_tokens (int): The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
-                vectors at the end. Reducing the size will remove vectors from the end. If not provided or `None`, just
+                vectors at the end. Reducing the size will remove vectors from the end. If not provided or None, just
                 returns a pointer to the input tokens embedding module of the model without doing anything.
+
+        Returns:
+            paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
         old_embeddings = self.get_input_embeddings()
         new_embeddings = self._get_resized_embeddings(old_embeddings,
@@ -492,9 +495,16 @@ class PretrainedModel(Layer, GenerationMixin):
         model_embeds = self.set_input_embeddings(new_embeddings)
         if new_num_tokens is None:
             return model_embeds
+
+        # Update vocab_size
+        self.vocab_size = new_num_tokens
+
+        # TODO(westfish@126.com): add tie_weight.
+        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+
         return model_embeds
 
-    def _get_resized_embeddings(self, old_embeddings, new_num_tokens):
+    def _get_resized_embeddings(self, old_embeddings, new_num_tokens=None):
         """
         Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
         initialized vectors at the end. Reducing the size will remove vectors from the end
@@ -506,6 +516,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 New number of tokens in the embedding matrix.
                 Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
                 vectors from the end. 
+
+        Returns:
+            paddle.nn.Embedding: The resized Embedding Module or the old Embedding Module if new_num_tokens is None.
         """
         if new_num_tokens is None:
             return old_embeddings
@@ -522,18 +535,18 @@ class PretrainedModel(Layer, GenerationMixin):
                 f" {nn.Embedding}.")
 
         # Build new embeddings
-        new_embeddings = nn.Embedding(
-            new_num_tokens, old_embedding_dim, weight_attr=None)
+        new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
 
-        # numbers of tokens to copy
-        n = min(old_num_tokens, new_num_tokens)
-
-        custom_weight = paddle.concat(
-            x=[
-                old_embeddings.weight[:n, :],
-                paddle.unsqueeze(new_embeddings.weight[-1, :], 0)
-            ],
-            axis=0)
+        # custom weight for new embedding
+        if old_num_tokens < new_num_tokens:
+            custom_weight = paddle.concat(
+                x=[
+                    old_embeddings.weight[:old_num_tokens, :],
+                    new_embeddings.weight[old_num_tokens:, :]
+                ],
+                axis=0)
+        else:
+            custom_weight = old_embeddings.weight[:new_num_tokens, :]
         new_embeddings.weight.set_value(custom_weight)
 
         return new_embeddings
