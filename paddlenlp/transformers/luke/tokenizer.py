@@ -66,8 +66,11 @@ def bytes_to_unicode():
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     """
     _chr = chr
-    bs = list(range(ord("!"), ord("~") + 1)) + list(
-        range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+    bs = list(range(ord("!"),
+                    ord("~") + 1)) + list(range(
+                        ord("¡"),
+                        ord("¬") + 1)) + list(range(ord("®"),
+                                                    ord("ÿ") + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -202,15 +205,14 @@ class LukeTokenizer(RobertaBPETokenizer):
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
-        super(LukeTokenizer, self).__init__(
-            vocab_file,
-            merges_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(LukeTokenizer, self).__init__(vocab_file,
+                                            merges_file,
+                                            do_lower_case=do_lower_case,
+                                            unk_token=unk_token,
+                                            sep_token=sep_token,
+                                            pad_token=pad_token,
+                                            cls_token=cls_token,
+                                            mask_token=mask_token)
 
     def get_entity_vocab(self):
         """Get the entity vocab"""
@@ -238,8 +240,8 @@ class LukeTokenizer(RobertaBPETokenizer):
                 token = ''.join(
                     self.byte_encoder[b] for b in token.encode('utf-8')
                 )  # Maps all our bytes to unicode strings, avoiding controle tokens of the BPE (spaces in our case)
-            bpe_tokens.extend(
-                bpe_token for bpe_token in self.bpe(token).split(' '))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def __call__(self,
@@ -250,7 +252,7 @@ class LukeTokenizer(RobertaBPETokenizer):
                  entities=None,
                  entities_pair=None,
                  max_mention_length=30,
-                 max_seq_len: Optional[int]=None,
+                 max_seq_len: Optional[int] = None,
                  stride=0,
                  add_prefix_space=False,
                  is_split_into_words=False,
@@ -420,9 +422,9 @@ class LukeTokenizer(RobertaBPETokenizer):
         if not entity_spans:
             return encode_output
         is_batched = bool(
-            (not is_split_into_words and isinstance(text, (list, tuple))) or
-            (is_split_into_words and isinstance(text, (list, tuple)) and
-             text and isinstance(text[0], (list, tuple))))
+            (not is_split_into_words and isinstance(text, (list, tuple)))
+            or (is_split_into_words and isinstance(text, (list, tuple)) and text
+                and isinstance(text[0], (list, tuple))))
         if is_batched:
             if entities is None:
                 entities = [None] * len(entity_spans)
@@ -440,8 +442,8 @@ class LukeTokenizer(RobertaBPETokenizer):
                         encode_output[i]['input_ids'].index(self.sep_token_id) +
                         2)
                     for k in entity_encode.keys():
-                        encode_output[i][k] = encode_output[i][
-                            k] + entity_encode[k]
+                        encode_output[i][
+                            k] = encode_output[i][k] + entity_encode[k]
 
         else:
             entity_encode = self.entity_encode(text, entities,
@@ -511,8 +513,8 @@ class LukeTokenizer(RobertaBPETokenizer):
                                                                                                   in self.added_tokens_encoder and token not in self._all_special_tokens \
                                                            else [token] for token in tokenized_text)))
 
-        added_tokens = list(self.added_tokens_encoder.keys(
-        )) + self._all_special_tokens
+        added_tokens = list(
+            self.added_tokens_encoder.keys()) + self._all_special_tokens
         tokenized_text = split_on_tokens(added_tokens, text)
         return tokenized_text
 
@@ -562,8 +564,8 @@ class LukeTokenizer(RobertaBPETokenizer):
     def convert_tokens_to_string(self, tokens):
         """ Converts a sequence of tokens (string) in a single string. """
         text = ''.join(tokens)
-        text = bytearray([self.byte_decoder[c] for c in text]).decode(
-            'utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
         return text
 
     def convert_tokens_to_ids(self, tokens):
@@ -631,8 +633,8 @@ class LukeTokenizer(RobertaBPETokenizer):
         if entities:
             for i, entity in enumerate(zip(entities, entity_spans)):
                 entity = convert_tuple_to_list(entity)
-                entity[1][0], entity[1][1] = self._convert_entity_pos(text,
-                                                                      entity[1])
+                entity[1][0], entity[1][1] = self._convert_entity_pos(
+                    text, entity[1])
                 if not self.entity_vocab.get(entity[0], None):
                     warnings.warn(f"{entity[0]} not found in entity thesaurus")
                     mentions.append((1, entity[1][0], entity[1][1]))
@@ -643,8 +645,8 @@ class LukeTokenizer(RobertaBPETokenizer):
             entities = [2] * len(entity_spans)
             for i, entity in enumerate(zip(entities, entity_spans)):
                 entity = convert_tuple_to_list(entity)
-                entity[1][0], entity[1][1] = self._convert_entity_pos(text,
-                                                                      entity[1])
+                entity[1][0], entity[1][1] = self._convert_entity_pos(
+                    text, entity[1])
                 mentions.append((entity[0], entity[1][0], entity[1][1]))
 
         entity_ids = [0] * len(mentions)
@@ -656,18 +658,17 @@ class LukeTokenizer(RobertaBPETokenizer):
         for i, (offset, (entity_id, start,
                          end)) in enumerate(zip(repeat(offset_a), mentions)):
             entity_ids[i] = entity_id
-            entity_position_ids[i][:end - start] = range(start + offset,
-                                                         end + offset)
-        return dict(
-            entity_ids=entity_ids,
-            entity_token_type_ids=entity_segment_ids,
-            entity_attention_mask=entity_attention_mask,
-            entity_position_ids=entity_position_ids)
+            entity_position_ids[i][:end - start] = range(
+                start + offset, end + offset)
+        return dict(entity_ids=entity_ids,
+                    entity_token_type_ids=entity_segment_ids,
+                    entity_attention_mask=entity_attention_mask,
+                    entity_position_ids=entity_position_ids)
 
     def _convert_entity_pos(self, text, entity_span):
         text_token = self.tokenize(text[0:entity_span[0]].strip())
-        entity_token = self.tokenize(text[entity_span[0]:entity_span[1]].strip(
-        ))
+        entity_token = self.tokenize(
+            text[entity_span[0]:entity_span[1]].strip())
         return len(text_token), len(text_token) + len(entity_token)
 
     def get_offset_mapping(self, text):
@@ -728,8 +729,8 @@ class LukeTokenizer(RobertaBPETokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """

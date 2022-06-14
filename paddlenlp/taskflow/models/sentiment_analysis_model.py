@@ -45,8 +45,9 @@ class BoWModel(nn.Layer):
                  hidden_size=128,
                  fc_hidden_size=96):
         super().__init__()
-        self.embedder = nn.Embedding(
-            vocab_size, emb_dim, padding_idx=padding_idx)
+        self.embedder = nn.Embedding(vocab_size,
+                                     emb_dim,
+                                     padding_idx=padding_idx)
         self.bow_encoder = BoWEncoder(emb_dim)
         self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
         self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
@@ -102,17 +103,15 @@ class LSTMModel(nn.Layer):
                  pooling_type=None,
                  fc_hidden_size=96):
         super().__init__()
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
-        self.lstm_encoder = LSTMEncoder(
-            emb_dim,
-            lstm_hidden_size,
-            num_layers=lstm_layers,
-            direction=direction,
-            dropout=dropout_rate,
-            pooling_type=pooling_type)
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
+        self.lstm_encoder = LSTMEncoder(emb_dim,
+                                        lstm_hidden_size,
+                                        num_layers=lstm_layers,
+                                        direction=direction,
+                                        dropout=dropout_rate,
+                                        pooling_type=pooling_type)
         self.fc = nn.Linear(self.lstm_encoder.get_output_dim(), fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
 
@@ -133,12 +132,13 @@ class LSTMModel(nn.Layer):
 
 
 class SkepSequenceModel(SkepPretrainedModel):
+
     def __init__(self, skep, num_classes=2, dropout=None):
         super(SkepSequenceModel, self).__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.skep.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.skep.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -148,11 +148,10 @@ class SkepSequenceModel(SkepPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        _, pooled_output = self.skep(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.skep(input_ids,
+                                     token_type_ids=token_type_ids,
+                                     position_ids=position_ids,
+                                     attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)

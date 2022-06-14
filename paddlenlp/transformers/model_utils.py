@@ -214,8 +214,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
-                cls.pretrained_init_configuration[
-                    pretrained_model_name_or_path])
+                cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            )
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
@@ -291,8 +291,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = i
                     base_arg = arg
                     break
@@ -300,8 +300,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = arg_name
                     base_arg = arg
                     break
@@ -376,8 +376,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 "Weights of {} not initialized from pretrained model: {}".
                 format(model.__class__.__name__, missing_keys))
         if len(unexpected_keys) > 0:
-            logger.info("Weights from pretrained model not used in {}: {}".
-                        format(model.__class__.__name__, unexpected_keys))
+            logger.info(
+                "Weights from pretrained model not used in {}: {}".format(
+                    model.__class__.__name__, unexpected_keys))
         # Allow the float16 model to load float32 weights, which decreases memory
         # usage in model loading stage and is useful to big models.
         dtype_prefix_len = len("paddle.")  # paddle.float16
@@ -414,8 +415,8 @@ class PretrainedModel(Layer, GenerationMixin):
                     args = []
                     for arg in value:
                         args.append(
-                            get_config(arg)
-                            if isinstance(arg, PretrainedModel) else arg)
+                            get_config(arg) if isinstance(arg, PretrainedModel
+                                                          ) else arg)
                     model_config[key] = tuple(args)
                 elif isinstance(value, PretrainedModel):
                     model_config[key] = value.init_config
@@ -470,7 +471,8 @@ class PretrainedModel(Layer, GenerationMixin):
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(
-                save_dir, list(self.resource_files_names.values())[0])
+                save_dir,
+                list(self.resource_files_names.values())[0])
             paddle.save(self.state_dict(), file_name)
         else:
             logger.warning(

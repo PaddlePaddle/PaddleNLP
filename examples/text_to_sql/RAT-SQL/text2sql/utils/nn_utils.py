@@ -27,21 +27,23 @@ def build_linear(n_in, n_out, name=None, init=None):
     return nn.Linear(
         n_in,
         n_out,
-        weight_attr=paddle.ParamAttr(
-            name='%s.w_0' % name if name is not None else None,
-            initializer=init),
-        bias_attr='%s.b_0' % name if name is not None else None, )
+        weight_attr=paddle.ParamAttr(name='%s.w_0' %
+                                     name if name is not None else None,
+                                     initializer=init),
+        bias_attr='%s.b_0' % name if name is not None else None,
+    )
 
 
 def build_layer_norm(n_in, name):
     return nn.LayerNorm(
         normalized_shape=n_in,
-        weight_attr=paddle.ParamAttr(
-            name='%s_layer_norm_scale' % name if name is not None else None,
-            initializer=nn.initializer.Constant(1.)),
-        bias_attr=paddle.ParamAttr(
-            name='%s_layer_norm_bias' % name if name is not None else None,
-            initializer=nn.initializer.Constant(0.)), )
+        weight_attr=paddle.ParamAttr(name='%s_layer_norm_scale' %
+                                     name if name is not None else None,
+                                     initializer=nn.initializer.Constant(1.)),
+        bias_attr=paddle.ParamAttr(name='%s_layer_norm_bias' %
+                                   name if name is not None else None,
+                                   initializer=nn.initializer.Constant(0.)),
+    )
 
 
 def lstm_init(num_layers, hidden_size, *batch_sizes):
@@ -85,14 +87,14 @@ def batch_gather_2d(var, indices):
     one = paddle.to_tensor([1], dtype='int64')
     end = paddle.cast(batch_size, dtype='int64')
     batch_indices_1d = paddle.unsqueeze(
-        paddle.arange(
-            zero, end, one, dtype=indices.dtype), [1])
+        paddle.arange(zero, end, one, dtype=indices.dtype), [1])
 
     seq_len = indices.shape[1]
     batch_indices = paddle.expand(batch_indices_1d, [batch_size, seq_len])
 
     coord_2d = paddle.concat(
-        [paddle.unsqueeze(batch_indices, [2]), paddle.unsqueeze(indices, [2])],
+        [paddle.unsqueeze(batch_indices, [2]),
+         paddle.unsqueeze(indices, [2])],
         axis=2)
     coord_2d.stop_gradient = True
     coord_1d = paddle.reshape(coord_2d, shape=[-1, 2])
@@ -156,8 +158,9 @@ def pad_sequences_for_3d(seqs, max_col, max_num, dtype=np.int64):
     padded = []
     for seq in seqs:
         padded.append(
-            np.vstack((seq, np.zeros(
-                (max_col - seq.shape[0], max_num), dtype=np.int64))))
+            np.vstack(
+                (seq, np.zeros((max_col - seq.shape[0], max_num),
+                               dtype=np.int64))))
     return np.array(padded).astype(dtype)
 
 
@@ -195,16 +198,15 @@ def tensor2numpy(inputs):
 
 if __name__ == "__main__":
     """run some simple test cases"""
-    seq_input = paddle.to_tensor(
-        [
-            [1, 2, 3, 4],
-            [5, 5, 5, 5],
-        ], dtype='float32')
-    mask = paddle.to_tensor(
-        [
-            [1, 1, 0, 0],
-            [1, 1, 1, 0],
-        ], dtype='float32')
+    seq_input = paddle.to_tensor([
+        [1, 2, 3, 4],
+        [5, 5, 5, 5],
+    ],
+                                 dtype='float32')
+    mask = paddle.to_tensor([
+        [1, 1, 0, 0],
+        [1, 1, 1, 0],
+    ], dtype='float32')
 
     print(sequence_mask(seq_input, mask, mode='zero'))
     print(sequence_mask(seq_input, mask, mode='-inf'))

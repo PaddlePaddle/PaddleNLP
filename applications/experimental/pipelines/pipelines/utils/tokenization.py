@@ -77,13 +77,12 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
         # Tokenize questions one by one
         for i_q, q in enumerate(d["qas"]):
             question_text = q["question"]
-            tokenized_q = tokenizer.encode(
-                question_text,
-                return_special_tokens_mask=True,
-                return_attention_mask=True,
-                return_offsets_mapping=True,
-                return_token_type_ids=False,
-                add_special_tokens=False)
+            tokenized_q = tokenizer.encode(question_text,
+                                           return_special_tokens_mask=True,
+                                           return_attention_mask=True,
+                                           return_offsets_mapping=True,
+                                           return_token_type_ids=False,
+                                           add_special_tokens=False)
 
             # Extract relevant data
             question_tokenids = tokenized_q["input_ids"]
@@ -122,11 +121,10 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
                 question_tokenids)
 
             baskets.append(
-                SampleBasket(
-                    raw=raw,
-                    id_internal=internal_id,
-                    id_external=external_id,
-                    samples=None))
+                SampleBasket(raw=raw,
+                             id_internal=internal_id,
+                             id_external=external_id,
+                             samples=None))
     return baskets
 
 

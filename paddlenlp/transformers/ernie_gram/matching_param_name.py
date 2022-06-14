@@ -34,7 +34,7 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=4):
                 ernie_name = ernie_format.format(i, proj_name, param_name)
                 convert_parameter_name_dict[ernie_name] = nlp_name
 
-    # Secondly, converts the encoder ffn parameter.  
+    # Secondly, converts the encoder ffn parameter.
     nlp_format = "encoder.layers.{}.linear{}.{}"
     ernie_format = "encoder_stack.block.{}.ffn.{}.{}"
     nlp_param_names = ["1", "2"]
@@ -86,9 +86,10 @@ def match_mlm_parameter(convert_parameter_name_dict):
 
 
 def write_vocab(vocab_file):
-    with open(
-            vocab_file, 'r', encoding='utf8') as f, open(
-                "ernie-gram-zh/new_vocab.txt", 'w', encoding='utf8') as nf:
+    with open(vocab_file, 'r',
+              encoding='utf8') as f, open("ernie-gram-zh/new_vocab.txt",
+                                          'w',
+                                          encoding='utf8') as nf:
         for line in f:
             word, word_id = line.strip().split("\t")
             nf.write(word + "\n")

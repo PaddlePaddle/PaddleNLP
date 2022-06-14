@@ -41,10 +41,12 @@ except ImportError:
 from ..data.vocab import Vocab
 from .utils import InitTrackerMeta, fn_args_to_dict
 
-from .tokenizer_utils_base import (
-    AddedToken, BatchEncoding, EncodedInput, EncodedInputPair,
-    PreTokenizedInput, PreTokenizedInputPair, PretrainedTokenizerBase,
-    TextInput, TextInputPair, TruncationStrategy, PaddingStrategy, TensorType)
+from .tokenizer_utils_base import (AddedToken, BatchEncoding, EncodedInput,
+                                   EncodedInputPair, PreTokenizedInput,
+                                   PreTokenizedInputPair,
+                                   PretrainedTokenizerBase, TextInput,
+                                   TextInputPair, TruncationStrategy,
+                                   PaddingStrategy, TensorType)
 
 __all__ = [
     'PretrainedTokenizer', 'BPETokenizer', 'tokenize_chinese_chars',
@@ -117,8 +119,8 @@ def _is_punctuation(char):
     # Characters such as "^", "$", and "`" are not in the Unicode
     # Punctuation class but we treat them as punctuation anyways, for
     # consistency.
-    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
-        (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
+    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64)
+            or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
         return True
     cat = unicodedata.category(char)
     if cat.startswith("P"):
@@ -130,16 +132,16 @@ def _is_end_of_word(text):
     """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
     last_char = text[-1]
     return bool(
-        _is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(
-            last_char))
+        _is_control(last_char) | _is_punctuation(last_char)
+        | _is_whitespace(last_char))
 
 
 def _is_start_of_word(text):
     """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
     first_char = text[0]
     return bool(
-        _is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(
-            first_char))
+        _is_control(first_char) | _is_punctuation(first_char)
+        | _is_whitespace(first_char))
 
 
 def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
@@ -148,8 +150,8 @@ def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
     """
     insertion_idx = bisect.bisect_left(token_list, new_token)
     # Checks if new_token is already in the ordered token_list
-    if insertion_idx < len(token_list) and token_list[
-            insertion_idx] == new_token:
+    if insertion_idx < len(
+            token_list) and token_list[insertion_idx] == new_token:
         # new_token is in token_list, don't add
         return
     else:
@@ -229,9 +231,9 @@ def normalize_chars(text):
 def _is_symbol(char):
     """Check whether CP is the codepoint of a Symbol character."""
     cp = ord(char)
-    if unicodedata.category(char).startswith('S') or (
-            cp in
-        [0x00ad, 0x00b2, 0x00ba, 0x3007, 0x00b5, 0x00d8, 0x014b, 0x01b1]):
+    if unicodedata.category(char).startswith('S') or (cp in [
+            0x00ad, 0x00b2, 0x00ba, 0x3007, 0x00b5, 0x00d8, 0x014b, 0x01b1
+    ]):
         return True
     return False
 
@@ -562,8 +564,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                 continue
             if key in self.SPECIAL_TOKENS_ATTRIBUTES:
                 if key == "additional_special_tokens":
-                    assert isinstance(value, (
-                        list, tuple)), f"Value {value} is not a list or tuple"
+                    assert isinstance(
+                        value,
+                        (list, tuple)), f"Value {value} is not a list or tuple"
                     assert all(
                         isinstance(t, (str, AddedToken)) for t in value
                     ), "One of the tokens is not a string or an AddedToken"
@@ -603,7 +606,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
     def _add_tokens(self,
                     new_tokens: Union[List[str], List[AddedToken]],
-                    special_tokens: bool=False) -> int:
+                    special_tokens: bool = False) -> int:
         """
         Add a list of new tokens to the tokenizer class. If the new tokens are not in the vocabulary, they are added to
         it with indices starting from length of the current vocabulary.
@@ -638,15 +641,15 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if not special_tokens and hasattr(
                     self, "do_lower_case") and self.do_lower_case:
                 token = token.lower()
-            if (token != self.unk_token and self.convert_tokens_to_ids(token) ==
-                    self.convert_tokens_to_ids(self.unk_token) and
-                    token not in tokens_to_add):
+            if (token != self.unk_token and self.convert_tokens_to_ids(token)
+                    == self.convert_tokens_to_ids(self.unk_token)
+                    and token not in tokens_to_add):
                 tokens_to_add.append(token)
                 if self.verbose:
                     logger.info(f"Adding {token} to the vocabulary")
 
-        added_tok_encoder = dict((tok, len(self) + i)
-                                 for i, tok in enumerate(tokens_to_add))
+        added_tok_encoder = dict(
+            (tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
         added_tok_decoder = {v: k for k, v in added_tok_encoder.items()}
         self.added_tokens_encoder.update(added_tok_encoder)
         self.added_tokens_decoder.update(added_tok_decoder)
@@ -735,13 +738,13 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if hasattr(self, "do_lower_case") and self.do_lower_case:
             # convert non-special tokens to lowercase
             escaped_special_toks = [
-                re.escape(s_tok)
-                for s_tok in (self.unique_no_split_tokens +
-                              self.all_special_tokens)
+                re.escape(s_tok) for s_tok in (self.unique_no_split_tokens +
+                                               self.all_special_tokens)
             ]
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
-            text = re.sub(
-                pattern, lambda m: m.groups()[0] or m.groups()[1].lower(), text)
+            text = re.sub(pattern,
+                          lambda m: m.groups()[0] or m.groups()[1].lower(),
+                          text)
 
         no_split_token = set(self.unique_no_split_tokens)
         tokens = self.tokens_trie.split(text)
@@ -878,13 +881,12 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             for index, line in enumerate(f):
                 token = line.rstrip('\n')
                 token_to_idx[token] = int(index)
-        vocab = Vocab.from_dict(
-            token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
+        vocab = Vocab.from_dict(token_to_idx,
+                                unk_token=unk_token,
+                                pad_token=pad_token,
+                                bos_token=bos_token,
+                                eos_token=eos_token,
+                                **kwargs)
         return vocab
 
     @staticmethod
@@ -934,8 +936,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                 token_ids_0=token_ids_0,
                 token_ids_1=token_ids_1,
                 already_has_special_tokens=True)
-        return [0] * ((len(token_ids_1)
-                       if token_ids_1 else 0) + len(token_ids_0))
+        return [0] * (
+            (len(token_ids_1) if token_ids_1 else 0) + len(token_ids_0))
 
     def num_special_tokens_to_add(self, pair):
         """
@@ -951,32 +953,33 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def _encode_plus(
             self,
             text: Union[TextInput, PreTokenizedInput, EncodedInput],
             text_pair: Optional[Union[TextInput, PreTokenizedInput,
-                                      EncodedInput]]=None,
-            add_special_tokens: bool=True,
-            padding_strategy: PaddingStrategy=PaddingStrategy.DO_NOT_PAD,
-            truncation_strategy: TruncationStrategy=TruncationStrategy.
-            DO_NOT_TRUNCATE,
-            max_length: Optional[int]=None,
-            stride: int=0,
-            is_split_into_words: bool=False,
-            pad_to_multiple_of: Optional[int]=None,
-            return_tensors: Optional[Union[str, TensorType]]=None,
-            return_position_ids: Optional[bool]=None,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True,
+                                      EncodedInput]] = None,
+            add_special_tokens: bool = True,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            truncation_strategy: TruncationStrategy = TruncationStrategy.
+        DO_NOT_TRUNCATE,
+            max_length: Optional[int] = None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            pad_to_multiple_of: Optional[int] = None,
+            return_tensors: Optional[Union[str, TensorType]] = None,
+            return_position_ids: Optional[bool] = None,
+            return_token_type_ids: Optional[bool] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_overflowing_tokens: bool = False,
+            return_special_tokens_mask: bool = False,
+            return_offsets_mapping: bool = False,
+            return_length: bool = False,
+            verbose: bool = True,
             **kwargs) -> BatchEncoding:
+
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self.tokenize(text, **kwargs)
@@ -1030,29 +1033,32 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
     def _batch_encode_plus(
             self,
-            batch_text_or_text_pairs: Union[List[TextInput], List[
-                TextInputPair], List[PreTokenizedInput], List[
-                    PreTokenizedInputPair], List[EncodedInput], List[
-                        EncodedInputPair], ],
-            add_special_tokens: bool=True,
-            padding_strategy: PaddingStrategy=PaddingStrategy.DO_NOT_PAD,
-            truncation_strategy: TruncationStrategy=TruncationStrategy.
-            DO_NOT_TRUNCATE,
-            max_length: Optional[int]=None,
-            stride: int=0,
-            is_split_into_words: bool=False,
-            pad_to_multiple_of: Optional[int]=None,
-            return_position_ids: Optional[bool]=None,
-            return_tensors: Optional[Union[str, TensorType]]=None,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_dict: bool=True,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True,
+            batch_text_or_text_pairs: Union[List[TextInput],
+                                            List[TextInputPair],
+                                            List[PreTokenizedInput],
+                                            List[PreTokenizedInputPair],
+                                            List[EncodedInput],
+                                            List[EncodedInputPair], ],
+            add_special_tokens: bool = True,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            truncation_strategy: TruncationStrategy = TruncationStrategy.
+        DO_NOT_TRUNCATE,
+            max_length: Optional[int] = None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            pad_to_multiple_of: Optional[int] = None,
+            return_position_ids: Optional[bool] = None,
+            return_tensors: Optional[Union[str, TensorType]] = None,
+            return_token_type_ids: Optional[bool] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_overflowing_tokens: bool = False,
+            return_special_tokens_mask: bool = False,
+            return_dict: bool = True,
+            return_offsets_mapping: bool = False,
+            return_length: bool = False,
+            verbose: bool = True,
             **kwargs) -> BatchEncoding:
+
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self.tokenize(text, **kwargs)
@@ -1104,8 +1110,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                         text[1] for text in batch_text_or_text_pairs
                     ]
                 else:
-                    kwargs[
-                        'texts'] = [text for text in batch_text_or_text_pairs]
+                    kwargs['texts'] = [
+                        text for text in batch_text_or_text_pairs
+                    ]
 
         batch_outputs = self._batch_prepare_for_model(
             input_ids,
@@ -1133,23 +1140,23 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             self,
             batch_ids_pairs: List[Union[PreTokenizedInputPair, Tuple[List[int],
                                                                      None]]],
-            add_special_tokens: bool=True,
-            padding_strategy: PaddingStrategy=PaddingStrategy.DO_NOT_PAD,
-            truncation_strategy: TruncationStrategy=TruncationStrategy.
-            DO_NOT_TRUNCATE,
-            max_length: Optional[int]=None,
-            stride: int=0,
-            pad_to_multiple_of: Optional[int]=None,
-            return_position_ids: Optional[bool]=None,
-            return_tensors: Optional[str]=None,
-            return_token_type_ids: Optional[bool]=None,
-            return_attention_mask: Optional[bool]=None,
-            return_overflowing_tokens: bool=False,
-            return_special_tokens_mask: bool=False,
-            return_dict: bool=True,
-            return_offsets_mapping: bool=False,
-            return_length: bool=False,
-            verbose: bool=True,
+            add_special_tokens: bool = True,
+            padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+            truncation_strategy: TruncationStrategy = TruncationStrategy.
+        DO_NOT_TRUNCATE,
+            max_length: Optional[int] = None,
+            stride: int = 0,
+            pad_to_multiple_of: Optional[int] = None,
+            return_position_ids: Optional[bool] = None,
+            return_tensors: Optional[str] = None,
+            return_token_type_ids: Optional[bool] = None,
+            return_attention_mask: Optional[bool] = None,
+            return_overflowing_tokens: bool = False,
+            return_special_tokens_mask: bool = False,
+            return_dict: bool = True,
+            return_offsets_mapping: bool = False,
+            return_length: bool = False,
+            verbose: bool = True,
             **kwargs) -> BatchEncoding:
         """
         Prepares a sequence of input id, or a pair of sequences of inputs ids so that it can be used by the model. It
@@ -1175,8 +1182,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                     return_attention_mask = "attention_mask" in self.model_input_names
 
                 max_len_for_pair = max_length - len(first_ids) - (
-                    self.num_special_tokens_to_add(pair=True)
-                    if add_special_tokens else 0)
+                    self.num_special_tokens_to_add(
+                        pair=True) if add_special_tokens else 0)
 
                 text, text_pair = kwargs['batch_text_or_text_pairs'][example_id]
                 token_offset_mapping = self.get_offset_mapping(text)
@@ -1218,8 +1225,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                                 "special_tokens_mask"] = self.get_special_tokens_mask(
                                     ids, pair_ids)
                         else:
-                            encoded_inputs["special_tokens_mask"] = [0] * len(
-                                sequence)
+                            encoded_inputs["special_tokens_mask"] = [
+                                0
+                            ] * len(sequence)
 
                     # Check lengths
                     self._eventual_warn_about_too_long_sequence(
@@ -1229,8 +1237,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                             range(len(encoded_inputs["input_ids"])))
 
                     if return_length:
-                        encoded_inputs["length"] = len(encoded_inputs[
-                            "input_ids"])
+                        encoded_inputs["length"] = len(
+                            encoded_inputs["input_ids"])
                         encoded_inputs["seq_len"] = encoded_inputs["length"]
 
                     encoded_inputs['overflow_to_sample'] = example_id
@@ -1260,14 +1268,16 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                     max_length=max_length,
                     stride=stride,
                     pad_to_multiple_of=None,  # we pad in batch afterward
-                    return_position_ids=return_position_ids,  # we pad in batch afterward
+                    return_position_ids=
+                    return_position_ids,  # we pad in batch afterward
                     return_attention_mask=False,  # we pad in batch afterward
                     return_token_type_ids=return_token_type_ids,
                     return_overflowing_tokens=return_overflowing_tokens,
                     return_special_tokens_mask=return_special_tokens_mask,
                     return_offsets_mapping=return_offsets_mapping,
                     return_length=return_length,
-                    return_tensors=None,  # We convert the whole batch to tensors at the end
+                    return_tensors=
+                    None,  # We convert the whole batch to tensors at the end
                     prepend_batch_axis=False,
                     verbose=verbose,
                     **kwargs)
@@ -1281,10 +1291,11 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             padding=padding_strategy.value,
             max_length=max_length,
             pad_to_multiple_of=pad_to_multiple_of,
-            return_attention_mask=return_attention_mask, )
+            return_attention_mask=return_attention_mask,
+        )
         if return_dict:
-            batch_outputs = BatchEncoding(
-                batch_outputs, tensor_type=return_tensors)
+            batch_outputs = BatchEncoding(batch_outputs,
+                                          tensor_type=return_tensors)
             return batch_outputs
         else:
             for k, v in batch_outputs.items():
@@ -1312,8 +1323,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         split_tokens = []
         for token in self.basic_tokenizer.tokenize(text):
             for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token
-                                    if sub_token != self.unk_token else token)
+                split_tokens.append(
+                    sub_token if sub_token != self.unk_token else token)
 
         normalized_text, char_mapping = '', []
 
@@ -1349,9 +1360,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
     def _decode(self,
                 token_ids: List[int],
-                skip_special_tokens: bool=False,
-                clean_up_tokenization_spaces: bool=True,
-                spaces_between_special_tokens: bool=True,
+                skip_special_tokens: bool = False,
+                clean_up_tokenization_spaces: bool = True,
+                spaces_between_special_tokens: bool = True,
                 **kwargs) -> str:
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer",
                                                        False)
@@ -1421,6 +1432,7 @@ class BPETokenizer(PretrainedTokenizer):
     """
 
     class Encoder(object):
+
         def __init__(self,
                      encoder,
                      bpe_merges,
@@ -1453,9 +1465,12 @@ class BPETokenizer(PretrainedTokenizer):
             And avoids mapping to whitespace/control characters the bpe code barfs on.
             """
 
-            bs = (list(range(ord("!"), ord("~") + 1)) +
-                  list(range(ord("¡"), ord("¬") + 1)) +
-                  list(range(ord("®"), ord("ÿ") + 1)))
+            bs = (list(range(ord("!"),
+                             ord("~") + 1)) +
+                  list(range(ord("¡"),
+                             ord("¬") + 1)) +
+                  list(range(ord("®"),
+                             ord("ÿ") + 1)))
             cs = bs[:]
 
             n = 0
@@ -1539,8 +1554,8 @@ class BPETokenizer(PretrainedTokenizer):
                     if token_i == 0:
                         sub_tokens.extend(self.re.findall(self.pat, token))
                     else:
-                        sub_tokens.extend(
-                            self.re.findall(self.pat, " " + token))
+                        sub_tokens.extend(self.re.findall(
+                            self.pat, " " + token))
             return sub_tokens
 
         def tokenize_old(self, text):
@@ -1587,9 +1602,8 @@ class BPETokenizer(PretrainedTokenizer):
                             self.decoder[int(tok)]
                             for tok in tokens[pre_token_i:token_i]
                         ])
-                        text = bytearray(
-                            [self.byte_decoder[c] for c in text]).decode(
-                                'utf-8', errors=self.errors)
+                        text = bytearray([self.byte_decoder[c] for c in text
+                                          ]).decode('utf-8', errors=self.errors)
                         texts.append(text)
                     # texts.append(token)
                     if token_i == 0:
@@ -1605,8 +1619,9 @@ class BPETokenizer(PretrainedTokenizer):
             if pre_token_i < len(tokens):
                 text = ''.join(
                     [self.decoder[int(tok)] for tok in tokens[pre_token_i:]])
-                text = bytearray([self.byte_decoder[c] for c in text]).decode(
-                    'utf-8', errors=self.errors)
+                text = bytearray([self.byte_decoder[c]
+                                  for c in text]).decode('utf-8',
+                                                         errors=self.errors)
                 texts.append(text)
 
             return ''.join(texts)
@@ -1620,12 +1635,11 @@ class BPETokenizer(PretrainedTokenizer):
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]"):
-        self.vocab = self.load_vocabulary(
-            vocab_file,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        self.vocab = self.load_vocabulary(vocab_file,
+                                          unk_token=unk_token,
+                                          sep_token=sep_token,
+                                          cls_token=cls_token,
+                                          mask_token=mask_token)
         self.encoder_json_path = encoder_json_path
         self.vocab_bpe_path = vocab_bpe_path
         self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
@@ -1653,4 +1667,5 @@ class BPETokenizer(PretrainedTokenizer):
 
         return self.Encoder(
             encoder=encoder,
-            bpe_merges=bpe_merges, )
+            bpe_merges=bpe_merges,
+        )

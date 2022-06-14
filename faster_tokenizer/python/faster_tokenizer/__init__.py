@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from typing import Tuple, Union, Tuple, List
 
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]
 
-TextEncodeInput = Union[TextInputSequence, Tuple[
-    TextInputSequence, TextInputSequence], List[TextInputSequence], ]
+TextEncodeInput = Union[TextInputSequence, Tuple[TextInputSequence,
+                                                 TextInputSequence],
+                        List[TextInputSequence], ]
 
-PreTokenizedEncodeInput = Union[PreTokenizedInputSequence, Tuple[
-    PreTokenizedInputSequence, PreTokenizedInputSequence], List[
-        PreTokenizedInputSequence], ]
+PreTokenizedEncodeInput = Union[PreTokenizedInputSequence,
+                                Tuple[PreTokenizedInputSequence,
+                                      PreTokenizedInputSequence],
+                                List[PreTokenizedInputSequence], ]
 
 InputSequence = Union[TextInputSequence, PreTokenizedInputSequence]
 

@@ -29,8 +29,8 @@ class Sample:
     def __init__(self,
                  id: str,
                  clear_text: dict,
-                 tokenized: Optional[dict]=None,
-                 features: Optional[dict]=None):
+                 tokenized: Optional[dict] = None,
+                 features: Optional[dict] = None):
         """
         :param id: The unique id of the sample
         :param clear_text: A dictionary containing various human readable fields (e.g. text, label).
@@ -88,11 +88,12 @@ class SampleBasket:
     pairs."""
 
     def __init__(
-            self,
-            id_internal: Optional[Union[int, str]],
-            raw: dict,
-            id_external: str=None,
-            samples: Optional[List[Sample]]=None, ):
+        self,
+        id_internal: Optional[Union[int, str]],
+        raw: dict,
+        id_external: str = None,
+        samples: Optional[List[Sample]] = None,
+    ):
         """
         :param id_internal: A unique identifying id. Used for identification within pipelines.
         :param external_id: Used for identification outside of pipelines. E.g. if another framework wants to pass along its own id with the results.
@@ -193,8 +194,8 @@ def offset_to_token_idx(token_offsets, ch_idx) -> Optional[int]:
     """Returns the idx of the token at the given character idx"""
     n_tokens = len(token_offsets)
     for i in range(n_tokens):
-        if (i + 1 == n_tokens) or (
-                token_offsets[i] <= ch_idx < token_offsets[i + 1]):
+        if (i + 1 == n_tokens) or (token_offsets[i] <= ch_idx <
+                                   token_offsets[i + 1]):
             return i
     return None
 

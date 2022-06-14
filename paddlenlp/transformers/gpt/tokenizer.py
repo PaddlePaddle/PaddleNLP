@@ -42,8 +42,11 @@ def bytes_to_unicode():
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
     _chr = chr
-    bs = list(range(ord("!"), ord("~") + 1)) + list(
-        range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+    bs = list(range(ord("!"),
+                    ord("~") + 1)) + list(range(
+                        ord("¡"),
+                        ord("¬") + 1)) + list(range(ord("®"),
+                                                    ord("ÿ") + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -259,8 +262,8 @@ class GPTChineseTokenizer(PretrainedTokenizer):
         """
 
         text = self.sp.decode(ids)
-        text = text.replace(' ', '').replace('\u2582', ' ').replace('\u2583',
-                                                                    '\n')
+        text = text.replace(' ', '').replace('\u2582',
+                                             ' ').replace('\u2583', '\n')
         return text
 
     def save_resources(self, save_directory):
@@ -360,18 +363,19 @@ class GPTTokenizer(PretrainedTokenizer):
             eol_token='\u010a',
             **kwargs  # The token of newline.
     ):
-        pad_token = AddedToken(
-            pad_token, lstrip=False,
-            rstrip=False) if isinstance(pad_token, str) else pad_token
-        eos_token = AddedToken(
-            eos_token, lstrip=False,
-            rstrip=False) if isinstance(eos_token, str) else eos_token
-        unk_token = AddedToken(
-            unk_token, lstrip=False,
-            rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   pad_token, str) else pad_token
+        eos_token = AddedToken(eos_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   eos_token, str) else eos_token
+        unk_token = AddedToken(unk_token,
+                               lstrip=False, rstrip=False) if isinstance(
+                                   unk_token, str) else unk_token
         self.eol_token = eol_token
-        self._build_special_tokens_map_extended(
-            bos_token=pad_token, eos_token=eos_token, unk_token=unk_token)
+        self._build_special_tokens_map_extended(bos_token=pad_token,
+                                                eos_token=eos_token,
+                                                unk_token=unk_token)
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
@@ -463,8 +467,8 @@ class GPTTokenizer(PretrainedTokenizer):
         re = try_import("regex")
         for token in re.findall(self.pat, text):
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(
-                bpe_token for bpe_token in self.bpe(token).split(' '))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def _convert_token_to_id(self, token):
@@ -496,8 +500,8 @@ class GPTTokenizer(PretrainedTokenizer):
         """
 
         text = ''.join([self.decoder[id] for id in ids])
-        text = bytearray([self.byte_decoder[c] for c in text]).decode(
-            'utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
         return text
 
     def save_resources(self, save_directory):

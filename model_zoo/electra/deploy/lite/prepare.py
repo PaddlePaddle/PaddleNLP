@@ -11,23 +11,20 @@ from paddlenlp.transformers import ElectraTokenizer
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--lite_lib_path",
-        type=str,
-        required=True,
-        default=None,
-        help="directory of paddle lite api library")
-    parser.add_argument(
-        "--lite_model_file",
-        type=str,
-        required=True,
-        default=None,
-        help="paddle lite model file(.nb)")
-    parser.add_argument(
-        "--predict_sentences",
-        type=str,
-        nargs="*",
-        help="one or more sentence to predict")
+    parser.add_argument("--lite_lib_path",
+                        type=str,
+                        required=True,
+                        default=None,
+                        help="directory of paddle lite api library")
+    parser.add_argument("--lite_model_file",
+                        type=str,
+                        required=True,
+                        default=None,
+                        help="paddle lite model file(.nb)")
+    parser.add_argument("--predict_sentences",
+                        type=str,
+                        nargs="*",
+                        help="one or more sentence to predict")
     parser.add_argument(
         "--predict_file",
         type=str,
@@ -38,13 +35,14 @@ def parse_args():
         type=str,
         default="predict_input",
         help="prepared file prefix after processing predict sentences")
-    parser.add_argument(
-        "--batch_size", type=int, default=100000, help="batch size")
-    parser.add_argument(
-        "--max_seq_length",
-        type=int,
-        default=128,
-        help="max length of each sequence")
+    parser.add_argument("--batch_size",
+                        type=int,
+                        default=100000,
+                        help="batch size")
+    parser.add_argument("--max_seq_length",
+                        type=int,
+                        default=128,
+                        help="max length of each sequence")
     parser.add_argument(
         "--model_name",
         type=str,
@@ -132,8 +130,8 @@ def prepare_predict(args, sentences=[], paths=[]):
     """
 
     # initialize data
-    if sentences != [] and isinstance(sentences, list) and (paths == [] or
-                                                            paths is None):
+    if sentences != [] and isinstance(sentences, list) and (paths == []
+                                                            or paths is None):
         predicted_data = sentences
     elif (sentences == [] or sentences is None) and isinstance(
             paths, list) and paths != []:

@@ -70,8 +70,9 @@ class TextGenerationTask(Task):
        Construct the input spec for the convert dygraph model to static model.
        """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='token_ids')
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_ids')
         ]
 
     def _construct_model(self, model):

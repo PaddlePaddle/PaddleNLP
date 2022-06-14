@@ -37,30 +37,32 @@ def create_model(args,
                  ernie_config,
                  is_prediction=False,
                  task_name=""):
-    pyreader = fluid.layers.py_reader(
-        capacity=50,
-        shapes=[[-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, args.max_seq_len, 1],
-                [-1, args.max_seq_len, 1], [-1, 1], [-1, 1]],
-        dtypes=[
-            'int64', 'int64', 'int64', 'int64', 'float32', 'int64', 'int64'
-        ],
-        lod_levels=[0, 0, 0, 0, 0, 0, 0],
-        name=task_name + "_" + pyreader_name,
-        use_double_buffer=True)
+    pyreader = fluid.layers.py_reader(capacity=50,
+                                      shapes=[[-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1],
+                                              [-1, args.max_seq_len, 1],
+                                              [-1, 1], [-1, 1]],
+                                      dtypes=[
+                                          'int64', 'int64', 'int64', 'int64',
+                                          'float32', 'int64', 'int64'
+                                      ],
+                                      lod_levels=[0, 0, 0, 0, 0, 0, 0],
+                                      name=task_name + "_" + pyreader_name,
+                                      use_double_buffer=True)
 
     (src_ids, sent_ids, pos_ids, task_ids, input_mask, labels,
      qids) = fluid.layers.read_file(pyreader)
 
     def _model(is_noise=False):
-        ernie = ErnieModel(
-            src_ids=src_ids,
-            position_ids=pos_ids,
-            sentence_ids=sent_ids,
-            task_ids=task_ids,
-            input_mask=input_mask,
-            config=ernie_config,
-            is_noise=is_noise)
+        ernie = ErnieModel(src_ids=src_ids,
+                           position_ids=pos_ids,
+                           sentence_ids=sent_ids,
+                           task_ids=task_ids,
+                           input_mask=input_mask,
+                           config=ernie_config,
+                           is_noise=is_noise)
 
         cls_feats = ernie.get_pooled_output()
         if not is_noise:
@@ -93,8 +95,9 @@ def create_model(args,
         ce_loss, probs = fluid.layers.softmax_with_cross_entropy(
             logits=logits, label=labels, return_softmax=True)
         loss = fluid.layers.mean(x=ce_loss)
-        accuracy = fluid.layers.accuracy(
-            input=probs, label=labels, total=num_seqs)
+        accuracy = fluid.layers.accuracy(input=probs,
+                                         label=labels,
+                                         total=num_seqs)
         graph_vars = {
             "loss": loss,
             "probs": probs,
@@ -233,8 +236,8 @@ def evaluate(exe,
             % (eval_phase, cost, ret, total_num_seqs, elapsed_time)
     elif metric == "acc_and_f1_and_mrr":
         ret_a = acc_and_f1(preds, labels)
-        preds = sorted(
-            zip(qids, scores, labels), key=lambda elem: (elem[0], -elem[1]))
+        preds = sorted(zip(qids, scores, labels),
+                       key=lambda elem: (elem[0], -elem[1]))
         ret_b = evaluate_mrr(preds)
         evaluate_info = "[%s evaluation] ave loss: %f, acc: %f, f1: %f, mrr: %f, data_num: %d, elapsed time: %f s" \
             % (eval_phase, cost, ret_a['acc'], ret_a['f1'], ret_b, total_num_seqs, elapsed_time)
