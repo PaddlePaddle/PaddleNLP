@@ -244,8 +244,8 @@ class XLNetTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -296,9 +296,8 @@ class XLNetTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return offset_mapping_0 + [(0, 0)] + [(0, 0)]
 
-        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [
-            (0, 0)
-        ]
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)
+                                                                 ] + [(0, 0)]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
@@ -329,12 +328,14 @@ class XLNetTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
-            return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)
-                                                     ) + [1, 1]
+            return ([0] * len(token_ids_0)) + [1] + ([0] *
+                                                     len(token_ids_1)) + [1, 1]
         return ([0] * len(token_ids_0)) + [1, 1]
 
     def create_token_type_ids_from_sequences(self,

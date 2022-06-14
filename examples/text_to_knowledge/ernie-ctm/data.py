@@ -35,11 +35,10 @@ def convert_example(example,
                     summary_num=2,
                     is_test=False):
     tokens = example["tokens"]
-    tokenized_input = tokenizer(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
+    tokenized_input = tokenizer(tokens,
+                                return_length=True,
+                                is_split_into_words=True,
+                                max_seq_len=max_seq_len)
 
     if is_test:
         return tokenized_input['input_ids'], tokenized_input[
@@ -66,17 +65,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def read_custom_data(filename):

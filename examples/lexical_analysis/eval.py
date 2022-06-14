@@ -50,12 +50,11 @@ def evaluate(args):
     # q2b.dic is used to replace DBC case to SBC case
     normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
 
-    trans_func = partial(
-        convert_example,
-        max_seq_len=args.max_seq_len,
-        word_vocab=word_vocab,
-        label_vocab=label_vocab,
-        normlize_vocab=normlize_vocab)
+    trans_func = partial(convert_example,
+                         max_seq_len=args.max_seq_len,
+                         word_vocab=word_vocab,
+                         label_vocab=label_vocab,
+                         normlize_vocab=normlize_vocab)
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -65,20 +64,18 @@ def evaluate(args):
     ): fn(samples)
 
     # Create sampler for dataloader
-    test_sampler = paddle.io.BatchSampler(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=False)
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_sampler=test_sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+    test_sampler = paddle.io.BatchSampler(dataset=test_ds,
+                                          batch_size=args.batch_size,
+                                          shuffle=False,
+                                          drop_last=False)
+    test_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_sampler=test_sampler,
+                                       return_list=True,
+                                       collate_fn=batchify_fn)
 
     # Define the model network and metric evaluator
-    model = BiGruCrf(args.emb_dim, args.hidden_size,
-                     len(word_vocab), len(label_vocab))
+    model = BiGruCrf(args.emb_dim, args.hidden_size, len(word_vocab),
+                     len(label_vocab))
     chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     # Load the model and start predicting

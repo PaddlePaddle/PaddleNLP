@@ -41,8 +41,10 @@ from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBP
 from ernie.tokenizing_ernie import ErnieTokenizer
 
 from roberta.modeling import RobertaForSequenceClassification
+
 sys.path.append('../../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
+
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -52,73 +54,66 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def get_args():
     parser = argparse.ArgumentParser('interpret sentiment analysis task')
-    parser.add_argument(
-        '--base_model',
-        required=True,
-        choices=['roberta_base', 'roberta_large', 'lstm'])
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=128,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--base_model',
+                        required=True,
+                        choices=['roberta_base', 'roberta_large', 'lstm'])
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=1, help='batchsize')
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='data directory includes train / develop data')
+    parser.add_argument('--data_dir',
+                        type=str,
+                        required=True,
+                        help='data directory includes train / develop data')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
-    parser.add_argument(
-        '--wd',
-        type=float,
-        default=0.01,
-        help='weight decay, aka L2 regularizer')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
+    parser.add_argument('--wd',
+                        type=float,
+                        default=0.01,
+                        help='weight decay, aka L2 regularizer')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
-    parser.add_argument(
-        '--inter_mode',
-        type=str,
-        default="attention",
-        choices=[
-            "attention", "simple_gradient", "smooth_gradient",
-            "integrated_gradient", "lime"
-        ],
-        help='appoint the mode of interpretable.')
+    parser.add_argument('--inter_mode',
+                        type=str,
+                        default="attention",
+                        choices=[
+                            "attention", "simple_gradient", "smooth_gradient",
+                            "integrated_gradient", "lime"
+                        ],
+                        help='appoint the mode of interpretable.')
     parser.add_argument(
         '--n-samples',
         type=int,
         default=25,
         help='number of samples used for smooth gradient method')
-    parser.add_argument(
-        '--output_dir',
-        type=Path,
-        required=True,
-        help='interpretable output directory')
+    parser.add_argument('--output_dir',
+                        type=Path,
+                        required=True,
+                        help='interpretable output directory')
     parser.add_argument('--start_id', type=int, default=0)
     parser.add_argument('--vocab_path', type=str, required=True)
-    parser.add_argument(
-        '--language',
-        type=str,
-        required=True,
-        help='language that the model is built for')
+    parser.add_argument('--language',
+                        type=str,
+                        required=True,
+                        help='language that the model is built for')
     args = parser.parse_args()
     return args
 
 
 class Senti_data(DatasetBuilder):
+
     def _read(self, filename):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
@@ -155,13 +150,16 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
@@ -169,8 +167,7 @@ def map_fn_senti(examples, tokenizer, args):
     log.debug('load data %d' % len(examples))
     if args.language == 'en':
         contexts = [
-            example['context'].encode(
-                'ascii', errors='replace').decode('UTF-8')
+            example['context'].encode('ascii', errors='replace').decode('UTF-8')
             for example in examples
         ]
     else:
@@ -181,32 +178,31 @@ def map_fn_senti(examples, tokenizer, args):
     for i in range(len(tokenized_examples)):
         tokenized_examples[i]['offset_mapping'] = [
             (0, 0)
-        ] + tokenizer.get_offset_mapping(contexts[i])[:args.max_seq_len -
-                                                      2] + [(0, 0)]
+        ] + tokenizer.get_offset_mapping(
+            contexts[i])[:args.max_seq_len - 2] + [(0, 0)]
     return tokenized_examples
 
 
 def init_lstm_var(args):
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     tokenizer = CharTokenizer(vocab, args.language, '../../punctuations')
     padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
-    trans_fn = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        is_test=True,
-        language=args.language)
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       is_test=True,
+                       language=args.language)
 
     # Init attention layer
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(
-        attention_layer=attention,
-        vocab_size=len(tokenizer.vocab),
-        lstm_hidden_size=lstm_hidden_size,
-        num_classes=2,
-        padding_idx=padding_idx)
+    model = BiLSTMAttentionModel(attention_layer=attention,
+                                 vocab_size=len(tokenizer.vocab),
+                                 lstm_hidden_size=lstm_hidden_size,
+                                 num_classes=2,
+                                 padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
     dev_ds = Senti_data().read(args.data_dir)
@@ -215,12 +211,11 @@ def init_lstm_var(args):
         Stack(dtype="int64"),  # seq len
     ): [data for data in fn(samples)]
 
-    dev_loader = create_dataloader(
-        dev_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='validation',
-        batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dev_ds,
+                                   trans_fn=trans_fn,
+                                   batch_size=args.batch_size,
+                                   mode='validation',
+                                   batchify_fn=batchify_fn)
 
     return model, tokenizer, dev_loader
 
@@ -244,19 +239,20 @@ def init_roberta_var(args):
 
     dev_ds = Senti_data().read(args.data_dir)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id)
-    }): fn(samples)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id)
+        }): fn(samples)
 
-    dataloader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    dataloader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_sampler=dev_batch_sampler,
+                                      collate_fn=batchify_fn,
+                                      return_list=True)
 
     return model, tokenizer, dataloader
 
@@ -278,8 +274,8 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
     char_attribution_dict = {}
     # Collect scores in different situation
     if args.base_model.startswith('roberta'):
-        assert len(inter_score) == len(offset), str(len(
-            inter_score)) + "not equal to" + str(len(offset))
+        assert len(inter_score) == len(offset), str(
+            len(inter_score)) + "not equal to" + str(len(offset))
         sorted_token = []
         for i in range(len(inter_score)):
             sorted_token.append([i, offset[i], inter_score[i]])
@@ -288,10 +284,12 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
                                       sorted_token)
 
         result['char_attri'] = collections.OrderedDict()
-        for token_info in sorted(
-                char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['char_attri'][str(token_info[
-                0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(char_attribution_dict,
+                                 key=lambda x: x[2],
+                                 reverse=True):
+            result['char_attri'][str(
+                token_info[0])] = [str(token_info[1]),
+                                   float(token_info[2])]
         result.pop('sent_token')
     else:
         if args.language == 'ch':
@@ -306,25 +304,25 @@ def extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict,
                 idx += 1
 
         result['char_attri'] = collections.OrderedDict()
-        for token_id, token_info in sorted(
-                char_attribution_dict.items(), key=lambda x: x[1][1],
-                reverse=True):
+        for token_id, token_info in sorted(char_attribution_dict.items(),
+                                           key=lambda x: x[1][1],
+                                           reverse=True):
             result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
 
-def extract_integrated_gradient_scores(
-        args, atts, input_ids, tokens, sub_word_id_dict, fwd_args, fwd_kwargs,
-        model, result, pred_label, err_total, offset, out_handle):
+def extract_integrated_gradient_scores(args, atts, input_ids, tokens,
+                                       sub_word_id_dict, fwd_args, fwd_kwargs,
+                                       model, result, pred_label, err_total,
+                                       offset, out_handle):
     embedded_grads_list = []
     for i in range(args.n_samples):
-        probs, _, embedded = model.forward_interpet(
-            *fwd_args,
-            **fwd_kwargs,
-            noise='integrated',
-            i=i,
-            n_samples=args.n_samples)
+        probs, _, embedded = model.forward_interpet(*fwd_args,
+                                                    **fwd_kwargs,
+                                                    noise='integrated',
+                                                    i=i,
+                                                    n_samples=args.n_samples)
         predicted_class_prob = probs[0][pred_label]
         predicted_class_prob.backward(retain_graph=False)
         embedded_grad = embedded.grad
@@ -338,14 +336,13 @@ def extract_integrated_gradient_scores(
             pred_confidence = probs.tolist()[0][pred_label]  # scalar
             pred_embedded = embedded  # Tensor(1, seq_len, embed_size)
 
-    embedded_grads_tensor = paddle.to_tensor(
-        embedded_grads_list,
-        dtype='float32',
-        place=paddle.CUDAPlace(0),
-        stop_gradient=True)
+    embedded_grads_tensor = paddle.to_tensor(embedded_grads_list,
+                                             dtype='float32',
+                                             place=paddle.CUDAPlace(0),
+                                             stop_gradient=True)
 
-    trapezoidal_grads = (
-        embedded_grads_tensor[1:] + embedded_grads_tensor[:-1]) / 2
+    trapezoidal_grads = (embedded_grads_tensor[1:] +
+                         embedded_grads_tensor[:-1]) / 2
     integral_grads = trapezoidal_grads.sum(0) / trapezoidal_grads.shape[
         0]  # Tensor(1, seq_len, embed_size)
 
@@ -356,8 +353,8 @@ def extract_integrated_gradient_scores(
     # eval err
     delta_pred_confidence = pred_confidence - baseline_pred_confidence
     sum_gradient = inter_score.sum().tolist()[0]
-    err = (delta_pred_confidence - sum_gradient + 1e-12) / (
-        delta_pred_confidence + 1e-12)
+    err = (delta_pred_confidence - sum_gradient +
+           1e-12) / (delta_pred_confidence + 1e-12)
     err_total.append(np.abs(err))
 
     print_str = '%s\t%d\t%.3f\t%.3f\t%.3f\t%.3f'
@@ -377,10 +374,12 @@ def extract_integrated_gradient_scores(
                                       sorted_token)
 
         result['char_attri'] = collections.OrderedDict()
-        for token_info in sorted(
-                char_attribution_dict, key=lambda x: x[2], reverse=True):
-            result['char_attri'][str(token_info[
-                0])] = [str(token_info[1]), float(token_info[2])]
+        for token_info in sorted(char_attribution_dict,
+                                 key=lambda x: x[2],
+                                 reverse=True):
+            result['char_attri'][str(
+                token_info[0])] = [str(token_info[1]),
+                                   float(token_info[2])]
         result.pop('sent_token')
 
     elif args.base_model == 'lstm':
@@ -391,9 +390,9 @@ def extract_integrated_gradient_scores(
             idx += 1
 
         result['char_attri'] = collections.OrderedDict()
-        for token_id, token_info in sorted(
-                char_attribution_dict.items(), key=lambda x: x[1][1],
-                reverse=True):
+        for token_id, token_info in sorted(char_attribution_dict.items(),
+                                           key=lambda x: x[1][1],
+                                           reverse=True):
             result['char_attri'][token_id] = token_info
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
@@ -403,8 +402,9 @@ def extract_integrated_gradient_scores(
 def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
                         result, lime_err_total, lime_score_total,
                         lime_relative_err_total, out_handle):
-    explainer = LimeTextExplainer(
-        class_names=['neg', 'pos'], verbose=False, language=args.language)
+    explainer = LimeTextExplainer(class_names=['neg', 'pos'],
+                                  verbose=False,
+                                  language=args.language)
 
     if_lstm = (args.base_model == 'lstm')
     explain_res = None
@@ -448,8 +448,9 @@ def extract_LIME_scores(args, tokenizer, tokens, pred_label, model, probs,
                     break
             if not got_score:
                 char_attribution_dict.append((idx, t, 0))
-        char_attribution_dict = sorted(
-            char_attribution_dict, key=lambda x: x[2], reverse=True)
+        char_attribution_dict = sorted(char_attribution_dict,
+                                       key=lambda x: x[2],
+                                       reverse=True)
 
         result['char_attri'] = collections.OrderedDict()
         for s in char_attribution_dict:
@@ -478,7 +479,8 @@ if __name__ == "__main__":
         model.train()  # set dropout to 0 in order to get the gradient
         log.debug('load model from %s' % args.init_checkpoint)
 
-        get_sub_word_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
+        get_sub_word_ids = lambda word: map(
+            str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
         for step, d in tqdm(enumerate(dataloader)):
             if step + 1 < args.start_id:  #start from the step's instance
                 continue
@@ -504,13 +506,14 @@ if __name__ == "__main__":
 
             result['id'] = dataloader.dataset.data[step]['id']
 
-            probs, atts, embedded = model.forward_interpet(*fwd_args,
-                                                           **fwd_kwargs)
+            probs, atts, embedded = model.forward_interpet(
+                *fwd_args, **fwd_kwargs)
             pred_label = paddle.argmax(probs, axis=-1).tolist()[0]
 
             result['pred_label'] = pred_label
             result['probs'] = [
-                float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()
+                float(format(prob, '.5f'))
+                for prob in probs.numpy()[0].tolist()
             ]
             sub_word_id_dict = []
             err_total = []

@@ -35,14 +35,15 @@ class HYP(DatasetBuilder):
     MD5 = "125c504b4da6882c2d163ae9962b6220"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('hyp', 'train.xml'),
-            "f9dc8cb583db4c061a5abfb556d8c164"),
-        'dev': META_INFO(
-            os.path.join('hyp', 'eval.xml'),
-            "20a7a7e82ae695a7fac4b8c48d0e4932"),
-        'test': META_INFO(
-            os.path.join('hyp', 'test.xml'), "5b1a166e7966fa744b402b033b9ed3ae")
+        'train':
+        META_INFO(os.path.join('hyp', 'train.xml'),
+                  "f9dc8cb583db4c061a5abfb556d8c164"),
+        'dev':
+        META_INFO(os.path.join('hyp', 'eval.xml'),
+                  "20a7a7e82ae695a7fac4b8c48d0e4932"),
+        'test':
+        META_INFO(os.path.join('hyp', 'test.xml'),
+                  "5b1a166e7966fa744b402b033b9ed3ae")
     }
 
     def _get_data(self, mode, **kwargs):
@@ -62,8 +63,8 @@ class HYP(DatasetBuilder):
         example_nodes = dom.documentElement.getElementsByTagName('article')
         for example in example_nodes:
             text = ''.join([
-                nodes.toprettyxml(
-                    indent='', newl='') for nodes in example.childNodes
+                nodes.toprettyxml(indent='', newl='')
+                for nodes in example.childNodes
             ])
             label = example.getAttribute('hyperpartisan')
             yield {'text': text, 'label': label}

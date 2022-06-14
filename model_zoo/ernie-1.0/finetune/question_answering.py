@@ -23,6 +23,7 @@ from paddlenlp.trainer import PredictionOutput
 
 
 class QuestionAnsweringTrainer(Trainer):
+
     def __init__(self,
                  *args,
                  eval_examples=None,
@@ -36,7 +37,7 @@ class QuestionAnsweringTrainer(Trainer):
                  eval_dataset=None,
                  eval_examples=None,
                  ignore_keys=None,
-                 metric_key_prefix: str="eval"):
+                 metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         eval_examples = self.eval_examples if eval_examples is None else eval_examples
@@ -52,7 +53,8 @@ class QuestionAnsweringTrainer(Trainer):
                 # No point gathering the predictions if there are no metrics, otherwise we defer to
                 # self.args.prediction_loss_only
                 prediction_loss_only=True if compute_metrics is None else None,
-                ignore_keys=ignore_keys, )
+                ignore_keys=ignore_keys,
+            )
         finally:
             self.compute_metrics = compute_metrics
 
@@ -70,15 +72,15 @@ class QuestionAnsweringTrainer(Trainer):
         else:
             metrics = {}
 
-        self.control = self.callback_handler.on_evaluate(self.args, self.state,
-                                                         self.control, metrics)
+        self.control = self.callback_handler.on_evaluate(
+            self.args, self.state, self.control, metrics)
         return metrics
 
     def predict(self,
                 predict_dataset,
                 predict_examples,
                 ignore_keys=None,
-                metric_key_prefix: str="test"):
+                metric_key_prefix: str = "test"):
         predict_dataloader = self.get_test_dataloader(predict_dataset)
 
         # Temporarily disable metric computation, we will do it in the loop here.
@@ -92,15 +94,17 @@ class QuestionAnsweringTrainer(Trainer):
                 # No point gathering the predictions if there are no metrics, otherwise we defer to
                 # self.args.prediction_loss_only
                 prediction_loss_only=True if compute_metrics is None else None,
-                ignore_keys=ignore_keys, )
+                ignore_keys=ignore_keys,
+            )
         finally:
             self.compute_metrics = compute_metrics
 
         if self.post_process_function is None or self.compute_metrics is None:
             return output
 
-        predictions = self.post_process_function(
-            predict_examples, predict_dataset, output.predictions, "predict")
+        predictions = self.post_process_function(predict_examples,
+                                                 predict_dataset,
+                                                 output.predictions, "predict")
         metrics = self.compute_metrics(predictions)
 
         # Prefix all keys with metric_key_prefix + '_'
@@ -108,13 +112,13 @@ class QuestionAnsweringTrainer(Trainer):
             if not key.startswith(f"{metric_key_prefix}_"):
                 metrics[f"{metric_key_prefix}_{key}"] = metrics.pop(key)
 
-        return PredictionOutput(
-            predictions=predictions.predictions,
-            label_ids=predictions.label_ids,
-            metrics=metrics)
+        return PredictionOutput(predictions=predictions.predictions,
+                                label_ids=predictions.label_ids,
+                                metrics=metrics)
 
 
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
@@ -123,10 +127,10 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.cross_entropy(
-            input=start_logits, label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(
-            input=end_logits, label=end_position)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
+                                                        label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
+                                                      label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 
@@ -139,11 +143,10 @@ def prepare_train_features(examples, tokenizer, args):
     contexts = examples['context']
     questions = examples['question']
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length)
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -188,8 +191,8 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char and
-                    offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char):
                 tokenized_examples["start_positions"].append(cls_index)
                 tokenized_examples["end_positions"].append(cls_index)
             else:
@@ -216,12 +219,11 @@ def prepare_validation_features(examples, tokenizer, args):
     contexts = examples['context']
     questions = examples['question']
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length,
-        return_attention_mask=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length,
+                                   return_attention_mask=True)
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -244,8 +246,8 @@ def prepare_validation_features(examples, tokenizer, args):
         # position is part of the context or not.
 
         tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index and
-             k != len(sequence_ids) - 1 else None)
+            (o if sequence_ids[k] == context_index
+             and k != len(sequence_ids) - 1 else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 

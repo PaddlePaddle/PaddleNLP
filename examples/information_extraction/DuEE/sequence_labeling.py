@@ -57,6 +57,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Sel
 args = parser.parse_args()
 # yapf: enable.
 
+
 def set_seed(args):
     """sets random seed"""
     random.seed(args.seed)
@@ -72,10 +73,12 @@ def evaluate(model, criterion, metric, num_label, data_loader):
     losses = []
     for input_ids, seg_ids, seq_lens, labels in data_loader:
         logits = model(input_ids, seg_ids)
-        loss = paddle.mean(criterion(logits.reshape([-1, num_label]), labels.reshape([-1])))
+        loss = paddle.mean(
+            criterion(logits.reshape([-1, num_label]), labels.reshape([-1])))
         losses.append(loss.numpy())
         preds = paddle.argmax(logits, axis=-1)
-        n_infer, n_label, n_correct = metric.compute(None, seq_lens, preds, labels)
+        n_infer, n_label, n_correct = metric.compute(None, seq_lens, preds,
+                                                     labels)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
     avg_loss = np.mean(losses)
@@ -84,13 +87,18 @@ def evaluate(model, criterion, metric, num_label, data_loader):
     return precision, recall, f1_score, avg_loss
 
 
-def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len=512, no_entity_label="O", ignore_label=-1, is_test=False):
+def convert_example_to_feature(example,
+                               tokenizer,
+                               label_vocab=None,
+                               max_seq_len=512,
+                               no_entity_label="O",
+                               ignore_label=-1,
+                               is_test=False):
     tokens, labels = example
-    tokenized_input = tokenizer(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
+    tokenized_input = tokenizer(tokens,
+                                return_length=True,
+                                is_split_into_words=True,
+                                max_seq_len=max_seq_len)
 
     input_ids = tokenized_input['input_ids']
     token_type_ids = tokenized_input['token_type_ids']
@@ -99,7 +107,7 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
     if is_test:
         return input_ids, token_type_ids, seq_len
     elif label_vocab is not None:
-        labels = labels[:(max_seq_len-2)]
+        labels = labels[:(max_seq_len - 2)]
         encoded_label = [no_entity_label] + labels + [no_entity_label]
         encoded_label = [label_vocab[x] for x in encoded_label]
         return input_ids, token_type_ids, seq_len, encoded_label
@@ -107,6 +115,7 @@ def convert_example_to_feature(example, tokenizer, label_vocab=None, max_seq_len
 
 class DuEventExtraction(paddle.io.Dataset):
     """DuEventExtraction"""
+
     def __init__(self, data_path, tag_path):
         self.label_vocab = load_dict(tag_path)
         self.word_ids = []
@@ -144,7 +153,8 @@ def do_train():
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieForTokenClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_map))
     model = paddle.DataParallel(model)
 
     print("============start train==========")
@@ -152,34 +162,33 @@ def do_train():
     dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
     test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
-    trans_func = partial(
-        convert_example_to_feature,
-        tokenizer=tokenizer,
-        label_vocab=train_ds.label_vocab,
-        max_seq_len=args.max_seq_len,
-        no_entity_label=no_entity_label,
-        ignore_label=ignore_label,
-        is_test=False)
+    trans_func = partial(convert_example_to_feature,
+                         tokenizer=tokenizer,
+                         label_vocab=train_ds.label_vocab,
+                         max_seq_len=args.max_seq_len,
+                         no_entity_label=no_entity_label,
+                         ignore_label=ignore_label,
+                         is_test=False)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # token type ids
-        Stack(dtype='int64'), # sequence lens
-        Pad(axis=0, pad_val=ignore_label, dtype='int64') # labels
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),  # input ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),  # token type ids
+        Stack(dtype='int64'),  # sequence lens
+        Pad(axis=0, pad_val=ignore_label, dtype='int64')  # labels
     ): fn(list(map(trans_func, samples)))
 
-    batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-    train_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_size=args.batch_size,
-        collate_fn=batchify_fn)
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        collate_fn=batchify_fn)
+    batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_loader = paddle.io.DataLoader(dataset=train_ds,
+                                        batch_sampler=batch_sampler,
+                                        collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_size=args.batch_size,
+                                      collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_size=args.batch_size,
+                                       collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
     # Generate parameter names needed to perform weight decay.
@@ -194,36 +203,43 @@ def do_train():
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
 
-    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(), suffix=False)
+    metric = ChunkEvaluator(label_list=train_ds.label_vocab.keys(),
+                            suffix=False)
     criterion = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
 
     step, best_f1 = 0, 0.0
     model.train()
     for epoch in range(args.num_epoch):
-        for idx, (input_ids, token_type_ids, seq_lens, labels) in enumerate(train_loader):
-            logits = model(input_ids, token_type_ids).reshape(
-                [-1, train_ds.label_num])
+        for idx, (input_ids, token_type_ids, seq_lens,
+                  labels) in enumerate(train_loader):
+            logits = model(input_ids,
+                           token_type_ids).reshape([-1, train_ds.label_num])
             loss = paddle.mean(criterion(logits, labels.reshape([-1])))
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
             loss_item = loss.numpy().item()
             if step > 0 and step % args.skip_step == 0 and rank == 0:
-                print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}')
+                print(
+                    f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) - loss: {loss_item:.6f}'
+                )
             if step > 0 and step % args.valid_step == 0 and rank == 0:
-                p, r, f1, avg_loss = evaluate(model, criterion, metric, len(label_map), dev_loader)
+                p, r, f1, avg_loss = evaluate(model, criterion, metric,
+                                              len(label_map), dev_loader)
                 print(f'dev step: {step} - loss: {avg_loss:.5f}, precision: {p:.5f}, recall: {r:.5f}, ' \
                         f'f1: {f1:.5f} current best {best_f1:.5f}')
                 if f1 > best_f1:
                     best_f1 = f1
                     print(f'==============================================save best model ' \
                             f'best performerence {best_f1:5f}')
-                    paddle.save(model.state_dict(), '{}/best.pdparams'.format(args.checkpoints))
+                    paddle.save(model.state_dict(),
+                                '{}/best.pdparams'.format(args.checkpoints))
             step += 1
 
     # save the final model
     if rank == 0:
-        paddle.save(model.state_dict(), '{}/final.pdparams'.format(args.checkpoints))
+        paddle.save(model.state_dict(),
+                    '{}/final.pdparams'.format(args.checkpoints))
 
 
 def do_predict():
@@ -232,7 +248,8 @@ def do_predict():
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieForTokenClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_map))
 
     no_entity_label = "O"
     ignore_label = len(label_map)
@@ -246,24 +263,31 @@ def do_predict():
         print("Loaded parameters from %s" % args.init_ckpt)
 
     # load data from predict file
-    sentences = read_by_lines(args.predict_data) # origin data format
+    sentences = read_by_lines(args.predict_data)  # origin data format
     sentences = [json.loads(sent) for sent in sentences]
 
     encoded_inputs_list = []
     for sent in sentences:
         sent = sent["text"].replace(" ", "\002")
-        input_ids, token_type_ids, seq_len = convert_example_to_feature([list(sent), []], tokenizer,
-                    max_seq_len=args.max_seq_len, is_test=True)
+        input_ids, token_type_ids, seq_len = convert_example_to_feature(
+            [list(sent), []],
+            tokenizer,
+            max_seq_len=args.max_seq_len,
+            is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids, seq_len))
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # input_ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'), # token_type_ids
-        Stack(dtype='int64') # sequence lens
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),  # token_type_ids
+        Stack(dtype='int64')  # sequence lens
     ): fn(samples)
     # Seperates data into some batches.
-    batch_encoded_inputs = [encoded_inputs_list[i: i + args.batch_size]
-                            for i in range(0, len(encoded_inputs_list), args.batch_size)]
+    batch_encoded_inputs = [
+        encoded_inputs_list[i:i + args.batch_size]
+        for i in range(0, len(encoded_inputs_list), args.batch_size)
+    ]
     results = []
     model.eval()
     for batch in batch_encoded_inputs:
@@ -274,9 +298,13 @@ def do_predict():
         probs = F.softmax(logits, axis=-1)
         probs_ids = paddle.argmax(probs, -1).numpy()
         probs = probs.numpy()
-        for p_list, p_ids, seq_len in zip(probs.tolist(), probs_ids.tolist(), seq_lens.tolist()):
-            prob_one = [p_list[index][pid] for index, pid in enumerate(p_ids[1: seq_len - 1])]
-            label_one = [id2label[pid] for pid in p_ids[1: seq_len - 1]]
+        for p_list, p_ids, seq_len in zip(probs.tolist(), probs_ids.tolist(),
+                                          seq_lens.tolist()):
+            prob_one = [
+                p_list[index][pid]
+                for index, pid in enumerate(p_ids[1:seq_len - 1])
+            ]
+            label_one = [id2label[pid] for pid in p_ids[1:seq_len - 1]]
             results.append({"probs": prob_one, "labels": label_one})
     assert len(results) == len(sentences)
     for sent, ret in zip(sentences, results):
@@ -284,7 +312,6 @@ def do_predict():
     sentences = [json.dumps(sent, ensure_ascii=False) for sent in sentences]
     write_by_lines(args.predict_save_path, sentences)
     print("save data {} to {}".format(len(sentences), args.predict_save_path))
-
 
 
 if __name__ == '__main__':

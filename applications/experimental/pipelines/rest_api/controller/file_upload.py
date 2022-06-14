@@ -45,8 +45,8 @@ try:
     is_faiss_or_inmemory_present = False
     for node in pipeline_definition["nodes"]:
         if (component_definitions[node["name"]]["type"] == "FAISSDocumentStore"
-                or component_definitions[node["name"]]["type"] ==
-                "InMemoryDocumentStore"):
+                or component_definitions[node["name"]]["type"]
+                == "InMemoryDocumentStore"):
             is_faiss_or_inmemory_present = True
             break
     if is_faiss_or_inmemory_present:
@@ -90,20 +90,20 @@ class Response(BaseModel):
 
 @router.post("/file-upload")
 def upload_file(
-        files: List[UploadFile]=File(...),
+        files: List[UploadFile] = File(...),
         # JSON serialized string
-        meta: Optional[str]=Form("null"),  # type: ignore
-        fileconverter_params: FileConverterParams=Depends(
+        meta: Optional[str] = Form("null"),  # type: ignore
+        fileconverter_params: FileConverterParams = Depends(
             FileConverterParams.as_form),  # type: ignore
-        preprocessor_params: PreprocessorParams=Depends(
+        preprocessor_params: PreprocessorParams = Depends(
             PreprocessorParams.as_form),  # type: ignore
 ):
     """
     You can use this endpoint to upload a file for indexing
     """
     if not INDEXING_PIPELINE:
-        raise HTTPException(
-            status_code=501, detail="Indexing Pipeline is not configured.")
+        raise HTTPException(status_code=501,
+                            detail="Indexing Pipeline is not configured.")
 
     file_paths: list = []
     file_metas: list = []
@@ -111,8 +111,8 @@ def upload_file(
     if not isinstance(meta_form, dict):
         raise HTTPException(
             status_code=500,
-            detail=f"The meta field must be a dict or None, not {type(meta_form)}"
-        )
+            detail=
+            f"The meta field must be a dict or None, not {type(meta_form)}")
 
     for file in files:
         try:
@@ -134,5 +134,6 @@ def upload_file(
             "TextFileConverter": fileconverter_params.dict(),
             "PDFFileConverter": fileconverter_params.dict(),
             "Preprocessor": preprocessor_params.dict(),
-        }, )
+        },
+    )
     return {'message': "OK"}

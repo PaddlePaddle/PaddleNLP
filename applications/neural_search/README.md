@@ -6,7 +6,7 @@
 
 所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户 Query 字面本身，而是能精准捕捉到用户 Query 后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语义索引模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
 
-例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。  
+例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。
 
 ```
 车头如何放置车牌    前牌照怎么装
@@ -84,7 +84,7 @@
 
 #### 3.1.2 评估指标
 
-**模型效果指标**  
+**模型效果指标**
 * 在语义索引召回阶段使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
 
 * 在排序阶段使用的指标为AUC，AUC反映的是分类器对样本的排序能力，如果完全随机得对样本分类，那么AUC应该接近0.5。分类器越可能把真正的正样本排在前面，AUC越大，分类性能越好。
@@ -143,7 +143,7 @@ a. 软件环境：
 
 
 - python >= 3.6
-- paddlenlp >= 2.2.1  
+- paddlenlp >= 2.2.1
 - paddlepaddle-gpu >=2.2
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
@@ -175,15 +175,15 @@ pip install -r requirements.txt
 
 第一步：无监督训练 Domain-adaptive Pretraining
 
-训练用时 16hour55min，可参考：[ERNIE 1.0](./recall/domain_adaptive_pretraining/)  
+训练用时 16hour55min，可参考：[ERNIE 1.0](./recall/domain_adaptive_pretraining/)
 
 第二步：无监督训练 SimCSE
 
-训练用时 16hour53min，可参考：[SimCSE](./recall/simcse/)  
+训练用时 16hour53min，可参考：[SimCSE](./recall/simcse/)
 
 第三步：有监督训练
 
-几分钟内训练完成，可参考 [In-batch Negatives](./recall/in_batch_negative/)  
+几分钟内训练完成，可参考 [In-batch Negatives](./recall/in_batch_negative/)
 
 
 此外，我们进行了多组实践，用来对比说明召回阶段各方案的效果：
@@ -201,7 +201,7 @@ pip install -r requirements.txt
 
 **召回系统搭建**
 
-召回系统使用索引引擎 Milvus，可参考 [milvus_system](./recall/milvus/)。  
+召回系统使用索引引擎 Milvus，可参考 [milvus_system](./recall/milvus/)。
 我们展示一下系统的效果，输入的文本如下：
 
 ```

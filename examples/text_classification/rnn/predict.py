@@ -87,55 +87,48 @@ if __name__ == "__main__":
     if network == 'bow':
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'bigru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'bilstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='bidirect',
+                          padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(
-            attention_layer=attention,
-            vocab_size=vocab_size,
-            lstm_hidden_size=lstm_hidden_size,
-            num_classes=num_classes,
-            padding_idx=pad_token_id)
+        model = BiLSTMAttentionModel(attention_layer=attention,
+                                     vocab_size=vocab_size,
+                                     lstm_hidden_size=lstm_hidden_size,
+                                     num_classes=num_classes,
+                                     padding_idx=pad_token_id)
     elif network == 'birnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'cnn':
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'gru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     elif network == 'lstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='forward',
+                          padding_idx=pad_token_id,
+                          pooling_type='max')
     elif network == 'rnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
@@ -155,11 +148,10 @@ if __name__ == "__main__":
     tokenizer = JiebaTokenizer(vocab)
     examples = preprocess_prediction_data(data, tokenizer)
 
-    results = predict(
-        model,
-        examples,
-        label_map=label_map,
-        batch_size=args.batch_size,
-        pad_token_id=vocab.token_to_idx.get("[PAD]", 0))
+    results = predict(model,
+                      examples,
+                      label_map=label_map,
+                      batch_size=args.batch_size,
+                      pad_token_id=vocab.token_to_idx.get("[PAD]", 0))
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

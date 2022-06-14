@@ -18,10 +18,9 @@ def search_in_milvus(text_embedding, query_text):
     partition_tag = 'partition_1'
     client = RecallByMilvus()
     start_time = time.time()
-    status, results = client.search(
-        collection_name=collection_name,
-        vectors=text_embedding,
-        partition_tag=partition_tag)
+    status, results = client.search(collection_name=collection_name,
+                                    vectors=text_embedding,
+                                    partition_tag=partition_tag)
     end_time = time.time()
     print('Search milvus time cost is {} seconds '.format(end_time -
                                                           start_time))
@@ -38,12 +37,11 @@ def search_in_milvus(text_embedding, query_text):
             list_data.append([query_text, text, distance])
     df = pd.DataFrame(list_data, columns=['query_text', 'text', 'distance'])
     df = df.sort_values(by="distance", ascending=True)
-    df.to_csv(
-        'data/recall_predict.csv',
-        columns=['text', 'distance'],
-        sep='\t',
-        header=None,
-        index=False)
+    df.to_csv('data/recall_predict.csv',
+              columns=['text', 'distance'],
+              sep='\t',
+              header=None,
+              index=False)
 
 
 if __name__ == "__main__":

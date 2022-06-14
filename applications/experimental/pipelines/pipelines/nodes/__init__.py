@@ -23,7 +23,8 @@ from pipelines.nodes.file_converter import (
     MarkdownConverter,
     PDFToTextConverter,
     PDFToTextOCRConverter,
-    TextConverter, )
+    TextConverter,
+)
 from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader

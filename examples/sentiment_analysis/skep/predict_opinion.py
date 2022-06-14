@@ -65,11 +65,10 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids(obj: `list[int]`): List of sequence pair mask. 
     """
     tokens = example["tokens"]
-    encoded_inputs = tokenizer(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(tokens,
+                               return_length=True,
+                               is_split_into_words=True,
+                               max_seq_len=max_seq_length)
     input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
     token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
     seq_len = np.array(encoded_inputs["seq_len"], dtype="int64")
@@ -119,17 +118,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 if __name__ == "__main__":
@@ -138,12 +138,12 @@ if __name__ == "__main__":
     test_ds = load_dataset("cote", "dp", splits=['test'])
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {0: "B", 1: "I", 2: "O"}
-    # `no_entity_label` represents that the token isn't an entity. 
+    # `no_entity_label` represents that the token isn't an entity.
     no_entity_label_idx = 2
 
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
-    model = SkepCrfForTokenClassification(
-        skep, num_classes=len(test_ds.label_list))
+    model = SkepCrfForTokenClassification(skep,
+                                          num_classes=len(test_ds.label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -151,22 +151,21 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # token type ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]
+            ),  # token type ids
         Stack(dtype='int64'),  # sequence lens
     ): [data for data in fn(samples)]
 
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='test',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    test_data_loader = create_dataloader(test_ds,
+                                         mode='test',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     results = predict(model, test_data_loader, label_map)
     for idx, example in enumerate(test_ds.data):

@@ -34,18 +34,18 @@ class YahooAnswer100K(DatasetBuilder):
     MD5 = "68b88fd3f2cc9918a78047d99bcc6532"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('yahoo-answer-100k', 'yahoo.train.txt'),
-            "3fb31bad56bae7c65fa084f702398c3b"),
-        'valid': META_INFO(
-            os.path.join('yahoo-answer-100k', 'yahoo.valid.txt'),
-            "2680dd89b4fe882359846b5accfb7647"),
-        'test': META_INFO(
-            os.path.join('yahoo-answer-100k', 'yahoo.test.txt'),
-            "3e6dcb643282e3543303980f1e21bb9d")
+        'train':
+        META_INFO(os.path.join('yahoo-answer-100k', 'yahoo.train.txt'),
+                  "3fb31bad56bae7c65fa084f702398c3b"),
+        'valid':
+        META_INFO(os.path.join('yahoo-answer-100k', 'yahoo.valid.txt'),
+                  "2680dd89b4fe882359846b5accfb7647"),
+        'test':
+        META_INFO(os.path.join('yahoo-answer-100k', 'yahoo.test.txt'),
+                  "3e6dcb643282e3543303980f1e21bb9d")
     }
-    VOCAB_INFO = (os.path.join("yahoo-answer-100k", "vocab.txt"),
-                  "2c17c7120e6240d34d19490404b5133d")
+    VOCAB_INFO = (os.path.join("yahoo-answer-100k",
+                               "vocab.txt"), "2c17c7120e6240d34d19490404b5133d")
     UNK_TOKEN = '_UNK'
 
     def _get_data(self, mode, **kwargs):

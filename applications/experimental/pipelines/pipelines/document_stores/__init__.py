@@ -34,4 +34,5 @@ FAISSDocumentStore = safe_import("pipelines.document_stores.faiss",
 from pipelines.document_stores.utils import (
     eval_data_from_json,
     eval_data_from_jsonl,
-    es_index_to_document_store, )
+    es_index_to_document_store,
+)

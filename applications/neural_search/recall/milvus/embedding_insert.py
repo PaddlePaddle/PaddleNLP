@@ -32,10 +32,9 @@ for i in tqdm(range(0, data_size, batch_size)):
     if (cur_end > data_size):
         cur_end = data_size
     batch_emb = embeddings[np.arange(i, cur_end)]
-    status, ids = client.insert(
-        collection_name=collection_name,
-        vectors=batch_emb.tolist(),
-        ids=embedding_ids[i:i + batch_size],
-        partition_tag=partition_tag)
+    status, ids = client.insert(collection_name=collection_name,
+                                vectors=batch_emb.tolist(),
+                                ids=embedding_ids[i:i + batch_size],
+                                partition_tag=partition_tag)
     # print(status)
     # print(ids)

@@ -28,7 +28,7 @@ VALID_CODE_GEN_INPUT_REGEX = re.compile(r"^[-a-zA-Z0-9_/.:]+$")
 
 def get_pipeline_definition(
         pipeline_config: Dict[str, Any],
-        pipeline_name: Optional[str]=None) -> Dict[str, Any]:
+        pipeline_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Get the definition of Pipeline from a given pipeline config. If the config contains more than one Pipeline,
     then the pipeline_name must be supplied.
@@ -45,8 +45,8 @@ def get_pipeline_definition(
             )
     else:
         pipelines_in_definitions = list(
-            filter(lambda p: p["name"] == pipeline_name, pipeline_config[
-                "pipelines"]))
+            filter(lambda p: p["name"] == pipeline_name,
+                   pipeline_config["pipelines"]))
         if not pipelines_in_definitions:
             raise KeyError(
                 f"Cannot find any pipeline with name '{pipeline_name}' declared in the YAML file."
