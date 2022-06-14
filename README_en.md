@@ -199,7 +199,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+#### ⚡ FasterTokenizer: High Performance Text Preprocessing Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -209,7 +209,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizer](./faster_tokenizer).
 
 #### ⚡ FasterGeneration: High Perforance Generation Library
 

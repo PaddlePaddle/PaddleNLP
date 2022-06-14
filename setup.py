@@ -61,7 +61,7 @@ setuptools.setup(
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
         where='.',
-        exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizers*',
+        exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizer*',
                  'faster_generation*', 'model_zoo*')),
     package_data={
         'paddlenlp.ops':

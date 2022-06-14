@@ -21,7 +21,7 @@ from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.import_utils import is_faster_tokenizers_available
+from paddlenlp.utils.import_utils import is_faster_tokenizer_available
 
 __all__ = [
     "AutoTokenizer",
@@ -82,7 +82,7 @@ FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFasterTokenizer", "bert"),
                                               ("ErnieFasterTokenizer", "ernie")
                                               ])
 # For FasterTokenizer
-if is_faster_tokenizers_available():
+if is_faster_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
 
 
@@ -188,7 +188,7 @@ class AutoTokenizer():
                                 actual_tokenizer_class = tokenizer_class[0]
                                 break
                         if use_faster:
-                            if is_faster_tokenizers_available():
+                            if is_faster_tokenizer_available():
                                 is_support_faster_tokenizer = False
                                 for tokenizer_class in tokenizer_classes:
                                     if tokenizer_class[1]:
@@ -204,8 +204,8 @@ class AutoTokenizer():
                                     )
                             else:
                                 logger.warning(
-                                    "Can't find the faster_tokenizers package, "
-                                    "please ensure install faster_tokenizers correctly. "
+                                    "Can't find the faster_tokenizer package, "
+                                    "please ensure install faster_tokenizer correctly. "
                                     "You can install faster_tokenizer by `pip install faster_tokenizer`"
                                     "(Currently only work for linux platform).")
 
