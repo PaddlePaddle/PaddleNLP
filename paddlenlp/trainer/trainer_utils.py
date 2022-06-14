@@ -28,6 +28,7 @@ from enum import Enum
 from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
+from paddle.optimizer.lr import LambdaDecay
 
 __all__ = [
     "TrainOutput",
@@ -38,6 +39,7 @@ __all__ = [
     "set_seed",
     "speed_metrics",
     "get_last_checkpoint",
+    "get_scheduler",
 ]
 
 
@@ -178,10 +180,168 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None):
 class SchedulerType(ExplicitEnum):
     LINEAR = "linear"
     COSINE = "cosine"
-    COSINE_WITH_RESTARTS = "cosine_with_restarts"
-    POLYNOMIAL = "polynomial"
     CONSTANT = "constant"
     CONSTANT_WITH_WARMUP = "constant_with_warmup"
+
+
+def get_constant_schedule(learning_rate: float, last_epoch: int = -1):
+    """
+    Create a schedule with a constant learning rate, using the learning rate set in optimizer.
+    Args:
+        learning_rate (float)
+            The initial learning rate. It is a python float number.
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+    Return:
+        `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
+    """
+    return LambdaDecay(learning_rate, lambda _: 1, last_epoch=last_epoch)
+
+
+def get_constant_schedule_with_warmup(learning_rate: float,
+                                      num_warmup_steps: int,
+                                      last_epoch: int = -1):
+    """
+    Create a schedule with a constant learning rate preceded by a warmup period during which the learning rate
+    increases linearly between 0 and the initial lr set in the optimizer.
+    Args:
+        learning_rate (float)
+            The initial learning rate. It is a python float number.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+    Return:
+        `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
+    """
+
+    def lr_lambda(current_step: int):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1.0, num_warmup_steps))
+        return 1.0
+
+    return LambdaDecay(learning_rate, lr_lambda, last_epoch=last_epoch)
+
+
+def get_linear_schedule_with_warmup(learning_rate: float,
+                                    num_warmup_steps,
+                                    num_training_steps,
+                                    last_epoch=-1):
+    """
+    Create a schedule with a learning rate that decreases linearly from the initial lr set in the optimizer to 0, after
+    a warmup period during which it increases linearly from 0 to the initial lr set in the optimizer.
+    Args:
+        learning_rate (float)
+            The initial learning rate. It is a python float number.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        num_training_steps (`int`):
+            The total number of training steps.
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+    Return:
+        `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
+    """
+
+    def lr_lambda(current_step: int):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        return max(
+            0.0,
+            float(num_training_steps - current_step) /
+            float(max(1, num_training_steps - num_warmup_steps)))
+
+    return LambdaDecay(learning_rate, lr_lambda, last_epoch)
+
+
+def get_cosine_schedule_with_warmup(learning_rate: float,
+                                    num_warmup_steps: int,
+                                    num_training_steps: int,
+                                    num_cycles: float = 0.5,
+                                    last_epoch: int = -1):
+    """
+    Create a schedule with a learning rate that decreases following the values of the cosine function between the
+    initial lr set in the optimizer to 0, after a warmup period during which it increases linearly between 0 and the
+    initial lr set in the optimizer.
+    Args:
+        learning_rate (float)
+            The initial learning rate. It is a python float number.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        num_training_steps (`int`):
+            The total number of training steps.
+        num_cycles (`float`, *optional*, defaults to 0.5):
+            The number of waves in the cosine schedule (the defaults is to just decrease from the max value to 0
+            following a half-cosine).
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+    Return:
+        `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
+    """
+
+    def lr_lambda(current_step):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        progress = float(current_step - num_warmup_steps) / float(
+            max(1, num_training_steps - num_warmup_steps))
+        return max(
+            0.0, 0.5 *
+            (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+
+    return LambdaDecay(learning_rate, lr_lambda, last_epoch)
+
+
+TYPE_TO_SCHEDULER_FUNCTION = {
+    SchedulerType.LINEAR: get_linear_schedule_with_warmup,
+    SchedulerType.COSINE: get_cosine_schedule_with_warmup,
+    SchedulerType.CONSTANT: get_constant_schedule,
+    SchedulerType.CONSTANT_WITH_WARMUP: get_constant_schedule_with_warmup,
+}
+
+
+def get_scheduler(
+    name: Union[str, SchedulerType],
+    learning_rate: float,
+    num_warmup_steps: Optional[int] = None,
+    num_training_steps: Optional[int] = None,
+):
+    """
+    Unified API to get any scheduler from its name.
+    Args:
+        name (`str` or `SchedulerType`):
+            The name of the scheduler to use.
+        learning_rate (float)
+            The initial learning rate. It is a python float number.
+        num_warmup_steps (`int`, *optional*):
+            The number of warmup steps to do. This is not required by all schedulers (hence the argument being
+            optional), the function will raise an error if it's unset and the scheduler type requires it.
+        num_training_steps (`int``, *optional*):
+            The number of training steps to do. This is not required by all schedulers (hence the argument being
+            optional), the function will raise an error if it's unset and the scheduler type requires it.
+    """
+    name = SchedulerType(name)
+    schedule_func = TYPE_TO_SCHEDULER_FUNCTION[name]
+    if name == SchedulerType.CONSTANT:
+        return schedule_func(learning_rate)
+
+    # All other schedulers require `num_warmup_steps`
+    if num_warmup_steps is None:
+        raise ValueError(
+            f"{name} requires `num_warmup_steps`, please provide that argument."
+        )
+
+    if name == SchedulerType.CONSTANT_WITH_WARMUP:
+        return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps)
+
+    # All other schedulers require `num_training_steps`
+    if num_training_steps is None:
+        raise ValueError(
+            f"{name} requires `num_training_steps`, please provide that argument."
+        )
+
+    return schedule_func(learning_rate,
+                         num_warmup_steps=num_warmup_steps,
+                         num_training_steps=num_training_steps)
 
 
 def _secs2timedelta(secs):
