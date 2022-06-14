@@ -242,7 +242,6 @@ def get_linear_schedule_with_warmup(learning_rate: float,
     Return:
         `paddle.optimizer.lr.LambdaDecay` with the appropriate schedule.
     """
-    print(f"get_linear_schedule_with_warmup {num_warmup_steps}", )
 
     def lr_lambda(current_step: int):
         if current_step < num_warmup_steps:
