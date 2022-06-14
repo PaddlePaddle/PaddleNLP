@@ -39,23 +39,6 @@ using TemplatePiece = boost::variant<TemplateSequence, TemplateSpecialToken>;
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
 void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
 
-// struct TemplatePiece {
-//   TemplatePiece() = default;
-//   template<typename PieceType>
-//   TemplatePiece(PieceType&& other) : piece_impl_(other) {}
-//   template<typename PieceType>
-//   TemplatePiece& operator=(PieceType&& other) {
-//     piece_impl_ = std::forward<PieceType>(other);
-//     return *this;
-//   }
-//   void ParseIdFromString(const std::string& template_id_string);
-//   void SetTypeId(uint type_id);
-//   void GetTemplatePieceFromString(const std::string& template_string);
-
-//   boost::variant<TemplateSequence, TemplateSpecialToken> piece_impl_;
-
-// };
-
 void ParseIdFromString(const std::string& template_id_string,
                        TemplatePiece* template_piece);
 void SetTypeId(uint type_id, TemplatePiece* template_piece);

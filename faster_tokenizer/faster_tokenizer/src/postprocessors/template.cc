@@ -107,14 +107,11 @@ void to_json(nlohmann::json& j, const TemplatePiece& template_piece) {
 
 void from_json(const nlohmann::json& j, TemplatePiece& template_piece) {
   if (j.find("Sequence") != j.end()) {
-    auto& template_sequence = boost::get<TemplateSequence>(template_piece);
-    j["Sequence"]["id"].get_to(template_sequence.first);
-    j["Sequence"]["type_id"].get_to(template_sequence.second);
+    template_piece =
+        TemplateSequence(j["Sequence"]["id"], j["Sequence"]["type_id"]);
   } else {
-    auto& template_special_token =
-        boost::get<TemplateSpecialToken>(template_piece);
-    j["SpecialToken"]["id"].get_to(template_special_token.first);
-    j["SpecialToken"]["type_id"].get_to(template_special_token.second);
+    template_piece = TemplateSpecialToken(j["SpecialToken"]["id"],
+                                          j["SpecialToken"]["type_id"]);
   }
 }
 
