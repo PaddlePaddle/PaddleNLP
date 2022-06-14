@@ -39,7 +39,7 @@ msgstr ""
 #: of paddlenlp.utils.batch_sampler.DistributedBatchSampler
 #: paddlenlp.utils.batch_sampler.DistributedBatchSampler.set_epoch
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.utils.batch_sampler.DistributedBatchSampler:10
 msgid ""
@@ -81,7 +81,7 @@ msgstr ""
 #: of paddlenlp.utils.batch_sampler.DistributedBatchSampler:34
 #: paddlenlp.utils.batch_sampler.DistributedBatchSampler.set_epoch:11
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.utils.batch_sampler.DistributedBatchSampler.set_epoch:1
 msgid ""

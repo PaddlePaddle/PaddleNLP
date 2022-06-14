@@ -30,7 +30,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2ForTokenClassification:1
 #: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:1
 msgid "基类：:class:`paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel`"
 
 #: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:1
 msgid "The bare LayoutLMv2 Model outputting raw hidden-states."
@@ -59,7 +59,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model
 #: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2Model:10
 msgid ""
@@ -143,7 +143,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.layoutlmv2.modeling.LayoutLMv2PretrainedModel.init_weights:1

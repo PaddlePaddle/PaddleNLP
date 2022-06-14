@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class：:class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.rouge.RougeL:1
 msgid ""
@@ -51,7 +51,7 @@ msgstr ""
 #: paddlenlp.metrics.rouge.RougeL.lcs paddlenlp.metrics.rouge.RougeLForDuReader
 #: paddlenlp.metrics.rouge.RougeLForDuReader.add_inst
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.metrics.rouge.RougeL:16
 msgid "`trans_func` transforms the network output to string to calculate."
@@ -74,7 +74,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL:30
 msgid "实际案例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.metrics.rouge.RougeL.lcs:1
 msgid "Calculate the length of longest common subsequence of string and sub."
@@ -90,7 +90,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL.lcs
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.rouge.RougeL.lcs:8
 msgid "Returns the length of the longest common subsequence of string and sub."
@@ -98,7 +98,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeL.lcs
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.metrics.rouge.RougeL.add_inst:1
 #: paddlenlp.metrics.rouge.RougeLForDuReader.add_inst:1
@@ -145,7 +145,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.rouge.RougeLForDuReader:1
 msgid "基类：:class:`paddlenlp.metrics.rouge.RougeL`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.metrics.rouge.RougeL`"
 
 #: of paddlenlp.metrics.rouge.RougeLForDuReader:1
 msgid "Rouge-L metric with bonus for DuReader contest."

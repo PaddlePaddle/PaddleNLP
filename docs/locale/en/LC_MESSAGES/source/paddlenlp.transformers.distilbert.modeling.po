@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.distilbert.modeling.DistilBertForTokenClassification:1
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.distilbert.modeling.DistilBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.distilbert.modeling.DistilBertPretrainedModel`"
 
 #: of paddlenlp.transformers.distilbert.modeling.DistilBertModel:1
 msgid "The bare DistilBert Model transformer outputting raw hidden-states."
@@ -60,7 +60,7 @@ msgstr ""
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.distilbert.modeling.DistilBertModel:10
 msgid ""
@@ -182,7 +182,7 @@ msgstr ""
 #: paddlenlp.transformers.distilbert.modeling.DistilBertForTokenClassification.forward
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.distilbert.modeling.DistilBertModel.forward:19
 msgid ""
@@ -197,7 +197,7 @@ msgstr ""
 #: paddlenlp.transformers.distilbert.modeling.DistilBertForTokenClassification.forward
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.distilbert.modeling.DistilBertForMaskedLM.forward:13
@@ -206,11 +206,11 @@ msgstr ""
 #: paddlenlp.transformers.distilbert.modeling.DistilBertForTokenClassification.forward:13
 #: paddlenlp.transformers.distilbert.modeling.DistilBertModel.forward:24
 msgid "示例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.transformers.distilbert.modeling.DistilBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.distilbert.modeling.DistilBertPretrainedModel:1
 msgid ""

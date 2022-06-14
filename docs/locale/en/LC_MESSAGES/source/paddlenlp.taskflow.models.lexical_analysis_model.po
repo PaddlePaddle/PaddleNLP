@@ -43,7 +43,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.models.lexical_analysis_model.BiGruCrf.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.models.lexical_analysis_model.BiGruCrf.forward:4
 msgid "unpacked tuple arguments"

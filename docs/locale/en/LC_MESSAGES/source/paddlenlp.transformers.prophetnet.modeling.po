@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration:1
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel:1
 msgid "基类：:class:`paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel`"
 
 #: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward:1
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward:1
@@ -42,7 +42,7 @@ msgstr ""
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetForConditionalGeneration.forward
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.prophetnet.modeling.ProphetNetDecoder.forward:4
 #: paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder.forward:4
@@ -60,7 +60,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.prophetnet.modeling.ProphetNetPretrainedModel:1
 msgid ""

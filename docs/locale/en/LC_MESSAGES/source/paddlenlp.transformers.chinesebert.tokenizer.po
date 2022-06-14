@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer:1
 msgid ""
@@ -40,7 +40,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.pinyin_locs_map
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.truncate_sequences
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer:5
 msgid ""
@@ -100,7 +100,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer:39
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.encode:1
@@ -255,7 +255,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.get_pinyin_ids
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.pinyin_locs_map
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.encode:62
@@ -365,7 +365,7 @@ msgstr ""
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.get_pinyin_ids
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.pinyin_locs_map
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.chinesebert.tokenizer.ChineseBertTokenizer.batch_encode:1

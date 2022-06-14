@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer:1
 msgid ""
@@ -43,7 +43,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained:5
 msgid ""
@@ -85,7 +85,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained:21
 msgid "An instance of `PretrainedTokenizer`."
@@ -93,9 +93,9 @@ msgstr ""
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.auto.tokenizer.AutoTokenizer.from_pretrained:25
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 

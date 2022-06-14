@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser:1
 msgid "基类：:class:`argparse.ArgumentParser`"
-msgstr ""
+msgstr "Base class：:class:`argparse.ArgumentParser`"
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser:1
 msgid ""
@@ -55,7 +55,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:6
@@ -86,7 +86,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses:12
@@ -121,7 +121,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser.parse_args_into_dataclasses
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.trainer.argparser.PdArgumentParser.parse_json_file:1
 msgid ""

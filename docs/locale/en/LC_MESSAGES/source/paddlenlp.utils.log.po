@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.utils.log.Logger:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.utils.log.Logger:1
 msgid "Deafult logger in PaddleNLP"
@@ -31,7 +31,7 @@ msgstr ""
 
 #: of paddlenlp.utils.log.Logger paddlenlp.utils.log.Logger.processing
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.utils.log.Logger:3
 msgid "Logger name, default is 'PaddleNLP'"

@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocForTokenClassification:1
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel:1
 msgid "基类：:class:`paddlenlp.transformers.ernie_doc.modeling.ErnieDocPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ernie_doc.modeling.ErnieDocPretrainedModel`"
 
 #: of paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel:1
 msgid "The bare ERNIE-Doc Model outputting raw hidden-states."
@@ -57,7 +57,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel:10
 msgid "The number of hidden layers in the Transformer encoder."
@@ -236,7 +236,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocForTokenClassification.forward
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel.forward:36
 msgid ""
@@ -304,7 +304,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocForTokenClassification.forward
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocForQuestionAnswering.forward:33
@@ -312,11 +312,11 @@ msgstr ""
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocForTokenClassification.forward:30
 #: paddlenlp.transformers.ernie_doc.modeling.ErnieDocModel.forward:55
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.ernie_doc.modeling.ErnieDocPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.ernie_doc.modeling.ErnieDocPretrainedModel:1
 msgid ""

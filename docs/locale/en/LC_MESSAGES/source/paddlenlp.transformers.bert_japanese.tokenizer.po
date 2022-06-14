@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.BertJapaneseTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.BertJapaneseTokenizer:1
 msgid "Construct a BERT tokenizer for Japanese text, based on a MecabTokenizer."
@@ -32,7 +32,7 @@ msgstr ""
 #: of paddlenlp.transformers.bert_japanese.tokenizer.BertJapaneseTokenizer
 #: paddlenlp.transformers.bert_japanese.tokenizer.CharacterTokenizer.tokenize
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.BertJapaneseTokenizer:3
 msgid ""
@@ -102,12 +102,12 @@ msgstr ""
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.BertJapaneseTokenizer:40
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.CharacterTokenizer:1
 #: paddlenlp.transformers.bert_japanese.tokenizer.MecabTokenizer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.bert_japanese.tokenizer.MecabTokenizer:1
 msgid "Runs basic tokenization with MeCab morphological parser."
@@ -143,7 +143,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.bert_japanese.tokenizer.CharacterTokenizer.tokenize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.bert_japanese.tokenizer.CharacterTokenizer.tokenize:8

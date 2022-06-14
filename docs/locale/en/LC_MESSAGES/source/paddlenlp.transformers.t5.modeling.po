@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration:1
 #: paddlenlp.transformers.t5.modeling.T5Model:1
 msgid "基类：:class:`paddlenlp.transformers.t5.modeling.T5PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.t5.modeling.T5PretrainedModel`"
 
 #: of paddlenlp.transformers.t5.modeling.T5Model:1
 msgid ""
@@ -53,7 +53,7 @@ msgstr ""
 #: paddlenlp.transformers.t5.modeling.T5Model
 #: paddlenlp.transformers.t5.modeling.T5Model.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.t5.modeling.T5Model:10
 msgid "Whether to tie input and output embeddings. Defaults to `False`."
@@ -221,7 +221,7 @@ msgstr ""
 #: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward
 #: paddlenlp.transformers.t5.modeling.T5Model.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.t5.modeling.T5Model.forward:49
 msgid ""
@@ -364,16 +364,16 @@ msgstr ""
 #: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward
 #: paddlenlp.transformers.t5.modeling.T5Model.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:64
 #: paddlenlp.transformers.t5.modeling.T5Model.forward:98
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.t5.modeling.T5PretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.t5.modeling.T5PretrainedModel:1
 msgid ""

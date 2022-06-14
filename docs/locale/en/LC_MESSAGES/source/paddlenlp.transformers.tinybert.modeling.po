@@ -25,7 +25,7 @@ msgstr ""
 #: paddlenlp.transformers.tinybert.modeling.TinyBertForSequenceClassification:1
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.tinybert.modeling.TinyBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tinybert.modeling.TinyBertPretrainedModel`"
 
 #: of paddlenlp.transformers.tinybert.modeling.TinyBertModel:1
 msgid "The bare TinyBert Model transformer outputting raw hidden-states."
@@ -54,7 +54,7 @@ msgstr ""
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.tinybert.modeling.TinyBertModel:10
 msgid ""
@@ -221,7 +221,7 @@ msgstr ""
 #: paddlenlp.transformers.tinybert.modeling.TinyBertForSequenceClassification.forward
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.tinybert.modeling.TinyBertModel.forward:30
 msgid ""
@@ -269,18 +269,18 @@ msgstr ""
 #: paddlenlp.transformers.tinybert.modeling.TinyBertForSequenceClassification.forward
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.tinybert.modeling.TinyBertForPretraining.forward:15
 #: paddlenlp.transformers.tinybert.modeling.TinyBertForSequenceClassification.forward:15
 #: paddlenlp.transformers.tinybert.modeling.TinyBertModel.forward:45
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.tinybert.modeling.TinyBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.tinybert.modeling.TinyBertPretrainedModel:1
 msgid ""

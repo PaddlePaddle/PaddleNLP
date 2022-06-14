@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.modeling.MPNetForTokenClassification:1
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel:1
 msgid "基类：:class:`paddlenlp.transformers.mpnet.modeling.MPNetPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.mpnet.modeling.MPNetPretrainedModel`"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetModel:1
 msgid "The bare MPNet Model transformer outputting raw hidden-states."
@@ -63,7 +63,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetModel:10
 msgid ""
@@ -214,7 +214,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.modeling.MPNetForTokenClassification.forward
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetModel.forward:23
 msgid ""
@@ -268,7 +268,7 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.modeling.MPNetForTokenClassification.forward
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetForMultipleChoice.forward:15
 #: paddlenlp.transformers.mpnet.modeling.MPNetForQuestionAnswering.forward:24
@@ -276,11 +276,11 @@ msgstr ""
 #: paddlenlp.transformers.mpnet.modeling.MPNetForTokenClassification.forward:15
 #: paddlenlp.transformers.mpnet.modeling.MPNetModel.forward:38
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.mpnet.modeling.MPNetPretrainedModel:1
 msgid ""

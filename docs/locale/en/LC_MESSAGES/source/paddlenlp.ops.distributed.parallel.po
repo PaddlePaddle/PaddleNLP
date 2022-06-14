@@ -32,7 +32,7 @@ msgstr ""
 #: paddlenlp.ops.distributed.parallel.RowParallelLiner
 #: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.ops.distributed.parallel.ParallelEmbedding:3
 msgid ""
@@ -77,7 +77,7 @@ msgstr ""
 #: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward
 #: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner.forward:4
 #: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward:5
@@ -89,7 +89,7 @@ msgstr ""
 #: paddlenlp.ops.distributed.parallel.ParallelEmbedding.forward
 #: paddlenlp.ops.distributed.parallel.RowParallelLiner.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.ops.distributed.parallel.ColumnParallelLiner:1
 msgid "Parallel Linear, axis=1."

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer:1
 msgid ""
@@ -48,7 +48,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.tokenize
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer:9
 msgid ""
@@ -96,7 +96,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.convert_tokens_to_string:12
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.tokenize:10
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -111,7 +111,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.tokenize
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -126,7 +126,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.tokenize
 #: paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.ppminilm.tokenizer.PPMiniLMTokenizer.tokenize:1
 msgid "Converts a string to a list of tokens."

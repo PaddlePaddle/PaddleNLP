@@ -25,7 +25,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMForSequenceClassification:1
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel:1
 msgid "基类：:class:`paddlenlp.transformers.ppminilm.modeling.PPMiniLMPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ppminilm.modeling.PPMiniLMPretrainedModel`"
 
 #: of paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel:1
 msgid "The bare PPMiniLM Model transformer outputting raw hidden-states."
@@ -53,7 +53,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel:10
 msgid ""
@@ -227,7 +227,7 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMForSequenceClassification.forward
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel.forward:42
 msgid ""
@@ -275,17 +275,17 @@ msgstr ""
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMForSequenceClassification.forward
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMForSequenceClassification.forward:15
 #: paddlenlp.transformers.ppminilm.modeling.PPMiniLMModel.forward:57
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.ppminilm.modeling.PPMiniLMPretrainedModel:1
 msgid "基类：:class:`paddlenlp.experimental.model_utils.FasterPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.experimental.model_utils.FasterPretrainedModel`"
 
 #: of paddlenlp.transformers.ppminilm.modeling.PPMiniLMPretrainedModel:1
 msgid ""

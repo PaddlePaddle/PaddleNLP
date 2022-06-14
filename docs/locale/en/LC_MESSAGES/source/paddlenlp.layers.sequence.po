@@ -29,7 +29,7 @@ msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.layers.sequence.sequence_mask:3
 msgid ""
@@ -43,7 +43,7 @@ msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.layers.sequence.sequence_mask:8
 msgid ""
@@ -53,5 +53,5 @@ msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetPretrainedModel:1
 msgid ""
@@ -46,7 +46,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.modeling.XLNetLMHeadModel:1
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel:1
 msgid "基类：:class:`paddlenlp.transformers.xlnet.modeling.XLNetPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.xlnet.modeling.XLNetPretrainedModel`"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetModel:1
 msgid "The bare XLNet Model outputting raw hidden-states."
@@ -81,7 +81,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetModel:10
 msgid ""
@@ -467,7 +467,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.modeling.XLNetLMHeadModel.forward
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetModel.forward:84
 msgid ""
@@ -584,7 +584,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.modeling.XLNetLMHeadModel.forward
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetForMultipleChoice.forward:47
 #: paddlenlp.transformers.xlnet.modeling.XLNetForQuestionAnswering.forward:50
@@ -593,7 +593,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.modeling.XLNetLMHeadModel.forward:48
 #: paddlenlp.transformers.xlnet.modeling.XLNetModel.forward:114
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.xlnet.modeling.XLNetForSequenceClassification:1
 msgid ""

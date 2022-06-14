@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer`"
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
 msgid ""
@@ -50,7 +50,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:9
 msgid ""
@@ -102,7 +102,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:37
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_entity_vocab:1
 msgid "Get the entity vocab"
@@ -175,7 +175,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping:7
 msgid "The offset map of input text."
@@ -186,7 +186,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:1

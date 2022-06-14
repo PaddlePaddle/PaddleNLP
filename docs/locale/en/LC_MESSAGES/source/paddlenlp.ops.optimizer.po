@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:1
 msgid "基类：:class:`paddle.optimizer.adamw.AdamW`"
-msgstr ""
+msgstr "Base class：:class:`paddle.optimizer.adamw.AdamW`"
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:1
 msgid ""
@@ -59,7 +59,7 @@ msgstr ""
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:21
 msgid ""
@@ -164,5 +164,5 @@ msgstr ""
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:78
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 

@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer:1
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer:1
 msgid "Runs basic tokenization (punctuation splitting, lower casing, etc.)."
@@ -42,7 +42,7 @@ msgstr ""
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer:3
 msgid "Whether or not to lowercase the input when tokenizing. Defaults to `True`."
@@ -66,7 +66,7 @@ msgstr ""
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:6
 msgid "A list of tokens."
@@ -82,18 +82,18 @@ msgstr ""
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.vocab_size
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.bert.tokenizer.BasicTokenizer.tokenize:10
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer:30
 #: paddlenlp.transformers.bert.tokenizer.BertTokenizer.convert_tokens_to_string:12
 #: paddlenlp.transformers.bert.tokenizer.WordpieceTokenizer.tokenize:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.bert.tokenizer.BertTokenizer:1
 msgid ""

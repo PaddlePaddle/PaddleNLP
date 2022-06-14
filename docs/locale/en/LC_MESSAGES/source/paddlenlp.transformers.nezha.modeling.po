@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.nezha.modeling.NeZhaForTokenClassification:1
 #: paddlenlp.transformers.nezha.modeling.NeZhaModel:1
 msgid "基类：:class:`paddlenlp.transformers.nezha.modeling.NeZhaPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.nezha.modeling.NeZhaPretrainedModel`"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaModel:1
 msgid "The bare NeZha Model transformer outputting raw hidden-states."
@@ -65,7 +65,7 @@ msgstr ""
 #: paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads
 #: paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaModel:10
 msgid ""
@@ -236,7 +236,7 @@ msgstr ""
 #: paddlenlp.transformers.nezha.modeling.NeZhaModel.forward
 #: paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaModel.forward:32
 msgid ""
@@ -293,7 +293,7 @@ msgstr ""
 #: paddlenlp.transformers.nezha.modeling.NeZhaModel.forward
 #: paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.nezha.modeling.NeZhaForQuestionAnswering.forward:24
@@ -301,11 +301,11 @@ msgstr ""
 #: paddlenlp.transformers.nezha.modeling.NeZhaForTokenClassification.forward:15
 #: paddlenlp.transformers.nezha.modeling.NeZhaModel.forward:47
 msgid "示例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaPretrainedModel:1
 msgid ""
@@ -455,7 +455,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.nezha.modeling.NeZhaPretrainingHeads:1
 msgid "Perform language modeling task and next sentence classification task."

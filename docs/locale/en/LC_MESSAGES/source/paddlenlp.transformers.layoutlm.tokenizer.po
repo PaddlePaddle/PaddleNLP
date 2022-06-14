@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.layoutlm.tokenizer.LayoutLMTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BertTokenizer`"
 
 #: of paddlenlp.transformers.layoutlm.tokenizer.LayoutLMTokenizer:1
 msgid ""

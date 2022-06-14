@@ -29,7 +29,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieForTokenClassification:1
 #: paddlenlp.transformers.ernie.modeling.ErnieModel:1
 msgid "基类：:class:`paddlenlp.transformers.ernie.modeling.ErniePretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ernie.modeling.ErniePretrainedModel`"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieModel:1
 msgid "The bare ERNIE Model transformer outputting raw hidden-states."
@@ -66,7 +66,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieModel:10
 msgid ""
@@ -232,7 +232,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieModel.forward:34
 msgid ""
@@ -287,7 +287,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward
 #: paddlenlp.transformers.ernie.modeling.ErniePretrainingCriterion.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.ernie.modeling.ErnieForMaskedLM.forward:15
 #: paddlenlp.transformers.ernie.modeling.ErnieForQuestionAnswering.forward:24
@@ -295,11 +295,11 @@ msgstr ""
 #: paddlenlp.transformers.ernie.modeling.ErnieForTokenClassification.forward:15
 #: paddlenlp.transformers.ernie.modeling.ErnieModel.forward:49
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.ernie.modeling.ErniePretrainedModel:1
 msgid ""

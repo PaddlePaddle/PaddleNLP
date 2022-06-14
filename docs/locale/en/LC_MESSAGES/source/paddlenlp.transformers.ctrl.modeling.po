@@ -25,7 +25,7 @@ msgstr ""
 #: paddlenlp.transformers.ctrl.modeling.CTRLLMHeadModel:1
 #: paddlenlp.transformers.ctrl.modeling.CTRLModel:1
 msgid "基类：:class:`paddlenlp.transformers.ctrl.modeling.CTRLPreTrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ctrl.modeling.CTRLPreTrainedModel`"
 
 #: of paddlenlp.transformers.ctrl.modeling.CTRLModel:1
 msgid ""
@@ -57,7 +57,7 @@ msgstr ""
 #: paddlenlp.transformers.ctrl.modeling.CTRLModel.forward
 #: paddlenlp.transformers.ctrl.modeling.SinusoidalPositionalEmbedding.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ctrl.modeling.CTRLModel:10
 msgid ""
@@ -236,7 +236,7 @@ msgstr ""
 #: paddlenlp.transformers.ctrl.modeling.CTRLLMHeadModel.forward
 #: paddlenlp.transformers.ctrl.modeling.CTRLModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ctrl.modeling.CTRLModel.forward:48
 msgid ""
@@ -329,14 +329,14 @@ msgstr ""
 #: paddlenlp.transformers.ctrl.modeling.CTRLLMHeadModel.forward
 #: paddlenlp.transformers.ctrl.modeling.CTRLModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Retun type"
 
 #: of
 #: paddlenlp.transformers.ctrl.modeling.CTRLForSequenceClassification.forward:48
 #: paddlenlp.transformers.ctrl.modeling.CTRLLMHeadModel.forward:49
 #: paddlenlp.transformers.ctrl.modeling.CTRLModel.forward:74
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.ctrl.modeling.CTRLLMHeadModel:1
 msgid ""
@@ -492,7 +492,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ctrl.modeling.SinusoidalPositionalEmbedding:1
 msgid "基类：:class:`paddle.nn.layer.common.Embedding`"
-msgstr ""
+msgstr "Base class：:class:`paddle.nn.layer.common.Embedding`"
 
 #: of paddlenlp.transformers.ctrl.modeling.SinusoidalPositionalEmbedding:1
 msgid "This module produces sinusoidal positional embeddings of any length."
