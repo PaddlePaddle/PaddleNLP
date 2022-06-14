@@ -32,11 +32,11 @@ docker exec -it triton_server bash
 python3 -m pip install paddlenlp
 ```
 
-### 安装FasterTokenizers文本处理加速库（可选）
-如果部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+### 安装FasterTokenizer文本处理加速库（可选）
+如果部署环境是Linux，推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
 ```
 # 注意：在容器内安装
-python3 -m pip install faster_tokenizers
+python3 -m pip install faster_tokenizer
 ```
 
 
