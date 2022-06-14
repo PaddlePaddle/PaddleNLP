@@ -32,7 +32,8 @@ def test_layoutlm_paddle():
             input_ids=batch_input["input_ids"],
             bbox=batch_input["bbox"],
             image=batch_input["image"],
-            attention_mask=batch_input["attention_mask"], )
+            attention_mask=batch_input["attention_mask"],
+        )
     sequence_output = outputs[0]
     pooled_output = outputs[1]
     return sequence_output, pooled_output
@@ -51,7 +52,8 @@ def test_layoutlm_torch():
         input_ids=batch_input["input_ids"],
         bbox=batch_input["bbox"],
         image=batch_input["image"],
-        attention_mask=batch_input["attention_mask"], )
+        attention_mask=batch_input["attention_mask"],
+    )
     sequence_output = outputs[0]
     pooled_output = outputs[1]
     return sequence_output, pooled_output

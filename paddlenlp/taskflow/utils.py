@@ -137,15 +137,15 @@ class TermTreeNode(object):
                  sid: str,
                  term: str,
                  base: str,
-                 node_type: str="term",
-                 term_type: Optional[str]=None,
-                 hyper: Optional[str]=None,
-                 level: Optional[int]=None,
-                 alias: Optional[List[str]]=None,
-                 alias_ext: Optional[List[str]]=None,
-                 sub_type: Optional[List[str]]=None,
-                 sub_term: Optional[List[str]]=None,
-                 data: Optional[Dict[str, Any]]=None):
+                 node_type: str = "term",
+                 term_type: Optional[str] = None,
+                 hyper: Optional[str] = None,
+                 level: Optional[int] = None,
+                 alias: Optional[List[str]] = None,
+                 alias_ext: Optional[List[str]] = None,
+                 sub_type: Optional[List[str]] = None,
+                 sub_term: Optional[List[str]] = None,
+                 data: Optional[Dict[str, Any]] = None):
         self._sid = sid
         self._term = term
         self._base = base
@@ -268,8 +268,11 @@ class TermTree(object):
 
     def __init__(self):
         self._nodes: Dict[str, TermTreeNode] = {}
-        self._root = TermTreeNode(
-            sid="root", term="root", base="cb", node_type="root", level=0)
+        self._root = TermTreeNode(sid="root",
+                                  term="root",
+                                  base="cb",
+                                  node_type="root",
+                                  level=0)
         self._nodes["root"] = self.root
         self._index = {}
 
@@ -297,11 +300,11 @@ class TermTree(object):
                 if row["type-1"] not in self:
                     self.add_type(type_name=row["type-1"], hyper_type="root")
                 if row["type-2"] != "" and row["type-2"] not in self:
-                    self.add_type(
-                        type_name=row["type-2"], hyper_type=row["type-1"])
+                    self.add_type(type_name=row["type-2"],
+                                  hyper_type=row["type-1"])
                 if row["type-3"] != "" and row["type-3"] not in self:
-                    self.add_type(
-                        type_name=row["type-3"], hyper_type=row["type-2"])
+                    self.add_type(type_name=row["type-3"],
+                                  hyper_type=row["type-2"])
 
     def __judge_term_node(self, node: TermTreeNode) -> bool:
         if node.termtype not in self:
@@ -311,14 +314,14 @@ class TermTree(object):
             warnings.warn(f"{node.sid} exists, will be replaced by new node.")
 
     def add_term(self,
-                 term: Optional[str]=None,
-                 base: Optional[str]=None,
-                 term_type: Optional[str]=None,
-                 sub_type: Optional[List[str]]=None,
-                 sub_term: Optional[List[str]]=None,
-                 alias: Optional[List[str]]=None,
-                 alias_ext: Optional[List[str]]=None,
-                 data: Optional[Dict[str, Any]]=None):
+                 term: Optional[str] = None,
+                 base: Optional[str] = None,
+                 term_type: Optional[str] = None,
+                 sub_type: Optional[List[str]] = None,
+                 sub_term: Optional[List[str]] = None,
+                 alias: Optional[List[str]] = None,
+                 alias_ext: Optional[List[str]] = None,
+                 data: Optional[Dict[str, Any]] = None):
         """Add a term into TermTree.
 
         Args:
@@ -334,16 +337,15 @@ class TermTree(object):
         if data is not None:
             new_node = TermTreeNode.from_dict(data)
         else:
-            new_node = TermTreeNode(
-                sid=f"{term_type}_{base}_{term}",
-                term=term,
-                base=base,
-                term_type=term_type,
-                sub_term=sub_term,
-                sub_type=sub_type,
-                alias=alias,
-                alias_ext=alias_ext,
-                node_type="term")
+            new_node = TermTreeNode(sid=f"{term_type}_{base}_{term}",
+                                    term=term,
+                                    base=base,
+                                    term_type=term_type,
+                                    sub_term=sub_term,
+                                    sub_type=sub_type,
+                                    alias=alias,
+                                    alias_ext=alias_ext,
+                                    node_type="term")
         self.__judge_term_node(new_node)
         self._nodes[new_node.sid] = new_node
         self.__build_index(new_node)
@@ -422,8 +424,11 @@ class TermTree(object):
                     visited_node.add(next_id)
         return False
 
-    def find_term(self, term: str, term_type: Optional[str]=None) -> Tuple[
-            bool, Union[List[str], None]]:
+    def find_term(
+            self,
+            term: str,
+            term_type: Optional[str] = None
+    ) -> Tuple[bool, Union[List[str], None]]:
         """Find a term in Term Tree. If term not exists, return None.
         If `term_type` is not None, will find term with this type.
 
@@ -474,10 +479,7 @@ class TermTree(object):
         term_tree.build_from_dir(term_schema_path, term_data_path, linking)
         return term_tree
 
-    def __dfs(self,
-              cur_id: str,
-              depth: int,
-              path: Dict[str, str],
+    def __dfs(self, cur_id: str, depth: int, path: Dict[str, str],
               writer: csv.DictWriter):
         cur_node = self._nodes[cur_id]
         if cur_node.node_type == "term":
@@ -502,17 +504,20 @@ class TermTree(object):
         out_path = {}
         for i in range(1, 3):
             out_path[f"type-{i}"] = ""
-        with open(
-                f"{save_dir}/termtree_type.csv", "wt", encoding="utf-8",
-                newline="") as fp:
+        with open(f"{save_dir}/termtree_type.csv",
+                  "wt",
+                  encoding="utf-8",
+                  newline="") as fp:
             fieldnames = ["type-1", "type-2", "type-3"]
-            csv_writer = csv.DictWriter(
-                fp, delimiter="\t", fieldnames=fieldnames)
+            csv_writer = csv.DictWriter(fp,
+                                        delimiter="\t",
+                                        fieldnames=fieldnames)
             csv_writer.writeheader()
             self.__dfs("root", 0, out_path, csv_writer)
-        with open(
-                f"{save_dir}/termtree_data", "w", encoding="utf-8",
-                newline="") as fp:
+        with open(f"{save_dir}/termtree_data",
+                  "w",
+                  encoding="utf-8",
+                  newline="") as fp:
             for nid in self:
                 node = self[nid]
                 if node.node_type == "term":
@@ -596,7 +601,7 @@ class BurkhardKellerTree(object):
     def __search_similar_word(self,
                               cur_node: BurkhardKellerNode,
                               s: str,
-                              threshold: int=2) -> List[str]:
+                              threshold: int = 2) -> List[str]:
         res = []
         if cur_node is None:
             return res
@@ -605,8 +610,8 @@ class BurkhardKellerTree(object):
             res.append((cur_node.word, dist))
         start = max(dist - threshold, 1)
         while start < dist + threshold:
-            tmp_res = self.__search_similar_word(
-                cur_node.next.get(start, None), s)[:]
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None),
+                                                 s)[:]
             res.extend(tmp_res)
             start += 1
         return res

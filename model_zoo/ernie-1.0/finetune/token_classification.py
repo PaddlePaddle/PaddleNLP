@@ -13,16 +13,17 @@
 # limitations under the License.
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
+def tokenize_and_align_labels(example,
+                              tokenizer,
+                              no_entity_id,
                               max_seq_len=512):
     if 'labels' in example:
         labels = example['labels']
         example = example['tokens']
-        tokenized_input = tokenizer(
-            example,
-            is_split_into_words=True,
-            max_seq_len=max_seq_len,
-            return_length=False)
+        tokenized_input = tokenizer(example,
+                                    is_split_into_words=True,
+                                    max_seq_len=max_seq_len,
+                                    return_length=False)
 
         # -2 for [CLS] and [SEP]
         if len(tokenized_input['input_ids']) - 2 < len(labels):
@@ -49,15 +50,14 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id,
             label_ids = label_ids[:len(tokenized_input['input_ids']) - 2]
         label_ids = [no_entity_id] + label_ids + [no_entity_id]
 
-        label_ids += [no_entity_id] * (
-            len(tokenized_input['input_ids']) - len(label_ids))
+        label_ids += [no_entity_id
+                      ] * (len(tokenized_input['input_ids']) - len(label_ids))
         tokenized_input["labels"] = label_ids
     return tokenized_input
 
 
 def ner_trans_fn(example, tokenizer, args):
-    return tokenize_and_align_labels(
-        example,
-        tokenizer=tokenizer,
-        no_entity_id=args.no_entity_id,
-        max_seq_len=args.max_seq_length)
+    return tokenize_and_align_labels(example,
+                                     tokenizer=tokenizer,
+                                     no_entity_id=args.no_entity_id,
+                                     max_seq_len=args.max_seq_length)

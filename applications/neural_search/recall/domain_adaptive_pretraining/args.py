@@ -101,7 +101,8 @@ def parse_args(MODEL_CLASSES):
         if args.hidden_dropout_prob != 0:
             args.hidden_dropout_prob = .0
             logger.warning(
-                "The hidden_dropout_prob should set to 0 for accuracy checking.")
+                "The hidden_dropout_prob should set to 0 for accuracy checking."
+            )
         if args.attention_probs_dropout_prob != 0:
             args.attention_probs_dropout_prob = .0
             logger.warning(

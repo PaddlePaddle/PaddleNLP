@@ -5,6 +5,7 @@ from paddlenlp.data import Pad, Vocab
 
 
 class TransformerReader(object):
+
     def __init__(self, args={}):
         super(TransformerReader, self).__init__()
 
@@ -45,8 +46,8 @@ class TransformerReader(object):
         """
         insts = self.tokenize(insts)
 
-        src_max_len = (max([len(inst) for inst in insts]) + self.pad_seq
-                       ) // self.pad_seq * self.pad_seq
+        src_max_len = (max([len(inst) for inst in insts]) +
+                       self.pad_seq) // self.pad_seq * self.pad_seq
         src_word = self.word_pad([
             inst + [self.eos_idx] + [self.pad_idx] *
             (src_max_len - 1 - len(inst)) for inst in insts

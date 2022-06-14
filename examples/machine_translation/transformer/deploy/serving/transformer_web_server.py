@@ -18,26 +18,28 @@ from transformer_reader import TransformerReader
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="../configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["gpu", "cpu"],
-        help="Device to use during inference. ")
-    parser.add_argument(
-        "--model_dir", default="", type=str, help="Path of the model. ")
+    parser.add_argument("--config",
+                        default="../configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
+    parser.add_argument("--device",
+                        default="gpu",
+                        type=str,
+                        choices=["gpu", "cpu"],
+                        help="Device to use during inference. ")
+    parser.add_argument("--model_dir",
+                        default="",
+                        type=str,
+                        help="Path of the model. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
-    parser.add_argument(
-        "--profile", action="store_true", help="Whether to profile. ")
+    parser.add_argument("--profile",
+                        action="store_true",
+                        help="Whether to profile. ")
     args = parser.parse_args()
     return args
 
@@ -59,6 +61,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 class TransformerService(WebService):
+
     def init_client(self, args):
         self.args = args
         self.transformer_reader = TransformerReader(args=args)
@@ -75,8 +78,9 @@ class TransformerService(WebService):
 
     def postprocess(self, feed={}, fetch=[], fetch_map=None):
         if fetch_map is not None:
-            finished_sequence = np.array(fetch_map[
-                "save_infer_model/scale_0.tmp_1"]).transpose([0, 2, 1])
+            finished_sequence = np.array(
+                fetch_map["save_infer_model/scale_0.tmp_1"]).transpose(
+                    [0, 2, 1])
             outputs = []
             for ins in finished_sequence:
                 n_best_seq = []
@@ -103,8 +107,10 @@ def do_server(args):
     service.load_model_config(args.inference_model_dir)
     if args.device == "gpu":
         service.set_gpus("0")
-        service.prepare_server(
-            workdir="workdir", port=9292, device="gpu", gpuid=0)
+        service.prepare_server(workdir="workdir",
+                               port=9292,
+                               device="gpu",
+                               gpuid=0)
     else:
         service.prepare_server(workdir="workdir", port=9292, device="cpu")
 

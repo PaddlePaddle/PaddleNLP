@@ -65,12 +65,13 @@ class BaseRetriever(BaseComponent):
 
     @abstractmethod
     def retrieve(
-            self,
-            query: str,
-            filters: dict=None,
-            top_k: Optional[int]=None,
-            index: str=None,
-            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
+        self,
+        query: str,
+        filters: dict = None,
+        top_k: Optional[int] = None,
+        index: str = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents
         that are most relevant to the query.
@@ -99,23 +100,23 @@ class BaseRetriever(BaseComponent):
         return wrapper
 
     def run(  # type: ignore
-            self,
-            root_node: str,
-            query: Optional[str]=None,
-            filters: Optional[dict]=None,
-            top_k: Optional[int]=None,
-            documents: Optional[List[dict]]=None,
-            index: Optional[str]=None,
-            headers: Optional[Dict[str, str]]=None, ):
+        self,
+        root_node: str,
+        query: Optional[str] = None,
+        filters: Optional[dict] = None,
+        top_k: Optional[int] = None,
+        documents: Optional[List[dict]] = None,
+        index: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
         if root_node == "Query":
             self.query_count += 1
             run_query_timed = self.timing(self.run_query, "query_time")
-            output, stream = run_query_timed(
-                query=query,
-                filters=filters,
-                top_k=top_k,
-                index=index,
-                headers=headers)
+            output, stream = run_query_timed(query=query,
+                                             filters=filters,
+                                             top_k=top_k,
+                                             index=index,
+                                             headers=headers)
         elif root_node == "File":
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
@@ -125,18 +126,18 @@ class BaseRetriever(BaseComponent):
         return output, stream
 
     def run_query(
-            self,
-            query: str,
-            filters: Optional[dict]=None,
-            top_k: Optional[int]=None,
-            index: Optional[str]=None,
-            headers: Optional[Dict[str, str]]=None, ):
-        documents = self.retrieve(
-            query=query,
-            filters=filters,
-            top_k=top_k,
-            index=index,
-            headers=headers)
+        self,
+        query: str,
+        filters: Optional[dict] = None,
+        top_k: Optional[int] = None,
+        index: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        documents = self.retrieve(query=query,
+                                  filters=filters,
+                                  top_k=top_k,
+                                  index=index,
+                                  headers=headers)
         document_ids = [doc.id for doc in documents]
         logger.debug(f"Retrieved documents with IDs: {document_ids}")
         output = {"documents": documents}

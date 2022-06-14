@@ -19,11 +19,10 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./configs/enwik8.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./configs/enwik8.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     args = parser.parse_args()
     return args
 
@@ -71,28 +70,27 @@ def do_eval(args):
             cutoffs = [60000, 100000, 640000]
             tie_projs += [False] * len(cutoffs)
 
-    mem_transformer = MemTransformerLM(
-        args.ntokens,
-        args.n_layer,
-        args.n_head,
-        args.d_model,
-        args.d_head,
-        args.d_inner_hid,
-        args.dropout,
-        args.attn_dropout,
-        tie_weight=args.tie_weight,
-        d_embed=args.d_model,
-        div_val=args.div_val,
-        tie_projs=tie_projs,
-        normalize_before=args.normalize_before,
-        tgt_len=args.tgt_len,
-        ext_len=args.ext_len,
-        mem_len=args.mem_len,
-        cutoffs=cutoffs,
-        same_length=args.same_length,
-        attn_type=args.attn_type,
-        clamp_len=args.clamp_len,
-        sample_softmax=args.sample_softmax)
+    mem_transformer = MemTransformerLM(args.ntokens,
+                                       args.n_layer,
+                                       args.n_head,
+                                       args.d_model,
+                                       args.d_head,
+                                       args.d_inner_hid,
+                                       args.dropout,
+                                       args.attn_dropout,
+                                       tie_weight=args.tie_weight,
+                                       d_embed=args.d_model,
+                                       div_val=args.div_val,
+                                       tie_projs=tie_projs,
+                                       normalize_before=args.normalize_before,
+                                       tgt_len=args.tgt_len,
+                                       ext_len=args.ext_len,
+                                       mem_len=args.mem_len,
+                                       cutoffs=cutoffs,
+                                       same_length=args.same_length,
+                                       attn_type=args.attn_type,
+                                       clamp_len=args.clamp_len,
+                                       sample_softmax=args.sample_softmax)
 
     assert args.init_from_params, (
         "Please set init_from_params to load the infer model.")

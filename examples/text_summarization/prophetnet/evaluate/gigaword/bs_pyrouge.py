@@ -35,6 +35,7 @@ def clean(x):
 
 
 class DirectoryProcessor:
+
     @staticmethod
     def process(input_dir, output_dir, function):
         """
@@ -226,8 +227,8 @@ class Rouge155(object):
         def sent_split_to_string(s):
             return "\n".join(ss.split(s))
 
-        process_func = partial(
-            DirectoryProcessor.process, function=sent_split_to_string)
+        process_func = partial(DirectoryProcessor.process,
+                               function=sent_split_to_string)
         self.__process_summaries(process_func)
 
     @staticmethod
@@ -262,9 +263,8 @@ class Rouge155(object):
         sentences = text.split("\n")
         sent_elems = [
             "<a name=\"{i}\">[{i}]</a> <a href=\"#{i}\" id={i}>"
-            "{text}</a>".format(
-                i=i, text=sent) for i, sent in enumerate(
-                    sentences, start=1)
+            "{text}</a>".format(i=i, text=sent)
+            for i, sent in enumerate(sentences, start=1)
         ]
         html = """<html>
 <head>
@@ -273,8 +273,7 @@ class Rouge155(object):
 <body bgcolor="white">
 {elems}
 </body>
-</html>""".format(
-            title=title, elems="\n".join(sent_elems))
+</html>""".format(title=title, elems="\n".join(sent_elems))
 
         return html
 
@@ -328,8 +327,9 @@ class Rouge155(object):
 
         with codecs.open(config_file_path, 'w', encoding='utf-8') as f:
             f.write('<ROUGE-EVAL version="1.55">')
-            for task_id, (system_filename, model_filenames) in enumerate(
-                    system_models_tuples, start=1):
+            for task_id, (system_filename,
+                          model_filenames) in enumerate(system_models_tuples,
+                                                        start=1):
                 eval_string = Rouge155.__get_eval_string(
                     task_id, system_id, system_dir, system_filename, model_dir,
                     model_filenames)
@@ -357,9 +357,11 @@ class Rouge155(object):
             config_dir, config_filename = os.path.split(config_file_path)
             verify_dir(config_dir, "configuration file")
         self._config_file = os.path.join(self._config_dir, config_filename)
-        Rouge155.write_config_static(
-            self._system_dir, self._system_filename_pattern, self._model_dir,
-            self._model_filename_pattern, self._config_file, system_id)
+        Rouge155.write_config_static(self._system_dir,
+                                     self._system_filename_pattern,
+                                     self._model_dir,
+                                     self._model_filename_pattern,
+                                     self._config_file, system_id)
         self.log.info("Written ROUGE configuration to {}".format(
             self._config_file))
 
@@ -481,12 +483,11 @@ class Rouge155(object):
         system and model summaries.
 
         """
-        peer_elems = "<P ID=\"{id}\">{name}</P>".format(
-            id=system_id, name=system_filename)
+        peer_elems = "<P ID=\"{id}\">{name}</P>".format(id=system_id,
+                                                        name=system_filename)
 
         model_elems = [
-            "<M ID=\"{id}\">{name}</M>".format(
-                id=chr(65 + i), name=name)
+            "<M ID=\"{id}\">{name}</M>".format(id=chr(65 + i), name=name)
             for i, name in enumerate(model_filenames)
         ]
 
@@ -504,12 +505,11 @@ class Rouge155(object):
             {model_elems}
         </MODELS>
     </EVAL>
-""".format(
-            task_id=task_id,
-            model_root=model_dir,
-            model_elems=model_elems,
-            peer_root=system_dir,
-            peer_elems=peer_elems)
+""".format(task_id=task_id,
+           model_root=model_dir,
+           model_elems=model_elems,
+           peer_root=system_dir,
+           peer_elems=peer_elems)
         return eval_string
 
     def __process_summaries(self, process_func):

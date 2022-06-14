@@ -150,17 +150,17 @@ class LukePretrainedModel(PretrainedModel):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
             layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else self.luke.config[
-                        "initializer_range"],
-                    shape=layer.weight.shape))
+                paddle.tensor.normal(mean=0.0,
+                                     std=self.initializer_range if hasattr(
+                                         self, "initializer_range") else
+                                     self.luke.config["initializer_range"],
+                                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = layer_norm_eps
 
 
 class LukeSelfOutput(nn.Layer):
+
     def __init__(self, hidden_size, hidden_dropout_prob):
         super(LukeSelfOutput, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -175,6 +175,7 @@ class LukeSelfOutput(nn.Layer):
 
 
 class LukeIntermediate(nn.Layer):
+
     def __init__(self, hidden_size, hidden_act, intermediate_size):
         super().__init__()
         self.dense = nn.Linear(hidden_size, intermediate_size)
@@ -187,6 +188,7 @@ class LukeIntermediate(nn.Layer):
 
 
 class LukeOutput(nn.Layer):
+
     def __init__(self, intermediate_size, hidden_size, hidden_dropout_prob):
         super(LukeOutput, self).__init__()
         self.dense = nn.Linear(intermediate_size, hidden_size)
@@ -212,26 +214,28 @@ class LukeEmbeddings(RobertaEmbeddings):
                  type_vocab_size=1,
                  pad_token_id=0,
                  hidden_dropout_prob=0.1):
-        super(LukeEmbeddings, self).__init__(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            pad_token_id=pad_token_id)
+        super(LukeEmbeddings,
+              self).__init__(vocab_size=vocab_size,
+                             hidden_size=hidden_size,
+                             hidden_dropout_prob=hidden_dropout_prob,
+                             max_position_embeddings=max_position_embeddings,
+                             type_vocab_size=type_vocab_size,
+                             pad_token_id=pad_token_id)
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None, ):
-        return super(LukeEmbeddings, self).forward(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+    ):
+        return super(LukeEmbeddings,
+                     self).forward(input_ids=input_ids,
+                                   token_type_ids=token_type_ids,
+                                   position_ids=position_ids)
 
 
 class LukePooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super(LukePooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -247,6 +251,7 @@ class LukePooler(nn.Layer):
 
 
 class EntityEmbeddings(nn.Layer):
+
     def __init__(self,
                  entity_vocab_size=500000,
                  entity_emb_size=256,
@@ -257,11 +262,13 @@ class EntityEmbeddings(nn.Layer):
         super(EntityEmbeddings, self).__init__()
         self.entity_emb_size = entity_emb_size
         self.hidden_size = hidden_size
-        self.entity_embeddings = nn.Embedding(
-            entity_vocab_size, entity_emb_size, padding_idx=0)
+        self.entity_embeddings = nn.Embedding(entity_vocab_size,
+                                              entity_emb_size,
+                                              padding_idx=0)
         if entity_emb_size != hidden_size:
-            self.entity_embedding_dense = nn.Linear(
-                entity_emb_size, hidden_size, bias_attr=False)
+            self.entity_embedding_dense = nn.Linear(entity_emb_size,
+                                                    hidden_size,
+                                                    bias_attr=False)
 
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
@@ -279,8 +286,8 @@ class EntityEmbeddings(nn.Layer):
             entity_embeddings = self.entity_embedding_dense(entity_embeddings)
 
         position_embeddings = self.position_embeddings(position_ids.clip(min=0))
-        position_embedding_mask = (
-            position_ids != -1).astype(position_embeddings.dtype).unsqueeze(-1)
+        position_embedding_mask = (position_ids != -1).astype(
+            position_embeddings.dtype).unsqueeze(-1)
         position_embeddings = position_embeddings * position_embedding_mask
         position_embeddings = paddle.sum(position_embeddings, axis=-2)
         position_embeddings = position_embeddings / position_embedding_mask.sum(
@@ -296,6 +303,7 @@ class EntityEmbeddings(nn.Layer):
 
 
 class LukeSelfAttention(nn.Layer):
+
     def __init__(self, num_attention_heads, hidden_size,
                  attention_probs_dropout_prob):
         super(LukeSelfAttention, self).__init__()
@@ -321,10 +329,11 @@ class LukeSelfAttention(nn.Layer):
         return x.transpose((0, 2, 1, 3))
 
     def forward(
-            self,
-            word_hidden_states,
-            entity_hidden_states,
-            attention_mask=None, ):
+        self,
+        word_hidden_states,
+        entity_hidden_states,
+        attention_mask=None,
+    ):
         word_size = word_hidden_states.shape[1]
 
         if entity_hidden_states is None:
@@ -356,18 +365,14 @@ class LukeSelfAttention(nn.Layer):
             e2e_key_layer = key_layer[:, :, word_size:, :]
 
             # compute attention scores based on the dot product between the query and key vectors
-            w2w_attention_scores = paddle.matmul(w2w_query_layer,
-                                                 w2w_key_layer.transpose(
-                                                     (0, 1, 3, 2)))
-            w2e_attention_scores = paddle.matmul(w2e_query_layer,
-                                                 w2e_key_layer.transpose(
-                                                     (0, 1, 3, 2)))
-            e2w_attention_scores = paddle.matmul(e2w_query_layer,
-                                                 e2w_key_layer.transpose(
-                                                     (0, 1, 3, 2)))
-            e2e_attention_scores = paddle.matmul(e2e_query_layer,
-                                                 e2e_key_layer.transpose(
-                                                     (0, 1, 3, 2)))
+            w2w_attention_scores = paddle.matmul(
+                w2w_query_layer, w2w_key_layer.transpose((0, 1, 3, 2)))
+            w2e_attention_scores = paddle.matmul(
+                w2e_query_layer, w2e_key_layer.transpose((0, 1, 3, 2)))
+            e2w_attention_scores = paddle.matmul(
+                e2w_query_layer, e2w_key_layer.transpose((0, 1, 3, 2)))
+            e2e_attention_scores = paddle.matmul(
+                e2e_query_layer, e2e_key_layer.transpose((0, 1, 3, 2)))
 
             # combine attention scores to create the final attention score matrix
             word_attention_scores = paddle.concat(
@@ -416,25 +421,29 @@ class LukeSelfAttention(nn.Layer):
 
 
 class LukeAttention(nn.Layer):
+
     def __init__(
-            self,
-            num_attention_heads,
-            hidden_size,
-            attention_probs_dropout_prob,
-            hidden_dropout_prob, ):
+        self,
+        num_attention_heads,
+        hidden_size,
+        attention_probs_dropout_prob,
+        hidden_dropout_prob,
+    ):
         super().__init__()
         self.self = LukeSelfAttention(
             num_attention_heads=num_attention_heads,
             hidden_size=hidden_size,
-            attention_probs_dropout_prob=attention_probs_dropout_prob, )
-        self.output = LukeSelfOutput(
-            hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob)
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+        )
+        self.output = LukeSelfOutput(hidden_size=hidden_size,
+                                     hidden_dropout_prob=hidden_dropout_prob)
 
     def forward(
-            self,
-            word_hidden_states,
-            entity_hidden_states,
-            attention_mask=None, ):
+        self,
+        word_hidden_states,
+        entity_hidden_states,
+        attention_mask=None,
+    ):
         word_size = word_hidden_states.shape[1]
         self_outputs = self.self(word_hidden_states, entity_hidden_states,
                                  attention_mask)
@@ -456,13 +465,14 @@ class LukeAttention(nn.Layer):
             entity_attention_output = attention_output[:, word_size:, :]
 
         # add attentions if we output them
-        outputs = (word_attention_output, entity_attention_output
-                   ) + self_outputs[2:]
+        outputs = (word_attention_output,
+                   entity_attention_output) + self_outputs[2:]
 
         return outputs
 
 
 class LukeLayer(nn.Layer):
+
     def __init__(self, num_attention_heads, hidden_size, hidden_act,
                  intermediate_size, attention_probs_dropout_prob,
                  hidden_dropout_prob):
@@ -477,27 +487,28 @@ class LukeLayer(nn.Layer):
             intermediate_size=intermediate_size,
             hidden_act=hidden_act,
             hidden_size=hidden_size)
-        self.output = LukeOutput(
-            intermediate_size=intermediate_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob)
+        self.output = LukeOutput(intermediate_size=intermediate_size,
+                                 hidden_size=hidden_size,
+                                 hidden_dropout_prob=hidden_dropout_prob)
 
     def forward(
-            self,
-            word_hidden_states,
-            entity_hidden_states,
-            attention_mask=None, ):
+        self,
+        word_hidden_states,
+        entity_hidden_states,
+        attention_mask=None,
+    ):
         word_size = word_hidden_states.shape[1]
 
         self_attention_outputs = self.attention(
             word_hidden_states,
             entity_hidden_states,
-            attention_mask, )
+            attention_mask,
+        )
         if entity_hidden_states is None:
             concat_attention_output = self_attention_outputs[0]
         else:
-            concat_attention_output = paddle.concat(
-                self_attention_outputs[:2], axis=1)
+            concat_attention_output = paddle.concat(self_attention_outputs[:2],
+                                                    axis=1)
 
         outputs = self_attention_outputs[
             2:]  # add self attentions if we output attention weights
@@ -521,33 +532,35 @@ class LukeLayer(nn.Layer):
 
 
 class LukeEncoder(nn.Layer):
+
     def __init__(self, num_attention_heads, hidden_size, hidden_act,
                  intermediate_size, num_hidden_layers,
                  attention_probs_dropout_prob, hidden_dropout_prob):
         super(LukeEncoder, self).__init__()
         self.layer = nn.LayerList([
-            LukeLayer(
-                num_attention_heads=num_attention_heads,
-                hidden_size=hidden_size,
-                hidden_act=hidden_act,
-                intermediate_size=intermediate_size,
-                attention_probs_dropout_prob=attention_probs_dropout_prob,
-                hidden_dropout_prob=hidden_dropout_prob)
+            LukeLayer(num_attention_heads=num_attention_heads,
+                      hidden_size=hidden_size,
+                      hidden_act=hidden_act,
+                      intermediate_size=intermediate_size,
+                      attention_probs_dropout_prob=attention_probs_dropout_prob,
+                      hidden_dropout_prob=hidden_dropout_prob)
             for _ in range(num_hidden_layers)
         ])
 
     def forward(
-            self,
-            word_hidden_states,
-            entity_hidden_states,
-            attention_mask=None, ):
+        self,
+        word_hidden_states,
+        entity_hidden_states,
+        attention_mask=None,
+    ):
 
         for i, layer_module in enumerate(self.layer):
 
             layer_outputs = layer_module(
                 word_hidden_states,
                 entity_hidden_states,
-                attention_mask, )
+                attention_mask,
+            )
 
             word_hidden_states = layer_outputs[0]
 
@@ -625,22 +638,23 @@ class LukeModel(LukePretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size=50267,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            max_position_embeddings=514,
-            type_vocab_size=1,
-            entity_vocab_size=500000,
-            entity_emb_size=256,
-            initializer_range=0.02,
-            pad_token_id=1,
-            entity_pad_token_id=0, ):
+        self,
+        vocab_size=50267,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=514,
+        type_vocab_size=1,
+        entity_vocab_size=500000,
+        entity_emb_size=256,
+        initializer_range=0.02,
+        pad_token_id=1,
+        entity_pad_token_id=0,
+    ):
         super(LukeModel, self).__init__()
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
@@ -671,15 +685,16 @@ class LukeModel(LukePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-            self,
-            input_ids,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None,
-            entity_ids=None,
-            entity_position_ids=None,
-            entity_token_type_ids=None,
-            entity_attention_mask=None, ):
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        entity_ids=None,
+        entity_position_ids=None,
+        entity_token_type_ids=None,
+        entity_attention_mask=None,
+    ):
         r"""
         The LukeModel forward method, overrides the `__call__()` special method.
 
@@ -774,8 +789,8 @@ class LukeModel(LukePretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
@@ -786,8 +801,8 @@ class LukeModel(LukePretrainedModel):
             entity_seq_length = entity_ids.shape[1]
             if entity_attention_mask is None:
                 entity_attention_mask = paddle.unsqueeze(
-                    (entity_ids == self.entity_pad_token_id
-                     ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                    (entity_ids == self.entity_pad_token_id).astype(
+                        self.pooler.dense.weight.dtype) * -1e4,
                     axis=[1, 2])
             else:
                 if entity_attention_mask.ndim == 2:
@@ -804,7 +819,8 @@ class LukeModel(LukePretrainedModel):
         word_embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
-            token_type_ids=token_type_ids, )
+            token_type_ids=token_type_ids,
+        )
 
         if entity_ids is None:
             entity_embedding_output = None
@@ -816,7 +832,8 @@ class LukeModel(LukePretrainedModel):
         encoder_outputs = self.encoder(
             word_embedding_output,
             entity_embedding_output,
-            attention_mask=attention_mask, )
+            attention_mask=attention_mask,
+        )
 
         sequence_output = encoder_outputs[0]
 
@@ -855,6 +872,7 @@ class LukeLMHead(nn.Layer):
 
 
 class EntityPredictionHeadTransform(nn.Layer):
+
     def __init__(self, hidden_act, hidden_size, entity_emb_size):
         super(EntityPredictionHeadTransform, self).__init__()
         self.dense = nn.Linear(hidden_size, entity_emb_size)
@@ -869,6 +887,7 @@ class EntityPredictionHeadTransform(nn.Layer):
 
 
 class EntityPredictionHead(nn.Layer):
+
     def __init__(self, hidden_size, entity_vocab_size, entity_emb_size,
                  hidden_act):
         super(EntityPredictionHead, self).__init__()
@@ -972,15 +991,14 @@ class LukeForMaskedLM(LukePretrainedModel):
                 logits, entity_logits = model(**inputs)
         """
 
-        outputs = self.luke(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            entity_ids=entity_ids,
-            entity_position_ids=entity_position_ids,
-            entity_token_type_ids=entity_token_type_ids,
-            entity_attention_mask=entity_attention_mask)
+        outputs = self.luke(input_ids=input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            entity_ids=entity_ids,
+                            entity_position_ids=entity_position_ids,
+                            entity_token_type_ids=entity_token_type_ids,
+                            entity_attention_mask=entity_attention_mask)
 
         logits = self.lm_head(outputs[0])
         entity_logits = self.entity_predictions(outputs[1])
@@ -1061,15 +1079,14 @@ class LukeForEntityClassification(LukePretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.luke(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            entity_ids=entity_ids,
-            entity_position_ids=entity_position_ids,
-            entity_token_type_ids=entity_token_type_ids,
-            entity_attention_mask=entity_attention_mask)
+        outputs = self.luke(input_ids=input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            entity_ids=entity_ids,
+                            entity_position_ids=entity_position_ids,
+                            entity_token_type_ids=entity_token_type_ids,
+                            entity_attention_mask=entity_attention_mask)
 
         feature_vector = outputs[1][:, 0, :]
         feature_vector = self.dropout(feature_vector)
@@ -1098,20 +1115,22 @@ class LukeForEntityPairClassification(LukePretrainedModel):
 
         self.num_classes = num_classes
         self.dropout = nn.Dropout(self.luke.config['hidden_dropout_prob'])
-        self.classifier = nn.Linear(
-            self.luke.config['hidden_size'] * 2, num_classes, bias_attr=False)
+        self.classifier = nn.Linear(self.luke.config['hidden_size'] * 2,
+                                    num_classes,
+                                    bias_attr=False)
         self.apply(self.init_weights)
 
     def forward(
-            self,
-            input_ids,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None,
-            entity_ids=None,
-            entity_position_ids=None,
-            entity_token_type_ids=None,
-            entity_attention_mask=None, ):
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        entity_ids=None,
+        entity_position_ids=None,
+        entity_token_type_ids=None,
+        entity_attention_mask=None,
+    ):
         r"""
         The LukeForEntityPairClassification forward method, overrides the __call__() special method.
 
@@ -1153,15 +1172,14 @@ class LukeForEntityPairClassification(LukePretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.luke(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            entity_ids=entity_ids,
-            entity_position_ids=entity_position_ids,
-            entity_token_type_ids=entity_token_type_ids,
-            entity_attention_mask=entity_attention_mask)
+        outputs = self.luke(input_ids=input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            entity_ids=entity_ids,
+                            entity_position_ids=entity_position_ids,
+                            entity_token_type_ids=entity_token_type_ids,
+                            entity_attention_mask=entity_attention_mask)
 
         feature_vector = paddle.concat(
             [outputs[1][:, 0, :], outputs[1][:, 1, :]], axis=1)
@@ -1253,27 +1271,28 @@ class LukeForEntitySpanClassification(LukePretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.luke(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            entity_ids=entity_ids,
-            entity_position_ids=entity_position_ids,
-            entity_token_type_ids=entity_token_type_ids,
-            entity_attention_mask=entity_attention_mask)
+        outputs = self.luke(input_ids=input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            entity_ids=entity_ids,
+                            entity_position_ids=entity_position_ids,
+                            entity_token_type_ids=entity_token_type_ids,
+                            entity_attention_mask=entity_attention_mask)
         hidden_size = outputs[0].shape[-1]
 
         entity_start_positions = entity_start_positions.unsqueeze(-1).expand(
             (-1, -1, hidden_size))
-        start_states = paddle_gather(
-            x=outputs[0], index=entity_start_positions, dim=-2)
+        start_states = paddle_gather(x=outputs[0],
+                                     index=entity_start_positions,
+                                     dim=-2)
         entity_end_positions = entity_end_positions.unsqueeze(-1).expand(
             (-1, -1, hidden_size))
-        end_states = paddle_gather(
-            x=outputs[0], index=entity_end_positions, dim=-2)
-        feature_vector = paddle.concat(
-            [start_states, end_states, outputs[1]], axis=2)
+        end_states = paddle_gather(x=outputs[0],
+                                   index=entity_end_positions,
+                                   dim=-2)
+        feature_vector = paddle.concat([start_states, end_states, outputs[1]],
+                                       axis=2)
 
         feature_vector = self.dropout(feature_vector)
         logits = self.classifier(feature_vector)
@@ -1351,15 +1370,14 @@ class LukeForQuestionAnswering(LukePretrainedModel):
                 start_logits, end_logits = model(**inputs)
         """
 
-        encoder_outputs = self.luke(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            entity_ids=entity_ids,
-            entity_position_ids=entity_position_ids,
-            entity_token_type_ids=entity_token_type_ids,
-            entity_attention_mask=entity_attention_mask)
+        encoder_outputs = self.luke(input_ids=input_ids,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids,
+                                    attention_mask=attention_mask,
+                                    entity_ids=entity_ids,
+                                    entity_position_ids=entity_position_ids,
+                                    entity_token_type_ids=entity_token_type_ids,
+                                    entity_attention_mask=entity_attention_mask)
 
         word_hidden_states = encoder_outputs[0][:, :input_ids.shape[1], :]
         logits = self.qa_outputs(word_hidden_states)

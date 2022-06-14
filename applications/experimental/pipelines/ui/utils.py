@@ -53,7 +53,10 @@ def pipelines_version():
     return requests.get(url, timeout=0.1).json()["hs_version"]
 
 
-def query(query, filters={}, top_k_reader=5, top_k_ranker=5,
+def query(query,
+          filters={},
+          top_k_reader=5,
+          top_k_ranker=5,
           top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Send a query to the REST API and parse the answer.
@@ -89,17 +92,22 @@ def query(query, filters={}, top_k_reader=5, top_k_ranker=5,
     for answer in answers:
         if answer.get("answer", None):
             results.append({
-                "context": "..." + answer["context"] + "...",
-                "answer": answer.get("answer", None),
-                "source": answer["meta"]["name"],
-                "relevance": round(answer["score"] * 100, 2),
+                "context":
+                "..." + answer["context"] + "...",
+                "answer":
+                answer.get("answer", None),
+                "source":
+                answer["meta"]["name"],
+                "relevance":
+                round(answer["score"] * 100, 2),
                 "document": [
                     doc for doc in response["documents"]
                     if doc["id"] == answer["document_id"]
                 ][0],
                 "offset_start_in_doc":
                 answer["offsets_in_document"][0]["start"],
-                "_raw": answer,
+                "_raw":
+                answer,
             })
         else:
             results.append({
@@ -113,7 +121,9 @@ def query(query, filters={}, top_k_reader=5, top_k_ranker=5,
 
 
 def semantic_search(
-        query, filters={}, top_k_reader=5,
+        query,
+        filters={},
+        top_k_reader=5,
         top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Send a query to the REST API and parse the answer.
@@ -186,7 +196,7 @@ def get_backlink(result) -> Tuple[Optional[str], Optional[str]]:
         if isinstance(doc, dict):
             if doc.get("meta", None):
                 if isinstance(doc["meta"], dict):
-                    if doc["meta"].get("url", None) and doc["meta"].get("title",
-                                                                        None):
+                    if doc["meta"].get("url", None) and doc["meta"].get(
+                            "title", None):
                         return doc["meta"]["url"], doc["meta"]["title"]
     return None, None

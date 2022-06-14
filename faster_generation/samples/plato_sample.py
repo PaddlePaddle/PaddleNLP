@@ -36,21 +36,19 @@ def postprocess_response(token_ids, tokenizer):
 
 inputs = '你好啊，你今年多大了'
 
-inputs_ids = tokenizer.dialogue_encode(
-    inputs,
-    add_start_token_as_response=True,
-    return_tensors=True,
-    is_split_into_words=False)
+inputs_ids = tokenizer.dialogue_encode(inputs,
+                                       add_start_token_as_response=True,
+                                       return_tensors=True,
+                                       is_split_into_words=False)
 
-outputs, _ = model.generate(
-    input_ids=inputs_ids['input_ids'],
-    token_type_ids=inputs_ids['token_type_ids'],
-    position_ids=inputs_ids['position_ids'],
-    attention_mask=inputs_ids['attention_mask'],
-    max_length=64,
-    decode_strategy='sampling',
-    top_k=5,
-    use_faster=True)
+outputs, _ = model.generate(input_ids=inputs_ids['input_ids'],
+                            token_type_ids=inputs_ids['token_type_ids'],
+                            position_ids=inputs_ids['position_ids'],
+                            attention_mask=inputs_ids['attention_mask'],
+                            max_length=64,
+                            decode_strategy='sampling',
+                            top_k=5,
+                            use_faster=True)
 
 result = postprocess_response(outputs[0].numpy(), tokenizer)
 result = "".join(result)

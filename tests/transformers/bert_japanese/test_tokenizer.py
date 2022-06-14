@@ -24,6 +24,7 @@ import unittest
 
 
 class TestBertJapaneseTokenizerFromPretrained(CpuCommonTest):
+
     @slow
     def test_from_pretrained(self):
         tokenizer = BertJapaneseTokenizer.from_pretrained("bert-base-japanese")
@@ -43,13 +44,12 @@ class TestBertJapaneseTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],
@@ -84,13 +84,12 @@ class TestBertJapaneseTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],

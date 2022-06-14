@@ -85,8 +85,8 @@ def encode_snippets_with_states(snippets, states):
     """
     for snippet in snippets:
         snippet.set_embedding(
-            paddle.concat(
-                [states[snippet.startpos], states[snippet.endpos]], axis=0))
+            paddle.concat([states[snippet.startpos], states[snippet.endpos]],
+                          axis=0))
     return snippets
 
 
@@ -136,8 +136,8 @@ def load_word_embeddings(input_vocabulary, output_vocabulary,
 
     def create_word_embeddings(vocab):
 
-        vocabulary_embeddings = np.zeros(
-            (len(vocab), glove_embedding_size), dtype=np.float32)
+        vocabulary_embeddings = np.zeros((len(vocab), glove_embedding_size),
+                                         dtype=np.float32)
         vocabulary_tokens = vocab.inorder_tokens
 
         glove_oov = 0
@@ -240,8 +240,8 @@ class ATISModel(paddle.nn.Layer):
             initial_discourse_state = self.create_parameter(
                 [params.encoder_state_size // 2],
                 dtype='float32',
-                default_initializer=paddle.nn.initializer.Uniform(
-                    low=-0.1, high=0.1))
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1,
+                                                                  high=0.1))
             self.add_parameter("initial_discourse_state",
                                initial_discourse_state)
 
@@ -268,18 +268,20 @@ class ATISModel(paddle.nn.Layer):
 
         return discourse_state, (h_0, c_0)
 
-    def _add_positional_embeddings(self, hidden_states, utterances,
+    def _add_positional_embeddings(self,
+                                   hidden_states,
+                                   utterances,
                                    group=False):
         grouped_states = []
 
         start_index = 0
         for utterance in utterances:
-            grouped_states.append(hidden_states[start_index:start_index + len(
-                utterance)])
+            grouped_states.append(hidden_states[start_index:start_index +
+                                                len(utterance)])
             start_index += len(utterance)
-        assert len(hidden_states) == sum(
-            [len(seq) for seq in grouped_states]) == sum(
-                [len(utterance) for utterance in utterances])
+        assert len(hidden_states) == sum([
+            len(seq) for seq in grouped_states
+        ]) == sum([len(utterance) for utterance in utterances])
 
         new_states = []
         flat_sequence = []
@@ -287,8 +289,8 @@ class ATISModel(paddle.nn.Layer):
         num_utterances_to_keep = min(self.params.maximum_utterances,
                                      len(utterances))
         for i, (states, utterance) in enumerate(
-                zip(grouped_states[-num_utterances_to_keep:], utterances[
-                    -num_utterances_to_keep:])):
+                zip(grouped_states[-num_utterances_to_keep:],
+                    utterances[-num_utterances_to_keep:])):
             positional_sequence = []
             index = num_utterances_to_keep - i - 1
 
@@ -328,19 +330,21 @@ class ATISModel(paddle.nn.Layer):
         if self.params.scheduler:
             self.scheduler = paddle.optimizer.lr.ReduceOnPlateau(
                 learning_rate=self.params.initial_learning_rate,
-                mode='min', )
-            self.trainer = paddle.optimizer.Adam(
-                parameters=params_trainer,
-                learning_rate=self.scheduler,
-                grad_clip=clip)
+                mode='min',
+            )
+            self.trainer = paddle.optimizer.Adam(parameters=params_trainer,
+                                                 learning_rate=self.scheduler,
+                                                 grad_clip=clip)
         else:
-            self.trainer = paddle.optimizer.Adam(
-                parameters=params_trainer, learning_rate=1.0, grad_clip=clip)
+            self.trainer = paddle.optimizer.Adam(parameters=params_trainer,
+                                                 learning_rate=1.0,
+                                                 grad_clip=clip)
         if self.params.fine_tune_bert:
             if self.params.scheduler:
                 self.scheduler = paddle.optimizer.lr.ReduceOnPlateau(
                     learning_rate=self.params.initial_learning_rate,
-                    mode='min', )
+                    mode='min',
+                )
                 self.bert_trainer = paddle.optimizer.Adam(
                     parameters=params_bert_trainer,
                     learning_rate=self.scheduler,

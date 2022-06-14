@@ -33,15 +33,19 @@ class CMRC2018(DatasetBuilder):
 
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train': META_INFO(
+        'train':
+        META_INFO(
             os.path.join('cmrc2018_train.json'),
             '7fb714b479c7f40fbb16acabd7af0ede',
-            'https://bj.bcebos.com/paddlenlp/datasets/cmrc/cmrc2018_train.json'),
-        'dev': META_INFO(
+            'https://bj.bcebos.com/paddlenlp/datasets/cmrc/cmrc2018_train.json'
+        ),
+        'dev':
+        META_INFO(
             os.path.join('cmrc2018_dev.json'),
             '853b80709ff2d071f9fce196521b843c',
             'https://bj.bcebos.com/paddlenlp/datasets/cmrc/cmrc2018_dev.json'),
-        'trial': META_INFO(
+        'trial':
+        META_INFO(
             os.path.join('cmrc2018_trial.json'),
             '070f8ade5b15cfdb095c1fcef9cf43c1',
             'https://bj.bcebos.com/paddlenlp/datasets/cmrc/cmrc2018_trial.json')

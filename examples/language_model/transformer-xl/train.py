@@ -21,11 +21,10 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./configs/enwik8.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./configs/enwik8.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     args = parser.parse_args()
     return args
 
@@ -60,28 +59,27 @@ def do_train(args):
             cutoffs = [60000, 100000, 640000]
             tie_projs += [False] * len(cutoffs)
 
-    mem_transformer = MemTransformerLM(
-        args.ntokens,
-        args.n_layer,
-        args.n_head,
-        args.d_model,
-        args.d_head,
-        args.d_inner_hid,
-        args.dropout,
-        args.attn_dropout,
-        tie_weight=args.tie_weight,
-        d_embed=args.d_model,
-        div_val=args.div_val,
-        tie_projs=tie_projs,
-        normalize_before=args.normalize_before,
-        tgt_len=args.tgt_len,
-        ext_len=args.ext_len,
-        mem_len=args.mem_len,
-        cutoffs=cutoffs,
-        same_length=args.same_length,
-        attn_type=args.attn_type,
-        clamp_len=args.clamp_len,
-        sample_softmax=args.sample_softmax)
+    mem_transformer = MemTransformerLM(args.ntokens,
+                                       args.n_layer,
+                                       args.n_head,
+                                       args.d_model,
+                                       args.d_head,
+                                       args.d_inner_hid,
+                                       args.dropout,
+                                       args.attn_dropout,
+                                       tie_weight=args.tie_weight,
+                                       d_embed=args.d_model,
+                                       div_val=args.div_val,
+                                       tie_projs=tie_projs,
+                                       normalize_before=args.normalize_before,
+                                       tgt_len=args.tgt_len,
+                                       ext_len=args.ext_len,
+                                       mem_len=args.mem_len,
+                                       cutoffs=cutoffs,
+                                       same_length=args.same_length,
+                                       attn_type=args.attn_type,
+                                       clamp_len=args.clamp_len,
+                                       sample_softmax=args.sample_softmax)
 
     if args.scheduler == 'cosine':
         scheduler = paddle.optimizer.lr.CosineAnnealingDecay(
@@ -186,17 +184,17 @@ def do_train(args):
                 log_start_time = time.time()
 
             if step_idx % args.save_step == 0 and step_idx != 0:
-                # Do validation. 
+                # Do validation.
                 mem_transformer.eval()
 
                 # TODO(FrostML): simplify this.
                 if args.mem_len == 0:
                     if dist.get_world_size() == 1:
-                        mem_transformer.reset_length(
-                            tgt_len=args.eval_tgt_len,
-                            ext_len=args.ext_len + args.tgt_len -
-                            args.eval_tgt_len,
-                            mem_len=args.mem_len)
+                        mem_transformer.reset_length(tgt_len=args.eval_tgt_len,
+                                                     ext_len=args.ext_len +
+                                                     args.tgt_len -
+                                                     args.eval_tgt_len,
+                                                     mem_len=args.mem_len)
                     else:
                         mem_transformer._layers.reset_length(
                             tgt_len=args.eval_tgt_len,
@@ -205,11 +203,11 @@ def do_train(args):
                             mem_len=args.mem_len)
                 else:
                     if dist.get_world_size() == 1:
-                        mem_transformer.reset_length(
-                            tgt_len=args.eval_tgt_len,
-                            ext_len=args.ext_len,
-                            mem_len=args.mem_len + args.tgt_len -
-                            args.eval_tgt_len)
+                        mem_transformer.reset_length(tgt_len=args.eval_tgt_len,
+                                                     ext_len=args.ext_len,
+                                                     mem_len=args.mem_len +
+                                                     args.tgt_len -
+                                                     args.eval_tgt_len)
                     else:
                         mem_transformer._layers.reset_length(
                             tgt_len=args.eval_tgt_len,
@@ -237,8 +235,8 @@ def do_train(args):
                     logger_info = logger_info + ", bpc: %f" % (eval_loss /
                                                                np.log(2))
                 else:
-                    logger_info = logger_info + ", ppl: %f" % (np.exp(eval_loss)
-                                                               )
+                    logger_info = logger_info + ", ppl: %f" % (
+                        np.exp(eval_loss))
                 logger.info(logger_info)
 
                 if args.save_model and rank == 0:
@@ -262,15 +260,13 @@ def do_train(args):
 
                 # TODO(FrostML): simplify this.
                 if dist.get_world_size() == 1:
-                    mem_transformer.reset_length(
-                        tgt_len=args.tgt_len,
-                        ext_len=args.ext_len,
-                        mem_len=args.mem_len)
+                    mem_transformer.reset_length(tgt_len=args.tgt_len,
+                                                 ext_len=args.ext_len,
+                                                 mem_len=args.mem_len)
                 else:
-                    mem_transformer._layers.reset_length(
-                        tgt_len=args.tgt_len,
-                        ext_len=args.ext_len,
-                        mem_len=args.mem_len)
+                    mem_transformer._layers.reset_length(tgt_len=args.tgt_len,
+                                                         ext_len=args.ext_len,
+                                                         mem_len=args.mem_len)
 
                 mem_transformer.train()
 

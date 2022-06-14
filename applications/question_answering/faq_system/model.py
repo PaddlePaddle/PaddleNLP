@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 
 
 class SimCSE(nn.Layer):
+
     def __init__(self,
                  pretrained_model,
                  dropout=None,
@@ -35,24 +36,24 @@ class SimCSE(nn.Layer):
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
-        # if output_emb_size is greater than 0, then add Linear layer to reduce embedding_size, 
-        # we recommend set output_emb_size = 256 considering the trade-off beteween 
+        # if output_emb_size is greater than 0, then add Linear layer to reduce embedding_size,
+        # we recommend set output_emb_size = 256 considering the trade-off beteween
         # recall performance and efficiency
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(
-                768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(768,
+                                                      output_emb_size,
+                                                      weight_attr=weight_attr)
 
         self.margin = margin
         # Used scaling cosine similarity to ease converge
         self.sacle = scale
 
     @paddle.jit.to_static(input_spec=[
-        paddle.static.InputSpec(
-            shape=[None, None], dtype='int64'), paddle.static.InputSpec(
-                shape=[None, None], dtype='int64')
+        paddle.static.InputSpec(shape=[None, None], dtype='int64'),
+        paddle.static.InputSpec(shape=[None, None], dtype='int64')
     ])
     def get_pooled_embedding(self,
                              input_ids,
@@ -61,7 +62,7 @@ class SimCSE(nn.Layer):
                              attention_mask=None,
                              with_pooler=True):
 
-        # Note: cls_embedding is poolerd embedding with act tanh 
+        # Note: cls_embedding is poolerd embedding with act tanh
         sequence_output, cls_embedding = self.ptm(input_ids, token_type_ids,
                                                   position_ids, attention_mask)
 
@@ -97,19 +98,17 @@ class SimCSE(nn.Layer):
                    title_attention_mask=None,
                    with_pooler=True):
 
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids,
-            query_token_type_ids,
-            query_position_ids,
-            query_attention_mask,
-            with_pooler=with_pooler)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask,
+                                                        with_pooler=with_pooler)
 
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids,
-            title_token_type_ids,
-            title_position_ids,
-            title_attention_mask,
-            with_pooler=with_pooler)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids,
+                                                        title_attention_mask,
+                                                        with_pooler=with_pooler)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
                                 axis=-1)
@@ -125,22 +124,24 @@ class SimCSE(nn.Layer):
                 title_position_ids=None,
                 title_attention_mask=None):
 
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids,
-            query_attention_mask)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask)
 
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids, title_token_type_ids, title_position_ids,
-            title_attention_mask)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids,
+                                                        title_attention_mask)
 
-        cosine_sim = paddle.matmul(
-            query_cls_embedding, title_cls_embedding, transpose_y=True)
+        cosine_sim = paddle.matmul(query_cls_embedding,
+                                   title_cls_embedding,
+                                   transpose_y=True)
 
         # substract margin from all positive samples cosine_sim()
-        margin_diag = paddle.full(
-            shape=[query_cls_embedding.shape[0]],
-            fill_value=self.margin,
-            dtype=paddle.get_default_dtype())
+        margin_diag = paddle.full(shape=[query_cls_embedding.shape[0]],
+                                  fill_value=self.margin,
+                                  dtype=paddle.get_default_dtype())
 
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 

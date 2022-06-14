@@ -36,6 +36,7 @@ ACT2FN = {
 
 
 class NoNorm(nn.Layer):
+
     def __init__(self, feat_size, eps=None):
         super().__init__()
         if isinstance(feat_size, int):
@@ -57,23 +58,25 @@ class MobileBertEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
     def __init__(
-            self,
-            vocab_size,
-            embedding_size=128,
-            hidden_size=512,
-            hidden_dropout_prob=0.0,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            layer_norm_eps=1e-12,
-            pad_token_id=1,
-            trigram_input=True,
-            normalization_type="no_norm", ):
+        self,
+        vocab_size,
+        embedding_size=128,
+        hidden_size=512,
+        hidden_dropout_prob=0.0,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        layer_norm_eps=1e-12,
+        pad_token_id=1,
+        trigram_input=True,
+        normalization_type="no_norm",
+    ):
         super().__init__()
         self.trigram_input = trigram_input
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
-        self.word_embeddings = nn.Embedding(
-            vocab_size, embedding_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            embedding_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -87,9 +90,9 @@ class MobileBertEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids",
-                             paddle.arange(max_position_embeddings).expand(
-                                 (1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(max_position_embeddings).expand((1, -1)))
 
     def forward(self,
                 input_ids=None,
@@ -124,11 +127,11 @@ class MobileBertEmbeddings(nn.Layer):
                     nn.functional.pad(inputs_embeds[:, 1:], [0, 0, 0, 1, 0, 0],
                                       value=0),
                     inputs_embeds,
-                    nn.functional.pad(inputs_embeds[:, :-1],
-                                      [0, 0, 1, 0, 0, 0],
+                    nn.functional.pad(inputs_embeds[:, :-1], [0, 0, 1, 0, 0, 0],
                                       value=0),
                 ],
-                axis=2, )
+                axis=2,
+            )
         if self.trigram_input or self.embedding_size != self.hidden_size:
             inputs_embeds = self.embedding_transformation(inputs_embeds)
 
@@ -143,17 +146,19 @@ class MobileBertEmbeddings(nn.Layer):
 
 
 class MobileBertAttention(nn.Layer):
+
     def __init__(
-            self,
-            num_attention_heads=4,
-            true_hidden_size=128,
-            hidden_size=512,
-            use_bottleneck_attention=False,
-            attention_probs_dropout_prob=0.1,
-            use_bottleneck=True,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12,
-            hidden_dropout_prob=0.0, ):
+        self,
+        num_attention_heads=4,
+        true_hidden_size=128,
+        hidden_size=512,
+        use_bottleneck_attention=False,
+        attention_probs_dropout_prob=0.1,
+        use_bottleneck=True,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+        hidden_dropout_prob=0.0,
+    ):
         super().__init__()
 
         self.num_attention_heads = num_attention_heads
@@ -161,8 +166,9 @@ class MobileBertAttention(nn.Layer):
         self.all_head_size = self.num_attention_heads * self.attention_head_size
         self.query = nn.Linear(true_hidden_size, self.all_head_size)
         self.key = nn.Linear(true_hidden_size, self.all_head_size)
-        self.value = nn.Linear(true_hidden_size if use_bottleneck_attention else
-                               hidden_size, self.all_head_size)
+        self.value = nn.Linear(
+            true_hidden_size if use_bottleneck_attention else hidden_size,
+            self.all_head_size)
 
         self.attention_dropout = nn.Dropout(attention_probs_dropout_prob)
 
@@ -181,14 +187,15 @@ class MobileBertAttention(nn.Layer):
         return x.transpose(perm=(0, 2, 1, 3))
 
     def forward(
-            self,
-            query_tensor,
-            key_tensor,
-            value_tensor,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=None, ):
+        self,
+        query_tensor,
+        key_tensor,
+        value_tensor,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=None,
+    ):
 
         mixed_query_layer = self.query(query_tensor)
         mixed_key_layer = self.key(key_tensor)
@@ -199,8 +206,9 @@ class MobileBertAttention(nn.Layer):
         value_layer = self.transpose_for_scores(mixed_value_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = paddle.matmul(
-            query_layer, key_layer, transpose_y=True)
+        attention_scores = paddle.matmul(query_layer,
+                                         key_layer,
+                                         transpose_y=True)
         attention_scores = attention_scores / math.sqrt(
             self.attention_head_size)
         if attention_mask is not None:
@@ -239,11 +247,13 @@ class MobileBertAttention(nn.Layer):
 
 
 class MobileBertIntermediate(nn.Layer):
+
     def __init__(
-            self,
-            true_hidden_size=128,
-            intermediate_size=512,
-            hidden_act="relu", ):
+        self,
+        true_hidden_size=128,
+        intermediate_size=512,
+        hidden_act="relu",
+    ):
         super().__init__()
         self.dense = nn.Linear(true_hidden_size, intermediate_size)
         if isinstance(hidden_act, str):
@@ -258,13 +268,15 @@ class MobileBertIntermediate(nn.Layer):
 
 
 class OutputBottleneck(nn.Layer):
+
     def __init__(
-            self,
-            true_hidden_size=128,
-            hidden_size=512,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12,
-            hidden_dropout_prob=0.0, ):
+        self,
+        true_hidden_size=128,
+        hidden_size=512,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+        hidden_dropout_prob=0.0,
+    ):
         super().__init__()
         self.dense = nn.Linear(true_hidden_size, hidden_size)
         self.layer_norm = NORM2FN[normalization_type](hidden_size,
@@ -279,15 +291,17 @@ class OutputBottleneck(nn.Layer):
 
 
 class MobileBertOutput(nn.Layer):
+
     def __init__(
-            self,
-            use_bottleneck=True,
-            intermediate_size=512,
-            true_hidden_size=128,
-            hidden_size=512,
-            normalization_type="no_norm",
-            hidden_dropout_prob=0.0,
-            layer_norm_eps=1e-12, ):
+        self,
+        use_bottleneck=True,
+        intermediate_size=512,
+        true_hidden_size=128,
+        hidden_size=512,
+        normalization_type="no_norm",
+        hidden_dropout_prob=0.0,
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.use_bottleneck = use_bottleneck
         self.dense = nn.Linear(intermediate_size, true_hidden_size)
@@ -300,7 +314,8 @@ class MobileBertOutput(nn.Layer):
                 hidden_size=hidden_size,
                 normalization_type=normalization_type,
                 layer_norm_eps=layer_norm_eps,
-                hidden_dropout_prob=hidden_dropout_prob, )
+                hidden_dropout_prob=hidden_dropout_prob,
+            )
 
     def forward(self, intermediate_states, residual_tensor_1,
                 residual_tensor_2):
@@ -315,12 +330,14 @@ class MobileBertOutput(nn.Layer):
 
 
 class BottleneckLayer(nn.Layer):
+
     def __init__(
-            self,
-            hidden_size=512,
-            intra_bottleneck_size=128,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12, ):
+        self,
+        hidden_size=512,
+        intra_bottleneck_size=128,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.dense = nn.Linear(hidden_size, intra_bottleneck_size)
         self.layer_norm = NORM2FN[normalization_type](intra_bottleneck_size,
@@ -333,14 +350,16 @@ class BottleneckLayer(nn.Layer):
 
 
 class Bottleneck(nn.Layer):
+
     def __init__(
-            self,
-            key_query_shared_bottleneck=True,
-            use_bottleneck_attention=False,
-            hidden_size=512,
-            intra_bottleneck_size=128,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12, ):
+        self,
+        key_query_shared_bottleneck=True,
+        use_bottleneck_attention=False,
+        hidden_size=512,
+        intra_bottleneck_size=128,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.key_query_shared_bottleneck = key_query_shared_bottleneck
         self.use_bottleneck_attention = use_bottleneck_attention
@@ -348,13 +367,15 @@ class Bottleneck(nn.Layer):
             hidden_size=hidden_size,
             intra_bottleneck_size=intra_bottleneck_size,
             normalization_type=normalization_type,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
         if self.key_query_shared_bottleneck:
             self.attention = BottleneckLayer(
                 hidden_size=hidden_size,
                 intra_bottleneck_size=intra_bottleneck_size,
                 normalization_type=normalization_type,
-                layer_norm_eps=layer_norm_eps, )
+                layer_norm_eps=layer_norm_eps,
+            )
 
     def forward(self, hidden_states):
         # This method can return three different tuples of values. These different values make use of bottlenecks,
@@ -386,12 +407,14 @@ class Bottleneck(nn.Layer):
 
 
 class FFNOutput(nn.Layer):
+
     def __init__(
-            self,
-            intermediate_size=512,
-            true_hidden_size=128,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12, ):
+        self,
+        intermediate_size=512,
+        true_hidden_size=128,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.dense = nn.Linear(intermediate_size, true_hidden_size)
         self.layer_norm = NORM2FN[normalization_type](true_hidden_size,
@@ -404,23 +427,27 @@ class FFNOutput(nn.Layer):
 
 
 class FFNLayer(nn.Layer):
+
     def __init__(
-            self,
-            true_hidden_size=128,
-            intermediate_size=512,
-            hidden_act="relu",
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12, ):
+        self,
+        true_hidden_size=128,
+        intermediate_size=512,
+        hidden_act="relu",
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.intermediate = MobileBertIntermediate(
             true_hidden_size=true_hidden_size,
             intermediate_size=intermediate_size,
-            hidden_act=hidden_act, )
+            hidden_act=hidden_act,
+        )
         self.output = FFNOutput(
             intermediate_size=intermediate_size,
             true_hidden_size=true_hidden_size,
             normalization_type=normalization_type,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
 
     def forward(self, hidden_states):
         intermediate_output = self.intermediate(hidden_states)
@@ -429,22 +456,24 @@ class FFNLayer(nn.Layer):
 
 
 class MobileBertLayer(nn.Layer):
+
     def __init__(
-            self,
-            use_bottleneck=True,
-            num_feedforward_networks=4,
-            num_attention_heads=4,
-            true_hidden_size=128,
-            use_bottleneck_attention=False,
-            attention_probs_dropout_prob=0.1,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12,
-            hidden_dropout_prob=0.0,
-            intermediate_size=512,
-            hidden_act="relu",
-            hidden_size=512,
-            key_query_shared_bottleneck=True,
-            intra_bottleneck_size=128, ):
+        self,
+        use_bottleneck=True,
+        num_feedforward_networks=4,
+        num_attention_heads=4,
+        true_hidden_size=128,
+        use_bottleneck_attention=False,
+        attention_probs_dropout_prob=0.1,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+        hidden_dropout_prob=0.0,
+        intermediate_size=512,
+        hidden_act="relu",
+        hidden_size=512,
+        key_query_shared_bottleneck=True,
+        intra_bottleneck_size=128,
+    ):
         super().__init__()
         self.use_bottleneck = use_bottleneck
         self.num_feedforward_networks = num_feedforward_networks
@@ -458,11 +487,13 @@ class MobileBertLayer(nn.Layer):
             use_bottleneck=use_bottleneck,
             normalization_type=normalization_type,
             layer_norm_eps=layer_norm_eps,
-            hidden_dropout_prob=hidden_dropout_prob, )
+            hidden_dropout_prob=hidden_dropout_prob,
+        )
         self.intermediate = MobileBertIntermediate(
             true_hidden_size=true_hidden_size,
             intermediate_size=intermediate_size,
-            hidden_act=hidden_act, )
+            hidden_act=hidden_act,
+        )
         self.output = MobileBertOutput(
             use_bottleneck=use_bottleneck,
             intermediate_size=intermediate_size,
@@ -470,7 +501,8 @@ class MobileBertLayer(nn.Layer):
             hidden_size=hidden_size,
             normalization_type=normalization_type,
             hidden_dropout_prob=hidden_dropout_prob,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
         if self.use_bottleneck:
             self.bottleneck = Bottleneck(
                 key_query_shared_bottleneck=key_query_shared_bottleneck,
@@ -478,7 +510,8 @@ class MobileBertLayer(nn.Layer):
                 hidden_size=hidden_size,
                 intra_bottleneck_size=intra_bottleneck_size,
                 normalization_type=normalization_type,
-                layer_norm_eps=layer_norm_eps, )
+                layer_norm_eps=layer_norm_eps,
+            )
         if num_feedforward_networks > 1:
             self.ffn = nn.LayerList([
                 FFNLayer(
@@ -486,16 +519,17 @@ class MobileBertLayer(nn.Layer):
                     intermediate_size=intermediate_size,
                     hidden_act=hidden_act,
                     normalization_type=normalization_type,
-                    layer_norm_eps=layer_norm_eps, )
-                for _ in range(num_feedforward_networks - 1)
+                    layer_norm_eps=layer_norm_eps,
+                ) for _ in range(num_feedforward_networks - 1)
             ])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=None, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=None,
+    ):
         if self.use_bottleneck:
             query_tensor, key_tensor, value_tensor, layer_input = self.bottleneck(
                 hidden_states)
@@ -511,7 +545,8 @@ class MobileBertLayer(nn.Layer):
             layer_input,
             attention_mask,
             head_mask,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
         attention_output = self_attention_outputs[0]
         s = (attention_output, )
         outputs = self_attention_outputs[
@@ -532,27 +567,30 @@ class MobileBertLayer(nn.Layer):
             value_tensor,
             layer_input,
             attention_output,
-            intermediate_output, ) + s)
+            intermediate_output,
+        ) + s)
         return outputs
 
 
 class MobileBertEncoder(nn.Layer):
+
     def __init__(
-            self,
-            num_hidden_layers=24,
-            use_bottleneck=True,
-            num_feedforward_networks=4,
-            num_attention_heads=4,
-            true_hidden_size=128,
-            use_bottleneck_attention=False,
-            attention_probs_dropout_prob=0.1,
-            normalization_type="no_norm",
-            layer_norm_eps=1e-12,
-            hidden_dropout_prob=0.0,
-            intermediate_size=512,
-            hidden_act="relu",
-            hidden_size=512,
-            key_query_shared_bottleneck=True, ):
+        self,
+        num_hidden_layers=24,
+        use_bottleneck=True,
+        num_feedforward_networks=4,
+        num_attention_heads=4,
+        true_hidden_size=128,
+        use_bottleneck_attention=False,
+        attention_probs_dropout_prob=0.1,
+        normalization_type="no_norm",
+        layer_norm_eps=1e-12,
+        hidden_dropout_prob=0.0,
+        intermediate_size=512,
+        hidden_act="relu",
+        hidden_size=512,
+        key_query_shared_bottleneck=True,
+    ):
         super().__init__()
         self.layers = nn.LayerList([
             MobileBertLayer(
@@ -568,16 +606,18 @@ class MobileBertEncoder(nn.Layer):
                 intermediate_size=intermediate_size,
                 key_query_shared_bottleneck=key_query_shared_bottleneck,
                 hidden_act=hidden_act,
-                hidden_size=hidden_size, ) for _ in range(num_hidden_layers)
+                hidden_size=hidden_size,
+            ) for _ in range(num_hidden_layers)
         ])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=False,
-            output_hidden_states=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
         for i, layer_module in enumerate(self.layers):
@@ -588,7 +628,8 @@ class MobileBertEncoder(nn.Layer):
                 hidden_states,
                 attention_mask,
                 head_mask[i],
-                output_attentions, )
+                output_attentions,
+            )
             hidden_states = layer_outputs[0]
 
             if output_attentions:
@@ -604,10 +645,12 @@ class MobileBertEncoder(nn.Layer):
 
 
 class MobileBertPooler(nn.Layer):
+
     def __init__(
-            self,
-            classifier_activation=False,
-            hidden_size=512, ):
+        self,
+        classifier_activation=False,
+        hidden_size=512,
+    ):
         super().__init__()
         self.do_activate = classifier_activation
         if self.do_activate:
@@ -626,11 +669,13 @@ class MobileBertPooler(nn.Layer):
 
 
 class MobileBertPredictionHeadTransform(nn.Layer):
+
     def __init__(
-            self,
-            hidden_size=512,
-            hidden_act="relu",
-            layer_norm_eps=1e-12, ):
+        self,
+        hidden_size=512,
+        hidden_act="relu",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         if isinstance(hidden_act, str):
@@ -648,22 +693,26 @@ class MobileBertPredictionHeadTransform(nn.Layer):
 
 
 class MobileBertLMPredictionHead(nn.Layer):
+
     def __init__(
-            self,
-            vocab_size=30522,
-            hidden_size=512,
-            embedding_size=128,
-            hidden_act="relu",
-            layer_norm_eps=1e-12, ):
+        self,
+        vocab_size=30522,
+        hidden_size=512,
+        embedding_size=128,
+        hidden_act="relu",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.transform = MobileBertPredictionHeadTransform(
             hidden_size=hidden_size,
             hidden_act=hidden_act,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
-        self.dense = nn.Linear(
-            vocab_size, hidden_size - embedding_size, bias_attr=False)
+        self.dense = nn.Linear(vocab_size,
+                               hidden_size - embedding_size,
+                               bias_attr=False)
         self.decoder = nn.Linear(embedding_size, vocab_size)
 
     def forward(self, hidden_states):
@@ -677,20 +726,23 @@ class MobileBertLMPredictionHead(nn.Layer):
 
 
 class MobileBertOnlyMLMHead(nn.Layer):
+
     def __init__(
-            self,
-            vocab_size=30522,
-            hidden_size=512,
-            embedding_size=128,
-            hidden_act="relu",
-            layer_norm_eps=1e-12, ):
+        self,
+        vocab_size=30522,
+        hidden_size=512,
+        embedding_size=128,
+        hidden_act="relu",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.predictions = MobileBertLMPredictionHead(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             embedding_size=embedding_size,
             hidden_act=hidden_act,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
 
     def forward(self, sequence_output):
         prediction_scores = self.predictions(sequence_output)
@@ -698,20 +750,23 @@ class MobileBertOnlyMLMHead(nn.Layer):
 
 
 class MobileBertPreTrainingHeads(nn.Layer):
+
     def __init__(
-            self,
-            vocab_size=30522,
-            hidden_size=512,
-            embedding_size=128,
-            hidden_act="relu",
-            layer_norm_eps=1e-12, ):
+        self,
+        vocab_size=30522,
+        hidden_size=512,
+        embedding_size=128,
+        hidden_act="relu",
+        layer_norm_eps=1e-12,
+    ):
         super().__init__()
         self.predictions = MobileBertLMPredictionHead(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             embedding_size=embedding_size,
             hidden_act=hidden_act,
-            layer_norm_eps=layer_norm_eps, )
+            layer_norm_eps=layer_norm_eps,
+        )
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
@@ -779,8 +834,8 @@ class MobileBertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.mobilebert.config["initializer_range"],
                     shape=layer.weight.shape))
             if layer.bias is not None:
@@ -818,15 +873,16 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
         self.cls.predictions.decoder = new_embeddigs
 
     def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            output_attentions=None,
-            output_hidden_states=None, ):
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        output_attentions=None,
+        output_hidden_states=None,
+    ):
         r"""
         The MobileBertForPreTraining forward method, overrides the __call__() special method.
         
@@ -871,18 +927,17 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
                 seq_relationship_logits = outputs[1]
         """
 
-        outputs = self.mobilebert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
+        outputs = self.mobilebert(input_ids,
+                                  attention_mask=attention_mask,
+                                  token_type_ids=token_type_ids,
+                                  position_ids=position_ids,
+                                  head_mask=head_mask,
+                                  inputs_embeds=inputs_embeds,
+                                  output_attentions=output_attentions,
+                                  output_hidden_states=output_hidden_states)
         sequence_output, pooled_output = outputs[:2]
-        prediction_scores, seq_relationship_score = self.cls(sequence_output,
-                                                             pooled_output)
+        prediction_scores, seq_relationship_score = self.cls(
+            sequence_output, pooled_output)
 
         output = (prediction_scores, seq_relationship_score) + outputs[2:]
         return output
@@ -955,31 +1010,32 @@ class MobileBertModel(MobileBertPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            embedding_size=128,
-            hidden_size=512,
-            hidden_dropout_prob=0.0,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            layer_norm_eps=1e-12,
-            pad_token_id=1,
-            trigram_input=True,
-            normalization_type="no_norm",
-            num_hidden_layers=24,
-            use_bottleneck=True,
-            num_feedforward_networks=4,
-            num_attention_heads=4,
-            true_hidden_size=128,
-            use_bottleneck_attention=False,
-            attention_probs_dropout_prob=0.1,
-            intermediate_size=512,
-            intra_bottleneck_size=128,
-            hidden_act="relu",
-            classifier_activation=False,
-            initializer_range=0.02,
-            key_query_shared_bottleneck=True,
-            add_pooling_layer=True, ):
+        self,
+        vocab_size,
+        embedding_size=128,
+        hidden_size=512,
+        hidden_dropout_prob=0.0,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        layer_norm_eps=1e-12,
+        pad_token_id=1,
+        trigram_input=True,
+        normalization_type="no_norm",
+        num_hidden_layers=24,
+        use_bottleneck=True,
+        num_feedforward_networks=4,
+        num_attention_heads=4,
+        true_hidden_size=128,
+        use_bottleneck_attention=False,
+        attention_probs_dropout_prob=0.1,
+        intermediate_size=512,
+        intra_bottleneck_size=128,
+        hidden_act="relu",
+        classifier_activation=False,
+        initializer_range=0.02,
+        key_query_shared_bottleneck=True,
+        add_pooling_layer=True,
+    ):
         super(MobileBertModel, self).__init__()
 
         self.initializer_range = initializer_range
@@ -997,7 +1053,8 @@ class MobileBertModel(MobileBertPretrainedModel):
             layer_norm_eps=layer_norm_eps,
             pad_token_id=pad_token_id,
             trigram_input=trigram_input,
-            normalization_type=normalization_type, )
+            normalization_type=normalization_type,
+        )
         self.encoder = MobileBertEncoder(
             num_hidden_layers=num_hidden_layers,
             use_bottleneck=use_bottleneck,
@@ -1012,11 +1069,13 @@ class MobileBertModel(MobileBertPretrainedModel):
             intermediate_size=intermediate_size,
             hidden_act=hidden_act,
             hidden_size=hidden_size,
-            key_query_shared_bottleneck=key_query_shared_bottleneck, )
+            key_query_shared_bottleneck=key_query_shared_bottleneck,
+        )
         self.num_hidden_layers = num_hidden_layers
         self.pooler = MobileBertPooler(
             classifier_activation=classifier_activation,
-            hidden_size=hidden_size, ) if add_pooling_layer else None
+            hidden_size=hidden_size,
+        ) if add_pooling_layer else None
 
         self.init_weights()
 
@@ -1071,15 +1130,16 @@ class MobileBertModel(MobileBertPretrainedModel):
         return head_mask
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            output_hidden_states=None,
-            output_attentions=None, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        output_hidden_states=None,
+        output_attentions=None,
+    ):
         r'''
         The MobileBertModel forward method, overrides the `__call__()` special method.
         
@@ -1177,17 +1237,17 @@ class MobileBertModel(MobileBertPretrainedModel):
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
-            inputs_embeds=inputs_embeds)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids,
+                                           inputs_embeds=inputs_embeds)
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
             head_mask=head_mask,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, )
+            output_hidden_states=output_hidden_states,
+        )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(
             sequence_output) if self.pooler is not None else None
@@ -1211,10 +1271,10 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
         super(MobileBertForSequenceClassification, self).__init__()
         self.num_labels = num_labels
         self.mobilebert = mobilebert
-        classifier_dropout = (
-            self.mobilebert.config["classifier_dropout"]
-            if self.mobilebert.config.get("classifier_dropout") is not None else
-            self.mobilebert.config["hidden_dropout_prob"])
+        classifier_dropout = (self.mobilebert.config["classifier_dropout"] if
+                              self.mobilebert.config.get("classifier_dropout")
+                              is not None else
+                              self.mobilebert.config["hidden_dropout_prob"])
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(self.mobilebert.config["hidden_size"],
                                     self.num_labels)
@@ -1276,7 +1336,8 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, )
+            output_hidden_states=output_hidden_states,
+        )
 
         pooled_output = outputs[1]
 
@@ -1306,17 +1367,18 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
         self.init_weights()
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            start_positions=None,
-            end_positions=None,
-            output_attentions=None,
-            output_hidden_states=None, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        start_positions=None,
+        end_positions=None,
+        output_attentions=None,
+        output_hidden_states=None,
+    ):
         r"""
         The MobileBertForQuestionAnswering forward method, overrides the __call__() special method.
         
@@ -1376,7 +1438,8 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states, )
+            output_hidden_states=output_hidden_states,
+        )
 
         sequence_output = outputs[0]
         logits = self.qa_outputs(sequence_output)
