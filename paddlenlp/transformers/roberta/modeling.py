@@ -107,7 +107,7 @@ class RobertaPretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "roberta-wwm-ext": {
+        "hfl/roberta-wwm-ext": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -121,7 +121,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
-        "roberta-wwm-ext-large": {
+        "hfl/roberta-wwm-ext-large": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -135,7 +135,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0
         },
-        "rbt6": {
+        "hfl/rbt6": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -149,7 +149,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
         },
-        "rbt4": {
+        "hfl/rbt4": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -163,7 +163,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
         },
-        "rbt3": {
+        "hfl/rbt3": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -177,7 +177,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "vocab_size": 21128,
             "pad_token_id": 0,
         },
-        "rbtl3": {
+        "hfl/rbtl3": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
@@ -195,17 +195,17 @@ class RobertaPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "roberta-wwm-ext":
+            "hfl/roberta-wwm-ext":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/roberta_chn_base.pdparams",
-            "roberta-wwm-ext-large":
+            "hfl/roberta-wwm-ext-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/roberta_chn_large.pdparams",
-            "rbt6":
+            "hfl/rbt6":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt6/rbt6_chn_large.pdparams",
-            "rbt4":
+            "hfl/rbt4":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt4/rbt4_chn_large.pdparams",
-            "rbt3":
+            "hfl/rbt3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/rbt3_chn_large.pdparams",
-            "rbtl3":
+            "hfl/rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
         }
     }

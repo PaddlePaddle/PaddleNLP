@@ -393,7 +393,7 @@ class BertTokenizer(PretrainedTokenizer):
         "uer/chinese-roberta-small": {
             "do_lower_case": True
         },
-        "uuer/chinese-roberta-mini": {
+        "uer/chinese-roberta-mini": {
             "do_lower_case": True
         },
         "uer/chinese-roberta-tiny": {
