@@ -1,4 +1,4 @@
-# FasterTokenizers Demo
+# FasterTokenizer Demo
 
 ## 1. 环境准备
 

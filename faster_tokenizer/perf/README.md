@@ -1,4 +1,4 @@
-# 飞桨FasterTokenizers性能测试
+# 飞桨FasterTokenizer性能测试
 
 在PaddleNLP v2.2.0版本中PaddleNLP推出了高性能的Transformer类文本分词器，简称飞桨FasterTokenizer。为了验证飞桨FasterTokenizer的性能快的特点，PaddleNLP选取了业内常见的一些文本分词器进行了性能对比比较，主要进行性能参考的是HuggingFace BertTokenizer， Tensorflow-text BertTokenizer. 我们以 bert-base-chinese 模型为例进行了文本分词性能实验对比，在中文的数据下进行性能对比实验，下面是具体实验设置信息：
 * [HuggingFace Tokenizers(Python)](https://github.com/huggingface/tokenizers):
@@ -26,7 +26,7 @@ import tensorflow_text as tf_text
 tf_tokenizer = tf_text.BertTokenizer(vocab)
 ```
 
-* [飞桨FasterTokenizers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/experimental):
+* [飞桨FasterTokenizer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/experimental):
 
 ```python
 from paddlenlp.experimental import FasterTokenizer
