@@ -41,12 +41,14 @@ import paddle.distributed as dist
 from paddle.io import (
     Dataset,
     DataLoader,
-    DistributedBatchSampler, )
+    DistributedBatchSampler,
+)
 
 from ..data import (
     default_data_collator,
     DataCollator,
-    DataCollatorWithPadding, )
+    DataCollatorWithPadding,
+)
 from ..transformers import LinearDecayWithWarmup
 from ..transformers.model_utils import PretrainedModel, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
@@ -63,7 +65,8 @@ from .trainer_utils import (
     speed_metrics,
     OptimizerNames,
     PREFIX_CHECKPOINT_DIR,
-    get_last_checkpoint, )
+    get_last_checkpoint,
+)
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -71,13 +74,15 @@ from .trainer_callback import (
     ProgressCallback,
     TrainerCallback,
     TrainerControl,
-    TrainerState, )
+    TrainerState,
+)
 from .utils.helper import (
     distributed_concat,
     nested_concat,
     nested_detach,
     nested_numpify,
-    nested_truncate, )
+    nested_truncate,
+)
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -159,18 +164,19 @@ class Trainer:
     from .trainer_utils import log_metrics, metrics_format, save_metrics, save_state
 
     def __init__(
-            self,
-            model: Union[PretrainedModel, nn.Layer]=None,
-            criterion: Union[nn.Layer]=None,
-            args: TrainingArguments=None,
-            data_collator: Optional[DataCollator]=None,
-            train_dataset: Optional[Dataset]=None,
-            eval_dataset: Optional[Dataset]=None,
-            tokenizer: Optional[PretrainedTokenizer]=None,
-            compute_metrics: Optional[Callable[[EvalPrediction], Dict]]=None,
-            callbacks: Optional[List[TrainerCallback]]=None,
-            optimizers: Tuple[paddle.optimizer.Optimizer,
-                              paddle.optimizer.lr.LRScheduler]=(None, None), ):
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: Union[nn.Layer] = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Optional[Dataset] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer,
+                          paddle.optimizer.lr.LRScheduler] = (None, None),
+    ):
         if paddle.distributed.get_world_size() > 1:
             if not paddle.fluid.dygraph.parallel_helper._is_parallel_ctx_initialized(
             ):
@@ -221,8 +227,8 @@ class Trainer:
         self.callback_handler = CallbackHandler(callbacks, self.model,
                                                 self.tokenizer, self.optimizer,
                                                 self.lr_scheduler)
-        self.add_callback(PrinterCallback if self.args.disable_tqdm else
-                          DEFAULT_PROGRESS_CALLBACK)
+        self.add_callback(PrinterCallback if self.args.
+                          disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
         if args.max_steps > 0:
             logger.info(
@@ -240,13 +246,13 @@ class Trainer:
                 init_loss_scaling=self.args.scale_loss)
             logger.info("Using half precision")
 
-        default_label_names = (["start_positions", "end_positions"] if
-                               "QusetionAnswering" in type(self.model).__name__
-                               else ["labels"])
+        default_label_names = ([
+            "start_positions", "end_positions"
+        ] if "QusetionAnswering" in type(self.model).__name__ else ["labels"])
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
-        self.control = self.callback_handler.on_init_end(self.args, self.state,
-                                                         self.control)
+        self.control = self.callback_handler.on_init_end(
+            self.args, self.state, self.control)
         self.print_config()
 
     def add_callback(self, callback):
@@ -306,7 +312,8 @@ class Trainer:
             if not os.path.isfile(
                     os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
                 raise ValueError(
-                    f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}"
+                )
 
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -320,9 +327,10 @@ class Trainer:
             del state_dict
 
     def train(
-            self,
-            resume_from_checkpoint: Optional[Union[str, bool]]=None,
-            ignore_keys_for_eval: Optional[List[str]]=None, ):
+        self,
+        resume_from_checkpoint: Optional[Union[str, bool]] = None,
+        ignore_keys_for_eval: Optional[List[str]] = None,
+    ):
         """
         Main training entry point.
         
@@ -351,7 +359,8 @@ class Trainer:
             if not os.path.isfile(
                     os.path.join(resume_from_checkpoint, WEIGHTS_NAME)):
                 raise ValueError(
-                    f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                    f"Can't find a valid checkpoint at {resume_from_checkpoint}"
+                )
 
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -479,8 +488,8 @@ class Trainer:
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
-        self.control = self.callback_handler.on_train_begin(args, self.state,
-                                                            self.control)
+        self.control = self.callback_handler.on_train_begin(
+            args, self.state, self.control)
 
         tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
@@ -529,9 +538,9 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control)
 
-                if (((step + 1) % args.gradient_accumulation_steps != 0) and
-                        args.local_rank != -1 and
-                        args._no_sync_in_gradient_accumulation):
+                if (((step + 1) % args.gradient_accumulation_steps != 0)
+                        and args.local_rank != -1
+                        and args._no_sync_in_gradient_accumulation):
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
                         tr_loss_step = self.training_step(model, inputs)
@@ -575,8 +584,8 @@ class Trainer:
                 )
                 self.control.should_training_stop = True
 
-            self.control = self.callback_handler.on_epoch_end(args, self.state,
-                                                              self.control)
+            self.control = self.callback_handler.on_epoch_end(
+                args, self.state, self.control)
             self._maybe_log_save_evaluate(tr_loss, model, epoch,
                                           ignore_keys_for_eval)
 
@@ -612,11 +621,10 @@ class Trainer:
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
 
-        metrics = speed_metrics(
-            "train",
-            start_time,
-            num_samples=num_train_samples,
-            num_steps=self.state.max_steps)
+        metrics = speed_metrics("train",
+                                start_time,
+                                num_samples=num_train_samples,
+                                num_steps=self.state.max_steps)
 
         metrics["train_loss"] = train_loss
 
@@ -624,8 +632,8 @@ class Trainer:
 
         self.log(metrics)
 
-        self.control = self.callback_handler.on_train_end(args, self.state,
-                                                          self.control)
+        self.control = self.callback_handler.on_train_end(
+            args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
@@ -649,7 +657,7 @@ class Trainer:
             drop_last=self.args.dataloader_drop_last)
 
     def _set_state_dict_in_model(self, state_dict):
-        # TODO  @ZHUI paddle need return the results of set_state_dict. 
+        # TODO  @ZHUI paddle need return the results of set_state_dict.
         self.model.set_state_dict(state_dict)
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
@@ -664,8 +672,9 @@ class Trainer:
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
 
-            logs["loss"] = round(tr_loss_scalar / (
-                self.state.global_step - self._globalstep_last_logged), 8)
+            logs["loss"] = round(
+                tr_loss_scalar /
+                (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
@@ -676,7 +685,8 @@ class Trainer:
                     num_samples=self.args.train_batch_size *
                     self.args.gradient_accumulation_steps,
                     num_steps=self.state.global_step -
-                    self._globalstep_last_logged, ))
+                    self._globalstep_last_logged,
+                ))
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -690,8 +700,8 @@ class Trainer:
 
         if self.control.should_save:
             self._save_checkpoint(model, metrics=metrics)
-            self.control = self.callback_handler.on_save(self.args, self.state,
-                                                         self.control)
+            self.control = self.callback_handler.on_save(
+                self.args, self.state, self.control)
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
@@ -711,8 +721,8 @@ class Trainer:
         train_dataset = self.train_dataset
         if is_datasets_available() and isinstance(train_dataset,
                                                   datasets.Dataset):
-            train_dataset = self._remove_unused_columns(
-                train_dataset, description="training")
+            train_dataset = self._remove_unused_columns(train_dataset,
+                                                        description="training")
 
         train_sampler = self._get_train_sampler()
 
@@ -720,7 +730,8 @@ class Trainer:
             train_dataset,
             batch_sampler=train_sampler,
             collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers, )
+            num_workers=self.args.dataloader_num_workers,
+        )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if self.args.world_size <= 1:
@@ -728,7 +739,8 @@ class Trainer:
                 eval_dataset,
                 batch_size=self.args.eval_batch_size,
                 shuffle=False,
-                drop_last=False, )
+                drop_last=False,
+            )
         else:
             return DistributedBatchSampler(
                 eval_dataset,
@@ -736,10 +748,12 @@ class Trainer:
                 rank=self.args.process_index,
                 batch_size=self.args.eval_batch_size,
                 shuffle=False,
-                drop_last=False, )
+                drop_last=False,
+            )
 
     def get_eval_dataloader(self,
-                            eval_dataset: Optional[Dataset]=None) -> DataLoader:
+                            eval_dataset: Optional[Dataset] = None
+                            ) -> DataLoader:
         """
         Returns the evaluation [`~paddle.io.DataLoader`].
 
@@ -756,8 +770,8 @@ class Trainer:
 
         if is_datasets_available() and isinstance(eval_dataset,
                                                   datasets.Dataset):
-            eval_dataset = self._remove_unused_columns(
-                eval_dataset, description="evaluation")
+            eval_dataset = self._remove_unused_columns(eval_dataset,
+                                                       description="evaluation")
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
@@ -765,7 +779,8 @@ class Trainer:
             eval_dataset,
             batch_sampler=eval_sampler,
             collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers, )
+            num_workers=self.args.dataloader_num_workers,
+        )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
         """
@@ -780,8 +795,8 @@ class Trainer:
         """
         if is_datasets_available() and isinstance(test_dataset,
                                                   datasets.Dataset):
-            test_dataset = self._remove_unused_columns(
-                test_dataset, description="test")
+            test_dataset = self._remove_unused_columns(test_dataset,
+                                                       description="test")
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -790,7 +805,8 @@ class Trainer:
             test_dataset,
             batch_sampler=test_sampler,
             collate_fn=self.data_collator,
-            drop_last=self.args.dataloader_drop_last, )
+            drop_last=self.args.dataloader_drop_last,
+        )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
@@ -861,8 +877,8 @@ class Trainer:
         if core.is_compiled_with_cuda():
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i)._is_init_py = True
-                core.default_cuda_generator(i).manual_seed(checkpoint_rng_state[
-                    "cuda"][i])
+                core.default_cuda_generator(i).manual_seed(
+                    checkpoint_rng_state["cuda"][i])
 
         core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
 
@@ -917,7 +933,8 @@ class Trainer:
                 self.args.lr_scheduler_type,
                 learning_rate=self.args.learning_rate,
                 num_warmup_steps=warmup,
-                num_training_steps=num_training_steps, )
+                num_training_steps=num_training_steps,
+            )
 
         return self.lr_scheduler
 
@@ -954,8 +971,9 @@ class Trainer:
             # return data.to(**kwargs)
         return data
 
-    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]
-                        ) -> Dict[str, Union[paddle.Tensor, Any]]:
+    def _prepare_inputs(
+        self, inputs: Dict[str, Union[paddle.Tensor, Any]]
+    ) -> Dict[str, Union[paddle.Tensor, Any]]:
         """
         Prepare `inputs` before feeding them to the model, converting them to tensors if they are not already and
         handling potential state.
@@ -972,14 +990,13 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.args.fp16:
-            ctx_manager = autocast(
-                True,
-                custom_black_list=[
-                    "reduce_sum",
-                    "c_softmax_with_cross_entropy",
-                    "elementwise_div",
-                ],
-                level=self.args.fp16_opt_level)
+            ctx_manager = autocast(True,
+                                   custom_black_list=[
+                                       "reduce_sum",
+                                       "c_softmax_with_cross_entropy",
+                                       "elementwise_div",
+                                   ],
+                                   level=self.args.fp16_opt_level)
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()
@@ -1052,7 +1069,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str]=None):
+    def save_model(self, output_dir: Optional[str] = None):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1094,24 +1111,27 @@ class Trainer:
             metric_value = metrics[metric_to_check]
 
             operator = np.greater if self.args.greater_is_better else np.less
-            if (self.state.best_metric is None or
-                    self.state.best_model_checkpoint is None or
-                    operator(metric_value, self.state.best_metric)):
+            if (self.state.best_metric is None
+                    or self.state.best_model_checkpoint is None
+                    or operator(metric_value, self.state.best_metric)):
                 self.state.best_metric = metric_value
                 self.state.best_model_checkpoint = output_dir
 
         # Save the Trainer state
         if self.args.should_save:
-            self.state.save_to_json(
-                os.path.join(output_dir, TRAINER_STATE_NAME))
+            self.state.save_to_json(os.path.join(output_dir,
+                                                 TRAINER_STATE_NAME))
 
         # Save RNG state in non-distributed training
         rng_states = {
-            "python": random.getstate(),
-            "numpy": np.random.get_state(),
+            "python":
+            random.getstate(),
+            "numpy":
+            np.random.get_state(),
             "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
-            "cpu": paddle.fluid.core.default_cpu_generator().get_state()
-            .current_seed(),
+            "cpu":
+            paddle.fluid.core.default_cpu_generator().get_state().current_seed(
+            ),
         }
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
@@ -1167,21 +1187,22 @@ class Trainer:
             return
 
         # Check if we should delete older checkpoint(s)
-        checkpoints_sorted = self._sorted_checkpoints(
-            use_mtime=use_mtime, output_dir=output_dir)
+        checkpoints_sorted = self._sorted_checkpoints(use_mtime=use_mtime,
+                                                      output_dir=output_dir)
         if len(checkpoints_sorted) <= self.args.save_total_limit:
             return
 
         # If save_total_limit=1 with load_best_model_at_end=True, we could end up deleting the last checkpoint, which
         # we don't do to allow resuming.
         save_total_limit = self.args.save_total_limit
-        if (self.state.best_model_checkpoint is not None and
-                self.args.save_total_limit == 1 and
-                checkpoints_sorted[-1] != self.state.best_model_checkpoint):
+        if (self.state.best_model_checkpoint is not None
+                and self.args.save_total_limit == 1
+                and checkpoints_sorted[-1] != self.state.best_model_checkpoint):
             save_total_limit = 2
 
         number_of_checkpoints_to_delete = max(
-            0, len(checkpoints_sorted) - save_total_limit)
+            0,
+            len(checkpoints_sorted) - save_total_limit)
         checkpoints_to_be_deleted = checkpoints_sorted[:
                                                        number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
@@ -1190,7 +1211,7 @@ class Trainer:
             )
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str]=None, state_dict=None):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -1235,9 +1256,8 @@ class Trainer:
             if self.do_grad_scaling and os.path.isfile(
                     os.path.join(checkpoint, SCALER_NAME)):
                 self.scaler.load_state_dict(
-                    paddle.load(
-                        os.path.join(checkpoint, SCALER_NAME),
-                        return_numpy=True))
+                    paddle.load(os.path.join(checkpoint, SCALER_NAME),
+                                return_numpy=True))
 
     def log(self, logs: Dict[str, float]) -> None:
         """
@@ -1252,16 +1272,17 @@ class Trainer:
         if self.state.epoch is not None:
             logs["epoch"] = round(self.state.epoch, 4)
 
-        output = { ** logs, ** {"step": self.state.global_step}}
+        output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state,
                                                     self.control, logs)
 
     def evaluate(
-            self,
-            eval_dataset: Optional[Dataset]=None,
-            ignore_keys: Optional[List[str]]=None,
-            metric_key_prefix: str="eval", ) -> Dict[str, float]:
+        self,
+        eval_dataset: Optional[Dataset] = None,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "eval",
+    ) -> Dict[str, float]:
         """
         Run evaluation and returns metrics.
 
@@ -1296,7 +1317,8 @@ class Trainer:
             # self.args.prediction_loss_only
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
-            metric_key_prefix=metric_key_prefix, )
+            metric_key_prefix=metric_key_prefix,
+        )
 
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
@@ -1304,7 +1326,8 @@ class Trainer:
                 metric_key_prefix,
                 start_time,
                 num_samples=output.num_samples,
-                num_steps=math.ceil(output.num_samples / total_batch_size), ))
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            ))
 
         self.log(output.metrics)
 
@@ -1314,13 +1337,14 @@ class Trainer:
         return output.metrics
 
     def evaluation_loop(
-            self,
-            dataloader: DataLoader,
-            description: str,
-            prediction_loss_only: Optional[bool]=None,
-            ignore_keys: Optional[List[str]]=None,
-            metric_key_prefix: str="eval",
-            max_eval_iters: Optional[int]=-1, ) -> EvalLoopOutput:
+        self,
+        dataloader: DataLoader,
+        description: str,
+        prediction_loss_only: Optional[bool] = None,
+        ignore_keys: Optional[List[str]] = None,
+        metric_key_prefix: str = "eval",
+        max_eval_iters: Optional[int] = -1,
+    ) -> EvalLoopOutput:
         """
         Prediction/evaluation loop, shared by `Trainer.evaluate()` and `Trainer.predict()`.
 
@@ -1348,10 +1372,10 @@ class Trainer:
             num_samples = self.num_examples(dataloader)
         else:
             num_samples = batch_size * self.args.world_size * max_eval_iters
-            if isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter.
-                          _DataLoaderIterBase) and isinstance(
-                              dataloader._batch_sampler,
-                              NlpDistributedBatchSampler):
+            if isinstance(
+                    dataloader, paddle.fluid.dataloader.dataloader_iter.
+                    _DataLoaderIterBase) and isinstance(
+                        dataloader._batch_sampler, NlpDistributedBatchSampler):
                 consumed_samples = (
                     (self.state.global_step) // args.eval_steps
                 ) * max_eval_iters * args.eval_batch_size * args.world_size
@@ -1389,14 +1413,15 @@ class Trainer:
         for step, inputs in enumerate(dataloader):
             # Update the observed num examples
             # Prediction step
-            loss, logits, labels = self.prediction_step(
-                model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
+            loss, logits, labels = self.prediction_step(model,
+                                                        inputs,
+                                                        prediction_loss_only,
+                                                        ignore_keys=ignore_keys)
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
                 losses = self._nested_gather(
-                    paddle.tile(
-                        loss, repeat_times=[batch_size, 1]))
+                    paddle.tile(loss, repeat_times=[batch_size, 1]))
                 losses_host = losses if losses_host is None else paddle.concat(
                     (losses_host, losses), axis=0)
             if labels is not None:
@@ -1441,8 +1466,7 @@ class Trainer:
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
             metrics = self.compute_metrics(
-                EvalPrediction(
-                    predictions=all_preds, label_ids=all_labels))
+                EvalPrediction(predictions=all_preds, label_ids=all_labels))
         else:
             metrics = {}
 
@@ -1454,16 +1478,15 @@ class Trainer:
             if not key.startswith(f"{metric_key_prefix}_"):
                 metrics[f"{metric_key_prefix}_{key}"] = metrics.pop(key)
 
-        return EvalLoopOutput(
-            predictions=all_preds,
-            label_ids=all_labels,
-            metrics=metrics,
-            num_samples=num_samples)
+        return EvalLoopOutput(predictions=all_preds,
+                              label_ids=all_labels,
+                              metrics=metrics,
+                              num_samples=num_samples)
 
     def predict(self,
                 test_dataset: Dataset,
-                ignore_keys: Optional[List[str]]=None,
-                metric_key_prefix: str="test") -> PredictionOutput:
+                ignore_keys: Optional[List[str]] = None,
+                metric_key_prefix: str = "test") -> PredictionOutput:
         """
         Run prediction and returns predictions and potential metrics.
         Depending on the dataset and your use case, your test dataset may contain labels. In that case, this method
@@ -1493,32 +1516,31 @@ class Trainer:
         start_time = time.time()
 
         eval_loop = self.evaluation_loop
-        output = eval_loop(
-            test_dataloader,
-            description="Prediction",
-            ignore_keys=ignore_keys,
-            metric_key_prefix=metric_key_prefix)
+        output = eval_loop(test_dataloader,
+                           description="Prediction",
+                           ignore_keys=ignore_keys,
+                           metric_key_prefix=metric_key_prefix)
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
             speed_metrics(
                 metric_key_prefix,
                 start_time,
                 num_samples=output.num_samples,
-                num_steps=math.ceil(output.num_samples / total_batch_size), ))
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            ))
 
-        return PredictionOutput(
-            predictions=output.predictions,
-            label_ids=output.label_ids,
-            metrics=output.metrics)
+        return PredictionOutput(predictions=output.predictions,
+                                label_ids=output.label_ids,
+                                metrics=output.metrics)
 
     def prediction_step(
-            self,
-            model: nn.Layer,
-            inputs: Dict[str, Union[paddle.Tensor, Any]],
-            prediction_loss_only: bool,
-            ignore_keys: Optional[List[str]]=None, ) -> Tuple[Optional[
-                paddle.Tensor], Optional[paddle.Tensor], Optional[
-                    paddle.Tensor]]:
+        self,
+        model: nn.Layer,
+        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        prediction_loss_only: bool,
+        ignore_keys: Optional[List[str]] = None,
+    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor],
+               Optional[paddle.Tensor]]:
         """
         Perform an evaluation step on `model` using `inputs`.
 
@@ -1563,8 +1585,9 @@ class Trainer:
         with paddle.no_grad():
             if has_labels:
                 with self.autocast_smart_context_manager():
-                    loss, outputs = self.compute_loss(
-                        model, inputs, return_outputs=True)
+                    loss, outputs = self.compute_loss(model,
+                                                      inputs,
+                                                      return_outputs=True)
                 loss = loss.mean().detach()
 
                 if isinstance(outputs, dict):
@@ -1634,12 +1657,12 @@ class Trainer:
         they can safely be gathered.
         """
         if isinstance(tensor, (list, tuple)):
-            return type(tensor)(self._pad_across_processes(
-                t, pad_index=pad_index) for t in tensor)
+            return type(tensor)(
+                self._pad_across_processes(t, pad_index=pad_index)
+                for t in tensor)
         elif isinstance(tensor, dict):
             return type(tensor)({
-                k: self._pad_across_processes(
-                    v, pad_index=pad_index)
+                k: self._pad_across_processes(v, pad_index=pad_index)
                 for k, v in tensor.items()
             })
         elif not isinstance(tensor, paddle.Tensor):
@@ -1662,14 +1685,14 @@ class Trainer:
         new_size = list(old_size)
         new_size[1] = max_size
         # new_tensor = tensor.new_zeros(tuple(new_size)) + pad_index
-        new_tensor = paddle.zeros(
-            tuple(new_size), dtype=tensor.dtype) + pad_index
+        new_tensor = paddle.zeros(tuple(new_size),
+                                  dtype=tensor.dtype) + pad_index
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
 
     def _remove_unused_columns(self,
                                dataset: "datasets.Dataset",
-                               description: Optional[str]=None):
+                               description: Optional[str] = None):
         if not self.args.remove_unused_columns:
             return dataset
         if self._signature_columns is None:
@@ -1697,10 +1720,9 @@ class Trainer:
         ]
 
         if version.parse(datasets.__version__) < version.parse("1.4.0"):
-            dataset.set_format(
-                type=dataset.format["type"],
-                columns=columns,
-                format_kwargs=dataset.format["format_kwargs"])
+            dataset.set_format(type=dataset.format["type"],
+                               columns=columns,
+                               format_kwargs=dataset.format["format_kwargs"])
             return dataset
         else:
             return dataset.remove_columns(ignored_columns)

@@ -52,14 +52,12 @@ class CovidDataset(paddle.io.Dataset):
 
         if self.mode == "train":
             normal_train_data = self.scaler.transform(
-                np.expand_dims(
-                    self.train_data, axis=1)).astype('float32')
+                np.expand_dims(self.train_data, axis=1)).astype('float32')
             self.feature, self.label = self._create_sequences(normal_train_data)
         elif self.mode == "test":
             test_data = daily_cases[-self.test_data_size - self.seq_length + 1:]
             normal_test_data = self.scaler.transform(
-                np.expand_dims(
-                    test_data, axis=1)).astype('float32')
+                np.expand_dims(test_data, axis=1)).astype('float32')
             self.feature, self.label = self._create_sequences(normal_test_data)
         else:
             raise ValueError('Invalid Mode: Only support "train" or "test".')
@@ -78,11 +76,11 @@ class CovidDataset(paddle.io.Dataset):
 
     def postprocessing(self, data):
         result = self.scaler.inverse_transform(
-            np.expand_dims(
-                np.array(data).flatten(), axis=0)).flatten().astype('int64')
+            np.expand_dims(np.array(data).flatten(),
+                           axis=0)).flatten().astype('int64')
         final_result = np.cumsum(
-            np.concatenate([np.array(self.train_data), result]))[
-                -self.test_data_size:]
+            np.concatenate([np.array(self.train_data),
+                            result]))[-self.test_data_size:]
         return final_result
 
     def __len__(self):

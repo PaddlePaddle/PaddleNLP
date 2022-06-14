@@ -71,13 +71,12 @@ class PlatoReader(DialogReader):
             batch["tgt_generation_mask"] = batch[
                 "generation_mask"][:, 0:1, :].astype("float32")
         else:
-            mask_return_list = mask(
-                batch_tokens=batch_token_ids,
-                vocab_size=self.vocab_size,
-                sent_b_starts=batch_tgt_start_idx,
-                is_unidirectional=True,
-                use_latent=True,
-                use_bow=self.use_bow)
+            mask_return_list = mask(batch_tokens=batch_token_ids,
+                                    vocab_size=self.vocab_size,
+                                    sent_b_starts=batch_tgt_start_idx,
+                                    is_unidirectional=True,
+                                    use_latent=True,
+                                    use_bow=self.use_bow)
             batch["tgt_label"] = mask_return_list[0]
             batch["tgt_pos"] = mask_return_list[1]
             if self.use_bow:

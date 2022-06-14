@@ -35,11 +35,10 @@ def vector_insert(file_path):
         if (cur_end > data_size):
             cur_end = data_size
         batch_emb = embeddings[np.arange(i, cur_end)]
-        status, ids = client.insert(
-            collection_name=collection_name,
-            vectors=batch_emb.tolist(),
-            ids=embedding_ids[i:i + batch_size],
-            partition_tag=partition_tag)
+        status, ids = client.insert(collection_name=collection_name,
+                                    vectors=batch_emb.tolist(),
+                                    ids=embedding_ids[i:i + batch_size],
+                                    partition_tag=partition_tag)
 
 
 if __name__ == "__main__":

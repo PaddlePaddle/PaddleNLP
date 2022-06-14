@@ -30,6 +30,7 @@ def get_container_type(container):
 
 
 class CommonTest(unittest.TestCase):
+
     def __init__(self, methodName='runTest'):
         super(CommonTest, self).__init__(methodName=methodName)
         self.config = {}
@@ -100,24 +101,26 @@ class CommonTest(unittest.TestCase):
         if result_t in [
                 str, int, bool, set, np.bool, np.int32, np.int64, np.str
         ]:
-            assertForNormalType(
-                result,
-                expected_result,
-                msg=error_msg.format(paddle.get_device(), expected_result,
-                                     result, self.__class__.__name__))
+            assertForNormalType(result,
+                                expected_result,
+                                msg=error_msg.format(paddle.get_device(),
+                                                     expected_result, result,
+                                                     self.__class__.__name__))
         elif result_t in [float, np.ndarray, np.float32, np.float64]:
-            assertForFloat(
-                np.allclose(
-                    result, expected_result, rtol=rtol, atol=atol),
-                msg=error_msg.format(paddle.get_device(), expected_result,
-                                     result, self.__class__.__name__))
+            assertForFloat(np.allclose(result,
+                                       expected_result,
+                                       rtol=rtol,
+                                       atol=atol),
+                           msg=error_msg.format(paddle.get_device(),
+                                                expected_result, result,
+                                                self.__class__.__name__))
             if result_t == np.ndarray:
-                assertForNormalType(
-                    result.shape,
-                    expected_result.shape,
-                    msg=error_msg.format(paddle.get_device(),
-                                         expected_result.shape, result.shape,
-                                         self.__class__.__name__))
+                assertForNormalType(result.shape,
+                                    expected_result.shape,
+                                    msg=error_msg.format(
+                                        paddle.get_device(),
+                                        expected_result.shape, result.shape,
+                                        self.__class__.__name__))
         else:
             raise ValueError(
                 'result type must be str, int, bool, set, np.bool, np.int32, '
@@ -159,11 +162,15 @@ class CommonTest(unittest.TestCase):
             atol: float
                 absolute tolerance, default 1.e-8
         '''
-        self._check_output_impl(
-            result, expected_result, rtol, atol, equal=False)
+        self._check_output_impl(result,
+                                expected_result,
+                                rtol,
+                                atol,
+                                equal=False)
 
 
 class CpuCommonTest(CommonTest):
+
     def __init__(self, methodName='runTest'):
         super(CpuCommonTest, self).__init__(methodName=methodName)
         self.places = ['cpu']

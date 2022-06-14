@@ -21,12 +21,14 @@ from paddlenlp.transformers import AutoTokenizer
 
 
 class InferBackend(object):
+
     def __init__(self, model_path, use_fp16):
         print(">>> [InferBackend] Creating Engine ...")
         providers = ['CUDAExecutionProvider']
         sess_options = ort.SessionOptions()
-        predictor = ort.InferenceSession(
-            model_path, sess_options=sess_options, providers=providers)
+        predictor = ort.InferenceSession(model_path,
+                                         sess_options=sess_options,
+                                         providers=providers)
         if "CUDAExecutionProvider" in predictor.get_providers():
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
@@ -39,8 +41,9 @@ class InferBackend(object):
                     onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model)
                 sess_options = ort.SessionOptions()
-                predictor = ort.InferenceSession(
-                    fp16_model, sess_options=sess_options, providers=providers)
+                predictor = ort.InferenceSession(fp16_model,
+                                                 sess_options=sess_options,
+                                                 providers=providers)
         else:
             print(">>> [InferBackend] Use CPU to inference ...")
             if use_fp16:
@@ -86,10 +89,11 @@ def seq_cls_print_ret(infer_result, input_data):
 
 
 class ErniePredictor(object):
+
     def __init__(self, args):
         self.task_name = args.task_name
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
+                                                       use_faster=True)
         if args.task_name == 'seq_cls':
             self.label_names = []
             self.preprocess = self.seq_cls_preprocess
@@ -114,15 +118,15 @@ class ErniePredictor(object):
     def seq_cls_preprocess(self, input_data: list):
         data = input_data
         # tokenizer + pad
-        data = self.tokenizer(
-            data, max_length=self.max_seq_length, padding=True, truncation=True)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def seq_cls_postprocess(self, infer_data, input_data):
@@ -141,20 +145,17 @@ class ErniePredictor(object):
         is_split_into_words = False
         if isinstance(data[0], list):
             is_split_into_words = True
-        data = self.tokenizer(
-            data,
-            max_length=self.max_seq_length,
-            padding=True,
-            truncation=True,
-            is_split_into_words=is_split_into_words)
+        data = self.tokenizer(data,
+                              max_length=self.max_seq_length,
+                              padding=True,
+                              truncation=True,
+                              is_split_into_words=is_split_into_words)
 
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }
 
     def token_cls_postprocess(self, infer_data, input_data):
@@ -167,8 +168,8 @@ class ErniePredictor(object):
             label_name = ""
             items = []
             for i, label in enumerate(token_label):
-                if (self.label_names[label] == "O" or
-                        "B-" in self.label_names[label]) and start >= 0:
+                if (self.label_names[label] == "O"
+                        or "B-" in self.label_names[label]) and start >= 0:
                     entity = input_data[batch][start:i - 1]
                     if isinstance(entity, list):
                         entity = "".join(entity)
@@ -184,8 +185,10 @@ class ErniePredictor(object):
             if start >= 0:
                 items.append({
                     "pos": [start, len(token_label) - 1],
-                    "entity": input_data[batch][start:len(token_label) - 1],
-                    "label": ""
+                    "entity":
+                    input_data[batch][start:len(token_label) - 1],
+                    "label":
+                    ""
                 })
             value.append(items)
 

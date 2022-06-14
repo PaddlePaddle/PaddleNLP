@@ -55,15 +55,17 @@ def convert_pair_example(example,
                          is_tokenized=True,
                          max_seq_length=128,
                          is_test=False):
-    seq1 = convert_example_for_lstm({
-        "sentence": example['sentence1'],
-        "labels": example['labels']
-    }, task_name, vocab, is_tokenized, max_seq_length, is_test)[:2]
+    seq1 = convert_example_for_lstm(
+        {
+            "sentence": example['sentence1'],
+            "labels": example['labels']
+        }, task_name, vocab, is_tokenized, max_seq_length, is_test)[:2]
 
-    seq2 = convert_example_for_lstm({
-        "sentence": example['sentence2'],
-        "labels": example['labels']
-    }, task_name, vocab, is_tokenized, max_seq_length, is_test)
+    seq2 = convert_example_for_lstm(
+        {
+            "sentence": example['sentence2'],
+            "labels": example['labels']
+        }, task_name, vocab, is_tokenized, max_seq_length, is_test)
     pair_features = seq1 + seq2
 
     return pair_features
@@ -77,19 +79,20 @@ def convert_example_for_distill(example,
                                 vocab,
                                 is_tokenized=True,
                                 is_test=False):
-    bert_features = convert_example_for_bert(
-        example,
-        tokenizer=tokenizer,
-        label_list=label_list,
-        is_tokenized=is_tokenized,
-        max_seq_length=max_seq_length,
-        is_test=is_test)
+    bert_features = convert_example_for_bert(example,
+                                             tokenizer=tokenizer,
+                                             label_list=label_list,
+                                             is_tokenized=is_tokenized,
+                                             max_seq_length=max_seq_length,
+                                             is_test=is_test)
     if task_name == 'qqp':
-        small_features = convert_pair_example(
-            example, task_name, vocab, is_tokenized, max_seq_length, is_test)
+        small_features = convert_pair_example(example, task_name, vocab,
+                                              is_tokenized, max_seq_length,
+                                              is_test)
     else:
-        small_features = convert_example_for_lstm(
-            example, task_name, vocab, is_tokenized, max_seq_length, is_test)
+        small_features = convert_example_for_lstm(example, task_name, vocab,
+                                                  is_tokenized, max_seq_length,
+                                                  is_test)
     return bert_features[:2] + small_features
 
 
@@ -108,11 +111,10 @@ def convert_example_for_bert(example,
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
     if 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length,
-            is_split_into_words=is_tokenized)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length,
+                            is_split_into_words=is_tokenized)
     else:
         if 'sentence' in example:
             text = example['sentence']
@@ -120,8 +122,9 @@ def convert_example_for_bert(example,
             text = example['text']
         else:
             text = example['bert_tokens']
-        example = tokenizer(
-            text, max_seq_len=max_seq_length, is_split_into_words=is_tokenized)
+        example = tokenizer(text,
+                            max_seq_len=max_seq_length,
+                            is_split_into_words=is_tokenized)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label

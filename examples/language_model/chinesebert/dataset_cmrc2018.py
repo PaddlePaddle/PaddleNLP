@@ -33,11 +33,10 @@ def prepare_train_features_paddlenlp(examples, tokenizer, args):
     contexts = [examples[i]["context"] for i in range(len(examples))]
     questions = [examples[i]["question"] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length)
 
     # Let's label those examples!
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -79,15 +78,15 @@ def prepare_train_features_paddlenlp(examples, tokenizer, args):
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char and
-                    offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char):
                 tokenized_examples[i]["start_positions"] = cls_index
                 tokenized_examples[i]["end_positions"] = cls_index
             else:
                 # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
                 # Note: we could go after the last offset if the answer is the last word (edge case).
-                while (token_start_index < len(offsets) and
-                       offsets[token_start_index][0] <= start_char):
+                while (token_start_index < len(offsets)
+                       and offsets[token_start_index][0] <= start_char):
                     token_start_index += 1
                 tokenized_examples[i]["start_positions"] = token_start_index - 1
                 while offsets[token_end_index][1] >= end_char:
@@ -107,11 +106,10 @@ def prepare_dev_features_paddlenlp(examples, tokenizer, args):
     contexts = [examples[i]["context"] for i in range(len(examples))]
     questions = [examples[i]["question"] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -142,30 +140,34 @@ def get_train_dataloader(tokenizer, args):
     else:
         ds = load_dataset("cmrc2018", splits=splits)
         ds.map(
-            partial(
-                prepare_train_features_paddlenlp,
-                tokenizer=tokenizer,
-                args=args),
+            partial(prepare_train_features_paddlenlp,
+                    tokenizer=tokenizer,
+                    args=args),
             batched=True,
-            lazy=False, )
+            lazy=False,
+        )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(
-        ds, batch_size=args.train_batch_size, shuffle=True)
+    batch_sampler = BatchSampler(ds,
+                                 batch_size=args.train_batch_size,
+                                 shuffle=True)
 
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=0),
-        "pinyin_ids": Pad(axis=0, pad_val=0),
-        "start_positions": Stack(dtype="int64"),
-        "end_positions": Stack(dtype="int64"), }): fn(samples)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=0),
+            "pinyin_ids": Pad(axis=0, pad_val=0),
+            "start_positions": Stack(dtype="int64"),
+            "end_positions": Stack(dtype="int64"),
+        }): fn(samples)
 
     data_loader = DataLoader(
         dataset=ds,
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         num_workers=args.num_workers,
-        return_list=True, )
+        return_list=True,
+    )
 
     return data_loader
 
@@ -180,25 +182,31 @@ def get_dev_dataloader(tokenizer, args, splits="dev"):
     else:
         ds = load_dataset("cmrc2018", splits=splits)
         ds.map(
-            partial(
-                prepare_dev_features_paddlenlp, tokenizer=tokenizer, args=args),
+            partial(prepare_dev_features_paddlenlp,
+                    tokenizer=tokenizer,
+                    args=args),
             batched=True,
-            lazy=False, )
+            lazy=False,
+        )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(
-        ds, batch_size=args.eval_batch_size, shuffle=False)
+    batch_sampler = BatchSampler(ds,
+                                 batch_size=args.eval_batch_size,
+                                 shuffle=False)
 
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=0),
-        "pinyin_ids": Pad(axis=0, pad_val=0), }): fn(samples)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=0),
+            "pinyin_ids": Pad(axis=0, pad_val=0),
+        }): fn(samples)
 
     data_loader = DataLoader(
         dataset=ds,
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         num_workers=args.num_workers,
-        return_list=True, )
+        return_list=True,
+    )
 
     return data_loader

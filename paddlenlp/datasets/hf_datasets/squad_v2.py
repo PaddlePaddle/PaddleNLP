@@ -50,10 +50,9 @@ class SquadV2(datasets.GeneratorBasedBuilder):
 
     # TODO(squad_v2): Set up version.
     BUILDER_CONFIGS = [
-        SquadV2Config(
-            name="squad_v2",
-            version=datasets.Version("2.0.0"),
-            description="SQuAD plaint text version 2"),
+        SquadV2Config(name="squad_v2",
+                      version=datasets.Version("2.0.0"),
+                      description="SQuAD plaint text version 2"),
     ]
 
     def _info(self):
@@ -63,13 +62,20 @@ class SquadV2(datasets.GeneratorBasedBuilder):
             description=_DESCRIPTION,
             # datasets.features.FeatureConnectors
             features=datasets.Features({
-                "id": datasets.Value("string"),
-                "title": datasets.Value("string"),
-                "context": datasets.Value("string"),
-                "question": datasets.Value("string"),
-                "answers": datasets.features.Sequence({
-                    "text": datasets.Value("string"),
-                    "answer_start": datasets.Value("int32"),
+                "id":
+                datasets.Value("string"),
+                "title":
+                datasets.Value("string"),
+                "context":
+                datasets.Value("string"),
+                "question":
+                datasets.Value("string"),
+                "answers":
+                datasets.features.Sequence({
+                    "text":
+                    datasets.Value("string"),
+                    "answer_start":
+                    datasets.Value("int32"),
                 }),
                 # These are the features of your dataset like images, labels ...
             }),
@@ -81,11 +87,11 @@ class SquadV2(datasets.GeneratorBasedBuilder):
             homepage="https://rajpurkar.github.io/SQuAD-explorer/",
             citation=_CITATION,
             task_templates=[
-                QuestionAnsweringExtractive(
-                    question_column="question",
-                    context_column="context",
-                    answers_column="answers")
-            ], )
+                QuestionAnsweringExtractive(question_column="question",
+                                            context_column="context",
+                                            answers_column="answers")
+            ],
+        )
 
     def _split_generators(self, dl_manager):
         """Returns SplitGenerators."""

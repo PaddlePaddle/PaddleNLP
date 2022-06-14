@@ -50,11 +50,10 @@ class ATISDataset():
                 database_schema, column_names_surface_form, column_names_embedder_input = self.read_database_schema(
                     params.database_schema_filename)
 
-        int_load_function = load_function(
-            params,
-            self.entities_dictionary,
-            self.anonymizer,
-            database_schema=database_schema)
+        int_load_function = load_function(params,
+                                          self.entities_dictionary,
+                                          self.anonymizer,
+                                          database_schema=database_schema)
 
         def collapse_list(the_list):
             """ Collapses a list of list into a single list."""
@@ -213,8 +212,8 @@ class ATISDataset():
 
             for i, (table_id, column_name) in enumerate(column_names_original):
                 column_name_surface_form = column_name
-                column_names_surface_form.append(column_name_surface_form.lower(
-                ))
+                column_names_surface_form.append(
+                    column_name_surface_form.lower())
 
             for table_name in table_names_original:
                 column_names_surface_form.append(table_name.lower())
@@ -250,17 +249,17 @@ class ATISDataset():
             for i, (table_id, column_name) in enumerate(column_names_original):
                 if table_id >= 0:
                     table_name = table_names_original[table_id]
-                    column_name_surface_form = '{}.{}'.format(table_name,
-                                                              column_name)
+                    column_name_surface_form = '{}.{}'.format(
+                        table_name, column_name)
                 else:
                     column_name_surface_form = column_name
-                column_names_surface_form.append(column_name_surface_form.lower(
-                ))
+                column_names_surface_form.append(
+                    column_name_surface_form.lower())
 
             # also add table_name.*
             for table_name in table_names_original:
-                column_names_surface_form.append('{}.*'.format(table_name.lower(
-                )))
+                column_names_surface_form.append('{}.*'.format(
+                    table_name.lower()))
 
             for i, (table_id, column_name) in enumerate(column_names):
                 if table_id >= 0:
@@ -311,9 +310,10 @@ class ATISDataset():
             `list`: All interactions.
         """
         ints = [
-            atis_batch.InteractionItem(
-                interaction, max_input_length, max_output_length,
-                self.entities_dictionary, max_interaction_length)
+            atis_batch.InteractionItem(interaction, max_input_length,
+                                       max_output_length,
+                                       self.entities_dictionary,
+                                       max_interaction_length)
             for interaction in dataset.examples
         ]
         if sorted_by_length:
@@ -377,12 +377,11 @@ class ATISDataset():
             `list`: Batches of interactions.
 
         """
-        items = self.get_all_interactions(
-            self.train_data,
-            max_interaction_length,
-            max_input_length,
-            max_output_length,
-            sorted_by_length=not randomize)
+        items = self.get_all_interactions(self.train_data,
+                                          max_interaction_length,
+                                          max_input_length,
+                                          max_output_length,
+                                          sorted_by_length=not randomize)
         if randomize:
             random.shuffle(items)
 

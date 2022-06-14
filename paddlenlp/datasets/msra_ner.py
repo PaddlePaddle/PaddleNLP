@@ -35,12 +35,12 @@ class MsraNer(DatasetBuilder):
     MD5 = 'f1aadbbf328ea2fa50c9c2b56db0d31e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('msra_ner', 'train.tsv'),
-            'e5b4b734ef91861384f441456ad995dd'),
-        'test': META_INFO(
-            os.path.join('msra_ner', 'test.tsv'),
-            '40b26ae09b63af78ea3a91ac8b8ae303')
+        'train':
+        META_INFO(os.path.join('msra_ner', 'train.tsv'),
+                  'e5b4b734ef91861384f441456ad995dd'),
+        'test':
+        META_INFO(os.path.join('msra_ner', 'test.tsv'),
+                  '40b26ae09b63af78ea3a91ac8b8ae303')
     }
 
     def _get_data(self, mode, **kwargs):

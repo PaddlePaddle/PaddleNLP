@@ -63,6 +63,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -95,10 +96,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads

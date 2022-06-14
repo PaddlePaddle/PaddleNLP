@@ -41,58 +41,58 @@ parser.add_argument(
     type=str,
     required=True,
     help="Use to store all outputs during training and evaluation.")
-parser.add_argument(
-    "--data_dir", type=str, required=True, help="Dataset folder")
-parser.add_argument(
-    "--num_train_epochs", type=int, default=2, help="Number of training cycles")
-parser.add_argument(
-    "--seed", type=int, default=42, help="random seed for initialization")
-parser.add_argument(
-    "--batch_size",
-    type=int,
-    default=8,
-    help="Batch size per GPU/CPU for training.")
-parser.add_argument(
-    "--device",
-    type=str,
-    default='gpu',
-    help="Batch size per GPU/CPU for training.")
-parser.add_argument(
-    "--gradient_accumulation_steps",
-    type=int,
-    default=3,
-    help="Gradient accumulated before each parameter update.")
-parser.add_argument(
-    "--weight_decay",
-    type=float,
-    default=0.01,
-    help="Weight decay if we apply some")
+parser.add_argument("--data_dir",
+                    type=str,
+                    required=True,
+                    help="Dataset folder")
+parser.add_argument("--num_train_epochs",
+                    type=int,
+                    default=2,
+                    help="Number of training cycles")
+parser.add_argument("--seed",
+                    type=int,
+                    default=42,
+                    help="random seed for initialization")
+parser.add_argument("--batch_size",
+                    type=int,
+                    default=8,
+                    help="Batch size per GPU/CPU for training.")
+parser.add_argument("--device",
+                    type=str,
+                    default='gpu',
+                    help="Batch size per GPU/CPU for training.")
+parser.add_argument("--gradient_accumulation_steps",
+                    type=int,
+                    default=3,
+                    help="Gradient accumulated before each parameter update.")
+parser.add_argument("--weight_decay",
+                    type=float,
+                    default=0.01,
+                    help="Weight decay if we apply some")
 parser.add_argument(
     "--warmup_proportion",
     type=float,
     default=0.06,
-    help="Proportion of training steps to perform linear learning rate warmup for."
-)
-parser.add_argument(
-    "--learning_rate",
-    type=float,
-    default=1e-5,
-    help="The initial learning rate for Adam.")
-parser.add_argument(
-    "--model_type",
-    type=str,
-    default='luke-base',
-    help="Type of pre-trained model.")
-parser.add_argument(
-    "--max_mention_length",
-    type=int,
-    default=30,
-    help="Max entity position's length")
+    help=
+    "Proportion of training steps to perform linear learning rate warmup for.")
+parser.add_argument("--learning_rate",
+                    type=float,
+                    default=1e-5,
+                    help="The initial learning rate for Adam.")
+parser.add_argument("--model_type",
+                    type=str,
+                    default='luke-base',
+                    help="Type of pre-trained model.")
+parser.add_argument("--max_mention_length",
+                    type=int,
+                    default=30,
+                    help="Max entity position's length")
 
 args = parser.parse_args()
 
 
 class Trainer(object):
+
     def __init__(self,
                  args,
                  model,
@@ -122,14 +122,13 @@ class Trainer(object):
         with tqdm(total=self.num_train_steps) as pbar:
             while True:
                 for step, batch in enumerate(self.dataloader):
-                    outputs = model(
-                        input_ids=batch[0],
-                        token_type_ids=batch[1],
-                        attention_mask=batch[2],
-                        entity_ids=batch[3],
-                        entity_position_ids=batch[4],
-                        entity_token_type_ids=batch[5],
-                        entity_attention_mask=batch[6])
+                    outputs = model(input_ids=batch[0],
+                                    token_type_ids=batch[1],
+                                    attention_mask=batch[2],
+                                    entity_ids=batch[3],
+                                    entity_position_ids=batch[4],
+                                    entity_token_type_ids=batch[5],
+                                    entity_attention_mask=batch[6])
 
                     loss = F.binary_cross_entropy_with_logits(
                         outputs.reshape([-1]),
@@ -161,21 +160,20 @@ class Trainer(object):
     def _create_optimizer(self, model):
         scheduler = self._create_scheduler()
         clip = paddle.nn.ClipGradByNorm(clip_norm=1.0)
-        return AdamW(
-            parameters=model.parameters(),
-            grad_clip=clip,
-            learning_rate=scheduler,
-            apply_decay_param_fun=lambda x: x in self.wd_params,
-            weight_decay=self.args.weight_decay), scheduler
+        return AdamW(parameters=model.parameters(),
+                     grad_clip=clip,
+                     learning_rate=scheduler,
+                     apply_decay_param_fun=lambda x: x in self.wd_params,
+                     weight_decay=self.args.weight_decay), scheduler
 
     def _create_scheduler(self):
-        return LinearDecayWithWarmup(
-            learning_rate=self.args.learning_rate,
-            total_steps=self.num_train_steps,
-            warmup=self.args.warmup_proportion)
+        return LinearDecayWithWarmup(learning_rate=self.args.learning_rate,
+                                     total_steps=self.num_train_steps,
+                                     warmup=self.args.warmup_proportion)
 
 
 class DataGenerator(Dataset):
+
     def __init__(self, features):
         super(DataGenerator, self).__init__()
         self.features = features
@@ -207,14 +205,13 @@ def evaluate(args, model, mode="dev", output_file=None):
     all_labels = []
 
     for batch in tqdm(dataloader, desc=mode):
-        logits = model(
-            input_ids=batch[0],
-            token_type_ids=batch[1],
-            attention_mask=batch[2],
-            entity_ids=batch[3],
-            entity_position_ids=batch[4],
-            entity_token_type_ids=batch[5],
-            entity_attention_mask=batch[6])
+        logits = model(input_ids=batch[0],
+                       token_type_ids=batch[1],
+                       attention_mask=batch[2],
+                       entity_ids=batch[3],
+                       entity_position_ids=batch[4],
+                       entity_token_type_ids=batch[5],
+                       entity_attention_mask=batch[6])
 
         logits = logits.tolist()
         labels = batch[7].tolist()
@@ -234,7 +231,8 @@ def evaluate(args, model, mode="dev", output_file=None):
                                                         all_label_indexes):
                 data = dict(
                     predictions=[label_list[ind] for ind in predicted_indexes],
-                    labels=[label_list[ind] for ind in label_indexes], )
+                    labels=[label_list[ind] for ind in label_indexes],
+                )
                 f.write(json.dumps(data) + "\n")
 
     num_predicted_labels = 0
@@ -246,8 +244,7 @@ def evaluate(args, model, mode="dev", output_file=None):
         num_predicted_labels += len(predicted_indexes)
         num_gold_labels += len(label_indexes)
         num_correct_labels += len(
-            frozenset(predicted_indexes).intersection(
-                frozenset(label_indexes)))
+            frozenset(predicted_indexes).intersection(frozenset(label_indexes)))
 
     if num_predicted_labels > 0:
         precision = num_correct_labels / num_predicted_labels
@@ -283,6 +280,7 @@ def load_examples(args, mode="train"):
     dataset = DataGenerator(features)
 
     def collate_fn(batch):
+
         def create_padded_sequence(k, padding_value):
             """Pad sequence to maximum length"""
             new_data = []
@@ -291,8 +289,8 @@ def load_examples(args, mode="train"):
                 if len(each_batch[k]) > max_len:
                     max_len = len(each_batch[k])
             for each_batch in batch:
-                new_data.append(each_batch[k] + [padding_value] * (
-                    max_len - len(each_batch[k])))
+                new_data.append(each_batch[k] + [padding_value] *
+                                (max_len - len(each_batch[k])))
             return np.array(new_data, dtype='int64')
 
         return (
@@ -303,13 +301,13 @@ def load_examples(args, mode="train"):
             create_padded_sequence(4, 0),  # pad entity_position_ids
             create_padded_sequence(5, 0),  # pad entity_segment_ids
             create_padded_sequence(6, 0),  # pad entity_attention_mask
-            create_padded_sequence(7, 0), )  # convert to numpy array
+            create_padded_sequence(7, 0),
+        )  # convert to numpy array
 
-    dataloader = DataLoader(
-        dataset,
-        shuffle='train' in mode,
-        batch_size=args.batch_size,
-        collate_fn=collate_fn)
+    dataloader = DataLoader(dataset,
+                            shuffle='train' in mode,
+                            batch_size=args.batch_size,
+                            collate_fn=collate_fn)
 
     return dataloader, examples, features, label_list
 
@@ -321,13 +319,12 @@ if __name__ == '__main__':
     num_train_steps_per_epoch = len(
         train_dataloader) // args.gradient_accumulation_steps
     num_train_steps = int(num_train_steps_per_epoch * args.num_train_epochs)
-    model = LukeForEntityClassification.from_pretrained(
-        args.model_type, num_classes=num_labels)
-    trainer = Trainer(
-        args,
-        model=model,
-        dataloader=train_dataloader,
-        num_train_steps=num_train_steps)
+    model = LukeForEntityClassification.from_pretrained(args.model_type,
+                                                        num_classes=num_labels)
+    trainer = Trainer(args,
+                      model=model,
+                      dataloader=train_dataloader,
+                      num_train_steps=num_train_steps)
     trainer.train()
     output_file = os.path.join(args.output_dir, f"test_predictions.jsonl")
     results.update({

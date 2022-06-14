@@ -84,10 +84,9 @@ def do_train():
     latest_checkpoint, latest_global_step = get_latest_checkpoint(args)
     logger.info("get latest_checkpoint:{}".format(latest_checkpoint))
 
-    model = SemanticIndexANCE(
-        pretrained_model,
-        margin=args.margin,
-        output_emb_size=args.output_emb_size)
+    model = SemanticIndexANCE(pretrained_model,
+                              margin=args.margin,
+                              output_emb_size=args.output_emb_size)
 
     if latest_checkpoint:
         state_dict = paddle.load(latest_checkpoint)
@@ -102,10 +101,9 @@ def do_train():
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -132,20 +130,21 @@ def do_train():
             logger.info("Latest ann_data is ready for training: [{}]".format(
                 latest_ann_data))
 
-        train_ds = load_dataset(
-            read_text_triplet, data_path=latest_ann_data, lazy=False)
+        train_ds = load_dataset(read_text_triplet,
+                                data_path=latest_ann_data,
+                                lazy=False)
 
-        train_data_loader = create_dataloader(
-            train_ds,
-            mode='train',
-            batch_size=args.batch_size,
-            batchify_fn=batchify_fn,
-            trans_fn=trans_func)
+        train_data_loader = create_dataloader(train_ds,
+                                              mode='train',
+                                              batch_size=args.batch_size,
+                                              batchify_fn=batchify_fn,
+                                              trans_fn=trans_func)
 
         num_training_steps = len(train_data_loader) * args.epochs
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_proportion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps,
+                                             args.warmup_proportion)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -180,8 +179,8 @@ def do_train():
                 if global_step % 10 == 0 and rank == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s, trainning_file: %s"
-                        % (global_step, epoch, step, loss,
-                           10 / (time.time() - tic_train), latest_ann_data))
+                        % (global_step, epoch, step, loss, 10 /
+                           (time.time() - tic_train), latest_ann_data))
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()

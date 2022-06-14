@@ -131,8 +131,8 @@ class MultiHeadAttention(nn.Layer):
         else:
             present = (None, )
 
-        scaled_attention, attn = scaled_dot_product_attention(q, k, v, mask,
-                                                              attention_mask)
+        scaled_attention, attn = scaled_dot_product_attention(
+            q, k, v, mask, attention_mask)
         scaled_attention = scaled_attention.transpose([0, 2, 1, 3])
 
         original_size_attention = scaled_attention.reshape(
@@ -146,6 +146,7 @@ class MultiHeadAttention(nn.Layer):
 
 
 class EncoderLayer(nn.Layer):
+
     def __init__(self,
                  hidden_size,
                  num_heads,
@@ -155,9 +156,9 @@ class EncoderLayer(nn.Layer):
         super().__init__()
 
         self.multi_head_attention = MultiHeadAttention(hidden_size, num_heads)
-        self.ffn = nn.Sequential(
-            nn.Linear(hidden_size, intermediate_size),
-            nn.ReLU(), nn.Linear(intermediate_size, hidden_size))
+        self.ffn = nn.Sequential(nn.Linear(hidden_size, intermediate_size),
+                                 nn.ReLU(),
+                                 nn.Linear(intermediate_size, hidden_size))
         self.layernorm1 = nn.LayerNorm(hidden_size, epsilon=epsilon)
         self.layernorm2 = nn.LayerNorm(hidden_size, epsilon=epsilon)
 
@@ -180,7 +181,8 @@ class EncoderLayer(nn.Layer):
             layer_past=layer_past,
             attention_mask=attention_mask,
             use_cache=use_cache,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
         attn_output = attn_outputs[0]
         attn_output = self.dropout1(attn_output)
         out1 = x + attn_output
@@ -253,10 +255,11 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else self.ctrl.config[
-                        "initializer_range"],
-                    shape=layer.weight.shape, ))
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
+                    self.ctrl.config["initializer_range"],
+                    shape=layer.weight.shape,
+                ))
             if layer.bias is not None:
                 layer.bias.set_value(paddle.zeros_like(layer.bias))
         elif isinstance(layer, SinusoidalPositionalEmbedding):
@@ -265,14 +268,15 @@ class CTRLPreTrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else self.ctrl.config[
-                        "initializer_range"],
-                    shape=layer.weight.shape, ))
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
+                    self.ctrl.config["initializer_range"],
+                    shape=layer.weight.shape,
+                ))
             if layer._padding_idx is not None:
                 emb_weight = layer.weight.numpy()
-                emb_weight[layer._padding_idx] = np.zeros_like(emb_weight[
-                    layer._padding_idx])
+                emb_weight[layer._padding_idx] = np.zeros_like(
+                    emb_weight[layer._padding_idx])
                 layer.weight.set_value(paddle.to_tensor(emb_weight))
         elif isinstance(layer, nn.LayerNorm):
             layer.weight.set_value(paddle.ones_like(layer.weight))
@@ -538,7 +542,8 @@ class CTRLModel(CTRLPreTrainedModel):
                 layer_past=layer_past,
                 attention_mask=attention_mask,
                 use_cache=use_cache,
-                output_attentions=output_attentions, )
+                output_attentions=output_attentions,
+            )
             hidden_states, present = outputs[:2]
             if use_cache is True:
                 presents = presents + (present, )
@@ -551,8 +556,7 @@ class CTRLModel(CTRLPreTrainedModel):
             all_hidden_states = all_hidden_states + (hidden_states, )
 
         return tuple(
-            v
-            for v in
+            v for v in
             [hidden_states, presents, all_hidden_states, all_attentions]
             if v is not None)
 
@@ -576,7 +580,8 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
             self.lm_head_bias = self.create_parameter(
                 shape=[self.ctrl.config["vocab_size"]],
                 dtype=self.lm_head.weight.dtype,
-                is_bias=True, )
+                is_bias=True,
+            )
         else:
             self.lm_head = nn.Linear(self.ctrl.config["hidden_size"],
                                      self.ctrl.config["vocab_size"])
@@ -678,15 +683,14 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
 
         """
 
-        ctrl_outputs = self.ctrl(
-            input_ids,
-            cache=cache,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
+        ctrl_outputs = self.ctrl(input_ids,
+                                 cache=cache,
+                                 attention_mask=attention_mask,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids,
+                                 use_cache=use_cache,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states)
 
         hidden_states = ctrl_outputs[0]
 
@@ -706,7 +710,8 @@ class CTRLLMHeadModel(CTRLPreTrainedModel):
             loss_fct = CrossEntropyLoss()
             loss = loss_fct(
                 shift_logits.reshape([-1, shift_logits.shape[-1]]),
-                shift_labels.flatten(), )
+                shift_labels.flatten(),
+            )
 
         output = (lm_logits, ) + ctrl_outputs[1:]
         return ((loss, ) + output) if loss is not None else output
@@ -737,10 +742,11 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
         super().__init__()
         self.num_classes = num_classes
         self.ctrl = ctrl
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ctrl.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(
-            self.ctrl.config["hidden_size"], num_classes, bias_attr=False)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.ctrl.
+                                  config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ctrl.config["hidden_size"],
+                                    num_classes,
+                                    bias_attr=False)
 
         self.init_weights()
 
@@ -820,15 +826,14 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
                 logits = output[1]
 
         """
-        ctrl_outputs = self.ctrl(
-            input_ids,
-            cache=cache,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
+        ctrl_outputs = self.ctrl(input_ids,
+                                 cache=cache,
+                                 attention_mask=attention_mask,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids,
+                                 use_cache=use_cache,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states)
 
         hidden_states = ctrl_outputs[0]
         logits = self.classifier(hidden_states)
@@ -842,12 +847,13 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
             sequence_lengths = -1
         else:
             sequence_lengths = paddle.not_equal(
-                input_ids, self.ctrl.config["pad_token_id"]
-                .astype(paddle.int64).sum(-1) - 1)
+                input_ids,
+                self.ctrl.config["pad_token_id"].astype(paddle.int64).sum(-1) -
+                1)
 
         pooled_logits = logits.gather_nd(
-            paddle.stack(
-                [paddle.arange(batch_size), sequence_lengths], axis=-1))
+            paddle.stack([paddle.arange(batch_size), sequence_lengths],
+                         axis=-1))
 
         loss = None
         if labels is not None:
@@ -858,9 +864,8 @@ class CTRLForSequenceClassification(CTRLPreTrainedModel):
                                 labels.astype(pooled_logits.dtype).flatten())
             else:
                 loss_fct = CrossEntropyLoss()
-                loss = loss_fct(
-                    pooled_logits.reshape([-1, self.num_classes]),
-                    labels.flatten())
+                loss = loss_fct(pooled_logits.reshape([-1, self.num_classes]),
+                                labels.flatten())
 
         output = (pooled_logits, ) + ctrl_outputs[1:]
         return ((loss, ) + output) if loss is not None else output

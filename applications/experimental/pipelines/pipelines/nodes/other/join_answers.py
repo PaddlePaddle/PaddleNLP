@@ -25,9 +25,9 @@ class JoinAnswers(BaseComponent):
     """
 
     def __init__(self,
-                 join_mode: str="concatenate",
-                 weights: Optional[List[float]]=None,
-                 top_k_join: Optional[int]=None):
+                 join_mode: str = "concatenate",
+                 weights: Optional[List[float]] = None,
+                 top_k_join: Optional[int] = None):
         """
         :param join_mode: `"concatenate"` to combine documents from multiple `Reader`s. `"merge"` to aggregate scores
         of individual `Answer`s.
@@ -44,16 +44,19 @@ class JoinAnswers(BaseComponent):
                     ), "Weights are not compatible with 'concatenate' join_mode"
 
         # Save init parameters to enable export of component config as YAML
-        self.set_config(
-            join_mode=join_mode, weights=weights, top_k_join=top_k_join)
+        self.set_config(join_mode=join_mode,
+                        weights=weights,
+                        top_k_join=top_k_join)
 
         self.join_mode = join_mode
         self.weights = [float(i) / sum(weights)
                         for i in weights] if weights else None
         self.top_k_join = top_k_join
 
-    def run(self, inputs: List[Dict],
-            top_k_join: Optional[int]=None) -> Tuple[Dict, str]:  # type: ignore
+    def run(self,
+            inputs: List[Dict],
+            top_k_join: Optional[int] = None
+            ) -> Tuple[Dict, str]:  # type: ignore
         reader_results = [inp["answers"] for inp in inputs]
 
         if not top_k_join:
@@ -61,12 +64,11 @@ class JoinAnswers(BaseComponent):
 
         if self.join_mode == "concatenate":
             concatenated_answers = [
-                answer
-                for cur_reader_result in reader_results
+                answer for cur_reader_result in reader_results
                 for answer in cur_reader_result
             ]
-            concatenated_answers = sorted(
-                concatenated_answers, reverse=True)[:top_k_join]
+            concatenated_answers = sorted(concatenated_answers,
+                                          reverse=True)[:top_k_join]
             return {
                 "answers": concatenated_answers,
                 "labels": inputs[0].get("labels", None)
@@ -94,10 +96,8 @@ class JoinAnswers(BaseComponent):
                 if isinstance(answer.score, float):
                     answer.score *= weight
 
-        return sorted(
-            [
-                answer
-                for cur_reader_result in reader_results
-                for answer in cur_reader_result
-            ],
-            reverse=True)
+        return sorted([
+            answer for cur_reader_result in reader_results
+            for answer in cur_reader_result
+        ],
+                      reverse=True)

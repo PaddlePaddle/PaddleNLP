@@ -131,10 +131,9 @@ class Text2SQLEncoderV2(nn.Layer):
                 [value_encs.shape[0], value_num, 2, -1]).sum(axis=2)
 
         orig_inputs = inputs['orig_inputs']
-        column_pointer_maps = [{
-            i: [i]
-            for i in range(len(orig_input.columns))
-        } for orig_input in orig_inputs]
+        column_pointer_maps = [{i: [i]
+                                for i in range(len(orig_input.columns))}
+                               for orig_input in orig_inputs]
         table_pointer_maps = [{i: [i]
                                for i in range(len(orig_input.tables))}
                               for orig_input in orig_inputs]
@@ -161,10 +160,8 @@ class Text2SQLEncoderV2(nn.Layer):
             v_e_input = val_enc.unsqueeze(0) if self.rel_has_value else None
             (q_enc_new, c_enc_new, t_enc_new,
              v_enc_new), align_mat = self.encs_update.forward_unbatched(
-                 q_enc.unsqueeze(0),
-                 col_enc.unsqueeze(0),
-                 tab_enc.unsqueeze(0), c_boundary, t_boundary,
-                 orig_input.relations, v_e_input)
+                 q_enc.unsqueeze(0), col_enc.unsqueeze(0), tab_enc.unsqueeze(0),
+                 c_boundary, t_boundary, orig_input.relations, v_e_input)
 
             memory = []
             if 'question' in self.include_in_memory:
@@ -178,8 +175,9 @@ class Text2SQLEncoderV2(nn.Layer):
             memory = paddle.concat(memory, axis=1)
             if not self.rel_has_value:
                 v_enc_new = val_enc.unsqueeze(0)
-                m2v_align_mat = self.value_align(
-                    memory, v_enc_new, relations=None)
+                m2v_align_mat = self.value_align(memory,
+                                                 v_enc_new,
+                                                 relations=None)
                 align_mat[2] = m2v_align_mat
 
             schema_memory = (c_enc_new, t_enc_new)
@@ -192,8 +190,7 @@ class Text2SQLEncoderV2(nn.Layer):
                     cls_hidden=cls_hidden[batch_idx],
                     memory=memory,
                     question_memory=q_enc_new,
-                    schema_memory=paddle.concat(
-                        schema_memory, axis=1),
+                    schema_memory=paddle.concat(schema_memory, axis=1),
                     words=orig_input.question_tokens,
                     pointer_memories={
                         'table': t_enc_new,
@@ -207,7 +204,8 @@ class Text2SQLEncoderV2(nn.Layer):
                     },
                     m2c_align_mat=align_mat[0],
                     m2t_align_mat=align_mat[1],
-                    m2v_align_mat=align_mat[2], ))
+                    m2v_align_mat=align_mat[2],
+                ))
 
         return enc_results
 
@@ -228,16 +226,16 @@ class Text2SQLEncoderV2(nn.Layer):
 
         token_gather_index = paddle.reshape(
             span_tokens_index, shape=[-1, max_col_nums * max_col_tokens])
-        span_tokens_enc_origin = nn_utils.batch_gather_2d(seq_hidden,
-                                                          token_gather_index)
+        span_tokens_enc_origin = nn_utils.batch_gather_2d(
+            seq_hidden, token_gather_index)
 
         span_tokens_weight = paddle.reshape(
             paddle.matmul(span_tokens_enc_origin,
                           paddle.unsqueeze(cls_hidden, [-1])),
             [-1, max_col_nums, max_col_tokens])
-        span_tokens_weight = F.softmax(
-            nn_utils.sequence_mask(span_tokens_weight, span_tokens_mask),
-            axis=-1)
+        span_tokens_weight = F.softmax(nn_utils.sequence_mask(
+            span_tokens_weight, span_tokens_mask),
+                                       axis=-1)
 
         span_tokens_enc_origin = paddle.reshape(
             span_tokens_enc_origin,
@@ -255,34 +253,36 @@ class Text2SQLEncoderV2(nn.Layer):
 if __name__ == "__main__":
     """run some simple test cases"""
     inputs = {
-        'src_ids': paddle.to_tensor(
-            np.array(
-                [0, 1, 2, 3, 4, 5], dtype=np.int64).reshape([1, 6])),
-        'sent_ids': paddle.to_tensor(
-            np.array(
-                [0, 1, 1, 1, 1, 1], dtype=np.int64).reshape([1, 6])),
-        'question_tokens_index': paddle.to_tensor(
-            list(range(1, 5)), dtype='int64').reshape([1, 4]),
-        'column_index': paddle.to_tensor(
-            [1, 4], dtype='int64').reshape([1, 2]),
-        'column_mask': paddle.to_tensor(
-            [1, 1], dtype='float32').reshape([1, 2]),
-        'column_tokens_index': paddle.to_tensor(
-            [1, 2, 3, 4, 5, 0], dtype='int64').reshape([1, 2, 3]),
-        'column_tokens_mask': paddle.to_tensor(
-            [1, 1, 1, 1, 1, 0], dtype='float32').reshape([1, 2, 3]),
-        'table_index': paddle.to_tensor(
-            [1, 4], dtype='int64').reshape([1, 2]),
-        'table_mask': paddle.to_tensor(
-            [1, 1], dtype='float32').reshape([1, 2]),
-        'table_tokens_index': paddle.to_tensor(
-            [1, 2, 3, 4, 5, 0], dtype='int64').reshape([1, 2, 3]),
-        'table_tokens_mask': paddle.to_tensor(
-            [1, 1, 1, 1, 1, 0], dtype='float32').reshape([1, 2, 3]),
-        'limit_nums_index': paddle.to_tensor(
-            [1, 4], dtype='int64').reshape([1, 2]),
-        'limit_nums_mask': paddle.to_tensor(
-            [1, 1], dtype='float32').reshape([1, 2]),
+        'src_ids':
+        paddle.to_tensor(
+            np.array([0, 1, 2, 3, 4, 5], dtype=np.int64).reshape([1, 6])),
+        'sent_ids':
+        paddle.to_tensor(
+            np.array([0, 1, 1, 1, 1, 1], dtype=np.int64).reshape([1, 6])),
+        'question_tokens_index':
+        paddle.to_tensor(list(range(1, 5)), dtype='int64').reshape([1, 4]),
+        'column_index':
+        paddle.to_tensor([1, 4], dtype='int64').reshape([1, 2]),
+        'column_mask':
+        paddle.to_tensor([1, 1], dtype='float32').reshape([1, 2]),
+        'column_tokens_index':
+        paddle.to_tensor([1, 2, 3, 4, 5, 0], dtype='int64').reshape([1, 2, 3]),
+        'column_tokens_mask':
+        paddle.to_tensor([1, 1, 1, 1, 1, 0], dtype='float32').reshape([1, 2,
+                                                                       3]),
+        'table_index':
+        paddle.to_tensor([1, 4], dtype='int64').reshape([1, 2]),
+        'table_mask':
+        paddle.to_tensor([1, 1], dtype='float32').reshape([1, 2]),
+        'table_tokens_index':
+        paddle.to_tensor([1, 2, 3, 4, 5, 0], dtype='int64').reshape([1, 2, 3]),
+        'table_tokens_mask':
+        paddle.to_tensor([1, 1, 1, 1, 1, 0], dtype='float32').reshape([1, 2,
+                                                                       3]),
+        'limit_nums_index':
+        paddle.to_tensor([1, 4], dtype='int64').reshape([1, 2]),
+        'limit_nums_mask':
+        paddle.to_tensor([1, 1], dtype='float32').reshape([1, 2]),
         'orig_inputs': [{
             'columns': ['a', 'b'],
             'tables': ['t1', 't2'],
