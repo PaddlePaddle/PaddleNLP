@@ -76,8 +76,9 @@ class RecallAtK(Metric):
             A list with scaler float: results of the calculated R1@K, R2@K, R5@K.
         """
         metrics_out = [
-            self.p_at_1_in_10 / self.num_sampls, self.p_at_2_in_10 /
-            self.num_sampls, self.p_at_5_in_10 / self.num_sampls
+            self.p_at_1_in_10 / self.num_sampls,
+            self.p_at_2_in_10 / self.num_sampls,
+            self.p_at_5_in_10 / self.num_sampls
         ]
         return metrics_out
 

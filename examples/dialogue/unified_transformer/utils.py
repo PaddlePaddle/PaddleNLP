@@ -93,6 +93,7 @@ def convert_example(example,
 
 
 def batchify_fn(batch_examples, pad_val, mode):
+
     def pad_mask(batch_attention_mask):
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
@@ -100,9 +101,9 @@ def batchify_fn(batch_examples, pad_val, mode):
             (batch_size, max_len, max_len), dtype='float32') * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
-            mask_data[-seq_len:, -seq_len:] = np.array(
-                batch_attention_mask[i], dtype='float32')
-        # In order to ensure the correct broadcasting mechanism, expand one 
+            mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i],
+                                                       dtype='float32')
+        # In order to ensure the correct broadcasting mechanism, expand one
         # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
@@ -126,38 +127,38 @@ def batchify_fn(batch_examples, pad_val, mode):
             for i, example in enumerate(batch_examples)
         ])
         labels = np.concatenate([
-            np.array(
-                example['labels'], dtype='int64') for example in batch_examples
+            np.array(example['labels'], dtype='int64')
+            for example in batch_examples
         ])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
-        seq_len = np.asarray(
-            [example['seq_len'] for example in batch_examples]).astype("int32")
+        seq_len = np.asarray([example['seq_len']
+                              for example in batch_examples]).astype("int32")
         return input_ids, token_type_ids, position_ids, attention_mask, seq_len
 
 
 def create_data_loader(dataset, tokenizer, args, mode):
     trans_func1 = partial(preprocess_examples, mode=mode)
-    trans_func2 = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
-        max_response_len=args.max_response_len,
-        max_knowledge_len=args.max_knowledge_len,
-        mode=mode)
+    trans_func2 = partial(convert_example,
+                          tokenizer=tokenizer,
+                          max_seq_len=args.max_seq_len,
+                          max_response_len=args.max_response_len,
+                          max_knowledge_len=args.max_knowledge_len,
+                          mode=mode)
     dataset = dataset.map(trans_func1, batched=True).map(trans_func2, lazy=True)
     if mode == 'train':
-        batch_sampler = DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=True)
+        batch_sampler = DistributedBatchSampler(dataset,
+                                                batch_size=args.batch_size,
+                                                shuffle=True)
     else:
-        batch_sampler = BatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=False)
+        batch_sampler = BatchSampler(dataset,
+                                     batch_size=args.batch_size,
+                                     shuffle=False)
     collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id, mode=mode)
-    data_loader = DataLoader(
-        dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=collate_fn,
-        return_list=True)
+    data_loader = DataLoader(dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=collate_fn,
+                             return_list=True)
     return dataset, data_loader
 
 
@@ -206,8 +207,8 @@ def select_response(ids,
 
         if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
             raise ValueError(
-                "the length of `ids` is {}, but the `num_return_sequences` is {}".
-                format(len(ids), num_return_sequences))
+                "the length of `ids` is {}, but the `num_return_sequences` is {}"
+                .format(len(ids), num_return_sequences))
 
         for pred, score in zip(ids, scores):
             pred_token_ids, pred_tokens = post_process_response(pred, tokenizer)
@@ -248,8 +249,8 @@ def select_response(ids,
                 pred_tokens, True) or get_in_turn_repetition(pred_token_ids)
 
             last_pos = 0
-            if (max_dec_len is not None and
-                    num_token >= max_dec_len) or in_turn_repetition:
+            if (max_dec_len is not None
+                    and num_token >= max_dec_len) or in_turn_repetition:
                 tmp.append([response])
             else:
                 tmp.insert(last_pos, [response])

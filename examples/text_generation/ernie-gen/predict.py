@@ -66,12 +66,11 @@ def predict():
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
 
-    trans_func = convert_example(
-        tokenizer=tokenizer,
-        attn_id=attn_id,
-        tgt_type_id=tgt_type_id,
-        max_encode_len=args.max_encode_len,
-        max_decode_len=args.max_decode_len)
+    trans_func = convert_example(tokenizer=tokenizer,
+                                 attn_id=attn_id,
+                                 tgt_type_id=tgt_type_id,
+                                 max_encode_len=args.max_encode_len,
+                                 max_decode_len=args.max_decode_len)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
@@ -85,14 +84,14 @@ def predict():
     ): after_padding(fn(samples))
 
     dev_dataset = dev_dataset.map(trans_func)
-    test_batch_sampler = paddle.io.BatchSampler(
-        dev_dataset, batch_size=args.batch_size, shuffle=False)
-    data_loader = DataLoader(
-        dataset=dev_dataset,
-        batch_sampler=test_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    test_batch_sampler = paddle.io.BatchSampler(dev_dataset,
+                                                batch_size=args.batch_size,
+                                                shuffle=False)
+    data_loader = DataLoader(dataset=dev_dataset,
+                             batch_sampler=test_batch_sampler,
+                             collate_fn=batchify_fn,
+                             num_workers=0,
+                             return_list=True)
 
     if args.init_checkpoint:
         model_state = paddle.load(args.init_checkpoint)
@@ -112,21 +111,20 @@ def predict():
         (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _,
          raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
-        output_ids = beam_search_infilling(
-            model,
-            src_ids,
-            src_sids,
-            eos_id=eos_id,
-            sos_id=sos_id,
-            attn_id=attn_id,
-            pad_id=pad_id,
-            unk_id=unk_id,
-            vocab_size=vocab_size,
-            max_decode_len=args.max_decode_len,
-            max_encode_len=args.max_encode_len,
-            beam_width=args.beam_width,
-            length_penalty=args.length_penalty,
-            tgt_type_id=tgt_type_id)
+        output_ids = beam_search_infilling(model,
+                                           src_ids,
+                                           src_sids,
+                                           eos_id=eos_id,
+                                           sos_id=sos_id,
+                                           attn_id=attn_id,
+                                           pad_id=pad_id,
+                                           unk_id=unk_id,
+                                           vocab_size=vocab_size,
+                                           max_decode_len=args.max_decode_len,
+                                           max_encode_len=args.max_encode_len,
+                                           beam_width=args.beam_width,
+                                           length_penalty=args.length_penalty,
+                                           tgt_type_id=tgt_type_id)
 
         for source_ids, target_ids, predict_ids in zip(
                 src_ids.numpy().tolist(),

@@ -28,10 +28,9 @@ logger = logging.getLogger("pipelines")
 router = APIRouter()
 
 
-@router.post(
-    "/documents/get_by_filters",
-    response_model=List[DocumentSerialized],
-    response_model_exclude_none=True)
+@router.post("/documents/get_by_filters",
+             response_model=List[DocumentSerialized],
+             response_model_exclude_none=True)
 def get_documents(filters: FilterRequest):
     """
     This endpoint allows you to retrieve documents contained in your document store.

@@ -229,8 +229,8 @@ def get_wemb_n(i_nlu, l_n, hS, num_hidden_layers, all_encoder_layer,
             i_layer = num_hidden_layers - 1 - i_noln
             st = i_noln * hS
             ed = (i_noln + 1) * hS
-            tmp = all_encoder_layer[i_layer][b, i_nlu1[0]:i_nlu1[
-                1], :].unsqueeze(0)
+            tmp = all_encoder_layer[i_layer][
+                b, i_nlu1[0]:i_nlu1[1], :].unsqueeze(0)
             pad_right = l_n_max - (i_nlu1[1] - i_nlu1[0])
             pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right],
                                                data_format='NLC').squeeze(0)
@@ -262,8 +262,8 @@ def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer,
                 i_layer = num_hidden_layers - 1 - i_nolh
                 st = i_nolh * hS
                 ed = (i_nolh + 1) * hS
-                tmp = all_encoder_layer[i_layer][b, i_hds11[0]:i_hds11[
-                    1], :].unsqueeze(0)
+                tmp = all_encoder_layer[i_layer][
+                    b, i_hds11[0]:i_hds11[1], :].unsqueeze(0)
                 pad_right = l_hpu_max - (i_hds11[1] - i_hds11[0])
                 pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right],
                                                    data_format='NLC').squeeze(0)
@@ -394,8 +394,9 @@ def get_bert_encoding(bert_config,
 
     t_to_tt_idx = t_to_tt_idx[0]
     assert len(t_to_tt_idx) == len(input_sequence)
-    assert sum(len(t_to_tt_idx_hds1) for t_to_tt_idx_hds1 in
-               t_to_tt_idx_hds) == len(input_schema.column_names_embedder_input)
+    assert sum(len(t_to_tt_idx_hds1)
+               for t_to_tt_idx_hds1 in t_to_tt_idx_hds) == len(
+                   input_schema.column_names_embedder_input)
 
     assert list(wemb_h.shape)[0] == len(
         input_schema.column_names_embedder_input)
@@ -408,8 +409,7 @@ def get_bert_encoding(bert_config,
         else:
             end = t_to_tt_idx[i + 1]
         utterance_states.append(
-            paddle.mean(
-                wemb_n[:, start:end, :], axis=[0, 1]))
+            paddle.mean(wemb_n[:, start:end, :], axis=[0, 1]))
     assert len(utterance_states) == len(input_sequence)
 
     schema_token_states = []
@@ -425,8 +425,7 @@ def get_bert_encoding(bert_config,
                 else:
                     end = t_to_tt_idx_hds11[i + 1]
                 schema_token_states1.append(
-                    paddle.mean(
-                        wemb_h[cnt, start:end, :], axis=0))
+                    paddle.mean(wemb_h[cnt, start:end, :], axis=0))
             assert len(schema_token_states1) == len(
                 input_schema.column_names_embedder_input[cnt].split())
             schema_token_states.append(schema_token_states1)

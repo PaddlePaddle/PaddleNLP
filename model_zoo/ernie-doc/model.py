@@ -18,6 +18,7 @@ import paddle.nn.functional as F
 
 
 class ErnieDocForTextMatching(nn.Layer):
+
     def __init__(self, ernie_doc, num_classes=2, dropout=None):
         super().__init__()
         self.ernie_doc = ernie_doc

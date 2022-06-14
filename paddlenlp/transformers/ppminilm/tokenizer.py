@@ -106,8 +106,8 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -180,8 +180,8 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""

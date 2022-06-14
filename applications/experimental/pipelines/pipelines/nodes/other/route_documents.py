@@ -29,8 +29,8 @@ class RouteDocuments(BaseComponent):
     outgoing_edges = 2
 
     def __init__(self,
-                 split_by: str="content_type",
-                 metadata_values: Optional[List[str]]=None):
+                 split_by: str = "content_type",
+                 metadata_values: Optional[List[str]] = None):
         """
         :param split_by: Field to split the documents by, either `"content_type"` or a metadata field name.
             If this parameter is set to `"content_type"`, the list of `Document`s will be split into a list containing

@@ -95,8 +95,8 @@ class XFUN(Dataset):
             difference = max_seq_len - len(encoded_inputs["input_ids"])
             if self.tokenizer.padding_side == 'right':
                 if return_attention_mask:
-                    encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
-                        "input_ids"]) + [0] * difference
+                    encoded_inputs["attention_mask"] = [1] * len(
+                        encoded_inputs["input_ids"]) + [0] * difference
                 if return_token_type_ids:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] +
@@ -104,12 +104,15 @@ class XFUN(Dataset):
                 if return_special_tokens_mask:
                     encoded_inputs["special_tokens_mask"] = encoded_inputs[
                         "special_tokens_mask"] + [1] * difference
-                encoded_inputs["input_ids"] = encoded_inputs[
-                    "input_ids"] + [self.tokenizer.pad_token_id] * difference
-                encoded_inputs["labels"] = encoded_inputs[
-                    "labels"] + [self.pad_token_label_id] * difference
-                encoded_inputs["bbox"] = encoded_inputs[
-                    "bbox"] + [[0, 0, 0, 0]] * difference
+                encoded_inputs["input_ids"] = encoded_inputs["input_ids"] + [
+                    self.tokenizer.pad_token_id
+                ] * difference
+                encoded_inputs["labels"] = encoded_inputs["labels"] + [
+                    self.pad_token_label_id
+                ] * difference
+                encoded_inputs["bbox"] = encoded_inputs["bbox"] + [[
+                    0, 0, 0, 0
+                ]] * difference
             elif self.tokenizer.padding_side == 'left':
                 if return_attention_mask:
                     encoded_inputs["attention_mask"] = [0] * difference + [
@@ -129,13 +132,13 @@ class XFUN(Dataset):
                 encoded_inputs["labels"] = [
                     self.pad_token_label_id
                 ] * difference + encoded_inputs["labels"]
-                encoded_inputs["bbox"] = [
-                    [0, 0, 0, 0]
-                ] * difference + encoded_inputs["bbox"]
+                encoded_inputs["bbox"] = [[
+                    0, 0, 0, 0
+                ]] * difference + encoded_inputs["bbox"]
         else:
             if return_attention_mask:
-                encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"])
+                encoded_inputs["attention_mask"] = [1] * len(
+                    encoded_inputs["input_ids"])
 
         return encoded_inputs
 
@@ -221,17 +224,18 @@ class XFUN(Dataset):
             bbox[3] = int(bbox[3] * 1000.0 / height)
 
             text = info["text"]
-            encode_res = self.tokenizer.encode(
-                text, pad_to_max_seq_len=False, return_attention_mask=True)
+            encode_res = self.tokenizer.encode(text,
+                                               pad_to_max_seq_len=False,
+                                               return_attention_mask=True)
 
             gt_label = []
             if not self.add_special_ids:
                 # TODO: use tok.all_special_ids to remove
                 encode_res["input_ids"] = encode_res["input_ids"][1:-1]
-                encode_res["token_type_ids"] = encode_res["token_type_ids"][1:
-                                                                            -1]
-                encode_res["attention_mask"] = encode_res["attention_mask"][1:
-                                                                            -1]
+                encode_res["token_type_ids"] = encode_res["token_type_ids"][
+                    1:-1]
+                encode_res["attention_mask"] = encode_res["attention_mask"][
+                    1:-1]
             if label.lower() == "other":
                 gt_label.extend([0] * len(encode_res["input_ids"]))
             else:
@@ -242,10 +246,12 @@ class XFUN(Dataset):
                 if gt_label[0] != self.label2id_map["O"]:
                     entity_id_to_index_map[info["id"]] = len(entities)
                     entities.append({
-                        "start": len(input_ids_list),
+                        "start":
+                        len(input_ids_list),
                         "end":
                         len(input_ids_list) + len(encode_res["input_ids"]),
-                        "label": label.upper(),
+                        "label":
+                        label.upper(),
                     })
             input_ids_list.extend(encode_res["input_ids"])
             token_type_ids_list.extend(encode_res["token_type_ids"])
@@ -283,8 +289,8 @@ class XFUN(Dataset):
             chunk_end = min(index + chunk_size, seq_len)
             encoded_inputs_example = {}
             for key in encoded_inputs:
-                encoded_inputs_example[key] = encoded_inputs[key][chunk_beg:
-                                                                  chunk_end]
+                encoded_inputs_example[key] = encoded_inputs[key][
+                    chunk_beg:chunk_end]
 
             encoded_inputs_all.append(encoded_inputs_example)
         return encoded_inputs_all
@@ -305,8 +311,8 @@ class XFUN(Dataset):
             entities_in_this_span = []
             global_to_local_map = {}  #
             for entity_id, entity in enumerate(entities):
-                if (index <= entity["start"] < index + chunk_size and
-                        index <= entity["end"] < index + chunk_size):
+                if (index <= entity["start"] < index + chunk_size
+                        and index <= entity["end"] < index + chunk_size):
                     entity["start"] = entity["start"] - index
                     entity["end"] = entity["end"] - index
                     global_to_local_map[entity_id] = len(entities_in_this_span)
@@ -318,10 +324,14 @@ class XFUN(Dataset):
                 if (index <= relation["start_index"] < index + chunk_size and
                         index <= relation["end_index"] < index + chunk_size):
                     relations_in_this_span.append({
-                        "head": global_to_local_map[relation["head"]],
-                        "tail": global_to_local_map[relation["tail"]],
-                        "start_index": relation["start_index"] - index,
-                        "end_index": relation["end_index"] - index,
+                        "head":
+                        global_to_local_map[relation["head"]],
+                        "tail":
+                        global_to_local_map[relation["tail"]],
+                        "start_index":
+                        relation["start_index"] - index,
+                        "end_index":
+                        relation["end_index"] - index,
                     })
             item.update({
                 "entities": reformat(entities_in_this_span),
@@ -365,7 +375,8 @@ class XFUN(Dataset):
                 "start_index": get_relation_span(rel, entities)[0],
                 "end_index": get_relation_span(rel, entities)[1],
             } for rel in kv_relations],
-            key=lambda x: x["head"], )
+            key=lambda x: x["head"],
+        )
         return relations
 
     def load_img(self, image_path):
@@ -376,8 +387,12 @@ class XFUN(Dataset):
         im_shape = img.shape[0:2]
         im_scale_y = resize_h / im_shape[0]
         im_scale_x = resize_w / im_shape[1]
-        img_new = cv2.resize(
-            img, None, None, fx=im_scale_x, fy=im_scale_y, interpolation=2)
+        img_new = cv2.resize(img,
+                             None,
+                             None,
+                             fx=im_scale_x,
+                             fy=im_scale_y,
+                             interpolation=2)
         mean = np.array([0.485, 0.456, 0.406])[np.newaxis, np.newaxis, :]
         std = np.array([0.229, 0.224, 0.225])[np.newaxis, np.newaxis, :]
         img_new = img_new / 255.0

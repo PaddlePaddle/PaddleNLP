@@ -32,8 +32,8 @@ class TritonPythonModel:
           * model_version: Model version
           * model_name: Model name
         """
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-medium-zh", use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
+                                                       use_faster=True)
         # You must parse model_config. JSON string is not parsed here
         self.model_config = json.loads(args['model_config'])
         print("model_config:", self.model_config)
@@ -77,11 +77,13 @@ class TritonPythonModel:
                                                      self.input_names[0])
             data = data.as_numpy()
             data = [i[0].decode('utf-8') for i in data]
-            data = self.tokenizer(
-                data, max_length=128, padding=True, truncation=True)
+            data = self.tokenizer(data,
+                                  max_length=128,
+                                  padding=True,
+                                  truncation=True)
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
-            token_type_ids = np.array(
-                data["token_type_ids"], dtype=self.output_dtype[1])
+            token_type_ids = np.array(data["token_type_ids"],
+                                      dtype=self.output_dtype[1])
 
             # print("input_ids:", input_ids)
             # print("token_type_ids:", token_type_ids)

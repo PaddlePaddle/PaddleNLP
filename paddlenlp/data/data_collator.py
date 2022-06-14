@@ -36,11 +36,12 @@ InputDataClass = NewType("InputDataClass", Any)
 A DataCollator is a function that takes a list of samples from a Dataset and collate them into a batch, as a dictionary
 of PyTorch/TensorFlow tensors or NumPy arrays.
 """
-DataCollator = NewType("DataCollator",
-                       Callable[[List[InputDataClass]], Dict[str, Any]])
+DataCollator = NewType("DataCollator", Callable[[List[InputDataClass]],
+                                                Dict[str, Any]])
 
 
 class DataCollatorMixin:
+
     def __call__(self, features, return_tensors=None):
         if return_tensors is None:
             return_tensors = self.return_tensors
@@ -90,8 +91,8 @@ def paddle_default_data_collator(
         label = first["label"].item() if isinstance(
             first["label"], paddle.Tensor) else first["label"]
         dtype = 'int64' if isinstance(label, int) else 'float32'
-        batch["labels"] = paddle.to_tensor(
-            [f["label"] for f in features], dtype=dtype)
+        batch["labels"] = paddle.to_tensor([f["label"] for f in features],
+                                           dtype=dtype)
     elif "label_ids" in first and first["label_ids"] is not None:
         if isinstance(first["label_ids"], paddle.Tensor):
             batch["labels"] = paddle.stack([f["label_ids"] for f in features])
@@ -103,8 +104,8 @@ def paddle_default_data_collator(
     # Handling of all other possible keys.
     # Again, we will use the first element to figure out which key/values are not None for this model.
     for k, v in first.items():
-        if k not in ("label", "label_ids") and v is not None and not isinstance(
-                v, str):
+        if k not in ("label",
+                     "label_ids") and v is not None and not isinstance(v, str):
             if isinstance(v, paddle.Tensor):
                 batch[k] = paddle.stack([f[k] for f in features])
             else:
@@ -133,16 +134,16 @@ def numpy_default_data_collator(
         if isinstance(first["label_ids"], np.ndarray):
             batch["labels"] = np.stack([f["label_ids"] for f in features])
         else:
-            dtype = np.int64 if type(first["label_ids"][
-                0]) is int else np.float32
-            batch["labels"] = np.array(
-                [f["label_ids"] for f in features], dtype=dtype)
+            dtype = np.int64 if type(
+                first["label_ids"][0]) is int else np.float32
+            batch["labels"] = np.array([f["label_ids"] for f in features],
+                                       dtype=dtype)
 
     # Handling of all other possible keys.
     # Again, we will use the first element to figure out which key/values are not None for this model.
     for k, v in first.items():
-        if k not in ("label", "label_ids") and v is not None and not isinstance(
-                v, str):
+        if k not in ("label",
+                     "label_ids") and v is not None and not isinstance(v, str):
             if isinstance(v, np.ndarray):
                 batch[k] = np.stack([f[k] for f in features])
             else:
@@ -168,7 +169,8 @@ class DefaultDataCollator(DataCollatorMixin):
     """
     return_tensors: str = "pd"
 
-    def __call__(self, features: List[Dict[str, Any]],
+    def __call__(self,
+                 features: List[Dict[str, Any]],
                  return_tensors=None) -> Dict[str, Any]:
         if return_tensors is None:
             return_tensors = self.return_tensors
@@ -197,7 +199,8 @@ class DataCollatorWithPadding:
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors=self.return_tensors, )
+            return_tensors=self.return_tensors,
+        )
         if "label" in batch:
             batch["labels"] = batch["label"]
             del batch["label"]
@@ -255,7 +258,8 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             # Conversion to tensors will fail if we have labels as they are not of the same length yet.
-            return_tensors="pd" if labels is None else None, )
+            return_tensors="pd" if labels is None else None,
+        )
 
         if labels is None:
             return batch
@@ -273,8 +277,7 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
                                  for label in labels]
 
         batch = {
-            k: paddle.to_tensor(
-                v, dtype='int64')
+            k: paddle.to_tensor(v, dtype='int64')
             for k, v in batch.items()
         }
         return batch
@@ -289,7 +292,8 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             # Conversion to tensors will fail if we have labels as they are not of the same length yet.
-            return_tensors="np" if labels is None else None, )
+            return_tensors="np" if labels is None else None,
+        )
 
         if labels is None:
             return batch
@@ -370,12 +374,12 @@ class DataCollatorForSeq2Seq:
 
             padding_side = self.tokenizer.padding_side
             for feature in features:
-                remainder = [self.label_pad_token_id] * (
-                    max_label_length - len(feature["labels"]))
+                remainder = [self.label_pad_token_id
+                             ] * (max_label_length - len(feature["labels"]))
                 if isinstance(feature["labels"], list):
-                    feature["labels"] = (feature["labels"] + remainder
-                                         if padding_side == "right" else
-                                         remainder + feature["labels"])
+                    feature["labels"] = (feature["labels"] +
+                                         remainder if padding_side == "right"
+                                         else remainder + feature["labels"])
                 elif padding_side == "right":
                     feature["labels"] = np.concatenate(
                         [feature["labels"], remainder]).astype(np.int64)
@@ -388,11 +392,12 @@ class DataCollatorForSeq2Seq:
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors=return_tensors, )
+            return_tensors=return_tensors,
+        )
 
         # prepare decoder_input_ids
-        if (labels is not None and self.model is not None and
-                hasattr(self.model, "prepare_decoder_input_ids_from_labels")):
+        if (labels is not None and self.model is not None and hasattr(
+                self.model, "prepare_decoder_input_ids_from_labels")):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(
                 labels=features["labels"])
             features["decoder_input_ids"] = decoder_input_ids

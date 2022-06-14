@@ -32,8 +32,10 @@ from squad import RCInterpret
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
 from roberta.modeling import RobertaForQuestionAnswering
+
 sys.path.append('../../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version, match
+
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -43,82 +45,81 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def get_args():
     parser = argparse.ArgumentParser('mrc task with roberta')
-    parser.add_argument(
-        '--base_model',
-        required=True,
-        choices=['roberta_base', 'roberta_large'])
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=512,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--base_model',
+                        required=True,
+                        choices=['roberta_base', 'roberta_large'])
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=512,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=32, help='batchsize')
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='data directory includes train / develop data')
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
+    parser.add_argument('--data_dir',
+                        type=str,
+                        required=True,
+                        help='data directory includes train / develop data')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
-    parser.add_argument(
-        '--inter_mode',
-        type=str,
-        default="attention",
-        choices=[
-            "attention", "simple_gradient", "smooth_gradient",
-            "integrated_gradient", "lime"
-        ],
-        help='appoint the mode of interpretable.')
+    parser.add_argument('--inter_mode',
+                        type=str,
+                        default="attention",
+                        choices=[
+                            "attention", "simple_gradient", "smooth_gradient",
+                            "integrated_gradient", "lime"
+                        ],
+                        help='appoint the mode of interpretable.')
     parser.add_argument(
         '--n-samples',
         type=int,
         default=25,
         help='number of samples used for smooth gradient method')
-    parser.add_argument(
-        '--output_dir',
-        type=Path,
-        required=True,
-        help='interpretable output directory')
+    parser.add_argument('--output_dir',
+                        type=Path,
+                        required=True,
+                        help='interpretable output directory')
     parser.add_argument(
         "--doc_stride",
         type=int,
         default=128,
-        help="When splitting up a long document into chunks, how much stride to take between chunks."
+        help=
+        "When splitting up a long document into chunks, how much stride to take between chunks."
     )
-    parser.add_argument(
-        "--start_step", type=int, default=0, help="start from which instance")
-    parser.add_argument(
-        "--language",
-        type=str,
-        required=True,
-        help="language that the model based on")
+    parser.add_argument("--start_step",
+                        type=int,
+                        default=0,
+                        help="start from which instance")
+    parser.add_argument("--language",
+                        type=str,
+                        required=True,
+                        help="language that the model based on")
     parser.add_argument(
         '--ans_path',
         type=str,
         required=True,
-        help="the path of the file which stores the predicted answer from last step"
-    )
+        help=
+        "the path of the file which stores the predicted answer from last step")
     parser.add_argument(
         '--ans_idx_path',
         type=str,
         required=True,
-        help="the path of the file which stores the predicted answer index from last step"
+        help=
+        "the path of the file which stores the predicted answer index from last step"
     )
-    parser.add_argument(
-        '--num_classes', type=int, required=True, help="number of class")
+    parser.add_argument('--num_classes',
+                        type=int,
+                        required=True,
+                        help="number of class")
     args = parser.parse_args()
     return args
 
@@ -139,23 +140,22 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     # context that overlaps a bit the context of the previous feature.
     if args.language == 'en':
         questions = [
-            examples[i]['question'].encode(
-                'ascii', errors='replace').decode('UTF-8')
+            examples[i]['question'].encode('ascii',
+                                           errors='replace').decode('UTF-8')
             for i in range(len(examples))
         ]
         contexts = [
-            examples[i]['context'].encode(
-                'ascii', errors='replace').decode('UTF-8')
+            examples[i]['context'].encode('ascii',
+                                          errors='replace').decode('UTF-8')
             for i in range(len(examples))
         ]
     else:
         questions = [examples[i]['question'] for i in range(len(examples))]
         contexts = [examples[i]['context'] for i in range(len(examples))]
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_len)
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -190,19 +190,21 @@ def init_roberta_var(args):
     dev_ds = RCInterpret().read(args.data_dir)
 
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "overflow_to_sample": Stack(dtype='int32'), }): fn(samples)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "offset_mapping": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "overflow_to_sample": Stack(dtype='int32'),
+        }): fn(samples)
 
-    dev_dataloader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    dev_dataloader = paddle.io.DataLoader(dataset=dev_ds,
+                                          batch_sampler=dev_batch_sampler,
+                                          collate_fn=batchify_fn,
+                                          return_list=True)
 
     return model, tokenizer, dev_dataloader, dev_ds
 
@@ -227,10 +229,12 @@ def ch_per_example(args, scores_in_one_example, prev_context_tokens, dev_ds,
     result['pred_feature'] = ans_idx_dic[str(result['id'])]
 
     result['char_attri'] = collections.OrderedDict()
-    for token_info in sorted(
-            char_attribution_dict, key=lambda x: x[2], reverse=True):
-        result['char_attri'][str(token_info[
-            0])] = [str(token_info[1]), float(token_info[2])]
+    for token_info in sorted(char_attribution_dict,
+                             key=lambda x: x[2],
+                             reverse=True):
+        result['char_attri'][str(
+            token_info[0])] = [str(token_info[1]),
+                               float(token_info[2])]
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
 
@@ -246,10 +250,12 @@ def en_per_example(inter_score, result, ans_dic, ans_idx_dic, offset,
     result['pred_label'] = ans_dic[str(result['id'])]
     result['pred_feature'] = ans_idx_dic[str(result['id'])]
     result['char_attri'] = collections.OrderedDict()
-    for token_info in sorted(
-            char_attribution_dict, key=lambda x: x[2], reverse=True):
-        result['char_attri'][str(token_info[
-            0])] = [str(token_info[1]), float(token_info[2])]
+    for token_info in sorted(char_attribution_dict,
+                             key=lambda x: x[2],
+                             reverse=True):
+        result['char_attri'][str(
+            token_info[0])] = [str(token_info[1]),
+                               float(token_info[2])]
     result.pop('sent_token')
 
     out_handle.write(json.dumps(result, ensure_ascii=False) + '\n')
@@ -265,10 +271,11 @@ def load_pred_data(ans_path, ans_idx_path):
     return ans_dic, ans_idx_dic
 
 
-def extract_attention_scores(
-        args, model, result, fwd_args, fwd_kwargs, prev_example_idx,
-        example_idx, prev_context_tokens, scores_in_one_example, dev_ds,
-        ans_dic, ans_idx_dic, context_tokens, offset, prev_offset, out_handle):
+def extract_attention_scores(args, model, result, fwd_args, fwd_kwargs,
+                             prev_example_idx, example_idx, prev_context_tokens,
+                             scores_in_one_example, dev_ds, ans_dic,
+                             ans_idx_dic, context_tokens, offset, prev_offset,
+                             out_handle):
     with paddle.no_grad():
         # start_logits: (bsz, seq); end_logits: (bsz, seq); cls_logits: (bsz, 2)
         # attention: list((bsz, head, seq, seq) * 12); embedded: (bsz, seq, emb)
@@ -278,8 +285,8 @@ def extract_attention_scores(
     # Attention score equals to the mean of attention of each token in the question
     attentions = attentions[-1][:, :, 1:SEP_idx, :].mean(2).mean(
         1)  # attentions: (bsz, seq_len)
-    context_score = attentions[0, SEP_idx + add_idx:
-                               -1]  # context_score: Tensor(context)
+    context_score = attentions[0, SEP_idx +
+                               add_idx:-1]  # context_score: Tensor(context)
     context_norm_score = context_score / context_score.sum(-1)
 
     if args.language == 'ch':
@@ -347,11 +354,10 @@ def extract_integrated_gradient_scores(
         elif i == args.n_samples - 1:
             pred_embedded = embedded  # Tensor(1, seq_len, embed_size)
 
-    embedded_grads_tensor = paddle.to_tensor(
-        embedded_grads_list,
-        dtype='float32',
-        place=paddle.CUDAPlace(0),
-        stop_gradient=True)
+    embedded_grads_tensor = paddle.to_tensor(embedded_grads_list,
+                                             dtype='float32',
+                                             place=paddle.CUDAPlace(0),
+                                             stop_gradient=True)
 
     trapezoidal_grads = (embedded_grads_tensor[1:] + embedded_grads_tensor[:-1]
                          ) / 2  # Tensor(n_samples-1, 1, seq_len, embed_size)
@@ -413,7 +419,8 @@ if __name__ == "__main__":
         prev_context_tokens = None
         prev_offset = None
 
-        get_subword_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
+        get_subword_ids = lambda word: map(
+            str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
         for step, d in tqdm(enumerate(dataloader)):
             if step < args.start_step:
                 continue
@@ -429,8 +436,8 @@ if __name__ == "__main__":
                 tokenizer.sep_token_id)
             context_ids = input_ids[0, SEP_idx + add_idx:-1]
             offset = offset_map[0, SEP_idx + add_idx:-1]
-            context_tokens = tokenizer.convert_ids_to_tokens(context_ids.numpy()
-                                                             .tolist())
+            context_tokens = tokenizer.convert_ids_to_tokens(
+                context_ids.numpy().tolist())
 
             if args.language == 'en':
                 example = dev_ds.data[step]

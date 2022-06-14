@@ -72,18 +72,15 @@ def interact(args):
         else:
             context.append(user_utt)
             example = Example(src=" [SEP] ".join(context), data_id=0)
-            record = plato_reader._convert_example_to_record(
-                example, is_infer=True)
+            record = plato_reader._convert_example_to_record(example,
+                                                             is_infer=True)
             data = plato_reader._pad_batch_records([record], is_infer=True)
             inputs = gen_inputs(data, args.latent_type_size)
             inputs['tgt_ids'] = inputs['tgt_ids'].astype('int64')
             pred = model(inputs)[0]
             bot_response = pred["response"]
-            print(
-                colored(
-                    "[Bot]:", "blue", attrs=["bold"]),
-                colored(
-                    bot_response, attrs=["bold"]))
+            print(colored("[Bot]:", "blue", attrs=["bold"]),
+                  colored(bot_response, attrs=["bold"]))
             context.append(bot_response)
     return
 

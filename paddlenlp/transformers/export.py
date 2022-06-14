@@ -25,8 +25,8 @@ __all__ = ["export_model"]
 def export_model(
         model: "PretrainedModel",
         input_spec=None,
-        path: Optional[str]=None,
-        model_format: Optional[str]="paddle") -> Tuple[List[str], List[str]]:
+        path: Optional[str] = None,
+        model_format: Optional[str] = "paddle") -> Tuple[List[str], List[str]]:
     """
     Export paddle inference model or onnx model.
     
@@ -68,4 +68,5 @@ def export_model(
         logger.info("ONNX model exported.")
     else:
         logger.info(
-            "This export format is not supported, please select paddle or onnx!")
+            "This export format is not supported, please select paddle or onnx!"
+        )

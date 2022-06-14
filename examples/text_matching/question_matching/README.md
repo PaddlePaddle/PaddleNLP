@@ -18,11 +18,11 @@
 当前大多数问题匹配任务采用单一指标，在同分布的测试集上评测模型的好坏，这种评测方式可能夸大了模型能力，并且缺乏对模型鲁棒性的细粒度优劣势评估。本次评测关注问题匹配模型在真实应用场景中的鲁棒性，从词汇理解、句法结构、错别字、口语化、对话理解五个维度检测模型的能力，从而发现模型的不足之处，推动语义匹配技术的发展。本次竞赛主要基于[千言数据集](https://luge.ai)，采用的数据集包括哈尔滨工业大学（深圳）的LCQMC和BQ数据集、OPPO的小布对话短文本数据集以及百度的DuQM数据集，期望从多维度、多领域出发，全面评价模型的鲁棒性，进一步提升问题匹配技术的研究水平。本次竞赛将在第九届“CCF大数据与计算智能大赛”举办技术交流论坛和颁奖仪式，诚邀学术界和工业界的研究者和开发者参加本次竞赛！
 
 ## 基线评测效果
-本项目分别基于ERNIE-1.0、Bert-base-chinese、ERNIE-Gram 3 个中文预训练模型训练了单塔 Point-wise 的匹配模型, 基于 ERNIE-Gram 的模型效果显著优于其它 2 个预训练模型。  
+本项目分别基于ERNIE-1.0、Bert-base-chinese、ERNIE-Gram 3 个中文预训练模型训练了单塔 Point-wise 的匹配模型, 基于 ERNIE-Gram 的模型效果显著优于其它 2 个预训练模型。
 
-此外，在 ERNIE-Gram 模型基础上我们也对最新的正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 进行了相关评测, [R-Drop](https://arxiv.org/abs/2106.14448) 策略的核心思想是针对同 1 个训练样本过多次前向网络得到的输出加上正则化的 Loss 约束。  
+此外，在 ERNIE-Gram 模型基础上我们也对最新的正则化策略 [R-Drop](https://arxiv.org/abs/2106.14448) 进行了相关评测, [R-Drop](https://arxiv.org/abs/2106.14448) 策略的核心思想是针对同 1 个训练样本过多次前向网络得到的输出加上正则化的 Loss 约束。
 
-我们开源了效果最好的 2 个策略对应模型的 checkpoint 作为本次比赛的基线方案: 基于 ERNIE-Gram 预训练模型 R-Drop 系数分别为 0.0 和 0.1 的 2 个模型, 用户可以下载相应的模型来复现我们的评测结果。  
+我们开源了效果最好的 2 个策略对应模型的 checkpoint 作为本次比赛的基线方案: 基于 ERNIE-Gram 预训练模型 R-Drop 系数分别为 0.0 和 0.1 的 2 个模型, 用户可以下载相应的模型来复现我们的评测结果。
 
 | 模型  | rdrop_coef | dev acc | test-A acc | test-B acc|
 | ---- | ---- |-----|--------|------- |
@@ -47,7 +47,7 @@ question_matching/
 ```
 
 ### 数据准备
-本项目使用竞赛提供的 LCQMC、BQ、OPPO 这 3 个数据集的训练集合集作为训练集，使用这 3 个数据集的验证集合集作为验证集。  
+本项目使用竞赛提供的 LCQMC、BQ、OPPO 这 3 个数据集的训练集合集作为训练集，使用这 3 个数据集的验证集合集作为验证集。
 
 运行如下命令生成本项目所使用的训练集和验证集，您在参赛过程中可以探索采取其它的训练集和验证集组合，不需要和基线方案完全一致。
 ```shell
@@ -99,7 +99,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train.py \
 * `seed`：可选，随机种子，默认为1000。
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 
-程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。  
+程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 
 训练过程中每一次在验证集上进行评估之后，程序会根据验证集的评估指标是否优于之前最优的模型指标来决定是否存储当前模型，如果优于之前最优的验证集指标则会存储当前模型，否则则不存储，因此训练过程结束之后，模型存储路径下 step 数最大的模型则对应验证集指标最高的模型, 一般我们选择验证集指标最高的模型进行预测。
 
@@ -141,4 +141,4 @@ python -u \
 提交预测结果进行评测
 
 ## Reference
-[1] Liang, Xiaobo, Lijun Wu, Juntao Li, Yue Wang, Qi Meng, Tao Qin, Wei Chen, Min Zhang, and Tie-Yan Liu. “R-Drop: Regularized Dropout for Neural Networks.” ArXiv:2106.14448 [Cs], June 28, 2021. http://arxiv.org/abs/2106.14448.  
+[1] Liang, Xiaobo, Lijun Wu, Juntao Li, Yue Wang, Qi Meng, Tao Qin, Wei Chen, Min Zhang, and Tie-Yan Liu. “R-Drop: Regularized Dropout for Neural Networks.” ArXiv:2106.14448 [Cs], June 28, 2021. http://arxiv.org/abs/2106.14448.

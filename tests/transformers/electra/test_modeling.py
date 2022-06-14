@@ -29,18 +29,19 @@ def create_input_data(config, seed=None):
     if seed is not None:
         np.random.seed(seed)
 
-    input_ids = np.random.randint(
-        low=0,
-        high=config['vocab_size'],
-        size=(config["batch_size"], config["seq_len"]))
+    input_ids = np.random.randint(low=0,
+                                  high=config['vocab_size'],
+                                  size=(config["batch_size"],
+                                        config["seq_len"]))
 
     return input_ids
 
 
 class TestElectraForSequenceClassification(CommonTest):
+
     def set_input(self):
-        self.config = copy.deepcopy(ElectraModel.pretrained_init_configuration[
-            'electra-base'])
+        self.config = copy.deepcopy(
+            ElectraModel.pretrained_init_configuration['electra-base'])
         self.config['num_hidden_layers'] = 2
         self.config['vocab_size'] = 512
         self.config['attention_probs_dropout_prob'] = 0.0
@@ -77,6 +78,7 @@ class TestElectraForSequenceClassification(CommonTest):
 
 
 class TestElectraForMaskedLM(TestElectraForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = ElectraForMaskedLM
 
@@ -102,6 +104,7 @@ class TestElectraForMaskedLM(TestElectraForSequenceClassification):
 
 
 class TestElectraForQuestionAnswering(TestElectraForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = ElectraForQuestionAnswering
 
@@ -119,9 +122,10 @@ class TestElectraForQuestionAnswering(TestElectraForSequenceClassification):
 
 
 class TestElectraForMultipleChoice(TestElectraForSequenceClassification):
+
     def set_input(self):
-        self.config = copy.deepcopy(ElectraModel.pretrained_init_configuration[
-            'electra-base'])
+        self.config = copy.deepcopy(
+            ElectraModel.pretrained_init_configuration['electra-base'])
         self.config['num_hidden_layers'] = 2
         self.config['vocab_size'] = 512
         self.config['attention_probs_dropout_prob'] = 0.0

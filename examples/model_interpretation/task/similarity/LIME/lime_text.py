@@ -55,10 +55,9 @@ class TextDomainMapper(explanation.DomainMapper):
             examples: ('bad', 1) or ('bad_3-6-12', 1)
         """
         if positions:
-            exp = [('%s_%s' % (
-                self.indexed_string.word(x[0]),
-                '-'.join(map(str, self.indexed_string.string_position(x[0])))),
-                    x[1]) for x in exp]
+            exp = [('%s_%s' % (self.indexed_string.word(x[0]), '-'.join(
+                map(str, self.indexed_string.string_position(x[0])))), x[1])
+                   for x in exp]
         else:
             exp = [(self.indexed_string.word(x[0]), x[1]) for x in exp]
         return exp
@@ -82,8 +81,8 @@ class TextDomainMapper(explanation.DomainMapper):
         """
         if not text:
             return u''
-        text = (self.indexed_string.raw_string()
-                .encode('utf-8', 'xmlcharrefreplace').decode('utf-8'))
+        text = (self.indexed_string.raw_string().encode(
+            'utf-8', 'xmlcharrefreplace').decode('utf-8'))
         text = re.sub(r'[<>&]', '|', text)
         exp = [(self.indexed_string.word(x[0]),
                 self.indexed_string.string_position(x[0]), x[1]) for x in exp]
@@ -155,8 +154,9 @@ class IndexedString(object):
         for i, word in enumerate(self.as_np):
             if word in non_vocab:
                 continue
-            if (self.language == 'ch' and not valid_word(word)) or (
-                    self.language == 'en' and valid_word(word)):
+            if (self.language == 'ch'
+                    and not valid_word(word)) or (self.language == 'en'
+                                                  and valid_word(word)):
                 non_vocab.add(word)
                 continue
             if bow:
@@ -393,8 +393,9 @@ class LimeTextExplainer(object):
         kernel_fn = partial(kernel, kernel_width=kernel_width)
 
         self.random_state = check_random_state(random_state)
-        self.base = lime_base.LimeBase(
-            kernel_fn, verbose, random_state=self.random_state)
+        self.base = lime_base.LimeBase(kernel_fn,
+                                       verbose,
+                                       random_state=self.random_state)
         self.class_names = class_names
         self.vocabulary = None
         self.feature_selection = feature_selection
@@ -477,10 +478,9 @@ class LimeTextExplainer(object):
 
         if self.class_names is None:
             self.class_names = [str(x) for x in range(yss[0].shape[0])]
-        ret_exp = explanation.Explanation(
-            domain_mapper=domain_mapper,
-            class_names=self.class_names,
-            random_state=self.random_state)
+        ret_exp = explanation.Explanation(domain_mapper=domain_mapper,
+                                          class_names=self.class_names,
+                                          random_state=self.random_state)
         ret_exp.predict_proba = yss[0]
         if top_labels:
             labels = np.argsort(yss[0])[-top_labels:]
@@ -614,8 +614,8 @@ class LimeTextExplainer(object):
         if not if_lstm:
             for token_ids in token_ids_list:
                 #token_ids = token_ids[:max_len]
-                token_ids = token_ids + [tokenizer.pad_token_id] * (
-                    max_len - len(token_ids))
+                token_ids = token_ids + [tokenizer.pad_token_id
+                                         ] * (max_len - len(token_ids))
                 token_ids_np.append(token_ids)
                 s_ids = [0 for _ in range(len(token_ids))]
                 s_ids_list.append(s_ids)
@@ -633,14 +633,14 @@ class LimeTextExplainer(object):
         epoch_num = math.ceil(len(perturb_text) / batch)
         for idx in range(epoch_num):
             if if_lstm:
-                query_list_tensor = paddle.to_tensor(query_list[idx * batch:(
-                    idx + 1) * batch])
-                title_list_tensor = paddle.to_tensor(title_list[idx * batch:(
-                    idx + 1) * batch])
-                query_len_list_tensor = paddle.to_tensor(query_len_list[
-                    idx * batch:(idx + 1) * batch])
-                title_len_list_tensor = paddle.to_tensor(title_len_list[
-                    idx * batch:(idx + 1) * batch])
+                query_list_tensor = paddle.to_tensor(
+                    query_list[idx * batch:(idx + 1) * batch])
+                title_list_tensor = paddle.to_tensor(
+                    title_list[idx * batch:(idx + 1) * batch])
+                query_len_list_tensor = paddle.to_tensor(
+                    query_len_list[idx * batch:(idx + 1) * batch])
+                title_len_list_tensor = paddle.to_tensor(
+                    title_len_list[idx * batch:(idx + 1) * batch])
                 label = classifier_fn(
                     query_list_tensor, title_list_tensor, query_len_list_tensor,
                     title_len_list_tensor)[0]  # label: Tensor[num_samples, 2]

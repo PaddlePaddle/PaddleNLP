@@ -19,12 +19,15 @@ import paddle.nn.functional as F
 
 
 class CrossEntropyCriterion(nn.Layer):
+
     def __init__(self):
         super(CrossEntropyCriterion, self).__init__()
 
     def forward(self, predict, label, trg_mask):
-        cost = F.cross_entropy(
-            input=predict, label=label, reduction='none', soft_label=False)
+        cost = F.cross_entropy(input=predict,
+                               label=label,
+                               reduction='none',
+                               soft_label=False)
         cost = paddle.squeeze(cost, axis=[2])
         masked_cost = cost * trg_mask
         batch_mean_cost = paddle.mean(masked_cost, axis=[0])
@@ -34,15 +37,15 @@ class CrossEntropyCriterion(nn.Layer):
 
 
 class Seq2SeqEncoder(nn.Layer):
+
     def __init__(self, vocab_size, embed_dim, hidden_size, num_layers):
         super(Seq2SeqEncoder, self).__init__()
         self.embedder = nn.Embedding(vocab_size, embed_dim)
 
-        self.lstm = nn.LSTM(
-            input_size=embed_dim,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=0.2 if num_layers > 1 else 0.)
+        self.lstm = nn.LSTM(input_size=embed_dim,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            dropout=0.2 if num_layers > 1 else 0.)
 
     def forward(self, sequence, sequence_length):
         inputs = self.embedder(sequence)
@@ -53,6 +56,7 @@ class Seq2SeqEncoder(nn.Layer):
 
 
 class AttentionLayer(nn.Layer):
+
     def __init__(self, hidden_size):
         super(AttentionLayer, self).__init__()
         self.input_proj = nn.Linear(hidden_size, hidden_size)
@@ -60,28 +64,30 @@ class AttentionLayer(nn.Layer):
 
     def forward(self, hidden, encoder_output, encoder_padding_mask):
         encoder_output = self.input_proj(encoder_output)
-        attn_scores = paddle.matmul(
-            paddle.unsqueeze(hidden, [1]), encoder_output, transpose_y=True)
+        attn_scores = paddle.matmul(paddle.unsqueeze(hidden, [1]),
+                                    encoder_output,
+                                    transpose_y=True)
 
         if encoder_padding_mask is not None:
             attn_scores = paddle.add(attn_scores, encoder_padding_mask)
 
         attn_scores = F.softmax(attn_scores)
-        attn_out = paddle.squeeze(
-            paddle.matmul(attn_scores, encoder_output), [1])
+        attn_out = paddle.squeeze(paddle.matmul(attn_scores, encoder_output),
+                                  [1])
         attn_out = paddle.concat([attn_out, hidden], 1)
         attn_out = self.output_proj(attn_out)
         return attn_out
 
 
 class Seq2SeqDecoderCell(nn.RNNCellBase):
+
     def __init__(self, num_layers, input_size, hidden_size):
         super(Seq2SeqDecoderCell, self).__init__()
         self.dropout = nn.Dropout(0.2)
         self.lstm_cells = nn.LayerList([
-            nn.LSTMCell(
-                input_size=input_size + hidden_size if i == 0 else hidden_size,
-                hidden_size=hidden_size) for i in range(num_layers)
+            nn.LSTMCell(input_size=input_size +
+                        hidden_size if i == 0 else hidden_size,
+                        hidden_size=hidden_size) for i in range(num_layers)
         ])
 
         self.attention_layer = AttentionLayer(hidden_size)
@@ -104,6 +110,7 @@ class Seq2SeqDecoderCell(nn.RNNCellBase):
 
 
 class Seq2SeqDecoder(nn.Layer):
+
     def __init__(self, vocab_size, embed_dim, hidden_size, num_layers):
         super(Seq2SeqDecoder, self).__init__()
         self.embedder = nn.Embedding(vocab_size, embed_dim)
@@ -126,7 +133,12 @@ class Seq2SeqDecoder(nn.Layer):
 
 
 class Seq2SeqAttnModel(nn.Layer):
-    def __init__(self, vocab_size, embed_dim, hidden_size, num_layers,
+
+    def __init__(self,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
                  eos_id=1):
         super(Seq2SeqAttnModel, self).__init__()
         self.hidden_size = hidden_size
@@ -142,10 +154,9 @@ class Seq2SeqAttnModel(nn.Layer):
         encoder_output, encoder_final_state = self.encoder(src, src_length)
 
         # Transfer shape of encoder_final_states to [num_layers, 2, batch_size, hidden_size]
-        encoder_final_states = [
-            (encoder_final_state[0][i], encoder_final_state[1][i])
-            for i in range(self.num_layers)
-        ]
+        encoder_final_states = [(encoder_final_state[0][i],
+                                 encoder_final_state[1][i])
+                                for i in range(self.num_layers)]
         # Construct decoder initial states: use input_feed and the shape is
         # [[h,c] * num_layers, input_feed], consistent with Seq2SeqDecoderCell.states
         decoder_initial_states = [
@@ -165,6 +176,7 @@ class Seq2SeqAttnModel(nn.Layer):
 
 
 class Seq2SeqAttnInferModel(Seq2SeqAttnModel):
+
     def __init__(self,
                  vocab_size,
                  embed_dim,
@@ -178,8 +190,9 @@ class Seq2SeqAttnInferModel(Seq2SeqAttnModel):
         self.beam_size = beam_size
         self.max_out_len = max_out_len
         self.num_layers = num_layers
-        super(Seq2SeqAttnInferModel, self).__init__(
-            vocab_size, embed_dim, hidden_size, num_layers, eos_id)
+        super(Seq2SeqAttnInferModel,
+              self).__init__(vocab_size, embed_dim, hidden_size, num_layers,
+                             eos_id)
 
         # Dynamic decoder for inference
         self.beam_search_decoder = nn.BeamSearchDecoder(
@@ -193,10 +206,9 @@ class Seq2SeqAttnInferModel(Seq2SeqAttnModel):
     def forward(self, src, src_length):
         encoder_output, encoder_final_state = self.encoder(src, src_length)
 
-        encoder_final_state = [
-            (encoder_final_state[0][i], encoder_final_state[1][i])
-            for i in range(self.num_layers)
-        ]
+        encoder_final_state = [(encoder_final_state[0][i],
+                                encoder_final_state[1][i])
+                               for i in range(self.num_layers)]
 
         # Initial decoder initial states
         decoder_initial_states = [

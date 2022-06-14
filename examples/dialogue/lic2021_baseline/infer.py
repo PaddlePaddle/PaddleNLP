@@ -22,14 +22,14 @@ def main(args):
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(
         args.model_name_or_path)
 
-    test_dataset = DialogueDataset(
-        args.test_data_path,
-        args.batch_size,
-        tokenizer.pad_token_id,
-        tokenizer.cls_token_id,
-        mode='test')
-    test_dataloader = DataLoader(
-        test_dataset, return_list=True, batch_size=None)
+    test_dataset = DialogueDataset(args.test_data_path,
+                                   args.batch_size,
+                                   tokenizer.pad_token_id,
+                                   tokenizer.cls_token_id,
+                                   mode='test')
+    test_dataloader = DataLoader(test_dataset,
+                                 return_list=True,
+                                 batch_size=None)
 
     infer(model, test_dataloader, tokenizer)
 
@@ -43,22 +43,21 @@ def infer(model, data_loader, tokenizer):
     responses = []
     for step, inputs in enumerate(data_loader, 1):
         token_ids, type_ids, pos_ids, generation_mask = inputs
-        ids, scores = model.generate(
-            input_ids=token_ids,
-            token_type_ids=type_ids,
-            position_ids=pos_ids,
-            attention_mask=generation_mask,
-            max_length=args.max_dec_len,
-            min_length=args.min_dec_len,
-            decode_strategy=args.decode_strategy,
-            temperature=args.temperature,
-            top_k=args.top_k,
-            top_p=args.top_p,
-            num_beams=args.num_beams,
-            length_penalty=args.length_penalty,
-            early_stopping=args.early_stopping,
-            num_return_sequences=args.num_samples,
-            use_faster=False)
+        ids, scores = model.generate(input_ids=token_ids,
+                                     token_type_ids=type_ids,
+                                     position_ids=pos_ids,
+                                     attention_mask=generation_mask,
+                                     max_length=args.max_dec_len,
+                                     min_length=args.min_dec_len,
+                                     decode_strategy=args.decode_strategy,
+                                     temperature=args.temperature,
+                                     top_k=args.top_k,
+                                     top_p=args.top_p,
+                                     num_beams=args.num_beams,
+                                     length_penalty=args.length_penalty,
+                                     early_stopping=args.early_stopping,
+                                     num_return_sequences=args.num_samples,
+                                     use_faster=False)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:

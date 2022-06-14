@@ -47,18 +47,22 @@ MODEL_CLASSES = {
 
 def create_data_holder(args):
     """creat data holder"""
-    tokens = paddle.static.data(
-        name="tokens", shape=[-1, args.max_seq_len], dtype="int64")
-    loss_mask = paddle.static.data(
-        name="loss_mask", shape=[-1, args.max_seq_len], dtype="float32")
+    tokens = paddle.static.data(name="tokens",
+                                shape=[-1, args.max_seq_len],
+                                dtype="int64")
+    loss_mask = paddle.static.data(name="loss_mask",
+                                   shape=[-1, args.max_seq_len],
+                                   dtype="float32")
     attention_mask = paddle.static.data(
         name="attention_mask",
         shape=[-1, 1, args.max_seq_len, args.max_seq_len],
         dtype="float32")
-    position_ids = paddle.static.data(
-        name="position_ids", shape=[-1, args.max_seq_len], dtype="int64")
-    labels = paddle.static.data(
-        name="labels", shape=[-1, args.max_seq_len], dtype="int64")
+    position_ids = paddle.static.data(name="position_ids",
+                                      shape=[-1, args.max_seq_len],
+                                      dtype="int64")
+    labels = paddle.static.data(name="labels",
+                                shape=[-1, args.max_seq_len],
+                                dtype="int64")
     return [tokens, loss_mask, attention_mask, position_ids, labels]
 
 
@@ -122,8 +126,8 @@ def dist_optimizer(args, topo):
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -135,8 +139,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
@@ -208,13 +212,12 @@ def do_train(args):
     assert args.pp_degree == 1, "Please use gpt-3 example to train GPT with pipline prallelism."
     assert args.mp_degree == 1, "Please use gpt-3 example to train GPT with model prallelism."
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=args.dp_degree,
+                    pp_degree=args.pp_degree,
+                    sharding_degree=args.sharding_degree,
+                    mp_degree=args.mp_degree)
 
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
@@ -262,7 +265,8 @@ def do_train(args):
                     max_seq_len=args.max_seq_len,
                     places=paddle.static.cuda_places(),
                     data_holders=data_holders,
-                    pipeline_mode=False, )
+                    pipeline_mode=False,
+                )
 
                 if args.model_name_or_path in pretrained_models_list:
                     model_config = model_class.pretrained_init_configuration[
@@ -330,8 +334,8 @@ def do_train(args):
                 }
 
             # Use the fleet api to compile the distributed optimizer
-            optimizer = fleet.distributed_optimizer(
-                optimizer, strategy=dist_strategy)
+            optimizer = fleet.distributed_optimizer(optimizer,
+                                                    strategy=dist_strategy)
 
             optimizer.minimize(loss)
             logger.info(f'final strategy: {fleet._final_strategy()}')
@@ -376,10 +380,7 @@ def do_train(args):
             else:
                 logger.info("Loading parameters from %s" % dygrah_path)
                 init_static_with_params(
-                    model,
-                    paddle.load(
-                        dygrah_path, return_numpy=True),
-                    topo,
+                    model, paddle.load(dygrah_path, return_numpy=True), topo,
                     main_program)
                 flag_loaded = True
 
@@ -425,8 +426,8 @@ def do_train(args):
                 if topo.is_last:
                     loss_return, lr_return = ret
                     # speed = args.logging_freq / (time.time() - tic_train)
-                    speed = args.logging_freq / (
-                        train_reader_cost + train_run_cost)
+                    speed = args.logging_freq / (train_reader_cost +
+                                                 train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
 
                     logger.info(
@@ -464,13 +465,12 @@ def do_train(args):
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % global_step)
                 logger.debug("saving models to {}".format(output_dir))
-                save_persistables(exe,
-                                  os.path.join(output_dir, "static_vars"),
+                save_persistables(exe, os.path.join(output_dir, "static_vars"),
                                   main_program)
 
                 if global_step <= args.save_steps:
-                    model.init_config["init_args"][0].init_config.pop("topo",
-                                                                      None)
+                    model.init_config["init_args"][0].init_config.pop(
+                        "topo", None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
