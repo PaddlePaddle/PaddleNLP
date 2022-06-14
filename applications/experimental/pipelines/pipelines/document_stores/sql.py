@@ -33,7 +33,8 @@ try:
         Text,
         text,
         JSON,
-        ForeignKeyConstraint, )
+        ForeignKeyConstraint,
+    )
     from sqlalchemy.ext.declarative import declarative_base
     from sqlalchemy.orm import relationship, sessionmaker
     from sqlalchemy.sql import case, null
@@ -56,8 +57,9 @@ class ORMBase(Base):
 
     id = Column(String(100), default=lambda: str(uuid4()), primary_key=True)
     created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(
-        DateTime, server_default=func.now(), server_onupdate=func.now())
+    updated_at = Column(DateTime,
+                        server_default=func.now(),
+                        server_onupdate=func.now())
 
 
 class DocumentORM(ORMBase):
@@ -69,8 +71,9 @@ class DocumentORM(ORMBase):
     index = Column(String(100), nullable=False, primary_key=True)
     vector_id = Column(String(100), unique=True, nullable=True)
     # speeds up queries for get_documents_by_vector_ids() by having a single query that returns joined metadata
-    meta = relationship(
-        "MetaDocumentORM", back_populates="documents", lazy="joined")
+    meta = relationship("MetaDocumentORM",
+                        back_populates="documents",
+                        lazy="joined")
 
 
 class MetaDocumentORM(ORMBase):
@@ -83,11 +86,12 @@ class MetaDocumentORM(ORMBase):
     document_id = Column(String(100), nullable=False, index=True)
     document_index = Column(String(100), nullable=False, index=True)
     __table_args__ = (
-        ForeignKeyConstraint(
-            [document_id, document_index], [DocumentORM.id, DocumentORM.index],
-            ondelete="CASCADE",
-            onupdate="CASCADE"),
-        {}, )  # type: ignore
+        ForeignKeyConstraint([document_id, document_index],
+                             [DocumentORM.id, DocumentORM.index],
+                             ondelete="CASCADE",
+                             onupdate="CASCADE"),
+        {},
+    )  # type: ignore
 
 
 class LabelORM(ORMBase):
@@ -116,22 +120,25 @@ class MetaLabelORM(ORMBase):
     label_id = Column(String(100), nullable=False, index=True)
     label_index = Column(String(100), nullable=False, index=True)
     __table_args__ = (
-        ForeignKeyConstraint(
-            [label_id, label_index], [LabelORM.id, LabelORM.index],
-            ondelete="CASCADE",
-            onupdate="CASCADE"),
-        {}, )  # type: ignore
+        ForeignKeyConstraint([label_id, label_index],
+                             [LabelORM.id, LabelORM.index],
+                             ondelete="CASCADE",
+                             onupdate="CASCADE"),
+        {},
+    )  # type: ignore
 
 
 class SQLDocumentStore(BaseDocumentStore):
+
     def __init__(
-            self,
-            url: str="sqlite://",
-            index: str="document",
-            label_index: str="label",
-            duplicate_documents: str="overwrite",
-            check_same_thread: bool=False,
-            isolation_level: str=None, ):
+        self,
+        url: str = "sqlite://",
+        index: str = "document",
+        label_index: str = "label",
+        duplicate_documents: str = "overwrite",
+        check_same_thread: bool = False,
+        isolation_level: str = None,
+    ):
         """
         An SQL backed DocumentStore. Currently supports SQLite, PostgreSQL and MySQL backends.
 
@@ -155,7 +162,8 @@ class SQLDocumentStore(BaseDocumentStore):
             index=index,
             label_index=label_index,
             duplicate_documents=duplicate_documents,
-            check_same_thread=check_same_thread, )
+            check_same_thread=check_same_thread,
+        )
         create_engine_params = {}
         if isolation_level:
             create_engine_params["isolation_level"] = isolation_level
@@ -184,8 +192,8 @@ class SQLDocumentStore(BaseDocumentStore):
     def get_document_by_id(
             self,
             id: str,
-            index: Optional[str]=None,
-            headers: Optional[Dict[str, str]]=None) -> Optional[Document]:
+            index: Optional[str] = None,
+            headers: Optional[Dict[str, str]] = None) -> Optional[Document]:
         """Fetch a document by specifying its text id string"""
         if headers:
             raise NotImplementedError(
@@ -196,11 +204,12 @@ class SQLDocumentStore(BaseDocumentStore):
         return document
 
     def get_documents_by_id(
-            self,
-            ids: List[str],
-            index: Optional[str]=None,
-            batch_size: int=10_000,
-            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
+        self,
+        ids: List[str],
+        index: Optional[str] = None,
+        batch_size: int = 10_000,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[Document]:
         """Fetch documents by specifying a list of text id strings"""
         if headers:
             raise NotImplementedError(
@@ -220,8 +229,8 @@ class SQLDocumentStore(BaseDocumentStore):
 
     def get_documents_by_vector_ids(self,
                                     vector_ids: List[str],
-                                    index: Optional[str]=None,
-                                    batch_size: int=10_000):
+                                    index: Optional[str] = None,
+                                    batch_size: int = 10_000):
         """Fetch documents by specifying a list of text vector id strings"""
         index = index or self.index
 
@@ -238,36 +247,36 @@ class SQLDocumentStore(BaseDocumentStore):
         return sorted_documents
 
     def get_all_documents(
-            self,
-            index: Optional[str]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            return_embedding: Optional[bool]=None,
-            batch_size: int=10_000,
-            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
+        self,
+        index: Optional[str] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        return_embedding: Optional[bool] = None,
+        batch_size: int = 10_000,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[Document]:
         if headers:
             raise NotImplementedError(
                 "SQLDocumentStore does not support headers.")
 
         documents = list(
-            self.get_all_documents_generator(
-                index=index,
-                filters=filters,
-                return_embedding=return_embedding,
-                batch_size=batch_size))
+            self.get_all_documents_generator(index=index,
+                                             filters=filters,
+                                             return_embedding=return_embedding,
+                                             batch_size=batch_size))
         return documents
 
     def get_all_documents_generator(
-            self,
-            index: Optional[str]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            return_embedding: Optional[bool]=None,
-            batch_size: int=10_000,
-            headers: Optional[Dict[str, str]]=None, ) -> Generator[Document,
-                                                                   None, None]:
+        self,
+        index: Optional[str] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        return_embedding: Optional[bool] = None,
+        batch_size: int = 10_000,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Generator[Document, None, None]:
         """
         Get documents from the document store. Under-the-hood, documents are fetched in batches from the
         document store and yielded as individual documents. This method can be used to iteratively process
@@ -290,7 +299,8 @@ class SQLDocumentStore(BaseDocumentStore):
         result = self._query(
             index=index,
             filters=filters,
-            batch_size=batch_size, )
+            batch_size=batch_size,
+        )
         yield from result
 
     def _create_document_field_map(self) -> Dict:
@@ -300,14 +310,15 @@ class SQLDocumentStore(BaseDocumentStore):
         return {}
 
     def _query(
-            self,
-            index: Optional[str]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            vector_ids: Optional[List[str]]=None,
-            only_documents_without_embedding: bool=False,
-            batch_size: int=10_000, ):
+        self,
+        index: Optional[str] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        vector_ids: Optional[List[str]] = None,
+        only_documents_without_embedding: bool = False,
+        batch_size: int = 10_000,
+    ):
         """
         :param index: Name of the index to get the documents from. If None, the
                       DocumentStore's default index (self.index) will be used.
@@ -346,9 +357,12 @@ class SQLDocumentStore(BaseDocumentStore):
 
         for i, row in enumerate(documents_query, start=1):
             documents_map[row.id] = Document.from_dict({
-                "id": row.id,
-                "content": row.content,
-                "content_type": row.content_type,
+                "id":
+                row.id,
+                "content":
+                row.content,
+                "content_type":
+                row.content_type,
                 "meta": {} if row.vector_id is None else {
                     "vector_id": row.vector_id
                 },
@@ -374,8 +388,8 @@ class SQLDocumentStore(BaseDocumentStore):
 
     def get_all_labels(self,
                        index=None,
-                       filters: Optional[dict]=None,
-                       headers: Optional[Dict[str, str]]=None):
+                       filters: Optional[dict] = None,
+                       headers: Optional[Dict[str, str]] = None):
         """
         Return all labels in the document store
         """
@@ -391,12 +405,13 @@ class SQLDocumentStore(BaseDocumentStore):
         return labels
 
     def write_documents(
-            self,
-            documents: Union[List[dict], List[Document]],
-            index: Optional[str]=None,
-            batch_size: int=10_000,
-            duplicate_documents: Optional[str]=None,
-            headers: Optional[Dict[str, str]]=None, ) -> None:
+        self,
+        documents: Union[List[dict], List[Document]],
+        index: Optional[str] = None,
+        batch_size: int = 10_000,
+        duplicate_documents: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> None:
         """
         Indexes documents for later queries.
 
@@ -443,8 +458,7 @@ class SQLDocumentStore(BaseDocumentStore):
                 meta_fields = doc.meta or {}
                 vector_id = meta_fields.pop("vector_id", None)
                 meta_orms = [
-                    MetaDocumentORM(
-                        name=key, value=value)
+                    MetaDocumentORM(name=key, value=value)
                     for key, value in meta_fields.items()
                 ]
                 doc_orm = DocumentORM(
@@ -453,7 +467,8 @@ class SQLDocumentStore(BaseDocumentStore):
                     content_type=doc.content_type,
                     vector_id=vector_id,
                     meta=meta_orms,
-                    index=index, )
+                    index=index,
+                )
                 if duplicate_documents == "overwrite":
                     # First old meta data cleaning is required
                     self.session.query(MetaDocumentORM).filter_by(
@@ -472,7 +487,7 @@ class SQLDocumentStore(BaseDocumentStore):
     def write_labels(self,
                      labels,
                      index=None,
-                     headers: Optional[Dict[str, str]]=None):
+                     headers: Optional[Dict[str, str]] = None):
         """Write annotation labels into document store."""
         if headers:
             raise NotImplementedError(
@@ -484,8 +499,8 @@ class SQLDocumentStore(BaseDocumentStore):
         index = index or self.label_index
 
         duplicate_ids: list = [
-            label.id for label in self._get_duplicate_labels(
-                labels, index=index)
+            label.id
+            for label in self._get_duplicate_labels(labels, index=index)
         ]
         if len(duplicate_ids) > 0:
             logger.warning(
@@ -515,7 +530,8 @@ class SQLDocumentStore(BaseDocumentStore):
                 is_correct_document=label.is_correct_document,
                 answer=label.answer.to_json(),
                 pipeline_id=label.pipeline_id,
-                index=index, )
+                index=index,
+            )
             if label.id in duplicate_ids:
                 self.session.merge(label_orm)
             else:
@@ -527,8 +543,8 @@ class SQLDocumentStore(BaseDocumentStore):
 
     def update_vector_ids(self,
                           vector_id_map: Dict[str, str],
-                          index: Optional[str]=None,
-                          batch_size: int=10_000):
+                          index: Optional[str] = None,
+                          batch_size: int = 10_000):
         """
         Update vector_ids for given document_ids.
 
@@ -542,11 +558,14 @@ class SQLDocumentStore(BaseDocumentStore):
                 DocumentORM.id.in_(chunk_map),
                 DocumentORM.index == index).update(
                     {
-                        DocumentORM.vector_id: case(
+                        DocumentORM.vector_id:
+                        case(
                             chunk_map,
-                            value=DocumentORM.id, )
+                            value=DocumentORM.id,
+                        )
                     },
-                    synchronize_session=False, )
+                    synchronize_session=False,
+                )
             try:
                 self.session.commit()
             except Exception as ex:
@@ -554,20 +573,19 @@ class SQLDocumentStore(BaseDocumentStore):
                 self.session.rollback()
                 raise ex
 
-    def reset_vector_ids(self, index: Optional[str]=None):
+    def reset_vector_ids(self, index: Optional[str] = None):
         """
         Set vector IDs for all documents as None
         """
         index = index or self.index
-        self.session.query(DocumentORM).filter_by(index=index).update({
-            DocumentORM.vector_id: null()
-        })
+        self.session.query(DocumentORM).filter_by(index=index).update(
+            {DocumentORM.vector_id: null()})
         self.session.commit()
 
     def update_document_meta(self,
                              id: str,
                              meta: Dict[str, str],
-                             index: str=None):
+                             index: str = None):
         """
         Update the metadata dictionary of a document by specifying its string id
         """
@@ -576,8 +594,10 @@ class SQLDocumentStore(BaseDocumentStore):
         self.session.query(MetaDocumentORM).filter_by(
             document_id=id, document_index=index).delete()
         meta_orms = [
-            MetaDocumentORM(
-                name=key, value=value, document_id=id, document_index=index)
+            MetaDocumentORM(name=key,
+                            value=value,
+                            document_id=id,
+                            document_index=index)
             for key, value in meta.items()
         ]
         for m in meta_orms:
@@ -585,13 +605,14 @@ class SQLDocumentStore(BaseDocumentStore):
         self.session.commit()
 
     def get_document_count(
-            self,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            index: Optional[str]=None,
-            only_documents_without_embedding: bool=False,
-            headers: Optional[Dict[str, str]]=None, ) -> int:
+        self,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        index: Optional[str] = None,
+        only_documents_without_embedding: bool = False,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> int:
         """
         Return the number of documents in the document store.
         """
@@ -604,10 +625,10 @@ class SQLDocumentStore(BaseDocumentStore):
 
         if filters:
             for key, values in filters.items():
-                query = query.join(
-                    MetaDocumentORM, aliased=True).filter(
-                        MetaDocumentORM.name == key,
-                        MetaDocumentORM.value.in_(values), )
+                query = query.join(MetaDocumentORM, aliased=True).filter(
+                    MetaDocumentORM.name == key,
+                    MetaDocumentORM.value.in_(values),
+                )
 
         if only_documents_without_embedding:
             query = query.filter(DocumentORM.vector_id.is_(None))
@@ -616,8 +637,8 @@ class SQLDocumentStore(BaseDocumentStore):
         return count
 
     def get_label_count(self,
-                        index: Optional[str]=None,
-                        headers: Optional[Dict[str, str]]=None) -> int:
+                        index: Optional[str] = None,
+                        headers: Optional[Dict[str, str]] = None) -> int:
         """
         Return the number of labels in the document store
         """
@@ -657,17 +678,19 @@ class SQLDocumentStore(BaseDocumentStore):
             pipeline_id=row.pipeline_id,
             created_at=row.created_at,
             updated_at=row.updated_at,
-            meta=row.meta, )
+            meta=row.meta,
+        )
         return label
 
     def query_by_embedding(
-            self,
-            query_emb: np.ndarray,
-            filters: Optional[dict]=None,
-            top_k: int=10,
-            index: Optional[str]=None,
-            return_embedding: Optional[bool]=None,
-            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
+        self,
+        query_emb: np.ndarray,
+        filters: Optional[dict] = None,
+        top_k: int = 10,
+        index: Optional[str] = None,
+        return_embedding: Optional[bool] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[Document]:
 
         raise NotImplementedError(
             "SQLDocumentStore is currently not supporting embedding queries. "
@@ -675,12 +698,13 @@ class SQLDocumentStore(BaseDocumentStore):
             "or change the DocumentStore (e.g. to ElasticsearchDocumentStore)")
 
     def delete_all_documents(
-            self,
-            index: Optional[str]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            headers: Optional[Dict[str, str]]=None, ):
+        self,
+        index: Optional[str] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        headers: Optional[Dict[str, str]] = None,
+    ):
         """
         Delete documents in an index. All documents are deleted if no filters are passed.
 
@@ -698,13 +722,14 @@ class SQLDocumentStore(BaseDocumentStore):
         self.delete_documents(index, None, filters)
 
     def delete_documents(
-            self,
-            index: Optional[str]=None,
-            ids: Optional[List[str]]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            headers: Optional[Dict[str, str]]=None, ):
+        self,
+        index: Optional[str] = None,
+        ids: Optional[List[str]] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        headers: Optional[Dict[str, str]] = None,
+    ):
         """
         Delete documents in an index. All documents are deleted if no filters are passed.
 
@@ -723,14 +748,15 @@ class SQLDocumentStore(BaseDocumentStore):
             self.session.query(DocumentORM).filter_by(index=index).delete(
                 synchronize_session=False)
         else:
-            document_ids_to_delete = self.session.query(DocumentORM.id).filter(
-                DocumentORM.index == index)
+            document_ids_to_delete = self.session.query(
+                DocumentORM.id).filter(DocumentORM.index == index)
             if filters:
                 for key, values in filters.items():
                     document_ids_to_delete = document_ids_to_delete.join(
                         MetaDocumentORM, aliased=True).filter(
                             MetaDocumentORM.name == key,
-                            MetaDocumentORM.value.in_(values), )
+                            MetaDocumentORM.value.in_(values),
+                        )
             if ids:
                 document_ids_to_delete = document_ids_to_delete.filter(
                     DocumentORM.id.in_(ids))
@@ -742,13 +768,14 @@ class SQLDocumentStore(BaseDocumentStore):
         self.session.commit()
 
     def delete_labels(
-            self,
-            index: Optional[str]=None,
-            ids: Optional[List[str]]=None,
-            filters: Optional[Dict[
-                str,
-                Any]]=None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
-            headers: Optional[Dict[str, str]]=None, ):
+        self,
+        index: Optional[str] = None,
+        ids: Optional[List[str]] = None,
+        filters: Optional[Dict[
+            str,
+            Any]] = None,  # TODO: Adapt type once we allow extended filters in SQLDocStore
+        headers: Optional[Dict[str, str]] = None,
+    ):
         """
         Delete labels from the document store. All labels are deleted if no filters are passed.
 
@@ -768,8 +795,8 @@ class SQLDocumentStore(BaseDocumentStore):
             self.session.query(LabelORM).filter_by(index=index).delete(
                 synchronize_session=False)
         else:
-            label_ids_to_delete = self.session.query(LabelORM.id).filter_by(
-                index=index)
+            label_ids_to_delete = self.session.query(
+                LabelORM.id).filter_by(index=index)
             if filters:
                 for key, values in filters.items():
                     label_attribute = getattr(LabelORM, key)
@@ -818,7 +845,8 @@ class SQLDocumentStore(BaseDocumentStore):
                 return column >= start_id
 
         q = session.query(
-            column, func.row_number().over(
+            column,
+            func.row_number().over(
                 order_by=column).label("rownum")).from_self(column)
         if windowsize > 1:
             q = q.filter(text("rownum %% %d=1" % windowsize))

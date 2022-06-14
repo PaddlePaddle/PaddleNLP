@@ -78,8 +78,8 @@ def flatten_distribution(distribution_map, probabilities):
 
 
 class SQLPrediction(
-        namedtuple('SQLPrediction', ('predictions', 'sequence',
-                                     'probability'))):
+        namedtuple('SQLPrediction',
+                   ('predictions', 'sequence', 'probability'))):
     """Contains prediction for a sequence."""
     __slots__ = ()
 
@@ -109,8 +109,8 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
         start_token_embedding = self.create_parameter(
             [params.output_embedding_size],
             dtype='float32',
-            default_initializer=paddle.nn.initializer.Uniform(
-                low=-0.1, high=0.1))
+            default_initializer=paddle.nn.initializer.Uniform(low=-0.1,
+                                                              high=0.1))
         self.add_parameter("start_token_embedding", start_token_embedding)
 
         self.input_size = input_size
@@ -148,29 +148,26 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
 
     def get_decoder_input(self, output_token_embedding, prediction):
         if self.params.use_schema_attention and self.params.use_query_attention:
-            decoder_input = paddle.concat(
-                [
-                    output_token_embedding,
-                    prediction.utterance_attention_results.vector,
-                    prediction.schema_attention_results.vector,
-                    prediction.query_attention_results.vector
-                ],
-                axis=0)
+            decoder_input = paddle.concat([
+                output_token_embedding,
+                prediction.utterance_attention_results.vector,
+                prediction.schema_attention_results.vector,
+                prediction.query_attention_results.vector
+            ],
+                                          axis=0)
         elif self.params.use_schema_attention:
-            decoder_input = paddle.concat(
-                [
-                    output_token_embedding,
-                    prediction.utterance_attention_results.vector,
-                    prediction.schema_attention_results.vector
-                ],
-                axis=0)
+            decoder_input = paddle.concat([
+                output_token_embedding,
+                prediction.utterance_attention_results.vector,
+                prediction.schema_attention_results.vector
+            ],
+                                          axis=0)
         else:
-            decoder_input = paddle.concat(
-                [
-                    output_token_embedding,
-                    prediction.utterance_attention_results.vector
-                ],
-                axis=0)
+            decoder_input = paddle.concat([
+                output_token_embedding,
+                prediction.utterance_attention_results.vector
+            ],
+                                          axis=0)
         return decoder_input
 
     def forward(self,
@@ -200,7 +197,8 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
         decoder_states = self._initialize_decoder_lstm(final_encoder_state)[0]
 
         decoder_input = paddle.concat(
-            [self.start_token_embedding, paddle.zeros([context_vector_size])],
+            [self.start_token_embedding,
+             paddle.zeros([context_vector_size])],
             axis=0)
         continue_generating = True
         while continue_generating:
@@ -220,8 +218,8 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
                     previous_query_states=previous_query_states,
                     input_schema=input_schema)
 
-                prediction = self.token_predictor(
-                    prediction_input, dropout_amount=dropout_amount)
+                prediction = self.token_predictor(prediction_input,
+                                                  dropout_amount=dropout_amount)
 
                 predictions.append(prediction)
                 # 经过
@@ -240,8 +238,8 @@ class SequencePredictorWithSchema(paddle.nn.Layer):
                         continue_generating = False
                 else:
                     assert prediction.scores.dim() == 1
-                    probabilities = F.softmax(
-                        prediction.scores, axis=0).cpu().numpy().tolist()
+                    probabilities = F.softmax(prediction.scores,
+                                              axis=0).cpu().numpy().tolist()
 
                     distribution_map = prediction.aligned_tokens
                     assert len(probabilities) == len(distribution_map)

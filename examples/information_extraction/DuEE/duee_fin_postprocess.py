@@ -36,10 +36,9 @@ def event_normalization(doc):
             argument_set.add(arg_str)
         event["arguments"] = argument_list
 
-    event_list = sorted(
-        doc.get("event_list", []),
-        key=lambda x: len(x["arguments"]),
-        reverse=True)
+    event_list = sorted(doc.get("event_list", []),
+                        key=lambda x: len(x["arguments"]),
+                        reverse=True)
     new_event_list = []
     for event in event_list:
         event_type = event["event_type"]
@@ -52,10 +51,10 @@ def event_normalization(doc):
                 continue
             new_event_argument_set = set()
             for arg in new_event["arguments"]:
-                new_event_argument_set.add("{}-{}".format(arg["role"], arg[
-                    "argument"]))
-            if len(event_argument_set & new_event_argument_set) == len(
-                    new_event_argument_set):
+                new_event_argument_set.add("{}-{}".format(
+                    arg["role"], arg["argument"]))
+            if len(event_argument_set
+                   & new_event_argument_set) == len(new_event_argument_set):
                 flag = False
         if flag:
             new_event_list.append(event)
@@ -71,8 +70,8 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
     role_data = read_by_lines(role_file)
     enum_data = read_by_lines(enum_file)
     schema_data = read_by_lines(schema_file)
-    print("trigger predict {} load from {}".format(
-        len(trigger_data), trigger_file))
+    print("trigger predict {} load from {}".format(len(trigger_data),
+                                                   trigger_file))
     print("role predict {} load from {}".format(len(role_data), role_file))
     print("enum predict {} load from {}".format(len(enum_data), enum_file))
     print("schema {} load from {}".format(len(schema_data), schema_file))
@@ -82,7 +81,7 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
         d_json = json.loads(s)
         schema[d_json["event_type"]] = [r["role"] for r in d_json["role_list"]]
 
-    # role depends on id and sent_id 
+    # role depends on id and sent_id
     for d in role_data:
         d_json = json.loads(d)
         r_ret = extract_result(d_json["text"], d_json["pred"]["labels"])
@@ -143,8 +142,7 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
 
     # unfiy the all prediction results and save them
     doc_pred = [
-        json.dumps(
-            event_normalization(r), ensure_ascii=False)
+        json.dumps(event_normalization(r), ensure_ascii=False)
         for r in doc_pred.values()
     ]
     print("submit data {} save to {}".format(len(doc_pred), save_path))
@@ -154,12 +152,15 @@ def predict_data_process(trigger_file, role_file, enum_file, schema_file,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Official evaluation script for DuEE version 1.0")
-    parser.add_argument(
-        "--trigger_file", help="trigger model predict data path", required=True)
-    parser.add_argument(
-        "--role_file", help="role model predict data path", required=True)
-    parser.add_argument(
-        "--enum_file", help="enum model predict data path", required=True)
+    parser.add_argument("--trigger_file",
+                        help="trigger model predict data path",
+                        required=True)
+    parser.add_argument("--role_file",
+                        help="role model predict data path",
+                        required=True)
+    parser.add_argument("--enum_file",
+                        help="enum model predict data path",
+                        required=True)
     parser.add_argument("--schema_file", help="schema file path", required=True)
     parser.add_argument("--save_path", help="save file path", required=True)
     args = parser.parse_args()

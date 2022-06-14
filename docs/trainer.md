@@ -367,7 +367,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否不使用 CUDA，即使CUDA环境可用。(`bool`, 可选, 默认为 `False`)
                         Do not use CUDA even when it is available (default:
                         False)
-  --seed  
+  --seed
                         设置的随机种子。为确保多次运行的可复现性。（`int`，可选，默认为 42）
 
                         Random seed that will be set at the beginning of
@@ -432,9 +432,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         If >=0, uses the corresponding part of the output as
                         the past state for next step. (default: -1)
 
-  --run_name  
+  --run_name
                         An optional descriptor for the run. (default: None)
-  --device  
+  --device
                         运行的设备名称。支持cpu/gpu, 默认gpu
                         （`str`，可选，默认为 'gpu'）
 
@@ -476,7 +476,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         first epochs and batches to get to the same training
                         data. (default: False)
 
-  --optim  
+  --optim
                         优化器名称，默认为adamw，，(`str`, 可选，默认为 `adamw`)
                         The optimizer to use. (default: adamw)
 

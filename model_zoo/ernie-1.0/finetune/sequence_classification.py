@@ -27,8 +27,9 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         text = example["text"]
         text_pair = None
 
-    encoded_inputs = tokenizer(
-        text=text, text_pair=text_pair, max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=text,
+                               text_pair=text_pair,
+                               max_seq_len=max_seq_length)
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
@@ -62,8 +63,9 @@ def convert_clue(example,
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        example['label'] = int(example[
-            "label"]) if label_dtype != "float32" else float(example["label"])
+        example['label'] = int(
+            example["label"]) if label_dtype != "float32" else float(
+                example["label"])
         label = example['label']
     # Convert raw text to feature
     if 'keyword' in example:  # CSL
@@ -78,10 +80,11 @@ def convert_clue(example,
             'target']['span1_text'], example['target']['span2_text'], example[
                 'target']['span1_index'], example['target']['span2_index']
         text_list = list(text)
-        assert text[pronoun_idx:(pronoun_idx + len(pronoun)
-                                 )] == pronoun, "pronoun: {}".format(pronoun)
-        assert text[query_idx:(query_idx + len(query)
-                               )] == query, "query: {}".format(query)
+        assert text[pronoun_idx:(
+            pronoun_idx +
+            len(pronoun))] == pronoun, "pronoun: {}".format(pronoun)
+        assert text[query_idx:(query_idx +
+                               len(query))] == query, "query: {}".format(query)
         if pronoun_idx > query_idx:
             text_list.insert(query_idx, "_")
             text_list.insert(query_idx + len(query) + 1, "_")
@@ -100,10 +103,9 @@ def convert_clue(example,
     if 'sentence' in example:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     elif 'sentence1' in example:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length)
 
     if not is_test:
         return {
@@ -122,12 +124,12 @@ def seq_trans_fn(example, tokenizer, args):
     return convert_example(
         example,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length, )
+        max_seq_length=args.max_seq_length,
+    )
 
 
 def clue_trans_fn(example, tokenizer, args):
-    return convert_clue(
-        example,
-        tokenizer=tokenizer,
-        label_list=args.label_list,
-        max_seq_length=args.max_seq_length)
+    return convert_clue(example,
+                        tokenizer=tokenizer,
+                        label_list=args.label_list,
+                        max_seq_length=args.max_seq_length)

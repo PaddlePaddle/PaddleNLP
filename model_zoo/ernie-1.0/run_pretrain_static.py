@@ -51,16 +51,17 @@ MODEL_CLASSES = {
 
 
 def create_pretrained_dataset(
-        args,
-        data_file,
-        tokenizer,
-        data_world_size,
-        data_world_rank,
-        max_seq_len,
-        places,
-        data_holders,
-        binary_head=True,
-        current_step=0, ):
+    args,
+    data_file,
+    tokenizer,
+    data_world_size,
+    data_world_rank,
+    max_seq_len,
+    places,
+    data_holders,
+    binary_head=True,
+    current_step=0,
+):
 
     train_valid_test_num_samples = [
         args.global_batch_size * args.max_steps,
@@ -122,40 +123,46 @@ def create_pretrained_dataset(
             shuffle=False,
             drop_last=True,
             consumed_samples=consumed_samples)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            places=places,
-            feed_list=data_holders,
-            batch_sampler=batch_sampler,
-            num_workers=args.num_workers,
-            worker_init_fn=None,
-            collate_fn=_collate_data,
-            return_list=False)
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           places=places,
+                                           feed_list=data_holders,
+                                           batch_sampler=batch_sampler,
+                                           num_workers=args.num_workers,
+                                           worker_init_fn=None,
+                                           collate_fn=_collate_data,
+                                           return_list=False)
         return data_loader
 
     train_dl = loader(train_ds, args.global_batch_size * current_step)
-    valid_dl = loader(valid_ds, args.micro_batch_size * (
-        (current_step + 1) // args.eval_freq) * args.eval_iters *
-                      data_world_size)
+    valid_dl = loader(
+        valid_ds,
+        args.micro_batch_size * ((current_step + 1) // args.eval_freq) *
+        args.eval_iters * data_world_size)
     test_dl = loader(test_ds, 0)
 
     return train_dl, valid_dl, test_dl
 
 
 def create_data_holder(args=None):
-    input_ids = paddle.static.data(
-        name="input_ids", shape=[-1, -1], dtype="int64")
-    segment_ids = paddle.static.data(
-        name="segment_ids", shape=[-1, -1], dtype="int64")
-    input_mask = paddle.static.data(
-        name="input_mask", shape=[-1, 1, 1, -1], dtype="float32")
-    masked_lm_positions = paddle.static.data(
-        name="masked_lm_positions", shape=[-1], dtype="int32")
-    masked_lm_labels = paddle.static.data(
-        name="masked_lm_labels", shape=[-1, 1], dtype="int64")
+    input_ids = paddle.static.data(name="input_ids",
+                                   shape=[-1, -1],
+                                   dtype="int64")
+    segment_ids = paddle.static.data(name="segment_ids",
+                                     shape=[-1, -1],
+                                     dtype="int64")
+    input_mask = paddle.static.data(name="input_mask",
+                                    shape=[-1, 1, 1, -1],
+                                    dtype="float32")
+    masked_lm_positions = paddle.static.data(name="masked_lm_positions",
+                                             shape=[-1],
+                                             dtype="int32")
+    masked_lm_labels = paddle.static.data(name="masked_lm_labels",
+                                          shape=[-1, 1],
+                                          dtype="int64")
 
-    next_sentence_labels = paddle.static.data(
-        name="next_sentence_labels", shape=[-1, 1], dtype="int64")
+    next_sentence_labels = paddle.static.data(name="next_sentence_labels",
+                                              shape=[-1, 1],
+                                              dtype="int64")
 
     return [
         input_ids, segment_ids, input_mask, masked_lm_positions,
@@ -215,14 +222,20 @@ def dist_optimizer(args, topo):
     if args.use_sharding:
         dist_strategy.sharding = True
         dist_strategy.sharding_configs = {
-            "segment_broadcast_MB": 32,
-            "sharding_degree": args.sharding_degree,
-            "mp_degree": args.mp_degree,
-            "pp_degree": args.pp_degree,
-            "dp_degree": args.dp_degree,
-            "gradient_merge_acc_step": accumulate_steps
-            if args.sharding_degree > 1 else 1,
-            "optimize_offload": False,
+            "segment_broadcast_MB":
+            32,
+            "sharding_degree":
+            args.sharding_degree,
+            "mp_degree":
+            args.mp_degree,
+            "pp_degree":
+            args.pp_degree,
+            "dp_degree":
+            args.dp_degree,
+            "gradient_merge_acc_step":
+            accumulate_steps if args.sharding_degree > 1 else 1,
+            "optimize_offload":
+            False,
         }
     if args.pp_degree > 1:
         dist_strategy.pipeline_configs = {
@@ -242,8 +255,8 @@ def get_train_data_file(args):
     else:
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz"
-                in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f))
+                and "_idx.npz" in str(f))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
 
@@ -331,13 +344,12 @@ def do_train(args):
     assert args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num, \
         "The product of degree num should be equal to worker_num."
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=args.dp_degree,
+                    pp_degree=args.pp_degree,
+                    sharding_degree=args.sharding_degree,
+                    mp_degree=args.mp_degree)
 
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
@@ -432,9 +444,10 @@ def do_train(args):
 
         criterion = criterion_class(with_nsp_loss=args.binary_head)
         if args.binary_head:
-            lm_loss, sop_loss = criterion(
-                prediction_scores, seq_relationship_score, masked_lm_labels,
-                next_sentence_labels)
+            lm_loss, sop_loss = criterion(prediction_scores,
+                                          seq_relationship_score,
+                                          masked_lm_labels,
+                                          next_sentence_labels)
             loss = lm_loss + sop_loss
         else:
             loss = criterion(prediction_scores, seq_relationship_score,
@@ -479,8 +492,8 @@ def do_train(args):
         #     }
 
         # Use the fleet api to compile the distributed optimizer
-        optimizer = fleet.distributed_optimizer(
-            optimizer, strategy=dist_strategy)
+        optimizer = fleet.distributed_optimizer(optimizer,
+                                                strategy=dist_strategy)
 
         optimizer.minimize(loss)
         logger.info(f'final strategy: {fleet._final_strategy()}')
@@ -526,10 +539,7 @@ def do_train(args):
             else:
                 logger.info("Loading parameters from %s" % dygrah_path)
                 init_static_with_params(
-                    model,
-                    paddle.load(
-                        dygrah_path, return_numpy=True),
-                    topo,
+                    model, paddle.load(dygrah_path, return_numpy=True), topo,
                     main_program)
                 flag_loaded = True
 
@@ -549,8 +559,8 @@ def do_train(args):
         fetch_loss_vars["lm_loss"] = lm_loss
         fetch_loss_vars["sop_loss"] = sop_loss
 
-    fetch_other_vars["learning_rate"] = main_program.global_block().vars[
-        "learning_rate_0"]
+    fetch_other_vars["learning_rate"] = main_program.global_block(
+    ).vars["learning_rate_0"]
 
     additional_vars = collections.OrderedDict()
     if args.use_amp:
@@ -638,12 +648,11 @@ def do_train(args):
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % global_step)
                 logger.debug("saving models to {}".format(output_dir))
-                save_persistables(exe,
-                                  os.path.join(output_dir, "static_vars"),
+                save_persistables(exe, os.path.join(output_dir, "static_vars"),
                                   main_program)
                 if global_step == args.save_steps:
-                    model.init_config["init_args"][0].init_config.pop("topo",
-                                                                      None)
+                    model.init_config["init_args"][0].init_config.pop(
+                        "topo", None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
@@ -670,11 +679,10 @@ def do_train(args):
                     }
 
                     with open(os.path.join(output_dir, "config.yml"), "w") as f:
-                        yaml.dump(
-                            step_config,
-                            f,
-                            encoding='utf-8',
-                            allow_unicode=True)
+                        yaml.dump(step_config,
+                                  f,
+                                  encoding='utf-8',
+                                  allow_unicode=True)
 
                 fleet.barrier_worker()
 
@@ -682,9 +690,9 @@ def do_train(args):
                 if args.sharding_degree <= 1:
                     # Save on the first worker by default.
                     if worker_index == 0:
-                        paddle.static.save(main_program,
-                                           os.path.join(output_dir,
-                                                        "static_vars"))
+                        paddle.static.save(
+                            main_program, os.path.join(output_dir,
+                                                       "static_vars"))
                 else:
                     # Use save_persistables in sharding, but more slower
                     save_persistables(exe,

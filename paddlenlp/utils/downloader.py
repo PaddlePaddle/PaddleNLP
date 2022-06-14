@@ -31,6 +31,7 @@ try:
 except:
 
     class tqdm(object):
+
         def __init__(self, total=None, **kwargs):
             self.total = total
             self.n = 0
@@ -40,8 +41,8 @@ except:
             if self.total is None:
                 sys.stderr.write("\r{0:.1f} bytes".format(self.n))
             else:
-                sys.stderr.write("\r{0:.1f}%".format(100 * self.n / float(
-                    self.total)))
+                sys.stderr.write("\r{0:.1f}%".format(100 * self.n /
+                                                     float(self.total)))
             sys.stderr.flush()
 
         def __enter__(self):
@@ -96,7 +97,8 @@ nlp_models = OrderedDict((
     ('BERT-multilingual-cased-base',
      'https://bert-models.bj.bcebos.com/multi_cased_L-12_H-768_A-12.tar.gz'),
     ('BERT-zh-base',
-     'https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz'), ))
+     'https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz'),
+))
 
 
 def is_url(path):
@@ -205,11 +207,10 @@ def _download(url, path, md5sum=None):
         total_size = req.headers.get('content-length')
         with open(tmp_fullname, 'wb') as f:
             if total_size:
-                with tqdm(
-                        total=int(total_size),
-                        unit='B',
-                        unit_scale=True,
-                        unit_divisor=1024) as pbar:
+                with tqdm(total=int(total_size),
+                          unit='B',
+                          unit_scale=True,
+                          unit_divisor=1024) as pbar:
                     for chunk in req.iter_content(chunk_size=1024):
                         f.write(chunk)
                         pbar.update(len(chunk))

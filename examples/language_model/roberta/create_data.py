@@ -27,60 +27,59 @@ parser.add_argument(
     default='wiki',
     type=str,
     required=False,
-    help="The output directory where the model predictions and checkpoints will be written."
+    help=
+    "The output directory where the model predictions and checkpoints will be written."
 )
-parser.add_argument(
-    "--dataset_name",
-    default='wikipedia',
-    type=str,
-    required=False,
-    help="dataset name")
-parser.add_argument(
-    "--dataset_config_name",
-    default='20200501.en',
-    type=str,
-    required=False,
-    help="dataset config name")
+parser.add_argument("--dataset_name",
+                    default='wikipedia',
+                    type=str,
+                    required=False,
+                    help="dataset name")
+parser.add_argument("--dataset_config_name",
+                    default='20200501.en',
+                    type=str,
+                    required=False,
+                    help="dataset config name")
 parser.add_argument(
     "--use_slow_tokenizer",
     action="store_true",
-    help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library)."
+    help=
+    "If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library)."
 )
-parser.add_argument(
-    "--tokenizer_name",
-    default='roberta-base',
-    type=str,
-    required=False,
-    help="tokenizer name")
+parser.add_argument("--tokenizer_name",
+                    default='roberta-base',
+                    type=str,
+                    required=False,
+                    help="tokenizer name")
 parser.add_argument(
     "--max_seq_length",
     default=512,
     type=int,
-    help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+    help=
+    "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
 )
 parser.add_argument(
     "--line_by_line",
     type=bool,
     default=False,
-    help="Whether distinct lines of text in the dataset are to be handled as distinct sequences.",
+    help=
+    "Whether distinct lines of text in the dataset are to be handled as distinct sequences.",
 )
-parser.add_argument(
-    "--preprocessing_num_workers",
-    default=20,
-    type=int,
-    help="multi-processing number.")
-parser.add_argument(
-    "--overwrite_cache",
-    type=bool,
-    default=False,
-    help="Overwrite the cached training and evaluation sets")
+parser.add_argument("--preprocessing_num_workers",
+                    default=20,
+                    type=int,
+                    help="multi-processing number.")
+parser.add_argument("--overwrite_cache",
+                    type=bool,
+                    default=False,
+                    help="Overwrite the cached training and evaluation sets")
 
 
 def main(args):
     if args.output_dir is not None:
         os.makedirs(args.output_dir, exist_ok=True)
 
-    # Get the datasets: 
+    # Get the datasets:
     if args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(args.dataset_name, args.dataset_config_name)
@@ -111,7 +110,8 @@ def main(args):
                 max_length=args.max_seq_length,
                 # We use this option because DataCollatorForLanguageModeling (see below) is more efficient when it
                 # receives the `special_tokens_mask`.
-                return_special_tokens_mask=True, )
+                return_special_tokens_mask=True,
+            )
 
         tokenized_datasets = raw_datasets.map(
             tokenize_function,
@@ -119,14 +119,15 @@ def main(args):
             num_proc=args.preprocessing_num_workers,
             remove_columns=[text_column_name],
             load_from_cache_file=not args.overwrite_cache,
-            desc="Running tokenizer on dataset line_by_line", )
+            desc="Running tokenizer on dataset line_by_line",
+        )
     else:
         # Otherwise, we tokenize every text, then concatenate them together before splitting them in smaller parts.
         # We use `return_special_tokens_mask=True` because DataCollatorForLanguageModeling (see below) is more
         # efficient when it receives the `special_tokens_mask`.
         def tokenize_function(examples):
-            return tokenizer(
-                examples[text_column_name], return_special_tokens_mask=True)
+            return tokenizer(examples[text_column_name],
+                             return_special_tokens_mask=True)
 
         tokenized_datasets = raw_datasets.map(
             tokenize_function,
@@ -134,7 +135,8 @@ def main(args):
             num_proc=args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not args.overwrite_cache,
-            desc="Running tokenizer on every text in dataset", )
+            desc="Running tokenizer on every text in dataset",
+        )
 
         # Main data processing function that will concatenate all texts from our dataset and generate chunks of
         # max_seq_length.
@@ -169,7 +171,8 @@ def main(args):
             batched=True,
             num_proc=args.preprocessing_num_workers,
             load_from_cache_file=not args.overwrite_cache,
-            desc=f"Grouping texts in chunks of {args.max_seq_length}", )
+            desc=f"Grouping texts in chunks of {args.max_seq_length}",
+        )
     tokenized_datasets.save_to_disk(args.output_dir)
 
 

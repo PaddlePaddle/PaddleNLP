@@ -39,21 +39,22 @@ class DensePassageRetriever(BaseRetriever):
     """
 
     def __init__(
-            self,
-            document_store: BaseDocumentStore,
-            query_embedding_model: Union[
-                Path, str]="rocketqa-zh-dureader-query-encoder",
-            passage_embedding_model: Union[
-                Path, str]="rocketqa-zh-dureader-para-encoder",
-            model_version: Optional[str]=None,
-            max_seq_len_query: int=64,
-            max_seq_len_passage: int=256,
-            top_k: int=10,
-            use_gpu: bool=True,
-            batch_size: int=16,
-            embed_title: bool=True,
-            similarity_function: str="dot_product",
-            progress_bar: bool=True, ):
+        self,
+        document_store: BaseDocumentStore,
+        query_embedding_model: Union[
+            Path, str] = "rocketqa-zh-dureader-query-encoder",
+        passage_embedding_model: Union[
+            Path, str] = "rocketqa-zh-dureader-para-encoder",
+        model_version: Optional[str] = None,
+        max_seq_len_query: int = 64,
+        max_seq_len_passage: int = 256,
+        top_k: int = 10,
+        use_gpu: bool = True,
+        batch_size: int = 16,
+        embed_title: bool = True,
+        similarity_function: str = "dot_product",
+        progress_bar: bool = True,
+    ):
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
 
@@ -106,10 +107,11 @@ class DensePassageRetriever(BaseRetriever):
             batch_size=batch_size,
             embed_title=embed_title,
             similarity_function=similarity_function,
-            progress_bar=progress_bar, )
+            progress_bar=progress_bar,
+        )
 
-        self.devices, _ = initialize_device_settings(
-            use_cuda=use_gpu, multi_gpu=True)
+        self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
+                                                     multi_gpu=True)
 
         if batch_size < len(self.devices):
             logger.warning(
@@ -148,15 +150,17 @@ class DensePassageRetriever(BaseRetriever):
             metric="text_similarity_metric",
             embed_title=embed_title,
             num_hard_negatives=0,
-            num_positives=1, )
+            num_positives=1,
+        )
 
     def retrieve(
-            self,
-            query: str,
-            filters: dict=None,
-            top_k: Optional[int]=None,
-            index: str=None,
-            headers: Optional[Dict[str, str]]=None, ) -> List[Document]:
+        self,
+        query: str,
+        filters: dict = None,
+        top_k: Optional[int] = None,
+        index: str = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents
         that are most relevant to the query.
@@ -208,18 +212,20 @@ class DensePassageRetriever(BaseRetriever):
             dicts, indices=[i for i in range(len(dicts))], return_baskets=True)
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id),  # input_ids
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id),  # token_type_ids
+            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id
+                ),  # input_ids
+            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id
+                ),  # token_type_ids
         ): [data for data in fn(samples)]
 
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=self.batch_size, shuffle=False)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=self.batch_size,
+                                               shuffle=False)
 
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=batchify_fn,
-            return_list=True)
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           batch_sampler=batch_sampler,
+                                           collate_fn=batchify_fn,
+                                           return_list=True)
 
         all_embeddings = {"query": [], "passages": []}
 
@@ -238,7 +244,8 @@ class DensePassageRetriever(BaseRetriever):
                 desc=f"Create embeddings",
                 position=1,
                 leave=False,
-                disable=disable_tqdm, ) as progress_bar:
+                disable=disable_tqdm,
+        ) as progress_bar:
             for batch in data_loader:
                 input_ids, token_type_ids = batch
                 #input_ids, token_type_ids, label_ids = batch
@@ -246,16 +253,16 @@ class DensePassageRetriever(BaseRetriever):
                     cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
                         input_ids=input_ids, token_type_ids=token_type_ids)
                     if "query" in dicts[0]:
-                        all_embeddings["query"].append(cls_embeddings.cpu()
-                                                       .numpy())
+                        all_embeddings["query"].append(
+                            cls_embeddings.cpu().numpy())
                     if "passages" in dicts[0]:
-                        all_embeddings["passages"].append(cls_embeddings.cpu()
-                                                          .numpy())
+                        all_embeddings["passages"].append(
+                            cls_embeddings.cpu().numpy())
                 progress_bar.update(self.batch_size)
 
         if all_embeddings["passages"]:
-            all_embeddings["passages"] = np.concatenate(all_embeddings[
-                "passages"])
+            all_embeddings["passages"] = np.concatenate(
+                all_embeddings["passages"])
         if all_embeddings["query"]:
             all_embeddings["query"] = np.concatenate(all_embeddings["query"])
         return all_embeddings
@@ -287,11 +294,14 @@ class DensePassageRetriever(BaseRetriever):
 
         passages = [{
             "passages": [{
-                "title": d.meta["name"] if d.meta and "name" in d.meta else "",
-                "text": d.content,
-                "label": d.meta["label"]
-                if d.meta and "label" in d.meta else "positive",
-                "external_id": d.id,
+                "title":
+                d.meta["name"] if d.meta and "name" in d.meta else "",
+                "text":
+                d.content,
+                "label":
+                d.meta["label"] if d.meta and "label" in d.meta else "positive",
+                "external_id":
+                d.id,
             }]
         } for d in docs]
         embeddings = self._get_predictions(passages)["passages"]

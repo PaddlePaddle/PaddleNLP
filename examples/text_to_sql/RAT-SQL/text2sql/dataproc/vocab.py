@@ -24,6 +24,7 @@ EOS = '<EOS>'
 
 
 class Vocab(collections.abc.Set):
+
     def __init__(self, iterable, special_elems=(UNK, BOS, EOS)):
         elements = list(special_elems)
         elements.extend(iterable)
@@ -65,11 +66,12 @@ class Vocab(collections.abc.Set):
 
     def save(self, out_path):
         with open(out_path, 'w') as ofs:
-            json.dump(
-                [self.id_to_elem[i] for i in range(len(self.id_to_elem))], ofs)
+            json.dump([self.id_to_elem[i] for i in range(len(self.id_to_elem))],
+                      ofs)
 
 
 class VocabBuilder:
+
     def __init__(self, min_freq=None, max_count=None):
         self.word_freq = collections.Counter()
         self.min_freq = min_freq

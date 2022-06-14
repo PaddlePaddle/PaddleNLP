@@ -269,8 +269,8 @@ class CandidateValueExtractor:
         values += num_values
         # 2. include chinese word
         cn_num_unit = cls.CN_NUM + cls.CN_UNIT
-        cn_num_texts = re.findall(r'[{}]*\.?[{}]+'.format(cn_num_unit,
-                                                          cn_num_unit), text)
+        cn_num_texts = re.findall(
+            r'[{}]*\.?[{}]+'.format(cn_num_unit, cn_num_unit), text)
 
         cn_num_values = [str_to_num(text) for text in cn_num_texts]
         values += [value for value in cn_num_values if value is not None]

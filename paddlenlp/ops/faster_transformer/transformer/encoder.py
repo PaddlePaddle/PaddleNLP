@@ -102,8 +102,10 @@ def infer_transformer_encoder(
 
     outputs = {"EncoderOut": encoder_out}
 
-    helper.append_op(
-        type='fusion_encoder', inputs=inputs, outputs=outputs, attrs=attrs)
+    helper.append_op(type='fusion_encoder',
+                     inputs=inputs,
+                     outputs=outputs,
+                     attrs=attrs)
     return encoder_out
 
 
@@ -399,26 +401,29 @@ def convert_to_fp16(transformer_encoder):
     """
     if not isinstance(transformer_encoder, paddle.nn.TransformerEncoder):
         logger.warning(
-            "transformer_encoder is not isinstance of paddle.nn.TransformerEncoder, return itself with no parameters convertion.".
-            format)
+            "transformer_encoder is not isinstance of paddle.nn.TransformerEncoder, return itself with no parameters convertion."
+            .format)
         return transformer_encoder
     else:
         encoder_layers = transformer_encoder.layers
 
         for mod in encoder_layers:
-            mod.norm1.weight = transfer_param(
-                mod.norm1.weight, restore_data=True)
-            mod.norm1.bias = transfer_param(
-                mod.norm1.bias, is_bias=True, restore_data=True)
-            mod.norm2.weight = transfer_param(
-                mod.norm2.weight, restore_data=True)
-            mod.norm2.bias = transfer_param(
-                mod.norm2.bias, is_bias=True, restore_data=True)
+            mod.norm1.weight = transfer_param(mod.norm1.weight,
+                                              restore_data=True)
+            mod.norm1.bias = transfer_param(mod.norm1.bias,
+                                            is_bias=True,
+                                            restore_data=True)
+            mod.norm2.weight = transfer_param(mod.norm2.weight,
+                                              restore_data=True)
+            mod.norm2.bias = transfer_param(mod.norm2.bias,
+                                            is_bias=True,
+                                            restore_data=True)
 
-            mod.linear1.weight = transfer_param(
-                mod.linear1.weight, restore_data=True)
-            mod.linear1.bias = transfer_param(
-                mod.linear1.bias, is_bias=True, restore_data=True)
+            mod.linear1.weight = transfer_param(mod.linear1.weight,
+                                                restore_data=True)
+            mod.linear1.bias = transfer_param(mod.linear1.bias,
+                                              is_bias=True,
+                                              restore_data=True)
 
             mod.self_attn.q_proj.weight = transfer_param(
                 mod.self_attn.q_proj.weight, restore_data=True)
@@ -437,10 +442,11 @@ def convert_to_fp16(transformer_encoder):
             mod.self_attn.out_proj.bias = transfer_param(
                 mod.self_attn.out_proj.bias, is_bias=True, restore_data=True)
 
-            mod.linear2.weight = transfer_param(
-                mod.linear2.weight, restore_data=True)
-            mod.linear2.bias = transfer_param(
-                mod.linear2.bias, is_bias=True, restore_data=True)
+            mod.linear2.weight = transfer_param(mod.linear2.weight,
+                                                restore_data=True)
+            mod.linear2.bias = transfer_param(mod.linear2.bias,
+                                              is_bias=True,
+                                              restore_data=True)
         logger.info(
             "Convert transformer_encoder's parameters from float32 to float16 succeessfully."
         )

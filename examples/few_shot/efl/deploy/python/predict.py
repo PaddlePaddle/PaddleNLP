@@ -64,6 +64,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -96,10 +97,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -125,21 +125,22 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(
-                model_name="ernie-1.0",
-                model_precision=precision,
-                batch_size=self.batch_size,
-                data_shape="dynamic",
-                save_path=args.save_log_path,
-                inference_config=config,
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
+            self.autolog = auto_log.AutoLogger(model_name="ernie-1.0",
+                                               model_precision=precision,
+                                               batch_size=self.batch_size,
+                                               data_shape="dynamic",
+                                               save_path=args.save_log_path,
+                                               inference_config=config,
+                                               pids=pid,
+                                               process_name=None,
+                                               gpu_ids=0,
+                                               time_keys=[
+                                                   'preprocess_time',
+                                                   'inference_time',
+                                                   'postprocess_time'
+                                               ],
+                                               warmup=0,
+                                               logger=logger)
 
     def predict(self, data, tokenizer):
         """
@@ -158,13 +159,15 @@ class Predictor(object):
 
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example(
-                text, tokenizer, is_test=True)
+            input_ids, segment_ids = convert_example(text,
+                                                     tokenizer,
+                                                     is_test=True)
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         if args.benchmark:

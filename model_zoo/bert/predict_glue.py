@@ -34,41 +34,49 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_type",
         default=None,
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_path",
         default=None,
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.", )
+        help="Device selected for inference.",
+    )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size for predict.", )
+        help="Batch size for predict.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     args = parser.parse_args()
     return args
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -102,8 +110,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -111,14 +119,14 @@ class Predictor(object):
         return output
 
     def predict(self, dataset, collate_fn, batch_size=1):
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=False)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=collate_fn,
-            num_workers=0,
-            return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=False)
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           batch_sampler=batch_sampler,
+                                           collate_fn=collate_fn,
+                                           num_workers=0,
+                                           return_list=True)
         outputs = []
         for data in data_loader:
             output = self.predict_batch(data)
@@ -137,8 +145,8 @@ def main():
     sentence1_key, sentence2_key = task_to_keys[args.task_name]
 
     test_ds = load_dataset('glue', args.task_name, split="test")
-    tokenizer = tokenizer_class.from_pretrained(
-        os.path.dirname(args.model_path))
+    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(
+        args.model_path))
 
     def preprocess_function(examples):
         # Tokenize the texts
@@ -152,11 +160,15 @@ def main():
 
     test_ds = test_ds.map(preprocess_function)
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        'input_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        'token_type_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # segment
     }): fn(samples)
-    predictor.predict(
-        test_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
+    predictor.predict(test_ds,
+                      batch_size=args.batch_size,
+                      collate_fn=batchify_fn)
 
 
 if __name__ == "__main__":

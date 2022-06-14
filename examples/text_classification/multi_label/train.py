@@ -94,35 +94,32 @@ def do_train():
 
     # Load train dataset.
     file_name = 'train.csv'
-    train_ds = load_dataset(
-        read_custom_data,
-        filename=os.path.join(args.data_path, file_name),
-        is_test=False,
-        lazy=False)
+    train_ds = load_dataset(read_custom_data,
+                            filename=os.path.join(args.data_path, file_name),
+                            is_test=False,
+                            lazy=False)
 
     pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
         "bert-base-uncased")
     tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
         'bert-base-uncased')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype='float32')  # label
     ): [data for data in fn(samples)]
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    model = MultiLabelClassifier(
-        pretrained_model, num_labels=len(train_ds.data[0]["label"]))
+    model = MultiLabelClassifier(pretrained_model,
+                                 num_labels=len(train_ds.data[0]["label"]))
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -164,8 +161,8 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, auc: %.5f, f1 score: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, auc, f1_score,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, auc, f1_score, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
