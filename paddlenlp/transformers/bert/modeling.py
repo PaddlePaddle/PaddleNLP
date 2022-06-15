@@ -504,7 +504,14 @@ class BertModel(BertPretrainedModel):
                                          type_vocab_size)
         self.fuse = fuse
         if self.fuse:
-            pass
+            self.encoder = nn.LayerList([FusedTransformerEncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                dropout_rate=hidden_dropout_prob,
+                activation=hidden_act,
+                attn_dropout_rate=attention_probs_dropout_prob,
+                act_dropout_rate=0.) for _ in range(num_hidden_layers)])
         else:
             encoder_layer = nn.TransformerEncoderLayer(
                 hidden_size,
@@ -609,7 +616,16 @@ class BertModel(BertPretrainedModel):
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids)
         if self.fuse:
-            pass
+            hidden_states = embedding_output
+            all_encoder_outputs = []
+            for layer in self.encoder:
+                hidden_states = layer(hidden_states, attention_mask)
+                all_encoder_outputs.append(hidden_states)
+            pooled_output = self.pooler(hidden_states)
+            if output_hidden_states:
+                return all_encoder_outputs, pooled_output
+            else:
+                return hidden_states, pooled_output
         else:
             if output_hidden_states:
                 output = embedding_output

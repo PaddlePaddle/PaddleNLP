@@ -410,7 +410,7 @@ def do_train(args):
 
                 if global_step % args.logging_steps == 0:
                     print(
-                        "tobal step: %d, epoch: %d, batch: %d, loss: %f, "
+                        "total step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                         % (global_step, epoch, step, loss_return[0],
                            reader_cost_avg.get_average(),
