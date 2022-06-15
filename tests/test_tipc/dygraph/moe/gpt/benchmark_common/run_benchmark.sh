@@ -5,18 +5,19 @@ function _set_params(){
     model_item=${1:-"model_item"}   # (必选) 模型 item
     fp_item=${2:-"fp32"}            # (必选) fp32|fp16
     dp_degree=${3:-"1"}             # (必选) dp/moe数据并行度
-    local_batch_size=${4:-"2"}      # (必选) 每张卡的batch_size
-    run_mode=${5:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1|DP_MoE_C1
-    device_num=${6:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    sharding_degree=${4:-"1"}       # (必选) sharding/moe分组参数切分并行度
+    local_batch_size=${5:-"2"}      # (必选) 每张卡的batch_size
+    run_mode=${6:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1|DP_MoE_C1|Sharding_MoE_C1
+    device_num=${7:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-    num_experts=${7:-8}             #(可选)每张卡的expert数量
-    max_iter=${8:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
-    use_sharding=${9:-"false"}               # （可选) 是否使用ShardingOptimizer
+    num_experts=${8:-8}             #(可选)每张卡的expert数量
+    max_iter=${9:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    use_sharding=${10:-"false"}               # （可选) 是否使用ShardingOptimizer
     num_workers=0                  # (可选)
     base_batch_size=$local_batch_size
     # 以下为通用执行命令，无特殊可不用修改
@@ -85,6 +86,7 @@ function _train(){
                 --dp_degree ${dp_degree}\
                 --mp_degree 1\
                 --pp_degree 1\
+                --sharding_degree ${sharding_degree}\
                 --expert_mode True\
                 --logging_freq 1 \
                 --num_experts ${num_experts}\
@@ -109,6 +111,16 @@ function _train(){
         workerlog_id=0
         ;;
     DP_MoE_C32) echo "run run_mode: DP_MoE_C32"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+              run_moe_pretrain.py ${train_cmd}"
+        workerlog_id=0
+        ;;
+    Sharding_MoE_C8) echo "run run_mode: Sharding_MoE_C8"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+              run_moe_pretrain.py ${train_cmd}"
+        workerlog_id=0
+        ;;
+    Sharding_MoE_C32) echo "run run_mode: Sharding_MoE_C32"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0

@@ -43,8 +43,8 @@ def evaluate(model, metric, data_loader):
                                      pos_ids)
         start_ids = paddle.cast(start_ids, 'float32')
         end_ids = paddle.cast(end_ids, 'float32')
-        num_correct, num_infer, num_label = metric.compute(start_prob, end_prob,
-                                                           start_ids, end_ids)
+        num_correct, num_infer, num_label = metric.compute(
+            start_prob, end_prob, start_ids, end_ids)
         metric.update(num_correct, num_infer, num_label)
     precision, recall, f1 = metric.accumulate()
     model.train()
@@ -55,19 +55,21 @@ def do_eval():
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     model = UIE.from_pretrained(args.model_path)
 
-    test_ds = load_dataset(
-        reader,
-        data_path=args.test_path,
-        max_seq_len=args.max_seq_len,
-        lazy=False)
+    test_ds = load_dataset(reader,
+                           data_path=args.test_path,
+                           max_seq_len=args.max_seq_len,
+                           lazy=False)
     test_ds = test_ds.map(
-        partial(
-            convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))
+        partial(convert_example,
+                tokenizer=tokenizer,
+                max_seq_len=args.max_seq_len))
 
-    test_batch_sampler = paddle.io.BatchSampler(
-        dataset=test_ds, batch_size=args.batch_size, shuffle=False)
-    test_data_loader = paddle.io.DataLoader(
-        dataset=test_ds, batch_sampler=test_batch_sampler, return_list=True)
+    test_batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
+                                                batch_size=args.batch_size,
+                                                shuffle=False)
+    test_data_loader = paddle.io.DataLoader(dataset=test_ds,
+                                            batch_sampler=test_batch_sampler,
+                                            return_list=True)
 
     metric = SpanEvaluator()
     precision, recall, f1 = evaluate(model, metric, test_data_loader)

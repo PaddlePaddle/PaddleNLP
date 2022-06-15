@@ -7,10 +7,12 @@ from pipelines.utils.doc_store import (
     launch_opensearch,
     launch_weaviate,
     stop_opensearch,
-    stop_service, )
+    stop_service,
+)
 from pipelines.utils.export_utils import (
     print_answers,
     print_documents,
     print_questions,
     export_answers_to_csv,
-    convert_labels_to_squad, )
+    convert_labels_to_squad,
+)

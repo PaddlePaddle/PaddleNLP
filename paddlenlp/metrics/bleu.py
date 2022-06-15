@@ -42,6 +42,7 @@ def get_match_size(cand_ngram, refs_ngram):
 
 
 def get_ngram(sent, n_size, label=None):
+
     def _ngram(sent, n_size):
         ngram_list = []
         for left in range(len(sent) - n_size):
@@ -157,8 +158,10 @@ class BLEU(paddle.metric.Metric):
                 raise AttributeError(
                     "The `update` method requires users to provide `trans_func` or `vocab` when initializing BLEU."
                 )
-            cand_list, ref_list = default_trans_func(
-                output, label, seq_mask=seq_mask, vocab=self.vocab)
+            cand_list, ref_list = default_trans_func(output,
+                                                     label,
+                                                     seq_mask=seq_mask,
+                                                     vocab=self.vocab)
         else:
             cand_list, ref_list = self.trans_func(output, label, seq_mask)
         if len(cand_list) != len(ref_list):
@@ -216,8 +219,8 @@ class BLEU(paddle.metric.Metric):
                 if self.candi_ngram[n_size] == 0:
                     _score = 0.0
                 else:
-                    _score = self.match_ngram[n_size] / float(self.candi_ngram[
-                        n_size])
+                    _score = self.match_ngram[n_size] / float(
+                        self.candi_ngram[n_size])
             except:
                 _score = 0
             if _score == 0:

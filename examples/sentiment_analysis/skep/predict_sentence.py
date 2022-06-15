@@ -150,7 +150,10 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = predict(
-        model, data, tokenizer, label_map, batch_size=args.batch_size)
+    results = predict(model,
+                      data,
+                      tokenizer,
+                      label_map,
+                      batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

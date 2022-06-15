@@ -69,12 +69,12 @@ def collate_batch_data_v2(origin_batch, config):
 
     QUESTION_TOKENS_INDEX = nn_utils.pad_sequences(
         QUESTION_TOKENS_INDEX, max_len=config.max_question_len)
-    TABLE_INDEX = nn_utils.pad_sequences(
-        TABLE_INDEX, max_len=config.max_table_num)
-    COLUMN_INDEX = nn_utils.pad_sequences(
-        COLUMN_INDEX, max_len=config.max_column_num)
-    VALUE_INDEX = nn_utils.pad_sequences(
-        VALUE_INDEX, max_len=config.max_column_num * 2)
+    TABLE_INDEX = nn_utils.pad_sequences(TABLE_INDEX,
+                                         max_len=config.max_table_num)
+    COLUMN_INDEX = nn_utils.pad_sequences(COLUMN_INDEX,
+                                          max_len=config.max_column_num)
+    VALUE_INDEX = nn_utils.pad_sequences(VALUE_INDEX,
+                                         max_len=config.max_column_num * 2)
 
     inputs = {
         'src_ids': TOKEN_IDS,

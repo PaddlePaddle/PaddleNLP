@@ -101,6 +101,7 @@ class SegJiebaTask(Task):
         return results
 
     def _run_model(self, inputs):
+
         def cut(string):
             return jieba.lcut(string)
 

@@ -33,7 +33,8 @@ from networkx.drawing.nx_agraph import to_agraph
 from pipelines.pipelines.config import (
     get_component_definitions,
     get_pipeline_definition,
-    read_pipeline_config_from_yaml, )
+    read_pipeline_config_from_yaml,
+)
 from pipelines.pipelines.utils import generate_code
 
 try:
@@ -80,7 +81,7 @@ class BasePipeline:
     def run(self, **kwargs):
         raise NotImplementedError
 
-    def get_config(self, return_defaults: bool=False) -> dict:
+    def get_config(self, return_defaults: bool = False) -> dict:
         """
         Returns a configuration for the Pipeline that can be used with `BasePipeline.load_from_config()`.
 
@@ -89,10 +90,11 @@ class BasePipeline:
         raise NotImplementedError
 
     def to_code(
-            self,
-            pipeline_variable_name: str="pipeline",
-            generate_imports: bool=True,
-            add_comment: bool=False, ) -> str:
+        self,
+        pipeline_variable_name: str = "pipeline",
+        generate_imports: bool = True,
+        add_comment: bool = False,
+    ) -> str:
         """
         Returns the code to create this pipeline as string.
 
@@ -108,14 +110,16 @@ class BasePipeline:
             pipeline_config=pipeline_config,
             pipeline_variable_name=pipeline_variable_name,
             generate_imports=generate_imports,
-            comment=CODE_GEN_DEFAULT_COMMENT if add_comment else None, )
+            comment=CODE_GEN_DEFAULT_COMMENT if add_comment else None,
+        )
         return code
 
     def to_notebook_cell(
-            self,
-            pipeline_variable_name: str="pipeline",
-            generate_imports: bool=True,
-            add_comment: bool=True, ):
+        self,
+        pipeline_variable_name: str = "pipeline",
+        generate_imports: bool = True,
+        add_comment: bool = True,
+    ):
         """
         Creates a new notebook cell with the code to create this pipeline.
 
@@ -132,7 +136,8 @@ class BasePipeline:
             pipeline_variable_name=pipeline_variable_name,
             generate_imports=generate_imports,
             comment=CODE_GEN_DEFAULT_COMMENT if add_comment else None,
-            add_pipeline_cls_import=False, )
+            add_pipeline_cls_import=False,
+        )
         try:
             get_ipython().set_next_input(code)  # type: ignore
         except NameError:
@@ -143,8 +148,8 @@ class BasePipeline:
     @classmethod
     def load_from_config(cls,
                          pipeline_config: Dict,
-                         pipeline_name: Optional[str]=None,
-                         overwrite_with_env_variables: bool=True):
+                         pipeline_name: Optional[str] = None,
+                         overwrite_with_env_variables: bool = True):
         """
         Load Pipeline from a config dict defining the individual components and how they're tied together to form
         a Pipeline. A single config can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -196,12 +201,14 @@ class BasePipeline:
             return Pipeline.load_from_config(
                 pipeline_config=pipeline_config,
                 pipeline_name=pipeline_name,
-                overwrite_with_env_variables=overwrite_with_env_variables, )
+                overwrite_with_env_variables=overwrite_with_env_variables,
+            )
         elif pipeline_definition["type"] == "RayPipeline":
             return RayPipeline.load_from_config(
                 pipeline_config=pipeline_config,
                 pipeline_name=pipeline_name,
-                overwrite_with_env_variables=overwrite_with_env_variables, )
+                overwrite_with_env_variables=overwrite_with_env_variables,
+            )
         else:
             raise KeyError(
                 f"Pipeline Type '{pipeline_definition['type']}' is not a valid. The available types are"
@@ -210,8 +217,8 @@ class BasePipeline:
     @classmethod
     def load_from_yaml(cls,
                        path: Path,
-                       pipeline_name: Optional[str]=None,
-                       overwrite_with_env_variables: bool=True):
+                       pipeline_name: Optional[str] = None,
+                       overwrite_with_env_variables: bool = True):
         """
         Load Pipeline from a YAML file defining the individual components and how they're tied together to form
         a Pipeline. A single YAML can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -268,7 +275,8 @@ class BasePipeline:
         return cls.load_from_config(
             pipeline_config=pipeline_config,
             pipeline_name=pipeline_name,
-            overwrite_with_env_variables=overwrite_with_env_variables, )
+            overwrite_with_env_variables=overwrite_with_env_variables,
+        )
 
 
 class Pipeline(BasePipeline):
@@ -320,8 +328,8 @@ class Pipeline(BasePipeline):
         self.graph.add_node(name, component=component, inputs=inputs)
 
         if len(self.graph.nodes) == 2:  # first node added; connect with Root
-            assert len(inputs) == 1 and inputs[0].split(".")[
-                0] == self.root_node, (
+            assert len(inputs) == 1 and inputs[0].split(
+                ".")[0] == self.root_node, (
                     f"The '{name}' node can only input from {self.root_node}. "
                     f"Set the 'inputs' parameter to ['{self.root_node}']")
             self.graph.add_edge(self.root_node, name, label="output_1")
@@ -368,14 +376,15 @@ class Pipeline(BasePipeline):
         self.graph.nodes[name]["component"] = component
 
     def run(  # type: ignore
-            self,
-            query: Optional[str]=None,
-            file_paths: Optional[List[str]]=None,
-            labels: Optional[MultiLabel]=None,
-            documents: Optional[List[Document]]=None,
-            meta: Optional[dict]=None,
-            params: Optional[dict]=None,
-            debug: Optional[bool]=None, ):
+        self,
+        query: Optional[str] = None,
+        file_paths: Optional[List[str]] = None,
+        labels: Optional[MultiLabel] = None,
+        documents: Optional[List[Document]] = None,
+        meta: Optional[dict] = None,
+        params: Optional[dict] = None,
+        debug: Optional[bool] = None,
+    ):
         """
         Runs the pipeline, one node at a time.
 
@@ -402,8 +411,9 @@ class Pipeline(BasePipeline):
                 not_a_node = set(params.keys()) - set(self.graph.nodes)
                 valid_global_params = set()
                 for node_id in self.graph.nodes:
-                    run_signature_args = inspect.signature(self.graph.nodes[
-                        node_id]["component"].run).parameters.keys()
+                    run_signature_args = inspect.signature(
+                        self.graph.nodes[node_id]
+                        ["component"].run).parameters.keys()
                     valid_global_params |= set(run_signature_args)
                 invalid_keys = [
                     key for key in not_a_node if key not in valid_global_params
@@ -518,11 +528,8 @@ class Pipeline(BasePipeline):
         assert len(reordered_columns) == len(df.columns)
         return df.reindex(columns=reordered_columns)
 
-    def _build_eval_dataframe(self,
-                              query: str,
-                              query_labels: MultiLabel,
-                              node_name: str,
-                              node_output: dict) -> DataFrame:
+    def _build_eval_dataframe(self, query: str, query_labels: MultiLabel,
+                              node_name: str, node_output: dict) -> DataFrame:
         """
         Builds a Dataframe for each query from which evaluation metrics can be calculated.
         Currently only answer or document returning nodes are supported, returns None otherwise.
@@ -535,7 +542,8 @@ class Pipeline(BasePipeline):
 
         if query_labels is None or query_labels.labels is None:
             logger.warning(
-                f"There is no label for query '{query}'. Query will be omitted.")
+                f"There is no label for query '{query}'. Query will be omitted."
+            )
             return pd.DataFrame()
 
         # remarks for no_answers:
@@ -570,18 +578,20 @@ class Pipeline(BasePipeline):
                 df_answers = pd.DataFrame(answers, columns=answer_cols_to_keep)
                 if len(df_answers) > 0:
                     df_answers["type"] = "answer"
-                    df_answers["gold_answers"] = [gold_answers] * len(
-                        df_answers)
+                    df_answers["gold_answers"] = [gold_answers
+                                                  ] * len(df_answers)
                     df_answers["gold_offsets_in_documents"] = [
                         gold_offsets_in_documents
                     ] * len(df_answers)
-                    df_answers["gold_document_ids"] = [gold_document_ids] * len(
-                        df_answers)
+                    df_answers["gold_document_ids"] = [gold_document_ids
+                                                       ] * len(df_answers)
                     df_answers["exact_match"] = df_answers.apply(
-                        lambda row: calculate_em_str_multi(gold_answers, row["answer"]),
+                        lambda row: calculate_em_str_multi(
+                            gold_answers, row["answer"]),
                         axis=1)
                     df_answers["f1"] = df_answers.apply(
-                        lambda row: calculate_f1_str_multi(gold_answers, row["answer"]),
+                        lambda row: calculate_f1_str_multi(
+                            gold_answers, row["answer"]),
                         axis=1)
                     df_answers["rank"] = np.arange(1, len(df_answers) + 1)
                     df = pd.concat([df, df_answers])
@@ -590,8 +600,8 @@ class Pipeline(BasePipeline):
             df["node"] = node_name
             df["multilabel_id"] = query_labels.id
             df["query"] = query
-            df["filters"] = json.dumps(
-                query_labels.filters, sort_keys=True).encode()
+            df["filters"] = json.dumps(query_labels.filters,
+                                       sort_keys=True).encode()
             df["eval_mode"] = "isolated" if "isolated" in field_name else "integrated"
             partial_dfs.append(df)
 
@@ -612,23 +622,24 @@ class Pipeline(BasePipeline):
                 if len(df_docs) > 0:
                     df_docs = df_docs.rename(columns={"id": "document_id"})
                     df_docs["type"] = "document"
-                    df_docs["gold_document_ids"] = [gold_document_ids] * len(
-                        df_docs)
+                    df_docs["gold_document_ids"] = [gold_document_ids
+                                                    ] * len(df_docs)
                     df_docs["gold_document_contents"] = [
                         gold_document_contents
                     ] * len(df_docs)
                     df_docs["gold_id_match"] = df_docs.apply(
-                        lambda row: 1.0 if row["document_id"] in gold_document_ids else 0.0,
+                        lambda row: 1.0
+                        if row["document_id"] in gold_document_ids else 0.0,
                         axis=1)
                     df_docs["answer_match"] = df_docs.apply(
-                        lambda row: 1.0
-                        if not query_labels.no_answer
-                        and any(gold_answer in row["content"] for gold_answer in gold_answers)
-                        else 0.0,
+                        lambda row: 1.0 if not query_labels.no_answer and any(
+                            gold_answer in row["content"]
+                            for gold_answer in gold_answers) else 0.0,
                         axis=1,
                     )
                     df_docs["gold_id_or_answer_match"] = df_docs.apply(
-                        lambda row: max(row["gold_id_match"], row["answer_match"]),
+                        lambda row: max(row["gold_id_match"], row["answer_match"
+                                                                  ]),
                         axis=1)
                     df_docs["rank"] = np.arange(1, len(df_docs) + 1)
                     df = pd.concat([df, df_docs])
@@ -637,8 +648,8 @@ class Pipeline(BasePipeline):
             df["node"] = node_name
             df["multilabel_id"] = query_labels.id
             df["query"] = query
-            df["filters"] = json.dumps(
-                query_labels.filters, sort_keys=True).encode()
+            df["filters"] = json.dumps(query_labels.filters,
+                                       sort_keys=True).encode()
             df["eval_mode"] = "isolated" if "isolated" in field_name else "integrated"
             partial_dfs.append(df)
 
@@ -648,8 +659,8 @@ class Pipeline(BasePipeline):
         current_node_edges = self.graph.edges(node_id, data=True)
         next_nodes = [
             next_node for _, next_node, data in current_node_edges
-            if not stream_id or data["label"] == stream_id or stream_id ==
-            "output_all"
+            if not stream_id or data["label"] == stream_id
+            or stream_id == "output_all"
         ]
         return next_nodes
 
@@ -680,8 +691,7 @@ class Pipeline(BasePipeline):
         matches = self.get_nodes_by_class(class_type=BaseDocumentStore)
         if len(matches) == 0:
             matches = list(
-                set(
-                    retriever.document_store
+                set(retriever.document_store
                     for retriever in self.get_nodes_by_class(
                         class_type=BaseRetriever)))
 
@@ -693,7 +703,7 @@ class Pipeline(BasePipeline):
         else:
             return matches[0]
 
-    def draw(self, path: Path=Path("pipeline.png")):
+    def draw(self, path: Path = Path("pipeline.png")):
         """
         Create a Graphviz visualization of the pipeline.
 
@@ -715,8 +725,8 @@ class Pipeline(BasePipeline):
     @classmethod
     def load_from_config(cls,
                          pipeline_config: Dict,
-                         pipeline_name: Optional[str]=None,
-                         overwrite_with_env_variables: bool=True):
+                         pipeline_name: Optional[str] = None,
+                         overwrite_with_env_variables: bool = True):
         """
         Load Pipeline from a config dict defining the individual components and how they're tied together to form
         a Pipeline. A single config can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -777,15 +787,14 @@ class Pipeline(BasePipeline):
                 name=name,
                 definitions=component_definitions,
                 components=components)
-            pipeline.add_node(
-                component=component, name=name, inputs=node.get("inputs", []))
+            pipeline.add_node(component=component,
+                              name=name,
+                              inputs=node.get("inputs", []))
 
         return pipeline
 
     @classmethod
-    def _load_or_get_component(cls,
-                               name: str,
-                               definitions: dict,
+    def _load_or_get_component(cls, name: str, definitions: dict,
                                components: dict):
         """
         Load a component from the definition or return if component object already present in `components` dict.
@@ -808,14 +817,14 @@ class Pipeline(BasePipeline):
             for key, value in component_params.items():
                 # Component params can reference to other components. For instance, a Retriever can reference a
                 # DocumentStore defined in the YAML. All references should be recursively resolved.
-                if (isinstance(value, str) and value in definitions.keys(
-                )):  # check if the param value is a reference to another component.
+                if (
+                        isinstance(value, str) and value in definitions.keys()
+                ):  # check if the param value is a reference to another component.
                     if value not in components.keys(
                     ):  # check if the referenced component is already loaded.
-                        cls._load_or_get_component(
-                            name=value,
-                            definitions=definitions,
-                            components=components)
+                        cls._load_or_get_component(name=value,
+                                                   definitions=definitions,
+                                                   components=components)
                     component_params[key] = components[
                         value]  # substitute reference (string) with the component object.
 
@@ -826,7 +835,7 @@ class Pipeline(BasePipeline):
             raise Exception(f"Failed loading pipeline component '{name}': {e}")
         return instance
 
-    def save_to_yaml(self, path: Path, return_defaults: bool=False):
+    def save_to_yaml(self, path: Path, return_defaults: bool = False):
         """
         Save a YAML configuration for the Pipeline that can be used with `Pipeline.load_from_yaml()`.
 
@@ -837,7 +846,7 @@ class Pipeline(BasePipeline):
         with open(path, "w") as outfile:
             yaml.dump(config, outfile, default_flow_style=False)
 
-    def get_config(self, return_defaults: bool=False) -> dict:
+    def get_config(self, return_defaults: bool = False) -> dict:
         """
         Returns a configuration for the Pipeline that can be used with `Pipeline.load_from_config()`.
 
@@ -869,8 +878,8 @@ class Pipeline(BasePipeline):
             component_signature: dict = {}
             for component_parent in component_parent_classes:
                 component_signature = {
-                    ** component_signature, **
-                    inspect.signature(component_parent).parameters
+                    **component_signature,
+                    **inspect.signature(component_parent).parameters
                 }
 
             for param_key, param_value in component_params.items():
@@ -885,13 +894,13 @@ class Pipeline(BasePipeline):
                     sub_component = param_value
                     sub_component_type_name = sub_component["type"]
                     sub_component_signature = inspect.signature(
-                        BaseComponent.subclasses[
-                            sub_component_type_name]).parameters
+                        BaseComponent.subclasses[sub_component_type_name]
+                    ).parameters
                     sub_component_params = {
                         k: v
                         for k, v in sub_component["params"].items()
-                        if sub_component_signature[k].default != v or
-                        return_defaults is True
+                        if sub_component_signature[k].default != v
+                        or return_defaults is True
                     }
 
                     sub_component_name = self._generate_component_name(
@@ -911,8 +920,10 @@ class Pipeline(BasePipeline):
 
             # create the Pipeline definition with how the Component are connected
             pipelines[pipeline_name]["nodes"].append({
-                "name": node,
-                "inputs": list(self.graph.predecessors(node))
+                "name":
+                node,
+                "inputs":
+                list(self.graph.predecessors(node))
             })
 
         config = {
@@ -923,10 +934,11 @@ class Pipeline(BasePipeline):
         return config
 
     def _generate_component_name(
-            self,
-            type_name: str,
-            params: Dict[str, Any],
-            existing_components: Dict[str, Any], ):
+        self,
+        type_name: str,
+        params: Dict[str, Any],
+        existing_components: Dict[str, Any],
+    ):
         component_name: str = type_name
         # add number if there are multiple distinct ones of the same type
         while component_name in existing_components and params != existing_components[

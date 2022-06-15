@@ -89,34 +89,37 @@ def do_train():
     pad_label_id = [len(label_list[0]) - 1, len(label_list[1]) - 1]
     ignore_label_id = -100
 
-    trans_func = partial(
-        convert_example_ner,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        pad_label_id=pad_label_id)
+    trans_func = partial(convert_example_ner,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         pad_label_id=pad_label_id)
 
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),
-        'position_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-        'attention_mask': Pad(axis=0, pad_val=0, dtype='float32'),
-        'label_oth': Pad(axis=0, pad_val=pad_label_id[0], dtype='int64'),
-        'label_sym': Pad(axis=0, pad_val=pad_label_id[1], dtype='int64')
+        'input_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+        'token_type_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),
+        'position_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+        'attention_mask':
+        Pad(axis=0, pad_val=0, dtype='float32'),
+        'label_oth':
+        Pad(axis=0, pad_val=pad_label_id[0], dtype='int64'),
+        'label_sym':
+        Pad(axis=0, pad_val=pad_label_id[1], dtype='int64')
     }): fn(samples)
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     if args.init_from_ckpt:
         if not os.path.isfile(args.init_from_ckpt):
@@ -168,7 +171,8 @@ def do_train():
             input_ids, token_type_ids, position_ids, masks, label_oth, label_sym = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                    custom_white_list=['layer_norm', 'softmax', 'gelu'],
+            ):
                 logits = model(input_ids, token_type_ids, position_ids)
 
                 loss_mask = paddle.unsqueeze(masks, 2)

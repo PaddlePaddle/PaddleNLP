@@ -30,8 +30,8 @@ DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
 
 # Sliders
-DEFAULT_DOCS_FROM_RETRIEVER = int(
-    os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "50"))
+DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
+                                            "50"))
 DEFAULT_DOCS_FROM_RANKER = int(os.getenv("DEFAULT_DOCS_FROM_RANKER", "1"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "1"))
 
@@ -48,8 +48,8 @@ def main():
 
     st.set_page_config(
         page_title="PaddleNLP 智能问答",
-        page_icon="https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png"
-    )
+        page_icon=
+        "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
     # Persistent state
     set_state_if_absent("question", DEFAULT_QUESTION_AT_STARTUP)
@@ -74,7 +74,8 @@ def main():
         max_value=50,
         value=DEFAULT_DOCS_FROM_RETRIEVER,
         step=1,
-        on_change=reset_results, )
+        on_change=reset_results,
+    )
 
     top_k_ranker = st.sidebar.slider(
         "最大排序数量",
@@ -82,7 +83,8 @@ def main():
         max_value=50,
         value=DEFAULT_DOCS_FROM_RANKER,
         step=1,
-        on_change=reset_results, )
+        on_change=reset_results,
+    )
 
     top_k_reader = st.sidebar.slider(
         "最大的答案的数量",
@@ -90,7 +92,8 @@ def main():
         max_value=50,
         value=DEFAULT_NUMBER_OF_ANSWERS,
         step=1,
-        on_change=reset_results, )
+        on_change=reset_results,
+    )
 
     # File upload block
     if not DISABLE_FILE_UPLOAD:
@@ -109,16 +112,15 @@ def main():
         pass
 
     # Search bar
-    question = st.text_input(
-        "",
-        value=st.session_state.question,
-        max_chars=100,
-        on_change=reset_results)
+    question = st.text_input("",
+                             value=st.session_state.question,
+                             max_chars=100,
+                             on_change=reset_results)
     col1, col2 = st.columns(2)
-    col1.markdown(
-        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
-    col2.markdown(
-        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    col1.markdown("<style>.stButton button {width:100%;}</style>",
+                  unsafe_allow_html=True)
+    col2.markdown("<style>.stButton button {width:100%;}</style>",
+                  unsafe_allow_html=True)
 
     # Run button
     run_pressed = col1.button("运行")
@@ -192,10 +194,11 @@ def main():
                 end_idx = start_idx + len(answer)
                 # Hack due to this bug: https://github.com/streamlit/streamlit/issues/3190
                 st.write(
-                    markdown(context[:start_idx] + str(
-                        annotation(answer, "ANSWER", "#8ef")) + context[
-                            end_idx:]),
-                    unsafe_allow_html=True, )
+                    markdown(context[:start_idx] +
+                             str(annotation(answer, "ANSWER", "#8ef")) +
+                             context[end_idx:]),
+                    unsafe_allow_html=True,
+                )
                 source = ""
                 url, title = get_backlink(result)
                 if url and title:
@@ -216,7 +219,8 @@ def main():
                 st.write(
                     #markdown(context[:start_idx] + str(annotation(answer, "ANSWER", "#8ef")) + context[end_idx:]),
                     markdown(context),
-                    unsafe_allow_html=True, )
+                    unsafe_allow_html=True,
+                )
                 st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")

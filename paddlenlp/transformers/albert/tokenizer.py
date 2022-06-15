@@ -109,14 +109,22 @@ class AlbertTokenizer(PretrainedTokenizer):
             "albert-chinese-xxlarge": None,
         },
         "vocab_file": {
-            "albert-base-v1": None,
-            "albert-large-v1": None,
-            "albert-xlarge-v1": None,
-            "albert-xxlarge-v1": None,
-            "albert-base-v2": None,
-            "albert-large-v2": None,
-            "albert-xlarge-v2": None,
-            "albert-xxlarge-v2": None,
+            "albert-base-v1":
+            None,
+            "albert-large-v1":
+            None,
+            "albert-xlarge-v1":
+            None,
+            "albert-xxlarge-v1":
+            None,
+            "albert-base-v2":
+            None,
+            "albert-large-v2":
+            None,
+            "albert-xlarge-v2":
+            None,
+            "albert-xxlarge-v2":
+            None,
             "albert-chinese-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
             "albert-chinese-small":
@@ -236,9 +244,9 @@ class AlbertTokenizer(PretrainedTokenizer):
                  mask_token="[MASK]",
                  **kwargs):
 
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
 
         self.do_lower_case = do_lower_case
@@ -248,15 +256,14 @@ class AlbertTokenizer(PretrainedTokenizer):
         self.sentencepiece_model_file = sentencepiece_model_file
 
         if vocab_file is not None:
-            self.tokenizer = AlbertChineseTokenizer(
-                vocab_file=vocab_file,
-                do_lower_case=do_lower_case,
-                unk_token=unk_token,
-                sep_token=sep_token,
-                pad_token=pad_token,
-                cls_token=cls_token,
-                mask_token=mask_token,
-                **kwargs)
+            self.tokenizer = AlbertChineseTokenizer(vocab_file=vocab_file,
+                                                    do_lower_case=do_lower_case,
+                                                    unk_token=unk_token,
+                                                    sep_token=sep_token,
+                                                    pad_token=pad_token,
+                                                    cls_token=cls_token,
+                                                    mask_token=mask_token,
+                                                    **kwargs)
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
@@ -482,7 +489,9 @@ class AlbertTokenizer(PretrainedTokenizer):
 
 
 class AlbertEnglishTokenizer(PretrainedTokenizer):
-    resource_files_names = {"sentencepiece_model_file": "spiece.model", }
+    resource_files_names = {
+        "sentencepiece_model_file": "spiece.model",
+    }
 
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
@@ -658,8 +667,8 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         sep = [self.sep_token_id]
@@ -674,9 +683,8 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [
-            (0, 0)
-        ]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
@@ -690,7 +698,9 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
@@ -783,4 +793,5 @@ class AlbertChineseTokenizer(BertTokenizer):
             sep_token=sep_token,
             pad_token=pad_token,
             cls_token=cls_token,
-            mask_token=mask_token, )
+            mask_token=mask_token,
+        )

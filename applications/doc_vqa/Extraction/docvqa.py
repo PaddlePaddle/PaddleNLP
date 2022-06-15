@@ -14,6 +14,7 @@ sys.path.insert(0, "../")
 
 
 class DocVQAExample(object):
+
     def __init__(self,
                  question,
                  doc_tokens,
@@ -48,6 +49,7 @@ class DocVQAFeatures(object):
 
 
 class DocVQA(Dataset):
+
     def __init__(self,
                  args,
                  tokenizer,
@@ -264,7 +266,8 @@ class DocVQA(Dataset):
                 input_mask=spans_input_mask,
                 segment_ids=spans_segment_ids,
                 boxes=spans_boxes_tokens,
-                label=label_ids, )
+                label=label_ids,
+            )
             features.append(feature)
         return features
 
@@ -292,8 +295,9 @@ class DocVQA(Dataset):
                 scale_y = 1000 / max(width, height)
 
             scaled_doc_boxes = [[
-                round((b[0] - x_min) * scale_x), round(
-                    (b[2] - y_min) * scale_y), round((b[1] - x_min) * scale_x),
+                round((b[0] - x_min) * scale_x),
+                round((b[2] - y_min) * scale_y),
+                round((b[1] - x_min) * scale_x),
                 round((b[3] - y_min) * scale_y)
             ] for b in doc_boxes]
 
@@ -308,11 +312,10 @@ class DocVQA(Dataset):
                     if pos > 1000:
                         print(width, height, box, oribox)
 
-            example = DocVQAExample(
-                question=question,
-                doc_tokens=doc_tokens,
-                doc_boxes=scaled_doc_boxes,
-                labels=labels)
+            example = DocVQAExample(question=question,
+                                    doc_tokens=doc_tokens,
+                                    doc_boxes=scaled_doc_boxes,
+                                    labels=labels)
             examples.append(example)
         return examples
 
@@ -338,19 +341,21 @@ class DocVQA(Dataset):
             max_span_num=self.max_span_num,
             max_query_length=self.max_query_length)
 
-        all_input_ids = paddle.to_tensor(
-            [f.input_ids for f in features], dtype="int64")
-        all_input_mask = paddle.to_tensor(
-            [f.input_mask for f in features], dtype="int64")
-        all_segment_ids = paddle.to_tensor(
-            [f.segment_ids for f in features], dtype="int64")
-        all_bboxes = paddle.to_tensor(
-            [f.boxes for f in features], dtype="int64")
-        all_labels = paddle.to_tensor(
-            [f.label for f in features], dtype="int64")
+        all_input_ids = paddle.to_tensor([f.input_ids for f in features],
+                                         dtype="int64")
+        all_input_mask = paddle.to_tensor([f.input_mask for f in features],
+                                          dtype="int64")
+        all_segment_ids = paddle.to_tensor([f.segment_ids for f in features],
+                                           dtype="int64")
+        all_bboxes = paddle.to_tensor([f.boxes for f in features],
+                                      dtype="int64")
+        all_labels = paddle.to_tensor([f.label for f in features],
+                                      dtype="int64")
         self.sample_list = [
-            np.array(all_input_ids), np.array(all_input_mask),
-            np.array(all_segment_ids), np.array(all_bboxes),
+            np.array(all_input_ids),
+            np.array(all_input_mask),
+            np.array(all_segment_ids),
+            np.array(all_bboxes),
             np.array(all_labels)
         ]
 

@@ -13,7 +13,7 @@ import paddle
 logger = logging.getLogger(__name__)
 
 
-def set_all_seeds(seed: int, deterministic_cudnn: bool=False) -> None:
+def set_all_seeds(seed: int, deterministic_cudnn: bool = False) -> None:
     """
     Setting multiple seeds to make runs reproducible.
 
@@ -32,8 +32,8 @@ def set_all_seeds(seed: int, deterministic_cudnn: bool=False) -> None:
 
 
 def initialize_device_settings(use_cuda: bool,
-                               local_rank: int=-1,
-                               multi_gpu: bool=True) -> Tuple[List[str], int]:
+                               local_rank: int = -1,
+                               multi_gpu: bool = True) -> Tuple[List[str], int]:
     """
     Returns a list of available devices.
 

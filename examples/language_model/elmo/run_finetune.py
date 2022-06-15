@@ -65,12 +65,10 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     """
     # Load data from files
     positive_examples = list(
-        open(
-            positive_data_file, 'r', encoding='latin-1').readlines())
+        open(positive_data_file, 'r', encoding='latin-1').readlines())
     positive_examples = [s.strip() for s in positive_examples]
     negative_examples = list(
-        open(
-            negative_data_file, 'r', encoding='latin-1').readlines())
+        open(negative_data_file, 'r', encoding='latin-1').readlines())
     negative_examples = [s.strip() for s in negative_examples]
     # Split by words
     x_text = positive_examples + negative_examples
@@ -84,6 +82,7 @@ def load_data_and_labels(positive_data_file, negative_data_file):
 
 
 class ELMoBowTextClassification(nn.Layer):
+
     def __init__(self, params_file, batch_size, sent_embedding_dim, dropout,
                  num_labels):
         super(ELMoBowTextClassification, self).__init__()
@@ -148,6 +147,7 @@ class ELMoBowTextClassification(nn.Layer):
 
 
 class SentencePolarityDatasetV1(Dataset):
+
     def __init__(self, x, y, vocab, max_seq_len):
         super(SentencePolarityDatasetV1, self).__init__()
 
@@ -177,13 +177,13 @@ class SentencePolarityDatasetV1(Dataset):
 def generate_batch(batch):
     batch_ids, batch_ids_reverse, batch_label = zip(*batch)
     max_len = max([ids.shape[0] for ids in batch_ids])
-    new_batch_ids = np.zeros(
-        [len(batch_ids), max_len, batch_ids[0].shape[1]], dtype=np.int64)
+    new_batch_ids = np.zeros([len(batch_ids), max_len, batch_ids[0].shape[1]],
+                             dtype=np.int64)
     new_batch_ids_reverse = np.zeros(
         [len(batch_ids), max_len, batch_ids[0].shape[1]], dtype=np.int64)
     new_batch_label = []
-    for i, (ids, ids_reverse, label
-            ) in enumerate(zip(batch_ids, batch_ids_reverse, batch_label)):
+    for i, (ids, ids_reverse,
+            label) in enumerate(zip(batch_ids, batch_ids_reverse, batch_label)):
         seq_len = ids.shape[0]
         new_batch_ids[i, :seq_len, :] = ids
         new_batch_ids_reverse[i, :seq_len, :] = ids_reverse
@@ -199,8 +199,10 @@ def finetune(args):
     pos_file = os.path.join(args.data_dir, 'rt-polarity.pos')
     neg_file = os.path.join(args.data_dir, 'rt-polarity.neg')
     x_text, y = load_data_and_labels(pos_file, neg_file)
-    x_train, x_test, y_train, y_test = train_test_split(
-        x_text, y, test_size=0.1, random_state=args.seed)
+    x_train, x_test, y_train, y_test = train_test_split(x_text,
+                                                        y,
+                                                        test_size=0.1,
+                                                        random_state=args.seed)
 
     if not args.init_from_ckpt:
         raise ValueError('`init_from_ckpt` should be set.')
@@ -211,10 +213,9 @@ def finetune(args):
         model = paddle.DataParallel(model)
     model.train()
 
-    adam = paddle.optimizer.Adam(
-        parameters=model.parameters(),
-        learning_rate=args.lr,
-        weight_decay=args.weight_decay)
+    adam = paddle.optimizer.Adam(parameters=model.parameters(),
+                                 learning_rate=args.lr,
+                                 weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
 
     vocab = load_vocab()
@@ -223,18 +224,16 @@ def finetune(args):
                                               args.max_seq_len)
     test_dataset = SentencePolarityDatasetV1(x_test, y_test, vocab,
                                              args.max_seq_len)
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        return_list=True,
-        shuffle=True,
-        collate_fn=lambda batch: generate_batch(batch))
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,
-        return_list=True,
-        shuffle=False,
-        collate_fn=lambda batch: generate_batch(batch))
+    train_loader = DataLoader(train_dataset,
+                              batch_size=args.batch_size,
+                              return_list=True,
+                              shuffle=True,
+                              collate_fn=lambda batch: generate_batch(batch))
+    test_loader = DataLoader(test_dataset,
+                             batch_size=args.batch_size,
+                             return_list=True,
+                             shuffle=False,
+                             collate_fn=lambda batch: generate_batch(batch))
 
     for epoch in range(args.epochs):
         print('Epoch {}/{}'.format(epoch + 1, args.epochs))
@@ -267,8 +266,8 @@ def test(model, test_loader):
         num += label.shape[0]
         predict = paddle.argmax(output, axis=1)
         label = paddle.cast(label, dtype=predict.dtype)
-        correct += paddle.sum(paddle.cast(
-            predict == label, dtype='int64')).numpy()[0]
+        correct += paddle.sum(paddle.cast(predict == label,
+                                          dtype='int64')).numpy()[0]
     model.train()
     return correct * 1.0 / num
 

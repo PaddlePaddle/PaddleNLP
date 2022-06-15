@@ -31,20 +31,22 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 class LinearDecayWithWarmup(LambdaDecay):
+
     def __init__(self,
                  learning_rate,
                  total_steps,
@@ -73,8 +75,8 @@ class LinearDecayWithWarmup(LambdaDecay):
                 Defaults to False.
         """
 
-        warmup_steps = warmup if isinstance(
-            warmup, int) else int(math.floor(warmup * total_steps))
+        warmup_steps = warmup if isinstance(warmup, int) else int(
+            math.floor(warmup * total_steps))
 
         def lr_lambda(current_step):
             if current_step < warmup_steps:
@@ -133,11 +135,10 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     if text_b is not None:
         text_b = tokenize_special_chars(normalize_chars(text_b))
 
-    encoded_inputs = tokenizer(
-        text=text_a,
-        text_pair=text_b,
-        max_seq_len=max_seq_length,
-        return_position_ids=True)
+    encoded_inputs = tokenizer(text=text_a,
+                               text_pair=text_b,
+                               max_seq_len=max_seq_length,
+                               return_position_ids=True)
     input_ids = encoded_inputs['input_ids']
     token_type_ids = encoded_inputs['token_type_ids']
     position_ids = encoded_inputs['position_ids']
@@ -202,10 +203,10 @@ def convert_example_ner(example,
             labels[0] = labels[0][:input_len - 2]
         if input_len - 2 < len(labels[1]):
             labels[1] = labels[1][:input_len - 2]
-        encoded_inputs['label_oth'] = [pad_label_id[0]] + labels[
-            0] + [pad_label_id[0]]
-        encoded_inputs['label_sym'] = [pad_label_id[1]] + labels[
-            1] + [pad_label_id[1]]
+        encoded_inputs['label_oth'] = [pad_label_id[0]
+                                       ] + labels[0] + [pad_label_id[0]]
+        encoded_inputs['label_sym'] = [pad_label_id[1]
+                                       ] + labels[1] + [pad_label_id[1]]
 
     return encoded_inputs
 
@@ -505,24 +506,25 @@ class SPOChunkEvaluator(paddle.metric.Metric):
     def accumulate(self):
         spo_precision = self.num_correct_spo / self.num_infer_spo
         spo_recall = self.num_correct_spo / self.num_label_spo
-        spo_f1 = 2 * self.num_correct_spo / (
-            self.num_infer_spo + self.num_label_spo)
+        spo_f1 = 2 * self.num_correct_spo / (self.num_infer_spo +
+                                             self.num_label_spo)
         ent_precision = self.num_correct_ent / self.num_infer_ent if self.num_infer_ent > 0 else 0.
         ent_recall = self.num_correct_ent / self.num_correct_ent if self.num_correct_ent > 0 else 0.
         ent_f1 = 2 * ent_precision * ent_recall / (
-            ent_precision + ent_recall) if (ent_precision + ent_recall
-                                            ) != 0 else 0.
+            ent_precision + ent_recall) if (ent_precision +
+                                            ent_recall) != 0 else 0.
         return {
             'entity': (ent_precision, ent_recall, ent_f1),
             'spo': (spo_precision, spo_recall, spo_f1)
         }
 
     def _is_number_or_matrix(self, var):
+
         def _is_number_(var):
-            return isinstance(
-                var, int) or isinstance(var, np.int64) or isinstance(
-                    var, float) or (isinstance(var, np.ndarray) and
-                                    var.shape == (1, ))
+            return isinstance(var,
+                              int) or isinstance(var, np.int64) or isinstance(
+                                  var, float) or (isinstance(var, np.ndarray)
+                                                  and var.shape == (1, ))
 
         return _is_number_(var) or isinstance(var, np.ndarray)
 

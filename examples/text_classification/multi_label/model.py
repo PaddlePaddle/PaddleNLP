@@ -16,12 +16,13 @@ import paddle.nn as nn
 
 
 class MultiLabelClassifier(nn.Layer):
+
     def __init__(self, pretrained_model, num_labels=2, dropout=None):
         super(MultiLabelClassifier, self).__init__()
         self.ptm = pretrained_model
         self.num_labels = num_labels
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ptm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.ptm.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ptm.config["hidden_size"], num_labels)
 
     def forward(self,
