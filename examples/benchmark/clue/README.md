@@ -684,7 +684,7 @@
         <tr>
             <td rowspan=1 align=center> 4L768H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">HFL/RBT4, Chinese</span>
+                <span style="font-size:18px"><b>HFL/RBT4, Chinese</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>67.45</b></span>
@@ -1144,21 +1144,30 @@ C3	77.88	(3e-05, 32, 0.1)
 
 #### 绘制二维图比较不同模型的性能、精度
 
-想要直观的感受出不同模型的性能、精度指标，以便于模型选型，可以参考 grid_search_tools/draw_pic.py 脚本，输入自己的数据，将模型的指标（精度、性能）绘制成图像。
+下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图。其中 batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，CPU 上包含了 1 或者 8 个线程的情况。
 
-下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图（batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，其中 CPU 上包含了 1 或者 8 个线程的情况）。横坐标反馈的是性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务），图中模型名下方是模型的参数量，圆形的大小反应了模型的参数量的大小。测试环境见[ERNIE 3.0文档](../../../model_zoo/ernie-3.0/README.md)中的说明
+横坐标表示性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）。
+
+图中模型名下方是模型的参数量，圆形的大小反应了模型的参数量的大小。
+
+测试环境见[ERNIE 3.0 性能测试](../../../model_zoo/ernie-3.0/README.md)。
 
 <table>
     <tr>
-        <td><a><img src="./img/cpu_thread1_bs32.png"></a></td>
-        <td><a><img src="./img/cpu_thread8_bs32.png"></a></td>
-    </tr>
-    <tr>
-        <td><a><img src="./img/gpu_bs32.png"></a></td>
+        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread1_bs32.png"></a></td>
+        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread8_bs32.png"></a></td>
     </tr>
 </table>
 
-##### 使用方法
+<table>
+    <tr>
+        <td style="text-align:center;vertical-align:middle">
+            <a><img src="../../../model_zoo/ernie-3.0/img/gpu_bs32.png"></a>
+        </td>
+    </tr>
+</table>
+
+##### 绘制方法
 
 首先先安装 matplotlib，这是一个 Python 语言及其数值计算库 NumPy 的绘图库。
 
@@ -1166,10 +1175,13 @@ C3	77.88	(3e-05, 32, 0.1)
 pip install matplotlib
 ```
 
-安装过后直接调用 `grid_search_tools/draw_pic.py` 脚本，需要传入 2 个参数，这两个参数主要为了配置文件名，其中第一个参数表示设备，第二个参数表示 batch_size。具体的精度、性能数据需要在脚本中手动配置。
+安装后直接调用 `grid_search_tools/draw_pic.py` 脚本，需要传入 2 个参数，这两个参数主要为了配置文件名，其中第一个参数表示设备（支持gpu、cpu1、cpu8，cpu1），第二个参数表示 batch_size。具体的精度、性能数据需要在脚本中手动配置。
 
 ```shell
+
+# cpu1代表线程数1，cpu8代表线程数8
 python grid_search_tools/draw_pic.py gpu 32
+
 ```
 
 
