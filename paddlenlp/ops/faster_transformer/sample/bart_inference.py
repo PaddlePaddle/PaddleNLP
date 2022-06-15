@@ -72,8 +72,6 @@ def infer(args):
 
     input_ids = prepare_input(tokenizer, sentences)
 
-    print(input_ids)
-
     # Load FasterTransformer lib.
     load("FasterTransformer", verbose=True)
 
@@ -103,7 +101,7 @@ def infer(args):
                 break
             generated_ids = postprocess_seq(beam, tokenizer.bos_token_id,
                                             tokenizer.eos_token_id)
-            seq = tokenizer.decode(generated_ids)
+            seq = tokenizer.convert_ids_to_string(generated_ids)
             print(f'{idx}-{beam_idx}: {seq}')
 
 

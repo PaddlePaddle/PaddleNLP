@@ -101,6 +101,7 @@ def do_predict(args):
     logger.info('Loading the model parameters, please wait...')
     model = BartForConditionalGeneration.from_pretrained(
         args.model_name_or_path)
+
     # Set evaluate mode
     model.eval()
     sentences = [
