@@ -38,11 +38,9 @@ def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
     return seq
 
 
-def prepare_input(tokenizer, sentences, pad_id):
-    word_pad = Pad(pad_id, dtype="int64")
-    tokenized = tokenizer(sentences, return_length=True)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
-    input_ids = paddle.to_tensor(inputs)
+def prepare_input(tokenizer, sentences):
+    tokenized = tokenizer(sentences, padding=True)
+    input_ids = paddle.to_tensor(tokenized['input_ids'], dtype='int64')
     return input_ids
 
 
@@ -115,7 +113,7 @@ def do_predict(args):
     bos_id = model.bart.config['bos_token_id']
     eos_id = model.bart.config['eos_token_id']
     pad_id = model.bart.config['pad_token_id']
-    input_ids = prepare_input(tokenizer, sentences, pad_id)
+    input_ids = prepare_input(tokenizer, sentences)
     # Define model
     faster_bart = model
 
@@ -155,4 +153,5 @@ def do_predict(args):
 if __name__ == "__main__":
     args = parse_args()
     pprint(args)
+
     do_predict(args)
