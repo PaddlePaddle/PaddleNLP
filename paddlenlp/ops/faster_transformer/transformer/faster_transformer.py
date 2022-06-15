@@ -1197,6 +1197,8 @@ class FasterBART(BartPretrainedModel):
                                           decoding_lib=decoding_lib,
                                           use_fp16_decoding=use_fp16_decoding)
         if self.enable_faster_encoder:
+            # (gongenlei) Need to use `enable_faster_encoder` in `__init__`
+            # when dygraph to static graph.
             self.encoder = FasterBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):

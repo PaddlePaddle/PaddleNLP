@@ -83,6 +83,7 @@ def infer(args):
 
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
+    # `embedding_eltwise_layernorm_fuse_pass` failed
     config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
     predictor = paddle_infer.create_predictor(config)
 

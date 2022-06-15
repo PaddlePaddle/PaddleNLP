@@ -136,6 +136,7 @@ class BartLearnedPositionalEmbedding(Embedding):
         positions = paddle.arange(past_key_values_length,
                                   past_key_values_length + seq_len,
                                   dtype="int64")
+        # (gongenlei) For dygraph to static graph
         return Embedding.forward(self, positions + self.offset)
 
 
