@@ -47,7 +47,7 @@ msgstr "Visualize Embedding Results"
 
 #: ../model_zoo/embeddings.md:9 ../model_zoo/embeddings.md:140
 msgid "计算词向量cosine相似度"
-msgstr "Calculate Word Vector Cosine Similarity"
+msgstr "Calculate the similarity of cosine for vectors"
 
 #: ../model_zoo/embeddings.md:10 ../model_zoo/embeddings.md:147
 msgid "计算词向量内积"
