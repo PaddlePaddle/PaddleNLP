@@ -1,10 +1,10 @@
 model_item=gpt3_moe
-fp_item=fp32
 dp_degree=1
-sharding_degree=1
+sharding_degree=32
 bs_item=8
-run_mode=DP_MoE_C1
-device_num=N1C1
+fp_item=fp16
+run_mode=Sharding_MoE_C32
+device_num=N4C32
 
 model=gpt
 

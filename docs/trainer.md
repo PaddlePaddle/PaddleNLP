@@ -285,7 +285,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --lr_scheduler_type
                         要使用的学习率调度策略。 (`str`, 可选, 默认为 `"linear"`)
 
-                        The scheduler type to use. (default: linear)
+                        The scheduler type to use. (default: linear) 支持，linear, cosine, constant, constant_with_warmup.
 
   --warmup_ratio
                         用于从 0 到 `learning_rate` 的线性warmup的总训练步骤的比例。（`float`，可选，默认为 0.0）

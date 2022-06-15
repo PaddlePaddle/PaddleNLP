@@ -213,7 +213,7 @@ private:
   AddedVocabulary added_vocabulary_;
   bool use_truncation_;
   bool use_padding_;
-  // TODO(zhoushunjie): Implement Decoder later.
+
   friend void to_json(nlohmann::json& j, const Tokenizer& tokenizer);
   friend void from_json(const nlohmann::json& j, Tokenizer& tokenizer);
 };
