@@ -55,13 +55,13 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_strategy",
-        default='sampling',
+        default='beam_search',
         type=str,
         help=
         "The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
     parser.add_argument("--beam_size",
-                        default=4,
+                        default=5,
                         type=int,
                         help="The parameters for beam search. ")
     parser.add_argument(
@@ -75,7 +75,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument("--max_length",
-                        default=50,
+                        default=20,
                         type=int,
                         help="Maximum output length. ")
     parser.add_argument("--diversity_rate",
