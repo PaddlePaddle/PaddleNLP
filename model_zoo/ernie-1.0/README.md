@@ -103,6 +103,7 @@ python -u  -m paddle.distributed.launch \
     --model_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
+    --split 949,50,1 \
     --max_seq_len 512 \
     --micro_batch_size 64 \
     --use_amp true \
@@ -125,6 +126,7 @@ python -u  -m paddle.distributed.launch \
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
 - `max_seq_len` 输入文本序列的长度。
 - `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
 - `use_amp` 开启混合精度策略。
