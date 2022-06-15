@@ -203,19 +203,19 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
 
         # From built-in pretrained models
-        if pretrained_model_name_or_path in pretrained_models:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[pretrained_model_name_or_path]
             )
+
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
@@ -270,6 +270,16 @@ class PretrainedModel(Layer, GenerationMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
+            model_config_file_path = os.path.join(default_root,
+                                                  cls.model_config_file)
+            # check if there is model config file in cache directory
+            if pretrained_model_name_or_path in cls.pretrained_init_configuration and init_kwargs is not None and not os.path.exists(
+                    model_config_file_path):
+                with io.open(model_config_file_path, 'w',
+                             encoding='utf-8') as f:
+                    json.dump(init_kwargs, f)
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
