@@ -392,7 +392,7 @@ def run(args):
                     logger.info("best_result: %.2f" % (best_acc * 100))
                     return
             tic_eval = time.time()
-            acc = evaluation(model, loss_fct, dev_data_loader, metric)
+            acc = evaluate(model, loss_fct, dev_data_loader, metric)
             logger.info("eval acc: %.5f, eval done total : %s s" %
                         (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
