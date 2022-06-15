@@ -165,6 +165,13 @@ def parse_args():
         help=
         'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
+    parser.add_argument(
+        "--fuse",
+        type=distutils.util.strtobool,
+        default=False,
+        help=
+        "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."
+    )
     args = parser.parse_args()
     return args
 

@@ -16,6 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+from paddle.incubate.nn import FusedTransformerEncoderLayer
 
 from .. import PretrainedModel, register_base_model
 
@@ -492,7 +493,8 @@ class BertModel(BertPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 pool_act="tanh"):
+                 pool_act="tanh",
+                 fuse=False):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -500,15 +502,19 @@ class BertModel(BertPretrainedModel):
                                          hidden_dropout_prob,
                                          max_position_embeddings,
                                          type_vocab_size)
-        encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.fuse = fuse
+        if self.fuse:
+            pass
+        else:
+            encoder_layer = nn.TransformerEncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                dropout=hidden_dropout_prob,
+                activation=hidden_act,
+                attn_dropout=attention_probs_dropout_prob,
+                act_dropout=0)
+            self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
@@ -602,22 +608,25 @@ class BertModel(BertPretrainedModel):
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids)
-        if output_hidden_states:
-            output = embedding_output
-            encoder_outputs = []
-            for mod in self.encoder.layers:
-                output = mod(output, src_mask=attention_mask)
-                encoder_outputs.append(output)
-            if self.encoder.norm is not None:
-                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-            pooled_output = self.pooler(encoder_outputs[-1])
+        if self.fuse:
+            pass
         else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
-            pooled_output = self.pooler(sequence_output)
-        if output_hidden_states:
-            return encoder_outputs, pooled_output
-        else:
-            return sequence_output, pooled_output
+            if output_hidden_states:
+                output = embedding_output
+                encoder_outputs = []
+                for mod in self.encoder.layers:
+                    output = mod(output, src_mask=attention_mask)
+                    encoder_outputs.append(output)
+                if self.encoder.norm is not None:
+                    encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+                pooled_output = self.pooler(encoder_outputs[-1])
+            else:
+                sequence_output = self.encoder(embedding_output, attention_mask)
+                pooled_output = self.pooler(sequence_output)
+            if output_hidden_states:
+                return encoder_outputs, pooled_output
+            else:
+                return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
