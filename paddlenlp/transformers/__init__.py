@@ -118,3 +118,4 @@ from ..utils.import_utils import is_faster_tokenizer_available
 if is_faster_tokenizer_available():
     from .bert.faster_tokenizer import *
     from .ernie.faster_tokenizer import *
+    from .tinybert.faster_tokenizer import *
