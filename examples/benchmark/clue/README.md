@@ -10,6 +10,7 @@
            * [环境依赖](#环境依赖)
            * [一键启动方法](#一键启动方法)
            * [Grid Search 脚本说明](#GridSearch脚本说明)
+           * [绘制二维图比较不同模型的性能、精度](#绘制二维图)
    * [参加 CLUE 竞赛](#参加CLUE竞赛)
        * [分类任务](#分类任务)
        * [阅读理解任务](#阅读理解任务)
@@ -681,6 +682,45 @@
             </td>
         </tr>
         <tr>
+            <td rowspan=1 align=center> 4L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">HFL/RBT4, Chinese</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>67.45</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>72.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.50</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.95</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>77.34</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.78</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.05</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>78.23</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.21/81.80</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>73.61</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.45</b></span>
+            </td>
+        </tr>
+        <tr>
             <td rowspan=1 align=center> 4L384H </td>
             <td style="text-align:center">
                 <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
@@ -756,6 +796,83 @@
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>55.11</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=1 align=center> 3L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>HFL/RBTL3, Chinese</b></span>
+            </td>
+                <td style="text-align:center">
+                <span style="font-size:18px"><b>66.79</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.11</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.14</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.56</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.29</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>69.74</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.93</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.59/81.35</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>72.57</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.56</b></span>
+            </td>
+        <tr>
+            <td rowspan=1 align=center> 3L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>HFL/RBT3, Chinese</b></span>
+            </td>
+                <td style="text-align:center">
+                <span style="font-size:18px"><b>65.72</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.95</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.53</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.18</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.20</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.71</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>67.11</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.63</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.14/78.09</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.70</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.08</b></span>
             </td>
         </tr>
     <tbody>
@@ -988,21 +1105,25 @@ python grid_seach.py ernie-3.0-nano-zh
 确认模型所有任务训练完成后，可以调用脚本 `extract_result.sh` 一键抽取 Grid Search 结果，打印出每个任务的最佳结果和对应的超参数，例如：
 
 ```shell
-bash extract_result.sh ernie-3.0-nano-zh # 注意模型名或者模型目录名后面不要带'/'
+bash extract_result.sh ernie-3.0-nano-zh
 ```
 ```text
-AFQMC    TNEWS    IFLYTEK    CMNLI    OCNLI    CLUEWSC2020    CSL    CMRC2018    CHID    C3
-76.48    58.47    61.18    83.57    80.20    88.49    82.80    72.20/90.67    83.67    78.49
+AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
+75.93	58.26	61.56	83.02	80.10	86.18	82.63	70.71/90.41	84.26	77.88
 ====================================================================
-best hyper-parameters list:
+Best hyper-parameters list:
 ====================================================================
-afqmc's best result is 76.48, and lr, bs, dropout_p are: 3e-05 16 0.1
-tnews's best result is 58.47, and lr, bs, dropout_p are: 5e-05 16 0.1
-iflytek's best result is 61.18, and lr, bs, dropout_p are: 5e-05 16 0.0
-ocnli's best result is 80.20, and lr, bs, dropout_p are: 2e-05 16 0.1
-cluewsc2020's best result is 88.49, and lr, bs, dropout_p are: 2e-05 32 0.0
-csl's best result is 82.80, lr, bs, and dropout_p are: 5e-05 64 0.1
-cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
+TASK	result	(lr, batch_size, dropout_p)
+AFQMC	75.93	(3e-05, 16, 0.1)
+TNEWS	58.26	(3e-05, 32, 0.1)
+IFLYTEK	61.56	(5e-05, 32, 0.0)
+CMNLI	83.02	(3e-05, 32, 0.1)
+OCNLI	80.10	(2e-05, 64, 0.1)
+CLUEWSC2020	86.18	(2e-05, 16, 0.0)
+CSL	82.63	(2e-05, 32, 0.1)
+CMRC2018	70.71/90.41	(2e-05, 24, 0.1)
+CHID	84.26	(3e-05, 24, 0.1)
+C3	77.88	(3e-05, 32, 0.1)
 ```
 
 另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
@@ -1018,6 +1139,39 @@ cmrc2018's best result is 69.52/89.02, and lr, bs, dropout_p are: 1e-05 32 0.1
 - `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
 - `run_mrc.sh` 阅读理解任务的启动脚本。
 - `run_cls.sh` 分类任务的启动脚本。
+
+<a name="绘制二维图"></a>
+
+#### 绘制二维图比较不同模型的性能、精度
+
+想要直观的感受出不同模型的性能、精度指标，以便于模型选型，可以参考 grid_search_tools/draw_pic.py 脚本，输入自己的数据，将模型的指标（精度、性能）绘制成图像。
+
+下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图（batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，其中 CPU 上包含了 1 或者 8 个线程的情况）。横坐标反馈的是性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务），图中模型名下方是模型的参数量，圆形的大小反应了模型的参数量的大小。测试环境见[ERNIE 3.0文档](../../../model_zoo/ernie-3.0/README.md)中的说明
+
+<table>
+    <tr>
+        <td><a><img src="./img/cpu_thread1_bs32.png"></a></td>
+        <td><a><img src="./img/cpu_thread8_bs32.png"></a></td>
+    </tr>
+    <tr>
+        <td><a><img src="./img/gpu_bs32.png"></a></td>
+    </tr>
+</table>
+
+##### 使用方法
+
+首先先安装 matplotlib，这是一个 Python 语言及其数值计算库 NumPy 的绘图库。
+
+```shell
+pip install matplotlib
+```
+
+安装过后直接调用 `grid_search_tools/draw_pic.py` 脚本，需要传入 2 个参数，这两个参数主要为了配置文件名，其中第一个参数表示设备，第二个参数表示 batch_size。具体的精度、性能数据需要在脚本中手动配置。
+
+```shell
+python grid_search_tools/draw_pic.py gpu 32
+```
+
 
 <a name="参加CLUE竞赛"></a>
 

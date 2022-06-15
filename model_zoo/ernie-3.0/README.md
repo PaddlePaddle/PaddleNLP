@@ -56,6 +56,20 @@
 - [**ERNIE 3.0-_Micro_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams) (_4-layer, 384-hidden, 12-heads_)
 - [**ERNIE 3.0-_Nano_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams) (_4-layer, 312-hidden, 12-heads_)
 
+
+下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图（batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，其中 CPU 上包含了 1 或者 8 个线程的情况）。横坐标反馈的是性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务），图中模型名下方是模型的参数量，圆形的大小反应了模型的参数量的大小。测试环境见[性能测试](#性能测试)。
+
+<table>
+    <tr>
+        <td><a><img src="./img/cpu_thread1_bs32.png"></a></td>
+        <td><a><img src="./img/cpu_thread8_bs32.png"></a></td>
+    </tr>
+    <tr>
+        <td><a><img src="./img/gpu_bs32.png"></a></td>
+    </tr>
+</table>
+
+
 在 CLUE **验证集**上评测指标如下表所示：
 
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
@@ -714,6 +728,45 @@
                 <span style="font-size:18px"><b>58.60</b></span>
             </td>
         </tr>
+               <tr>
+            <td rowspan=1 align=center> 4L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">HFL/RBT4, Chinese</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>67.45</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>72.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.50</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.95</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>77.34</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.78</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.05</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>78.23</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.21/81.80</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>73.61</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.45</b></span>
+            </td>
+        </tr>
         <tr>
             <td rowspan=1 align=center> 4L384H </td>
             <td style="text-align:center">
@@ -790,6 +843,83 @@
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>55.11</b></span>
+            </td>
+        </tr>
+                <tr>
+            <td rowspan=1 align=center> 3L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>HFL/RBTL3, Chinese</b></span>
+            </td>
+                <td style="text-align:center">
+                <span style="font-size:18px"><b>66.79</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.11</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>56.14</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.56</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.29</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>69.74</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.93</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.59/81.35</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>72.57</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.56</b></span>
+            </td>
+        <tr>
+            <td rowspan=1 align=center> 3L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>HFL/RBT3, Chinese</b></span>
+            </td>
+                <td style="text-align:center">
+                <span style="font-size:18px"><b>65.72</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.95</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.53</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.18</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.20</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.71</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>67.11</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.63</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.14/78.09</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.70</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.08</b></span>
             </td>
         </tr>
     <tbody>
