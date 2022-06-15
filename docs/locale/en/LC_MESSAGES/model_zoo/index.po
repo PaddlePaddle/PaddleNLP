@@ -187,7 +187,7 @@ msgstr ""
 
 #: ../model_zoo/index.rst:4
 msgid "PaddleNLP Transformer预训练模型"
-msgstr ""
+msgstr "PaddleNLP Transformer Pre-Trained Models"
 
 #: ../model_zoo/index.rst:6
 msgid ""
@@ -196,26 +196,33 @@ msgid ""
 "``BERT``、``ERNIE``、``ALBERT``、``RoBERTa``、``XLNet`` 等，采用统一的API进行加载、训练和调用，"
 " 让开发者能够方便快捷地应用各种Transformer类预训练模型及其下游任务，且相应预训练模型权重下载速度快、稳定。"
 msgstr ""
+"With the development of deep learning, a large number of high-quality Transformer class pre-training models have emerged in the field of NLP. The State of the Art (SOTA) of different NLP tasks has been refreshed many times, which has greatly promoted the progress of natural language processing."
+"PaddleNLP provides users with commonly used pre-trained models and their corresponding weights, such as ``BERT``, ``ERNIE``, ``ALBERT``, ``RoBERTa``, ``XLNet``, etc."
+"The unified API is used for loading, training and invocation, allowing developers to easily and quickly apply various Transformer class pre-trained models and their downstream tasks. The download speed of the corresponding pre-trained model weights is fast and stable."
 
 #: ../model_zoo/index.rst:12
 msgid "预训练模型使用方法"
-msgstr ""
+msgstr "How to use the pre-trained model"
 
 #: ../model_zoo/index.rst:14
 msgid ""
 "PaddleNLP Transformer API在提供丰富预训练模型的同时，也降低了用户的使用门槛。 "
 "使用Auto模块，可以加载不同网络结构的预训练模型，无需查找模型对应的类别。只需十几行代码，用户即可完成模型加载和下游任务Fine-tuning。"
 msgstr ""
+"While the PaddleNLP Transformer API provides rich pre-trained models, it also lowers the threshold for users to use."
+"Using the Auto module, you can load pre-trained models of different network structures without having to look up the categories corresponding to the models."
+"With just a dozen lines of code, users can complete model loading and downstream task Fine-tuning."
 
 #: ../model_zoo/index.rst:52
 msgid ""
 "上面的代码给出使用预训练模型的简要示例，更完整详细的示例代码， 可以参考：`使用预训练模型Fine-tune完成中文文本分类任务 "
 "<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models/>`_"
 msgstr ""
-
+"The above code gives a brief example of using the pre-trained model. For the comphrehensive and detailed example code, please refer to: `Use the pre-trained model Fine-tune to complete the Chinese text classification task"
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models/>`_""
 #: ../model_zoo/index.rst:55
 msgid "加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。"
-msgstr ""
+msgstr "Loading dataset: PaddleNLP has built-in multiple datasets. Users can import the requested datasets with one click." 
 
 #: ../model_zoo/index.rst:56
 msgid ""
@@ -226,32 +233,39 @@ msgid ""
 "``num_classes`` 等， 也是通过 ``from_pretrained()`` 传入。``Tokenizer`` 使用同样的 "
 "``from_pretrained`` 方法加载。"
 msgstr ""
+"Loading pretrained models: PaddleNLP's pre-trained models can be easily loaded via the ``from_pretrained()`` method."
+"The Auto module (including AutoModel, AutoTokenizer, and various downstream task classes) provides a easy-to-use interface, and can call pre-trained models of different network structures without specifying a category."
+"The first parameter is the corresponding ``Pretrained Weight`` in the summary table, which can load the corresponding pre-trained weight."
+"``AutoModelForSequenceClassification`` initializes other parameters required by ``__init__``, such as ``num_classes``, etc., which are also passed in through ``from_pretrained()``."
+"``Tokenizer`` is loaded using the same ``from_pretrained`` method."
 
 #: ../model_zoo/index.rst:62
 msgid "通过 ``Dataset`` 的 ``map`` 函数，使用 ``tokenizer`` 将 ``dataset`` 从原始文本处理成模型的输入。"
-msgstr ""
+msgstr "Use the ``tokenizer`` to process the ``dataset`` from raw text into the model input via the ``map`` function from ``Dataset``.  "
 
 #: ../model_zoo/index.rst:63
 msgid "定义 ``BatchSampler`` 和 ``DataLoader``，shuffle数据、组合Batch。"
-msgstr ""
+msgstr "Define ``BatchSampler`` and ``DataLoader``，shuffle data, combine Batch."
 
 #: ../model_zoo/index.rst:64
 msgid "定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。"
-msgstr ""
+msgstr "Define the optimizer, loss function, etc. required for training, and you can start the model fine-tune task."
 
 #: ../model_zoo/index.rst:68
 msgid "Transformer预训练模型汇总"
-msgstr ""
+msgstr "Transformer pre-trained model summary"
 
 #: ../model_zoo/index.rst:70
 msgid ""
 "PaddleNLP的Transformer预训练模型包含从 `huggingface.co`_ "
 "直接转换的模型权重和百度自研模型权重，方便社区用户直接迁移使用。 目前共包含了40多个主流预训练模型，500多个模型权重。"
 msgstr ""
+"The Transformer pre-training model of PaddleNLP includes the model weight directly converted from `huggingface.co`_ and the weight of Baidu's self-developed model,"
+"which is convenient for community users to directly migrate and use. Currently, it contains more than 40 mainstream pre-training models and more than 500 model weights."
 
 #: ../model_zoo/index.rst:125
 msgid "Transformer预训练模型适用任务汇总"
-msgstr ""
+msgstr "Applicable task summary of Transformer per-trained model "
 
 #: ../model_zoo/index.rst:128
 msgid "Model"
@@ -509,6 +523,19 @@ msgid ""
 "/NEZHA-PyTorch>`_, `ZhuiyiTechnology/simbert "
 "<https://github.com/ZhuiyiTechnology/simbert>`_"
 msgstr ""
+"Chinese per-trained models are partialy from ： `brightmart/albert_zh "
+"<https://github.com/brightmart/albert_zh>`_, `ymcui/Chinese-BERT-wwm "
+"<https://github.com/ymcui/Chinese-BERT-wwm>`_, `huawei-noah/Pretrained-"
+"Language-Model/TinyBERT <https://github.com/huawei-noah/Pretrained-"
+"Language-Model/tree/master/TinyBERT>`_, `ymcui/Chinese-XLNet "
+"<https://github.com/ymcui/Chinese-XLNet>`_, "
+"`huggingface/xlnet_chinese_large "
+"<https://huggingface.co/clue/xlnet_chinese_large>`_, `Knover/luge-"
+"dialogue <https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-"
+"dialogue>`_, `huawei-noah/Pretrained-Language-Model/NEZHA-PyTorch/ "
+"<https://github.com/huawei-noah/Pretrained-Language-Model/tree/master"
+"/NEZHA-PyTorch>`_, `ZhuiyiTechnology/simbert "
+"<https://github.com/ZhuiyiTechnology/simbert>`_"
 
 #: ../model_zoo/index.rst:269
 msgid ""
