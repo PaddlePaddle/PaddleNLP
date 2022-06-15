@@ -61,8 +61,8 @@ def _do_infer(model,
         db_id = inputs['orig_inputs'][0].db.db_id
         question_id = inputs['orig_inputs'][0].question_id
         question = inputs['orig_inputs'][0].question
-        gold_query = labels[0].orig_code if labels is not None and labels[
-            0] is not None else ''
+        gold_query = labels[
+            0].orig_code if labels is not None and labels[0] is not None else ''
         values = inputs['orig_inputs'][0].values
         if len(decoded) == 0:
             pred_query = 'select *'
@@ -97,21 +97,28 @@ def _infer_one(model,
     """
     if use_heuristic:
         # TODO: from_cond should be true from non-bert model
-        beams = sql_beam_search.beam_search_with_heuristics(
-            model, inputs, beam_size=beam_size, max_steps=1000, from_cond=False)
+        beams = sql_beam_search.beam_search_with_heuristics(model,
+                                                            inputs,
+                                                            beam_size=beam_size,
+                                                            max_steps=1000,
+                                                            from_cond=False)
     else:
-        beams = beam_search.beam_search(
-            model, inputs, beam_size=beam_size, max_steps=1000)
+        beams = beam_search.beam_search(model,
+                                        inputs,
+                                        beam_size=beam_size,
+                                        max_steps=1000)
     decoded = []
     for beam in beams:
         model_output, inferred_code = beam.inference_state.finalize()
 
         decoded.append({
-            'pred_query': inferred_code,
-            'model_output': model_output,
-            'score': beam.score,
-            **
-            ({
+            'pred_query':
+            inferred_code,
+            'model_output':
+            model_output,
+            'score':
+            beam.score,
+            **({
                 'choice_history': beam.choice_history,
                 'score_history': beam.score_history,
             } if output_history else {})

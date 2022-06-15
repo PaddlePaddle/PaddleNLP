@@ -67,8 +67,7 @@ def set_seed(args):
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
     return [
-        paddle.zeros(
-            [batch_size, memory_length, d_model], dtype="float32")
+        paddle.zeros([batch_size, memory_length, d_model], dtype="float32")
         for _ in range(n_layers)
     ]
 
@@ -109,21 +108,21 @@ def evaluate(model, metric, data_loader, memories0):
 
         if step % eval_logging_step == 0:
             logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
-                        (step, np.mean(losses),
-                         eval_logging_step / (time.time() - tic_train)))
+                        (step, np.mean(losses), eval_logging_step /
+                         (time.time() - tic_train)))
             tic_train = time.time()
 
     qids = preds_dict.keys()
     for qid in qids:
         preds = paddle.concat(preds_dict[qid], axis=0).unsqueeze(0)
-        labels = paddle.concat(
-            labels_dict[qid], axis=0).unsqueeze(0).squeeze(-1)
+        labels = paddle.concat(labels_dict[qid],
+                               axis=0).unsqueeze(0).squeeze(-1)
         length = paddle.concat(length_dict[qid], axis=0)
         length = length.sum(axis=0)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             length, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
     metric.reset()
     logger.info("Total {} samples.".format(len(qids)))
@@ -187,14 +186,14 @@ def do_train(args):
         mode="test",
         no_entity_id=no_entity_id)
 
-    train_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                           return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(
-        capacity=70, return_list=True)
+    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
+                                                          return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -202,8 +201,8 @@ def do_train(args):
     logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
-    logger.info("Num warmup steps: %d" % int(num_training_steps *
-                                             args.warmup_proportion))
+    logger.info("Num warmup steps: %d" %
+                int(num_training_steps * args.warmup_proportion))
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
@@ -219,14 +218,13 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        n_layers=model_config["num_hidden_layers"],
-        layerwise_decay=args.layerwise_decay,
-        name_dict=name_dict)
+    optimizer = AdamWDL(learning_rate=lr_scheduler,
+                        parameters=model.parameters(),
+                        weight_decay=args.weight_decay,
+                        apply_decay_param_fun=lambda x: x in decay_params,
+                        n_layers=model_config["num_hidden_layers"],
+                        layerwise_decay=args.layerwise_decay,
+                        name_dict=name_dict)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = ChunkEvaluator(label_list=train_ds.label_list)

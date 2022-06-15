@@ -43,6 +43,7 @@ np.random.seed(0)
 
 
 class GraphNN(paddle.nn.Layer):
+
     def __init__(self, params):
         super(GraphNN, self).__init__()
         self.params = params
@@ -62,21 +63,18 @@ class GraphNN(paddle.nn.Layer):
         bias_attr_qfc = paddle.ParamAttr(
             initializer=paddle.nn.initializer.Constant(value=0.0))
 
-        self.final_fc = paddle.nn.Linear(
-            params.encoder_state_size,
-            params.encoder_state_size,
-            weight_attr=weight_attr_final_fc,
-            bias_attr=bias_attr_final_fc)
-        self.fc = paddle.nn.Linear(
-            params.encoder_state_size,
-            params.encoder_state_size,
-            weight_attr=weight_attr_fc,
-            bias_attr=bias_attr_fc)
-        self.qfc = paddle.nn.Linear(
-            params.encoder_state_size,
-            params.encoder_state_size,
-            weight_attr=weight_attr_qfc,
-            bias_attr=bias_attr_qfc)
+        self.final_fc = paddle.nn.Linear(params.encoder_state_size,
+                                         params.encoder_state_size,
+                                         weight_attr=weight_attr_final_fc,
+                                         bias_attr=bias_attr_final_fc)
+        self.fc = paddle.nn.Linear(params.encoder_state_size,
+                                   params.encoder_state_size,
+                                   weight_attr=weight_attr_fc,
+                                   bias_attr=bias_attr_fc)
+        self.qfc = paddle.nn.Linear(params.encoder_state_size,
+                                    params.encoder_state_size,
+                                    weight_attr=weight_attr_qfc,
+                                    bias_attr=bias_attr_qfc)
         self.dropout = paddle.nn.Dropout(0.1)
         self.leakyReLU = paddle.nn.LeakyReLU(0.2)
         self.elu = paddle.nn.ELU()
@@ -88,8 +86,7 @@ class GraphNN(paddle.nn.Layer):
         len_tokens = x.shape[0]
         if previous_x is not None:
             x_new = self.leakyReLU(
-                self.fc(paddle.concat(
-                    [previous_x, x], axis=0))).unsqueeze(0)
+                self.fc(paddle.concat([previous_x, x], axis=0))).unsqueeze(0)
         else:
             x_new = self.leakyReLU(
                 self.fc(x).unsqueeze(0))  # [1, len_tokens, d]
@@ -100,16 +97,17 @@ class GraphNN(paddle.nn.Layer):
             [0, 2, 1])) / 10.0  # [3, len_tokens, len_tokens]
         tmp_adj_matrix = (adj_matrix == 0).expand(
             shape=[3, adj_matrix.shape[0], adj_matrix.shape[1]])
-        outputs = model_utils.mask_fill(
-            input=outputs, mask=tmp_adj_matrix, value=-1e9)
+        outputs = model_utils.mask_fill(input=outputs,
+                                        mask=tmp_adj_matrix,
+                                        value=-1e9)
         outputs = self.dropout(F.softmax(outputs, axis=-1))
         outputs = paddle.matmul(outputs, x_)
         outputs = paddle.concat(paddle.split(outputs, 3, axis=0), axis=2)
         if previous_x is not None:
             outputs = paddle.split(outputs, 2, axis=1)[1]
         outputs = x.unsqueeze(0) + outputs
-        ret = x + self.dropout(
-            self.leakyReLU(self.final_fc(outputs).squeeze(0)))
+        ret = x + self.dropout(self.leakyReLU(
+            self.final_fc(outputs).squeeze(0)))
         return ret
 
 
@@ -219,12 +217,10 @@ class SchemaInteractionATISModel(ATISModel):
         token_accuracy = 0.
         if self.params.use_encoder_attention:
             schema_attention = self.utterance2schema_attention_module(
-                paddle.stack(
-                    schema_states, axis=0),
+                paddle.stack(schema_states, axis=0),
                 input_hidden_states).vector  # input_value_size x len(schema)
             utterance_attention = self.schema2utterance_attention_module(
-                paddle.stack(
-                    input_hidden_states, axis=0),
+                paddle.stack(input_hidden_states, axis=0),
                 schema_states).vector  # schema_value_size x len(input)
 
             if schema_attention.dim() == 1:
@@ -233,29 +229,26 @@ class SchemaInteractionATISModel(ATISModel):
                 utterance_attention = utterance_attention.unsqueeze(1)
 
             new_schema_states = paddle.concat(
-                [paddle.stack(
-                    schema_states, axis=1), schema_attention],
+                [paddle.stack(schema_states, axis=1), schema_attention],
                 axis=0)  # (input_value_size+schema_value_size) x len(schema)
             schema_states = list(
-                paddle.split(
-                    new_schema_states,
-                    num_or_sections=new_schema_states.shape[1],
-                    axis=1))
+                paddle.split(new_schema_states,
+                             num_or_sections=new_schema_states.shape[1],
+                             axis=1))
             schema_states = [
                 schema_state.squeeze() for schema_state in schema_states
             ]
 
             new_input_hidden_states = paddle.concat(
                 [
-                    paddle.stack(
-                        input_hidden_states, axis=1), utterance_attention
+                    paddle.stack(input_hidden_states, axis=1),
+                    utterance_attention
                 ],
                 axis=0)  # (input_value_size+schema_value_size) x len(input)
             input_hidden_states = list(
-                paddle.split(
-                    new_input_hidden_states,
-                    num_or_sections=new_input_hidden_states.shape[1],
-                    axis=1))
+                paddle.split(new_input_hidden_states,
+                             num_or_sections=new_input_hidden_states.shape[1],
+                             axis=1))
             input_hidden_states = [
                 input_hidden_state.squeeze()
                 for input_hidden_state in input_hidden_states
@@ -284,12 +277,10 @@ class SchemaInteractionATISModel(ATISModel):
                         previous_queries) > 0:
                     query_scores = F.softmax(prediction.query_scores, axis=0)
                     copy_switch = prediction.copy_switch
-                    scores = paddle.concat(
-                        [
-                            scores * (1 - copy_switch),
-                            query_scores * copy_switch
-                        ],
-                        axis=0)
+                    scores = paddle.concat([
+                        scores * (1 - copy_switch), query_scores * copy_switch
+                    ],
+                                           axis=0)
                     alignments = alignments + prediction.query_tokens
 
                 all_scores.append(scores)
@@ -356,15 +347,13 @@ class SchemaInteractionATISModel(ATISModel):
 
     def encode_schema_self_attention(self, schema_states):
         schema_self_attention = self.schema2schema_attention_module(
-            paddle.stack(
-                schema_states, axis=0), schema_states).vector
+            paddle.stack(schema_states, axis=0), schema_states).vector
         if schema_self_attention.dim() == 1:
             schema_self_attention = schema_self_attention.unsqueeze(1)
         residual_schema_states = list(
-            paddle.split(
-                schema_self_attention,
-                num_or_sections=schema_self_attention.shape[1],
-                axis=1))
+            paddle.split(schema_self_attention,
+                         num_or_sections=schema_self_attention.shape[1],
+                         axis=1))
         residual_schema_states = [
             schema_state.squeeze() for schema_state in residual_schema_states
         ]
@@ -411,7 +400,8 @@ class SchemaInteractionATISModel(ATISModel):
             num_out_layers_h=1)
 
         if self.params.discourse_level_lstm:
-            utterance_token_embedder = lambda x: paddle.concat([x, discourse_state], axis=0)
+            utterance_token_embedder = lambda x: paddle.concat(
+                [x, discourse_state], axis=0)
             for idx in range(len(utterance_states)):
                 utterance_states[idx] = utterance_token_embedder(
                     utterance_states[idx])
@@ -442,9 +432,9 @@ class SchemaInteractionATISModel(ATISModel):
 
     def get_query_token_embedding(self, output_token, input_schema):
         if input_schema:
-            if not (self.output_embedder.in_vocabulary(output_token) or
-                    input_schema.in_vocabulary(
-                        output_token, surface_form=True)):
+            if not (self.output_embedder.in_vocabulary(output_token)
+                    or input_schema.in_vocabulary(output_token,
+                                                  surface_form=True)):
                 output_token = 'value'
             if self.output_embedder.in_vocabulary(output_token):
                 output_token_embedding = self.output_embedder(output_token)
@@ -458,7 +448,7 @@ class SchemaInteractionATISModel(ATISModel):
     def get_utterance_attention(self, final_utterance_states_c,
                                 final_utterance_states_h, final_utterance_state,
                                 num_utterances_to_keep):
-        # self-attention between utterance_states            
+        # self-attention between utterance_states
         final_utterance_states_h.append(final_utterance_state[0])
         final_utterance_states_c.append(final_utterance_state[1])
         final_utterance_states_c = final_utterance_states_c[
@@ -484,7 +474,8 @@ class SchemaInteractionATISModel(ATISModel):
     def get_previous_queries(self, previous_queries, previous_query_states,
                              previous_query, input_schema):
 
-        query_token_embedder = lambda query_token: self.get_query_token_embedding(query_token, input_schema)
+        query_token_embedder = lambda query_token: self.get_query_token_embedding(
+            query_token, input_schema)
 
         previous_query_embedding = []
 
@@ -499,8 +490,8 @@ class SchemaInteractionATISModel(ATISModel):
 
         previous_outputs, _ = self.query_encoder(
             previous_query_embedding.unsqueeze(0))
-        previous_outputs, _ = model_utils.LSTM_output_transfer(previous_outputs,
-                                                               _)
+        previous_outputs, _ = model_utils.LSTM_output_transfer(
+            previous_outputs, _)
 
         assert len(previous_outputs) == len(previous_query)
         previous_query_states.append(previous_outputs)
@@ -587,9 +578,10 @@ class SchemaInteractionATISModel(ATISModel):
         inner = []
         for i, ele in enumerate(
                 interaction.interaction.schema.column_names_surface_form):
-            for j in range(i + 1,
-                           len(interaction.interaction.schema.
-                               column_names_surface_form)):
+            for j in range(
+                    i + 1,
+                    len(interaction.interaction.schema.column_names_surface_form
+                        )):
                 if ele.split(
                         '.'
                 )[0] == interaction.interaction.schema.column_names_surface_form[
@@ -607,8 +599,8 @@ class SchemaInteractionATISModel(ATISModel):
         previous_schema_states = paddle.zeros(
             [input_schema.num_col, self.params.encoder_state_size])
 
-        for utterance_index, utterance in enumerate(interaction.gold_utterances(
-        )):
+        for utterance_index, utterance in enumerate(
+                interaction.gold_utterances()):
 
             if interaction.identifier in LIMITED_INTERACTIONS and utterance_index > LIMITED_INTERACTIONS[
                     interaction.identifier]:
@@ -625,8 +617,7 @@ class SchemaInteractionATISModel(ATISModel):
                     available_snippets,
                     utterance.contained_entities(),
                     utterance.anonymized_gold_query(),
-                    prob_align=snippet_alignment_probability
-                ) + [vocab.EOS_TOK]
+                    prob_align=snippet_alignment_probability) + [vocab.EOS_TOK]
             else:
                 gold_query = utterance.gold_query()
 
@@ -645,8 +636,9 @@ class SchemaInteractionATISModel(ATISModel):
                     previous_schema_states)
                 schema_states = self.gnn[i](schema_states, adjacent_matrix)
             previous_schema_states = schema_states
-            schema_states_ls = paddle.split(
-                schema_states, schema_states.shape[0], axis=0)
+            schema_states_ls = paddle.split(schema_states,
+                                            schema_states.shape[0],
+                                            axis=0)
             schema_states = [ele.squeeze(0) for ele in schema_states_ls]
 
             input_hidden_states.extend(utterance_states)
@@ -734,8 +726,8 @@ class SchemaInteractionATISModel(ATISModel):
 
             loss_scalar = float(normalized_loss.numpy())
             isNan = sum(
-                paddle.cast(paddle.isnan(normalized_loss), 'float32').numpy()
-                .tolist()) == 0
+                paddle.cast(paddle.isnan(normalized_loss),
+                            'float32').numpy().tolist()) == 0
             if paddle.isnan(normalized_loss):
                 print("nan error but keep running")
             assert isNan
@@ -778,9 +770,10 @@ class SchemaInteractionATISModel(ATISModel):
         inner = []
         for i, ele in enumerate(
                 interaction.interaction.schema.column_names_surface_form):
-            for j in range(i + 1,
-                           len(interaction.interaction.schema.
-                               column_names_surface_form)):
+            for j in range(
+                    i + 1,
+                    len(interaction.interaction.schema.column_names_surface_form
+                        )):
                 if ele.split(
                         '.'
                 )[0] == interaction.interaction.schema.column_names_surface_form[
@@ -813,7 +806,8 @@ class SchemaInteractionATISModel(ATISModel):
 
             if not self.params.use_bert:
                 if self.params.discourse_level_lstm:
-                    utterance_token_embedder = lambda token: paddle.concat([self.input_embedder(token), discourse_state], axis=0)
+                    utterance_token_embedder = lambda token: paddle.concat(
+                        [self.input_embedder(token), discourse_state], axis=0)
                 else:
                     utterance_token_embedder = self.input_embedder
                 final_utterance_state, utterance_states = self.utterance_encoder(
@@ -836,8 +830,9 @@ class SchemaInteractionATISModel(ATISModel):
                 schema_states = self.gnn[i](schema_states, adjacent_matrix)
             previous_schema_states = schema_states
 
-            schema_states_ls = paddle.split(
-                schema_states, schema_states.shape[0], axis=0)
+            schema_states_ls = paddle.split(schema_states,
+                                            schema_states.shape[0],
+                                            axis=0)
             schema_states = [ele.squeeze(0) for ele in schema_states_ls]
 
             input_hidden_states.extend(utterance_states)
@@ -867,8 +862,9 @@ class SchemaInteractionATISModel(ATISModel):
 
             snippets = None
             if self.params.use_snippets:
-                snippets = self._encode_snippets(
-                    previous_query, available_snippets, input_schema)
+                snippets = self._encode_snippets(previous_query,
+                                                 available_snippets,
+                                                 input_schema)
 
             if self.params.use_previous_query and len(previous_query) > 0:
                 previous_queries, previous_query_states = self.get_previous_queries(
@@ -963,9 +959,10 @@ class SchemaInteractionATISModel(ATISModel):
         inner = []
         for i, ele in enumerate(
                 interaction.interaction.schema.column_names_surface_form):
-            for j in range(i + 1,
-                           len(interaction.interaction.schema.
-                               column_names_surface_form)):
+            for j in range(
+                    i + 1,
+                    len(interaction.interaction.schema.column_names_surface_form
+                        )):
                 if ele.split(
                         '.'
                 )[0] == interaction.interaction.schema.column_names_surface_form[
@@ -983,8 +980,8 @@ class SchemaInteractionATISModel(ATISModel):
         previous_schema_states = paddle.zeros(
             [input_schema.num_col, self.params.encoder_state_size])
 
-        for utterance_index, utterance in enumerate(interaction.gold_utterances(
-        )):
+        for utterance_index, utterance in enumerate(
+                interaction.gold_utterances()):
 
             input_sequence = utterance.input_sequence()
 
@@ -1005,8 +1002,9 @@ class SchemaInteractionATISModel(ATISModel):
                 schema_states = self.gnn[i](schema_states, adjacent_matrix)
             previous_schema_states = schema_states
 
-            schema_states_ls = paddle.split(
-                schema_states, schema_states.shape[0], axis=0)
+            schema_states_ls = paddle.split(schema_states,
+                                            schema_states.shape[0],
+                                            axis=0)
             schema_states = [ele.squeeze(0) for ele in schema_states_ls]
 
             input_hidden_states.extend(utterance_states)

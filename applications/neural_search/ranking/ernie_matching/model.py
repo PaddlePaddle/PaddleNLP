@@ -18,6 +18,7 @@ import paddle.nn.functional as F
 
 
 class PairwiseMatching(nn.Layer):
+
     def __init__(self, pretrained_model, dropout=None, margin=0.1):
         super().__init__()
         self.ptm = pretrained_model
@@ -28,9 +29,8 @@ class PairwiseMatching(nn.Layer):
         self.similarity = nn.Linear(self.ptm.config["hidden_size"], 1)
 
     @paddle.jit.to_static(input_spec=[
-        paddle.static.InputSpec(
-            shape=[None, None], dtype='int64'), paddle.static.InputSpec(
-                shape=[None, None], dtype='int64')
+        paddle.static.InputSpec(shape=[None, None], dtype='int64'),
+        paddle.static.InputSpec(shape=[None, None], dtype='int64')
     ])
     def get_pooled_embedding(self,
                              input_ids,
@@ -83,10 +83,13 @@ class PairwiseMatching(nn.Layer):
         pos_sim = F.sigmoid(pos_sim)
         neg_sim = F.sigmoid(neg_sim)
 
-        labels = paddle.full(
-            shape=[pos_cls_embedding.shape[0]], fill_value=1.0, dtype='float32')
+        labels = paddle.full(shape=[pos_cls_embedding.shape[0]],
+                             fill_value=1.0,
+                             dtype='float32')
 
-        loss = F.margin_ranking_loss(
-            pos_sim, neg_sim, labels, margin=self.margin)
+        loss = F.margin_ranking_loss(pos_sim,
+                                     neg_sim,
+                                     labels,
+                                     margin=self.margin)
 
         return loss

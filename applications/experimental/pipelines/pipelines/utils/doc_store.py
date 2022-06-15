@@ -25,7 +25,8 @@ def launch_es(sleep=15, delete_existing=False):
         [
             f'docker run -d -p 9200:9200 -e "discovery.type=single-node" --name {ELASTICSEARCH_CONTAINER_NAME} elasticsearch:7.9.2'
         ],
-        shell=True, )
+        shell=True,
+    )
     if status.returncode:
         logger.warning(
             "Tried to start Elasticsearch through Docker but this failed. "
@@ -49,7 +50,8 @@ def launch_opensearch(sleep=15, delete_existing=False):
         [
             f'docker run -d -p 9201:9200 -p 9600:9600 -e "discovery.type=single-node" --name {OPENSEARCH_CONTAINER_NAME} opensearchproject/opensearch:1.2.4'
         ],
-        shell=True, )
+        shell=True,
+    )
     if status.returncode:
         logger.warning(
             "Tried to start OpenSearch through Docker but this failed. "
@@ -67,7 +69,8 @@ def launch_weaviate(sleep=15):
         [
             "docker run -d -p 8080:8080 --env AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED='true' --env PERSISTENCE_DATA_PATH='/var/lib/weaviate' --name {WEAVIATE_CONTAINER_NAME} semitechnologies/weaviate:1.7.2"
         ],
-        shell=True, )
+        shell=True,
+    )
     if status.returncode:
         logger.warning(
             "Tried to start Weaviate through Docker but this failed. "
@@ -164,7 +167,8 @@ def launch_milvus1(sleep=15):
           -p 19121:19121 \
           milvusdb/milvus:1.1.0-cpu-d050721-5e559c"
         ],
-        shell=True, )
+        shell=True,
+    )
     if status.returncode:
         logger.warning(
             "Tried to start Milvus through Docker but this failed. "

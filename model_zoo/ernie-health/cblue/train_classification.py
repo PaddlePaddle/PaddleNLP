@@ -116,8 +116,9 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds = load_dataset(
-        'cblue', args.dataset, splits=['train', 'dev'])
+    train_ds, dev_ds = load_dataset('cblue',
+                                    args.dataset,
+                                    splits=['train', 'dev'])
 
     model = ElectraForSequenceClassification.from_pretrained(
         'ernie-health-chinese',
@@ -125,27 +126,25 @@ def do_train():
         activation='tanh')
     tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # segment
         Pad(axis=0, pad_val=args.max_seq_length - 1, dtype='int64'),  # position
         Stack(dtype='int64')): [data for data in fn(samples)]
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -203,9 +202,8 @@ def do_train():
             input_ids, token_type_ids, position_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=[
-                        'layer_norm', 'softmax', 'gelu', 'tanh'
-                    ], ):
+                    custom_white_list=['layer_norm', 'softmax', 'gelu', 'tanh'],
+            ):
                 logits = model(input_ids, token_type_ids, position_ids)
                 loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)

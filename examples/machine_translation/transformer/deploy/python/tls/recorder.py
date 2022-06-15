@@ -26,6 +26,7 @@ if paddle.is_compiled_with_cuda():
 
 
 class Recorder(object):
+
     def __init__(self, config, batch_size, model_name, mem_info=None):
         self.model_name = model_name
         self.config = config

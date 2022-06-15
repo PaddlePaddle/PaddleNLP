@@ -17,6 +17,7 @@ from config import MILVUS_HOST, MILVUS_PORT, collection_param, index_type, index
 
 
 class VecToMilvus():
+
     def __init__(self):
         self.client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
 
@@ -69,19 +70,18 @@ class VecToMilvus():
                 self.create_index(collection_name)
                 print('collection info: {}'.format(
                     self.client.get_collection_info(collection_name)[1]))
-            if (partition_tag is not None) and (
-                    not self.has_partition(collection_name, partition_tag)):
+            if (partition_tag is not None) and (not self.has_partition(
+                    collection_name, partition_tag)):
                 self.create_partition(collection_name, partition_tag)
-            status, ids = self.client.insert(
-                collection_name=collection_name,
-                records=vectors,
-                ids=ids,
-                partition_tag=partition_tag)
+            status, ids = self.client.insert(collection_name=collection_name,
+                                             records=vectors,
+                                             ids=ids,
+                                             partition_tag=partition_tag)
             self.client.flush([collection_name])
             print(
                 'Insert {} entities, there are {} entities after insert data.'.
-                format(
-                    len(ids), self.client.count_entities(collection_name)[1]))
+                format(len(ids),
+                       self.client.count_entities(collection_name)[1]))
             return status, ids
         except Exception as e:
             print("Milvus insert error:", e)
@@ -95,10 +95,9 @@ if __name__ == '__main__':
     partition_tag = 'partition_1'
     ids = [random.randint(0, 1000) for _ in range(100)]
     embeddings = [[random.random() for _ in range(128)] for _ in range(100)]
-    status, ids = client.insert(
-        collection_name=collection_name,
-        vectors=embeddings,
-        ids=ids,
-        partition_tag=partition_tag)
+    status, ids = client.insert(collection_name=collection_name,
+                                vectors=embeddings,
+                                ids=ids,
+                                partition_tag=partition_tag)
     print(status)
     print(ids)

@@ -33,27 +33,27 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     sentence1 = example["sentence1"]
     sentence2 = example["sentence2"]
-    encoded_inputs = tokenizer(
-        text=sentence1,
-        text_pair=sentence2,
-        max_seq_len=max_seq_length,
-        truncation_strategy="only_first")
+    encoded_inputs = tokenizer(text=sentence1,
+                               text_pair=sentence2,
+                               max_seq_len=max_seq_length,
+                               truncation_strategy="only_first")
 
     src_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
@@ -104,7 +104,7 @@ class IflytekProcessor(DataProcessor):
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -122,8 +122,8 @@ class IflytekProcessor(DataProcessor):
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -153,10 +153,10 @@ class OcnliProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -172,11 +172,11 @@ class OcnliProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -185,8 +185,8 @@ class OcnliProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
                     examples.append(new_example)
 
         return MapDataset(examples)
@@ -208,7 +208,7 @@ class TnewsProcessor(DataProcessor):
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -227,8 +227,8 @@ class TnewsProcessor(DataProcessor):
                     new_example["sentence2"] = label_description
 
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -258,10 +258,10 @@ class BustmProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -277,11 +277,11 @@ class BustmProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -290,8 +290,8 @@ class BustmProcessor(DataProcessor):
                 for label, label_description in task_label_description.items():
                     new_example = dict()
                     new_example["sentence1"] = example['sentence1']
-                    new_example["sentence2"] = label_description + example[
-                        'sentence2']
+                    new_example[
+                        "sentence2"] = label_description + example['sentence2']
                     examples.append(new_example)
 
         return MapDataset(examples)
@@ -314,7 +314,7 @@ class EprstmtProcessor(DataProcessor):
                     new_example["sentence1"] = example['sentence']
                     new_example["sentence2"] = label_description
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -333,8 +333,8 @@ class EprstmtProcessor(DataProcessor):
                     new_example["sentence2"] = label_description
 
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -366,7 +366,7 @@ class CsldcpProcessor(DataProcessor):
                     new_example["sentence1"] = example['content']
                     new_example["sentence2"] = label_description
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -385,8 +385,8 @@ class CsldcpProcessor(DataProcessor):
                     new_example["sentence2"] = label_description
 
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -419,7 +419,7 @@ class CslProcessor(DataProcessor):
                     new_example["sentence2"] = label_description + " ".join(
                         example['keyword'])
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -439,8 +439,8 @@ class CslProcessor(DataProcessor):
                         example['keyword'])
 
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 
@@ -475,7 +475,7 @@ class CluewscProcessor(DataProcessor):
                         "span1_text"] + label_description + example["target"][
                             "span2_text"]
 
-                    # Todo: handle imbanlanced example, maybe hurt model performance 
+                    # Todo: handle imbanlanced example, maybe hurt model performance
                     if true_label == label:
                         new_example["label"] = 1
                         examples.append(new_example)
@@ -496,8 +496,8 @@ class CluewscProcessor(DataProcessor):
                             "span2_text"]
 
                     # Get true_label's index at task_label_description for evaluate
-                    true_label_index = list(task_label_description.keys(
-                    )).index(true_label)
+                    true_label_index = list(
+                        task_label_description.keys()).index(true_label)
                     new_example["label"] = true_label_index
                     examples.append(new_example)
 

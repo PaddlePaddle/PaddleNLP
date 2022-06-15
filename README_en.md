@@ -30,14 +30,8 @@
 
 ## News 📢
 
-* 🔥 2022.5.18-19 We will introduce **UIE** (Universal Information Extraction) and **ERNIE 3.0** light-weight model on [bilibili](https://space.bilibili.com/476867757). Welcome to join us!
-
-  <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
-  </div>
-
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow]((./docs/model_zoo/taskflow.md)).
+  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow](./docs/model_zoo/taskflow.md).
   * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
   * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
   * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with ⚡**FasterGeneration**⚡, the *11B open-domain SOTA chatbot model* can be deployed on multi-GPU and do parallel inference easily.
@@ -63,7 +57,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
 ### Awesome Chinese Model Zoo
 
-#### 🀄 Comprehensive Chinese Transformer Models  
+#### 🀄 Comprehensive Chinese Transformer Models
 
 We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
@@ -205,7 +199,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+#### ⚡ FasterTokenizer: High Performance Text Preprocessing Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -215,7 +209,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizer](./faster_tokenizer).
 
 #### ⚡ FasterGeneration: High Perforance Generation Library
 

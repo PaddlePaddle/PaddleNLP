@@ -93,15 +93,15 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
                  pad_token="__null__",
                  eol_token="__newln__",
                  **kwargs):
-        super(BlenderbotSmallTokenizer, self).__init__(
-            vocab_file=vocab_file,
-            merges_file=merges_file,
-            errors=errors,
-            max_len=max_len,
-            special_tokens=special_tokens,
-            pad_token=pad_token,
-            eos_token=eos_token,
-            eol_token=eol_token)
+        super(BlenderbotSmallTokenizer,
+              self).__init__(vocab_file=vocab_file,
+                             merges_file=merges_file,
+                             errors=errors,
+                             max_len=max_len,
+                             special_tokens=special_tokens,
+                             pad_token=pad_token,
+                             eos_token=eos_token,
+                             eol_token=eol_token)
         self.pat = r"\S+\n?"  # String matching pattern of BlenderbotSmall is different from Blenderbot
         self.unk_id = self.encoder[unk_token]
         self.eol_token = eol_token
@@ -210,9 +210,10 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
             ids, skip_special_tokens=skip_special_tokens)
         output_string = self.convert_tokens_to_string(tokens)
         if clean_up_tokenization_spaces:
-            output_string = (output_string.replace(" .", ".").replace(" ?", "?")
-                             .replace(" !", "!").replace(" ,", ",")
-                             .replace(" ' ", "'").replace(" n't", "n't")
-                             .replace(" 'm", "'m").replace(" 's", "'s")
-                             .replace(" 've", "'ve").replace(" 're", "'re"))
+            output_string = (output_string.replace(" .", ".").replace(
+                " ?", "?").replace(" !", "!").replace(" ,", ",").replace(
+                    " ' ",
+                    "'").replace(" n't", "n't").replace(" 'm", "'m").replace(
+                        " 's", "'s").replace(" 've",
+                                             "'ve").replace(" 're", "'re"))
         return output_string

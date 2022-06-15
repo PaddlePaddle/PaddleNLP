@@ -39,6 +39,7 @@ def get_examples(mode='train'):
 
 
 class TestImdbTrainSet(CpuCommonTest):
+
     def setUp(self):
         self.config['path_or_read_func'] = 'imdb'
         self.config['splits'] = 'train'
@@ -53,6 +54,7 @@ class TestImdbTrainSet(CpuCommonTest):
 
 
 class TestImdbTestSet(CpuCommonTest):
+
     def setUp(self):
         self.config['path_or_read_func'] = 'imdb'
         self.config['splits'] = 'test'
@@ -67,6 +69,7 @@ class TestImdbTestSet(CpuCommonTest):
 
 
 class TestImdbTrainTestSet(CpuCommonTest):
+
     def setUp(self):
         self.config['path_or_read_func'] = 'imdb'
         self.config['splits'] = ['train', 'test']
@@ -89,6 +92,7 @@ class TestImdbTrainTestSet(CpuCommonTest):
 
 
 class TestImdbNoSplitDataFiles(CpuCommonTest):
+
     def setUp(self):
         self.config['path_or_read_func'] = 'imdb'
 

@@ -24,10 +24,9 @@ def search_in_milvus(text_embedding):
     collection_name = 'literature_search'
     partition_tag = 'partition_2'
     client = RecallByMilvus()
-    status, results = client.search(
-        collection_name=collection_name,
-        vectors=text_embedding.tolist(),
-        partition_tag=partition_tag)
+    status, results = client.search(collection_name=collection_name,
+                                    vectors=text_embedding.tolist(),
+                                    partition_tag=partition_tag)
     # print(status)
     # print(resultes)
     corpus_file = "milvus/milvus_data.csv"
@@ -52,8 +51,9 @@ if __name__ == "__main__":
     paddle.set_device(device)
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    trans_func = partial(
-        convert_example, tokenizer=tokenizer, max_seq_length=max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -63,8 +63,8 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexBaseStatic(
-        pretrained_model, output_emb_size=output_emb_size)
+    model = SemanticIndexBaseStatic(pretrained_model,
+                                    output_emb_size=output_emb_size)
 
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
@@ -79,12 +79,11 @@ if __name__ == "__main__":
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(
-        corpus_ds,
-        mode='predict',
-        batch_size=batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(corpus_ds,
+                                           mode='predict',
+                                           batch_size=batch_size,
+                                           batchify_fn=batchify_fn,
+                                           trans_fn=trans_func)
 
     # Need better way to get inner model of DataParallel
 

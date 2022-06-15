@@ -24,12 +24,11 @@ URL = "https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.ta
 
 def main(arguments):
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-d',
-        '--data_dir',
-        help='directory to save data to',
-        type=str,
-        default='data')
+    parser.add_argument('-d',
+                        '--data_dir',
+                        help='directory to save data to',
+                        type=str,
+                        default='data')
     args = parser.parse_args(arguments)
     get_path_from_url(URL, args.data_dir)
 

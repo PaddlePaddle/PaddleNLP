@@ -83,7 +83,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-1.0-large-zh":
+            "ernie-1.0-large-zh-cw":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
@@ -136,7 +136,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-1.0-base-zh": {
             "do_lower_case": True
         },
-        "ernie-1.0-large-zh": {
+        "ernie-1.0-large-zh-cw": {
             "do_lower_case": True
         },
         "ernie-tiny": {
@@ -223,8 +223,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -297,8 +297,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -494,7 +494,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         self.dict = pickle.load(open(word_dict, 'rb'))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
 
-        # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
+        # if the sentencepiece_model_file is not exists, just the default sentence-piece model
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
@@ -616,8 +616,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -733,7 +733,9 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:

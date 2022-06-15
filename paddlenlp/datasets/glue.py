@@ -236,7 +236,8 @@ class Glue(DatasetBuilder):
             'url': {
                 'train_data':
                 'https://bj.bcebos.com/dataset/glue/mrpc/msr_paraphrase_train.txt',
-                'dev_id': 'https://bj.bcebos.com/dataset/glue/mrpc/dev_ids.tsv',
+                'dev_id':
+                'https://bj.bcebos.com/dataset/glue/mrpc/dev_ids.tsv',
                 'test_data':
                 'https://bj.bcebos.com/dataset/glue/mrpc/msr_paraphrase_test.txt'
             },
@@ -300,8 +301,8 @@ class Glue(DatasetBuilder):
                     train_path = os.path.join(default_root, 'MRPC', 'train.tsv')
                     dev_path = os.path.join(default_root, 'MRPC', 'dev.tsv')
                     with open(train_data_path, encoding='utf-8') as data_fh:
-                        with open(
-                                train_path, 'w', encoding='utf-8') as train_fh:
+                        with open(train_path, 'w',
+                                  encoding='utf-8') as train_fh:
                             with open(dev_path, 'w', encoding='utf8') as dev_fh:
                                 header = data_fh.readline()
                                 train_fh.write(header)

@@ -38,15 +38,15 @@ class DRCD_CN(DatasetBuilder):
     MD5 = "8ceed5076c4f59d7a3666b13851e41fa"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('drcd_cn', 'train.json'),
-            '5a51ee5a106e16965c85fce364d316d7'),
-        'dev': META_INFO(
-            os.path.join('drcd_cn', 'dev.json'),
-            'f352b17cddeed69877ff94d4321817ce'),
-        'test': META_INFO(
-            os.path.join('drcd_cn', 'test.json'),
-            'e674a667033c4e8c9ae6d05d95073d02')
+        'train':
+        META_INFO(os.path.join('drcd_cn', 'train.json'),
+                  '5a51ee5a106e16965c85fce364d316d7'),
+        'dev':
+        META_INFO(os.path.join('drcd_cn', 'dev.json'),
+                  'f352b17cddeed69877ff94d4321817ce'),
+        'test':
+        META_INFO(os.path.join('drcd_cn', 'test.json'),
+                  'e674a667033c4e8c9ae6d05d95073d02')
     }
 
     def _get_data(self, mode, **kwargs):

@@ -155,7 +155,7 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
         y_pred = np.ones(shape=[batch_size, candidate_num])
 
         for label_idx in range(candidate_num):
-            # [bathc_size, label_length(4)] 
+            # [bathc_size, label_length(4)]
             single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
             # Calculate joint distribution of candidate labels
             for index in range(label_length):
@@ -377,7 +377,7 @@ if __name__ == "__main__":
 
     # Some fewshot_learning strategy is defined by transform_fn
     # Note: Set lazy=False to transform example inplace immediately,
-    # because transform_fn should only be executed only once when 
+    # because transform_fn should only be executed only once when
     # iterate multi-times for train_ds
     test_ds = test_ds.map(transform_fn, lazy=False)
 
