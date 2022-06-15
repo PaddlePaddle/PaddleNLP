@@ -475,6 +475,37 @@ NormalizedString& NormalizedString::Replace(const re2::RE2& pattern,
   return *this;
 }
 
+NormalizedString& NormalizedString::Prepend(const std::string& content) {
+  // Get the first unicode char of normalized
+  uint32_t first_char_of_normalized;
+  auto first_char_width =
+      utils::UTF8ToUInt32(normalized_.data(), &first_char_of_normalized);
+  first_char_of_normalized = utils::UTF8ToUnicode(first_char_of_normalized);
+
+  std::u32string u32content;
+  u32content.reserve(content.length());
+  std::vector<int> changes;
+  changes.reserve(content.length());
+  uint utf8_len = 0;
+  while (utf8_len < content.length()) {
+    uint32_t content_char;
+    auto content_char_width =
+        utils::UTF8ToUInt32(content.data() + utf8_len, &content_char);
+    content_char = utils::UTF8ToUnicode(content_char);
+    u32content.push_back(content_char);
+    if (utf8_len == 0) {
+      changes.push_back(0);
+    } else {
+      changes.push_back(1);
+    }
+    utf8_len += content_char_width;
+  }
+  u32content.push_back(first_char_of_normalized);
+  changes.push_back(1);
+  UpdateNormalizedRange({u32content, changes}, 0, {0, first_char_width}, false);
+  return *this;
+}
+
 bool NormalizedString::ValidateRange(const core::Range& range,
                                      bool origin_range) const {
   if (origin_range) {

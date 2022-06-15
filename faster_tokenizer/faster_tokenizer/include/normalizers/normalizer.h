@@ -71,6 +71,7 @@ public:
   NormalizedString& Lowercase();
   NormalizedString& Replace(const re2::RE2& pattern,
                             const std::string& content);
+  NormalizedString& Prepend(const std::string& content);
   bool Slice(core::Range range,
              NormalizedString* normalized,
              bool origin_range) const;
