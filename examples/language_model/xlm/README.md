@@ -2,6 +2,7 @@
 
 ## 目录
 * [模型简介](#模型简介)
+* [模型实现的注意点](#模型实现的注意点)
 * [快速开始](#快速开始)
   * [通用参数释义](#通用参数释义)
   * [自然语言推断任务](#自然语言推断任务)
@@ -20,7 +21,11 @@ XLM论文中一共提出了三种预训练任务：**CLM**、**MLM**和**TLM**�
 
 ![framework](./framework.jpg)
 
-
+## 模型实现的注意点
+本仓库的模型在复现过程中主要参考了huggingface的实现，故在实现过程中与facebook团队的官方实现相比存在一定的不同。
+- 对于`token_pair`任务，`huggingface`的`tokenizer`会额外添加`<s> A </s> B </s>`的标记，而`facebook`的`tokenizer`会添加`</s> A </s> B </s>`的标记，本仓库的实现遵循了`huggingface`的实现，主要区别在于第一个特殊标记使用了`<s>`而不是`</s>`。
+- facebook的XLM模型由于并未使用`token_type_id`参数，因此我们在实际使用`tokenizer`的时候需要人工传入`return_token_type_ids=False`，如：`tokenizer(text, return_token_type_ids=False)`，这样就不会返回`token_type_id`了。
+- 考虑到现有已开源预训练权重的XLM模型，在`XLMPredLayer`处并未使用到`adaptive_softmax`，因此本仓库仅实现了带有`cross_entropy`的`XLMPredLayer`。
 
 本文件夹内包含了`XLM模型`在`xnli任务`上的训练和验证内容。以下是本例的简要目录结构及说明：
 

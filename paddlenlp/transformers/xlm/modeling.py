@@ -29,7 +29,7 @@ __all__ = [
     "XLMWithLMHeadModel",
     "XLMForSequenceClassification",
     "XLMForTokenClassification",
-    "XLMForQuestionAnswering",
+    "XLMForQuestionAnsweringSimple",
     "XLMForMultipleChoice",
 ]
 
@@ -37,6 +37,7 @@ INF = 1e4
 
 
 class SinusoidalPositionalEmbedding(nn.Embedding):
+
     def __init__(self, num_embeddings, embedding_dim):
         super().__init__(num_embeddings, embedding_dim)
         self.weight = self._init_weight(self.weight)
@@ -98,15 +99,19 @@ class MultiHeadAttention(nn.Layer):
 
     def shape(self, x):
         """projection"""
-        return x.reshape([0, 0, self.n_heads, self.dim_per_head]).transpose(
-            [0, 2, 1, 3])
+        return x.reshape([0, 0, self.n_heads,
+                          self.dim_per_head]).transpose([0, 2, 1, 3])
 
     def unshape(self, x):
         """compute context"""
-        return x.transpose([0, 2, 1, 3]).reshape(
-            [0, 0, self.n_heads * self.dim_per_head])
+        return x.transpose([0, 2, 1, 3
+                            ]).reshape([0, 0, self.n_heads * self.dim_per_head])
 
-    def forward(self, input, mask, kv=None, cache=None,
+    def forward(self,
+                input,
+                mask,
+                kv=None,
+                cache=None,
                 output_attentions=False):
         """
         Self-attention (if kv is None) or attention over source sentence (provided by kv).
@@ -148,8 +153,8 @@ class MultiHeadAttention(nn.Layer):
         q = q / math.sqrt(
             self.dim_per_head)  # (bs, n_heads, qlen, dim_per_head)
 
-        scores = paddle.matmul(
-            q, k, transpose_y=True)  # (bs, n_heads, qlen, klen)
+        scores = paddle.matmul(q, k,
+                               transpose_y=True)  # (bs, n_heads, qlen, klen)
 
         mask = mask.reshape(mask_reshape)  # (bs, n_heads, qlen, klen)
 
@@ -168,6 +173,7 @@ class MultiHeadAttention(nn.Layer):
 
 
 class TransformerFFN(nn.Layer):
+
     def __init__(self, in_dim, dim_hidden, out_dim, hidden_act, dropout_prob):
         super().__init__()
         self.lin1 = nn.Linear(in_dim, dim_hidden)
@@ -610,10 +616,11 @@ class XLMPretrainedModel(PretrainedModel):
                 mean=0.0,
                 std=self.embed_init_std if hasattr(self, "embed_init_std") else
                 self.xlm.config["embed_init_std"],
-                shape=layer.weight.shape, )
+                shape=layer.weight.shape,
+            )
             if layer._padding_idx is not None:
-                new_weight[layer._padding_idx] = paddle.zeros_like(new_weight[
-                    layer._padding_idx])
+                new_weight[layer._padding_idx] = paddle.zeros_like(
+                    new_weight[layer._padding_idx])
             layer.weight.set_value(new_weight)
         elif isinstance(layer, nn.Linear):
             layer.weight.set_value(
@@ -621,7 +628,8 @@ class XLMPretrainedModel(PretrainedModel):
                     mean=0.0,
                     std=self.init_std if hasattr(self, "init_std") else
                     self.xlm.config["init_std"],
-                    shape=layer.weight.shape, ))
+                    shape=layer.weight.shape,
+                ))
             if layer.bias is not None:
                 layer.bias.set_value(paddle.zeros_like(layer.bias))
         elif isinstance(layer, nn.LayerNorm):
@@ -703,42 +711,43 @@ class XLMModel(XLMPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size=95000,
-            is_encoder=True,
-            causal=False,
-            n_langs=15,
-            use_lang_embeddings=True,
-            hidden_size=1024,
-            hidden_act="gelu",
-            num_attention_heads=8,
-            num_hidden_layers=12,
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            max_position_embeddings=512,
-            use_sinusoidal_embeddings=False,
-            layer_norm_eps=1e-12,
-            embed_init_std=2048**-0.5,
-            init_std=0.02,
-            pad_token_id=2,
-            lang_id=4,
-            lang2id={
-                "ar": 0,
-                "bg": 1,
-                "de": 2,
-                "el": 3,
-                "en": 4,
-                "es": 5,
-                "fr": 6,
-                "hi": 7,
-                "ru": 8,
-                "sw": 9,
-                "th": 10,
-                "tr": 11,
-                "ur": 12,
-                "vi": 13,
-                "zh": 14,
-            }, ):
+        self,
+        vocab_size=95000,
+        is_encoder=True,
+        causal=False,
+        n_langs=15,
+        use_lang_embeddings=True,
+        hidden_size=1024,
+        hidden_act="gelu",
+        num_attention_heads=8,
+        num_hidden_layers=12,
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        use_sinusoidal_embeddings=False,
+        layer_norm_eps=1e-12,
+        embed_init_std=2048**-0.5,
+        init_std=0.02,
+        pad_token_id=2,
+        lang_id=4,
+        lang2id={
+            "ar": 0,
+            "bg": 1,
+            "de": 2,
+            "el": 3,
+            "en": 4,
+            "es": 5,
+            "fr": 6,
+            "hi": 7,
+            "ru": 8,
+            "sw": 9,
+            "th": 10,
+            "tr": 11,
+            "ur": 12,
+            "vi": 13,
+            "zh": 14,
+        },
+    ):
         super().__init__()
         self.causal = causal
         self.num_hidden_layers = num_hidden_layers
@@ -778,8 +787,7 @@ class XLMModel(XLMPretrainedModel):
                 MultiHeadAttention(num_attention_heads, hidden_size,
                                    attention_probs_dropout_prob))
             self.layer_norm1.append(
-                nn.LayerNorm(
-                    hidden_size, epsilon=layer_norm_eps))
+                nn.LayerNorm(hidden_size, epsilon=layer_norm_eps))
 
             self.ffns.append(
                 TransformerFFN(
@@ -787,27 +795,29 @@ class XLMModel(XLMPretrainedModel):
                     hidden_size * 4,
                     hidden_size,
                     hidden_act,
-                    hidden_dropout_prob, ))
+                    hidden_dropout_prob,
+                ))
             self.layer_norm2.append(
-                nn.LayerNorm(
-                    hidden_size, epsilon=layer_norm_eps))
+                nn.LayerNorm(hidden_size, epsilon=layer_norm_eps))
 
         self.register_buffer(
             "position_ids",
             paddle.arange(0, max_position_embeddings).reshape((1, -1)),
-            persistable=False, )
+            persistable=False,
+        )
         self.init_weights()
 
     def forward(
-            self,
-            input_ids=None,
-            langs=None,
-            attention_mask=None,
-            position_ids=None,
-            lengths=None,
-            cache=None,
-            output_attentions=False,
-            output_hidden_states=False, ):
+        self,
+        input_ids=None,
+        langs=None,
+        attention_mask=None,
+        position_ids=None,
+        lengths=None,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+    ):
         r'''
         The XLMModel forward method, overrides the `__call__()` special method.
 
@@ -900,8 +910,10 @@ class XLMModel(XLMPretrainedModel):
                 lengths = paddle.to_tensor([seqlen] * bs, dtype="int64")
 
         # generate masks
-        mask, attn_mask = get_masks(
-            seqlen, lengths, self.causal, padding_mask=attention_mask)
+        mask, attn_mask = get_masks(seqlen,
+                                    lengths,
+                                    self.causal,
+                                    padding_mask=attention_mask)
 
         # position_ids
         if position_ids is None:
@@ -938,7 +950,8 @@ class XLMModel(XLMPretrainedModel):
                 tensor,
                 attn_mask,
                 cache=cache,
-                output_attentions=output_attentions, )
+                output_attentions=output_attentions,
+            )
             attn = attn_outputs[0]
             if output_attentions:
                 attentions = attentions + (attn_outputs[1], )
@@ -968,20 +981,19 @@ class XLMPredLayer(nn.Layer):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            hidden_size,
-            embedding_weights=None, ):
+        self,
+        vocab_size,
+        hidden_size,
+        embedding_weights=None,
+    ):
         super().__init__()
         self.vocab_size = vocab_size
         if embedding_weights is None:
             self.proj = nn.Linear(hidden_size, vocab_size)
         else:
             self.bias = self.create_parameter(shape=[vocab_size], is_bias=True)
-            self.proj = (
-                lambda x: paddle.matmul(x, embedding_weights, transpose_y=True)
-                + self.bias
-            )
+            self.proj = (lambda x: paddle.matmul(
+                x, embedding_weights, transpose_y=True) + self.bias)
 
     def forward(self, x, y=None):
         """Compute the loss, and optionally the scores."""
@@ -989,10 +1001,9 @@ class XLMPredLayer(nn.Layer):
         scores = self.proj(x)
         outputs = (scores, ) + outputs
         if y is not None:
-            loss = F.cross_entropy(
-                scores.reshape([-1, self.vocab_size]),
-                y.flatten(),
-                reduction="mean")
+            loss = F.cross_entropy(scores.reshape([-1, self.vocab_size]),
+                                   y.flatten(),
+                                   reduction="mean")
             outputs = (loss, ) + outputs
         return outputs
 
@@ -1014,7 +1025,8 @@ class XLMWithLMHeadModel(XLMPretrainedModel):
         self.pred_layer = XLMPredLayer(
             xlm.config["vocab_size"],
             xlm.config["hidden_size"],
-            embedding_weights=self.xlm.embeddings.weight, )
+            embedding_weights=self.xlm.embeddings.weight,
+        )
         self.init_weights()
 
     def forward(self,
@@ -1167,7 +1179,8 @@ class XLMForSequenceClassification(XLMPretrainedModel):
                                    attention_mask=attention_mask,
                                    position_ids=position_ids,
                                    lengths=lengths)[0]
-        pooled_output = self.dropout(sequence_output[:, 0])
+        sequence_output = self.dropout(sequence_output)
+        pooled_output = sequence_output[:, 0]
         logits = self.classifier(pooled_output)
 
         return logits
@@ -1193,8 +1206,8 @@ class XLMForTokenClassification(XLMPretrainedModel):
         super(XLMForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.xlm = xlm  # allow xlm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.xlm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.xlm.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.xlm.config["hidden_size"], num_classes)
         self.init_weights()
 
@@ -1252,25 +1265,19 @@ class XLMForTokenClassification(XLMPretrainedModel):
         return logits
 
 
-class XLMForQuestionAnswering(XLMPretrainedModel):
+class XLMForQuestionAnsweringSimple(XLMPretrainedModel):
     """
-    XLMModel with a linear layer on top of the hidden-states output to compute `span_start_logits`
-    and `span_end_logits`, designed for question-answering tasks like SQuAD.
+    XLMModel with a span classification head on top for extractive question-answering tasks like SQuAD (a linear
+    layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
 
     Args:
         xlm (:class:`XLMModel`):
             An instance of XLMModel.
-        dropout (float, optional):
-            The dropout probability for output of XLM.
-            If None, use the same value as `hidden_dropout_prob` of `XLMModel`
-            instance `xlm`. Defaults to `None`.
     """
 
-    def __init__(self, xlm, dropout=None):
-        super(XLMForQuestionAnswering, self).__init__()
+    def __init__(self, xlm):
+        super(XLMForQuestionAnsweringSimple, self).__init__()
         self.xlm = xlm  # allow xlm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.xlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.xlm.config["hidden_size"], 2)
         self.init_weights()
 
@@ -1333,7 +1340,6 @@ class XLMForQuestionAnswering(XLMPretrainedModel):
                                    attention_mask=attention_mask,
                                    position_ids=position_ids,
                                    lengths=lengths)[0]
-        sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         start_logits, end_logits = paddle.unstack(x=logits, axis=-1)
 
@@ -1360,8 +1366,8 @@ class XLMForMultipleChoice(XLMPretrainedModel):
         super(XLMForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.xlm = xlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.xlm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.xlm.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.xlm.config["hidden_size"], 1)
         self.init_weights()
 
@@ -1456,9 +1462,8 @@ class XLMForMultipleChoice(XLMPretrainedModel):
                                    attention_mask=attention_mask,
                                    position_ids=position_ids,
                                    lengths=lengths)[0]
-
+        sequence_output = self.dropout(sequence_output)
         pooled_output = sequence_output[:, 0]
-        pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: [bs*num_choice, 1]
         reshaped_logits = logits.reshape(
