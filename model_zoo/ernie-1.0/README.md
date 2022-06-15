@@ -116,10 +116,11 @@ python -u  -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_rate 0.01 \
     --grad_clip 1.0 \
-    --logging_freq 20\
+    --logging_freq 20 \
     --num_workers 2 \
     --eval_freq 1000 \
-    --device "gpu"\
+    --device "gpu" \
+    --share_folder false \
 ```
 
 其中参数释义如下：
@@ -141,11 +142,12 @@ python -u  -m paddle.distributed.launch \
 - `logging_freq` 日志输出间隔。
 - `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_freq` 模型评估间隔。
-- `device` 训练设备。
+- `device` 训练设备，默认为GPU。
+- `share_folder` 多机训练时，如果多机input_dir为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。
 
 
 注：
-- 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。请确保重启的训练配置与之前相同。
+- 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint(`output_dir/model_last`)，开始重启训练。请确保重启的训练配置与之前相同。
 - visualdl的日志在 `./output/ernie-1.0-dp8-gb512/train_log/xxx` 中。
 
 
