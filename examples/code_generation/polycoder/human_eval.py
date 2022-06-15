@@ -39,8 +39,8 @@ def tokenize_input(tokenizer, texts):
         input_ids.append(ids)
     for i in range(len(input_ids)):
         if len(input_ids[i]) < max_len:
-            input_ids[i] += [tokenizer.pad_token_id] * (
-                max_len - len(input_ids[i]))
+            input_ids[i] += [tokenizer.pad_token_id
+                             ] * (max_len - len(input_ids[i]))
     input_ids = paddle.to_tensor(input_ids, dtype="int32")
     return input_ids
 
@@ -50,12 +50,12 @@ def convert_example(example, tokenizer):
     tokenized = tokenizer(example, return_position_ids=True)
     input_ids = tokenized['input_ids']
     tokenized['attention_mask'] = np.triu(
-        np.ones(
-            (len(input_ids), len(input_ids)), dtype='float32') * -1e4, 1)
+        np.ones((len(input_ids), len(input_ids)), dtype='float32') * -1e4, 1)
     return tokenized
 
 
 def batchify_fn(examples, pad_val):
+
     def pad_mask(batch_attention_mask):
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
@@ -63,8 +63,8 @@ def batchify_fn(examples, pad_val):
             (batch_size, max_len, max_len), dtype='float32') * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
-            mask_data[-seq_len:, -seq_len:] = np.array(
-                batch_attention_mask[i], dtype='float32')
+            mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i],
+                                                       dtype='float32')
         # In order to ensure the correct broadcasting mechanism, expand one
         # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
@@ -82,77 +82,72 @@ def batchify_fn(examples, pad_val):
 def create_data_loader(dataset, tokenizer, args):
     trans_func = partial(convert_example, tokenizer=tokenizer)
     dataset = dataset.map(trans_func, lazy=True)
-    batch_sampler = BatchSampler(
-        dataset, batch_size=args.batch_size, shuffle=False)
+    batch_sampler = BatchSampler(dataset,
+                                 batch_size=args.batch_size,
+                                 shuffle=False)
     collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id)
-    data_loader = DataLoader(
-        dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=collate_fn,
-        return_list=True)
+    data_loader = DataLoader(dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=collate_fn,
+                             return_list=True)
     return data_loader
 
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument(
-        '--model_type',
-        default='gpt2',
-        type=str,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()))
+    parser.add_argument('--model_type',
+                        default='gpt2',
+                        type=str,
+                        help="Model type selected in the list: " +
+                        ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument(
         '--model_name_or_path',
         default='gpt2-en',
         type=str,
         help="The path or shortcut name of the pre-trained model.")
 
-    parser.add_argument(
-        "--vocab_file",
-        type=str,
-        default='./data_tools/code-vocab.json',
-        help="Path to the vocab file")
+    parser.add_argument("--vocab_file",
+                        type=str,
+                        default='./data_tools/code-vocab.json',
+                        help="Path to the vocab file")
     parser.add_argument(
         "--merge_file",
         type=str,
         default='./data_tools/code-merges.txt',
-        help="Path to the BPE merge file (if necessary).", )
-    parser.add_argument(
-        '--batch_size',
-        type=int,
-        default=128,
-        help='Batch size per GPU/CPU for predict.')
-    parser.add_argument(
-        "--end_token",
-        default="\n",
-        type=str,
-        help="The end token. Defaults to \n. ")
-    parser.add_argument(
-        '--decode_strategy',
-        type=str,
-        default='sampling',
-        help='The decode strategy in generation.')
+        help="Path to the BPE merge file (if necessary).",
+    )
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=128,
+                        help='Batch size per GPU/CPU for predict.')
+    parser.add_argument("--end_token",
+                        default="\n",
+                        type=str,
+                        help="The end token. Defaults to \n. ")
+    parser.add_argument('--decode_strategy',
+                        type=str,
+                        default='sampling',
+                        help='The decode strategy in generation.')
     parser.add_argument(
         '--top_k',
         type=int,
         default=5,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
     parser.add_argument(
         '--temperature',
         type=float,
         default=1.0,
         help='The value used to module the next token probabilities.')
-    parser.add_argument(
-        '--top_p',
-        type=float,
-        default=1.0,
-        help='The cumulative probability for top-p sampling.')
-    parser.add_argument(
-        '--num_beams',
-        type=int,
-        default=0,
-        help='The number of beams for beam search.')
+    parser.add_argument('--top_p',
+                        type=float,
+                        default=1.0,
+                        help='The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams',
+                        type=int,
+                        default=0,
+                        help='The number of beams for beam search.')
     parser.add_argument(
         '--length_penalty',
         type=float,
@@ -169,28 +164,26 @@ def parse_args():
         default=False,
         help='Whether to stop the beam search when at least `num_beams` '
         'sentences are finished per batch or not.')
-    parser.add_argument(
-        '--min_dec_len',
-        type=int,
-        default=1,
-        help='The minimum sequence length of generation.')
-    parser.add_argument(
-        '--max_dec_len',
-        type=int,
-        default=512,
-        help='The maximum sequence length of generation.')
-    parser.add_argument(
-        '--num_samples',
-        type=int,
-        default=1,
-        help='The number of output sequences to generation.')
-    parser.add_argument(
-        '--seed', type=int, default=123, help='Random seed for initialization.')
-    parser.add_argument(
-        '--device',
-        type=str,
-        default='gpu',
-        help='The device to select for training the model.')
+    parser.add_argument('--min_dec_len',
+                        type=int,
+                        default=1,
+                        help='The minimum sequence length of generation.')
+    parser.add_argument('--max_dec_len',
+                        type=int,
+                        default=512,
+                        help='The maximum sequence length of generation.')
+    parser.add_argument('--num_samples',
+                        type=int,
+                        default=1,
+                        help='The number of output sequences to generation.')
+    parser.add_argument('--seed',
+                        type=int,
+                        default=123,
+                        help='Random seed for initialization.')
+    parser.add_argument('--device',
+                        type=str,
+                        default='gpu',
+                        help='The device to select for training the model.')
 
     args = parser.parse_args()
     return args
@@ -236,8 +229,8 @@ def main(args):
         model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     except KeyError:
         raise KeyError(
-            "The `model_type` must be selected in the list: {}. But received: {}.".
-            format(MODEL_CLASSES.keys(), args.model_type))
+            "The `model_type` must be selected in the list: {}. But received: {}."
+            .format(MODEL_CLASSES.keys(), args.model_type))
 
     model = model_class.from_pretrained(args.model_name_or_path)
     tokenizer = tokenizer_class(args.vocab_file, args.merge_file)
@@ -261,21 +254,20 @@ def main(args):
     generated_sequences = []
     for batch in data_loader:
         input_ids, position_ids, attention_mask = batch
-        ids, scores = model.generate(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            max_length=args.max_dec_len,
-            min_length=args.min_dec_len,
-            decode_strategy=args.decode_strategy,
-            temperature=args.temperature,
-            top_k=args.top_k,
-            top_p=args.top_p,
-            num_beams=args.num_beams,
-            length_penalty=args.length_penalty,
-            repetition_penalty=args.repetition_penalty,
-            early_stopping=args.early_stopping,
-            eos_token_id=tokenizer.eos_token_id)
+        ids, scores = model.generate(input_ids=input_ids,
+                                     position_ids=position_ids,
+                                     attention_mask=attention_mask,
+                                     max_length=args.max_dec_len,
+                                     min_length=args.min_dec_len,
+                                     decode_strategy=args.decode_strategy,
+                                     temperature=args.temperature,
+                                     top_k=args.top_k,
+                                     top_p=args.top_p,
+                                     num_beams=args.num_beams,
+                                     length_penalty=args.length_penalty,
+                                     repetition_penalty=args.repetition_penalty,
+                                     early_stopping=args.early_stopping,
+                                     eos_token_id=tokenizer.eos_token_id)
         for i, generated_ids in enumerate(ids):
             generated_ids = generated_ids.numpy().tolist()
             generated_ids = postprocess_response(generated_ids,

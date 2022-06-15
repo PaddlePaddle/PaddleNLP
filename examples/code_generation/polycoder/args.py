@@ -35,7 +35,8 @@ def parse_args(MODEL_CLASSES):
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -46,17 +47,18 @@ def parse_args(MODEL_CLASSES):
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
-    parser.add_argument(
-        "--vocab_file",
-        type=str,
-        default='./data_tools/code-vocab.json',
-        help="Path to the vocab file")
+            ], [])),
+    )
+    parser.add_argument("--vocab_file",
+                        type=str,
+                        default='./data_tools/code-vocab.json',
+                        help="Path to the vocab file")
     parser.add_argument(
         "--merge_file",
         type=str,
         default='./data_tools/code-merges.txt',
-        help="Path to the BPE merge file (if necessary).", )
+        help="Path to the BPE merge file (if necessary).",
+    )
 
     # Train I/O config
     parser.add_argument(
@@ -64,56 +66,57 @@ def parse_args(MODEL_CLASSES):
         default=None,
         type=str,
         required=True,
-        help="The input directory where the data will be read from.", )
+        help="The input directory where the data will be read from.",
+    )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the training logs and checkpoints will be written."
+        help=
+        "The output directory where the training logs and checkpoints will be written."
     )
-    parser.add_argument(
-        "--split",
-        type=str,
-        default='900,50,50',
-        help="Train/valid/test data split.")
+    parser.add_argument("--split",
+                        type=str,
+                        default='900,50,50',
+                        help="Train/valid/test data split.")
 
-    parser.add_argument(
-        "--max_seq_len", type=int, default=1024, help="Max sequence length.")
+    parser.add_argument("--max_seq_len",
+                        type=int,
+                        default=1024,
+                        help="Max sequence length.")
     parser.add_argument(
         "--micro_batch_size",
         default=8,
         type=int,
-        help="Batch size per device for one step training.", )
+        help="Batch size per device for one step training.",
+    )
     parser.add_argument(
         "--global_batch_size",
         default=None,
         type=int,
-        help="Global batch size for all training process. None for not check the size is valid. "
+        help=
+        "Global batch size for all training process. None for not check the size is valid. "
         "If we only use data parallelism, it should be device_num * micro_batch_size."
     )
 
     # Default training config
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--grad_clip",
-        default=0.0,
-        type=float,
-        help="Grad clip for the parameter.")
-    parser.add_argument(
-        "--max_lr",
-        default=1e-5,
-        type=float,
-        help="The initial max learning rate for Adam.")
-    parser.add_argument(
-        "--min_lr",
-        default=5e-5,
-        type=float,
-        help="The initial min learning rate for Adam.")
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--grad_clip",
+                        default=0.0,
+                        type=float,
+                        help="Grad clip for the parameter.")
+    parser.add_argument("--max_lr",
+                        default=1e-5,
+                        type=float,
+                        help="The initial max learning rate for Adam.")
+    parser.add_argument("--min_lr",
+                        default=5e-5,
+                        type=float,
+                        help="The initial min learning rate for Adam.")
     parser.add_argument(
         "--warmup_rate",
         default=0.01,
@@ -133,91 +136,83 @@ def parse_args(MODEL_CLASSES):
         type=float,
         help="The bate2 for Adam optimizer. The exponential decay "
         "rate for the 2nd moment estimates.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
 
     # Training steps config
-    parser.add_argument(
-        "--max_steps",
-        default=500000,
-        type=int,
-        help="set total number of training steps to perform.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--decay_steps",
-        default=360000,
-        type=int,
-        help="The steps use to control the learing rate. "
-        "If the step > decay_steps, will use the min_lr.")
-    parser.add_argument(
-        "--logging_freq",
-        type=int,
-        default=1,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--eval_freq",
-        type=int,
-        default=100,
-        help="Evaluate for every X updates steps.")
-    parser.add_argument(
-        "--eval_iters",
-        type=int,
-        default=10,
-        help="Evaluate the model use X steps data.")
+    parser.add_argument("--max_steps",
+                        default=500000,
+                        type=int,
+                        help="set total number of training steps to perform.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=500,
+                        help="Save checkpoint every X updates steps.")
+    parser.add_argument("--decay_steps",
+                        default=360000,
+                        type=int,
+                        help="The steps use to control the learing rate. "
+                        "If the step > decay_steps, will use the min_lr.")
+    parser.add_argument("--logging_freq",
+                        type=int,
+                        default=1,
+                        help="Log every X updates steps.")
+    parser.add_argument("--eval_freq",
+                        type=int,
+                        default=100,
+                        help="Evaluate for every X updates steps.")
+    parser.add_argument("--eval_iters",
+                        type=int,
+                        default=10,
+                        help="Evaluate the model use X steps data.")
 
     # Config for 4D Parallelism
-    parser.add_argument(
-        "--use_sharding",
-        type=str2bool,
-        nargs='?',
-        const=False,
-        help="Use sharding Parallelism to training.")
+    parser.add_argument("--use_sharding",
+                        type=str2bool,
+                        nargs='?',
+                        const=False,
+                        help="Use sharding Parallelism to training.")
     parser.add_argument(
         "--sharding_degree",
         type=int,
         default=1,
         help="Sharding degree. Share the parameters to many cards.")
-    parser.add_argument(
-        "--dp_degree", type=int, default=1, help="Data Parallelism degree.")
+    parser.add_argument("--dp_degree",
+                        type=int,
+                        default=1,
+                        help="Data Parallelism degree.")
     parser.add_argument(
         "--mp_degree",
         type=int,
         default=1,
-        help="Model Parallelism degree. Spliting the linear layers to many cards."
-    )
+        help=
+        "Model Parallelism degree. Spliting the linear layers to many cards.")
     parser.add_argument(
         "--pp_degree",
         type=int,
         default=1,
-        help="Pipeline Parallelism degree.  Spliting the the model layers to different parts."
+        help=
+        "Pipeline Parallelism degree.  Spliting the the model layers to different parts."
     )
-    parser.add_argument(
-        "--use_recompute",
-        type=str2bool,
-        nargs='?',
-        const=False,
-        help="Using the recompute to save the memory.")
+    parser.add_argument("--use_recompute",
+                        type=str2bool,
+                        nargs='?',
+                        const=False,
+                        help="Using the recompute to save the memory.")
 
     # AMP config
-    parser.add_argument(
-        "--use_amp",
-        type=str2bool,
-        nargs='?',
-        const=False,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--amp_level",
-        type=str,
-        default="O1",
-        choices=["O1", "O2"],
-        help="select O1 or O2 of amp level.")
+    parser.add_argument("--use_amp",
+                        type=str2bool,
+                        nargs='?',
+                        const=False,
+                        help="Enable mixed precision training.")
+    parser.add_argument("--amp_level",
+                        type=str,
+                        default="O1",
+                        choices=["O1", "O2"],
+                        help="select O1 or O2 of amp level.")
     parser.add_argument(
         "--enable_addto",
         type=str2bool,
@@ -229,39 +224,36 @@ def parse_args(MODEL_CLASSES):
         "--scale_loss",
         type=float,
         default=32768,
-        help="The value of scale_loss for fp16. This is only used for AMP training."
-    )
-    parser.add_argument(
-        "--hidden_dropout_prob",
-        type=float,
-        default=0.1,
-        help="The hidden dropout prob.")
-    parser.add_argument(
-        "--attention_probs_dropout_prob",
-        type=float,
-        default=0.1,
-        help="The attention probs dropout prob.")
+        help=
+        "The value of scale_loss for fp16. This is only used for AMP training.")
+    parser.add_argument("--hidden_dropout_prob",
+                        type=float,
+                        default=0.1,
+                        help="The hidden dropout prob.")
+    parser.add_argument("--attention_probs_dropout_prob",
+                        type=float,
+                        default=0.1,
+                        help="The attention probs dropout prob.")
     # Other config
-    parser.add_argument(
-        "--seed", type=int, default=1234, help="Random seed for initialization")
-    parser.add_argument(
-        "--check_accuracy",
-        type=str2bool,
-        nargs='?',
-        const=False,
-        help="Check accuracy for training process.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["cpu", "gpu", "xpu"],
-        help="select cpu, gpu, xpu devices.")
-    parser.add_argument(
-        "--lr_decay_style",
-        type=str,
-        default="cosine",
-        choices=["cosine", "none"],
-        help="Learning rate decay style.")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=1234,
+                        help="Random seed for initialization")
+    parser.add_argument("--check_accuracy",
+                        type=str2bool,
+                        nargs='?',
+                        const=False,
+                        help="Check accuracy for training process.")
+    parser.add_argument("--device",
+                        type=str,
+                        default="gpu",
+                        choices=["cpu", "gpu", "xpu"],
+                        help="select cpu, gpu, xpu devices.")
+    parser.add_argument("--lr_decay_style",
+                        type=str,
+                        default="cosine",
+                        choices=["cosine", "none"],
+                        help="Learning rate decay style.")
     parser.add_argument(
         '-p',
         '--profiler_options',
@@ -270,37 +262,34 @@ def parse_args(MODEL_CLASSES):
         help='The option of profiler, which should be in format '
         '\"key1=value1;key2=value2;key3=value3\".')
     # generation
-    parser.add_argument(
-        '--test_file',
-        type=str,
-        default='./data_tools/test.txt',
-        help='The file to evaluate model.')
-    parser.add_argument(
-        '--decode_strategy',
-        type=str,
-        default='sampling',
-        help='The decode strategy in generation.')
+    parser.add_argument('--test_file',
+                        type=str,
+                        default='./data_tools/test.txt',
+                        help='The file to evaluate model.')
+    parser.add_argument('--decode_strategy',
+                        type=str,
+                        default='sampling',
+                        help='The decode strategy in generation.')
     parser.add_argument(
         '--top_k',
         type=int,
         default=5,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
     parser.add_argument(
         '--temperature',
         type=float,
         default=0.5,
         help='The value used to module the next token probabilities.')
-    parser.add_argument(
-        '--top_p',
-        type=float,
-        default=1.0,
-        help='The cumulative probability for top-p sampling.')
-    parser.add_argument(
-        '--num_beams',
-        type=int,
-        default=0,
-        help='The number of beams for beam search.')
+    parser.add_argument('--top_p',
+                        type=float,
+                        default=1.0,
+                        help='The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams',
+                        type=int,
+                        default=0,
+                        help='The number of beams for beam search.')
     parser.add_argument(
         '--length_penalty',
         type=float,
@@ -312,21 +301,18 @@ def parse_args(MODEL_CLASSES):
         default=False,
         help='Whether to stop the beam search when at least `num_beams` '
         'sentences are finished per batch or not.')
-    parser.add_argument(
-        '--min_dec_len',
-        type=int,
-        default=1,
-        help='The minimum sequence length of generation.')
-    parser.add_argument(
-        '--max_dec_len',
-        type=int,
-        default=512,
-        help='The maximum sequence length of generation.')
-    parser.add_argument(
-        '--num_return_sequences',
-        type=int,
-        default=1,
-        help='The number of output sequences to generation.')
+    parser.add_argument('--min_dec_len',
+                        type=int,
+                        default=1,
+                        help='The minimum sequence length of generation.')
+    parser.add_argument('--max_dec_len',
+                        type=int,
+                        default=512,
+                        help='The maximum sequence length of generation.')
+    parser.add_argument('--num_return_sequences',
+                        type=int,
+                        default=1,
+                        help='The number of output sequences to generation.')
     args = parser.parse_args()
     args.test_iters = args.eval_iters * 10
 
@@ -334,7 +320,8 @@ def parse_args(MODEL_CLASSES):
         if args.hidden_dropout_prob != 0:
             args.hidden_dropout_prob = .0
             logger.warning(
-                "The hidden_dropout_prob should set to 0 for accuracy checking.")
+                "The hidden_dropout_prob should set to 0 for accuracy checking."
+            )
         if args.attention_probs_dropout_prob != 0:
             args.attention_probs_dropout_prob = .0
             logger.warning(

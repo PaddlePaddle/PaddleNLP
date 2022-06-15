@@ -15,7 +15,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── run_pretrain.py                # 预训练代码
 ├── human_eval.py                  # 评估代码
 ├── scripts/                       # 数据处理/训练/生成/评估脚本
-└── data_tools/  
+└── data_tools/
     ├── Makefile                   # Makefile
     ├── README.md                  # 文档
     ├── code-merges.txt            # GPT分词merge文件
@@ -50,7 +50,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 #### 数据获取与制作
 
 一共是4024265个文件，共计51.6G
-- C++ 一共 3309507个文件，共44G  
+- C++ 一共 3309507个文件，共44G
 - Python 一共714758个文件，共7.6G
 
 链接: https://pan.baidu.com/s/1TEWUZ9rT3rJa3OyIs1Qa-A?pwd=sjet 提取码: sjet

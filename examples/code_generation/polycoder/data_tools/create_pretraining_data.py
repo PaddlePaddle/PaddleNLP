@@ -28,16 +28,14 @@ from paddlenlp.transformers import GPTTokenizer
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='data input/output')
-    group.add_argument(
-        '--input_path',
-        type=str,
-        required=True,
-        help='Path to input JSON files.')
-    group.add_argument(
-        '--output_prefix',
-        type=str,
-        required=True,
-        help='Output prefix to store output file.')
+    group.add_argument('--input_path',
+                       type=str,
+                       required=True,
+                       help='Path to input JSON files.')
+    group.add_argument('--output_prefix',
+                       type=str,
+                       required=True,
+                       help='Output prefix to store output file.')
     group.add_argument(
         '--data_format',
         type=str,
@@ -48,43 +46,42 @@ def get_args():
         '--json_key',
         type=str,
         default='text',
-        help='For JSON format. Space separate listed of keys to extract from json'
-    )
+        help=
+        'For JSON format. Space separate listed of keys to extract from json')
     group = parser.add_argument_group(title='common config')
-    group.add_argument(
-        '--append_eos',
-        action='store_true',
-        help='Append an <eos> token to the end of a document.')
-    group.add_argument(
-        '--log_interval',
-        type=int,
-        default=100,
-        help='Interval between progress updates')
-    group.add_argument(
-        '--workers',
-        type=int,
-        default=1,
-        help='Number of worker processes to launch')
-    group.add_argument(
-        "--vocab_file",
-        type=str,
-        default='./data_tools/code-vocab.json',
-        help="Path to the vocab file")
+    group.add_argument('--append_eos',
+                       action='store_true',
+                       help='Append an <eos> token to the end of a document.')
+    group.add_argument('--log_interval',
+                       type=int,
+                       default=100,
+                       help='Interval between progress updates')
+    group.add_argument('--workers',
+                       type=int,
+                       default=1,
+                       help='Number of worker processes to launch')
+    group.add_argument("--vocab_file",
+                       type=str,
+                       default='./data_tools/code-vocab.json',
+                       help="Path to the vocab file")
     group.add_argument(
         "--merge_file",
         type=str,
         default='./data_tools/code-merges.txt',
-        help="Path to the BPE merge file (if necessary).", )
+        help="Path to the BPE merge file (if necessary).",
+    )
     args = parser.parse_args()
     return args
 
 
 class IdentitySplitter(object):
+
     def tokenize(self, *text):
         return text
 
 
 class Converter(object):
+
     def __init__(self, args):
         self.args = args
 
@@ -173,25 +170,21 @@ def main():
                 if sentence_len == 0:
                     continue
                 sentlens_stream.write(
-                    sentence_len.to_bytes(
-                        4, byteorder='little', signed=True))
+                    sentence_len.to_bytes(4, byteorder='little', signed=True))
                 sent_count += 1
                 token_ids_stream.write(
-                    np.array(
-                        sentence, dtype=save_dtype).tobytes(order='C'))
+                    np.array(sentence, dtype=save_dtype).tobytes(order='C'))
 
             doc_cumsum_stream.write(
-                sent_count.to_bytes(
-                    8, byteorder='little', signed=True))
+                sent_count.to_bytes(8, byteorder='little', signed=True))
 
             if step % args.log_interval == 0:
                 current = time.time()
                 elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
-                print(
-                    f"Processed {step} documents",
-                    f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
-                    file=sys.stderr)
+                print(f"Processed {step} documents",
+                      f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
+                      file=sys.stderr)
 
     pool.close()
     print("Saving tokens to files...")
