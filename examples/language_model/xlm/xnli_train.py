@@ -40,81 +40,84 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument(
-        "--model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model.")
+    parser.add_argument("--model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model.")
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--max_seq_length",
         default=256,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=2e-6,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--dropout", default=0.1, type=float, help="Dropout rate.")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=2e-6,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--dropout",
+                        default=0.1,
+                        type=float,
+                        help="Dropout rate.")
     parser.add_argument(
         "--num_train_epochs",
         default=5,
         type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=200,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=24544,
-        help="Save checkpoint every X updates steps.")
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=200,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=24544,
+                        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--batch_size",
         default=8,
         type=int,
-        help="Batch size per GPU/CPU/XPU for training.", )
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
+        help="Batch size per GPU/CPU/XPU for training.",
+    )
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
         type=str,
         choices=["cpu", "gpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument(
-        "--use_amp",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=2**15,
-        help="The value of scale_loss for fp16.")
+    parser.add_argument("--use_amp",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Enable mixed precision training.")
+    parser.add_argument("--scale_loss",
+                        type=float,
+                        default=2**15,
+                        help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
 
@@ -153,33 +156,31 @@ def convert_example(example, tokenizer, max_seq_length=256, language="en"):
     premise = example["premise"]
     hypothesis = example["hypothesis"]
     # Convert raw text to feature
-    example = tokenizer(
-        premise,
-        text_pair=hypothesis,
-        max_length=max_seq_length,
-        return_attention_mask=True,
-        return_token_type_ids=False,
-        lang=language)
+    example = tokenizer(premise,
+                        text_pair=hypothesis,
+                        max_length=max_seq_length,
+                        return_attention_mask=True,
+                        return_token_type_ids=False,
+                        lang=language)
     return example["input_ids"], example["attention_mask"], label
 
 
 def get_test_dataloader(args, language, batchify_fn, tokenizer):
     # make sure language is `language``
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        language=language)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         language=language)
     test_ds = load_dataset("xnli", language, splits="test")
     test_ds = test_ds.map(trans_func, lazy=True)
-    test_batch_sampler = BatchSampler(
-        test_ds, batch_size=args.batch_size * 4, shuffle=False)
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        batch_sampler=test_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    test_batch_sampler = BatchSampler(test_ds,
+                                      batch_size=args.batch_size * 4,
+                                      shuffle=False)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  batch_sampler=test_batch_sampler,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  return_list=True)
     return test_data_loader
 
 
@@ -194,15 +195,15 @@ def do_train(args):
     # define train dataset language
     language = "en"
     train_ds = load_dataset("xnli", language, splits="train")
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        language=language)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         language=language)
 
     train_ds = train_ds.map(trans_func, lazy=True)
-    train_batch_sampler = DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_batch_sampler = DistributedBatchSampler(train_ds,
+                                                  batch_size=args.batch_size,
+                                                  shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
@@ -210,12 +211,11 @@ def do_train(args):
         Stack(dtype="int64")  # labels
     ): fn(samples)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
 
     model = XLMForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=3, dropout=args.dropout)
@@ -231,12 +231,11 @@ def do_train(args):
         num_training_steps = len(train_data_loader) * args.num_train_epochs
         num_train_epochs = args.num_train_epochs
 
-    optimizer = Adam(
-        learning_rate=args.learning_rate,
-        beta1=0.9,
-        beta2=0.999,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters())
+    optimizer = Adam(learning_rate=args.learning_rate,
+                     beta1=0.9,
+                     beta2=0.999,
+                     epsilon=args.adam_epsilon,
+                     parameters=model.parameters())
 
     loss_fct = nn.CrossEntropyLoss()
     if args.use_amp:
@@ -256,8 +255,9 @@ def do_train(args):
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits = model(
-                    input_ids, langs=lang_ids, attention_mask=attention_mask)
+                logits = model(input_ids,
+                               langs=lang_ids,
+                               attention_mask=attention_mask)
                 loss = loss_fct(logits, labels)
 
             if args.use_amp:

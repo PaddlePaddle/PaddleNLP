@@ -622,31 +622,32 @@ class XLMTokenizer(PretrainedTokenizer):
     }
 
     def __init__(
-            self,
-            vocab_file,
-            merges_file,
-            unk_token="<unk>",
-            bos_token="<s>",
-            sep_token="</s>",
-            pad_token="<pad>",
-            cls_token="</s>",
-            mask_token="<special1>",
-            additional_special_tokens=[
-                "<special0>",
-                "<special1>",
-                "<special2>",
-                "<special3>",
-                "<special4>",
-                "<special5>",
-                "<special6>",
-                "<special7>",
-                "<special8>",
-                "<special9>",
-            ],
-            lang2id=None,
-            id2lang=None,
-            do_lowercase_and_remove_accent=True,
-            **kwargs, ):
+        self,
+        vocab_file,
+        merges_file,
+        unk_token="<unk>",
+        bos_token="<s>",
+        sep_token="</s>",
+        pad_token="<pad>",
+        cls_token="</s>",
+        mask_token="<special1>",
+        additional_special_tokens=[
+            "<special0>",
+            "<special1>",
+            "<special2>",
+            "<special3>",
+            "<special4>",
+            "<special5>",
+            "<special6>",
+            "<special7>",
+            "<special8>",
+            "<special9>",
+        ],
+        lang2id=None,
+        id2lang=None,
+        do_lowercase_and_remove_accent=True,
+        **kwargs,
+    ):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.sm = try_import("sacremoses")
@@ -885,8 +886,9 @@ class XLMTokenizer(PretrainedTokenizer):
         return out_string
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. An XLM sequence has the following format:
@@ -910,8 +912,9 @@ class XLMTokenizer(PretrainedTokenizer):
         return bos + token_ids_0 + sep + token_ids_1 + sep
 
     def create_token_type_ids_from_sequences(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. An XLM sequence
         pair mask has the following format:
@@ -935,10 +938,11 @@ class XLMTokenizer(PretrainedTokenizer):
         return len(cls + token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1]
 
     def get_special_tokens_mask(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None,
-            already_has_special_tokens: bool=False, ) -> List[int]:
+        self,
+        token_ids_0: List[int],
+        token_ids_1: Optional[List[int]] = None,
+        already_has_special_tokens: bool = False,
+    ) -> List[int]:
         """
         Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer `prepare_for_model` method.
@@ -959,7 +963,8 @@ class XLMTokenizer(PretrainedTokenizer):
             return super().get_special_tokens_mask(
                 token_ids_0=token_ids_0,
                 token_ids_1=token_ids_1,
-                already_has_special_tokens=True, )
+                already_has_special_tokens=True,
+            )
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + (

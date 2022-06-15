@@ -33,23 +33,25 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument(
-        "--model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model.")
+    parser.add_argument("--model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model.")
     parser.add_argument(
         "--batch_size",
         default=8,
         type=int,
-        help="Batch size per GPU/CPU/XPU for training.", )
+        help="Batch size per GPU/CPU/XPU for training.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=256,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--device",
         default="gpu",
@@ -82,13 +84,12 @@ def convert_example(example, tokenizer, max_seq_length=256, language="en"):
     premise = example["premise"]
     hypothesis = example["hypothesis"]
     # Convert raw text to feature
-    example = tokenizer(
-        premise,
-        text_pair=hypothesis,
-        max_length=max_seq_length,
-        return_attention_mask=True,
-        return_token_type_ids=False,
-        lang=language)
+    example = tokenizer(premise,
+                        text_pair=hypothesis,
+                        max_length=max_seq_length,
+                        return_attention_mask=True,
+                        return_token_type_ids=False,
+                        lang=language)
     return example["input_ids"], example["attention_mask"], label
 
 
@@ -99,21 +100,20 @@ def get_test_dataloader(args, language, tokenizer):
         Stack(dtype="int64")  # labels
     ): fn(samples)
     # make sure language is `language``
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        language=language)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         language=language)
     test_ds = load_dataset("xnli", language, splits="test")
     test_ds = test_ds.map(trans_func, lazy=True)
-    test_batch_sampler = BatchSampler(
-        test_ds, batch_size=args.batch_size * 4, shuffle=False)
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        batch_sampler=test_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    test_batch_sampler = BatchSampler(test_ds,
+                                      batch_size=args.batch_size * 4,
+                                      shuffle=False)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  batch_sampler=test_batch_sampler,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  return_list=True)
     return test_data_loader
 
 
