@@ -143,12 +143,13 @@ def get_progressbar(name, size):
         size (`int`): The maximum size of the progress bar.
 
     """
-    return progressbar.ProgressBar(
-        maxval=size,
-        widgets=[
-            name, progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage(),
-            ' ', progressbar.ETA()
-        ])
+    return progressbar.ProgressBar(maxval=size,
+                                   widgets=[
+                                       name,
+                                       progressbar.Bar('=', '[', ']'), ' ',
+                                       progressbar.Percentage(), ' ',
+                                       progressbar.ETA()
+                                   ])
 
 
 def train_epoch_with_utterances(batches, model, randomize=True):
@@ -231,12 +232,11 @@ def train_epoch_with_interactions(interaction_batches,
             skip_num += 1
             continue
 
-        batch_loss, step = model.train_step(
-            interaction,
-            params.train_maximum_sql_length,
-            db2id=db2id,
-            id2db=id2db,
-            step=step)
+        batch_loss, step = model.train_step(interaction,
+                                            params.train_maximum_sql_length,
+                                            db2id=db2id,
+                                            id2db=id2db,
+                                            step=step)
 
         loss_sum += batch_loss
 
@@ -276,8 +276,8 @@ def update_sums(metrics,
         else:
             num_tokens_correct = 0.
             for j, token in enumerate(gold_query):
-                if len(predicted_sequence) > j and predicted_sequence[
-                        j] == token:
+                if len(predicted_sequence
+                       ) > j and predicted_sequence[j] == token:
                     num_tokens_correct += 1
             metrics_sums[Metrics.TOKEN_ACCURACY] += num_tokens_correct / \
                 len(gold_query)
@@ -376,8 +376,9 @@ def evaluate_utterance_sample(sample,
 
     predictions = []
     for i, item in enumerate(sample):
-        _, loss, predicted_seq = model.eval_step(
-            item, max_generation_length, feed_gold_query=gold_forcing)
+        _, loss, predicted_seq = model.eval_step(item,
+                                                 max_generation_length,
+                                                 feed_gold_query=gold_forcing)
         loss = loss / len(item.gold_query())
         predictions.append(predicted_seq)
 
@@ -386,35 +387,33 @@ def evaluate_utterance_sample(sample,
                                                         predicted_seq)
 
         if write_results:
-            write_prediction(
-                predictions_file,
-                identifier=item.interaction.identifier,
-                input_seq=item.input_sequence(),
-                probability=0,
-                prediction=predicted_seq,
-                flat_prediction=flat_sequence,
-                gold_query=item.gold_query(),
-                flat_gold_queries=item.original_gold_queries(),
-                gold_tables=item.gold_tables(),
-                index_in_interaction=item.utterance_index,
-                database_username=database_username,
-                database_password=database_password,
-                database_timeout=database_timeout)
+            write_prediction(predictions_file,
+                             identifier=item.interaction.identifier,
+                             input_seq=item.input_sequence(),
+                             probability=0,
+                             prediction=predicted_seq,
+                             flat_prediction=flat_sequence,
+                             gold_query=item.gold_query(),
+                             flat_gold_queries=item.original_gold_queries(),
+                             gold_tables=item.gold_tables(),
+                             index_in_interaction=item.utterance_index,
+                             database_username=database_username,
+                             database_password=database_password,
+                             database_timeout=database_timeout)
 
-        update_sums(
-            metrics,
-            metrics_sums,
-            predicted_seq,
-            flat_sequence,
-            item.gold_query(),
-            item.original_gold_queries()[0],
-            gold_forcing,
-            loss,
-            token_accuracy,
-            database_username=database_username,
-            database_password=database_password,
-            database_timeout=database_timeout,
-            gold_table=item.gold_tables()[0])
+        update_sums(metrics,
+                    metrics_sums,
+                    predicted_seq,
+                    flat_sequence,
+                    item.gold_query(),
+                    item.original_gold_queries()[0],
+                    gold_forcing,
+                    loss,
+                    token_accuracy,
+                    database_username=database_username,
+                    database_password=database_password,
+                    database_timeout=database_timeout,
+                    gold_table=item.gold_tables()[0])
 
         progbar.update(i)
 
@@ -517,36 +516,34 @@ def evaluate_interaction_sample(sample,
             #         num_after_first_utterances += 1
 
             if write_results:
-                write_prediction(
-                    predictions_file,
-                    identifier=interaction.identifier,
-                    input_seq=item.input_sequence(),
-                    probability=decoder_results.probability,
-                    prediction=sequence,
-                    flat_prediction=flat_sequence,
-                    gold_query=gold_query,
-                    flat_gold_queries=gold_queries,
-                    gold_tables=gold_tables,
-                    index_in_interaction=index,
-                    database_username=database_username,
-                    database_password=database_password,
-                    database_timeout=database_timeout,
-                    compute_metrics=compute_metrics)
+                write_prediction(predictions_file,
+                                 identifier=interaction.identifier,
+                                 input_seq=item.input_sequence(),
+                                 probability=decoder_results.probability,
+                                 prediction=sequence,
+                                 flat_prediction=flat_sequence,
+                                 gold_query=gold_query,
+                                 flat_gold_queries=gold_queries,
+                                 gold_tables=gold_tables,
+                                 index_in_interaction=index,
+                                 database_username=database_username,
+                                 database_password=database_password,
+                                 database_timeout=database_timeout,
+                                 compute_metrics=compute_metrics)
 
-            update_sums(
-                metrics,
-                metrics_sums,
-                sequence,
-                flat_sequence,
-                gold_query,
-                original_gold_query,
-                gold_forcing,
-                loss,
-                token_accuracy,
-                database_username=database_username,
-                database_password=database_password,
-                database_timeout=database_timeout,
-                gold_table=gold_table)
+            update_sums(metrics,
+                        metrics_sums,
+                        sequence,
+                        flat_sequence,
+                        gold_query,
+                        original_gold_query,
+                        gold_forcing,
+                        loss,
+                        token_accuracy,
+                        database_username=database_username,
+                        database_password=database_password,
+                        database_timeout=database_timeout,
+                        gold_table=gold_table)
 
         progbar.update(i)
 
@@ -599,17 +596,17 @@ def evaluate_using_predicted_queries(sample,
                     timeout=database_timeout) and probability >= 0.24:
                 utterance.set_pred_query(
                     item.remove_snippets(predicted_sequence))
-                item.add_utterance(
-                    utterance,
-                    item.remove_snippets(predicted_sequence),
-                    previous_snippets=utterance.snippets())
+                item.add_utterance(utterance,
+                                   item.remove_snippets(predicted_sequence),
+                                   previous_snippets=utterance.snippets())
             else:
                 # Add the /previous/ predicted query, guaranteed to be syntactically
                 # correct
                 seq = []
                 utterance.set_pred_query(seq)
-                item.add_utterance(
-                    utterance, seq, previous_snippets=utterance.snippets())
+                item.add_utterance(utterance,
+                                   seq,
+                                   previous_snippets=utterance.snippets())
 
             original_utt = item.interaction.utterances[utterance.index]
             write_prediction(
@@ -620,29 +617,26 @@ def evaluate_using_predicted_queries(sample,
                 prediction=predicted_sequence,
                 flat_prediction=flat_sequence,
                 gold_query=original_utt.gold_query_to_use,
-                flat_gold_queries=[
-                    q[0] for q in original_utt.all_gold_queries
-                ],
+                flat_gold_queries=[q[0] for q in original_utt.all_gold_queries],
                 gold_tables=[q[1] for q in original_utt.all_gold_queries],
                 index_in_interaction=utterance.index,
                 database_username=database_username,
                 database_password=database_password,
                 database_timeout=database_timeout)
 
-            update_sums(
-                metrics,
-                metrics_sums,
-                predicted_sequence,
-                flat_sequence,
-                original_utt.gold_query_to_use,
-                original_utt.original_gold_query,
-                gold_forcing,
-                loss,
-                token_accuracy=0,
-                database_username=database_username,
-                database_password=database_password,
-                database_timeout=database_timeout,
-                gold_table=original_utt.gold_sql_results)
+            update_sums(metrics,
+                        metrics_sums,
+                        predicted_sequence,
+                        flat_sequence,
+                        original_utt.gold_query_to_use,
+                        original_utt.original_gold_query,
+                        gold_forcing,
+                        loss,
+                        token_accuracy=0,
+                        database_username=database_username,
+                        database_password=database_password,
+                        database_timeout=database_timeout,
+                        gold_table=original_utt.gold_sql_results)
 
         predictions.append(int_predictions)
         progbar.update(i)

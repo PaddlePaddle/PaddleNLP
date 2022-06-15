@@ -54,9 +54,8 @@ __all__ = [
 
 
 class PinyinEmbedding(nn.Layer):
-    def __init__(self,
-                 pinyin_map_len: int,
-                 embedding_size: int,
+
+    def __init__(self, pinyin_map_len: int, embedding_size: int,
                  pinyin_out_dim: int):
         """
         Pinyin Embedding Layer.
@@ -76,7 +75,8 @@ class PinyinEmbedding(nn.Layer):
             out_channels=self.pinyin_out_dim,
             kernel_size=2,
             stride=1,
-            padding=0, )
+            padding=0,
+        )
 
     def forward(self, pinyin_ids):
         """
@@ -112,8 +112,8 @@ class GlyphEmbedding(nn.Layer):
 
     def __init__(self, num_embeddings, embedding_dim):
         super(GlyphEmbedding, self).__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+        self.embedding = nn.Embedding(num_embeddings=num_embeddings,
+                                      embedding_dim=embedding_dim)
 
     def forward(self, input_ids):
         """
@@ -136,26 +136,29 @@ class FusionBertEmbeddings(nn.Layer):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            hidden_size,
-            pad_token_id,
-            type_vocab_size,
-            max_position_embeddings,
-            pinyin_map_len,
-            glyph_embedding_dim,
-            layer_norm_eps=1e-12,
-            hidden_dropout_prob=0.1, ):
+        self,
+        vocab_size,
+        hidden_size,
+        pad_token_id,
+        type_vocab_size,
+        max_position_embeddings,
+        pinyin_map_len,
+        glyph_embedding_dim,
+        layer_norm_eps=1e-12,
+        hidden_dropout_prob=0.1,
+    ):
         super(FusionBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.pinyin_embeddings = PinyinEmbedding(
             pinyin_map_len=pinyin_map_len,
             embedding_size=128,
-            pinyin_out_dim=hidden_size, )
+            pinyin_out_dim=hidden_size,
+        )
         self.glyph_embeddings = GlyphEmbedding(vocab_size, glyph_embedding_dim)
 
         self.glyph_map = nn.Linear(glyph_embedding_dim, hidden_size)
@@ -166,10 +169,9 @@ class FusionBertEmbeddings(nn.Layer):
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
             "position_ids",
-            paddle.expand(
-                paddle.arange(
-                    max_position_embeddings, dtype="int64"),
-                shape=[1, -1]), )
+            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"),
+                          shape=[1, -1]),
+        )
 
     def forward(self,
                 input_ids,
@@ -278,13 +280,14 @@ class ChineseBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.chinesebert.config["initializer_range"],
-                        shape=layer.weight.shape, ))
+                        shape=layer.weight.shape,
+                    ))
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = (self.layer_norm_eps
-                              if hasattr(self, "layer_norm_eps") else
+            layer._epsilon = (self.layer_norm_eps if hasattr(
+                self, "layer_norm_eps") else
                               self.chinesebert.config["layer_norm_eps"])
 
 
@@ -364,23 +367,24 @@ class ChineseBertModel(ChineseBertPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size=23236,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            initializer_range=0.02,
-            pad_token_id=0,
-            pool_act="tanh",
-            layer_norm_eps=1e-12,
-            glyph_embedding_dim=1728,
-            pinyin_map_len=32, ):
+        self,
+        vocab_size=23236,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        pad_token_id=0,
+        pool_act="tanh",
+        layer_norm_eps=1e-12,
+        glyph_embedding_dim=1728,
+        pinyin_map_len=32,
+    ):
         super(ChineseBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.layer_norm_eps = layer_norm_eps
@@ -394,7 +398,8 @@ class ChineseBertModel(ChineseBertPretrainedModel):
             pinyin_map_len,
             glyph_embedding_dim,
             layer_norm_eps,
-            hidden_dropout_prob, )
+            hidden_dropout_prob,
+        )
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -402,7 +407,8 @@ class ChineseBertModel(ChineseBertPretrainedModel):
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0, )
+            act_dropout=0,
+        )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
@@ -492,15 +498,17 @@ class ChineseBertModel(ChineseBertPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2], )
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2],
+            )
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             pinyin_ids=pinyin_ids,
             position_ids=position_ids,
-            token_type_ids=token_type_ids, )
+            token_type_ids=token_type_ids,
+        )
 
         if output_hidden_states:
             output = embedding_output
@@ -582,11 +590,10 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
                 start_logits = outputs[0]
                 end_logits = outputs[1]
         """
-        sequence_output, _ = self.chinesebert(
-            input_ids,
-            pinyin_ids,
-            token_type_ids=token_type_ids,
-            position_ids=None)
+        sequence_output, _ = self.chinesebert(input_ids,
+                                              pinyin_ids,
+                                              token_type_ids=token_type_ids,
+                                              position_ids=None)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -670,7 +677,8 @@ class ChineseBertForSequenceClassification(ChineseBertPretrainedModel):
             pinyin_ids=pinyin_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask, )
+            attention_mask=attention_mask,
+        )
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -751,7 +759,8 @@ class ChineseBertForTokenClassification(ChineseBertPretrainedModel):
             pinyin_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask, )
+            attention_mask=attention_mask,
+        )
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -776,7 +785,8 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
             self.chinesebert.config["vocab_size"],
             self.chinesebert.config["hidden_act"],
             embedding_weights=self.chinesebert.embeddings.word_embeddings.
-            weight, )
+            weight,
+        )
 
         self.apply(self.init_weights)
 
@@ -824,7 +834,8 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
                 pinyin_ids,
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
-                attention_mask=attention_mask, )
+                attention_mask=attention_mask,
+            )
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, masked_positions)
@@ -877,12 +888,12 @@ class ChineseBertPretrainingCriterion(nn.Layer):
 
         """
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(
-                prediction_scores,
-                masked_lm_labels,
-                reduction="none",
-                ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(prediction_scores,
+                                             masked_lm_labels,
+                                             reduction="none",
+                                             ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = F.cross_entropy(
-                seq_relationship_score, next_sentence_labels, reduction="none")
+            next_sentence_loss = F.cross_entropy(seq_relationship_score,
+                                                 next_sentence_labels,
+                                                 reduction="none")
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

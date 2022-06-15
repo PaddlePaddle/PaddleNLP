@@ -62,9 +62,9 @@ ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WW
 解压文件
 ```shell
 unzip comment2019zh_corpus.zip -d  clue_corpus_small_14g/comment2019zh_corpus
-unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus  
+unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus
 unzip webText2019zh_corpus.zip -d  clue_corpus_small_14g/webText2019zh_corpus
-unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus  
+unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
@@ -180,8 +180,11 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
 
 ### 预训练模型贡献
-PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
-使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
+PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到`zhui/ernie-1.0-cluecorpussmall`参数，可直接使用。
+```python
+model = AutoModelForMaskedLM.from_pretrained('zhui/ernie-1.0-cluecorpussmall')
+```
 
 贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 

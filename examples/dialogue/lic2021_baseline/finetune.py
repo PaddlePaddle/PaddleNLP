@@ -40,25 +40,25 @@ def main(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_dataset = DialogueDataset(
-        args.train_data_path,
-        args.batch_size,
-        tokenizer.pad_token_id,
-        tokenizer.cls_token_id,
-        args.sort_pool_size,
-        args.seed,
-        mode='train')
-    train_dataloader = DataLoader(
-        train_dataset, return_list=True, batch_size=None)
-    valid_dataset = DialogueDataset(
-        args.valid_data_path,
-        args.batch_size,
-        tokenizer.pad_token_id,
-        tokenizer.cls_token_id,
-        args.sort_pool_size,
-        mode='valid')
-    valid_dataloader = DataLoader(
-        valid_dataset, return_list=True, batch_size=None)
+    train_dataset = DialogueDataset(args.train_data_path,
+                                    args.batch_size,
+                                    tokenizer.pad_token_id,
+                                    tokenizer.cls_token_id,
+                                    args.sort_pool_size,
+                                    args.seed,
+                                    mode='train')
+    train_dataloader = DataLoader(train_dataset,
+                                  return_list=True,
+                                  batch_size=None)
+    valid_dataset = DialogueDataset(args.valid_data_path,
+                                    args.batch_size,
+                                    tokenizer.pad_token_id,
+                                    tokenizer.cls_token_id,
+                                    args.sort_pool_size,
+                                    mode='valid')
+    valid_dataloader = DataLoader(valid_dataset,
+                                  return_list=True,
+                                  batch_size=None)
 
     lr_scheduler = NoamDecay(1 / (args.warmup_steps * (args.lr**2)),
                              args.warmup_steps)
@@ -68,12 +68,11 @@ def main(args):
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    optimizer = AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
 
     step = 0
     total_time = 0.0
@@ -95,9 +94,10 @@ def main(args):
             total_time += (time.time() - batch_start_time)
             if step % args.logging_steps == 0:
                 ppl = paddle.exp(loss)
-                print('step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
-                      % (step, loss, ppl, optimizer.get_lr(),
-                         total_time / args.logging_steps))
+                print(
+                    'step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step' %
+                    (step, loss, ppl, optimizer.get_lr(),
+                     total_time / args.logging_steps))
                 total_time = 0.0
             if step % args.save_steps == 0:
                 evaluation(model, valid_dataloader)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+
 sys.path.append("../")
 
 import os
@@ -33,6 +34,7 @@ from classification.data import convert_example_to_feature as convert_example_to
 
 
 class Predictor(object):
+
     def __init__(self, args):
         self.args = args
         self.ext_predictor, self.ext_input_handles, self.ext_output_hanle = self.create_predictor(
@@ -88,20 +90,20 @@ class Predictor(object):
             predictor.get_input_handle(name)
             for name in predictor.get_input_names()
         ]
-        output_handle = predictor.get_output_handle(predictor.get_output_names()
-                                                    [0])
+        output_handle = predictor.get_output_handle(
+            predictor.get_output_names()[0])
 
         return predictor, input_handles, output_handle
 
     def predict_ext(self, args):
-        ori_test_ds = load_dataset(
-            read_test_file, data_path=args.test_path, lazy=False)
-        trans_func = partial(
-            convert_example_to_feature_ext,
-            tokenizer=self.tokenizer,
-            label2id=self.ext_label2id,
-            max_seq_len=args.ext_max_seq_len,
-            is_test=True)
+        ori_test_ds = load_dataset(read_test_file,
+                                   data_path=args.test_path,
+                                   lazy=False)
+        trans_func = partial(convert_example_to_feature_ext,
+                             tokenizer=self.tokenizer,
+                             label2id=self.ext_label2id,
+                             max_seq_len=args.ext_max_seq_len,
+                             is_test=True)
         test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
         batch_list = [
             test_ds[idx:idx + args.batch_size]
@@ -110,8 +112,8 @@ class Predictor(object):
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
-            Stack(dtype="int64")): fn(samples)
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
+                ), Stack(dtype="int64")): fn(samples)
 
         results = []
         for bid, batch_data in enumerate(batch_list):
@@ -132,8 +134,8 @@ class Predictor(object):
                 aps = decoding(text[:args.ext_max_seq_len - 2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
-                    aspect_text = self._concate_aspect_and_opinion(text, aspect,
-                                                                   opinions)
+                    aspect_text = self._concate_aspect_and_opinion(
+                        text, aspect, opinions)
                     results.append({
                         "id": str(idx) + "_" + str(aid),
                         "aspect": aspect,
@@ -145,12 +147,11 @@ class Predictor(object):
 
     def predict_cls(self, args, ext_results):
         test_ds = MapDataset(ext_results)
-        trans_func = partial(
-            convert_example_to_feature_cls,
-            tokenizer=self.tokenizer,
-            label2id=self.cls_label2id,
-            max_seq_len=args.cls_max_seq_len,
-            is_test=True)
+        trans_func = partial(convert_example_to_feature_cls,
+                             tokenizer=self.tokenizer,
+                             label2id=self.cls_label2id,
+                             max_seq_len=args.cls_max_seq_len,
+                             is_test=True)
         test_ds = test_ds.map(trans_func, lazy=False)
         batch_list = [
             test_ds[idx:idx + args.batch_size]
@@ -159,8 +160,8 @@ class Predictor(object):
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
-            Stack(dtype="int64")): fn(samples)
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
+                ), Stack(dtype="int64")): fn(samples)
 
         results = []
         for batch_data in batch_list:
@@ -192,9 +193,12 @@ class Predictor(object):
                 if idx == 0:
                     sentiment_result["text"] = single_ap["text"]
                 ap_list.append({
-                    "aspect": single_ap["aspect"],
-                    "opinions": single_ap["opinions"],
-                    "sentiment_polarity": single_ap["sentiment_polarity"]
+                    "aspect":
+                    single_ap["aspect"],
+                    "opinions":
+                    single_ap["opinions"],
+                    "sentiment_polarity":
+                    single_ap["sentiment_polarity"]
                 })
             sentiment_result["ap_list"] = ap_list
             sentiment_results.append(sentiment_result)

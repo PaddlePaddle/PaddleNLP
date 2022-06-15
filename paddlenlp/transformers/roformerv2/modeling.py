@@ -32,6 +32,7 @@ __all__ = [
 
 
 class Norm(Layer):
+
     def __init__(self, epsilon=1e-12):
         super().__init__()
         self._epsilon = epsilon
@@ -70,12 +71,13 @@ def _convert_attention_mask(attn_mask, dtype):
 
 
 class RotaryPositionEmbedding(Layer):
+
     def __init__(self, dim, max_position_embeddings=512):
         super().__init__()
-        inv_freq = 1.0 / (10000**(paddle.arange(
-            0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
-        t = paddle.arange(
-            max_position_embeddings, dtype=paddle.get_default_dtype())
+        inv_freq = 1.0 / (10000**(
+            paddle.arange(0, dim, 2, dtype=paddle.get_default_dtype()) / dim))
+        t = paddle.arange(max_position_embeddings,
+                          dtype=paddle.get_default_dtype())
         freqs = paddle.matmul(t.unsqueeze(1), inv_freq.unsqueeze(0))
         self.register_buffer("sin", freqs.sin(), persistable=False)
         self.register_buffer("cos", freqs.cos(), persistable=False)
@@ -85,16 +87,18 @@ class RotaryPositionEmbedding(Layer):
         seqlen = paddle.shape(x)[-2]
         sin, cos = (
             self.sin[offset:offset + seqlen, :],
-            self.cos[offset:offset + seqlen, :], )
+            self.cos[offset:offset + seqlen, :],
+        )
         x1, x2 = x[..., 0::2], x[..., 1::2]
         # [cos_nθ, -sin_nθ] [x1]
         # [sin_nθ,  cos_nθ] [x2]
         # => [x1 * cos_nθ - x2 * sin_nθ, x1 * sin_nθ + x2 * cos_nθ]
-        return paddle.stack(
-            [x1 * cos - x2 * sin, x1 * sin + x2 * cos], axis=-1).flatten(-2, -1)
+        return paddle.stack([x1 * cos - x2 * sin, x1 * sin + x2 * cos],
+                            axis=-1).flatten(-2, -1)
 
 
 class MultiHeadAttentionWithRotary(Layer):
+
     def __init__(self,
                  embed_dim,
                  num_heads,
@@ -168,6 +172,7 @@ class MultiHeadAttentionWithRotary(Layer):
 
 
 class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -180,15 +185,14 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
                  rotary_value=False,
                  max_position_embeddings=512,
                  **kwargs):
-        super().__init__(
-            d_model,
-            nhead,
-            dim_feedforward,
-            dropout=dropout,
-            activation=activation,
-            attn_dropout=attn_dropout,
-            act_dropout=act_dropout,
-            normalize_before=normalize_before)
+        super().__init__(d_model,
+                         nhead,
+                         dim_feedforward,
+                         dropout=dropout,
+                         activation=activation,
+                         attn_dropout=attn_dropout,
+                         act_dropout=act_dropout,
+                         normalize_before=normalize_before)
         self.self_attn = MultiHeadAttentionWithRotary(
             d_model,
             nhead,
@@ -209,11 +213,12 @@ class RoFormerv2Embeddings(Layer):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            hidden_dropout_prob=0.1,
-            type_vocab_size=2, ):
+        self,
+        vocab_size,
+        hidden_size=768,
+        hidden_dropout_prob=0.1,
+        type_vocab_size=2,
+    ):
         super(RoFormerv2Embeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -313,8 +318,8 @@ class RoFormerv2PretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 num_hidden_layers = self.num_hidden_layers if hasattr(
-                    self, "num_hidden_layers") else self.roformerv2.config[
-                        "num_hidden_layers"]
+                    self, "num_hidden_layers"
+                ) else self.roformerv2.config["num_hidden_layers"]
                 initializer(layer.weight, num_hidden_layers, order=2, gain=1.0)
             if isinstance(layer, nn.Linear):
                 use_bias = self.use_bias if hasattr(
@@ -402,7 +407,8 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
             vocab_size,
             hidden_size,
             hidden_dropout_prob,
-            type_vocab_size, )
+            type_vocab_size,
+        )
         encoder_layer = TransformerEncoderLayerWithRotary(
             hidden_size,
             num_attention_heads,
@@ -484,22 +490,22 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(paddle.get_default_dtype()) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(
-                    axis=[1, 2]).astype(paddle.get_default_dtype())
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
+                    paddle.get_default_dtype())
                 attention_mask = (1.0 - attention_mask) * -1e4
             else:
                 raise ValueError("Currently we only support 2D attention_mask.")
 
         attention_mask.stop_gradient = True
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids, token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           token_type_ids=token_type_ids)
 
         if output_hidden_states:
             output = embedding_output
@@ -534,8 +540,8 @@ class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):
     def __init__(self, roformerv2, dropout=None):
         super(RoFormerv2ForQuestionAnswering, self).__init__()
         self.roformerv2 = roformerv2
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roformerv2.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roformerv2.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roformerv2.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
@@ -580,10 +586,9 @@ class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):
                 start_logits = outputs[0]
                 end_logits = outputs[1]
         """
-        sequence_output = self.roformerv2(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.roformerv2(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         start_logits, end_logits = paddle.unstack(logits, axis=-1)
@@ -611,8 +616,8 @@ class RoFormerv2ForSequenceClassification(RoFormerv2PretrainedModel):
         super(RoFormerv2ForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.roformerv2 = roformerv2
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roformerv2.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roformerv2.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roformerv2.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -645,10 +650,9 @@ class RoFormerv2ForSequenceClassification(RoFormerv2PretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.roformerv2(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.roformerv2(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          attention_mask=attention_mask)
         pooled_output = sequence_output[:, 0]
 
         pooled_output = self.dropout(pooled_output)
@@ -676,8 +680,8 @@ class RoFormerv2ForTokenClassification(RoFormerv2PretrainedModel):
         super(RoFormerv2ForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.roformerv2 = roformerv2  # allow roformerv2 to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roformerv2.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roformerv2.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roformerv2.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -710,10 +714,9 @@ class RoFormerv2ForTokenClassification(RoFormerv2PretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.roformerv2(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.roformerv2(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -740,8 +743,8 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
         super(RoFormerv2ForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.roformerv2 = roformerv2
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roformerv2.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roformerv2.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roformerv2.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
@@ -812,17 +815,16 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
                    ))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(shape=(
-                -1, paddle.shape(token_type_ids)[-1]))
+            token_type_ids = token_type_ids.reshape(
+                shape=(-1, paddle.shape(token_type_ids)[-1]))
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 shape=(-1, paddle.shape(attention_mask)[-1]))
 
-        sequence_output = self.roformerv2(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.roformerv2(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          attention_mask=attention_mask)
 
         pooled_output = sequence_output[:, 0]
         pooled_output = self.dropout(pooled_output)
@@ -835,6 +837,7 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
 
 
 class RoFormerv2LMPredictionHead(Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -853,8 +856,9 @@ class RoFormerv2LMPredictionHead(Layer):
                 is_bias=True)
 
     def forward(self, hidden_states):
-        hidden_states = paddle.matmul(
-            hidden_states, self.decoder_weight, transpose_y=True)
+        hidden_states = paddle.matmul(hidden_states,
+                                      self.decoder_weight,
+                                      transpose_y=True)
         if self.use_bias:
             hidden_states = hidden_states + self.decoder_bias
 
@@ -914,10 +918,9 @@ class RoFormerv2ForMaskedLM(RoFormerv2PretrainedModel):
                 # [1, 11, 12000]
 
         """
-        sequence_output = self.roformerv2(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.roformerv2(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          attention_mask=attention_mask)
 
         prediction_scores = self.cls(sequence_output)
         return prediction_scores

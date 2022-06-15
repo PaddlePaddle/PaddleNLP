@@ -146,8 +146,8 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
                     # big models.
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.unified_transformer.config["initializer_range"],
                         shape=layer.weight.shape))
 
@@ -281,9 +281,11 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
         self.mask_token_id = mask_token_id
         self.initializer_range = initializer_range
 
-        self.embeddings = UnifiedTransformerEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, role_type_size)
+        self.embeddings = UnifiedTransformerEmbeddings(vocab_size, hidden_size,
+                                                       hidden_dropout_prob,
+                                                       max_position_embeddings,
+                                                       type_vocab_size,
+                                                       role_type_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -383,8 +385,10 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 outputs = model(**inputs)
         """
 
-        embedding_output = self.embeddings(
-            input_ids, token_type_ids, position_ids, role_ids=role_ids)
+        embedding_output = self.embeddings(input_ids,
+                                           token_type_ids,
+                                           position_ids,
+                                           role_ids=role_ids)
         if use_cache:
             if cache is None:
                 cache = self.encoder.gen_cache(embedding_output)
@@ -398,6 +402,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
 
 
 class UnifiedTransformerLMHead(nn.Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -423,9 +428,9 @@ class UnifiedTransformerLMHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        logits = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        logits = paddle.tensor.matmul(hidden_states,
+                                      self.decoder_weight,
+                                      transpose_y=True) + self.decoder_bias
         return logits
 
 
@@ -506,14 +511,13 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.unified_transformer(
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            use_cache,
-            cache,
-            role_ids=role_ids)
+        outputs = self.unified_transformer(input_ids,
+                                           token_type_ids,
+                                           position_ids,
+                                           attention_mask,
+                                           use_cache,
+                                           cache,
+                                           role_ids=role_ids)
         sequence_output = outputs[0] if use_cache else outputs
         logits = self.lm_head(sequence_output, masked_positions)
         if use_cache:

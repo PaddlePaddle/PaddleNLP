@@ -82,18 +82,18 @@ def do_train():
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
     evaluate_fn = do_evaluate if args.task_name != "chid" else do_evaluate_chid
 
-    train_ds, dev_ds, public_test_ds = load_dataset(
-        "fewclue",
-        name=args.task_name,
-        splits=("train_0", "dev_0", "test_public"))
+    train_ds, dev_ds, public_test_ds = load_dataset("fewclue",
+                                                    name=args.task_name,
+                                                    splits=("train_0", "dev_0",
+                                                            "test_public"))
 
     # Task related transform operations, eg: numbert label -> text_label, english -> chinese
-    transform_fn = partial(
-        transform_fn_dict[args.task_name], label_normalize_dict=label_norm_dict)
+    transform_fn = partial(transform_fn_dict[args.task_name],
+                           label_normalize_dict=label_norm_dict)
 
     # Some fewshot_learning strategy is defined by transform_fn
     # Note: Set lazy=True to transform example inplace immediately,
-    # because transform_fn should only be executed only once when 
+    # because transform_fn should only be executed only once when
     # iterate multi-times for train_ds
     train_ds = train_ds.map(transform_fn, lazy=False)
     dev_ds = dev_ds.map(transform_fn, lazy=False)
@@ -118,35 +118,32 @@ def do_train():
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
             Stack(dtype="int64"),  # masked_positions
             Stack(dtype="int64"),  # masked_lm_labels
-            Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
+            Stack(dtype="int64"
+                  ),  # candidate_labels_ids [candidate_num, label_length]
         ): [data for data in fn(samples)]
 
-    trans_func = partial(
-        convert_example_fn,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        p_embedding_num=args.p_embedding_num)
+    trans_func = partial(convert_example_fn,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         p_embedding_num=args.p_embedding_num)
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='eval',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
-    public_test_data_loader = create_dataloader(
-        public_test_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    public_test_data_loader = create_dataloader(public_test_ds,
+                                                mode='eval',
+                                                batch_size=args.batch_size,
+                                                batchify_fn=batchify_fn,
+                                                trans_fn=trans_func)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -184,16 +181,14 @@ def do_train():
             masked_positions = batch[2]
             masked_lm_labels = batch[3]
 
-            prediction_scores = model(
-                input_ids=src_ids,
-                token_type_ids=token_type_ids,
-                masked_positions=masked_positions)
+            prediction_scores = model(input_ids=src_ids,
+                                      token_type_ids=token_type_ids,
+                                      masked_positions=masked_positions)
 
             if args.rdrop_coef > 0:
-                prediction_scores_2 = model(
-                    input_ids=src_ids,
-                    token_type_ids=token_type_ids,
-                    masked_positions=masked_positions)
+                prediction_scores_2 = model(input_ids=src_ids,
+                                            token_type_ids=token_type_ids,
+                                            masked_positions=masked_positions)
                 ce_loss = (
                     mlm_loss_fn(prediction_scores, masked_lm_labels) +
                     mlm_loss_fn(prediction_scores_2, masked_lm_labels)) * 0.5
@@ -206,8 +201,8 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
@@ -218,8 +213,9 @@ def do_train():
                                               label_norm_dict)
         print("epoch:{}, dev_accuracy:{:.3f}, total_num:{}".format(
             epoch, dev_accuracy, total_num))
-        test_accuracy, total_num = evaluate_fn(
-            model, tokenizer, public_test_data_loader, label_norm_dict)
+        test_accuracy, total_num = evaluate_fn(model, tokenizer,
+                                               public_test_data_loader,
+                                               label_norm_dict)
         print("epoch:{}, test_accuracy:{:.3f}, total_num:{}".format(
             epoch, test_accuracy, total_num))
 

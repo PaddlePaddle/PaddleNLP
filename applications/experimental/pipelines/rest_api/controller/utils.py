@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 
 class RequestLimiter:
+
     def __init__(self, limit):
         self.semaphore = Semaphore(limit - 1)
 
@@ -50,9 +51,8 @@ def as_form(cls: Type[BaseModel]):
         inspect.Parameter(
             field.alias,
             inspect.Parameter.POSITIONAL_ONLY,
-            default=(Form(field.default)
-                     if not field.required else Form(...)), )
-        for field in cls.__fields__.values()
+            default=(Form(field.default) if not field.required else Form(...)),
+        ) for field in cls.__fields__.values()
     ]
 
     async def _as_form(**data):

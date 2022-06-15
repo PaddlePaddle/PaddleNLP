@@ -38,8 +38,9 @@ args = parser.parse_args()
 
 def convert_to_features(example, tokenizer, label_vocab):
     tokens, labels = example
-    tokenized_input = tokenizer(
-        tokens, return_length=True, is_split_into_words=True)
+    tokenized_input = tokenizer(tokens,
+                                return_length=True,
+                                is_split_into_words=True)
     # Token '[CLS]' and '[SEP]' will get label 'O'
     labels = ['O'] + labels + ['O']
     tokenized_input['labels'] = [label_vocab[x] for x in labels]
@@ -88,17 +89,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 if __name__ == '__main__':
@@ -116,8 +118,9 @@ if __name__ == '__main__':
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_to_features, tokenizer=tokenizer, label_vocab=label_vocab)
+    trans_func = partial(convert_to_features,
+                         tokenizer=tokenizer,
+                         label_vocab=label_vocab)
 
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
@@ -126,28 +129,26 @@ if __name__ == '__main__':
     ignore_label = -1
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # token_type_ids
         Stack(dtype='int64'),  # seq_len
         Pad(axis=0, pad_val=ignore_label, dtype='int64')  # labels
     ): fn(samples)
 
-    train_loader = create_dataloader(
-        dataset=train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn)
+    train_loader = create_dataloader(dataset=train_ds,
+                                     mode='train',
+                                     batch_size=args.batch_size,
+                                     batchify_fn=batchify_fn)
 
-    dev_loader = create_dataloader(
-        dataset=dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dataset=dev_ds,
+                                   mode='dev',
+                                   batch_size=args.batch_size,
+                                   batchify_fn=batchify_fn)
 
-    test_loader = create_dataloader(
-        dataset=test_ds,
-        mode='test',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn)
+    test_loader = create_dataloader(dataset=test_ds,
+                                    mode='test',
+                                    batch_size=args.batch_size,
+                                    batchify_fn=batchify_fn)
 
     # Define the model netword and its loss
     model = ErnieForTokenClassification.from_pretrained(
@@ -156,8 +157,8 @@ if __name__ == '__main__':
         model = paddle.DataParallel(model)
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
     loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label)
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=2e-5, parameters=model.parameters())
+    optimizer = paddle.optimizer.AdamW(learning_rate=2e-5,
+                                       parameters=model.parameters())
 
     step = 0
     for epoch in range(args.epochs):

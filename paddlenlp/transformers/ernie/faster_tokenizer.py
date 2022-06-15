@@ -16,7 +16,7 @@
 import json
 from typing import List, Optional, Tuple
 
-from faster_tokenizers import normalizers
+from faster_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFasterTokenizer
 from .tokenizer import ErnieTokenizer
 
@@ -28,96 +28,9 @@ VOCAB_FILES_NAMES = {
 
 class ErnieFasterTokenizer(PretrainedFasterTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "ernie-1.0":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
-            "ernie-2.0-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-en-finetuned-squad":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-large-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
-            "ernie-gen-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base-en/vocab.txt",
-            "ernie-gen-large-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
-            "ernie-gen-large-en-430g":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
-            "rocketqa-zh-dureader-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-zh-dureader-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-v1-marco-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "rocketqa-v1-marco-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "rocketqa-zh-dureader-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-v1-marco-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "ernie-3.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
-            "ernie-3.0-medium-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-        }
-    }
-    pretrained_init_configuration = {
-        "ernie-1.0": {
-            "do_lower_case": True
-        },
-        "ernie-tiny": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-en": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-en-finetuned-squad": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-large-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-base-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-large-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-large-en-430g": {
-            "do_lower_case": True
-        },
-        "ppminilm-6l-768h": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-cross-encoder": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-base-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-medium-zh": {
-            "do_lower_case": True
-        },
-    }
     slow_tokenizer_class = ErnieTokenizer
+    pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
     padding_side = 'right'
 
     def __init__(self,
@@ -143,13 +56,14 @@ class ErnieFasterTokenizer(PretrainedFasterTokenizer):
             mask_token=mask_token,
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            **kwargs, )
+            **kwargs,
+        )
 
         normalizer_state = json.loads(
             self.backend_tokenizer.normalizer.__getstate__())
-        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case or
-                normalizer_state.get("strip_accents", strip_accents) !=
-                strip_accents or normalizer_state.get(
+        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case
+                or normalizer_state.get("strip_accents", strip_accents)
+                != strip_accents or normalizer_state.get(
                     "handle_chinese_chars",
                     tokenize_chinese_chars) != tokenize_chinese_chars):
             normalizer_class = getattr(normalizers,
@@ -164,6 +78,6 @@ class ErnieFasterTokenizer(PretrainedFasterTokenizer):
 
     def save_vocabulary(self,
                         save_directory: str,
-                        filename_prefix: Optional[str]=None) -> Tuple[str]:
+                        filename_prefix: Optional[str] = None) -> Tuple[str]:
         files = self._tokenizer.model.save(save_directory, filename_prefix)
         return tuple(files)

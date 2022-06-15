@@ -20,7 +20,8 @@ from uie.seq2struct.utils import (
     set_logger,
     better_print_multi,
     get_train_dataloader,
-    load_eval_tasks, )
+    load_eval_tasks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,25 +31,30 @@ def parse_args():
     parser.add_argument(
         "--multi_task_config",
         required=True,
-        help="Path to multi-task config file.", )
+        help="Path to multi-task config file.",
+    )
     parser.add_argument(
         "--model_name_or_path",
         default="t5-large",
         type=str,
-        help="Path to pre-trained model or shortcut name of model.", )
+        help="Path to pre-trained model or shortcut name of model.",
+    )
     parser.add_argument(
         "--output_dir",
         type=str,
         help="The output directory where the model predictions and checkpoints"
-        " will be written. Default as `outputs`", )
+        " will be written. Default as `outputs`",
+    )
     parser.add_argument(
         "--overwrite_output_dir",
         action='store_true',
-        help="Overwrite output directory", )
+        help="Overwrite output directory",
+    )
     parser.add_argument(
         "--logging_dir",
         type=str,
-        help="The output logging directory", )
+        help="The output logging directory",
+    )
     parser.add_argument(
         "--max_source_length",
         default=384,
@@ -60,159 +66,167 @@ def parse_args():
         "--max_target_length",
         default=192,
         type=int,
-        help="The maximum total target sequence length to be generated.", )
-    parser.add_argument(
-        "--max_prefix_length",
-        default=None,
-        type=int,
-        help="The maximum prefix length.")
+        help="The maximum total target sequence length to be generated.",
+    )
+    parser.add_argument("--max_prefix_length",
+                        default=None,
+                        type=int,
+                        help="The maximum prefix length.")
     parser.add_argument(
         "--per_device_train_batch_size",
         default=16,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per GPU/CPU for training.",
+    )
     parser.add_argument(
         "--per_device_eval_batch_size",
         default=16,
         type=int,
-        help="Batch size per GPU/CPU for evaluating.", )
+        help="Batch size per GPU/CPU for evaluating.",
+    )
     parser.add_argument(
         "--metric_for_best_model",
         type=str,
-        help="The main metric to choose the best checkpoint.", )
+        help="The main metric to choose the best checkpoint.",
+    )
     parser.add_argument(
         "--gradient_accumulation_steps",
         default=1,
         type=int,
-        help="gradient_accumulation_steps.", )
+        help="gradient_accumulation_steps.",
+    )
     parser.add_argument(
         "--learning_rate",
         default=5e-4,
         type=float,
-        help="The initial learning rate for Adam.", )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--adam_beta1",
-        default=0.9,
-        type=float,
-        help="Beta1 for AdamW optimizer")
-    parser.add_argument(
-        "--adam_beta2",
-        default=0.999,
-        type=float,
-        help="Beta2 for AdamW optimizer")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+        help="The initial learning rate for Adam.",
+    )
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--adam_beta1",
+                        default=0.9,
+                        type=float,
+                        help="Beta1 for AdamW optimizer")
+    parser.add_argument("--adam_beta2",
+                        default=0.999,
+                        type=float,
+                        help="Beta2 for AdamW optimizer")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-6,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="Max gradient norm.")
     parser.add_argument(
         "--num_train_epochs",
         default=10,
         type=int,
-        help="Total number of training epochs to perform.", )
+        help="Total number of training epochs to perform.",
+    )
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
     parser.add_argument(
         "--warmup_ratio",
         default=0.06,
         type=float,
-        help="Proportion of training steps to perform linear learning rate warmup for.",
+        help=
+        "Proportion of training steps to perform linear learning rate warmup for.",
     )
     parser.add_argument(
         "--ignore_pad_token_for_loss",
         type=bool,
         default=True,
-        help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.",
+        help=
+        "Whether to ignore the tokens corresponding to padded labels in the loss computation or not.",
     )
     parser.add_argument(
         "--warmup_steps",
         type=int,
         default=-1,
-        help="warmup_steps.", )
+        help="warmup_steps.",
+    )
     parser.add_argument(
         "--logging_steps",
         type=int,
         default=500,
-        help="Log every X updates steps.", )
+        help="Log every X updates steps.",
+    )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="random seed for initialization", )
+        help="random seed for initialization",
+    )
     parser.add_argument(
         "--writer_type",
         choices=["visualdl", "tensorboard"],
         default="visualdl",
-        help="writer_type.", )
+        help="writer_type.",
+    )
     parser.add_argument(
         "--lr_scheduler_type",
         choices=["linear", "cosine", "poly"],
         default="linear",
         type=str,
-        help="lr_scheduler_type.", )
-    parser.add_argument(
-        "--use_amp",
-        "--fp16",
-        action="store_true",
-        help="Enable mixed precision training.")
+        help="lr_scheduler_type.",
+    )
+    parser.add_argument("--use_amp",
+                        "--fp16",
+                        action="store_true",
+                        help="Enable mixed precision training.")
     parser.add_argument(
         "--scale_loss",
         type=float,
         default=2**15,
-        help="The value of scale_loss for fp16.", )
+        help="The value of scale_loss for fp16.",
+    )
     parser.add_argument(
         "--dataloader_num_workers",
         type=int,
         default=0,
-        help="dataloader_num_workers.", )
-    parser.add_argument(
-        "--spot_noise",
-        type=float,
-        default=0,
-        help="The noise rate of inserting rejection null spot.")
-    parser.add_argument(
-        "--asoc_noise",
-        type=float,
-        default=0,
-        help="The noise rate of inserting rejection null asoc.")
+        help="dataloader_num_workers.",
+    )
+    parser.add_argument("--spot_noise",
+                        type=float,
+                        default=0,
+                        help="The noise rate of inserting rejection null spot.")
+    parser.add_argument("--asoc_noise",
+                        type=float,
+                        default=0,
+                        help="The noise rate of inserting rejection null asoc.")
     parser.add_argument(
         '--negative_keep',
         type=float,
         default=1.0,
         help="The keep rate of negative instance for fast training.")
-    parser.add_argument(
-        "--meta_positive_rate",
-        type=float,
-        default=1,
-        help="The keep rate of positive spot.")
-    parser.add_argument(
-        "--meta_negative",
-        type=int,
-        default=-1,
-        help="Negative Schema Number in Training.")
+    parser.add_argument("--meta_positive_rate",
+                        type=float,
+                        default=1,
+                        help="The keep rate of positive spot.")
+    parser.add_argument("--meta_negative",
+                        type=int,
+                        default=-1,
+                        help="Negative Schema Number in Training.")
     parser.add_argument(
         "--ordered_prompt",
         action='store_true',
         help="Whether to sort the spot prompt and asoc prompt or not.")
     parser.add_argument('--do_train', action='store_true')
     parser.add_argument('--do_eval', action='store_true')
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["cpu", "gpu"],
-        help="Device for selecting for the training.")
+    parser.add_argument("--device",
+                        type=str,
+                        default="gpu",
+                        choices=["cpu", "gpu"],
+                        help="Device for selecting for the training.")
 
     args = parser.parse_args()
 
@@ -258,13 +272,13 @@ def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
             input_ids=batch['input_ids'],
             attention_mask=batch['attention_mask'],
             max_length=generate_max_length,
-            use_faster=True, )
+            use_faster=True,
+        )
 
         # Convert Token id to Token String
-        outputs = tokenizer.batch_decode(
-            outputs,
-            clean_up_tokenization_spaces=False,
-            skip_special_tokens=False)
+        outputs = tokenizer.batch_decode(outputs,
+                                         clean_up_tokenization_spaces=False,
+                                         skip_special_tokens=False)
 
         preds = [postprocess_text(output) for output in outputs]
         all_preds.extend(preds)
@@ -274,14 +288,14 @@ def evaluate(model, tokenizer, data_loader, generate_max_length, eval_instances,
     # Parsing SEL to Record
     all_records = []
     for predicted_sel, instance in zip(all_preds, eval_instances):
-        record = sel2record.sel2record(
-            pred=predicted_sel,
-            text=instance['text'],
-            tokens=instance['tokens'])
+        record = sel2record.sel2record(pred=predicted_sel,
+                                       text=instance['text'],
+                                       tokens=instance['tokens'])
         all_records += [record]
 
-    task_metrics = evaluate_extraction_results(
-        eval_instances, all_records, eval_match_mode=eval_match_mode)
+    task_metrics = evaluate_extraction_results(eval_instances,
+                                               all_records,
+                                               eval_match_mode=eval_match_mode)
 
     prediction = {
         'record': all_records,
@@ -306,7 +320,8 @@ def eval_all_tasks(eval_tasks, model, tokenizer, generate_max_length):
             generate_max_length=generate_max_length,
             eval_instances=eval_task.val_instances,
             sel2record=eval_task.sel2record,
-            eval_match_mode=eval_task.config.eval_match_mode, )
+            eval_match_mode=eval_task.config.eval_match_mode,
+        )
 
         for metric_name in eval_task.metrics:
             metric_key = f"{task_name}:{metric_name}"
@@ -328,7 +343,8 @@ def test(args, model, tokenizer):
         eval_tasks=eval_tasks,
         model=model,
         tokenizer=tokenizer,
-        generate_max_length=args.max_target_length, )
+        generate_max_length=args.max_target_length,
+    )
 
     for line in better_print_multi(eval_overall_results).split('\n'):
         logger.info(line)
@@ -351,15 +367,16 @@ def train(args, model, tokenizer):
     train_dataloader = get_train_dataloader(
         model=model,
         tokenizer=tokenizer,
-        args=args, )
-    eval_tasks = load_eval_tasks(
-        model=model, tokenizer=tokenizer, args=args) if args.do_eval else None
+        args=args,
+    )
+    eval_tasks = load_eval_tasks(model=model, tokenizer=tokenizer,
+                                 args=args) if args.do_eval else None
 
     def math_ceil(x, y):
         return math.ceil(x / float(y))
 
-    num_update_steps_per_epoch = math_ceil(
-        len(train_dataloader), args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math_ceil(len(train_dataloader),
+                                           args.gradient_accumulation_steps)
     if args.logging_steps > num_update_steps_per_epoch:
         args.logging_steps = num_update_steps_per_epoch
     if args.max_steps > 0:
@@ -374,7 +391,8 @@ def train(args, model, tokenizer):
         scheduler_type=args.lr_scheduler_type,
         num_warmup_steps=args.warmup_steps
         if args.warmup_steps > 0 else args.warmup_ratio,
-        num_training_steps=args.max_steps, )
+        num_training_steps=args.max_steps,
+    )
 
     total_batch_size = (args.per_device_train_batch_size *
                         args.gradient_accumulation_steps *
@@ -393,7 +411,8 @@ def train(args, model, tokenizer):
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=grad_clip, )
+        grad_clip=grad_clip,
+    )
 
     if args.use_amp:
         scaler = GradScaler(init_loss_scaling=args.scale_loss)
@@ -428,8 +447,8 @@ def train(args, model, tokenizer):
         for step, batch in enumerate(train_dataloader):
             model.train()
 
-            with auto_cast(
-                    args.use_amp, custom_white_list=["layer_norm", "softmax"]):
+            with auto_cast(args.use_amp,
+                           custom_white_list=["layer_norm", "softmax"]):
                 outputs = model(**batch)
                 loss = outputs[0] / args.gradient_accumulation_steps
                 tr_loss += loss.item()
@@ -439,8 +458,8 @@ def train(args, model, tokenizer):
             else:
                 loss.backward()
 
-            if (step % args.gradient_accumulation_steps == 0 or
-                    step == len(train_dataloader) - 1):
+            if (step % args.gradient_accumulation_steps == 0
+                    or step == len(train_dataloader) - 1):
                 if args.use_amp:
                     scaler.minimize(optimizer, loss)
                 else:
@@ -450,8 +469,8 @@ def train(args, model, tokenizer):
                 optimizer.clear_grad()
                 global_steps += 1
 
-                if (args.logging_steps > 0 and
-                        global_steps % args.logging_steps == 0):
+                if (args.logging_steps > 0
+                        and global_steps % args.logging_steps == 0):
                     if paddle.distributed.get_rank() == 0:
                         logging_lr_loss()
                         logging_loss = tr_loss
@@ -467,7 +486,8 @@ def train(args, model, tokenizer):
                 eval_tasks=eval_tasks,
                 model=model,
                 tokenizer=tokenizer,
-                generate_max_length=generate_max_length, )
+                generate_max_length=generate_max_length,
+            )
 
             for line in better_print_multi(eval_overall_results).split('\n'):
                 logger.info(line)

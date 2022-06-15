@@ -66,35 +66,6 @@ def set_seed(seed):
     np.random.seed(seed)
     paddle.seed(seed)
 
-def do_evaluate(model, tokenizer, data_loader, with_pooler=False):
-    model.eval()
-
-    total_num = 0
-    spearman_corr = 0.0
-    sims = []
-    labels = []
-
-    for batch in data_loader:
-        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids, label = batch
-        total_num += len(label)
-
-        query_cls_embedding = model.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, with_pooler=with_pooler)
-
-        title_cls_embedding = model.get_pooled_embedding(title_input_ids, title_token_type_ids, with_pooler=with_pooler)
-
-        cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding, axis=-1)
-
-        sims.append(cosine_sim.numpy())
-        labels.append(label.numpy())
-
-    sims = np.concatenate(sims, axis=0)
-    labels = np.concatenate(labels, axis=0)
-
-    spearman_corr = stats.spearmanr(labels, sims).correlation
-    model.train()
-    return spearman_corr, total_num
-
 def do_train():
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
@@ -121,10 +92,10 @@ def do_train():
         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
     ): [data for data in fn(samples)]
 
 

@@ -29,10 +29,9 @@ from text2sql.utils import ast_util
 
 def bimap(first, second):
     return {f: s
-            for f, s in zip(first, second)}, {
-                s: f
-                for f, s in zip(first, second)
-            }
+            for f, s in zip(first, second)
+            }, {s: f
+                for f, s in zip(first, second)}
 
 
 def filter_nones(d):
@@ -210,66 +209,83 @@ class DuSQLLanguageV2(object):
             return None
         if self.factorize_sketch == 0:
             return filter_nones({
-                '_type': 'sql',
-                'select': self.parse_select(sql['select']),
-                'where': self.parse_cond(
-                    sql['where'], optional=True),
+                '_type':
+                'sql',
+                'select':
+                self.parse_select(sql['select']),
+                'where':
+                self.parse_cond(sql['where'], optional=True),
                 'group_by': [self.parse_col_unit(u) for u in sql['groupBy']],
-                'order_by': self.parse_order_by(sql['orderBy']),
-                'having': self.parse_cond(
-                    sql['having'], optional=True),
-                'limit': sql['limit']
-                if self.include_literals else (sql['limit'] is not None),
-                'intersect': self.parse_sql(
-                    sql['intersect'], optional=True),
-                'except': self.parse_sql(
-                    sql['except'], optional=True),
-                'union': self.parse_sql(
-                    sql['union'], optional=True),
-                **
-                ({
+                'order_by':
+                self.parse_order_by(sql['orderBy']),
+                'having':
+                self.parse_cond(sql['having'], optional=True),
+                'limit':
+                sql['limit'] if self.include_literals else
+                (sql['limit'] is not None),
+                'intersect':
+                self.parse_sql(sql['intersect'], optional=True),
+                'except':
+                self.parse_sql(sql['except'], optional=True),
+                'union':
+                self.parse_sql(sql['union'], optional=True),
+                **({
                     'from':
                     self.parse_from(sql['from'], self.infer_from_conditions),
                 } if self.output_from else {})
             })
         elif self.factorize_sketch == 1:
             return filter_nones({
-                '_type': 'sql',
-                'select': self.parse_select(sql['select']),
-                **
-                ({
+                '_type':
+                'sql',
+                'select':
+                self.parse_select(sql['select']),
+                **({
                     'from':
                     self.parse_from(sql['from'], self.infer_from_conditions),
-                } if self.output_from else {}),
-                'sql_where': filter_nones({
-                    '_type': 'sql_where',
-                    'where': self.parse_cond(
-                        sql['where'], optional=True),
-                    'sql_groupby': filter_nones({
-                        '_type': 'sql_groupby',
+                } if self.output_from else {}), 'sql_where':
+                filter_nones({
+                    '_type':
+                    'sql_where',
+                    'where':
+                    self.parse_cond(sql['where'], optional=True),
+                    'sql_groupby':
+                    filter_nones({
+                        '_type':
+                        'sql_groupby',
                         'group_by':
                         [self.parse_col_unit(u) for u in sql['groupBy']],
-                        'having': filter_nones({
-                            '_type': 'having',
-                            'having': self.parse_cond(
-                                sql['having'], optional=True),
+                        'having':
+                        filter_nones({
+                            '_type':
+                            'having',
+                            'having':
+                            self.parse_cond(sql['having'], optional=True),
                         }),
-                        'sql_orderby': filter_nones({
-                            '_type': 'sql_orderby',
-                            'order_by': self.parse_order_by(sql['orderBy']),
-                            'limit': filter_nones({
-                                '_type': 'limit',
-                                'limit': sql['limit'] if self.include_literals
-                                else (sql['limit'] is not None),
+                        'sql_orderby':
+                        filter_nones({
+                            '_type':
+                            'sql_orderby',
+                            'order_by':
+                            self.parse_order_by(sql['orderBy']),
+                            'limit':
+                            filter_nones({
+                                '_type':
+                                'limit',
+                                'limit':
+                                sql['limit'] if self.include_literals else
+                                (sql['limit'] is not None),
                             }),
-                            'sql_ieu': filter_nones({
-                                '_type': 'sql_ieu',
-                                'intersect': self.parse_sql(
-                                    sql['intersect'], optional=True),
-                                'except': self.parse_sql(
-                                    sql['except'], optional=True),
-                                'union': self.parse_sql(
-                                    sql['union'], optional=True),
+                            'sql_ieu':
+                            filter_nones({
+                                '_type':
+                                'sql_ieu',
+                                'intersect':
+                                self.parse_sql(sql['intersect'], optional=True),
+                                'except':
+                                self.parse_sql(sql['except'], optional=True),
+                                'union':
+                                self.parse_sql(sql['union'], optional=True),
                             })
                         })
                     })
@@ -277,38 +293,48 @@ class DuSQLLanguageV2(object):
             })
         elif self.factorize_sketch == 2:
             return filter_nones({
-                '_type': 'sql',
-                'select': self.parse_select(sql['select']),
-                **
-                ({
+                '_type':
+                'sql',
+                'select':
+                self.parse_select(sql['select']),
+                **({
                     'from':
                     self.parse_from(sql['from'], self.infer_from_conditions),
-                } if self.output_from else {}),
-                "sql_where": filter_nones({
-                    '_type': 'sql_where',
-                    'where': self.parse_cond(
-                        sql['where'], optional=True),
+                } if self.output_from else {}), "sql_where":
+                filter_nones({
+                    '_type':
+                    'sql_where',
+                    'where':
+                    self.parse_cond(sql['where'], optional=True),
                 }),
-                "sql_groupby": filter_nones({
-                    '_type': 'sql_groupby',
+                "sql_groupby":
+                filter_nones({
+                    '_type':
+                    'sql_groupby',
                     'group_by':
                     [self.parse_col_unit(u) for u in sql['groupBy']],
-                    'having': self.parse_cond(
-                        sql['having'], optional=True),
+                    'having':
+                    self.parse_cond(sql['having'], optional=True),
                 }),
-                "sql_orderby": filter_nones({
-                    '_type': 'sql_orderby',
-                    'order_by': self.parse_order_by(sql['orderBy']),
-                    'limit': sql['limit'] if sql['limit'] is not None else 0,
+                "sql_orderby":
+                filter_nones({
+                    '_type':
+                    'sql_orderby',
+                    'order_by':
+                    self.parse_order_by(sql['orderBy']),
+                    'limit':
+                    sql['limit'] if sql['limit'] is not None else 0,
                 }),
-                'sql_ieu': filter_nones({
-                    '_type': 'sql_ieu',
-                    'intersect': self.parse_sql(
-                        sql['intersect'], optional=True),
-                    'except': self.parse_sql(
-                        sql['except'], optional=True),
-                    'union': self.parse_sql(
-                        sql['union'], optional=True),
+                'sql_ieu':
+                filter_nones({
+                    '_type':
+                    'sql_ieu',
+                    'intersect':
+                    self.parse_sql(sql['intersect'], optional=True),
+                    'except':
+                    self.parse_sql(sql['except'], optional=True),
+                    'union':
+                    self.parse_sql(sql['union'], optional=True),
                 })
             })
 
@@ -524,7 +550,8 @@ class DuSQLUnparser:
         if negated:
             tokens.append('NOT')
         tokens += [
-            self.COND_TYPES_B[cond['_type']], self.unparse_val(cond['val1'])
+            self.COND_TYPES_B[cond['_type']],
+            self.unparse_val(cond['val1'])
         ]
         return ' '.join(tokens)
 
@@ -588,10 +615,9 @@ class DuSQLUnparser:
             if table_id in covered_tables:
                 continue
             try:
-                path = nx.shortest_path(
-                    self.schema.foreign_key_graph,
-                    source=start_table_id,
-                    target=table_id)
+                path = nx.shortest_path(self.schema.foreign_key_graph,
+                                        source=start_table_id,
+                                        target=table_id)
             except (nx.NetworkXNoPath, nx.NodeNotFound):
                 covered_tables.add(table_id)
                 continue
@@ -686,7 +712,7 @@ class DuSQLUnparser:
             result += ['HAVING', ' '.join(having_block)]
 
         tree, target_tree = find_subtree(tree, "sql_orderby")
-        # int? limit, 
+        # int? limit,
         if 'limit' in target_tree:
             limit_index = int(target_tree['limit'])
             limit_value = '0'
@@ -769,8 +795,7 @@ class DuSQLUnparser:
                 for cond_idx in sorted(cond_indices_by_table[table_id]):
                     if cond_idx in output_cond_indices:
                         continue
-                    if tables_involved_by_cond_idx[
-                            cond_idx] <= output_table_ids:
+                    if tables_involved_by_cond_idx[cond_idx] <= output_table_ids:
                         conds_to_output.append(all_conds[cond_idx])
                         output_cond_indices.add(cond_idx)
                 if conds_to_output:

@@ -9,6 +9,7 @@ import numpy as np
 
 
 class FunsdDataset(Dataset):
+
     def __init__(self, args, tokenizer, labels, pad_token_label_id, mode):
         logger.info("Creating features from dataset file at %s", args.data_dir)
         examples = read_examples_from_file(args.data_dir, mode)
@@ -25,20 +26,21 @@ class FunsdDataset(Dataset):
             pad_on_left=False,
             pad_token=tokenizer.convert_tokens_to_ids([tokenizer.pad_token])[0],
             pad_token_segment_id=0,
-            pad_token_label_id=pad_token_label_id, )
+            pad_token_label_id=pad_token_label_id,
+        )
 
         self.features = features
         # Convert to Tensors and build dataset
-        self.all_input_ids = paddle.to_tensor(
-            [f.input_ids for f in features], dtype="int64")
-        self.all_input_mask = paddle.to_tensor(
-            [f.input_mask for f in features], dtype="int64")
+        self.all_input_ids = paddle.to_tensor([f.input_ids for f in features],
+                                              dtype="int64")
+        self.all_input_mask = paddle.to_tensor([f.input_mask for f in features],
+                                               dtype="int64")
         self.all_segment_ids = paddle.to_tensor(
             [f.segment_ids for f in features], dtype="int64")
-        self.all_label_ids = paddle.to_tensor(
-            [f.label_ids for f in features], dtype="int64")
-        self.all_bboxes = paddle.to_tensor(
-            [f.boxes for f in features], dtype="int64")
+        self.all_label_ids = paddle.to_tensor([f.label_ids for f in features],
+                                              dtype="int64")
+        self.all_bboxes = paddle.to_tensor([f.boxes for f in features],
+                                           dtype="int64")
 
     def __len__(self):
         return len(self.features)
@@ -49,7 +51,8 @@ class FunsdDataset(Dataset):
             self.all_input_mask[index],
             self.all_segment_ids[index],
             self.all_label_ids[index],
-            self.all_bboxes[index], )
+            self.all_bboxes[index],
+        )
 
 
 class InputExample(object):
@@ -77,15 +80,16 @@ class InputFeatures(object):
     """A single set of features of data."""
 
     def __init__(
-            self,
-            input_ids,
-            input_mask,
-            segment_ids,
-            label_ids,
-            boxes,
-            actual_bboxes,
-            file_name,
-            page_size, ):
+        self,
+        input_ids,
+        input_mask,
+        segment_ids,
+        label_ids,
+        boxes,
+        actual_bboxes,
+        file_name,
+        page_size,
+    ):
         assert (
             0 <= all(boxes) <= 1000
         ), "Error with input bbox ({}): the coordinate value is not between 0 and 1000".format(
@@ -106,10 +110,11 @@ def read_examples_from_file(data_dir, mode):
     image_file_path = os.path.join(data_dir, "{}_image.txt".format(mode))
     guid_index = 1
     examples = []
-    with open(
-            file_path, encoding="utf-8") as f, open(
-                box_file_path, encoding="utf-8") as fb, open(
-                    image_file_path, encoding="utf-8") as fi:
+    with open(file_path,
+              encoding="utf-8") as f, open(box_file_path,
+                                           encoding="utf-8") as fb, open(
+                                               image_file_path,
+                                               encoding="utf-8") as fi:
         words = []
         boxes = []
         actual_bboxes = []
@@ -127,7 +132,8 @@ def read_examples_from_file(data_dir, mode):
                             boxes=boxes,
                             actual_bboxes=actual_bboxes,
                             file_name=file_name,
-                            page_size=page_size, ))
+                            page_size=page_size,
+                        ))
                     guid_index += 1
                     words = []
                     boxes = []
@@ -165,29 +171,31 @@ def read_examples_from_file(data_dir, mode):
                     boxes=boxes,
                     actual_bboxes=actual_bboxes,
                     file_name=file_name,
-                    page_size=page_size, ))
+                    page_size=page_size,
+                ))
     return examples
 
 
 def convert_examples_to_features(
-        examples,
-        label_list,
-        max_seq_length,
-        tokenizer,
-        cls_token_at_end=False,
-        cls_token="[CLS]",
-        cls_token_segment_id=1,
-        sep_token="[SEP]",
-        sep_token_extra=False,
-        pad_on_left=False,
-        pad_token=0,
-        cls_token_box=[0, 0, 0, 0],
-        sep_token_box=[1000, 1000, 1000, 1000],
-        pad_token_box=[0, 0, 0, 0],
-        pad_token_segment_id=0,
-        pad_token_label_id=-1,
-        sequence_a_segment_id=0,
-        mask_padding_with_zero=True, ):
+    examples,
+    label_list,
+    max_seq_length,
+    tokenizer,
+    cls_token_at_end=False,
+    cls_token="[CLS]",
+    cls_token_segment_id=1,
+    sep_token="[SEP]",
+    sep_token_extra=False,
+    pad_on_left=False,
+    pad_token=0,
+    cls_token_box=[0, 0, 0, 0],
+    sep_token_box=[1000, 1000, 1000, 1000],
+    pad_token_box=[0, 0, 0, 0],
+    pad_token_segment_id=0,
+    pad_token_label_id=-1,
+    sequence_a_segment_id=0,
+    mask_padding_with_zero=True,
+):
 
     label_map = {label: i for i, label in enumerate(label_list)}
 
@@ -211,8 +219,8 @@ def convert_examples_to_features(
             token_boxes.extend([box] * len(word_tokens))
             actual_bboxes.extend([actual_bbox] * len(word_tokens))
             # Use the real label id for the first token of the word, and padding ids for the remaining tokens
-            label_ids.extend([label_map[label]] + [pad_token_label_id] * (len(
-                word_tokens) - 1))
+            label_ids.extend([label_map[label]] + [pad_token_label_id] *
+                             (len(word_tokens) - 1))
 
         # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
@@ -276,10 +284,10 @@ def convert_examples_to_features(
         padding_length = max_seq_length - len(input_ids)
         if pad_on_left:
             input_ids = ([pad_token] * padding_length) + input_ids
-            input_mask = ([0 if mask_padding_with_zero else 1] * padding_length
-                          ) + input_mask
-            segment_ids = ([pad_token_segment_id] * padding_length
-                           ) + segment_ids
+            input_mask = ([0 if mask_padding_with_zero else 1] *
+                          padding_length) + input_mask
+            segment_ids = ([pad_token_segment_id] *
+                           padding_length) + segment_ids
             label_ids = ([pad_token_label_id] * padding_length) + label_ids
             token_boxes = ([pad_token_box] * padding_length) + token_boxes
         else:
@@ -304,5 +312,6 @@ def convert_examples_to_features(
                 boxes=token_boxes,
                 actual_bboxes=actual_bboxes,
                 file_name=file_name,
-                page_size=page_size, ))
+                page_size=page_size,
+            ))
     return features

@@ -26,11 +26,10 @@ from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransfo
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--use_role",
-        type=strtobool,
-        default=True,
-        help="Whether to use role embeddings.")
+    parser.add_argument("--use_role",
+                        type=strtobool,
+                        default=True,
+                        help="Whether to use role embeddings.")
     parser.add_argument(
         "--position_style",
         default="relative",
@@ -43,49 +42,48 @@ def parse_args():
         default=1,
         type=int,
         help="The number of returned sequences for each sample.")
-    parser.add_argument(
-        "--max_out_len",
-        default=64,
-        type=int,
-        help="Maximum output sequence length.")
-    parser.add_argument(
-        "--min_out_len",
-        default=1,
-        type=int,
-        help="Minimum output sequence length.")
+    parser.add_argument("--max_out_len",
+                        default=64,
+                        type=int,
+                        help="Maximum output sequence length.")
+    parser.add_argument("--min_out_len",
+                        default=1,
+                        type=int,
+                        help="Minimum output sequence length.")
     parser.add_argument(
         "--topk",
         default=1,
         type=int,
-        help="The number of highest probability tokens to keep for top-k-sampling."
-    )
-    parser.add_argument(
-        "--topp",
-        default=1.0,
-        type=float,
-        help="The cumulative probability for top-p-filtering.")
-    parser.add_argument(
-        "--temperature",
-        default=1.0,
-        type=float,
-        help="The temperature to set.")
-    parser.add_argument(
-        "--use_faster",
-        action="store_true",
-        help="Whether to use faster generation. ")
+        help=
+        "The number of highest probability tokens to keep for top-k-sampling.")
+    parser.add_argument("--topp",
+                        default=1.0,
+                        type=float,
+                        help="The cumulative probability for top-p-filtering.")
+    parser.add_argument("--temperature",
+                        default=1.0,
+                        type=float,
+                        help="The temperature to set.")
+    parser.add_argument("--use_faster",
+                        action="store_true",
+                        help="Whether to use faster generation. ")
     parser.add_argument(
         "--use_fp16",
         action="store_true",
-        help="Whether to use fp16 to predict. Only available when `use_faster` is True."
+        help=
+        "Whether to use fp16 to predict. Only available when `use_faster` is True."
     )
-    parser.add_argument(
-        "--profile", action="store_true", help="Whether to profile.")
+    parser.add_argument("--profile",
+                        action="store_true",
+                        help="Whether to profile.")
     args = parser.parse_args()
     return args
 
 
 def profile(batch_size, total_step=50, warmup_step=10, rank=0):
+
     def _wrapper(func):
+
         def _impl(*args, **kwargs):
             for i in range(total_step):
                 if i == warmup_step:
@@ -139,8 +137,8 @@ def main(args):
         UnifiedTransformerLMHeadModel.generate = profile(args.batch_size)(
             UnifiedTransformerLMHeadModel.generate)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained("plato-xl")
-    model = UnifiedTransformerLMHeadModel.from_pretrained(
-        "plato-xl", load_state_as_np=True)
+    model = UnifiedTransformerLMHeadModel.from_pretrained("plato-xl",
+                                                          load_state_as_np=True)
     model.eval()
 
     history = [
