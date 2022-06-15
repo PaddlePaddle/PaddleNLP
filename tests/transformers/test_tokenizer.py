@@ -72,6 +72,10 @@ class TestPretrainedFromPretrained(CpuCommonTest):
         self.assertTrue(
             os.path.exists(os.path.join(cache_dir, model.model_config_file)))
 
+        # TODO: make this test code pass
+        # from pretrained from the dir
+        # PretrainedModelClass.from_pretrained(cache_dir)
+
     @parameterized.expand(get_pretrained_tokenzier_params())
     def test_pretrained_tokenizer(
             self, tokenizer_name: str,
@@ -85,3 +89,7 @@ class TestPretrainedFromPretrained(CpuCommonTest):
             os.path.exists(
                 os.path.join(cache_dir, tokenizer.tokenizer_config_file)))
         self.assertTrue(os.path.exists(os.path.join(cache_dir, )))
+
+        # TODO: make this test code pass
+        # from_pretrained from the dir
+        # PretrainedTokenzierClass.from_pretrained(cache_dir)
