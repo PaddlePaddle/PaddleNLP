@@ -8,7 +8,7 @@ run_mode=DP2-MP2-PP2
 device_num=N1C8
 
 model=gpt
-micro_bs=${bs_item}
+micro_bs=8
 # get data
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/${model}/benchmark_common/prepare.sh

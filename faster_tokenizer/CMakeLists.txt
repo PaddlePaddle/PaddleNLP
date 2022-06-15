@@ -59,7 +59,7 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel
+    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
     DEPENDS copy_python_tokenizers)
 
 else(WITH_PYTHON)
