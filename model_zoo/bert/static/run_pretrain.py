@@ -309,6 +309,7 @@ def do_train(args):
     config = model_class.pretrained_init_configuration[args.model_name_or_path]
     if config["vocab_size"] % 8 != 0:
         config["vocab_size"] += 8 - (config["vocab_size"] % 8)
+    config['fuse'] = args.fuse
     model = BertForPretraining(BertModel(**config))
     criterion = BertPretrainingCriterion(model.bert.config["vocab_size"])
     prediction_scores, seq_relationship_score = model(

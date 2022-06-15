@@ -79,7 +79,7 @@ function _train(){
             --batch_size ${batch_size} \
             --use_amp ${use_amp} \
             --gradient_merge_steps $gradient_merge_steps \
-            --fuse true"
+            --fuse true "
     elif [[ ${model_type} = "large" ]]; then
          train_cmd="${add_options} \
             --max_predictions_per_seq 80 \
@@ -96,7 +96,8 @@ function _train(){
             --model_name_or_path bert-${model_type}-uncased \
             --batch_size ${batch_size} \
             --use_amp ${use_amp} \
-            --gradient_merge_steps $gradient_merge_steps"
+            --gradient_merge_steps $gradient_merge_steps \
+            --fuse true "
     else
         echo "Model type must be base or large. "
     fi
