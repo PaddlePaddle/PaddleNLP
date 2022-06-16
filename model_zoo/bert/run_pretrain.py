@@ -341,7 +341,7 @@ def do_train(args):
         model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
         config = model_class.pretrained_init_configuration[
-                args.model_name_or_path]
+            args.model_name_or_path]
         config['fuse'] = args.fuse
         model = model_class(base_class(**config))
     else:
@@ -443,9 +443,12 @@ def do_train(args):
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
                  masked_lm_scale) = batch
-                with paddle.amp.auto_cast(
-                        args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"]):
+                with paddle.amp.auto_cast(args.use_amp,
+                                          custom_white_list=[
+                                              "layer_norm", "softmax", "gelu",
+                                              "fused_attention",
+                                              "fused_feedforward"
+                                          ]):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
