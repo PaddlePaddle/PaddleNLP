@@ -92,12 +92,10 @@ def do_train(args):
             warmup_steps=args.warmup_steps,
             learning_rate=args.learning_rate)
     elif args.scheduler == 'dev_perf':
-        # fluid api
-        scheduler = paddle.fluid.dygraph.ReduceLROnPlateau(
-            learning_rate=args.learning_rate,
-            decay_rate=args.decay_rate,
-            patience=args.patience,
-            min_lr=args.lr_min)
+        paddle.optimizer.lr.ReduceOnPlateau(learning_rate=args.learning_rate,
+                                            factor=args.decay_rate,
+                                            patience=args.patience,
+                                            min_lr=args.lr_min)
     elif args.scheduler == 'constant':
         scheduler = args.learning_rate
 
