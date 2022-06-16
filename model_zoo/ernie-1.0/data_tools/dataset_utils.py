@@ -83,8 +83,8 @@ class BlendableDataset(paddle.io.Dataset):
         self.dataset_index = np.zeros(self.size, dtype=np.uint8)
         self.dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
-        local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(
-        ))
+        local_rank = 0 if fleet.local_rank() is None else int(
+            fleet.local_rank())
 
         while True:
             try:
@@ -145,6 +145,7 @@ def get_datasets_weights_and_num_samples(data_prefix,
 
 
 class MMapIndexedDataset(paddle.io.Dataset):
+
     def __init__(self, path, skip_warmup=False):
         super().__init__()
 
@@ -156,8 +157,9 @@ class MMapIndexedDataset(paddle.io.Dataset):
             if not os.path.isfile(path + suffix):
                 raise ValueError("File Not found, %s" % (path + suffix))
 
-        self._token_ids = np.load(
-            path + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        self._token_ids = np.load(path + "_ids.npy",
+                                  mmap_mode="r",
+                                  allow_pickle=True)
         process_data = np.load(path + "_idx.npz")
         self._sizes = process_data["lens"]
         self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
@@ -356,8 +358,8 @@ def create_masked_lm_predictions(tokens,
         # at all -- we still predict each WordPiece independently, softmaxed
         # over the entire vocabulary.
         vocab_id = vocab_id_to_token_dict[token]
-        if (do_whole_word_mask and len(cand_indexes) >= 1 and
-                not is_start_piece(vocab_id)):
+        if (do_whole_word_mask and len(cand_indexes) >= 1
+                and not is_start_piece(vocab_id)):
             cand_indexes[-1].append(i)
         else:
             cand_indexes.append([i])
@@ -372,9 +374,9 @@ def create_masked_lm_predictions(tokens,
                 vocab_id = vocab_id_to_token_dict[tokens[i]]
                 new_vocab_id = vocab_id[2:] if len(
                     re.findall('##[\u4E00-\u9FA5]', vocab_id)) > 0 else vocab_id
-                char_tokens.append(vocab_token_to_id_dict[new_vocab_id]
-                                   if new_vocab_id in vocab_token_to_id_dict
-                                   else token)
+                char_tokens.append(
+                    vocab_token_to_id_dict[new_vocab_id] if new_vocab_id in
+                    vocab_token_to_id_dict else token)
             else:
                 char_tokens.append(tokens[i])
         output_tokens = list(char_tokens)
@@ -425,10 +427,9 @@ def create_masked_lm_predictions(tokens,
                     continue
 
         if not geometric_dist:
-            n = np_rng.choice(
-                ngrams[:len(cand_index_set)],
-                p=pvals[:len(cand_index_set)] /
-                pvals[:len(cand_index_set)].sum(keepdims=True))
+            n = np_rng.choice(ngrams[:len(cand_index_set)],
+                              p=pvals[:len(cand_index_set)] /
+                              pvals[:len(cand_index_set)].sum(keepdims=True))
         else:
             # Sampling "n" from the geometric distribution and clipping it to
             # the max_ngrams. Using p=0.2 default from the SpanBERT paper
@@ -482,8 +483,8 @@ def create_masked_lm_predictions(tokens,
 
             output_tokens[index] = masked_token
             masked_lms.append(
-                MaskedLmInstance(
-                    index=index, label=backup_output_tokens[index]))
+                MaskedLmInstance(index=index,
+                                 label=backup_output_tokens[index]))
 
         masked_spans.append(
             MaskedLmInstance(
@@ -507,10 +508,9 @@ def create_masked_lm_predictions(tokens,
                     if index in covered_indexes or index in select_indexes:
                         continue
 
-            n = np.random.choice(
-                ngrams[:len(cand_index_set)],
-                p=pvals[:len(cand_index_set)] /
-                pvals[:len(cand_index_set)].sum(keepdims=True))
+            n = np.random.choice(ngrams[:len(cand_index_set)],
+                                 p=pvals[:len(cand_index_set)] /
+                                 pvals[:len(cand_index_set)].sum(keepdims=True))
             index_set = sum(cand_index_set[n - 1], [])
             n -= 1
 
@@ -542,8 +542,7 @@ def create_masked_lm_predictions(tokens,
         for src_i, tgt_i in zip(select_indexes, permute_indexes):
             output_tokens[src_i] = orig_token[tgt_i]
             masked_lms.append(
-                MaskedLmInstance(
-                    index=src_i, label=orig_token[src_i]))
+                MaskedLmInstance(index=src_i, label=orig_token[src_i]))
 
     masked_lms = sorted(masked_lms, key=lambda x: x.index)
     # Sort the spans by the index of the first span
@@ -573,8 +572,8 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     tokentypes_np = np.array(tokentypes + filler, dtype=np.int64)
 
     # Padding mask.
-    padding_mask_np = np.array(
-        [1] * num_tokens + [0] * padding_length, dtype=np.int64)
+    padding_mask_np = np.array([1] * num_tokens + [0] * padding_length,
+                               dtype=np.int64)
 
     # Lables and loss mask.
     labels = [-1] * max_seq_length
@@ -604,20 +603,19 @@ def build_train_valid_test_datasets(data_prefix,
                                     dataset_type='standard_bert'):
 
     if len(data_prefix) == 1:
-        return _build_train_valid_test_datasets(
-            data_prefix[0],
-            args,
-            tokenizer,
-            splits_string,
-            train_valid_test_num_samples,
-            max_seq_length,
-            masked_lm_prob,
-            short_seq_prob,
-            seed,
-            skip_warmup,
-            binary_head,
-            max_seq_length_dec,
-            dataset_type=dataset_type)
+        return _build_train_valid_test_datasets(data_prefix[0],
+                                                args,
+                                                tokenizer,
+                                                splits_string,
+                                                train_valid_test_num_samples,
+                                                max_seq_length,
+                                                masked_lm_prob,
+                                                short_seq_prob,
+                                                seed,
+                                                skip_warmup,
+                                                binary_head,
+                                                max_seq_length_dec,
+                                                dataset_type=dataset_type)
 
     # Blending dataset.
     # Parse the values.
@@ -703,8 +701,8 @@ def _build_train_valid_test_datasets(data_prefix,
         start_index = indexed_dataset.doc_idx[splits[index]]
         end_index = indexed_dataset.doc_idx[splits[index + 1]]
         print_rank_0('     sentence indices in [{}, {}) total of {} '
-                     'sentences'.format(start_index, end_index, end_index -
-                                        start_index))
+                     'sentences'.format(start_index, end_index,
+                                        end_index - start_index))
 
     print_split_stats('train', 0)
     print_split_stats('validation', 1)
@@ -732,31 +730,29 @@ def _build_train_valid_test_datasets(data_prefix,
                 max_num_samples=train_valid_test_num_samples[index],
                 max_seq_length=max_seq_length,
                 seed=seed,
-                share_folder=args.share_folder, )
+                share_folder=args.share_folder,
+            )
             if dataset_type == DSET_TYPE_T5:
-                dataset = T5Dataset(
-                    indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,
-                    masked_lm_prob=masked_lm_prob,
-                    max_seq_length_dec=max_seq_length_dec,
-                    short_seq_prob=short_seq_prob,
-                    **kwargs)
+                dataset = T5Dataset(indexed_dataset=indexed_dataset,
+                                    tokenizer=tokenizer,
+                                    masked_lm_prob=masked_lm_prob,
+                                    max_seq_length_dec=max_seq_length_dec,
+                                    short_seq_prob=short_seq_prob,
+                                    **kwargs)
             elif dataset_type == DSET_TYPE_BERT:
-                dataset = BertDataset(
-                    indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,
-                    masked_lm_prob=masked_lm_prob,
-                    short_seq_prob=short_seq_prob,
-                    binary_head=binary_head,
-                    **kwargs)
+                dataset = BertDataset(indexed_dataset=indexed_dataset,
+                                      tokenizer=tokenizer,
+                                      masked_lm_prob=masked_lm_prob,
+                                      short_seq_prob=short_seq_prob,
+                                      binary_head=binary_head,
+                                      **kwargs)
             elif dataset_type == DSET_TYPE_ERNIE:
-                dataset = ErnieDataset(
-                    indexed_dataset=indexed_dataset,
-                    tokenizer=tokenizer,
-                    masked_lm_prob=masked_lm_prob,
-                    short_seq_prob=short_seq_prob,
-                    binary_head=binary_head,
-                    **kwargs)
+                dataset = ErnieDataset(indexed_dataset=indexed_dataset,
+                                       tokenizer=tokenizer,
+                                       masked_lm_prob=masked_lm_prob,
+                                       short_seq_prob=short_seq_prob,
+                                       binary_head=binary_head,
+                                       **kwargs)
             else:
                 raise NotImplementedError("Dataset type not fully implemented.")
 
@@ -786,8 +782,9 @@ def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
                  'seconds'.format(time.time() - start_time))
 
     print_rank_0(' > indexed dataset stats:')
-    print_rank_0('    number of documents: {}'.format(
-        indexed_dataset.doc_idx.shape[0] - 1))
+    print_rank_0(
+        '    number of documents: {}'.format(indexed_dataset.doc_idx.shape[0] -
+                                             1))
     print_rank_0('    number of sentences: {}'.format(
         indexed_dataset.sizes.shape[0]))
 
@@ -812,8 +809,8 @@ def get_train_valid_test_split_(splits_string, size):
     splits = [split / splits_sum for split in splits]
     splits_index = [0]
     for index, split in enumerate(splits):
-        splits_index.append(splits_index[index] + int(
-            round(split * float(size))))
+        splits_index.append(splits_index[index] +
+                            int(round(split * float(size))))
     diff = splits_index[-1] - size
     for index in range(1, len(splits_index)):
         splits_index[index] -= diff
@@ -865,20 +862,22 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         # Build samples mapping
         verbose = local_rank == 0
         start_time = time.time()
-        print_rank_0(' > building sapmles index mapping for {} ...'.format(
-            name))
+        print_rank_0(
+            ' > building sapmles index mapping for {} ...'.format(name))
         # First compile and then import.
         if local_rank == 0:
             compile_helper()
         import data_tools.helpers as helpers
-        samples_mapping = helpers.build_mapping(
-            indexed_dataset.doc_idx, indexed_dataset.sizes, num_epochs,
-            max_num_samples, max_seq_length, short_seq_prob, seed, verbose, 2
-            if binary_head else 1)
+        samples_mapping = helpers.build_mapping(indexed_dataset.doc_idx,
+                                                indexed_dataset.sizes,
+                                                num_epochs, max_num_samples,
+                                                max_seq_length, short_seq_prob,
+                                                seed, verbose,
+                                                2 if binary_head else 1)
         print_rank_0(' > done building sapmles index maping')
         np.save(indexmap_filename, samples_mapping, allow_pickle=True)
-        print_rank_0(' > saved the index mapping in {}'.format(
-            indexmap_filename))
+        print_rank_0(
+            ' > saved the index mapping in {}'.format(indexmap_filename))
         # Make sure all the ranks have built the mapping
         print_rank_0(' > elasped time to build and save samples mapping '
                      '(seconds): {:4f}'.format(time.time() - start_time))
@@ -907,11 +906,13 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
     # Load indexed dataset.
     print_rank_0(' > loading indexed mapping from {}'.format(indexmap_filename))
     start_time = time.time()
-    samples_mapping = np.load(
-        indexmap_filename, allow_pickle=True, mmap_mode='r')
-    print_rank_0('    loaded indexed file in {:3.3f} seconds'.format(time.time(
-    ) - start_time))
-    print_rank_0('    total number of samples: {}'.format(samples_mapping.shape[
-        0]))
+    samples_mapping = np.load(indexmap_filename,
+                              allow_pickle=True,
+                              mmap_mode='r')
+    print_rank_0(
+        '    loaded indexed file in {:3.3f} seconds'.format(time.time() -
+                                                            start_time))
+    print_rank_0('    total number of samples: {}'.format(
+        samples_mapping.shape[0]))
 
     return samples_mapping

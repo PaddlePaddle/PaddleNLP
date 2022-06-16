@@ -12,30 +12,34 @@ from paddlenlp.transformers import ElectraTokenizer
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_file", type=str, required=True, help="model filename")
-    parser.add_argument(
-        "--params_file", type=str, required=True, help="parameter filename")
-    parser.add_argument(
-        "--predict_sentences",
-        type=str,
-        nargs="*",
-        help="one or more sentence to predict")
+    parser.add_argument("--model_file",
+                        type=str,
+                        required=True,
+                        help="model filename")
+    parser.add_argument("--params_file",
+                        type=str,
+                        required=True,
+                        help="parameter filename")
+    parser.add_argument("--predict_sentences",
+                        type=str,
+                        nargs="*",
+                        help="one or more sentence to predict")
     parser.add_argument(
         "--predict_file",
         type=str,
         nargs="*",
         help="one or more file which contain sentence to predict")
     parser.add_argument("--batch_size", type=int, default=1, help="batch size")
-    parser.add_argument(
-        "--use_gpu", action="store_true", help="whether to use gpu")
-    parser.add_argument(
-        "--use_trt", action="store_true", help="whether to use TensorRT")
-    parser.add_argument(
-        "--max_seq_length",
-        type=int,
-        default=128,
-        help="max length of each sequence")
+    parser.add_argument("--use_gpu",
+                        action="store_true",
+                        help="whether to use gpu")
+    parser.add_argument("--use_trt",
+                        action="store_true",
+                        help="whether to use TensorRT")
+    parser.add_argument("--max_seq_length",
+                        type=int,
+                        default=128,
+                        help="max length of each sequence")
     parser.add_argument(
         "--model_name",
         type=str,
@@ -125,8 +129,8 @@ def predict(args, sentences=[], paths=[]):
     """
 
     # initialize data
-    if sentences != [] and isinstance(sentences, list) and (paths == [] or
-                                                            paths is None):
+    if sentences != [] and isinstance(sentences, list) and (paths == []
+                                                            or paths is None):
         predicted_data = sentences
     elif (sentences == [] or sentences is None) and isinstance(
             paths, list) and paths != []:

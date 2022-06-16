@@ -76,18 +76,20 @@ class TextSimilarityTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64", name='token_type_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None],
+                                    dtype="int64",
+                                    name='token_type_ids'),
         ]
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        self._model = BertModel.from_pretrained(
-            self._task_path, pool_act='linear')
+        self._model = BertModel.from_pretrained(self._task_path,
+                                                pool_act='linear')
         self._model.eval()
 
     def _construct_tokenizer(self, model):
@@ -139,10 +141,16 @@ class TextSimilarityTask(Task):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # text1_input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # text1_token_type_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # text2_input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # text2_token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # text1_input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # text1_token_type_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # text2_input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # text2_token_type_ids
         ): [data for data in fn(samples)]
 
         outputs = {}

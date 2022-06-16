@@ -18,635 +18,749 @@
 
 本项目基于 PaddlePaddle 在 CLUE 数据集上对领先的开源预训练模型模型进行了充分评测，为开发者在预训练模型选择上提供参考，同时开发者基于本项目可以轻松一键复现模型效果，也可以参加 CLUE 竞赛取得好成绩。
 
+
 <a name="CLUE评测结果"></a>
 
 ## CLUE 评测结果
 
 使用多种**中文**预训练模型微调在 CLUE 的各验证集上有如下结果：
 
-
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
-        <tbody>
-                <tr>
-                        <td style="text-align:center;vertical-align:middle">
-                                <span style="font-size:18px;">Arch</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px;">Model</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px;">AVG</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px;">AFQMC</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">TNEWS</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">IFLYTEK</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">CMNLI</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">OCNLI</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">CLUEWSC2020</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">CSL</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">CMRC2018</span>
-                        </td>
-                        <td style="text-align:center;">
-                                <span style="font-size:18px;">CHID</span>
-                        </td>
-                        <td style="text-align:center;">
-                          <span style="font-size:18px;">C<sup>3</sup></span>
-                        </td>  
-                </tr>
-                <tr>
-                        <td rowspan=1 align=center> 24L1024H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">RoBERTa-wwm-ext-large</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.61</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.33</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.02</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.88</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">78.81</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">90.79</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.67</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">70.58/89.82</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">85.72</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.26</span>
-                        </td>
-                </tr>
-                <tr>
-            <td rowspan=6 align=center> 12L768H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>76.05</b></span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>75.93</b></span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>58.26</b></span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>61.56</b></span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>83.02</b></span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>80.10</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">86.18</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.63</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">70.71/90.41</span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>84.26</b></span>
-                        </td>  
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>77.88</b></span>
-                        </td>
-                </tr>
-                <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE-Gram-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.72</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.28</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">57.88</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">60.87</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.90</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">79.08</span>
-                        </td>
-                        <td style="text-align:center">
-                          <span style="font-size:18px"><b>88.82</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.83</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">71.82/90.38</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">84.04</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">73.69</span>
-                        </td>
-                </tr>
-               <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">Mengzi-BERT-Base</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.69</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.35</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">57.76</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">61.64</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.41</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">77.93</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">88.16</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.20</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">67.04/88.35</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.74</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">70.70</span>
-                        </td>
-                </tr>
-                <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE-1.0</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.17</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.84</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">58.91</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.25</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">81.68</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.58</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">85.20</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.77</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">67.32/87.83</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.47</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">69.68</span>
-                        </td>
-                </tr>
-                         <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">RoBERTa-wwm-ext</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.11</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.60</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">58.08</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">61.23</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">81.11</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.92</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">88.49</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">80.77</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">68.39/88.50</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">83.43</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">68.03</span>
-                        </td>
-                </tr>
-                         <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">BERT-Base-Chinese</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">72.57</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.63</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">57.13</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">61.29</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">80.97</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.22</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">81.91</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">81.90</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">65.30/86.53</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">82.01</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">65.38</span>
-                        </td>
-                </tr>
-                <tr>
-                        <td rowspan=5 align=center> 6L768H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>72.49</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>73.37</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>57.00</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>60.67</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>80.64</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>76.88</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>79.28</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>81.60</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>65.83/87.30</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>79.91</b></span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>69.73</b></span>
-                        </td>
-                </tr>
-                <tr>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">HLF/RBT6, Chinese</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">69.74</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">56.62</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.68</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">79.26</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">73.15</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">80.04</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.26/84.72</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">78.26</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.93</span>
-                        </td>
-                </tr>
-                <tr>
-                <td style="text-align:center">
-                        <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">69.58</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">72.22</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">55.70</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">54.48</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">79.12</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">74.07</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">77.63</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">80.17</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.63/83.72</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">77.64</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.11</span>
-                        </td>
-                </tr>
-                <td style="text-align:center">
-                        <span style="font-size:18px">RoFormerV2 Small</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">68.52</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">72.47</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">56.53</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">60.72</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.37</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">72.95</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">75.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">81.07</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">62.97/83.64</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">67.66</span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.41</span>
-                        </td>
-                </tr>
-                <tr>
-                <td style="text-align:center">
-                        <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">66.67</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">70.13</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">56.41</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">59.79</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">77.38</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">71.86</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">69.41</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">76.73</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">53.22/75.03</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">77.00</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">54.77</span>
-                        </td>
-                </tr>
-                <tr>
+    <tbody>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;">Arch</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">Model</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">AVG</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">AFQMC</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">TNEWS</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">IFLYTEK</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">CMNLI</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">OCNLI</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">CLUEWSC2020</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">CSL</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">CMRC2018</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">CHID</span>
+            </td>
+            <td style="text-align:center;">
+                <span style="font-size:18px;">C<sup>3</sup></span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=2 align=center> 24L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 2.0-Large-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>77.03</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.67</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.29</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.82</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>79.69</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">89.14</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.10</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.48/90.35</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">85.52</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>78.12</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">RoBERTa-wwm-ext-large</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.61</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.00</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.33</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.02</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>83.88</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">78.81</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>90.79</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.67</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.58/89.82</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>85.72</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.26</span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=1 align=center> 20L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Xbase-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>78.71</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.85</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.89</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.76</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>82.51</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>89.80</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.47</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>75.49/92.67</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>86.36</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.59</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=7 align=center> 12L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.05</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>75.93</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">58.26</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.56</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>83.02</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>80.10</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">86.18</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.63</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.71/90.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.26</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>77.88</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE-Gram-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.72</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.28</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.88</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">60.87</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.90</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">79.08</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>88.82</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>82.83</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.82/90.38</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.04</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.69</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 2.0-Base-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.95</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.25</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">58.53</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.72</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.07</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">78.81</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.21</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.77</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">68.22/88.71</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.78</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.19</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">Mengzi-BERT-Base</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.69</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.35</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.76</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.64</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.93</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">88.16</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.20</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.04/88.35</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.74</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.70</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 1.0-Base-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.17</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.84</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.91</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.25</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.68</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.58</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">85.20</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.77</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.32/87.83</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.47</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.68</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">RoBERTa-wwm-ext</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.11</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.60</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">58.08</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.23</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.11</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.92</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">88.49</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.77</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">68.39/88.50</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.43</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">68.03</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">BERT-Base-Chinese</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">72.57</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.63</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.13</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.29</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.97</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.22</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.90</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">65.30/86.53</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.01</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">65.38</span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=5 align=center> 6L768H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>72.49</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>73.37</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>57.00</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">60.67</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>80.64</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.88</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>79.28</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>81.60</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>65.83/87.30</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>79.91</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>69.73</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">HLF/RBT6, Chinese</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.74</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.15</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">56.62</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.68</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">79.26</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.15</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.00</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.04</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.26/84.72</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">78.26</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.93</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.58</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">72.22</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">55.70</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">54.48</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">79.12</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.07</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.63</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.17</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.63/83.72</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.64</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.11</span>
+            </td>
+        </tr>
+        <td style="text-align:center">
+            <span style="font-size:18px">RoFormerV2 Small</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">68.52</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">72.47</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">56.53</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px"><b>60.72</b></span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">76.37</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">72.95</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">75.00</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">81.07</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">62.97/83.64</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">67.66</span>
+        </td>
+        <td style="text-align:center">
+            <span style="font-size:18px">59.41</span>
+        </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">66.67</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.13</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">56.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.79</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.38</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">71.86</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.73</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">53.22/75.03</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.00</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">54.77</span>
+            </td>
+        </tr>
+        <tr>
             <td rowspan=1 align=center> 6L384H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>66.90</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>71.85</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>55.24</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>54.48</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>77.19</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>73.08</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>71.05</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>79.30</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>58.53/81.97</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>69.71</b></span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>58.60</b></span>
-                        </td>
-                </tr>
-                <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>66.90</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.85</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.24</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>54.48</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>77.19</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>73.08</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.05</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>79.30</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.53/81.97</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>69.71</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.60</b></span>
+            </td>
+        </tr>
+        <tr>
             <td rowspan=1 align=center> 4L384H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>64.21</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>71.15</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>55.05</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>53.83</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>74.81</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>70.41</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>69.08</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>76.50</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>53.77/77.82</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>62.26</b></span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>55.53</b></span>
-                        </td>
-                </tr>
-                <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>64.21</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>71.15</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.05</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>53.83</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>74.81</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.41</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>69.08</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.50</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>53.77/77.82</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.26</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.53</b></span>
+            </td>
+        </tr>
+        <tr>
             <td rowspan=1 align=center> 4L312H </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>62.97</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>70.51</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>54.57</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>48.36</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>74.97</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>70.61</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>68.75</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>75.93</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>52.00/76.35</b></span>
-                        </td>
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>58.91</b></span>
-                        </td>  
-                        <td style="text-align:center">
-                                <span style="font-size:18px"><b>55.11</b></span>
-                        </td>
-                </tr>
-        <tbody>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 3.0-Nano-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.97</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.51</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>54.57</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>48.36</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>74.97</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>70.61</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>68.75</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>75.93</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>52.00/76.35</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>58.91</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>55.11</b></span>
+            </td>
+        </tr>
+    <tbody>
 </table>
 <br />
-
 
 AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM (Exact Match)/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
 
@@ -672,24 +786,26 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 
 | Model                            | AFQMC   | TNEWS   | IFLYTEK | CMNLI    | OCNLI    | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
 | -------------------------------- | ------- | ------- | ------- | -------- | -------- | ----------- | ------- | -------- | ------- | ------------- |
+| ERNIE 3.0-Xbase-zh               | 2e-5,16 | 3e-5,32 | 3e-5,32 | 3e-5,64  | 3e-5,64  | 2e-5,32     | 1e-5,16 | 3e-5,24  | 2e-5,24 | 3e-5,24       |
+| ERNIE 2.0-Large-zh               | 1e-5,32 | 3e-5,64 | 3e-5,32 | 2e-5,32  | 1e-5,16  | 3e-5,32     | 1e-5,64 | 2e-5,24  | 2e-5,24 | 3e-5,32       |
 | RoBERTa-wwm-ext-large            | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
 | ERNIE 3.0-Base-zh                | 3e-5,16 | 3e-5,32 | 5e-5,32 | 3e-5,32  | 2e-5,64  | 2e-5,16     | 2e-5,32 | 2e-5,24  | 3e-5,24 | 3e-5,32       |
 | ERNIE-Gram-zh                    | 1e-5,16 | 5e-5,16 | 5e-5,16 | 2e-5,32  | 2e-5,64  | 3e-5,16     | 3e-5,64 | 3e-5,32  | 2e-5,24 | 2e-5,24       |
+| ERNIE 2.0-Base-zh                | 3e-5,64 | 3e-5,64 | 5e-5,16 | 5e-5,64  | 5e-5,32  | 5e-5,16     | 2e-5,16 | 2e-5,32  | 3e-5,24 | 3e-5,32       |
 | Mengzi-Bert-Base                 | 3e-5,32 | 5e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,16  | 3e-5,8      | 1e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,32       |
-| ERNIE 1.0                        | 3e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5，32 | 3e-5，16 | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
+| ERNIE 1.0-Base-zh                | 3e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
 | RoBERTa-wwm-ext                  | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
 | BERT-Base-Chinese                | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Medium-zh              | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
 | TinyBERT<sub>6</sub> ,Chinese    | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 3e-5,24 | 2e-5,24       |
 | RoFormerV2 Small                 | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
 | HLF/RBT6, Chinese                | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,32  | 3e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
-| UER/Chinese-RoBERTa (L6-H768) | 2e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 5e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
+| UER/Chinese-RoBERTa (L6-H768)    | 2e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 5e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
 | ERNIE 3.0-Mini-zh                | 5e-5,64 | 5e-5,64 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
-| ERNIE 3.0-Micro-zh               | 3e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,32  | 5e-5,16      | 3e-5,64 | 3e-5,24  | 3e-5,32 | 3e-5,24       |
+| ERNIE 3.0-Micro-zh               | 3e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,32  | 5e-5,16     | 3e-5,64 | 3e-5,24  | 3e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Nano-zh                | 2e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,8      | 3e-5,32 | 3e-5,24  | 3e-5,24 | 2e-5,24       |
 
-
-其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 <a name="一键复现模型效果"></a>
 

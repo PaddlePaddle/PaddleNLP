@@ -17,10 +17,12 @@ from uie.evaluation.constants import (
     text_start,
     spot_prompt,
     asoc_prompt,
-    null_span, )
+    null_span,
+)
 from uie.evaluation.sel2record import (
     RecordSchema,
-    convert_spot_asoc, )
+    convert_spot_asoc,
+)
 
 logger = logging.getLogger("__main__")
 
@@ -115,8 +117,9 @@ class DynamicSSIGenerator():
         schema_ordered_dict = OrderedDict()
         for name in schema_name_list:
             # tokenizer.encode("人物") -> [8, 122]
-            encoded_name = tokenizer.encode(
-                name, add_special_tokens=False, return_token_type_ids=None)
+            encoded_name = tokenizer.encode(name,
+                                            add_special_tokens=False,
+                                            return_token_type_ids=None)
             schema_ordered_dict[name] = encoded_name["input_ids"]
         return schema_ordered_dict
 
@@ -145,8 +148,9 @@ class DynamicSSIGenerator():
         """
         neg_cands = candidates if candidates is not None else self.spot_list
 
-        negative_spot = self.sample_negative(
-            postive=positive, candidates=neg_cands, k=self.negative)
+        negative_spot = self.sample_negative(postive=positive,
+                                             candidates=neg_cands,
+                                             k=self.negative)
         positive_spot = random.sample(
             positive, math.floor(len(positive) * self.positive_rate))
 
@@ -154,7 +158,8 @@ class DynamicSSIGenerator():
             candidates=positive_spot + negative_spot,
             prompt=self.spot_prompt_id,
             mapper=self.spot_dict,
-            ordered_prompt=self.ordered_prompt, )
+            ordered_prompt=self.ordered_prompt,
+        )
 
         return converted_spot_prefix, positive_spot, negative_spot
 
@@ -169,13 +174,15 @@ class DynamicSSIGenerator():
             List[str]: Sampled Negative Asoc List
         """
         neg_cands = candidates if candidates is not None else self.asoc_list
-        negative_asoc = self.sample_negative(
-            postive=positive, candidates=neg_cands, k=self.negative)
+        negative_asoc = self.sample_negative(postive=positive,
+                                             candidates=neg_cands,
+                                             k=self.negative)
         converted_asoc_prefix = self.convert_prefix(
             candidates=positive + negative_asoc,
             prompt=self.asoc_prompt_id,
             mapper=self.asoc_dict,
-            ordered_prompt=self.ordered_prompt, )
+            ordered_prompt=self.ordered_prompt,
+        )
         return converted_asoc_prefix, negative_asoc
 
     def full_spot(self, candidates=None, shuffle=False):
@@ -191,7 +198,8 @@ class DynamicSSIGenerator():
             candidates=prefix_cands,
             prompt=self.spot_prompt_id,
             mapper=self.spot_dict,
-            ordered_prompt=ordered_prompt, )
+            ordered_prompt=ordered_prompt,
+        )
 
     def full_asoc(self, candidates=None, shuffle=False):
         # Random Prompt + Shuffle
@@ -206,16 +214,17 @@ class DynamicSSIGenerator():
             candidates=prefix_cands,
             prompt=self.asoc_prompt_id,
             mapper=self.asoc_dict,
-            ordered_prompt=ordered_prompt, )
+            ordered_prompt=ordered_prompt,
+        )
 
     @staticmethod
     def convert_prefix(candidates, prompt, mapper, ordered_prompt=True):
         prefix = list()
 
         if ordered_prompt:
-            candidate_sorted = sorted(
-                [(candidate, index)
-                 for index, candidate in enumerate(candidates)])
+            candidate_sorted = sorted([
+                (candidate, index) for index, candidate in enumerate(candidates)
+            ])
             index_list = [index for _, index in candidate_sorted]
         else:
             index_list = np.random.permutation(len(candidates)).tolist()
@@ -227,16 +236,17 @@ class DynamicSSIGenerator():
 
 
 class DataCollatorForSeq2Seq:
+
     def __init__(self,
                  tokenizer,
                  ssi_generator: DynamicSSIGenerator,
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
-                 max_source_length: Optional[int]=None,
-                 max_target_length: Optional[int]=None,
-                 max_prefix_length: Optional[int]=None,
-                 spot_asoc_nosier: SpotAsocNoiser=None,
+                 max_source_length: Optional[int] = None,
+                 max_target_length: Optional[int] = None,
+                 max_prefix_length: Optional[int] = None,
+                 spot_asoc_nosier: SpotAsocNoiser = None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
@@ -274,7 +284,8 @@ class DataCollatorForSeq2Seq:
                     target_spot_asoc = self.spot_asoc_nosier.add_noise(
                         target_spot_asoc,
                         spot_label_list=neg_spot,
-                        asoc_label_list=neg_asoc, )
+                        asoc_label_list=neg_asoc,
+                    )
             else:
                 # Evaluation using Ordered SSI
                 spot_prefix = self.ssi_generator.full_spot(
@@ -306,10 +317,13 @@ class DataCollatorForSeq2Seq:
                 max_seq_len=self.max_target_length)
 
             new_data.append({
-                'input_ids': source_text_id,
-                'labels': target_labels['input_ids'],
+                'input_ids':
+                source_text_id,
+                'labels':
+                target_labels['input_ids'],
                 'attention_mask': [1] * len(source_text_id),
-                'decoder_attention_mask': target_labels['attention_mask'],
+                'decoder_attention_mask':
+                target_labels['attention_mask'],
             })
 
         first = new_data[0]
@@ -338,15 +352,17 @@ class DataCollatorForSeq2Seq:
                          ) and v is not None and not isinstance(v, str):
                 batch[k] = _pad_function(
                     sequence=[d[k] for d in new_data],
-                    pad_value=pad_value_map[k], )
+                    pad_value=pad_value_map[k],
+                )
             else:
                 batch[k] = _pad_function(
                     sequence=[d[k] for d in new_data],
-                    pad_value=self.label_pad_token_id, )
+                    pad_value=self.label_pad_token_id,
+                )
 
         # prepare decoder_input_ids
-        if (labels is not None and self.model is not None and
-                hasattr(self.model, "prepare_decoder_input_ids_from_labels")):
+        if (labels is not None and self.model is not None and hasattr(
+                self.model, "prepare_decoder_input_ids_from_labels")):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(
                 labels=batch["labels"])
             if not return_tensors:
@@ -358,16 +374,17 @@ class DataCollatorForSeq2Seq:
 
 
 class DataCollatorForMultiTaskSeq2Seq:
+
     def __init__(self,
                  tokenizer,
                  ssi_generator: DynamicSSIGenerator,
                  model=None,
                  label_pad_token_id=-100,
                  padding=True,
-                 max_source_length: Optional[int]=None,
-                 max_target_length: Optional[int]=None,
-                 max_prefix_length: Optional[int]=None,
-                 spot_asoc_nosier: SpotAsocNoiser=None,
+                 max_source_length: Optional[int] = None,
+                 max_target_length: Optional[int] = None,
+                 max_prefix_length: Optional[int] = None,
+                 spot_asoc_nosier: SpotAsocNoiser = None,
                  return_tensors=True):
 
         self.tokenizer = tokenizer
@@ -405,10 +422,12 @@ class DataCollatorForMultiTaskSeq2Seq:
                 # 因此 candidates 在任务内进行采样
                 spot_prefix, pos_spot, neg_spot = self.ssi_generator.sample_spot(
                     positive=list(positive_spot),
-                    candidates=ins['spots'], )
+                    candidates=ins['spots'],
+                )
                 asoc_prefix, neg_asoc = self.ssi_generator.sample_asoc(
                     positive=list(positive_asoc),
-                    candidates=ins['asocs'], )
+                    candidates=ins['asocs'],
+                )
 
                 # Filter spot-asoc not in Positive Spot
                 target_spot_asoc = list(
@@ -419,7 +438,8 @@ class DataCollatorForMultiTaskSeq2Seq:
                     target_spot_asoc = self.spot_asoc_nosier.add_noise(
                         target_spot_asoc,
                         spot_label_list=neg_spot,
-                        asoc_label_list=neg_asoc, )
+                        asoc_label_list=neg_asoc,
+                    )
 
             else:
                 # Evaluation using Ordered SSI
@@ -452,10 +472,13 @@ class DataCollatorForMultiTaskSeq2Seq:
                 max_seq_len=self.max_target_length)
 
             new_data.append({
-                'input_ids': source_text_id,
-                'labels': target_labels['input_ids'],
+                'input_ids':
+                source_text_id,
+                'labels':
+                target_labels['input_ids'],
                 'attention_mask': [1] * len(source_text_id),
-                'decoder_attention_mask': target_labels['attention_mask'],
+                'decoder_attention_mask':
+                target_labels['attention_mask'],
             })
 
         first = new_data[0]
@@ -484,15 +507,17 @@ class DataCollatorForMultiTaskSeq2Seq:
                          ) and v is not None and not isinstance(v, str):
                 batch[k] = _pad_function(
                     sequence=[d[k] for d in new_data],
-                    pad_value=pad_value_map[k], )
+                    pad_value=pad_value_map[k],
+                )
             else:
                 batch[k] = _pad_function(
                     sequence=[d[k] for d in new_data],
-                    pad_value=self.label_pad_token_id, )
+                    pad_value=self.label_pad_token_id,
+                )
 
         # prepare decoder_input_ids
-        if (labels is not None and self.model is not None and
-                hasattr(self.model, "prepare_decoder_input_ids_from_labels")):
+        if (labels is not None and self.model is not None and hasattr(
+                self.model, "prepare_decoder_input_ids_from_labels")):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(
                 labels=batch["labels"])
             if not return_tensors:

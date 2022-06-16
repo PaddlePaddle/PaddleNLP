@@ -302,6 +302,7 @@ class BartDecoder(BartPretrainedModel):
 
         if memory_mask is not None:
             memory_mask = self.get_extended_attention_mask(memory_mask)
+
         decoder_output = self.decoder(tgt=decoder_input,
                                       memory=encoder_output,
                                       tgt_mask=decoder_attention_mask,

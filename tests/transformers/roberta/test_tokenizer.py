@@ -27,6 +27,7 @@ import unittest
 
 
 class TestRobertaTokenizer(CpuCommonTest):
+
     def set_attr(self):
         self.do_lower_case = True
 
@@ -52,10 +53,9 @@ class TestRobertaTokenizer(CpuCommonTest):
         self.set_attr()
         self.create_input_file()
         self.set_test_case()
-        self.tokenizer = RobertaTokenizer(
-            vocab_file=self.vocab_file,
-            merges_file=None,
-            do_lower_case=self.do_lower_case)
+        self.tokenizer = RobertaTokenizer(vocab_file=self.vocab_file,
+                                          merges_file=None,
+                                          do_lower_case=self.do_lower_case)
 
     def test_tokenize(self):
         text_array = self.tokenizer.tokenize(self.text)
@@ -68,11 +68,10 @@ class TestRobertaTokenizer(CpuCommonTest):
         expected_token_type_ids = [0, 0, 0, 0, 0, 0, 0, 0]
         expected_attention_mask = [1] * len(expected_input_ids)
         expected_tokens_mask = [1, 0, 0, 0, 0, 0, 0, 1]
-        result = self.tokenizer(
-            "This  is a simple text",
-            return_attention_mask=True,
-            return_length=True,
-            return_special_tokens_mask=True)
+        result = self.tokenizer("This  is a simple text",
+                                return_attention_mask=True,
+                                return_length=True,
+                                return_special_tokens_mask=True)
         self.check_output_equal(result['input_ids'], expected_input_ids)
         self.check_output_equal(result['token_type_ids'],
                                 expected_token_type_ids)
@@ -171,10 +170,10 @@ class TestRobertaTokenizer(CpuCommonTest):
             self.tokenizer.cls_token, self.tokenizer.unk_token,
             self.tokenizer.sep_token
         ])
-        self.check_output_equal(
-            set(self.tokenizer.all_special_tokens), expected_special_tokens_set)
-        self.check_output_equal(
-            set(self.tokenizer.all_special_ids), set([0, 1, 2, 14, 15]))
+        self.check_output_equal(set(self.tokenizer.all_special_tokens),
+                                expected_special_tokens_set)
+        self.check_output_equal(set(self.tokenizer.all_special_ids),
+                                set([0, 1, 2, 14, 15]))
 
     @assert_raises(ValueError)
     def test_non_exist_vocab_file(self):
@@ -182,6 +181,7 @@ class TestRobertaTokenizer(CpuCommonTest):
 
 
 class TestRobertaTokenizerFromPretrained(CpuCommonTest):
+
     @slow
     def test_from_pretrained(self):
         tokenizer = RobertaTokenizer.from_pretrained("roberta-wwm-ext")
@@ -201,13 +201,12 @@ class TestRobertaTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],
@@ -242,13 +241,12 @@ class TestRobertaTokenizerFromPretrained(CpuCommonTest):
         expected_special_tokens_mask = [
             1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1
         ]
-        results = tokenizer(
-            [text1], [text2],
-            20,
-            stride=1,
-            pad_to_max_seq_len=True,
-            return_attention_mask=True,
-            return_special_tokens_mask=True)
+        results = tokenizer([text1], [text2],
+                            20,
+                            stride=1,
+                            pad_to_max_seq_len=True,
+                            return_attention_mask=True,
+                            return_special_tokens_mask=True)
 
         self.check_output_equal(results[0]['input_ids'], expected_input_ids)
         self.check_output_equal(results[0]['token_type_ids'],

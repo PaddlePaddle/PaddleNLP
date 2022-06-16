@@ -413,7 +413,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 <a name="6-5"></a>
 
-##### Q4.5 【解语】wordtag模型如何自定义添加命名实体及对应词类?  
+##### Q4.5 【解语】wordtag模型如何自定义添加命名实体及对应词类?
 
 **A:** 其主要依赖于二次构造数据来进行finetune，同时要更新termtree信息。wordtag分为两个步骤：
 （1）通过BIOES体系进行分词；
@@ -465,7 +465,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
     mylayer = MyLayer()
     for name, param in mylayer.named_parameters():
-        print(name, param)  
+        print(name, param)
 ```
 
 <a name="7-3"></a>

@@ -164,12 +164,10 @@ def einsum(equation, *operands):
                               right_out_dims):
             output_perm[j] = i
 
-        left = paddle.reshape(
-            paddle.transpose(
-                left, perm=left_perm), (batch_size, left_size, summed_size))
-        right = paddle.reshape(
-            paddle.transpose(
-                right, perm=right_perm), (batch_size, summed_size, right_size))
+        left = paddle.reshape(paddle.transpose(left, perm=left_perm),
+                              (batch_size, left_size, summed_size))
+        right = paddle.reshape(paddle.transpose(right, perm=right_perm),
+                               (batch_size, summed_size, right_size))
         result = paddle.matmul(left, right)
         result = paddle.reshape(result, out_shape)
         result = paddle.transpose(result, output_perm)
@@ -276,8 +274,8 @@ def einsum(equation, *operands):
                     letter_num]] == -1, "character {} occurs twice in output".format(
                         ch)
 
-                idxes_to_output_dims[letters_to_idx[
-                    letter_num]] = num_output_dims
+                idxes_to_output_dims[
+                    letters_to_idx[letter_num]] = num_output_dims
                 num_output_dims += 1
     else:  #  num_eqns_size == 1
         # Infer the output dims
@@ -335,13 +333,13 @@ def einsum(equation, *operands):
     sum_dims = []
     result = preprocessed_operands[0]
     for i in range(num_total_idxes):
-        if idxes_last_operand[i] == 0 and idxes_to_output_dims[
-                i] >= num_output_dims:
+        if idxes_last_operand[
+                i] == 0 and idxes_to_output_dims[i] >= num_output_dims:
             result = result.sum(axis=idxes_to_output_dims[i], keepdim=True)
     for i in range(1, len(preprocessed_operands)):
         for j in range(num_total_idxes):
-            if idxes_last_operand[j] == i and idxes_to_output_dims[
-                    j] >= num_output_dims:
+            if idxes_last_operand[
+                    j] == i and idxes_to_output_dims[j] >= num_output_dims:
                 sum_dims.append(idxes_to_output_dims[j])
         result = _mul_sum(result, preprocessed_operands[i], sum_dims)
 

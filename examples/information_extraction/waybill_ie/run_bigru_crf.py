@@ -95,45 +95,44 @@ if __name__ == '__main__':
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
     word_vocab = load_dict(os.path.join(args.data_dir, 'word.dic'))
 
-    trans_func = partial(
-        convert_to_features, word_vocab=word_vocab, label_vocab=label_vocab)
+    trans_func = partial(convert_to_features,
+                         word_vocab=word_vocab,
+                         label_vocab=label_vocab)
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int32'),  # token_ids
+        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int32'
+            ),  # token_ids
         Stack(dtype='int64'),  # seq_len
         Pad(axis=0, pad_val=label_vocab.get('O', 0), dtype='int64')  # label_ids
     ): fn(samples)
 
-    train_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=True,
-        return_list=True,
-        collate_fn=batchify_fn)
+    train_loader = paddle.io.DataLoader(dataset=train_ds,
+                                        batch_size=args.batch_size,
+                                        shuffle=True,
+                                        drop_last=True,
+                                        return_list=True,
+                                        collate_fn=batchify_fn)
 
-    dev_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_size=args.batch_size,
-        drop_last=True,
-        return_list=True,
-        collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_size=args.batch_size,
+                                      drop_last=True,
+                                      return_list=True,
+                                      collate_fn=batchify_fn)
 
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        drop_last=True,
-        return_list=True,
-        collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_size=args.batch_size,
+                                       drop_last=True,
+                                       return_list=True,
+                                       collate_fn=batchify_fn)
 
     # Define the model netword and its loss
     model = BiGRUWithCRF(300, 256, len(word_vocab), len(label_vocab))
 
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=0.001, parameters=model.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=0.001,
+                                      parameters=model.parameters())
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     step = 0

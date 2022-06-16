@@ -20,6 +20,7 @@ import paddlenlp as nlp
 
 
 class SimNet(nn.Layer):
+
     def __init__(self,
                  network,
                  vocab_size,
@@ -30,25 +31,27 @@ class SimNet(nn.Layer):
 
         network = network.lower()
         if network == 'bow':
-            self.model = BoWModel(
-                vocab_size, num_classes, emb_dim, padding_idx=pad_token_id)
+            self.model = BoWModel(vocab_size,
+                                  num_classes,
+                                  emb_dim,
+                                  padding_idx=pad_token_id)
         elif network == 'cnn':
-            self.model = CNNModel(
-                vocab_size, num_classes, emb_dim, padding_idx=pad_token_id)
+            self.model = CNNModel(vocab_size,
+                                  num_classes,
+                                  emb_dim,
+                                  padding_idx=pad_token_id)
         elif network == 'gru':
-            self.model = GRUModel(
-                vocab_size,
-                num_classes,
-                emb_dim,
-                direction='forward',
-                padding_idx=pad_token_id)
+            self.model = GRUModel(vocab_size,
+                                  num_classes,
+                                  emb_dim,
+                                  direction='forward',
+                                  padding_idx=pad_token_id)
         elif network == 'lstm':
-            self.model = LSTMModel(
-                vocab_size,
-                num_classes,
-                emb_dim,
-                direction='forward',
-                padding_idx=pad_token_id)
+            self.model = LSTMModel(vocab_size,
+                                   num_classes,
+                                   emb_dim,
+                                   direction='forward',
+                                   padding_idx=pad_token_id)
         else:
             raise ValueError(
                 "Unknown network: %s, it must be one of bow, cnn, lstm or gru."
@@ -103,8 +106,9 @@ class BoWModel(nn.Layer):
                  padding_idx=0,
                  fc_hidden_size=128):
         super().__init__()
-        self.embedder = nn.Embedding(
-            vocab_size, emb_dim, padding_idx=padding_idx)
+        self.embedder = nn.Embedding(vocab_size,
+                                     emb_dim,
+                                     padding_idx=padding_idx)
         self.bow_encoder = nlp.seq2vec.BoWEncoder(emb_dim)
         self.fc = nn.Linear(self.bow_encoder.get_output_dim() * 2,
                             fc_hidden_size)
@@ -130,6 +134,7 @@ class BoWModel(nn.Layer):
 
 
 class LSTMModel(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  num_classes,
@@ -142,16 +147,14 @@ class LSTMModel(nn.Layer):
                  pooling_type=None,
                  fc_hidden_size=128):
         super().__init__()
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
-        self.lstm_encoder = nlp.seq2vec.LSTMEncoder(
-            emb_dim,
-            lstm_hidden_size,
-            num_layers=lstm_layers,
-            direction=direction,
-            dropout=dropout_rate)
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
+        self.lstm_encoder = nlp.seq2vec.LSTMEncoder(emb_dim,
+                                                    lstm_hidden_size,
+                                                    num_layers=lstm_layers,
+                                                    direction=direction,
+                                                    dropout=dropout_rate)
         self.fc = nn.Linear(self.lstm_encoder.get_output_dim() * 2,
                             fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
@@ -163,10 +166,10 @@ class LSTMModel(nn.Layer):
         embedded_query = self.embedder(query)
         embedded_title = self.embedder(title)
         # Shape: (batch_size, lstm_hidden_size)
-        query_repr = self.lstm_encoder(
-            embedded_query, sequence_length=query_seq_len)
-        title_repr = self.lstm_encoder(
-            embedded_title, sequence_length=title_seq_len)
+        query_repr = self.lstm_encoder(embedded_query,
+                                       sequence_length=query_seq_len)
+        title_repr = self.lstm_encoder(embedded_title,
+                                       sequence_length=title_seq_len)
         # Shape: (batch_size, 2*lstm_hidden_size)
         contacted = paddle.concat([query_repr, title_repr], axis=-1)
         # Shape: (batch_size, fc_hidden_size)
@@ -205,10 +208,10 @@ class LSTMModel(nn.Layer):
                 embedded_title - embedded_title_baseline)
 
         # Shape: (batch_size, lstm_hidden_size)
-        query_repr = self.lstm_encoder(
-            embedded_query, sequence_length=query_seq_len)
-        title_repr = self.lstm_encoder(
-            embedded_title, sequence_length=title_seq_len)
+        query_repr = self.lstm_encoder(embedded_query,
+                                       sequence_length=query_seq_len)
+        title_repr = self.lstm_encoder(embedded_title,
+                                       sequence_length=title_seq_len)
         # Shape: (batch_size, 2*lstm_hidden_size)
         contacted = paddle.concat([query_repr, title_repr], axis=-1)
         # Shape: (batch_size, fc_hidden_size)
@@ -217,13 +220,11 @@ class LSTMModel(nn.Layer):
         logits = self.output_layer(fc_out)
         probs = F.softmax(logits, axis=-1)
 
-        q_att = paddle.matmul(
-            fc_out, embedded_query,
-            transpose_y=True).squeeze(axis=[1])  # (bsz, query_len)
+        q_att = paddle.matmul(fc_out, embedded_query, transpose_y=True).squeeze(
+            axis=[1])  # (bsz, query_len)
         q_att = F.softmax(q_att, axis=-1)
-        t_att = paddle.matmul(
-            fc_out, embedded_title,
-            transpose_y=True).squeeze(axis=[1])  # (bsz, title_len)
+        t_att = paddle.matmul(fc_out, embedded_title, transpose_y=True).squeeze(
+            axis=[1])  # (bsz, title_len)
         t_att = F.softmax(t_att, axis=-1)
 
         addiational_info = {
@@ -235,6 +236,7 @@ class LSTMModel(nn.Layer):
 
 
 class GRUModel(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  num_classes,
@@ -247,16 +249,14 @@ class GRUModel(nn.Layer):
                  pooling_type=None,
                  fc_hidden_size=96):
         super().__init__()
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
-        self.gru_encoder = nlp.seq2vec.GRUEncoder(
-            emb_dim,
-            gru_hidden_size,
-            num_layers=gru_layers,
-            direction=direction,
-            dropout=dropout_rate)
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
+        self.gru_encoder = nlp.seq2vec.GRUEncoder(emb_dim,
+                                                  gru_hidden_size,
+                                                  num_layers=gru_layers,
+                                                  direction=direction,
+                                                  dropout=dropout_rate)
         self.fc = nn.Linear(self.gru_encoder.get_output_dim() * 2,
                             fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
@@ -266,10 +266,10 @@ class GRUModel(nn.Layer):
         embedded_query = self.embedder(query)
         embedded_title = self.embedder(title)
         # Shape: (batch_size, gru_hidden_size)
-        query_repr = self.gru_encoder(
-            embedded_query, sequence_length=query_seq_len)
-        title_repr = self.gru_encoder(
-            embedded_title, sequence_length=title_seq_len)
+        query_repr = self.gru_encoder(embedded_query,
+                                      sequence_length=query_seq_len)
+        title_repr = self.gru_encoder(embedded_title,
+                                      sequence_length=title_seq_len)
         # Shape: (batch_size, 2*gru_hidden_size)
         contacted = paddle.concat([query_repr, title_repr], axis=-1)
         # Shape: (batch_size, fc_hidden_size)
@@ -312,8 +312,9 @@ class CNNModel(nn.Layer):
                  fc_hidden_size=128):
         super().__init__()
         self.padding_idx = padding_idx
-        self.embedder = nn.Embedding(
-            vocab_size, emb_dim, padding_idx=padding_idx)
+        self.embedder = nn.Embedding(vocab_size,
+                                     emb_dim,
+                                     padding_idx=padding_idx)
         self.encoder = nlp.seq2vec.CNNEncoder(
             emb_dim=emb_dim,
             num_filter=num_filter,

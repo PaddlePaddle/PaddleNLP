@@ -281,7 +281,6 @@ class ErnieMModel(ErnieMPretrainedModel):
                 axis=[1, 2])
         else:
             attention_mask = self.get_extended_attention_mask(attention_mask)
-
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)

@@ -39,8 +39,8 @@ BaseConfig.arbitrary_types_allowed = True
 
 router = APIRouter()
 
-PIPELINE = Pipeline.load_from_yaml(
-    Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_PIPELINE_NAME)
+PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
+                                   pipeline_name=QUERY_PIPELINE_NAME)
 DOCUMENT_STORE = PIPELINE.get_document_store()
 logging.info(f"Loaded pipeline nodes: {PIPELINE.graph.nodes.keys()}")
 
@@ -68,8 +68,9 @@ def pipelines_version():
     return {"hs_version": pipelines.__version__}
 
 
-@router.post(
-    "/query", response_model=QueryResponse, response_model_exclude_none=True)
+@router.post("/query",
+             response_model=QueryResponse,
+             response_model_exclude_none=True)
 def query(request: QueryRequest):
     """
     This endpoint receives the question as a string and allows the requester to set

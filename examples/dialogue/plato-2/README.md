@@ -18,7 +18,7 @@ PLATO-2的训练过程及其他细节详见 [Knover](https://github.com/PaddlePa
 
 - python 3.7+
 - sentencepiece
-- termcolor  
+- termcolor
 
 安装方式：`pip install sentencepiece termcolor`
 

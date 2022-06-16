@@ -11,34 +11,31 @@ from .model_base import BenchmarkBase
 
 sys.path.append(
     os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
-            os.pardir, "examples", "language_model")))
+        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
+                     os.pardir, "examples", "language_model")))
 from xlnet.run_glue import create_data_loader
 
 
 class XLNetBenchmark(BenchmarkBase):
+
     def __init__(self):
         self.label_list = None
         super().__init__()
 
     @staticmethod
     def add_args(args, parser):
-        parser.add_argument(
-            '--model_name_or_path',
-            type=str,
-            default="xlnet-base-cased",
-            help='Model name. Defaults to xlnet-base-cased. ')
-        parser.add_argument(
-            '--task_name',
-            type=str,
-            default="SST-2",
-            help='Task name. Defaults to sst-2. ')
-        parser.add_argument(
-            '--max_seq_length',
-            type=int,
-            default=args.max_seq_len,
-            help='Maximum sequence length. ')
+        parser.add_argument('--model_name_or_path',
+                            type=str,
+                            default="xlnet-base-cased",
+                            help='Model name. Defaults to xlnet-base-cased. ')
+        parser.add_argument('--task_name',
+                            type=str,
+                            default="SST-2",
+                            help='Task name. Defaults to sst-2. ')
+        parser.add_argument('--max_seq_length',
+                            type=int,
+                            default=args.max_seq_len,
+                            help='Maximum sequence length. ')
 
     def create_data_loader(self, args, **kwargs):
         args.task_name = args.task_name.lower()

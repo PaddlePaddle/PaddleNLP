@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataCollator:
+
     def __call__(self, batch):
         data_dict = {}
         to_tensor_keys = []
@@ -204,22 +205,22 @@ def re_score(pred_relations, gt_relations, mode="strict"):
     logger.info(f"RE Evaluation in *** {mode.upper()} *** mode")
 
     logger.info(
-        "processed {} sentences with {} relations; found: {} relations; correct: {}.".
-        format(n_sents, n_rels, n_found, tp))
-    logger.info("\tALL\t TP: {};\tFP: {};\tFN: {}".format(scores["ALL"][
-        "tp"], scores["ALL"]["fp"], scores["ALL"]["fn"]))
+        "processed {} sentences with {} relations; found: {} relations; correct: {}."
+        .format(n_sents, n_rels, n_found, tp))
+    logger.info("\tALL\t TP: {};\tFP: {};\tFN: {}".format(
+        scores["ALL"]["tp"], scores["ALL"]["fp"], scores["ALL"]["fn"]))
     logger.info(
         "\t\t(m avg): precision: {:.2f};\trecall: {:.2f};\tf1: {:.2f} (micro)".
         format(precision, recall, f1))
     logger.info(
-        "\t\t(M avg): precision: {:.2f};\trecall: {:.2f};\tf1: {:.2f} (Macro)\n".
-        format(scores["ALL"]["Macro_p"], scores["ALL"]["Macro_r"], scores["ALL"]
-               ["Macro_f1"]))
+        "\t\t(M avg): precision: {:.2f};\trecall: {:.2f};\tf1: {:.2f} (Macro)\n"
+        .format(scores["ALL"]["Macro_p"], scores["ALL"]["Macro_r"],
+                scores["ALL"]["Macro_f1"]))
 
     for rel_type in relation_types:
         logger.info(
-            "\t{}: \tTP: {};\tFP: {};\tFN: {};\tprecision: {:.2f};\trecall: {:.2f};\tf1: {:.2f};\t{}".
-            format(
+            "\t{}: \tTP: {};\tFP: {};\tFN: {};\tprecision: {:.2f};\trecall: {:.2f};\tf1: {:.2f};\t{}"
+            .format(
                 rel_type,
                 scores[rel_type]["tp"],
                 scores[rel_type]["fp"],
@@ -227,7 +228,8 @@ def re_score(pred_relations, gt_relations, mode="strict"):
                 scores[rel_type]["p"],
                 scores[rel_type]["r"],
                 scores[rel_type]["f1"],
-                scores[rel_type]["tp"] + scores[rel_type]["fp"], ))
+                scores[rel_type]["tp"] + scores[rel_type]["fp"],
+            ))
 
     return scores
 
@@ -284,42 +286,39 @@ def train(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    train_dataset = XFUN(
-        tokenizer,
-        data_dir=args.train_data_dir,
-        label_path=args.train_label_path,
-        label2id_map=label2id_map,
-        img_size=(224, 224),
-        max_seq_len=args.max_seq_length,
-        pad_token_label_id=pad_token_label_id,
-        contains_re=True,
-        add_special_ids=False,
-        return_attention_mask=True,
-        load_mode='all')
+    train_dataset = XFUN(tokenizer,
+                         data_dir=args.train_data_dir,
+                         label_path=args.train_label_path,
+                         label2id_map=label2id_map,
+                         img_size=(224, 224),
+                         max_seq_len=args.max_seq_length,
+                         pad_token_label_id=pad_token_label_id,
+                         contains_re=True,
+                         add_special_ids=False,
+                         return_attention_mask=True,
+                         load_mode='all')
 
-    eval_dataset = XFUN(
-        tokenizer,
-        data_dir=args.eval_data_dir,
-        label_path=args.eval_label_path,
-        label2id_map=label2id_map,
-        img_size=(224, 224),
-        max_seq_len=args.max_seq_length,
-        pad_token_label_id=pad_token_label_id,
-        contains_re=True,
-        add_special_ids=False,
-        return_attention_mask=True,
-        load_mode='all')
+    eval_dataset = XFUN(tokenizer,
+                        data_dir=args.eval_data_dir,
+                        label_path=args.eval_label_path,
+                        label2id_map=label2id_map,
+                        img_size=(224, 224),
+                        max_seq_len=args.max_seq_length,
+                        pad_token_label_id=pad_token_label_id,
+                        contains_re=True,
+                        add_special_ids=False,
+                        return_attention_mask=True,
+                        load_mode='all')
 
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=True)
     args.train_batch_size = args.per_gpu_train_batch_size * max(
         1, paddle.distributed.get_world_size())
-    train_dataloader = paddle.io.DataLoader(
-        train_dataset,
-        batch_sampler=train_sampler,
-        num_workers=8,
-        use_shared_memory=True,
-        collate_fn=DataCollator())
+    train_dataloader = paddle.io.DataLoader(train_dataset,
+                                            batch_sampler=train_sampler,
+                                            num_workers=8,
+                                            use_shared_memory=True,
+                                            collate_fn=DataCollator())
 
     eval_dataloader = paddle.io.DataLoader(
         eval_dataset,
@@ -341,14 +340,14 @@ def train(args):
             lr_scheduler,
             args.warmup_steps,
             start_lr=0,
-            end_lr=args.learning_rate, )
+            end_lr=args.learning_rate,
+        )
     grad_clip = paddle.nn.ClipGradByNorm(clip_norm=10)
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=args.learning_rate,
-        parameters=model.parameters(),
-        epsilon=args.adam_epsilon,
-        grad_clip=grad_clip,
-        weight_decay=args.weight_decay)
+    optimizer = paddle.optimizer.Adam(learning_rate=args.learning_rate,
+                                      parameters=model.parameters(),
+                                      epsilon=args.adam_epsilon,
+                                      grad_clip=grad_clip,
+                                      weight_decay=args.weight_decay)
 
     # Train!
     logger.info("***** Running training *****")
@@ -384,8 +383,8 @@ def train(args):
 
             global_step += 1
 
-            if (paddle.distributed.get_rank() == 0 and args.eval_steps > 0 and
-                    global_step % args.eval_steps == 0):
+            if (paddle.distributed.get_rank() == 0 and args.eval_steps > 0
+                    and global_step % args.eval_steps == 0):
                 # Log metrics
                 if paddle.distributed.get_rank(
                 ) == 0 and args.evaluate_during_training:
@@ -397,15 +396,14 @@ def train(args):
                         os.makedirs(output_dir, exist_ok=True)
                         model.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(args,
-                                    os.path.join(output_dir,
-                                                 "training_args.bin"))
+                        paddle.save(
+                            args, os.path.join(output_dir, "training_args.bin"))
                         logger.info(f"Saving model checkpoint to {output_dir}")
                     logger.info(f"eval results: {results}")
                     logger.info(f"best_metirc: {best_metirc}")
 
-            if (paddle.distributed.get_rank() == 0 and args.save_steps > 0 and
-                    global_step % args.save_steps == 0):
+            if (paddle.distributed.get_rank() == 0 and args.save_steps > 0
+                    and global_step % args.save_steps == 0):
                 # Save model checkpoint
                 output_dir = os.path.join(args.output_dir, "checkpoint-latest")
                 os.makedirs(output_dir, exist_ok=True)

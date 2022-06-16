@@ -106,6 +106,7 @@ def predict(model,
 
 
 class LongDocClassifier:
+
     def __init__(self,
                  model_name_or_path,
                  trainer_num=1,
@@ -220,20 +221,21 @@ class LongDocClassifier:
         B, T, H, M, N = self.batch_size, self.max_seq_length, self.model_config["hidden_size"], self.memory_len, \
                         self.model_config["num_hidden_layers"]
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[B, T, 1], dtype="int64", name="input_ids"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[N, B, M, H], dtype="float32",
-                name="memories"),  # memories
-            paddle.static.InputSpec(
-                shape=[B, T, 1], dtype="int64",
-                name="token_type_ids"),  # token_type_ids
-            paddle.static.InputSpec(
-                shape=[B, 2 * T + M, 1], dtype="int64",
-                name="position_ids"),  # position_ids
-            paddle.static.InputSpec(
-                shape=[B, T, 1], dtype="float32",
-                name="attn_mask"),  # attn_mask
+            paddle.static.InputSpec(shape=[B, T, 1],
+                                    dtype="int64",
+                                    name="input_ids"),  # input_ids
+            paddle.static.InputSpec(shape=[N, B, M, H],
+                                    dtype="float32",
+                                    name="memories"),  # memories
+            paddle.static.InputSpec(shape=[B, T, 1],
+                                    dtype="int64",
+                                    name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(shape=[B, 2 * T + M, 1],
+                                    dtype="int64",
+                                    name="position_ids"),  # position_ids
+            paddle.static.InputSpec(shape=[B, T, 1],
+                                    dtype="float32",
+                                    name="attn_mask"),  # attn_mask
         ]
 
     def _convert_dygraph_to_static(self):
@@ -243,8 +245,8 @@ class LongDocClassifier:
         assert self._model is not None, 'The dygraph model must be created before converting the dygraph model to static model.'
         assert self._input_spec is not None, 'The input spec must be created before converting the dygraph model to static model.'
         logger.info("Converting to the inference model cost a little time.")
-        static_model = paddle.jit.to_static(
-            self._model, input_spec=self._input_spec)
+        static_model = paddle.jit.to_static(self._model,
+                                            input_spec=self._input_spec)
         save_path = os.path.join(self.static_path, "static", "inference")
         paddle.jit.save(static_model, save_path)
         logger.info("The inference model save in the path:{}".format(save_path))
@@ -258,12 +260,11 @@ class LongDocClassifier:
             # Copy the memory
             memories = create_memory()
         else:
-            memories = np.zeros(
-                [
-                    self.model_config["num_hidden_layers"], self.batch_size,
-                    self.memory_len, self.model_config["hidden_size"]
-                ],
-                dtype="float32")
+            memories = np.zeros([
+                self.model_config["num_hidden_layers"], self.batch_size,
+                self.memory_len, self.model_config["hidden_size"]
+            ],
+                                dtype="float32")
         file_path = saved_path
         if not self.static_mode:
             self.input_handles, self.output_handle, self.predictor = None, None, self._model
@@ -285,15 +286,14 @@ def do_predict(args):
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-    predictor = LongDocClassifier(
-        model_name_or_path=args.model_name_or_path,
-        rank=rank,
-        trainer_num=trainer_num,
-        batch_size=args.batch_size,
-        max_seq_length=args.max_seq_length,
-        memory_len=args.memory_length,
-        static_mode=args.static_mode,
-        static_path=args.static_path)
+    predictor = LongDocClassifier(model_name_or_path=args.model_name_or_path,
+                                  rank=rank,
+                                  trainer_num=trainer_num,
+                                  batch_size=args.batch_size,
+                                  max_seq_length=args.max_seq_length,
+                                  memory_len=args.memory_length,
+                                  static_mode=args.static_mode,
+                                  static_path=args.static_path)
     predictor.run_model(saved_path=args.test_results_file)
 
 

@@ -17,11 +17,12 @@
 
 from typing import Dict, List, Tuple
 
-from faster_tokenizers import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizers.models import WordPiece
+from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
+from faster_tokenizer.models import WordPiece, FasterWordPiece
 
 
 class Converter:
+
     def __init__(self, original_tokenizer):
         self.original_tokenizer = original_tokenizer
 
@@ -30,12 +31,13 @@ class Converter:
 
 
 class BertConverter(Converter):
+
     def converted(self) -> Tokenizer:
         vocab = self.original_tokenizer.vocab
         tokenizer = Tokenizer(
-            WordPiece(
-                vocab._token_to_idx,
-                unk_token=str(self.original_tokenizer.unk_token)))
+            FasterWordPiece(vocab._token_to_idx,
+                            unk_token=str(self.original_tokenizer.unk_token),
+                            with_pretokenization=True))
 
         tokenize_chinese_chars = True
         strip_accents = True
@@ -47,7 +49,8 @@ class BertConverter(Converter):
             clean_text=True,
             handle_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            lowercase=do_lower_case, )
+            lowercase=do_lower_case,
+        )
         tokenizer.pretokenizer = pretokenizers.BertPreTokenizer()
 
         cls_token = str(self.original_tokenizer.cls_token)
@@ -66,9 +69,14 @@ class ErnieConverter(BertConverter):
     pass
 
 
+class TinyBertConverter(BertConverter):
+    pass
+
+
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
+    "TinyBertTokenizer": TinyBertConverter,
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 

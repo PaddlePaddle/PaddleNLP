@@ -8,6 +8,7 @@ import sys
 from multiprocessing import Process, Queue
 
 from paddlenlp.transformers import LayoutXLMTokenizer
+
 tokenizer = LayoutXLMTokenizer.from_pretrained("layoutxlm-base-uncased")
 
 
@@ -38,8 +39,8 @@ def merge_bbox(tok_bboxes):
         height_m += y_max - y_min
         width_m += x_max - x_min
     height_m = height_m / len(tok_bboxes)
-    if (height_g - height_m
-        ) < 0.5 * height_m and width_g - width_m < 0.1 * width_m:
+    if (height_g -
+            height_m) < 0.5 * height_m and width_g - width_m < 0.1 * width_m:
         return False, [min_gx, max_gx, min_gy, max_gy]
     else:
         return True, tok_bboxes[0]
@@ -123,20 +124,20 @@ def xlm_parse(ocr_res, tokenizer):
                     for j in range(i, len(span_text)):
                         if span_text[j].lower() == span_tokens[tid + 1][0]:
                             break
-                        if span_text[j].lower() == "，" and span_tokens[tid + 1][
-                                0] == ",":
+                        if span_text[j].lower() == "，" and span_tokens[
+                                tid + 1][0] == ",":
                             break
-                        if span_text[j].lower() == "；" and span_tokens[tid + 1][
-                                0] == ";":
+                        if span_text[j].lower() == "；" and span_tokens[
+                                tid + 1][0] == ";":
                             break
-                        if span_text[j].lower() == "）" and span_tokens[tid + 1][
-                                0] == ")":
+                        if span_text[j].lower() == "）" and span_tokens[
+                                tid + 1][0] == ")":
                             break
-                        if span_text[j].lower() == "（" and span_tokens[tid + 1][
-                                0] == "(":
+                        if span_text[j].lower() == "（" and span_tokens[
+                                tid + 1][0] == "(":
                             break
-                        if span_text[j].lower() == "￥" and span_tokens[tid + 1][
-                                0] == "¥":
+                        if span_text[j].lower() == "￥" and span_tokens[
+                                tid + 1][0] == "¥":
                             break
 
                     tok_len = j - i
@@ -213,7 +214,8 @@ def tokenize_ocr_res(ocr_reses):
 
                 shift = tok_x_max
                 new_token_boxes.append(
-                    [round(tok_x_min), round(tok_x_max), tok_y_min, tok_y_max])
+                    [round(tok_x_min),
+                     round(tok_x_max), tok_y_min, tok_y_max])
                 new_tokens.append(char)
             new_res.append({
                 "text": para["text"],
@@ -251,8 +253,8 @@ def process_input(ocr_reses, tokenizer, save_ocr_path):
 def ocr_preprocess(img_dir):
     ocr = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=True)
     ocr_reses = []
-    img_names = sorted(
-        os.listdir(img_dir), key=lambda x: int(x.split("_")[1].split(".")[0]))
+    img_names = sorted(os.listdir(img_dir),
+                       key=lambda x: int(x.split("_")[1].split(".")[0]))
     for img_name in img_names:
         img_path = os.path.join(img_dir, img_name)
         parsing_res = ocr.ocr(img_path, cls=True)

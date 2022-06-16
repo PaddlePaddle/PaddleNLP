@@ -40,10 +40,11 @@ class ErnieRanker(BaseRanker):
     """
 
     def __init__(
-            self,
-            model_name_or_path: Union[str, Path],
-            top_k: int=10,
-            use_gpu: bool=True, ):
+        self,
+        model_name_or_path: Union[str, Path],
+        top_k: int = 10,
+        use_gpu: bool = True,
+    ):
         """
         :param model_name_or_path: Directory of a saved model or the name of a public model e.g.
         'rocketqa-zh-dureader-cross-encoder'.
@@ -54,12 +55,13 @@ class ErnieRanker(BaseRanker):
         # save init parameters to enable export of component config as YAML
         self.set_config(
             model_name_or_path=model_name_or_path,
-            top_k=top_k, )
+            top_k=top_k,
+        )
 
         self.top_k = top_k
 
-        self.devices, _ = initialize_device_settings(
-            use_cuda=use_gpu, multi_gpu=True)
+        self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
+                                                     multi_gpu=True)
 
         self.transformer_model = ErnieCrossEncoder(model_name_or_path)
         self.tokenizer = ErnieTokenizer.from_pretrained(model_name_or_path)
@@ -70,8 +72,8 @@ class ErnieRanker(BaseRanker):
 
     def predict_batch(self,
                       query_doc_list: List[dict],
-                      top_k: int=None,
-                      batch_size: int=None):
+                      top_k: int = None,
+                      batch_size: int = None):
         """
         Use loaded Ranker model to, for a list of queries, rank each query's supplied list of Document.
 
@@ -87,7 +89,7 @@ class ErnieRanker(BaseRanker):
     def predict(self,
                 query: str,
                 documents: List[Document],
-                top_k: Optional[int]=None) -> List[Document]:
+                top_k: Optional[int] = None) -> List[Document]:
         """
         Use loaded ranker model to re-rank the supplied list of Document.
 
@@ -101,11 +103,11 @@ class ErnieRanker(BaseRanker):
         if top_k is None:
             top_k = self.top_k
 
-        features = self.tokenizer(
-            [query for doc in documents], [doc.content for doc in documents],
-            max_seq_len=256,
-            pad_to_max_seq_len=True,
-            truncation_strategy="longest_first")
+        features = self.tokenizer([query for doc in documents],
+                                  [doc.content for doc in documents],
+                                  max_seq_len=256,
+                                  pad_to_max_seq_len=True,
+                                  truncation_strategy="longest_first")
 
         tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
@@ -120,7 +122,8 @@ class ErnieRanker(BaseRanker):
         sorted_scores_and_documents = sorted(
             zip(similarity_scores, documents),
             key=lambda similarity_document_tuple: similarity_document_tuple[0],
-            reverse=True, )
+            reverse=True,
+        )
 
         # rank documents according to scores
         sorted_documents = [doc for _, doc in sorted_scores_and_documents]

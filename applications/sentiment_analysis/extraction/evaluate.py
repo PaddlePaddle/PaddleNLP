@@ -35,8 +35,8 @@ def evaluate(model, data_loader, metric):
         predictions = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             seq_lens, predictions, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
 
     precision, recall, f1 = metric.accumulate()
 

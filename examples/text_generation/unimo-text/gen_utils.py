@@ -38,15 +38,14 @@ def convert_example(example,
         title = example['title']
 
     if mode != 'test':
-        tokenized_example = tokenizer.gen_encode(
-            source,
-            title=title,
-            target=example['target'],
-            max_seq_len=max_seq_len,
-            max_target_len=max_target_len,
-            max_title_len=max_title_len,
-            return_position_ids=True,
-            return_length=True)
+        tokenized_example = tokenizer.gen_encode(source,
+                                                 title=title,
+                                                 target=example['target'],
+                                                 max_seq_len=max_seq_len,
+                                                 max_target_len=max_target_len,
+                                                 max_title_len=max_title_len,
+                                                 return_position_ids=True,
+                                                 return_length=True)
         target_start = tokenized_example['input_ids'].index(
             tokenizer.cls_token_id, 1)
         target_end = tokenized_example['seq_len']
@@ -72,6 +71,7 @@ def convert_example(example,
 
 
 def batchify_fn(batch_examples, pad_val, mode):
+
     def pad_mask(batch_attention_mask):
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
@@ -79,9 +79,9 @@ def batchify_fn(batch_examples, pad_val, mode):
             (batch_size, max_len, max_len), dtype='float32') * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
-            mask_data[-seq_len:, -seq_len:] = np.array(
-                batch_attention_mask[i], dtype='float32')
-        # In order to ensure the correct broadcasting mechanism, expand one 
+            mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i],
+                                                       dtype='float32')
+        # In order to ensure the correct broadcasting mechanism, expand one
         # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
@@ -105,8 +105,8 @@ def batchify_fn(batch_examples, pad_val, mode):
             for i, example in enumerate(batch_examples)
         ])
         labels = np.concatenate([
-            np.array(
-                example['labels'], dtype='int64') for example in batch_examples
+            np.array(example['labels'], dtype='int64')
+            for example in batch_examples
         ])
         return input_ids, token_type_ids, position_ids, attention_mask, masked_positions, labels
     else:
@@ -114,26 +114,26 @@ def batchify_fn(batch_examples, pad_val, mode):
 
 
 def create_data_loader(dataset, tokenizer, args, mode):
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
-        max_target_len=args.max_target_len,
-        max_title_len=args.max_title_len,
-        mode=mode)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_len=args.max_seq_len,
+                         max_target_len=args.max_target_len,
+                         max_title_len=args.max_title_len,
+                         mode=mode)
     dataset = dataset.map(trans_func, lazy=True)
     if mode == 'train':
-        batch_sampler = DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=True)
+        batch_sampler = DistributedBatchSampler(dataset,
+                                                batch_size=args.batch_size,
+                                                shuffle=True)
     else:
-        batch_sampler = BatchSampler(
-            dataset, batch_size=args.batch_size // 2, shuffle=False)
+        batch_sampler = BatchSampler(dataset,
+                                     batch_size=args.batch_size // 2,
+                                     shuffle=False)
     collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id, mode=mode)
-    data_loader = DataLoader(
-        dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=collate_fn,
-        return_list=True)
+    data_loader = DataLoader(dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=collate_fn,
+                             return_list=True)
     return dataset, data_loader
 
 
@@ -152,7 +152,10 @@ def post_process_sum(token_ids, tokenizer):
     return token_ids, tokens
 
 
-def select_sum(ids, scores, tokenizer, max_dec_len=None,
+def select_sum(ids,
+               scores,
+               tokenizer,
+               max_dec_len=None,
                num_return_sequences=1):
     results = []
     group = []
@@ -163,8 +166,8 @@ def select_sum(ids, scores, tokenizer, max_dec_len=None,
 
         if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
             raise ValueError(
-                "the length of `ids` is {}, but the `num_return_sequences` is {}".
-                format(len(ids), num_return_sequences))
+                "the length of `ids` is {}, but the `num_return_sequences` is {}"
+                .format(len(ids), num_return_sequences))
 
         for pred, score in zip(ids, scores):
             pred_token_ids, pred_tokens = post_process_sum(pred, tokenizer)

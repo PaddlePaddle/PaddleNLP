@@ -11,11 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+try:
+    from paddle.incubate.nn import FusedTransformerEncoderLayer
+except ImportError:
+    FusedTransformerEncoderLayer = None
 
 from .. import PretrainedModel, register_base_model
 
@@ -272,6 +277,90 @@ class BertPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "pad_token_id": 0,
         },
+        "uer/chinese-roberta-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "uer/chinese-roberta-medium": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 512,
+            "initializer_range": 0.02,
+            "intermediate_size": 2048,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 8,
+            "num_hidden_layers": 8,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "uer/chinese-roberta-6l-768h": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "uer/chinese-roberta-small": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 512,
+            "initializer_range": 0.02,
+            "intermediate_size": 2048,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 8,
+            "num_hidden_layers": 4,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "uer/chinese-roberta-mini": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 256,
+            "initializer_range": 0.02,
+            "intermediate_size": 1024,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 4,
+            "num_hidden_layers": 4,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
+        "uer/chinese-roberta-tiny": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 128,
+            "initializer_range": 0.02,
+            "intermediate_size": 512,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 2,
+            "num_hidden_layers": 2,
+            "type_vocab_size": 2,
+            "vocab_size": 21128,
+            "pad_token_id": 0
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -300,6 +389,18 @@ class BertPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-large-chinese.pdparams",
             "simbert-base-chinese":
             "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
+            "uer/chinese-roberta-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
+            "uer/chinese-roberta-medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
+            "uer/chinese-roberta-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
+            "uer/chinese-roberta-small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
+            "uer/chinese-roberta-mini":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_mini.pdparams",
+            "uer/chinese-roberta-tiny":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_tiny.pdparams",
         }
     }
     base_model_prefix = "bert"
@@ -396,7 +497,8 @@ class BertModel(BertPretrainedModel):
                  type_vocab_size=16,
                  initializer_range=0.02,
                  pad_token_id=0,
-                 pool_act="tanh"):
+                 pool_act="tanh",
+                 fuse=False):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -413,6 +515,7 @@ class BertModel(BertPretrainedModel):
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
@@ -510,12 +613,22 @@ class BertModel(BertPretrainedModel):
                 encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
             pooled_output = self.pooler(encoder_outputs[-1])
         else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
-            pooled_output = self.pooler(sequence_output)
-        if output_hidden_states:
-            return encoder_outputs, pooled_output
-        else:
-            return sequence_output, pooled_output
+            if output_hidden_states:
+                output = embedding_output
+                encoder_outputs = []
+                for mod in self.encoder.layers:
+                    output = mod(output, src_mask=attention_mask)
+                    encoder_outputs.append(output)
+                if self.encoder.norm is not None:
+                    encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+                pooled_output = self.pooler(encoder_outputs[-1])
+            else:
+                sequence_output = self.encoder(embedding_output, attention_mask)
+                pooled_output = self.pooler(sequence_output)
+            if output_hidden_states:
+                return encoder_outputs, pooled_output
+            else:
+                return sequence_output, pooled_output
 
 
 class BertForQuestionAnswering(BertPretrainedModel):

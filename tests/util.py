@@ -67,7 +67,9 @@ def softmax_with_cross_entropy(logits,
 
 
 def assert_raises(Error=AssertionError):
+
     def assert_raises_error(func):
+
         def wrapper(self, *args, **kwargs):
             with self.assertRaises(Error):
                 func(self, *args, **kwargs)

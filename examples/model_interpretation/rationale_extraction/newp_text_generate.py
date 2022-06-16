@@ -63,8 +63,8 @@ def generate_for_senti(args, evid_dict, ratio):
     keys = [int(x) for x in char_attri[math.ceil(length * rationale_ratio):]]
     keys.sort()
     for key in keys:
-        toprationale_exclusive_text.append(evid_dict['char_attri'][str(key)][0]
-                                           .strip())
+        toprationale_exclusive_text.append(
+            evid_dict['char_attri'][str(key)][0].strip())
 
     if args.language == 'en':
         toprationale_text = ' '.join(toprationale_text)
@@ -126,8 +126,8 @@ def generate_for_similarity(args, evid_dict, ratio):
     ]
     keys.sort()
     for key in keys:
-        q_topR_noRtext.append(evid_dict['query_char_attri'][str(key)][0].strip(
-        ))
+        q_topR_noRtext.append(
+            evid_dict['query_char_attri'][str(key)][0].strip())
 
     if args.language == 'ch':
         q_topR_Rtext = ''.join(q_topR_Rtext)
@@ -177,31 +177,33 @@ def generate_for_similarity(args, evid_dict, ratio):
     r['context'] = [q_topR_Rtext, t_topR_Rtext]
     r['context_idx'] = [[
         int(x) for x in q_char_attri[:math.ceil(q_length * q_rationale_ratio)]
-    ], [
-        int(x) for x in t_char_attri[:math.ceil(t_length * t_rationale_ratio)]
-    ]]
-    r['context_token'] = [[
-        evid_dict['query_char_attri'][x][0]
-        for x in q_char_attri[:math.ceil(q_length * q_rationale_ratio)]
-    ], [
-        evid_dict['title_char_attri'][x][0]
-        for x in t_char_attri[:math.ceil(t_length * t_rationale_ratio)]
-    ]]
+    ], [int(x) for x in t_char_attri[:math.ceil(t_length * t_rationale_ratio)]]]
+    r['context_token'] = [
+        [
+            evid_dict['query_char_attri'][x][0]
+            for x in q_char_attri[:math.ceil(q_length * q_rationale_ratio)]
+        ],
+        [
+            evid_dict['title_char_attri'][x][0]
+            for x in t_char_attri[:math.ceil(t_length * t_rationale_ratio)]
+        ]
+    ]
     r['label'] = label
     ex_r['id'] = evid_dict['id']
     ex_r['context'] = [q_topR_noRtext, t_topR_noRtext]
     ex_r['context_idx'] = [[
         int(x) for x in q_char_attri[math.ceil(q_length * q_rationale_ratio):]
-    ], [
-        int(x) for x in t_char_attri[math.ceil(t_length * t_rationale_ratio):]
-    ]]
-    ex_r['context_token'] = [[
-        evid_dict['query_char_attri'][x][0]
-        for x in q_char_attri[math.ceil(q_length * q_rationale_ratio):]
-    ], [
-        evid_dict['title_char_attri'][x][0]
-        for x in t_char_attri[math.ceil(t_length * t_rationale_ratio):]
-    ]]
+    ], [int(x) for x in t_char_attri[math.ceil(t_length * t_rationale_ratio):]]]
+    ex_r['context_token'] = [
+        [
+            evid_dict['query_char_attri'][x][0]
+            for x in q_char_attri[math.ceil(q_length * q_rationale_ratio):]
+        ],
+        [
+            evid_dict['title_char_attri'][x][0]
+            for x in t_char_attri[math.ceil(t_length * t_rationale_ratio):]
+        ]
+    ]
     ex_r['label'] = label
     return r, ex_r
 
@@ -223,8 +225,8 @@ def generate_for_MRC(args, evid_dict, ratio):
     keys = [int(x) for x in char_attri[math.ceil(length * rationale_ratio):]]
     keys.sort()
     for key in keys:
-        toprationale_exclusive_text.append(evid_dict['char_attri'][str(key)][0]
-                                           .strip())
+        toprationale_exclusive_text.append(
+            evid_dict['char_attri'][str(key)][0].strip())
 
     if args.language == 'en':
         toprationale_text = ' '.join(toprationale_text)
@@ -292,18 +294,17 @@ def r_text_generation(evids, args):
     rationale_ratio = json.loads(args.ratio)
     for id, evid_dict in enumerate(evids):
         if args.task == 'senti':
-            data_R_dict, Rdata_noR_dict = generate_for_senti(args, evid_dict,
-                                                             rationale_ratio)
+            data_R_dict, Rdata_noR_dict = generate_for_senti(
+                args, evid_dict, rationale_ratio)
         elif args.task == 'similarity':
             data_R_dict, Rdata_noR_dict = generate_for_similarity(
                 args, evid_dict, rationale_ratio)
         elif args.task == 'mrc':
-            data_R_dict, Rdata_noR_dict = generate_for_MRC(args, evid_dict,
-                                                           rationale_ratio)
+            data_R_dict, Rdata_noR_dict = generate_for_MRC(
+                args, evid_dict, rationale_ratio)
         f_rationale.write(json.dumps(data_R_dict, ensure_ascii=False) + '\n')
         f_rationale_exclusive.write(
-            json.dumps(
-                Rdata_noR_dict, ensure_ascii=False) + '\n')
+            json.dumps(Rdata_noR_dict, ensure_ascii=False) + '\n')
 
     f_rationale.close()
     f_rationale_exclusive.close()
