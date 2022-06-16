@@ -11,12 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
-from paddle.incubate.nn import FusedTransformerEncoderLayer
+try:
+    from paddle.incubate.nn import FusedTransformerEncoderLayer
+except ImportError:
+    FusedTransformerEncoderLayer = None
 
 from .. import PretrainedModel, register_base_model
 
@@ -502,7 +506,12 @@ class BertModel(BertPretrainedModel):
                                          hidden_dropout_prob,
                                          max_position_embeddings,
                                          type_vocab_size)
-        self.fuse = fuse
+        if fuse and FusedTransformerEncoderLayer is None:
+            warnings.warn(
+                "FusedTransformerEncoderLayer is not supported by the running Paddle. "
+                "The flag fuse_transformer will be ignored. Try Paddle >= 2.3.0"
+            )
+        self.fuse = fuse and FusedTransformerEncoderLayer is not None
         if self.fuse:
             self.encoder = nn.LayerList([
                 FusedTransformerEncoderLayer(

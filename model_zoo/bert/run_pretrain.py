@@ -174,7 +174,7 @@ def parse_args():
         'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
     parser.add_argument(
-        "--fuse",
+        "--fuse_transformer",
         type=distutils.util.strtobool,
         default=False,
         help=
@@ -342,7 +342,7 @@ def do_train(args):
     if args.model_name_or_path in pretrained_models_list:
         config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
-        config['fuse'] = args.fuse
+        config['fuse'] = args.fuse_transformer
         model = model_class(base_class(**config))
     else:
         model = model_class.from_pretrained(args.model_name_or_path)

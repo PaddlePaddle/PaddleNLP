@@ -166,7 +166,7 @@ def parse_args():
         'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
     parser.add_argument(
-        "--fuse",
+        "--fuse_transformer",
         type=distutils.util.strtobool,
         default=False,
         help=
@@ -309,7 +309,7 @@ def do_train(args):
     config = model_class.pretrained_init_configuration[args.model_name_or_path]
     if config["vocab_size"] % 8 != 0:
         config["vocab_size"] += 8 - (config["vocab_size"] % 8)
-    config['fuse'] = args.fuse
+    config['fuse'] = args.fuse_transformer
     model = BertForPretraining(BertModel(**config))
     criterion = BertPretrainingCriterion(model.bert.config["vocab_size"])
     prediction_scores, seq_relationship_score = model(
