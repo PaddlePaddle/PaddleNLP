@@ -191,8 +191,8 @@ struct Symbol {
 
 struct BPEWord {
   BPEWord() = default;
-  BPEWord(size_t capacity) { symbols_.reserve(capacity); }
-
+  BPEWord(size_t capacity) { Reserve(capacity); }
+  void Reserve(size_t capacity) { symbols_.reserve(capacity); }
   void Add(uint32_t ch, size_t byte_len) {
     int len = symbols_.size();
     int next = -1;
@@ -241,7 +241,8 @@ struct BPEWord {
       auto& second = symbols_[i + 1];
 
       auto new_merge_info = merges.at({first.ch_, second.ch_});
-      core::Merge new_merge{i, new_merge_info.first, new_merge_info.second};
+      core::Merge new_merge{
+          static_cast<size_t>(i), new_merge_info.first, new_merge_info.second};
       queue.push(new_merge);
     }
     std::random_device
@@ -291,7 +292,9 @@ struct BPEWord {
           auto new_pair = Pair{prev_symbol.ch_, current.ch_};
           if (merges.find(new_pair) != merges.end()) {
             auto new_merge = merges.at(new_pair);
-            queue.push({current.prev_, new_merge.first, new_merge.second});
+            queue.push({static_cast<size_t>(current.prev_),
+                        new_merge.first,
+                        new_merge.second});
           }
         }
 

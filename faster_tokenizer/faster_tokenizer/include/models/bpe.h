@@ -22,8 +22,17 @@ namespace tokenizers {
 namespace models {
 
 struct BPE : public Model {
+  BPE();
+  BPE(const core::Vocab& vocab,
+      const core::Merges& merges,
+      size_t cache_capacity = utils::DEFAULT_CACHE_CAPACITY,
+      const std::vector<float>& dropout = {},
+      const std::vector<std::string>& unk_token = {},
+      const std::vector<std::string>& continuing_subword_prefix = {},
+      const std::vector<std::string>& end_of_word_suffix = {},
+      bool fuse_unk = false);
   virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const override;
+      const std::string& sequence) const override;
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual bool IdToToken(uint id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;
@@ -32,13 +41,25 @@ struct BPE : public Model {
   virtual std::string Save(const std::string& folder,
                            const std::string& filename_prefix) const override;
 
+  void ClearCache();
+  static core::Vocab GetVocabFromFile(const std::string& vocab_json_path);
+  static core::Merges GetMergesFromFile(const std::string& merge_path);
+  static void GetVocabAndMergesFromFile(const std::string& vocab_json_path,
+                                        const std::string& merge_path,
+                                        core::Vocab* vocab,
+                                        core::Merges* merges);
+
 private:
+  void Init(const core::Merges& merges);
+  void MergeWord(const std::string& word, core::BPEWord* bpe_word);
+  std::vector<core::Token> WordToTokens(const core::BPEWord& bpe_word);
+  std::vector<core::Token> TokenizeWithCache(const std::string& sequence);
   core::Vocab vocab_;
   core::VocabReversed vocab_reversed_;
   core::MergeMap merges_;
 
   // The following vector may contain 0 or 1 element
-  std::vector<utils::Cache<std::string, core::BPEWord>> cache_;
+  utils::Cache<std::string, core::BPEWord> cache_;
   std::vector<float> dropout_;
   std::vector<std::string> unk_token_;
   std::vector<uint> unk_token_id_;

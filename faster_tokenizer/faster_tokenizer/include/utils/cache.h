@@ -32,8 +32,10 @@ template <typename K, typename V>
 struct Cache {
   std::unordered_map<K, V> map_;
   size_t capacity_;
-  Cache() : capacity_(DEFAULT_CACHE_CAPACITY) { Fresh(); }
-  Cache(size_t capacity) : capacity_(capacity) { Fresh(); }
+  Cache(size_t capacity = DEFAULT_CACHE_CAPACITY) : capacity_(capacity) {
+    Fresh();
+  }
+
   void Fresh() { CreateCacheMap(capacity_); }
   void Clear() {
     WLock guard(cache_mutex_);
