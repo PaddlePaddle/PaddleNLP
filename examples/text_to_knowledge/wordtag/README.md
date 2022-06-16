@@ -40,7 +40,6 @@ WordTag模型对所有的词预测到上位词类之后，会直接根据预测�
 
 WordTag共包含91种词性及专名类别标签，标签集合如下表
 
-
 <table>
     <thead>
         <th colspan='7'>WordTag标签集合</th>
