@@ -32,7 +32,7 @@ struct BPE : public Model {
       const std::vector<std::string>& end_of_word_suffix = {},
       bool fuse_unk = false);
   virtual std::vector<core::Token> Tokenize(
-      const std::string& sequence) const override;
+      const std::string& sequence) override;
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual bool IdToToken(uint id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;

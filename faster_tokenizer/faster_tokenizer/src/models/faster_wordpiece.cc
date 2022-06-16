@@ -373,7 +373,7 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
 }
 
 std::vector<core::Token> FasterWordPiece::Tokenize(
-    const std::string& sequence) const {
+    const std::string& sequence) {
   if (!with_pretokenization_) {
     return TokenizeWithoutPreTokenize(sequence);
   }

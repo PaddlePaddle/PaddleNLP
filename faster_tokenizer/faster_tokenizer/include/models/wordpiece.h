@@ -32,7 +32,7 @@ struct WordPiece : public Model {
             size_t max_input_chars_per_word,
             std::string&& continuing_subword_prefix);
   virtual std::vector<core::Token> Tokenize(
-      const std::string& sequence) const override;
+      const std::string& sequence) override;
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual bool IdToToken(uint id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;

@@ -22,8 +22,7 @@ namespace tokenizers {
 namespace models {
 
 struct Model {
-  virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const = 0;
+  virtual std::vector<core::Token> Tokenize(const std::string& tokens) = 0;
   virtual bool TokenToId(const std::string& token, uint* id) const = 0;
   virtual bool IdToToken(uint id, std::string* token) const = 0;
   virtual core::Vocab GetVocab() const = 0;

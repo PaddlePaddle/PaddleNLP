@@ -25,7 +25,7 @@ class PyModel : public models::Model {
 public:
   using Model::Model;
   virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const override {
+      const std::string& tokens) override {
     PYBIND11_OVERLOAD_PURE_NAME(
         std::vector<core::Token>, Model, "tokenize", Tokenize, tokens);
   }
@@ -58,7 +58,7 @@ public:
 class PyWordPiece : public models::WordPiece {
   using WordPiece::WordPiece;
   virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const override {
+      const std::string& tokens) override {
     PYBIND11_OVERLOAD_NAME(
         std::vector<core::Token>, WordPiece, "tokenize", Tokenize, tokens);
   }
@@ -91,7 +91,7 @@ class PyWordPiece : public models::WordPiece {
 class PyFasterWordPiece : public models::FasterWordPiece {
   using FasterWordPiece::FasterWordPiece;
   virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const override {
+      const std::string& tokens) override {
     PYBIND11_OVERLOAD_NAME(std::vector<core::Token>,
                            FasterWordPiece,
                            "tokenize",

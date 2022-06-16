@@ -128,9 +128,7 @@ std::vector<core::Token> BPE::WordToTokens(const core::BPEWord& bpe_word) {
 std::vector<core::Token> BPE::TokenizeWithCache(const std::string& sequence) {
   return {};
 }
-std::vector<core::Token> BPE::Tokenize(const std::string& tokens) const {
-  return {};
-}
+std::vector<core::Token> BPE::Tokenize(const std::string& tokens) { return {}; }
 
 bool BPE::TokenToId(const std::string& token, uint* id) const {
   if (vocab_.find(token) == vocab_.end()) {

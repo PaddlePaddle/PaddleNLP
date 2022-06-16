@@ -106,8 +106,7 @@ std::string WordPiece::Save(const std::string& folder,
   return filepath;
 }
 
-std::vector<core::Token> WordPiece::Tokenize(
-    const std::string& sequence) const {
+std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
   VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence";
   std::vector<core::Token> all_tokens;
   size_t unicode_len =
