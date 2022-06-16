@@ -504,14 +504,16 @@ class BertModel(BertPretrainedModel):
                                          type_vocab_size)
         self.fuse = fuse
         if self.fuse:
-            self.encoder = nn.LayerList([FusedTransformerEncoderLayer(
-                hidden_size,
-                num_attention_heads,
-                intermediate_size,
-                dropout_rate=hidden_dropout_prob,
-                activation=hidden_act,
-                attn_dropout_rate=attention_probs_dropout_prob,
-                act_dropout_rate=0.) for _ in range(num_hidden_layers)])
+            self.encoder = nn.LayerList([
+                FusedTransformerEncoderLayer(
+                    hidden_size,
+                    num_attention_heads,
+                    intermediate_size,
+                    dropout_rate=hidden_dropout_prob,
+                    activation=hidden_act,
+                    attn_dropout_rate=attention_probs_dropout_prob,
+                    act_dropout_rate=0.) for _ in range(num_hidden_layers)
+            ])
         else:
             encoder_layer = nn.TransformerEncoderLayer(
                 hidden_size,
@@ -521,7 +523,8 @@ class BertModel(BertPretrainedModel):
                 activation=hidden_act,
                 attn_dropout=attention_probs_dropout_prob,
                 act_dropout=0)
-            self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+            self.encoder = nn.TransformerEncoder(encoder_layer,
+                                                 num_hidden_layers)
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
