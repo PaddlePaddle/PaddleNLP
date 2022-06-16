@@ -150,8 +150,8 @@ class TinyBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.tinybert.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -242,9 +242,10 @@ class TinyBertModel(TinyBertPretrainedModel):
         super(TinyBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = BertEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+        self.embeddings = BertEmbeddings(vocab_size, hidden_size,
+                                         hidden_dropout_prob,
+                                         max_position_embeddings,
+                                         type_vocab_size)
 
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
@@ -327,8 +328,8 @@ class TinyBertModel(TinyBertPretrainedModel):
         '''
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
             attention_mask = self.get_extended_attention_mask(attention_mask)
@@ -389,8 +390,9 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 
         """
-        sequence_output, pooled_output = self.tinybert(
-            input_ids, token_type_ids, attention_mask)
+        sequence_output, pooled_output = self.tinybert(input_ids,
+                                                       token_type_ids,
+                                                       attention_mask)
 
         return sequence_output
 
@@ -415,8 +417,8 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         super(TinyBertForSequenceClassification, self).__init__()
         self.tinybert = tinybert
         self.num_classes = num_classes
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.tinybert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  tinybert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.tinybert.config["hidden_size"],
                                     num_classes)
         self.activation = nn.ReLU()
@@ -455,8 +457,9 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 logits = outputs[0]
         """
 
-        sequence_output, pooled_output = self.tinybert(
-            input_ids, token_type_ids, attention_mask)
+        sequence_output, pooled_output = self.tinybert(input_ids,
+                                                       token_type_ids,
+                                                       attention_mask)
 
         logits = self.classifier(self.activation(pooled_output))
         return logits
@@ -517,10 +520,9 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.tinybert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.tinybert(input_ids,
+                                           token_type_ids=token_type_ids,
+                                           attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -549,8 +551,8 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
         super(TinyBertForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.tinybert = tinybert
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.tinybert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  tinybert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
@@ -576,17 +578,16 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
             -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(shape=(
-                -1, token_type_ids.shape[-1]))
+            token_type_ids = token_type_ids.reshape(
+                shape=(-1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        _, pooled_output = self.tinybert(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.tinybert(input_ids,
+                                         token_type_ids=token_type_ids,
+                                         attention_mask=attention_mask)
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
