@@ -78,27 +78,37 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "roberta-wwm-ext":
+            "hfl/roberta-wwm-ext":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_base/vocab.txt",
-            "roberta-wwm-ext-large":
+            "hfl/roberta-wwm-ext-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/roberta_large/vocab.txt",
-            "rbt3":
+            "hfl/rbt6":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt6/vocab.txt",
+            "hfl/rbt4":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/rbt4/vocab.txt",
+            "hfl/rbt3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbt3/vocab.txt",
-            "rbtl3":
+            "hfl/rbtl3":
             "https://bj.bcebos.com/paddlenlp/models/transformers/rbtl3/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "roberta-wwm-ext": {
+        "hfl/roberta-wwm-ext": {
             "do_lower_case": True
         },
-        "roberta-wwm-ext-large": {
+        "hfl/roberta-wwm-ext-large": {
             "do_lower_case": True
         },
-        "rbt3": {
+        "hfl/rbt6": {
             "do_lower_case": True
         },
-        "rbtl3": {
+        "hfl/rbt4": {
+            "do_lower_case": True
+        },
+        "hfl/rbt3": {
+            "do_lower_case": True
+        },
+        "hfl/rbtl3": {
             "do_lower_case": True
         },
     }

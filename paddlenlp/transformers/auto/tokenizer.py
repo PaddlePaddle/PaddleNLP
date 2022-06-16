@@ -70,6 +70,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("UnifiedTransformerTokenizer", "unified_transformer"),
     ("UNIMOTokenizer", "unimo"),
     ("XLNetTokenizer", "xlnet"),
+    ("XLMTokenizer", "xlm"),
     ("GPTTokenizer", "gpt"),
     ("GPTChineseTokenizer", "gpt"),
     ("T5Tokenizer", 't5'),
@@ -79,8 +80,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFasterTokenizer", "bert"),
-                                              ("ErnieFasterTokenizer", "ernie")
-                                              ])
+                                              ("ErnieFasterTokenizer", "ernie"),
+                                              ("TinyBertFasterTokenizer",
+                                               "tinybert")])
 # For FasterTokenizer
 if is_faster_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)

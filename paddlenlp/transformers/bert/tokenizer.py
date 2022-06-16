@@ -330,6 +330,18 @@ class BertTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
             "simbert-base-chinese":
             "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
+            "uer/chinese-roberta-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-6l-768h":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-small":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-mini":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-tiny":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -367,6 +379,24 @@ class BertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
         "simbert-base-chinese": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-base": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-medium": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-6l-768h": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-small": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-mini": {
+            "do_lower_case": True
+        },
+        "uer/chinese-roberta-tiny": {
             "do_lower_case": True
         },
     }
