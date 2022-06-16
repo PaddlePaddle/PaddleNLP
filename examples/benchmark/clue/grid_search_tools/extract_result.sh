@@ -48,7 +48,7 @@ do
     fi
     s=${s##*/}
     s=`echo $s|awk '{split($1, hy, "."); print hy[1]"."hy[2]}'`
-    s=`echo $s|awk '{split($1, hy, "_"); print hy[1]", " hy[2]", " hy[3]}'`
+    s=`echo $s|awk '{split($1, hy, "_"); print hy[1]"," hy[2]"," hy[3]}'`
     echo -n ${task}| tr 'a-z' 'A-Z'
     echo -e "\t"${dict[$task]}"\t("$s")"
 done
