@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../advanced_guide/fastergeneration/index.rst:3
 msgid "文本生成高性能加速"
-msgstr ""
+msgstr "Speed Up Text Generation With High Performance"
 
