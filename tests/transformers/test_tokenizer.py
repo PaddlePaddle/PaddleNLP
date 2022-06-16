@@ -105,7 +105,6 @@ class TestPretrainedFromPretrained(CpuCommonTest):
     def test_pretrained_model(self, model_name: str,
                               PretrainedModelClass: Type[PretrainedModel]):
         """stupid test"""
-        return
         cache_dir = os.path.join(MODEL_HOME, model_name)
         shutil.rmtree(cache_dir, ignore_errors=True)
 
