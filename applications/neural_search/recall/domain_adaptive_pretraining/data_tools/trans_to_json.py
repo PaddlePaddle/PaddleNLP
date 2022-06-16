@@ -78,7 +78,7 @@ def raw_text_to_json(path, doc_spliter="", json_key="text", min_doc_length=10):
     out_filepath = path + ".jsonl"
     fout = open(out_filepath, "w", encoding="utf-8")
     len_files = 0
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         doc = ""
         line = f.readline()
         while line:
