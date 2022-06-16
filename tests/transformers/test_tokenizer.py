@@ -17,7 +17,11 @@ import os
 from typing import Type, List, Tuple
 import shutil
 import unittest
+from multiprocessing import Process
+from tempfile import TemporaryDirectory
 from parameterized import parameterized
+
+from paddle import nn
 from paddlenlp.transformers.model_utils import PretrainedModel, MODEL_HOME
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 
@@ -29,9 +33,20 @@ from paddlenlp.transformers.tinybert.modeling import TinyBertForPretraining
 
 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 from paddlenlp.transformers.gpt.tokenizer import GPTTokenizer, GPTChineseTokenizer
+from paddlenlp.transformers.tinybert.tokenizer import TinyBertTokenizer
 
 from tests.common_test import CpuCommonTest, CommonTest
 from tests.util import slow, assert_raises
+
+
+class FakePretrainedModel(PretrainedModel):
+
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(2, 2)
+
+    def forward(self, *args, **kwargs):
+        pass
 
 
 def get_pretrained_models_params() -> List[Tuple[str, Type[PretrainedModel]]]:
@@ -40,7 +55,9 @@ def get_pretrained_models_params() -> List[Tuple[str, Type[PretrainedModel]]]:
     Returns:
         List[Tuple[str, Type[PretrainedModel]]]: the parameters of unit test method
     """
-    model_types: List[PretrainedModel] = [BertForPretraining, GPTForPretraining]
+    model_types: List[PretrainedModel] = [
+        BertForPretraining, GPTForPretraining, TinyBertForPretraining
+    ]
     name_class_tuples: List[Tuple[str, Type[PretrainedModel]]] = []
     for ModelType in model_types:
         for model_name in ModelType.pretrained_resource_files_map.get(
@@ -57,7 +74,7 @@ def get_pretrained_tokenzier_params(
         List[Tuple[str, Type[PretrainedTokenzier]]]: the parameters of unit test method
     """
     tokenizer_types: List[PretrainedTokenizer] = [
-        BertTokenizer, GPTTokenizer, GPTChineseTokenizer
+        BertTokenizer, GPTTokenizer, GPTChineseTokenizer, TinyBertTokenizer
     ]
     name_class_params: List[Tuple[str, Type[PretrainedTokenizer]]] = []
     for TokenizerType in tokenizer_types:
@@ -69,6 +86,20 @@ def get_pretrained_tokenzier_params(
 
 class TestPretrainedFromPretrained(CpuCommonTest):
     """module for test pretrained model"""
+
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        model = FakePretrainedModel()
+        model.save_pretrained(self.temp_dir.name)
+
+    def do_pretrained_in_process(self):
+        FakePretrainedModel.from_pretrained(self.temp_dir.name)
+
+    @parameterized.expand([(1, ), (8, ), (20, ), (50, ), (100, ), (1000, )])
+    def test_model_config_writing(self, process_num: int):
+        for _ in range(process_num):
+            process = Process(target=self.do_pretrained_in_process)
+            process.start()
 
     @parameterized.expand(get_pretrained_models_params())
     def test_pretrained_model(self, model_name: str,
