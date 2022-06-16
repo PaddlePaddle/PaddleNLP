@@ -648,37 +648,37 @@
                 <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>66.90</b></span>
+                <span style="font-size:18px">66.90</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.85</b></span>
+                <span style="font-size:18px">71.85</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.24</b></span>
+                <span style="font-size:18px">55.24</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>54.48</b></span>
+                <span style="font-size:18px">54.48</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>77.19</b></span>
+                <span style="font-size:18px">77.19</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>73.08</b></span>
+                <span style="font-size:18px">73.08</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.05</b></span>
+                <span style="font-size:18px">71.05</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>79.30</b></span>
+                <span style="font-size:18px">79.30</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>58.53/81.97</b></span>
+                <span style="font-size:18px">58.53/81.97</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>69.71</b></span>
+                <span style="font-size:18px">69.71</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>58.60</b></span>
+                <span style="font-size:18px">58.60</span>
             </td>
         </tr>
         <tr>

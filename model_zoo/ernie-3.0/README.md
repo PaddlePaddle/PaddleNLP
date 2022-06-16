@@ -715,7 +715,7 @@ batch_size = 1 和 32 时，GPU 性能-精度图：
         <tr>
             <td rowspan=1 align=center> 6L384H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 3.0-Mini-zh</b></span>
+                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">66.90</span>
