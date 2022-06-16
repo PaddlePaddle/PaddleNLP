@@ -188,7 +188,7 @@
         <tr>
             <td rowspan=7 align=center> 12L768H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 3.0-Base-zh</span>
+                <span style="font-size:18px"><b>ERNIE 3.0-Base-zh</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>76.05</b></span>
@@ -455,7 +455,7 @@
         <tr>
             <td rowspan=5 align=center> 6L768H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 3.0-Medium-zh</span>
+                <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>72.49</b></span>
@@ -726,37 +726,37 @@
                 <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>64.21</b></span>
+                <span style="font-size:18px">64.21</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.15</b></span>
+                <span style="font-size:18px">71.15</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.05</b></span>
+                <span style="font-size:18px">55.05</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>53.83</b></span>
+                <span style="font-size:18px">53.83</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>74.81</b></span>
+                <span style="font-size:18px">74.81</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>70.41</b></span>
+                <span style="font-size:18px">70.41</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>69.08</b></span>
+                <span style="font-size:18px">69.08</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.50</b></span>
+                <span style="font-size:18px">76.50</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>53.77/77.82</b></span>
+                <span style="font-size:18px">53.77/77.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>62.26</b></span>
+                <span style="font-size:18px">62.26</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.53</b></span>
+                <span style="font-size:18px">55.53</span>
             </td>
         </tr>
         <tr>

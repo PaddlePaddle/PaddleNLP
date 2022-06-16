@@ -718,37 +718,37 @@ batch_size = 1 和 32 时，GPU 性能-精度图：
                 <span style="font-size:18px"><b>ERNIE 3.0-Mini-zh</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>66.90</b></span>
+                <span style="font-size:18px">66.90</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.85</b></span>
+                <span style="font-size:18px">71.85</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.24</b></span>
+                <span style="font-size:18px">55.24</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>54.48</b></span>
+                <span style="font-size:18px">54.48</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>77.19</b></span>
+                <span style="font-size:18px">77.19</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>73.08</b></span>
+                <span style="font-size:18px">73.08</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.05</b></span>
+                <span style="font-size:18px">71.05</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>79.30</b></span>
+                <span style="font-size:18px">79.30</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>58.53/81.97</b></span>
+                <span style="font-size:18px">58.53/81.97</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>69.71</b></span>
+                <span style="font-size:18px">69.71</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>58.60</b></span>
+                <span style="font-size:18px">58.60</span>
             </td>
         </tr>
                <tr>
@@ -793,40 +793,40 @@ batch_size = 1 和 32 时，GPU 性能-精度图：
         <tr>
             <td rowspan=1 align=center> 4L384H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 3.0-Micro-zh</b></span>
+                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>64.21</b></span>
+                <span style="font-size:18px">64.21</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.15</b></span>
+                <span style="font-size:18px">71.15</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.05</b></span>
+                <span style="font-size:18px">55.05</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>53.83</b></span>
+                <span style="font-size:18px">53.83</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>74.81</b></span>
+                <span style="font-size:18px">74.81</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>70.41</b></span>
+                <span style="font-size:18px">70.41</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>69.08</b></span>
+                <span style="font-size:18px">69.08</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.50</b></span>
+                <span style="font-size:18px">76.50</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>53.77/77.82</b></span>
+                <span style="font-size:18px">53.77/77.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>62.26</b></span>
+                <span style="font-size:18px">62.26</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>55.53</b></span>
+                <span style="font-size:18px">55.53</span>
             </td>
         </tr>
         <tr>
