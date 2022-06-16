@@ -867,6 +867,8 @@ batch_size = 1 和 32 时，GPU 性能-精度图：
             <td style="text-align:center">
                 <span style="font-size:18px"><b>55.11</b></span>
             </td>
+        </tr>
+        <tr>
             <td style="text-align:center">
             <span style="font-size:18px">TinyBERT<sub>4</sub>, Chinese</span>
             </td>
@@ -904,7 +906,7 @@ batch_size = 1 和 32 时，GPU 性能-精度图：
                 <span style="font-size:18px">52.15</span>
             </td>
         </tr>
-                <tr>
+             <tr>
             <td rowspan=1 align=center> 3L1024H </td>
             <td style="text-align:center">
                 <span style="font-size:18px">HFL/RBTL3, Chinese</span>

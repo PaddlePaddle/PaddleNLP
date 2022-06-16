@@ -797,6 +797,8 @@
             <td style="text-align:center">
                 <span style="font-size:18px"><b>55.11</b></span>
             </td>
+        </tr>
+        <tr>
             <td style="text-align:center">
             <span style="font-size:18px">TinyBERT<sub>4</sub>, Chinese</span>
             </td>
