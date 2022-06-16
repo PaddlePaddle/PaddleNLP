@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Google AI, Google Brain and Carnegie Mellon University Authors and the HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,6 @@ import os
 import unicodedata
 from shutil import copyfile
 from typing import List, Optional
-# from paddlenlp.transformers.tokenizer_utils import is_chinese_char as ischnch
 
 import sentencepiece as spm
 
@@ -197,9 +196,7 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
-
         text = self.preprocess_text(text)
-        # print('tokenize_text:',text)
         if not sample:
             pieces = self.sp_model.EncodeAsPieces(text)
         else:
@@ -217,8 +214,6 @@ class XLNetTokenizer(PretrainedTokenizer):
                         cur_pieces[0] = cur_pieces[0][1:]
                 cur_pieces.append(piece[-1])
                 new_pieces.extend(cur_pieces)
-            # elif len(piece) > 0 and self.is_chinese_char(ord(piece[0])):
-            #     new_pieces.append(SENTENCEPIECE_UNDERLINE+piece)
             else:
                 new_pieces.append(piece)
 
@@ -404,46 +399,29 @@ class XLNetTokenizer(PretrainedTokenizer):
                 copyfile(self.vocab_file, save_path)
 
     def get_offset_mapping(self, text):
+        """Get XLNet offset mapping."""
         text = self.preprocess_text(text)
-        # text = text.replace("``", '"').replace("''", '"')
-        # print('TEXT:    ',text)
         normalized_text, char_mapping = '', []
         for i, ch in enumerate(text):
-            # if not self.keep_accents:
-            #     ch = unicodedata.normalize("NFKD", ch)
-            #     if not unicodedata.combining(ch):
-            #         normalized_text += ch
-            #         char_mapping.extend([i] * len(ch))
-            # else:
+            if self.do_lower_case:
+                ch = ch.lower()
             normalized_text += ch
             char_mapping.extend([i] * len(ch))
-
-        if self.do_lower_case:
-            normalized_text = normalized_text.lower()
-
         text, token_mapping, offset = normalized_text, [], 0
         split_tokens = self.tokenize(text)
         if split_tokens[0] == SENTENCEPIECE_UNDERLINE:
             split_tokens = split_tokens[1:]
             token_mapping.append((0, 0))
-
         for token in split_tokens:
             if token[0] == SENTENCEPIECE_UNDERLINE:
                 token = token[1:]
-
             if len(token) == 0:
                 length = 1
             else:
                 length = len(token)
-            if text[offset:].find(token) == -1:
-                print('    text:   ', text, '\n  text[offset]:   ',
-                      text[offset:], '\n token   ', token, '\n split_tokens:',
-                      split_tokens)
             start = text[offset:].index(token) + offset
             end = start + length
-
             token_mapping.append(
                 (char_mapping[start], char_mapping[end - 1] + 1))
             offset = end
-
         return token_mapping

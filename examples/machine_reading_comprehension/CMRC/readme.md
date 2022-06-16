@@ -38,8 +38,8 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_cmrc.py \
     --model_type xlnet \
     --model_name_or_path chinese-xlnet-mid \
-    --max_seq_length 1024 \
-    --batch_size 6 \
+    --max_seq_length 512 \
+    --batch_size 16 \
     --learning_rate 3e-5 \
     --num_train_epochs 3 \
     --logging_steps 500 \
@@ -62,11 +62,11 @@ python -m paddle.distributed.launch --gpus "0" run_cmrc.py \
 
 ```text
 {
-  "exact": 61.26126126126126,
-  "f1": 84.18154653513831,
+  "exact": 63.96396396396396,
+  "f1": 85.19589159932923,
   "total": 3219,
-  "HasAns_exact": 61.26126126126126,
-  "HasAns_f1": 84.18154653513831,
+  "HasAns_exact": 63.96396396396396,
+  "HasAns_f1": 85.19589159932923,
   "HasAns_total": 3219
 }
 ```
