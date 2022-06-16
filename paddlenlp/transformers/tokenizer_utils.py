@@ -561,8 +561,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
     def _build_special_tokens_map_extended(self, **kwargs):
         if getattr(self, "_has_built_special_tokens", None):
             return
-        self._has_built_special_tokens = True
         SpecialTokensMixin.__init__(self, **kwargs)
+        self._has_built_special_tokens = True
 
     @property
     def vocab_size(self) -> int:
