@@ -517,6 +517,11 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
         typeid(postprocessors::BertPostProcessor)) {
       j["postprocessor"] = *dynamic_cast<postprocessors::BertPostProcessor*>(
           tokenizer.post_processor_.get());
+    } else if (typeid(*tokenizer.post_processor_.get()) ==
+               typeid(postprocessors::TemplatePostProcessor)) {
+      j["postprocessor"] =
+          *dynamic_cast<postprocessors::TemplatePostProcessor*>(
+              tokenizer.post_processor_.get());
     }
   }
 
@@ -611,6 +616,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         postprocessors::BertPostProcessor bert_postprocessor;
         post_processor.get_to(bert_postprocessor);
         tokenizer.SetPostProcessor(bert_postprocessor);
+      } else if (post_processor.at("type") == "TemplateProcessing") {
+        postprocessors::TemplatePostProcessor template_postprocessor;
+        post_processor.get_to(template_postprocessor);
+        tokenizer.SetPostProcessor(template_postprocessor);
       }
     }
 
@@ -686,7 +695,10 @@ template void Tokenizer::SetModel(const models::FasterWordPiece&);
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(
     const postprocessors::BertPostProcessor&);
+template void Tokenizer::SetPostProcessor(
+    const postprocessors::TemplatePostProcessor&);
 
+// Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
 }  // core
 }  // tokenizers

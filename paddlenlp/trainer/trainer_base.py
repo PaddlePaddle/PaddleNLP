@@ -66,6 +66,7 @@ from .trainer_utils import (
     OptimizerNames,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
+    get_scheduler,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -919,14 +920,8 @@ class Trainer:
         Args:
             num_training_steps (int): The number of training steps to do.
         """
-
-        def get_scheduler(lr_scheduler_type, learning_rate, num_warmup_steps,
-                          num_training_steps):
-            # TODO  @ZHUI support others
-            return LinearDecayWithWarmup(learning_rate, num_training_steps,
-                                         num_warmup_steps)
-
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
+        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else int(
+            self.args.warmup_ratio * num_training_steps)
 
         if self.lr_scheduler is None:
             self.lr_scheduler = get_scheduler(

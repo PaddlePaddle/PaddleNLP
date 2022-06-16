@@ -19,9 +19,9 @@ python -u  -m paddle.distributed.launch \
     --model_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
+    --split 949,50,1 \
     --max_seq_len 512 \
     --micro_batch_size 64 \
-    --global_batch_size 512 \
     --sharding_degree 1\
     --dp_degree 8 \
     --use_sharding false \
