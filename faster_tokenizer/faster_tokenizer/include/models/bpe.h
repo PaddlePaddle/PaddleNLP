@@ -48,6 +48,8 @@ struct BPE : public Model {
                                         const std::string& merge_path,
                                         core::Vocab* vocab,
                                         core::Merges* merges);
+  static void ConstructMergesPair(const std::string word_line,
+                                  std::pair<std::string, std::string>* result);
 
 private:
   void Init(const core::Merges& merges);
@@ -68,6 +70,8 @@ private:
   std::vector<std::string> continuing_subword_prefix_;
   std::vector<std::string> end_of_word_suffix_;
   bool fuse_unk_;
+  friend void to_json(nlohmann::json& j, const BPE& model);
+  friend void from_json(const nlohmann::json& j, BPE& model);
 };
 
 }  // models

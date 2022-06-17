@@ -99,6 +99,16 @@ core::Vocab BPE::GetVocabFromFile(const std::string& vocab_json_path) {
   return vocab;
 }
 
+void BPE::ConstructMergesPair(const std::string word_line,
+                              std::pair<std::string, std::string>* result) {
+  auto pair_a_begin = word_line.find_first_not_of(WHITESPACE);
+  auto pair_a_end = word_line.find_first_of(WHITESPACE, pair_a_begin);
+  auto pair_b_begin = word_line.find_first_not_of(WHITESPACE, pair_a_end);
+  auto pair_b_end = word_line.find_first_of(WHITESPACE, pair_b_begin);
+  *result = {word_line.substr(pair_a_begin, pair_a_end - pair_a_begin),
+             word_line.substr(pair_b_begin, pair_b_end - pair_b_begin)};
+}
+
 core::Merges BPE::GetMergesFromFile(const std::string& merge_path) {
   std::ifstream fin(merge_path);
   core::Merges merges;
@@ -106,13 +116,9 @@ core::Merges BPE::GetMergesFromFile(const std::string& merge_path) {
   char word[MAX_BUFFER_SIZE];
   while (fin.getline(word, MAX_BUFFER_SIZE)) {
     std::string word_str = word;
-    auto pair_a_begin = word_str.find_first_not_of(WHITESPACE);
-    auto pair_a_end = word_str.find_first_of(WHITESPACE, pair_a_begin);
-    auto pair_b_begin = word_str.find_first_not_of(WHITESPACE, pair_a_end);
-    auto pair_b_end = word_str.find_first_of(WHITESPACE, pair_b_begin);
-    merges.emplace_back(std::pair<std::string, std::string>{
-        word_str.substr(pair_a_begin, pair_a_end - pair_a_begin),
-        word_str.substr(pair_b_begin, pair_b_end - pair_b_begin)});
+    std::pair<std::string, std::string> result;
+    ConstructMergesPair(word_str, &result);
+    merges.emplace_back(result);
   }
   return merges;
 }
@@ -232,6 +238,54 @@ size_t BPE::GetVocabSize() const { return vocab_.size(); }
 std::string BPE::Save(const std::string& folder,
                       const std::string& filename_prefix) const {
   return "";
+}
+
+void to_json(nlohmann::json& j, const BPE& model) {
+  std::vector<std::pair<core::Pair, uint32_t>> merges;
+  for (auto& merge : model.merges_) {
+    merges.push_back({merge.first, merge.second.first});
+  }
+  std::sort(merges.begin(),
+            merges.end(),
+            [](const std::pair<core::Pair, uint32_t>& a,
+               const std::pair<core::Pair, uint32_t>& b) {
+              return a.second < b.second;
+            });
+  std::vector<std::string> merge_strs;
+  for (auto& merge : merges) {
+    std::string s = model.vocab_reversed_.at(merge.first.first) + " " +
+                    model.vocab_reversed_.at(merge.first.second);
+    merge_strs.push_back(s);
+  }
+
+  j = {{"type", "WordPiece"},
+       {"unk_token", model.unk_token_},
+       {"continuing_subword_prefix", model.continuing_subword_prefix_},
+       {"end_of_word_suffix", model.end_of_word_suffix_},
+       {"fuse_unk", model.fuse_unk_},
+       {"dropout", model.dropout_},
+       {"vocab", model.vocab_},
+       {"merges", merge_strs}};
+}
+
+void from_json(const nlohmann::json& j, BPE& model) {
+  j["vocab"].get_to(model.vocab_);
+  j["unk_token"].get_to(model.unk_token_);
+  j["continuing_subword_prefix"].get_to(model.continuing_subword_prefix_);
+  j["end_of_word_suffix"].get_to(model.end_of_word_suffix_);
+  j["fuse_unk"].get_to(model.fuse_unk_);
+  j["dropout"].get_to(model.dropout_);
+
+  std::vector<std::string> merge_strs;
+  j["merges"].get_to(merge_strs);
+
+  core::Merges merges;
+  std::pair<std::string, std::string> result;
+  for (auto& word_line : merge_strs) {
+    BPE::ConstructMergesPair(word_line, &result);
+    merges.push_back(result);
+  }
+  model.Init(merges);
 }
 
 }  // model
