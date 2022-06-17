@@ -15,6 +15,10 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+try:
+    from paddle.incubate.nn import FusedTransformerEncoderLayer
+except ImportError:
+    FusedTransformerEncoderLayer = None
 
 from .. import PretrainedModel, register_base_model
 
@@ -550,7 +554,8 @@ class ErnieModel(ErniePretrainedModel):
                  pad_token_id=0,
                  task_type_vocab_size=3,
                  task_id=0,
-                 use_task_id=False):
+                 use_task_id=False,
+                 fuse=False):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -563,17 +568,38 @@ class ErnieModel(ErniePretrainedModel):
                                           type_vocab_size, pad_token_id,
                                           weight_attr, task_type_vocab_size,
                                           task_id, use_task_id)
-        encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0,
-            weight_attr=weight_attr,
-            normalize_before=False)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        if fuse and FusedTransformerEncoderLayer is None:
+            warnings.warn(
+                "FusedTransformerEncoderLayer is not supported by the running Paddle. "
+                "The flag fuse_transformer will be ignored. Try Paddle >= 2.3.0"
+            )
+        self.fuse = fuse and FusedTransformerEncoderLayer is not None
+        if self.fuse:
+            self.encoder = nn.LayerList([
+                FusedTransformerEncoderLayer(
+                    hidden_size,
+                    num_attention_heads,
+                    intermediate_size,
+                    dropout_rate=hidden_dropout_prob,
+                    activation=hidden_act,
+                    attn_dropout_rate=attention_probs_dropout_prob,
+                    act_dropout_rate=0.,
+                    weight_attr=weight_attr,
+                    normalize_before=False) for _ in range(num_hidden_layers)
+            ])
+        else:
+            encoder_layer = nn.TransformerEncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                dropout=hidden_dropout_prob,
+                activation=hidden_act,
+                attn_dropout=attention_probs_dropout_prob,
+                act_dropout=0,
+                weight_attr=weight_attr,
+                normalize_before=False)
+            self.encoder = nn.TransformerEncoder(encoder_layer,
+                                                 num_hidden_layers)
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
 
@@ -662,8 +688,12 @@ class ErnieModel(ErniePretrainedModel):
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids,
                                            task_type_ids=task_type_ids)
-
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
+        if self.fuse:
+            encoder_outputs = embedding_output
+            for layer in self.encoder:
+                encoder_outputs = layer(encoder_outputs, attention_mask)
+        else:
+            encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
         return sequence_output, pooled_output

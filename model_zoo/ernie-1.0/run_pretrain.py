@@ -327,6 +327,7 @@ def do_train(args):
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+        model_config["fuse"] = args.fuse_transformer
         model = model_class(base_class(**model_config))
     else:
         model = model_class.from_pretrained(
@@ -383,7 +384,8 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(models=model, level='O2')
+        if not args.fuse_transformer:
+            model = paddle.amp.decorate(models=model, level='O2')
     else:
         scaler = None
 
@@ -463,13 +465,14 @@ def do_train(args):
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
 
-            with paddle.amp.auto_cast(args.use_amp,
-                                      custom_black_list=[
-                                          "reduce_sum",
-                                          "c_softmax_with_cross_entropy",
-                                          "elementwise_div"
-                                      ],
-                                      level='O2'):
+            with paddle.amp.auto_cast(
+                    args.use_amp,
+                    custom_white_list=["fused_attention", "fused_feedforward"],
+                    custom_black_list=[
+                        "reduce_sum", "c_softmax_with_cross_entropy",
+                        "elementwise_div"
+                    ],
+                    level='O2'):
 
                 # Create the model for the ernie pretrain
                 prediction_scores, seq_relationship_score = model(

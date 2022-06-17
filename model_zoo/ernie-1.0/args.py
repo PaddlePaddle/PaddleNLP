@@ -89,6 +89,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="select cpu, gpu, xpu devices.")
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
+    parser.add_argument("--fuse_transformer", type=str2bool, default=False, help="Wether to use FusedTransformer to speed up the train.")
 
     # Argument for bert
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")

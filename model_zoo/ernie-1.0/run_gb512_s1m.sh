@@ -34,5 +34,6 @@ python -u  -m paddle.distributed.launch \
     --logging_freq 20\
     --num_workers 2 \
     --eval_freq 1000 \
-    --device "gpu"\
+    --device "gpu" \
+    --fuse_transformer false \
 
