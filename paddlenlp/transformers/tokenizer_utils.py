@@ -44,8 +44,8 @@ from .utils import InitTrackerMeta, fn_args_to_dict
 from .tokenizer_utils_base import (AddedToken, BatchEncoding, EncodedInput,
                                    EncodedInputPair, PreTokenizedInput,
                                    PreTokenizedInputPair,
-                                   PretrainedTokenizerBase, TextInput,
-                                   TextInputPair, TruncationStrategy,
+                                   PretrainedTokenizerBase, SpecialTokensMixin,
+                                   TextInput, TextInputPair, TruncationStrategy,
                                    PaddingStrategy, TensorType)
 
 __all__ = [
@@ -559,24 +559,10 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         self._decode_use_source_tokenizer = False
 
     def _build_special_tokens_map_extended(self, **kwargs):
-        for key, value in kwargs.items():
-            if value is None:
-                continue
-            if key in self.SPECIAL_TOKENS_ATTRIBUTES:
-                if key == "additional_special_tokens":
-                    assert isinstance(
-                        value,
-                        (list, tuple)), f"Value {value} is not a list or tuple"
-                    assert all(
-                        isinstance(t, (str, AddedToken)) for t in value
-                    ), "One of the tokens is not a string or an AddedToken"
-                    setattr(self, key, value)
-                elif isinstance(value, (str, AddedToken)):
-                    setattr(self, key, value)
-                else:
-                    raise TypeError(
-                        f"special token {key} has to be either str or AddedToken but got: {type(value)}"
-                    )
+        if getattr(self, "_has_built_special_tokens", None):
+            return
+        SpecialTokensMixin.__init__(self, **kwargs)
+        self._has_built_special_tokens = True
 
     @property
     def vocab_size(self) -> int:
@@ -777,7 +763,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if token in no_split_token:
                 tokenized_text.append(token)
             else:
-                tokenized_text.extend(self._tokenize(token, **kwargs))
+                tokenized_text.extend(self._tokenize(token))
         # ["This", " is", " something", "<special_token_1>", "else"]
         return tokenized_text
 
