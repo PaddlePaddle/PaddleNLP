@@ -48,7 +48,7 @@ data = [
         17.50, 72.49, '#A52A2A', 7.5
     ],
     [
-        'ERNIE 3.0-Mini-zh', '26.95M', 0.75, 38.24, 5.54, 1.62, 30.28, 8.18,
+        'ERNIE 3.0-Mini-zh', '26.95M', 0.75, 38.24, 5.54, 1.59, 30.28, 8.18,
         66.90, '#CD5C5C', 2.7
     ],
     [
@@ -64,18 +64,18 @@ data = [
         71.71, '#4169E1', 10.2
     ],
     [
-        'UER/RoBERTa-6L768H', '59.74M', 1.36, 112.55, 16.21, 2.06, 102.95,
+        'UER/RoBERTa-6L768H', '59.74M', 1.36, 112.55, 16.21, 2.04, 102.95,
         18.55, 67.17, '#6495ED', 6.0
     ],
     [
-        'UER/RoBERTa-Medium', '36.56M', 1.02, 71.23, 10.84, 2.00, 65.74, 13.26,
+        'UER/RoBERTa-Medium', '36.56M', 1.02, 71.23, 10.84, 1.91, 65.74, 13.26,
         68.17, '#87CEFA', 3.7
     ],
     # ['UER/RoBERTa-Small', '23.95M', 0.63, 36.33, 5.61, 1.41, 33.26, 7.01, 59.69, '#B0E0E6', 2.4],
     # ['UER/RoBERTa-Mini','8.77M', 0.59, 10.61, 2.02, 1.41, 10.03, 3.60, 53.85, '#40E0D0', 0.9],
     # ['UER/RoBERTa-Tiny','3.18M', 0.37, 2.08, 0.72, 1.03, 2.25, 1.30, 49.19, '#4682B4', 0.3],
     [
-        'TinyBERT6, Chinese', '64.47M', 1.44, 113.90, 16.37, 2.10, 104.06,
+        'TinyBERT6, Chinese', '64.47M', 1.44, 113.90, 16.37, 2.14, 104.06,
         17.44, 69.58, '#008000', 6.5
     ],
     [
@@ -87,7 +87,7 @@ data = [
         15.47, 66.79, '#FFA500', 6.1
     ],
     [
-        'HFL/RBT6, Chinese', '59.74M', 1.43, 114.24, 16.35, 2.12, 103.53, 17.27,
+        'HFL/RBT6, Chinese', '59.74M', 1.43, 114.24, 16.35, 2.14, 103.53, 17.27,
         70.18, '#FFDEAD', 6.0
     ],
     [
@@ -95,7 +95,7 @@ data = [
         67.45, '#FFD700', 4.7
     ],
     [
-        'HFL/RBT3, Chinese', '38.43M', 0.86, 58.65, 8.28, 1.49, 52.12, 10.63,
+        'HFL/RBT3, Chinese', '38.43M', 0.86, 58.65, 8.28, 1.40, 52.12, 10.63,
         65.72, '#FFE4B5', 3.8
     ],
 ]
@@ -123,7 +123,7 @@ for i in range(len(data)):
                        marker='o',
                        ms=ms)
         xytext = (latency + 0.1, clue_res - 0.1)
-        if model_name in ('TinyBERT6, Chinese', 'UER/RoBERTa-6L768H'):
+        if model_name in ('HFL/RBTL3, Chinese'):
             xytext = (latency + 0.1, clue_res - 0.6)
         plt.annotate(model_name,
                      xy=(latency, clue_res),
@@ -149,7 +149,7 @@ for i in range(len(data)):
                        marker='o',
                        ms=ms)
         xytext = (latency + 8.0, clue_res - 0.1)
-        if model_name in ('TinyBERT6, Chinese', 'UER/RoBERTa-6L768H'):
+        if model_name in ('TinyBERT6, Chinese', 'HFL/RBTL3, Chinese'):
             xytext = (latency + 8.0, clue_res - 0.6)
         plt.annotate(model_name,
                      xy=(latency, clue_res),
@@ -174,7 +174,7 @@ for i in range(len(data)):
                        marker='o',
                        ms=ms)
         xytext = (latency + 1.2, clue_res - 0.1)
-        if data[i][0] in ('TinyBERT6, Chinese', 'UER/RoBERTa-6L768H'):
+        if data[i][0] in ('TinyBERT6, Chinese', 'HFL/RBTL3, Chinese'):
             xytext = (latency + 1.2, clue_res - 0.6)
         plt.annotate(model_name,
                      xy=(latency, clue_res),
