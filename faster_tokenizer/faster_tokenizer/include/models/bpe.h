@@ -52,8 +52,10 @@ struct BPE : public Model {
 private:
   void Init(const core::Merges& merges);
   void MergeWord(const std::string& word, core::BPEWord* bpe_word);
-  std::vector<core::Token> WordToTokens(const core::BPEWord& bpe_word);
-  std::vector<core::Token> TokenizeWithCache(const std::string& sequence);
+  void WordToTokens(const core::BPEWord& bpe_word,
+                    std::vector<core::Token>* tokens);
+  void TokenizeWithCache(const std::string& sequence,
+                         std::vector<core::Token>* tokens);
   core::Vocab vocab_;
   core::VocabReversed vocab_reversed_;
   core::MergeMap merges_;

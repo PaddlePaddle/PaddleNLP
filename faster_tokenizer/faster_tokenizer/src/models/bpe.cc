@@ -20,6 +20,7 @@ limitations under the License. */
 
 #include "glog/logging.h"
 #include "models/bpe.h"
+#include "utils/utf8.h"
 
 namespace tokenizers {
 namespace models {
@@ -57,6 +58,11 @@ void BPE::Init(const core::Merges& merges) {
       oss << "Can't merge token out of the vocabulary";
       throw std::runtime_error(oss.str());
     }
+  }
+
+  // construct unk
+  if (unk_token_.size() > 0) {
+    unk_token_id_.emplace_back(vocab_.at(unk_token_.front()));
   }
 }
 
@@ -119,15 +125,88 @@ void BPE::GetVocabAndMergesFromFile(const std::string& vocab_json_path,
   *merges = BPE::GetMergesFromFile(merge_path);
 }
 
-void BPE::MergeWord(const std::string& word, core::BPEWord* bpe_word) {}
+void BPE::MergeWord(const std::string& word, core::BPEWord* bpe_word) {
+  std::vector<std::pair<uint32_t, size_t>> unk;
+  bpe_word->Reserve(word.length());
+  uint32_t start = 0;
+  while (start < word.length()) {
+    uint32_t content_char;
+    uint32_t content_char_width =
+        utils::UTF8ToUInt32(word.data() + start, &content_char);
+    content_char = utils::UTF8ToUnicode(content_char);
+    uint32_t end = start + content_char_width;
+    bool is_first = (start == 0);
+    bool is_last = (end >= word.length());
+    std::string curr_str = word.substr(start, content_char_width);
+    // Add the `continuing_subword_prefix` if relevant
+    if (!is_first) {
+      if (continuing_subword_prefix_.size() > 0) {
+        curr_str = continuing_subword_prefix_.front() + curr_str;
+      }
+    }
+    // Add the `end_of_word_suffix` if relevant
+    if (is_last) {
+      if (end_of_word_suffix_.size() > 0) {
+        curr_str = curr_str + end_of_word_suffix_.front();
+      }
+    }
 
-std::vector<core::Token> BPE::WordToTokens(const core::BPEWord& bpe_word) {
-  return {};
+    if (vocab_.find(curr_str) != vocab_.end()) {
+      if (unk.size() > 0) {
+        bpe_word->Add(unk.front().first, unk.front().second);
+        unk.clear();
+      }
+      auto id = vocab_.at(curr_str);
+      bpe_word->Add(id, content_char_width);
+    } else {
+      if (unk_token_.size() > 0) {
+        if (unk.size() == 0) {
+          unk.push_back({unk_token_id_.front(), content_char_width});
+        } else {
+          if (fuse_unk_) {
+            unk[0] = {unk[0].first, unk[0].second + content_char_width};
+          } else {
+            bpe_word->Add(unk[0].first, unk[0].second);
+            unk[0] = {unk_token_id_.front(), content_char_width};
+          }
+        }
+      }
+    }
+    start = end;
+  }
+
+  if (unk.size() > 0) {
+    bpe_word->Add(unk.front().first, unk.front().second);
+  }
+  bpe_word->MergeAll(merges_, dropout_);
 }
 
-std::vector<core::Token> BPE::TokenizeWithCache(const std::string& sequence) {
-  return {};
+void BPE::WordToTokens(const core::BPEWord& bpe_word,
+                       std::vector<core::Token>* tokens) {
+  std::vector<uint32_t> chars;
+  bpe_word.GetChars(&chars);
+
+  std::vector<core::Offset> offsets;
+  bpe_word.GetOffset(&offsets);
+
+  tokens->reserve(offsets.size());
+  for (int i = 0; i < offsets.size(); ++i) {
+    tokens->emplace_back(chars[i], vocab_reversed_[chars[i]], offsets[i]);
+  }
 }
+
+void BPE::TokenizeWithCache(const std::string& sequence,
+                            std::vector<core::Token>* tokens) {
+  core::BPEWord bpe_word;
+  if (cache_.GetValue(sequence, &bpe_word)) {
+    WordToTokens(bpe_word, tokens);
+  } else {
+    MergeWord(sequence, &bpe_word);
+    WordToTokens(bpe_word, tokens);
+    cache_.SetValue(sequence, bpe_word);
+  }
+}
+
 std::vector<core::Token> BPE::Tokenize(const std::string& tokens) { return {}; }
 
 bool BPE::TokenToId(const std::string& token, uint* id) const {
