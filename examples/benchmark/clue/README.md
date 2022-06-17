@@ -960,10 +960,12 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | HFL/RBT4, Chinese                | 5e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,32       |
 | ERNIE 3.0-Micro-zh               | 3e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,32  | 5e-5,16     | 3e-5,64 | 3e-5,24  | 3e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Nano-zh                | 2e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,8      | 3e-5,32 | 3e-5,24  | 3e-5,24 | 2e-5,24       |
+| TinyBERT<sub>4</sub>, Chinese    | 3e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,16     | 5e-5,16 | 3e-5,16  | 3e-5,16| 2e-5,16        |
 | HFL/RBTL3, Chinese               | 5e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5, 32 | 2e-5,16  | 5e-5,8      | 2e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,16       |
 | HFL/RBT3, Chinese                | 5e-5,64 | 5e-5,32 | 5e-5,16 | 5e-5, 16 | 2e-5,16  | 3e-5,16     | 5e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,16       |
 
-其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 、`HFL/RBT3, Chinese`、`HFL/RBTL3, Chinese`、`HFL/RBT6, Chinese`在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh`、`HFL/RBT3, Chinese`、`HFL/RBT4, Chinese`、`HFL/RBT6, Chinese`在 IFLYTEK 处的 dropout_prob 为 0.0。
+
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 、`HFL/RBT3, Chinese`、`HFL/RBTL3, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh`、`HFL/RBT3, Chinese`、`HFL/RBT4, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 <a name="一键复现模型效果"></a>
 

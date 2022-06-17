@@ -1620,7 +1620,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, albert, num_labels):
+    def __init__(self, albert, num_labels=2):
         super(AlbertForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
         self.transformer = albert
