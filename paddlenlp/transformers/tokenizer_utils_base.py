@@ -778,6 +778,14 @@ class SpecialTokensMixin:
     ]
 
     def __init__(self, verbose=True, **kwargs):
+        # TODO(guosheng): `SpecialTokensMixin.__init__` would be called by
+        # `PretrainedTokenizer._wrap_init` using args which might be str rather
+        # than instances of `AddedToken`, and this causes `AddedToken` settings
+        # made by `_build_special_tokens_map_extended` overwrited.
+        # Maybe `PretrainedTokenizer._wrap_init` should be called before init
+        # later.
+        if getattr(self, "_has_built_special_tokens", None):
+            return
         self._bos_token = None
         self._eos_token = None
         self._unk_token = None
