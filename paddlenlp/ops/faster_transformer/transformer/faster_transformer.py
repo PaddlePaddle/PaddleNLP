@@ -1197,8 +1197,7 @@ class FasterBART(BartPretrainedModel):
                                           decoding_lib=decoding_lib,
                                           use_fp16_decoding=use_fp16_decoding)
         if self.enable_faster_encoder:
-            # (gongenlei) Need to use `enable_faster_encoder` in `__init__`
-            # when dygraph to static graph.
+            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
             self.encoder = FasterBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
@@ -1231,8 +1230,6 @@ class FasterBART(BartPretrainedModel):
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-            if self.enable_faster_encoder:
-                self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
