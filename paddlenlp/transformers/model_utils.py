@@ -271,15 +271,6 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             init_kwargs = init_configuration
 
-            model_config_file_path = os.path.join(default_root,
-                                                  cls.model_config_file)
-            # check if there is model config file in cache directory
-            if pretrained_model_name_or_path in cls.pretrained_init_configuration and init_kwargs is not None and not os.path.exists(
-                    model_config_file_path):
-                with io.open(model_config_file_path, 'w',
-                             encoding='utf-8') as f:
-                    json.dump(init_kwargs, f)
-
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
@@ -342,6 +333,14 @@ class PretrainedModel(Layer, GenerationMixin):
                 if k in derived_parameters_dict:
                     derived_kwargs[k] = v
             model = cls(*derived_args, **derived_kwargs)
+
+        # save the model config file into cache dir
+        model_config_file_path = os.path.join(default_root,
+                                              cls.model_config_file)
+        # check if there is model config file in cache directory
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration and init_kwargs is not None and not os.path.exists(
+                model_config_file_path):
+            model.save_model_config(default_root)
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
