@@ -10,7 +10,6 @@
            * [环境依赖](#环境依赖)
            * [一键启动方法](#一键启动方法)
            * [Grid Search 脚本说明](#GridSearch脚本说明)
-           * [绘制二维图比较不同模型的性能、精度](#绘制二维图)
    * [参加 CLUE 竞赛](#参加CLUE竞赛)
        * [分类任务](#分类任务)
        * [阅读理解任务](#阅读理解任务)
@@ -1182,64 +1181,6 @@ C3	77.88	(3e-05, 32, 0.1)
 - `extract_result.sh` 从日志抽取每个任务的最佳结果和对应的最佳超参并打印，`grid_search.py` 在完成训练任务后会自动调用，也可手动调用，需要 1 个参数：模型名称或目录。手动调用前需要确认训练均全部完成，并且保证该目录下有分类和阅读理解所有任务的日志。
 - `run_mrc.sh` 阅读理解任务的启动脚本。
 - `run_cls.sh` 分类任务的启动脚本。
-
-<a name="绘制二维图"></a>
-
-#### 绘制二维图比较不同模型的性能、精度
-
-下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图。其中 batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，CPU 上包含了 1 或者 8 个线程的情况。
-
-横坐标表示性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）。
-
-图中模型名下方是模型的参数量，圆形的大小反应了模型的参数量的大小。
-
-测试环境见[ERNIE 3.0 性能测试](../../../model_zoo/ernie-3.0/README.md)。
-
-
-batch_size = 32 时，CPU 性能-精度图（线程数 1 和 8）：
-
-<table>
-    <tr>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread1_bs32.png"></a></td>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread8_bs32.png"></a></td>
-    </tr>
-</table>
-
-batch_size = 1 时，CPU 性能-精度图（线程数 1 和 8）：
-
-<table>
-    <tr>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread1_bs1.png"></a></td>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/cpu_thread8_bs1.png"></a></td>
-    </tr>
-</table>
-
-batch_size = 1 和 32 时，GPU 性能-精度图：
-
-<table>
-    <tr>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/gpu_bs32.png"></a></td>
-        <td><a><img src="../../../model_zoo/ernie-3.0/img/gpu_bs1.png"></a></td>
-    </tr>
-</table>
-
-
-##### 绘制方法
-
-首先先安装 matplotlib，这是一个 Python 语言及其数值计算库 NumPy 的绘图库。
-
-```shell
-pip install matplotlib
-```
-
-安装后直接调用 `grid_search_tools/draw_pic.py` 脚本，需要传入 2 个参数，这两个参数主要为了配置文件名，其中第一个参数表示设备（支持gpu、cpu1、cpu8，cpu1），第二个参数表示 batch_size。具体的精度、性能数据需要在脚本中手动配置。
-
-```shell
-
-# cpu1代表线程数1，cpu8代表线程数8
-python grid_search_tools/draw_pic.py gpu 32
-
-```
 
 
 <a name="参加CLUE竞赛"></a>

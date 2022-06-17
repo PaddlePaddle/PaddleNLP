@@ -57,7 +57,7 @@
 - [**ERNIE 3.0-_Nano_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams) (_4-layer, 312-hidden, 12-heads_)
 
 
-下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的Transformer Layer 层）性能、精度指标的二维图。其中 batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，CPU 上包含了 1 或者 8 个线程的情况。
+下面是表现 PaddleNLP 中不同中文模型（包含 12 个 以内的 Transformer Layer 层）性能、精度指标的二维图。其中 batch_size 包括了 1 和 32 两种情况，包括了 GPU 和 CPU 两种设备，CPU 上包含了 1 或者 8 个线程的情况。
 
 横坐标表示性能（latency，单位毫秒），纵坐标表现的是 CLUE 10 个任务上的平均精度（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）。
 
@@ -65,30 +65,30 @@
 
 测试环境见[性能测试](#性能测试)。
 
-batch_size = 32 时，CPU 性能-精度图（线程数 1 和 8）：
+batch_size = 32 时，CPU 下的效果-时延图（线程数 1 和 8）：
 
 <table>
     <tr>
-        <td><a><img src="./img/cpu_thread1_bs32.png"></a></td>
-        <td><a><img src="./img/cpu_thread8_bs32.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545147-308ec66f-3a4e-4ebc-82c0-16af0c2509c2.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545156-5d854521-9575-416a-b137-751770408ca7.png"></a></td>
     </tr>
 </table>
 
-batch_size = 1 时，CPU 性能-精度图（线程数 1 和 8）：
+batch_size = 1 时，CPU 下的效果-时延图（线程数 1 和 8）：
 
 <table>
     <tr>
-        <td><a><img src="./img/cpu_thread1_bs1.png"></a></td>
-        <td><a><img src="./img/cpu_thread8_bs1.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545136-7550f2a8-c2f9-4c85-9b0b-c60191c064a3.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545152-a4ad1dfe-11fe-4f49-b039-6ca3212318d9.png"></a></td>
     </tr>
 </table>
 
-batch_size = 1 和 32 时，GPU 性能-精度图：
+batch_size = 1 和 32 时，GPU下的效果-时延图：
 
 <table>
     <tr>
-        <td><a><img src="./img/gpu_bs32.png"></a></td>
-        <td><a><img src="./img/gpu_bs1.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545165-5010bae8-e21a-402c-b18e-f9843d4419b9.png"></a></td>
+        <td><a><img src="https://user-images.githubusercontent.com/26483581/174545160-e62f71ca-f59d-4523-9543-86fda795a0a5.png"></a></td>
     </tr>
 </table>
 
