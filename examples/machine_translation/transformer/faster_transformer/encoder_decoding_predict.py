@@ -216,7 +216,7 @@ def do_predict(args):
                     "Setting info: batch size: {}, topp: {}, use fp16: {}. ".
                     format(args.infer_batch_size, args.topp,
                            args.use_fp16_decoding))
-            paddle.fluid.core._cuda_synchronize(place)
+            paddle.device.cuda.synchronize(place)
             logger.info("Average time latency is {} ms/batch. ".format(
                 (time.time() - start) / len(test_loader) * 1000))
 
