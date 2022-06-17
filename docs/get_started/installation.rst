@@ -93,7 +93,7 @@ github代码会跟随开发进度不断更新
   cd PaddleNLP
   git checkout develop
 
-使用Docker镜像体验PaddleOCR
+使用Docker镜像体验PaddleNLP
 ^^^^^^^^
 
 如果您没有Docker运行环境，请参考 `Docker官网`_ 进行安装
