@@ -409,6 +409,8 @@ def do_train(args):
     epoch = 0
     learning_rate = main_program.global_block().vars["learning_rate_0"]
     step = 0
+    if args.pp_degree > 1:
+        train_data_loader.start()
     while True:
         fetchs = []
         if topo.is_last:
@@ -508,7 +510,6 @@ def do_train(args):
                 reader_start = time.time()
             epoch += 1
         else:  # for pipeline, use noniterable dataloader
-            train_data_loader.start()
             try:
                 train_reader_cost += time.time() - reader_start
                 train_start = time.time()
