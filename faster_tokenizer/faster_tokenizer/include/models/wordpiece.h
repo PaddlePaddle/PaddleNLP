@@ -38,8 +38,9 @@ struct WordPiece : public Model {
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   // Return the saved voacb full path
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override;
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override;
   static core::Vocab GetVocabFromFile(const std::string& file);
   static WordPiece GetWordPieceFromFile(
       const std::string& file,

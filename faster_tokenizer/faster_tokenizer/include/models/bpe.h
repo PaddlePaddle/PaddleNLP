@@ -38,8 +38,9 @@ struct BPE : public Model {
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   // Return the saved voacb path
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override;
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override;
 
   void ClearCache();
   static core::Vocab GetVocabFromFile(const std::string& vocab_json_path);

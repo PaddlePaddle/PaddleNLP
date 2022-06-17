@@ -20,6 +20,7 @@ limitations under the License. */
 
 #include "glog/logging.h"
 #include "models/bpe.h"
+#include "utils/path.h"
 #include "utils/utf8.h"
 
 namespace tokenizers {
@@ -116,6 +117,9 @@ core::Merges BPE::GetMergesFromFile(const std::string& merge_path) {
   char word[MAX_BUFFER_SIZE];
   while (fin.getline(word, MAX_BUFFER_SIZE)) {
     std::string word_str = word;
+    if (word_str.find_first_of("#version") == 0) {
+      continue;
+    }
     std::pair<std::string, std::string> result;
     ConstructMergesPair(word_str, &result);
     merges.emplace_back(result);
@@ -234,10 +238,41 @@ bool BPE::IdToToken(uint id, std::string* token) const {
 core::Vocab BPE::GetVocab() const { return vocab_; }
 
 size_t BPE::GetVocabSize() const { return vocab_.size(); }
-// Return the saved voacb path
-std::string BPE::Save(const std::string& folder,
-                      const std::string& filename_prefix) const {
-  return "";
+
+// Return the saved voacb path and merges.txt
+std::vector<std::string> BPE::Save(const std::string& folder,
+                                   const std::string& filename_prefix) const {
+  // write vocab json
+  std::string vocab_path;
+  if (filename_prefix == "") {
+    vocab_path = utils::PathJoin(folder, "vocab.json");
+  } else {
+    vocab_path = utils::PathJoin({folder, filename_prefix, "-vocab.json"});
+  }
+  VLOG(6) << "Vocab path" << vocab_path;
+  core::SortedVocabReversed sorted_vocab_r(vocab_reversed_.begin(),
+                                           vocab_reversed_.end());
+  nlohmann::json j = sorted_vocab_r;
+  std::ofstream fout(vocab_path);
+  fout << j.dump();
+  fout.close();
+
+  // write merges.txt
+  std::string merges_path;
+  if (filename_prefix == "") {
+    merges_path = utils::PathJoin(folder, "merges.txt");
+  } else {
+    merges_path = utils::PathJoin({folder, filename_prefix, "-merges.txt"});
+  }
+  VLOG(6) << "Merges path" << merges_path;
+  std::ofstream merge_fout(merges_path);
+  merge_fout << "#version: 0.2\n";
+  for (auto&& merge : merges_) {
+    merge_fout << vocab_reversed_.at(merge.first.first) << " "
+               << vocab_reversed_.at(merge.first.second) << "\n";
+  }
+  merge_fout.close();
+  return {vocab_path, merges_path};
 }
 
 void to_json(nlohmann::json& j, const BPE& model) {
@@ -258,13 +293,16 @@ void to_json(nlohmann::json& j, const BPE& model) {
     merge_strs.push_back(s);
   }
 
+  core::SortedVocabReversed sorted_vocab_r(model.vocab_reversed_.begin(),
+                                           model.vocab_reversed_.end());
+
   j = {{"type", "WordPiece"},
        {"unk_token", model.unk_token_},
        {"continuing_subword_prefix", model.continuing_subword_prefix_},
        {"end_of_word_suffix", model.end_of_word_suffix_},
        {"fuse_unk", model.fuse_unk_},
        {"dropout", model.dropout_},
-       {"vocab", model.vocab_},
+       {"vocab", sorted_vocab_r},
        {"merges", merge_strs}};
 }
 

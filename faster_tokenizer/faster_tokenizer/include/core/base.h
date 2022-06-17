@@ -140,9 +140,17 @@ using Offset = std::pair<uint, uint>;
 using Range = std::pair<uint, uint>;
 using Vocab = std::unordered_map<std::string, uint>;
 using VocabReversed = std::unordered_map<uint, std::string>;
+using SortedVocabReversed = std::map<uint, std::string>;
 using Pair = std::pair<uint, uint>;
 using MergeMap = std::unordered_map<Pair, std::pair<uint, uint>>;
 using Merges = std::vector<std::pair<std::string, std::string>>;
+
+inline void to_json(nlohmann::json& j, const SortedVocabReversed& sorted_vocab_r) {
+  j = nlohmann::ordered_json();
+  for (const auto& item : sorted_vocab_r) {
+    j[item.second] = item.first;
+  }
+}
 
 struct Token {
   uint id_;

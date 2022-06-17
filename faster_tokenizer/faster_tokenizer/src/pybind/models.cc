@@ -48,10 +48,11 @@ public:
     PYBIND11_OVERLOAD_PURE_NAME(size_t, Model, "get_vocab_size", GetVocabSize);
   }
 
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override {
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override {
     PYBIND11_OVERLOAD_PURE_NAME(
-        std::string, Model, "save", Save, folder, filename_prefix);
+        std::vector<std::string>, Model, "save", Save, folder, filename_prefix);
   }
 };
 
@@ -81,10 +82,15 @@ class PyWordPiece : public models::WordPiece {
     PYBIND11_OVERLOAD_NAME(size_t, WordPiece, "get_vocab_size", GetVocabSize);
   }
 
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override {
-    PYBIND11_OVERLOAD_NAME(
-        std::string, WordPiece, "save", Save, folder, filename_prefix);
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override {
+    PYBIND11_OVERLOAD_NAME(std::vector<std::string>,
+                           WordPiece,
+                           "save",
+                           Save,
+                           folder,
+                           filename_prefix);
   }
 };
 
@@ -118,10 +124,15 @@ class PyFasterWordPiece : public models::FasterWordPiece {
         size_t, FasterWordPiece, "get_vocab_size", GetVocabSize);
   }
 
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override {
-    PYBIND11_OVERLOAD_NAME(
-        std::string, FasterWordPiece, "save", Save, folder, filename_prefix);
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override {
+    PYBIND11_OVERLOAD_NAME(std::vector<std::string>,
+                           FasterWordPiece,
+                           "save",
+                           Save,
+                           folder,
+                           filename_prefix);
   }
 };
 

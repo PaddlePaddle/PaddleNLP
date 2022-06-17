@@ -82,8 +82,8 @@ bool WordPiece::IdToToken(uint id, std::string* token) const {
   return true;
 }
 
-std::string WordPiece::Save(const std::string& folder,
-                            const std::string& filename_prefix) const {
+std::vector<std::string> WordPiece::Save(
+    const std::string& folder, const std::string& filename_prefix) const {
   std::string filepath;
   if (filename_prefix == "") {
     filepath = utils::PathJoin(folder, "vocab.txt");
@@ -103,7 +103,7 @@ std::string WordPiece::Save(const std::string& folder,
     fout << vocab_item.second << "\n";
   }
   fout.close();
-  return filepath;
+  return {filepath};
 }
 
 std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
