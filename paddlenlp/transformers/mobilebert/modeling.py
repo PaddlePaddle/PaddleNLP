@@ -1039,6 +1039,8 @@ class MobileBertModel(MobileBertPretrainedModel):
         super(MobileBertModel, self).__init__()
 
         self.initializer_range = initializer_range
+        self.pad_token_id = pad_token_id
+
         if use_bottleneck:
             true_hidden_size = intra_bottleneck_size
         else:
@@ -1221,12 +1223,9 @@ class MobileBertModel(MobileBertPretrainedModel):
                 "You have to specify either input_ids or inputs_embeds")
 
         if attention_mask is None:
-            extended_attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            extended_attention_mask = self.get_extended_attention_mask(
-                attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask)
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')

@@ -278,11 +278,9 @@ class MBartEncoder(MBartPretrainedModel):
         encoder_input = self.encoder_dropout(hidden_states)
 
         if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        attention_mask = self.get_extended_attention_mask(attention_mask)
+
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
 

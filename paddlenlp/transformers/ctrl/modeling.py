@@ -358,6 +358,7 @@ class CTRLModel(CTRLPreTrainedModel):
         self.hidden_size = hidden_size
         self.num_layers = num_hidden_layers
         self.initializer_range = initializer_range
+        self.pad_token_id = pad_token_id
 
         self.pos_encoding = SinusoidalPositionalEmbedding(
             max_position_embeddings, self.hidden_size)
@@ -495,11 +496,8 @@ class CTRLModel(CTRLPreTrainedModel):
 
         # Attention mask.
         if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(shape=[-1, seq_len])

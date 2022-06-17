@@ -179,10 +179,15 @@ class PretrainedModel(Layer, GenerationMixin):
         elif attention_mask.ndim == 2:
             attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-        extended_attention_mask = attention_mask.astype(
-            paddle.get_default_dtype())
+        extended_attention_mask = attention_mask.astype(self.dtype())
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         return extended_attention_mask
+
+    def dtype(self):
+        try:
+            return next(self.named_parameters())[1].dtype
+        except StopIteration:
+            return paddle.get_default_dtype()
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):

@@ -844,10 +844,9 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
-            attention_mask = paddle.cast(input_ids != self.pad_token_id,
-                                         dtype=paddle.get_default_dtype())
-        visual_attention_mask = paddle.ones(visual_shape,
-                                            dtype=paddle.get_default_dtype())
+            attention_mask = (input_ids != self.pad_token_id).astype(
+                self.dtype())
+        visual_attention_mask = paddle.ones(visual_shape, dtype=self.dtype())
 
         final_attention_mask = paddle.concat(
             [attention_mask, visual_attention_mask], axis=1)

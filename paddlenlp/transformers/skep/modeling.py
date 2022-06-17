@@ -348,12 +348,9 @@ class SkepModel(SkepPretrainedModel):
 
         """
         if attention_mask is None:
-            attention_mask = paddle.unsqueeze(
-                (input_ids.astype("int64") == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2])
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,

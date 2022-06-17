@@ -62,7 +62,6 @@ class ErnieGramEmbeddings(nn.Layer):
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
-            position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
         input_embedings = self.word_embeddings(input_ids)
@@ -302,12 +301,8 @@ class ErnieGramModel(ErnieGramPretrainedModel):
 
         """
         if attention_mask is None:
-            attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    paddle.get_default_dtype()) * -1e4,
-                axis=[1, 2])
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,

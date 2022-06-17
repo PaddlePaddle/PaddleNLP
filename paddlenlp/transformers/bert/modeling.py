@@ -506,16 +506,34 @@ class BertModel(BertPretrainedModel):
                                          hidden_dropout_prob,
                                          max_position_embeddings,
                                          type_vocab_size)
-        encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-
+        if fuse and FusedTransformerEncoderLayer is None:
+            warnings.warn(
+                "FusedTransformerEncoderLayer is not supported by the running Paddle. "
+                "The flag fuse_transformer will be ignored. Try Paddle >= 2.3.0"
+            )
+        self.fuse = fuse and FusedTransformerEncoderLayer is not None
+        if self.fuse:
+            self.encoder = nn.LayerList([
+                FusedTransformerEncoderLayer(
+                    hidden_size,
+                    num_attention_heads,
+                    intermediate_size,
+                    dropout_rate=hidden_dropout_prob,
+                    activation=hidden_act,
+                    attn_dropout_rate=attention_probs_dropout_prob,
+                    act_dropout_rate=0.) for _ in range(num_hidden_layers)
+            ])
+        else:
+            encoder_layer = nn.TransformerEncoderLayer(
+                hidden_size,
+                num_attention_heads,
+                intermediate_size,
+                dropout=hidden_dropout_prob,
+                activation=hidden_act,
+                attn_dropout=attention_probs_dropout_prob,
+                act_dropout=0)
+            self.encoder = nn.TransformerEncoder(encoder_layer,
+                                                 num_hidden_layers)
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
@@ -594,24 +612,23 @@ class BertModel(BertPretrainedModel):
                 output = model(**inputs)
         """
         if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids)
-        if output_hidden_states:
-            output = embedding_output
-            encoder_outputs = []
-            for mod in self.encoder.layers:
-                output = mod(output, src_mask=attention_mask)
-                encoder_outputs.append(output)
-            if self.encoder.norm is not None:
-                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-            pooled_output = self.pooler(encoder_outputs[-1])
+        if self.fuse:
+            hidden_states = embedding_output
+            all_encoder_outputs = []
+            for layer in self.encoder:
+                hidden_states = layer(hidden_states, attention_mask)
+                all_encoder_outputs.append(hidden_states)
+            pooled_output = self.pooler(hidden_states)
+            if output_hidden_states:
+                return all_encoder_outputs, pooled_output
+            else:
+                return hidden_states, pooled_output
         else:
             if output_hidden_states:
                 output = embedding_output

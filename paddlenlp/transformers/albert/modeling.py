@@ -1054,12 +1054,10 @@ class AlbertModel(AlbertPretrainedModel):
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
         if attention_mask is None:
-            extended_attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            extended_attention_mask = self.get_extended_attention_mask(
-                attention_mask)
+            attention_mask = input_ids != self.pad_token_id
+        extended_attention_mask = self.get_extended_attention_mask(
+            attention_mask)
+
         if token_type_ids is None:
             token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 

@@ -460,10 +460,7 @@ class GAUAlphaModel(GAUAlphaPretrainedModel):
 
         if attention_mask is None:
             attention_mask = input_ids != self.pad_token_id
-        if attention_mask.ndim == 2:
-            attention_mask = attention_mask.unsqueeze(1)  # bs, 1, seqlen
-        attention_mask = attention_mask.astype(paddle.get_default_dtype())
-        attention_mask.stop_gradient = True
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
