@@ -637,7 +637,7 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
                 position_ids=None,
                 output_attentions=None,
                 output_hidden_states=None):
-        r'''
+        r"""
         The  forward method, overrides the `__call__()` special method.
         Args:
            input_ids (Tensor):
@@ -645,14 +645,14 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
                numerical representations of tokens that build the input sequence.
                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
            attention_mask (Tensor, optional):
-               Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
-               usually the paddings or the subsequent positions.
-               Its data type can be int, float and bool.
-               If its data type is int, the values should be either 0 or 1.
-               - **1** for tokens that **not masked**,
-               - **0** for tokens that **masked**.
-               It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-               Defaults to `None`, which means nothing needed to be prevented attention to.
+               Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+               positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+               `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+               or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+               For all shapes above, the tensor's data type can be int, float or boolean.
+               When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+               When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
+               Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
            token_type_ids (Tensor, optional):
                Segment token indices to indicate different portions of the inputs.
                Selected in the range ``[0, type_vocab_size - 1]``.
@@ -688,7 +688,7 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
                The length of the list is `num_hidden_layers` + 1 (Embedding Layer output).
                Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
-        '''
+        """
         input_shape = input_ids.shape
 
         if attention_mask is None:

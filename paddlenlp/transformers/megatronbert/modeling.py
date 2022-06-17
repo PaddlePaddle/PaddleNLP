@@ -611,16 +611,14 @@ class MegatronBertModel(MegatronBertPretrainedModel):
                 max_position_embeddings - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                Defaults to `None`, which means nothing needed to be prevented attention to.
+                Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+                positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+                `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For all shapes above, the tensor's data type can be int, float or boolean.
+                When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
 
         Returns:
             tuple: Returns tuple (`sequence_output`, `pooled_output`).

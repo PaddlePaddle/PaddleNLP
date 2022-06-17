@@ -969,8 +969,8 @@ class AlbertModel(AlbertPretrainedModel):
                  `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
                  or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                  For all shapes above, the tensor's data type can be int, float or boolean.
-                 When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
-                 When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                 When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+                 When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
                  Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
              token_type_ids (Tensor, optional):
                  Segment token indices to indicate different portions of the inputs.
