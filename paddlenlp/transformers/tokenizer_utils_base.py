@@ -778,6 +778,14 @@ class SpecialTokensMixin:
     ]
 
     def __init__(self, verbose=True, **kwargs):
+        # TODO(guosheng): `SpecialTokensMixin.__init__` would be called by
+        # `PretrainedTokenizer._wrap_init` using args which might be str rather
+        # than instances of `AddedToken`, and this causes `AddedToken` settings
+        # made by `_build_special_tokens_map_extended` overwrited.
+        # Maybe `PretrainedTokenizer._wrap_init` should be called before init
+        # later.
+        if getattr(self, "_has_built_special_tokens", None):
+            return
         self._bos_token = None
         self._eos_token = None
         self._unk_token = None
@@ -1497,8 +1505,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         vocab_files = {}
         init_configuration = {}
 
-        pretrained_models = list(cls.pretrained_init_configuration.keys())
-
         additional_files_names = {
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
@@ -1511,7 +1517,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         }
 
         # From built-in pretrained models
-        if pretrained_model_name_or_path in pretrained_models:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
@@ -1577,6 +1583,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
@@ -1689,6 +1696,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             logger.info(
                 "Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained."
             )
+
+        # save all of related things into default root dir
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+            tokenizer.save_pretrained(default_root)
 
         return tokenizer
 
