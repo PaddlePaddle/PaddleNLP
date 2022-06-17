@@ -1123,7 +1123,6 @@ class WordTagRelationExtractor(object):
                 return -2, None
             for j, tail_conf in enumerate(sg_conf):
                 flag = self._match_item(item, tail_conf["main"])
-                # print(item, flag)
                 if flag is True:
                     return i, tail_conf
                 if item["wordtag_label"].startswith(head_hype):
@@ -1252,10 +1251,6 @@ class WordTagRelationExtractor(object):
 
                 trig_status, trig_conf = self._trig_handler(
                     cur_item, self._schema[head_type])
-                # print(
-                #     head_cand["item"], head_cand["wordtag_label"],
-                #     cur_item["item"], trig_status, j, len(self._all_items), sep="\t"
-                # )
 
                 # Find a tail role, generate corresponding triple.
                 if trig_status == "trig_t":
@@ -1369,8 +1364,6 @@ class WordTagRelationExtractor(object):
                             head_conf["g_t_map"][group_name], head_type)
                         tail_item = self._all_items[tail_idx]
                         if tail_idx > 0:
-                            # print(tail_idx, tail_conf)
-
                             del self._jux_buf[:]
                             _ = self._search_jux(
                                 cur_item=tail_item,
