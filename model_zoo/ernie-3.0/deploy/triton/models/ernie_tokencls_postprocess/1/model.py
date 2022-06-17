@@ -100,8 +100,9 @@ class TritonPythonModel:
                 value.append(items)
             out_result = np.array(value, dtype='object')
             out_tensor = pb_utils.Tensor(self.output_names[0], out_result)
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[out_tensor, ])
+            inference_response = pb_utils.InferenceResponse(output_tensors=[
+                out_tensor,
+            ])
             responses.append(inference_response)
         return responses
 
