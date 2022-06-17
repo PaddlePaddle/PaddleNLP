@@ -38,11 +38,9 @@ def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
     return seq
 
 
-def prepare_input(tokenizer, sentences, pad_id):
-    word_pad = Pad(pad_id, dtype="int64")
-    tokenized = tokenizer(sentences, return_length=True)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
-    input_ids = paddle.to_tensor(inputs)
+def prepare_input(tokenizer, sentences):
+    tokenized = tokenizer(sentences, padding=True)
+    input_ids = paddle.to_tensor(tokenized['input_ids'], dtype='int64')
     return input_ids
 
 
@@ -57,13 +55,13 @@ def parse_args():
     )
     parser.add_argument(
         "--decoding_strategy",
-        default='sampling',
+        default='beam_search',
         type=str,
         help=
         "The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
     parser.add_argument("--beam_size",
-                        default=4,
+                        default=5,
                         type=int,
                         help="The parameters for beam search. ")
     parser.add_argument(
@@ -77,7 +75,7 @@ def parse_args():
         type=float,
         help="The probability threshold to procedure topp sampling. ")
     parser.add_argument("--max_length",
-                        default=50,
+                        default=20,
                         type=int,
                         help="Maximum output length. ")
     parser.add_argument("--diversity_rate",
@@ -103,6 +101,7 @@ def do_predict(args):
     logger.info('Loading the model parameters, please wait...')
     model = BartForConditionalGeneration.from_pretrained(
         args.model_name_or_path)
+
     # Set evaluate mode
     model.eval()
     sentences = [
@@ -115,7 +114,7 @@ def do_predict(args):
     bos_id = model.bart.config['bos_token_id']
     eos_id = model.bart.config['eos_token_id']
     pad_id = model.bart.config['pad_token_id']
-    input_ids = prepare_input(tokenizer, sentences, pad_id)
+    input_ids = prepare_input(tokenizer, sentences)
     # Define model
     faster_bart = model
 
@@ -155,4 +154,5 @@ def do_predict(args):
 if __name__ == "__main__":
     args = parse_args()
     pprint(args)
+
     do_predict(args)
