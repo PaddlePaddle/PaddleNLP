@@ -19,79 +19,90 @@ msgstr ""
 
 #: ../community/contribute_datasets/sharing_dataset.rst:3
 msgid "分享你的数据集"
-msgstr ""
+msgstr "Share Your Datasets"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:5
 msgid "除了使用PaddleNLP内置的数据集以外，我们也鼓励用户向PaddleNLP贡献自己的数据集。"
-msgstr ""
+msgstr "In addition to using the datasets built into PaddleNLP, we also encourage users to contribute their own datasets to PaddleNLP."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:7
 msgid "下面我们来介绍一下贡献数据集的详细流程："
-msgstr ""
+msgstr "Let's introduce the detailed process of contributing datasets:"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:10
 msgid "配置环境"
-msgstr ""
+msgstr "Configuration Environment"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:12
 msgid "编写和测试PaddleNLP代码需要依赖python3.6以上版本以及最新版本的PaddlePaddle。请确保正确安装以上依赖。"
 msgstr ""
+"Writing and testing PaddleNLP code requires python3.6 or above and the latest version of PaddlePaddle."
+"Please make sure to install the above dependencies correctly."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:13
 msgid "在PaddleNLP的github页面上点击Fork按钮，在自己的github中创建一份PaddleNLP repo的副本。"
-msgstr ""
+msgstr "Click the Fork button on PaddleNLP's github page to create a PaddleNLP repo in your own github."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:14
 msgid "将您frok的内容下载到本地，并将官方repo作为remote。"
-msgstr ""
+msgstr "Download your frok content locally and use the official repo as a remote."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:22
 msgid "安装pre-commit钩子，它可以帮助我们格式化源代码，再提交前自动检查代码问题。不满足钩子的PR **不能** 被提交到PaddleNLP。"
 msgstr ""
+"Install the pre-commit hook, which can help us format the source code and automatically check for code problems before committing."
+"The source code which doen't satisfy git hook **can not** be committed to PaddleNLP."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:30
 msgid "添加一个 :class:`DatasetBuilder`"
-msgstr ""
+msgstr "Add a :class:`DatasetBuilder`"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:32
 msgid "创建一个新的本地分支，一般从develop 分支上创建新分支。"
-msgstr ""
+msgstr "Create a new local branch, usually create from the develop branch."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:38
 msgid ""
 "找到您本地repo下的 `PaddleNLP/paddlenlp/datasets/` "
 "路径，PaddleNLP的所有数据集代码都储存在这个文件夹下。"
 msgstr ""
+"Find the `PaddleNLP/paddlenlp/datasets/` path under your local repo,"
+"all PaddleNLP dataset codes are stored in this folder."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:44
 msgid "为您的数据集确定一个 `name`，例如 `squad` , `chnsenticorp` 等，这个 `name` 就是您的数据集被读取时的名称。"
-msgstr ""
+msgstr "Determine a `name` for your dataset, such as `squad` , `chnsenticorp` , etc. This `name` is the name of your dataset when it was read."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:48
 msgid "为了方便别人使用您的数据集，确保这个 `name` **不会太长而且能够正确的表义**。"
-msgstr ""
+msgstr "To make it easier for others to use your dataset, make sure that the `name` **is not too long and can correctly indicate the meaning**."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:49
 msgid "数据集的 `name` 格式应为snake case。"
-msgstr ""
+msgstr "The `name` format of the dataset should be snake case."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:51
 msgid ""
 "在该路径下创建python文件，文件名是数据集的 `name`，例如 `squad.py` 。并在这个文件中编写数据集的 "
 ":class:`DatasetBuilder` 代码。"
-msgstr ""
+msgstr "Create a python file in this path with the `name` of the dataset, for example `squad.py` . And write the :class:`DatasetBuilder` code of the dataset in this file."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:53
 msgid ""
 ":class:`DatasetBuilder` 的编写可以参考教程 :doc:`如何创建一个DatasetBuilder "
 "<./how_to_write_a_DatasetBuilder>` 。里面给出了详细的步骤和规范。"
 msgstr ""
+"To write :class:`DatasetBuilder`, you can refer to the tutorial :doc:`How to create a DatasetBuilder <./how_to_write_a_DatasetBuilder>` ."
+"There are detailed steps and specifications."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:55
 msgid ""
 "我们也推荐您参考已有数据集的 :class:`DatasetBuilder` "
 "进行创建，从已有代码copy一些共用部分可能对您编写自己的数据集代码有所帮助，下面是一些已有数据集的示例："
 msgstr ""
+"We also recommend that you create your own dataset by referring to :class:`DatasetBuilder` of an existing dataset."
+"Copying some common parts from the existing code may help you write your own dataset code. Here are some examples of existing datasets:"
+
 
 #: ../community/contribute_datasets/sharing_dataset.rst:57
 msgid ""
@@ -99,6 +110,9 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
 " 翻译数据集，包含词表文件。"
 msgstr ""
+"`iwslt15.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
+"translation datasets, including vocabulary files."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:58
 msgid ""
@@ -106,6 +120,9 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__"
 " glue数据集，包含多个子数据集，文件格式为tsv。"
 msgstr ""
+"`glue.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__"
+"glue datasets, including multiple sub-datasets, the file format is tsv."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:59
 msgid ""
@@ -113,6 +130,9 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/squad.py>`__"
 " 阅读理解数据集，文件格式为json。"
 msgstr ""
+"`squad.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/squad.py>`__"
+"read the comprehension datasets, the file format is json."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:60
 msgid ""
@@ -120,6 +140,9 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/imdb.py>`__"
 " imdb数据集，每个split包含多个文件。"
 msgstr ""
+"`imdb.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/imdb.py>`__"
+"imbd datasets, each split contains multiple files."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:61
 msgid ""
@@ -127,6 +150,9 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/ptb.py>`__"
 " 语料库数据集。"
 msgstr ""
+"`ptb.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/ptb.py>`__"
+"corpus datasets."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:62
 msgid ""
@@ -134,36 +160,43 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/msra_ner.py>`__"
 " 序列标注数据集。"
 msgstr ""
+"`msra_ner.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/msra_ner.py>`__"
+"sequence labeling datasets."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:64
 msgid ""
 "开发完成后，可以使用 :attr:`load_dataset` 测试您创建的数据集中的split能否正确被识别。也可以使用 "
 ":attr:`print` 看看数据集读入的格式是否符合您的预期："
 msgstr ""
+"After development, you can use :attr:`load_dataset` to test whether the splits in the dataset you created can be correctly recognized."
+"You can also use :attr:`print` to see if the dataset is read in the format you expect:"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:74
 msgid "提交您的成果"
-msgstr ""
+msgstr "Commit your work"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:76
 msgid "当您认为数据集的代码已经ready后，就可以在本地commit您的修改了："
-msgstr ""
+msgstr "When you think the code for the dataset is ready, you can commit your changes locally:"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:83
 msgid "在提交修改之前，最好获取获取先upstream的最新代码并更新当前分支。"
-msgstr ""
+msgstr "Before committing changes, it is better to fetch the latest code upstream and update the current branch"
 
 #: ../community/contribute_datasets/sharing_dataset.rst:90
 msgid "将本地的修改推送到GitHub上，并在GitHub上向PaddleNLP提交Pull Request。"
-msgstr ""
+msgstr "Push the local changes to GitHub and create a Pull Request to PaddleNLP on GitHub."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:96
 msgid ""
 "以上就是像PaddleNLP贡献数据集的完整流程了。我们看到您的PR后会尽快review，如果有任何问题都会尽快反馈给您。如果没有问题的话我们就会合入到PaddleNLP"
 " repo，您贡献的数据集就可以供其他人使用啦。"
 msgstr ""
+"The above is the complete process of contributing datasets to PaddleNLP. After we see your PR, we will review it as soon as possible,"
+"If there are any questions, we will feedback to you as soon as possible. If there are no issues, we will merge it into the PaddleNLP repo. Then the dataset you contribute can be used by others."
 
 #: ../community/contribute_datasets/sharing_dataset.rst:98
 msgid "如果您对贡献数据集还有任何疑问，欢迎加入官方QQ技术交流群: 973379845向我们提出。我们会尽快为您解答。"
-msgstr ""
+msgstr "If you still have questions about how to contribute datasets, please join and ask us at the official QQ technical exchange group: 973379845. We will answer your questions as soon as possible."
 

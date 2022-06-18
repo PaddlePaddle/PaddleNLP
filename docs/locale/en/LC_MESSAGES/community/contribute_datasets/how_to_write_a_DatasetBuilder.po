@@ -19,51 +19,58 @@ msgstr ""
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:3
 msgid "创建 :class:`DatasetBuilder`"
-msgstr ""
+msgstr "Create :class:`DatasetBuilder`"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:5
 msgid ""
 "数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。一个合格的 :class:`DatasetBuilder`"
 " 需要遵循一些协议和规范。"
 msgstr ""
+"Dataset contributions are achieved by defining a subclass of :class:`DatasetBuilder`."
+"A qualified :class:`DatasetBuilder` needs to follow some protocols and specifications. "
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:7
 msgid "下面我们以 :obj:`LCQMC` 为例了解一下 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。"
-msgstr ""
+msgstr "Let's take :obj:`LCQMC` as an example to understand what methods and parameters are usually included in :class:`DatasetBuilder`."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:10
 msgid "成员变量"
-msgstr ""
+msgstr "member variables"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:40
 msgid ""
 "首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` 类，类名格式为camel "
 "case。之后应该添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量："
 msgstr ""
+"The first contributed dataset needs to inherit from the :class:`paddlenlp.datasets.DatasetBuilder` class, and the class name format is camel case. "
+"After that, a comment should be added to briefly explain the source of the dataset and other information. Then the following member variables need to be defined:"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:42
 msgid ""
 ":attr:`lazy` ：数据集的默认类型。:obj:`False` 对应 :class:`MapDataset` ，:obj:`True` "
 "对应 :class:`IterDataset` 。"
-msgstr ""
+msgstr ":attr:`lazy` : Default type of dataset. :obj:`False` corresponds to :class:`MapDataset` , :obj:`True` corresponds to :class:`IterDataset`."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:43
 msgid ":attr:`URL` ：数据集压缩包下载地址，需提供有效并稳定的下载链接。如果数据集不是压缩包，可以不再这里提供。"
-msgstr ""
+msgstr ":attr:`URL` ：The download address of the data set compressed package must provide a valid and stable download link. If the dataset is not a compressed package, it can no longer be provided here."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:44
 msgid ":attr:`MD5` ：数据集压缩包的md5值，用于文件校验，如果数据集文件不是压缩包，可以不再这里提供。"
-msgstr ""
+msgstr ":attr:`MD5` ：The md5 value of the compressed package of the dataset is used for file verification. If the dataset file is not a compressed package, it can no longer be provided here."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:45
 msgid ":attr:`META_INFO` ：数据集split信息格式。"
-msgstr ""
+msgstr ":attr:`META_INFO` ：Dataset split information format."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:46
 msgid ""
 ":attr:`SPLITS` "
 "：数据集的split信息，包含数据集解压后的不同文件的具体位置，文件名，md5值等，如果数据集不是压缩包则通常在这里提供下载地址，还可以包含诸如不同文件对应的文件读取参数等信息。"
 msgstr ""
+":attr:`SPLITS` "
+"：The split information of the dataset, including the specific location, file name, md5 value, etc. of the different files after the dataset is decompressed. "
+"If the data set is not a compressed package, the download address is usually provided here, and information such as file reading parameters corresponding to different files can also be included."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:48
 msgid ""
@@ -71,12 +78,17 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
 " ）。或者成员变量会有其他格式。贡献者可以根据实际情况自行调整。"
 msgstr ""
+"In addition, different datasets may require other member variables such as :attr:`VOCAB_INFO`"
+"please refer to `iwslt15.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__)."
+"Or member variables will have other formats. Contributors can adjust according to the actual situation."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:52
 msgid ""
 "如果贡献的数据集没有子数据集，那么 :class:`DatasetBuilder` **必须包含** :attr:`SPLITS` "
 "成员变量，且该变量必须是一个字典，字典的key是该数据集包含的splits。"
 msgstr ""
+"If the contributed dataset has no sub-dataset, then :class:`DatasetBuilder` **must contain** :attr:`SPLITS` member variable,"
+"and the variable must be a dictionary, the key of the dictionary is the splits contained in the dataset ."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:53
 msgid ""
@@ -85,11 +97,16 @@ msgid ""
 "。字典的value是包含该数据集的子数据集split信息的字典，key值必须是 `splits` 。具体格式（参见 `glue.py "
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__"
 " ）"
+
 msgstr ""
+"If the contributed dataset has sub-dataset, then :class:`DatasetBuilder` **must contain** :attr:`BUILDER_CONFIGS` member variable,"
+"and the variable must be a dictionary. The key of the dictionary is the :attr:`name` of the sub-dataset contained in the dataset."
+"The value of the dictionary is a dictionary containing the split information of the sub-dataset of this dataset, and the key value must be `splits` ."
+"Specific format (please refer to `glue.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__)"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:56
 msgid ":func:`_get_data` 方法"
-msgstr ""
+msgstr ":func:`_get_data` method"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:71
 msgid ""
@@ -98,10 +115,12 @@ msgid ""
 ":func:`paddle.utils.download.get_path_from_url` "
 "方法下载并校验数据集文件，最后返回数据集文件的本地地址。"
 msgstr ""
+"The :func:`_get_data` method locates the specific dataset file according to the incoming :attr:`mode` and the split information of the dataset."
+"First, verify the local file by md5 value. If the verification fails, call the :func:`paddle.utils.download.get_path_from_url` method to download and verify the dataset file, and finally return the local address of the dataset file. "
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:74
 msgid ":func:`_read` 方法"
-msgstr ""
+msgstr ":func:`_read` method"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:90
 msgid ""
@@ -109,10 +128,12 @@ msgid ""
 "可以构造 :class:`MapDataset` 和  :class:`IterDataset` 两种数据集。 "
 "当不同split对应的数据文件读取方式不同时，该方法还需要支持 :attr:`split` 参数，并支持不同split下的读取方式。"
 msgstr ""
+"The :func:`_read` method reads data according to the passed in file address. The method must be a generator to ensure that :class:`DatasetBuilder` can construct both :class:`MapDataset` and :class:`IterDataset` datasets."
+"When the data files corresponding to different splits are read in different ways, the method also needs to support the :attr:`split` parameter, and support the reading methods under different splits."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:95
 msgid "该方法提供的每条example都应是一个 :class:`Dictionary` 对象。"
-msgstr ""
+msgstr "Each example provided by this method should be a :class:`Dictionary` object."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:96
 msgid ""
@@ -120,24 +141,28 @@ msgid ""
 "label转换为id的功能。如果用户需要此功能，需要将example中label对应的key设置为 **\"label\"** 或 "
 "**\"labels\"** ，并在类中正确添加 :func:`get_labels` 方法。"
 msgstr ""
+"The :class:`DatasetBuilder` provides the function of converting class label to id when generating Dataset."
+"If users need this function, they need to set the key corresponding to the label in the example"
+"to **\"label\"** or **\"labels\"** , and add the :func:`get_labels` method to the class correctly."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:99
 msgid ":func:`get_labels` 方法"
-msgstr ""
+msgstr ":func:`get_labels` method"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:109
 msgid ""
 ":func:`get_labels` 方法返回一个由该数据集中所有label组成的list。用于将数据集中的class "
 "label转换为id，并且这个list之后会作为实例变量传给生成的数据集。"
 msgstr ""
-
+"The :func:`get_labels` method returns a list of all labels in the dataset. It is used to convert the class label in the dataset into an id,"
+"and this list will then be passed to the generated dataset as an instance variable."
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:112
-msgid ":func:`get_vocab` 方法"
-msgstr ""
+msgid ":func:`get_vocab` 方法" 
+msgstr ":func:`get_vocab` method"
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:114
 msgid "如果数据集提供词典文件，则需要加入 :func:`get_vocab` 方法和 :attr:`VOCAB_INFO` 变量。"
-msgstr ""
+msgstr "If the dataset provides dictionary files, you need to include the :func:`get_vocab` method and the :attr:`VOCAB_INFO` variable."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:116
 msgid ""
@@ -147,14 +172,19 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
 " 。"
 msgstr ""
+"This method will return a :class:`Dictionary` object containing the dictionary information of the dataset according to the :attr:`VOCAB_INFO` variable"
+"and pass it as an instance variable to the generated dataset. Used to initialize the :class:`paddlenlp.data.Vocab` object during training."
+"Please refer to  `iwslt15.py <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__ for the writing method."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:121
 msgid ""
 "贡献数据集时 :func:`get_labels` 和 :func:`get_vocab` 方法是可选的，视具体数据集内容而定。 "
 ":func:`_read` 和 :func:`_get_data` 方法是 **必须包含** 的。"
 msgstr ""
+"When contributing a dataset, the :func:`get_labels` and :func:`get_vocab` methods are optional. It depends on the content of the specific dataset."
+":func:`_read` and :func:`_get_data` methods are **must contain**."
 
 #: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:122
 msgid "如果您不希望在数据获取过程中进行md5值校验，可以不用给出相关成员变量和校验代码。"
-msgstr ""
+msgstr "If you don't want to perform md5 value verification during the data acquisition process, you don't need to give the relevant member variables and verification codes."
 

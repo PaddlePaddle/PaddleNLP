@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../community/contribute_models/contribute_new_models.rst:3
 msgid "贡献新模型"
-msgstr ""
+msgstr "Contribute new models"
 

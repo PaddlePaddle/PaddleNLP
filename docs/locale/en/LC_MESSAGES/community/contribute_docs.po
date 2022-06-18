@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../community/contribute_docs.rst:3
 msgid "如何贡献问答、案例"
-msgstr ""
+msgstr "How to contribute Q&A, and case study"
 
