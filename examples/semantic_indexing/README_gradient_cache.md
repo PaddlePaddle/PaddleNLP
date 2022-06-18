@@ -61,7 +61,7 @@ python train_dense_encoder.py \
 * `train_data_path`:训练数据存放地址
 * `chunk_size`:chunk大小
 
-##生成文章稠密向量表示
+## 生成文章稠密向量表示
 
 ```
 python generate_dense_embeddings.py \
@@ -73,7 +73,7 @@ python generate_dense_embeddings.py \
    --con_model_path {con_model_path}
 ``` 
 
-##如果只有一台机器，可以直接使用  
+## 如果只有一台机器，可以直接使用  
 
 ```
 python generate_dense_embedding \ 
@@ -91,7 +91,7 @@ python generate_dense_embedding \
 * `con_model_path`： 模型存储 checkpoint 的间隔 steps 个数 
 
 
-##针对全部文档的检索器验证
+## 针对全部文档的检索器验证
 ```
 python dense_retriever.py --hnsw_index \
     --out_file {out_file} \
