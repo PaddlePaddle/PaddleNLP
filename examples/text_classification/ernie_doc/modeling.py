@@ -28,6 +28,7 @@ __all__ = [
 
 
 class PointwiseFFN(nn.Layer):
+
     def __init__(self,
                  d_inner_hid,
                  d_hid,
@@ -36,11 +37,15 @@ class PointwiseFFN(nn.Layer):
                  weight_attr=None,
                  bias_attr=None):
         super(PointwiseFFN, self).__init__()
-        self.linear1 = nn.Linear(
-            d_hid, d_inner_hid, weight_attr, bias_attr=bias_attr)
+        self.linear1 = nn.Linear(d_hid,
+                                 d_inner_hid,
+                                 weight_attr,
+                                 bias_attr=bias_attr)
         self.dropout = nn.Dropout(dropout_rate, mode="upscale_in_train")
-        self.linear2 = nn.Linear(
-            d_inner_hid, d_hid, weight_attr, bias_attr=bias_attr)
+        self.linear2 = nn.Linear(d_inner_hid,
+                                 d_hid,
+                                 weight_attr,
+                                 bias_attr=bias_attr)
         self.activation = getattr(F, hidden_act)
 
     def forward(self, x):
@@ -48,6 +53,7 @@ class PointwiseFFN(nn.Layer):
 
 
 class MultiHeadAttention(nn.Layer):
+
     def __init__(self,
                  d_key,
                  d_value,
@@ -67,33 +73,30 @@ class MultiHeadAttention(nn.Layer):
 
         assert d_key * n_head == d_model, "d_model must be divisible by n_head"
 
-        self.q_proj = nn.Linear(
-            d_model,
-            d_key * n_head,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
-        self.k_proj = nn.Linear(
-            d_model,
-            d_key * n_head,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
-        self.v_proj = nn.Linear(
-            d_model,
-            d_value * n_head,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
-        self.r_proj = nn.Linear(
-            d_model,
-            d_key * n_head,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
-        self.t_proj = nn.Linear(
-            d_model,
-            d_key * n_head,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
-        self.out_proj = nn.Linear(
-            d_model, d_model, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.q_proj = nn.Linear(d_model,
+                                d_key * n_head,
+                                weight_attr=weight_attr,
+                                bias_attr=bias_attr)
+        self.k_proj = nn.Linear(d_model,
+                                d_key * n_head,
+                                weight_attr=weight_attr,
+                                bias_attr=bias_attr)
+        self.v_proj = nn.Linear(d_model,
+                                d_value * n_head,
+                                weight_attr=weight_attr,
+                                bias_attr=bias_attr)
+        self.r_proj = nn.Linear(d_model,
+                                d_key * n_head,
+                                weight_attr=weight_attr,
+                                bias_attr=bias_attr)
+        self.t_proj = nn.Linear(d_model,
+                                d_key * n_head,
+                                weight_attr=weight_attr,
+                                bias_attr=bias_attr)
+        self.out_proj = nn.Linear(d_model,
+                                  d_model,
+                                  weight_attr=weight_attr,
+                                  bias_attr=bias_attr)
         self.r_w_bias = r_w_bias
         self.r_r_bias = r_r_bias
         self.r_t_bias = r_t_bias
@@ -195,6 +198,7 @@ class MultiHeadAttention(nn.Layer):
 
 
 class ErnieDocEncoderLayer(nn.Layer):
+
     def __init__(self,
                  n_head,
                  d_key,
@@ -235,20 +239,20 @@ class ErnieDocEncoderLayer(nn.Layer):
             r_t_bias,
             attention_dropout,
             weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0], )
-        self.ffn = PointwiseFFN(
-            d_inner_hid,
-            d_model,
-            relu_dropout,
-            hidden_act,
-            weight_attr=weight_attrs[1],
-            bias_attr=bias_attrs[1])
+            bias_attr=bias_attrs[0],
+        )
+        self.ffn = PointwiseFFN(d_inner_hid,
+                                d_model,
+                                relu_dropout,
+                                hidden_act,
+                                weight_attr=weight_attrs[1],
+                                bias_attr=bias_attrs[1])
         self.norm1 = nn.LayerNorm(d_model, epsilon=epsilon)
         self.norm2 = nn.LayerNorm(d_model, epsilon=epsilon)
-        self.dropout1 = nn.Dropout(
-            prepostprocess_dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(
-            prepostprocess_dropout, mode="upscale_in_train")
+        self.dropout1 = nn.Dropout(prepostprocess_dropout,
+                                   mode="upscale_in_train")
+        self.dropout2 = nn.Dropout(prepostprocess_dropout,
+                                   mode="upscale_in_train")
         self.d_model = d_model
         self.epsilon = epsilon
         self.normalize_before = normalize_before
@@ -273,12 +277,13 @@ class ErnieDocEncoderLayer(nn.Layer):
 
 
 class ErnieDocEncoder(nn.Layer):
+
     def __init__(self, num_layers, encoder_layer, mem_len):
         super(ErnieDocEncoder, self).__init__()
-        self.layers = nn.LayerList([(
-            encoder_layer
-            if i == 0 else type(encoder_layer)(**encoder_layer._config))
-                                    for i in range(num_layers)])
+        self.layers = nn.LayerList([
+            (encoder_layer if i == 0 else type(encoder_layer)(
+                **encoder_layer._config)) for i in range(num_layers)
+        ])
         self.num_layers = num_layers
         self.normalize_before = self.layers[0].normalize_before
         self.mem_len = mem_len
@@ -289,8 +294,8 @@ class ErnieDocEncoder(nn.Layer):
         if prev_mem is None:
             new_mem = curr[:, -self.mem_len:, :]
         else:
-            new_mem = paddle.concat([prev_mem, curr_out],
-                                    1)[:, -self.mem_len:, :]
+            new_mem = paddle.concat([prev_mem, curr_out], 1)[:,
+                                                             -self.mem_len:, :]
         new_mem.stop_gradient = True
         return new_mem
 
@@ -304,22 +309,25 @@ class ErnieDocEncoder(nn.Layer):
             enc_input = encoder_layer(enc_input, memories[0], rel_pos, rel_task,
                                       attn_mask)
             if new_mem is None:
-                new_mem = paddle.unsqueeze(
-                    self._cache_mem(enc_input, memories[0]), axis=0)
+                new_mem = paddle.unsqueeze(self._cache_mem(
+                    enc_input, memories[0]),
+                                           axis=0)
             else:
-                new_mem = paddle.concat(
-                    [
-                        new_mem, paddle.unsqueeze(
-                            self._cache_mem(enc_input, memories[0]), axis=0)
-                    ],
-                    axis=0)
+                new_mem = paddle.concat([
+                    new_mem,
+                    paddle.unsqueeze(self._cache_mem(enc_input, memories[0]),
+                                     axis=0)
+                ],
+                                        axis=0)
             sign = memories.shape[0]
             if sign > 1:
                 axis = [0]
                 start = [1]
                 end = [memories.shape[0]]
-                memories = paddle.slice(
-                    memories, axes=axis, starts=start, ends=end)
+                memories = paddle.slice(memories,
+                                        axes=axis,
+                                        starts=start,
+                                        ends=end)
             else:
                 memories = None
         return enc_input, new_mem
@@ -388,13 +396,14 @@ class ErnieDocPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_doc.config["initializer_range"],
                         shape=layer.weight.shape))
 
 
 class ErnieDocEmbeddings(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  d_model,
@@ -419,13 +428,11 @@ class ErnieDocEmbeddings(nn.Layer):
         # position_embeddings: [B, 2 * T + M, H]
         position_embeddings = self.pos_emb(position_ids.squeeze(-1))
         batch_size = input_ids.shape[0]
-        token_type_ids = paddle.concat(
-            [
-                paddle.zeros(
-                    shape=[batch_size, self.memory_len, 1], dtype="int64") +
-                token_type_ids[0, 0, 0], token_type_ids
-            ],
-            axis=1)
+        token_type_ids = paddle.concat([
+            paddle.zeros(shape=[batch_size, self.memory_len, 1], dtype="int64")
+            + token_type_ids[0, 0, 0], token_type_ids
+        ],
+                                       axis=1)
         token_type_ids.stop_gradient = True
         # token_type_embeddings: [B, M + T, H]
         token_type_embeddings = self.token_type_emb(token_type_ids.squeeze(-1))
@@ -565,27 +572,26 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         self.encoder = ErnieDocEncoder(num_hidden_layers, encoder_layer,
                                        memory_len)
         self.pad_token_id = pad_token_id
-        self.embeddings = ErnieDocEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob, memory_len,
-            max_position_embeddings, task_type_vocab_size, pad_token_id)
+        self.embeddings = ErnieDocEmbeddings(vocab_size, hidden_size,
+                                             hidden_dropout_prob, memory_len,
+                                             max_position_embeddings,
+                                             task_type_vocab_size, pad_token_id)
         self.pooler = ErnieDocPooler(hidden_size, cls_token_idx)
 
     def _create_n_head_attn_mask(self, attn_mask, batch_size):
         # attn_mask shape: [B, T, 1]
         # concat an data_mask, shape: [B, M + T, 1]
-        data_mask = paddle.concat(
-            [
-                paddle.ones(
-                    shape=[batch_size, self.memory_len, 1],
-                    dtype=attn_mask.dtype), attn_mask
-            ],
-            axis=1)
+        data_mask = paddle.concat([
+            paddle.ones(shape=[batch_size, self.memory_len, 1],
+                        dtype=attn_mask.dtype), attn_mask
+        ],
+                                  axis=1)
         data_mask.stop_gradient = True
         # create a self_attn_mask, shape: [B, T, M + T]
         self_attn_mask = paddle.matmul(attn_mask, data_mask, transpose_y=True)
         self_attn_mask = (self_attn_mask - 1) * 1e8
-        n_head_self_attn_mask = paddle.stack(
-            [self_attn_mask] * self.n_head, axis=1)
+        n_head_self_attn_mask = paddle.stack([self_attn_mask] * self.n_head,
+                                             axis=1)
         n_head_self_attn_mask.stop_gradient = True
         return n_head_self_attn_mask
 
@@ -686,15 +692,14 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
         batch_size = input_embeddings.shape[0]
         # [B, N, T, M + T]
-        n_head_self_attn_mask = self._create_n_head_attn_mask(attn_mask,
-                                                              batch_size)
+        n_head_self_attn_mask = self._create_n_head_attn_mask(
+            attn_mask, batch_size)
         # memories contain n_layer memory whose shape is [B, M, H]
-        encoder_output, new_mem = self.encoder(
-            enc_input=input_embeddings,
-            memories=memories,
-            rel_pos=position_embeddings,
-            rel_task=token_embeddings,
-            attn_mask=n_head_self_attn_mask)
+        encoder_output, new_mem = self.encoder(enc_input=input_embeddings,
+                                               memories=memories,
+                                               rel_pos=position_embeddings,
+                                               rel_task=token_embeddings,
+                                               attn_mask=n_head_self_attn_mask)
         pooled_output = self.pooler(encoder_output)
         return encoder_output, pooled_output, new_mem
 
@@ -786,8 +791,9 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        _, pooled_output, mem = self.ernie_doc(
-            input_ids, memories, token_type_ids, position_ids, attn_mask)
+        _, pooled_output, mem = self.ernie_doc(input_ids, memories,
+                                               token_type_ids, position_ids,
+                                               attn_mask)
         pooled_output = self.dropout(pooled_output)
         logits = self.linear(pooled_output)
         return logits, mem
@@ -882,8 +888,9 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        sequence_output, _, mem = self.ernie_doc(
-            input_ids, memories, token_type_ids, position_ids, attn_mask)
+        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
+                                                 token_type_ids, position_ids,
+                                                 attn_mask)
         sequence_output = self.dropout(sequence_output)
         logits = self.linear(sequence_output)
         return logits, mem
@@ -979,8 +986,9 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 mem = outputs[2]
 
         """
-        sequence_output, _, mem = self.ernie_doc(
-            input_ids, memories, token_type_ids, position_ids, attn_mask)
+        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
+                                                 token_type_ids, position_ids,
+                                                 attn_mask)
         sequence_output = self.dropout(sequence_output)
         logits = self.linear(sequence_output)
         start_logits, end_logits = paddle.transpose(logits, perm=[2, 0, 1])

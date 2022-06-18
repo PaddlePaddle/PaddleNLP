@@ -70,8 +70,8 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
                 if parm.shape[dim] != v:
                     break
 
-            splited = np.split(
-                tensor, topo.mp_info.size, axis=dim)[topo.mp_info.rank]
+            splited = np.split(tensor, topo.mp_info.size,
+                               axis=dim)[topo.mp_info.rank]
             ret_dict[parm.name] = splited
         else:
             ret_dict[parm.name] = tensor

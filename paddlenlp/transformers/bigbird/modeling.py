@@ -67,6 +67,7 @@ ACT2FN = {
 
 
 class TransformerEncoderLayer(Layer):
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -96,23 +97,26 @@ class TransformerEncoderLayer(Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
 
-        self.self_attn = MultiHeadAttention(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
-            weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
-            attention_type=attention_type,
-            block_size=block_size,
-            window_size=window_size,
-            num_global_blocks=num_global_blocks,
-            num_rand_blocks=num_rand_blocks,
-            seed=seed)
-        self.linear1 = Linear(
-            d_model, dim_feedforward, weight_attrs[1], bias_attr=bias_attrs[1])
+        self.self_attn = MultiHeadAttention(d_model,
+                                            nhead,
+                                            dropout=attn_dropout,
+                                            weight_attr=weight_attrs[0],
+                                            bias_attr=bias_attrs[0],
+                                            attention_type=attention_type,
+                                            block_size=block_size,
+                                            window_size=window_size,
+                                            num_global_blocks=num_global_blocks,
+                                            num_rand_blocks=num_rand_blocks,
+                                            seed=seed)
+        self.linear1 = Linear(d_model,
+                              dim_feedforward,
+                              weight_attrs[1],
+                              bias_attr=bias_attrs[1])
         self.dropout = Dropout(act_dropout, mode="upscale_in_train")
-        self.linear2 = Linear(
-            dim_feedforward, d_model, weight_attrs[1], bias_attr=bias_attrs[1])
+        self.linear2 = Linear(dim_feedforward,
+                              d_model,
+                              weight_attrs[1],
+                              bias_attr=bias_attrs[1])
         self.norm1 = LayerNorm(d_model, epsilon=1e-12)
         self.norm2 = LayerNorm(d_model, epsilon=1e-12)
         self.dropout1 = Dropout(dropout, mode="upscale_in_train")
@@ -145,11 +149,13 @@ class TransformerEncoderLayer(Layer):
 
 
 class TransformerEncoder(Layer):
+
     def __init__(self, encoder_layer, num_layers):
         super(TransformerEncoder, self).__init__()
-        self.layers = LayerList([(encoder_layer if i == 0 else
-                                  type(encoder_layer)(**encoder_layer._config))
-                                 for i in range(num_layers)])
+        self.layers = LayerList([
+            (encoder_layer if i == 0 else type(encoder_layer)(
+                **encoder_layer._config)) for i in range(num_layers)
+        ])
         self.num_layers = num_layers
         self.norm = LayerNorm(self.layers[0].d_model, epsilon=1e-12)
         self.normalize_before = self.layers[0].normalize_before
@@ -211,8 +217,9 @@ class BigBirdEmbeddings(Layer):
                  type_vocab_size=16,
                  padding_idx=0):
         super(BigBirdEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=padding_idx)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=padding_idx)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -287,8 +294,8 @@ class BigBirdPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.bigbird.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -386,9 +393,10 @@ class BigBirdModel(BigBirdPretrainedModel):
                  **kwargs):
         super(BigBirdModel, self).__init__()
         # embedding
-        self.embeddings = BigBirdEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id)
+        self.embeddings = BigBirdEmbeddings(vocab_size, hidden_size,
+                                            hidden_dropout_prob,
+                                            max_position_embeddings,
+                                            type_vocab_size, pad_token_id)
 
         # encoder
         encoder_layer = TransformerEncoderLayer(
@@ -412,8 +420,8 @@ class BigBirdModel(BigBirdPretrainedModel):
 
     def _process_mask(self, input_ids, attention_mask_list=None):
         # [B, T]
-        attention_mask = (input_ids == self.pad_token_id
-                          ).astype(self.pooler.dense.weight.dtype)
+        attention_mask = (input_ids == self.pad_token_id).astype(
+            self.pooler.dense.weight.dtype)
         # [B, 1, T, 1]
         query_mask = paddle.unsqueeze(attention_mask, axis=[1, 3])
         # [B, 1, 1, T]
@@ -533,8 +541,8 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
         if num_classes is None:
             num_classes = self.bigbird.config["num_labels"]
         self.linear = nn.Linear(self.bigbird.config["hidden_size"], num_classes)
-        self.dropout = nn.Dropout(
-            self.bigbird.config['hidden_dropout_prob'], mode="upscale_in_train")
+        self.dropout = nn.Dropout(self.bigbird.config['hidden_dropout_prob'],
+                                  mode="upscale_in_train")
         self.apply(self.init_weights)
 
     def forward(self,
@@ -594,17 +602,17 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
                 output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
                 print(output)
         """
-        _, pooled_output = self.bigbird(
-            input_ids,
-            token_type_ids,
-            attention_mask_list=attention_mask_list,
-            rand_mask_idx_list=rand_mask_idx_list)
+        _, pooled_output = self.bigbird(input_ids,
+                                        token_type_ids,
+                                        attention_mask_list=attention_mask_list,
+                                        rand_mask_idx_list=rand_mask_idx_list)
         output = self.dropout(pooled_output)
         output = self.linear(output)
         return output
 
 
 class BigBirdLMPredictionHead(Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -661,8 +669,9 @@ class BigBirdPretrainingHeads(Layer):
                  activation,
                  embedding_weights=None):
         super(BigBirdPretrainingHeads, self).__init__()
-        self.predictions = BigBirdLMPredictionHead(
-            hidden_size, vocab_size, activation, embedding_weights)
+        self.predictions = BigBirdLMPredictionHead(hidden_size, vocab_size,
+                                                   activation,
+                                                   embedding_weights)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -792,11 +801,10 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
                 output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
                 print(output)
         """
-        outputs = self.bigbird(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask_list=None,
-            rand_mask_idx_list=rand_mask_idx_list)
+        outputs = self.bigbird(input_ids,
+                               token_type_ids=token_type_ids,
+                               attention_mask_list=None,
+                               rand_mask_idx_list=rand_mask_idx_list)
         sequence_output, pooled_output = outputs[:2]
         prediction_scores, seq_relationship_score = self.cls(
             sequence_output, pooled_output, masked_positions)
@@ -921,23 +929,24 @@ class BigBirdPretrainingCriterion(paddle.nn.Layer):
                                 masked_lm_scale, masked_lm_weights)
                 print(loss)
         """
-        masked_lm_loss = F.cross_entropy(
-            prediction_scores,
-            masked_lm_labels,
-            ignore_index=self.ignore_index,
-            reduction='none')
+        masked_lm_loss = F.cross_entropy(prediction_scores,
+                                         masked_lm_labels,
+                                         ignore_index=self.ignore_index,
+                                         reduction='none')
         masked_lm_loss = paddle.transpose(masked_lm_loss, [1, 0])
         masked_lm_loss = paddle.sum(masked_lm_loss * masked_lm_weights) / (
             paddle.sum(masked_lm_weights) + 1e-5)
         scale = 1.0
         if not self.use_nsp:
             scale = 0.0
-        next_sentence_loss = F.cross_entropy(
-            seq_relationship_score, next_sentence_labels, reduction='none')
+        next_sentence_loss = F.cross_entropy(seq_relationship_score,
+                                             next_sentence_labels,
+                                             reduction='none')
         return masked_lm_loss + paddle.mean(next_sentence_loss) * scale
 
 
 class BigBirdIntermediate(Layer):
+
     def __init__(self, hidden_size, dim_feedforward, activation):
         super().__init__()
         self.dense = nn.Linear(hidden_size, dim_feedforward)
@@ -953,6 +962,7 @@ class BigBirdIntermediate(Layer):
 
 
 class BigBirdOutput(Layer):
+
     def __init__(self, hidden_size, dim_feedforward, hidden_dropout_prob):
         super().__init__()
         self.dense = nn.Linear(dim_feedforward, hidden_size)
@@ -983,8 +993,8 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
     def __init__(self, bigbird, dropout=None):
         super(BigBirdForQuestionAnswering, self).__init__()
         self.bigbird = bigbird  # allow bigbird to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bigbird.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  bigbird.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
@@ -1075,8 +1085,8 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
         super(BigBirdForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.bigbird = bigbird  # allow bigbird to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bigbird.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  bigbird.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.bigbird.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -1150,8 +1160,8 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
         super(BigBirdForMultipleChoice, self).__init__()
         self.bigbird = bigbird  # allow bigbird to be config
         self.num_choices = num_choices
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.bigbird.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  bigbird.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
@@ -1195,17 +1205,16 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
             -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if attention_mask_list is not None:
-            attention_mask_list = attention_mask_list.reshape(shape=(
-                -1, *attention_mask_list.shape[2:]))
+            attention_mask_list = attention_mask_list.reshape(
+                shape=(-1, *attention_mask_list.shape[2:]))
 
         if rand_mask_idx_list is not None:
-            rand_mask_idx_list = rand_mask_idx_list.reshape(shape=(
-                -1, *rand_mask_idx_list.shape[2:]))
+            rand_mask_idx_list = rand_mask_idx_list.reshape(
+                shape=(-1, *rand_mask_idx_list.shape[2:]))
 
-        _, pooled_output = self.bigbird(
-            input_ids,
-            attention_mask_list=attention_mask_list,
-            rand_mask_idx_list=rand_mask_idx_list)
+        _, pooled_output = self.bigbird(input_ids,
+                                        attention_mask_list=attention_mask_list,
+                                        rand_mask_idx_list=rand_mask_idx_list)
 
         pooled_output = self.dropout(pooled_output)
 
@@ -1281,9 +1290,10 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape(shape=(
-                    -1, self.bigbird.config["vocab_size"])),
-                labels.reshape(shape=(-1, )), )
+                prediction_scores.reshape(
+                    shape=(-1, self.bigbird.config["vocab_size"])),
+                labels.reshape(shape=(-1, )),
+            )
             return masked_lm_loss, prediction_scores, sequence_output
 
         return prediction_scores, sequence_output

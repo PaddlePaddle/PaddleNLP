@@ -33,7 +33,8 @@ def semantic_search_tutorial():
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False, )
+            embed_title=False,
+        )
     else:
         doc_dir = "data/dureader_robust_processed"
         dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_robust_processed.zip"
@@ -46,8 +47,8 @@ def semantic_search_tutorial():
         if os.path.exists(faiss_document_store):
             os.remove(faiss_document_store)
 
-        document_store = FAISSDocumentStore(
-            embedding_dim=768, faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(embedding_dim=768,
+                                            faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
         retriever = DensePassageRetriever(
@@ -58,7 +59,8 @@ def semantic_search_tutorial():
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
-            embed_title=False, )
+            embed_title=False,
+        )
 
         # update Embedding
         document_store.update_embeddings(retriever)
@@ -75,14 +77,15 @@ def semantic_search_tutorial():
     from pipelines.pipelines import SemanticSearchPipeline
     pipe = SemanticSearchPipeline(retriever, ranker)
 
-    prediction = pipe.run(
-        query="亚马逊河流的介绍",
-        params={"Retriever": {
-            "top_k": 50
-        },
-                "Ranker": {
-                    "top_k": 5
-                }})
+    prediction = pipe.run(query="亚马逊河流的介绍",
+                          params={
+                              "Retriever": {
+                                  "top_k": 50
+                              },
+                              "Ranker": {
+                                  "top_k": 5
+                              }
+                          })
 
     print_documents(prediction)
 

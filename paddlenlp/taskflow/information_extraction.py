@@ -162,7 +162,8 @@ class UIETask(Task):
         self.set_schema(schema)
         if model not in self.encoding_model_map.keys():
             raise ValueError(
-                "Model should be one of uie-base, uie-tiny and uie-medical-base")
+                "Model should be one of uie-base, uie-tiny and uie-medical-base"
+            )
         self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
@@ -188,14 +189,18 @@ class UIETask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='token_type_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='pos_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='att_mask'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_type_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='pos_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='att_mask'),
         ]
 
     def _construct_model(self, model):
@@ -245,16 +250,15 @@ class UIETask(Task):
 
         def read(inputs):
             for example in inputs:
-                encoded_inputs = self._tokenizer(
-                    text=[example["prompt"]],
-                    text_pair=[example["text"]],
-                    stride=len(example["prompt"]),
-                    truncation=True,
-                    max_seq_len=self._max_seq_len,
-                    pad_to_max_seq_len=True,
-                    return_attention_mask=True,
-                    return_position_ids=True,
-                    return_dict=False)
+                encoded_inputs = self._tokenizer(text=[example["prompt"]],
+                                                 text_pair=[example["text"]],
+                                                 stride=len(example["prompt"]),
+                                                 truncation=True,
+                                                 max_seq_len=self._max_seq_len,
+                                                 pad_to_max_seq_len=True,
+                                                 return_attention_mask=True,
+                                                 return_position_ids=True,
+                                                 return_dict=False)
                 encoded_inputs = encoded_inputs[0]
 
                 tokenized_output = [
@@ -265,18 +269,19 @@ class UIETask(Task):
                     encoded_inputs["offset_mapping"]
                 ]
                 tokenized_output = [
-                    np.array(
-                        x, dtype="int64") for x in tokenized_output
+                    np.array(x, dtype="int64") for x in tokenized_output
                 ]
 
                 yield tuple(tokenized_output)
 
         infer_ds = load_dataset(read, inputs=short_inputs, lazy=False)
-        batch_sampler = paddle.io.BatchSampler(
-            dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
+                                               batch_size=self._batch_size,
+                                               shuffle=False)
 
-        infer_data_loader = paddle.io.DataLoader(
-            dataset=infer_ds, batch_sampler=batch_sampler, return_list=True)
+        infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
+                                                 batch_sampler=batch_sampler,
+                                                 return_list=True)
 
         sentence_ids = []
         probs = []
@@ -303,12 +308,13 @@ class UIETask(Task):
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
-            end_ids_list = get_bool_ids_greater_than(
-                end_prob, limit=self._position_prob, return_prob=True)
+            end_ids_list = get_bool_ids_greater_than(end_prob,
+                                                     limit=self._position_prob,
+                                                     return_prob=True)
 
             for start_ids, end_ids, ids, offset_map in zip(
-                    start_ids_list, end_ids_list,
-                    input_ids.tolist(), offset_maps.tolist()):
+                    start_ids_list, end_ids_list, input_ids.tolist(),
+                    offset_maps.tolist()):
                 for i in reversed(range(len(ids))):
                     if ids[i] != 0:
                         ids = ids[:i]
@@ -343,8 +349,9 @@ class UIETask(Task):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0][
-                            'text']] = [1, short_results[v][0]['probability']]
+                        cls_options[short_results[v][0]['text']] = [
+                            1, short_results[v][0]['probability']
+                        ]
                     else:
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
@@ -353,8 +360,10 @@ class UIETask(Task):
                     cls_res, cls_info = max(cls_options.items(),
                                             key=lambda x: x[1])
                     concat_results.append([{
-                        'text': cls_res,
-                        'probability': cls_info[1] / cls_info[0]
+                        'text':
+                        cls_res,
+                        'probability':
+                        cls_info[1] / cls_info[0]
                     }])
                 else:
                     concat_results.append([])
@@ -471,8 +480,8 @@ class UIETask(Task):
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
-                                new_relations[i].append(relations[i][j][
-                                    "relations"][node.name][k])
+                                new_relations[i].append(
+                                    relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]

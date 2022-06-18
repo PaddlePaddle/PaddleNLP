@@ -21,6 +21,7 @@ __all__ = ['RougeL', 'RougeLForDuReader']
 
 
 class RougeN():
+
     def __init__(self, n):
         self.n = n
 
@@ -99,11 +100,13 @@ class RougeN():
 
 
 class Rouge1(RougeN):
+
     def __init__(self):
         super(Rouge1, self).__init__(n=1)
 
 
 class Rouge2(RougeN):
+
     def __init__(self):
         super(Rouge2, self).__init__(n=2)
 

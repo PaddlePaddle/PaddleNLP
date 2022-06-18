@@ -175,16 +175,15 @@ class AdamW(Adam):
                     "'lr_ratio' is unimplemented in CPU, XPU and NPU")
         self._lr_ratio = lr_ratio
 
-        super(AdamW, self).__init__(
-            learning_rate=learning_rate,
-            parameters=parameters,
-            beta1=beta1,
-            beta2=beta2,
-            epsilon=epsilon,
-            grad_clip=grad_clip,
-            name=name,
-            lazy_mode=lazy_mode,
-            multi_precision=multi_precision)
+        super(AdamW, self).__init__(learning_rate=learning_rate,
+                                    parameters=parameters,
+                                    beta1=beta1,
+                                    beta2=beta2,
+                                    epsilon=epsilon,
+                                    grad_clip=grad_clip,
+                                    name=name,
+                                    lazy_mode=lazy_mode,
+                                    multi_precision=multi_precision)
         self._default_dict = {'coeff': coeff}
 
         self.type = "adamw"
@@ -243,13 +242,13 @@ class AdamW(Adam):
                     decay_coeff = 1.0 - learning_rate * self._coeff
                 self._lr_to_coeff[learning_rate] = decay_coeff
 
-            find_master = (self._multi_precision and
-                           param.dtype == core.VarDesc.VarType.FP16)
+            find_master = (self._multi_precision
+                           and param.dtype == core.VarDesc.VarType.FP16)
             if find_master:
                 master_weight = self._master_weights[param.name]
                 scaled_param = master_weight * decay_coeff
-                paddle.fluid.layers.assign(
-                    input=scaled_param, output=master_weight)
+                paddle.fluid.layers.assign(input=scaled_param,
+                                           output=master_weight)
             else:
                 scaled_param = param * decay_coeff
                 paddle.fluid.layers.assign(input=scaled_param, output=param)
@@ -335,13 +334,18 @@ class AdamW(Adam):
             "Beta2PowOut": [beta2_pow_acc],
         }
         attrs = {
-            "lazy_mode": self._lazy_mode,
-            "min_row_size_to_use_multithread": 1000,
-            "multi_precision": find_master,
-            "with_decay": with_decay,
-            "coeff": self._coeff,
-            "lr_ratio": 1.
-            if self._lr_ratio is None else self._lr_ratio(param_and_grad[0])
+            "lazy_mode":
+            self._lazy_mode,
+            "min_row_size_to_use_multithread":
+            1000,
+            "multi_precision":
+            find_master,
+            "with_decay":
+            with_decay,
+            "coeff":
+            self._coeff,
+            "lr_ratio":
+            1. if self._lr_ratio is None else self._lr_ratio(param_and_grad[0])
         }
 
         if isinstance(self._beta1, Variable):
@@ -361,12 +365,11 @@ class AdamW(Adam):
             inputs["MasterParam"] = master_weight
             outputs["MasterParamOut"] = master_weight
 
-        adamw_op = block.append_op(
-            type=self.type,
-            inputs=inputs,
-            outputs=outputs,
-            attrs=attrs,
-            stop_gradient=True)
+        adamw_op = block.append_op(type=self.type,
+                                   inputs=inputs,
+                                   outputs=outputs,
+                                   attrs=attrs,
+                                   stop_gradient=True)
 
         return adamw_op
 

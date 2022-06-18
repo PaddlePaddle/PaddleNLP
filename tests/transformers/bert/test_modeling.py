@@ -33,36 +33,39 @@ def create_input_data(config, seed=None):
     if seed is not None:
         np.random.seed(seed)
 
-    input_ids = np.random.randint(
-        low=0,
-        high=config['vocab_size'],
-        size=(config["batch_size"], config["seq_len"]))
+    input_ids = np.random.randint(low=0,
+                                  high=config['vocab_size'],
+                                  size=(config["batch_size"],
+                                        config["seq_len"]))
     num_to_predict = int(config["seq_len"] * 0.15)
     masked_lm_positions = np.random.choice(
         config["seq_len"], (config["batch_size"], num_to_predict),
         replace=False)
     masked_lm_positions = np.sort(masked_lm_positions)
     pred_padding_len = config["seq_len"] - num_to_predict
-    temp_masked_lm_positions = np.full(
-        masked_lm_positions.size, 0, dtype=np.int32)
+    temp_masked_lm_positions = np.full(masked_lm_positions.size,
+                                       0,
+                                       dtype=np.int32)
     mask_token_num = 0
     for i, x in enumerate(masked_lm_positions):
         for j, pos in enumerate(x):
-            temp_masked_lm_positions[mask_token_num] = i * config[
-                "seq_len"] + pos
+            temp_masked_lm_positions[
+                mask_token_num] = i * config["seq_len"] + pos
             mask_token_num += 1
     masked_lm_positions = temp_masked_lm_positions
     return input_ids, masked_lm_positions
 
 
 class NpBertPretrainingCriterion(object):
+
     def __init__(self, vocab_size):
         self.vocab_size = vocab_size
 
     def __call__(self, prediction_scores, seq_relationship_score,
                  masked_lm_labels, next_sentence_labels, masked_lm_scale):
-        masked_lm_loss = softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=-1)
+        masked_lm_loss = softmax_with_cross_entropy(prediction_scores,
+                                                    masked_lm_labels,
+                                                    ignore_index=-1)
         masked_lm_loss = masked_lm_loss / masked_lm_scale
         next_sentence_loss = softmax_with_cross_entropy(seq_relationship_score,
                                                         next_sentence_labels)
@@ -70,9 +73,10 @@ class NpBertPretrainingCriterion(object):
 
 
 class TestBertForSequenceClassification(CommonTest):
+
     def set_input(self):
-        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
-            'bert-base-uncased'])
+        self.config = copy.deepcopy(
+            BertModel.pretrained_init_configuration['bert-base-uncased'])
         self.config['num_hidden_layers'] = 2
         self.config['vocab_size'] = 512
         self.config['attention_probs_dropout_prob'] = 0.0
@@ -111,6 +115,7 @@ class TestBertForSequenceClassification(CommonTest):
 
 
 class TestBertForTokenClassification(TestBertForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForTokenClassification
 
@@ -120,6 +125,7 @@ class TestBertForTokenClassification(TestBertForSequenceClassification):
 
 
 class TestBertForPretraining(TestBertForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForPretraining
 
@@ -136,8 +142,8 @@ class TestBertForPretraining(TestBertForSequenceClassification):
         bert = BertModel(**config)
         model = self.TEST_MODEL_CLASS(bert)
         input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        masked_lm_positions = paddle.to_tensor(
-            self.masked_lm_positions, dtype="int64")
+        masked_lm_positions = paddle.to_tensor(self.masked_lm_positions,
+                                               dtype="int64")
         self.output = model(input_ids, masked_positions=masked_lm_positions)
         self.check_testcase()
 
@@ -149,6 +155,7 @@ class TestBertForPretraining(TestBertForSequenceClassification):
 
 
 class TestBertForMaskedLM(TestBertForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForMaskedLM
 
@@ -175,6 +182,7 @@ class TestBertForMaskedLM(TestBertForSequenceClassification):
 
 
 class TestBertForQuestionAnswering(TestBertForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = BertForQuestionAnswering
 
@@ -192,9 +200,10 @@ class TestBertForQuestionAnswering(TestBertForSequenceClassification):
 
 
 class TestBertForMultipleChoice(TestBertForSequenceClassification):
+
     def set_input(self):
-        self.config = copy.deepcopy(BertModel.pretrained_init_configuration[
-            'bert-base-uncased'])
+        self.config = copy.deepcopy(
+            BertModel.pretrained_init_configuration['bert-base-uncased'])
         self.config['num_hidden_layers'] = 2
         self.config['vocab_size'] = 512
         self.config['attention_probs_dropout_prob'] = 0.0
@@ -237,21 +246,22 @@ class TestBertForMultipleChoice(TestBertForSequenceClassification):
 
 
 class TestBertPretrainingCriterion(CommonTest):
+
     def setUp(self):
         self.config['vocab_size'] = 1024
         self.criterion = BertPretrainingCriterion(**self.config)
         self.np_criterion = NpBertPretrainingCriterion(**self.config)
 
     def _construct_input_data(self, mask_num, vocab_size, batch_size):
-        prediction_scores = np.random.rand(
-            mask_num, vocab_size).astype(paddle.get_default_dtype())
-        seq_relationship_score = np.random.rand(
-            batch_size, 2).astype(paddle.get_default_dtype())
+        prediction_scores = np.random.rand(mask_num, vocab_size).astype(
+            paddle.get_default_dtype())
+        seq_relationship_score = np.random.rand(batch_size, 2).astype(
+            paddle.get_default_dtype())
         masked_lm_labels = np.random.randint(0, vocab_size, (mask_num, 1))
         next_sentence_labels = np.random.randint(0, 2, (batch_size, 1))
         masked_lm_scale = 1.0
-        masked_lm_weights = np.random.randint(
-            0, 2, (mask_num)).astype(paddle.get_default_dtype())
+        masked_lm_weights = np.random.randint(0, 2, (mask_num)).astype(
+            paddle.get_default_dtype())
         return prediction_scores, seq_relationship_score, masked_lm_labels, \
             next_sentence_labels, masked_lm_scale, masked_lm_weights
 
@@ -263,13 +273,14 @@ class TestBertPretrainingCriterion(CommonTest):
         prediction_score = paddle.to_tensor(np_prediction_score)
         seq_relationship_score = paddle.to_tensor(np_seq_relationship_score)
         masked_lm_labels = paddle.to_tensor(np_masked_lm_labels, dtype="int64")
-        next_sentence_labels = paddle.to_tensor(
-            np_next_sentence_labels, dtype="int64")
+        next_sentence_labels = paddle.to_tensor(np_next_sentence_labels,
+                                                dtype="int64")
         masked_lm_weights = paddle.to_tensor(np_masked_lm_weights)
 
-        np_loss = self.np_criterion(
-            np_prediction_score, np_seq_relationship_score, np_masked_lm_labels,
-            np_next_sentence_labels, masked_lm_scale)
+        np_loss = self.np_criterion(np_prediction_score,
+                                    np_seq_relationship_score,
+                                    np_masked_lm_labels,
+                                    np_next_sentence_labels, masked_lm_scale)
         loss = self.criterion(prediction_score, seq_relationship_score,
                               masked_lm_labels, next_sentence_labels,
                               masked_lm_scale)
@@ -277,12 +288,12 @@ class TestBertPretrainingCriterion(CommonTest):
 
 
 class TestBertFromPretrain(CommonTest):
+
     @slow
     def test_bert_base_uncased(self):
-        model = BertModel.from_pretrained(
-            'bert-base-uncased',
-            attention_probs_dropout_prob=0.0,
-            hidden_dropout_prob=0.0)
+        model = BertModel.from_pretrained('bert-base-uncased',
+                                          attention_probs_dropout_prob=0.0,
+                                          hidden_dropout_prob=0.0)
         self.config = copy.deepcopy(model.config)
         self.config['seq_len'] = 32
         self.config['batch_size'] = 3
@@ -301,15 +312,17 @@ class TestBertFromPretrain(CommonTest):
                                        [-0.28287640, 0.06244858, 0.54864359],
                                        [-0.54589444, 0.04811822, 0.50559914]])
         # There's output diff about 1e-6 between cpu and gpu
-        self.check_output_equal(
-            output[0].numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
+        self.check_output_equal(output[0].numpy()[0, 0:3, 0:3],
+                                expected_seq_slice,
+                                atol=1e-6)
 
         expected_pooled_slice = np.array(
             [[-0.67418981, -0.07148759, 0.85799801],
              [-0.62072051, -0.08452632, 0.96691507],
              [-0.74019802, -0.10187808, 0.95353240]])
-        self.check_output_equal(
-            output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
+        self.check_output_equal(output[1].numpy()[0:3, 0:3],
+                                expected_pooled_slice,
+                                atol=1e-6)
 
 
 if __name__ == "__main__":

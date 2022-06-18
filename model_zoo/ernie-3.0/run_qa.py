@@ -49,81 +49,87 @@ def parse_args():
         "--output_dir",
         default="best_cmrc_model",
         type=str,
-        help="The output directory where the model predictions and checkpoints will be written."
+        help=
+        "The output directory where the model predictions and checkpoints will be written."
     )
-    parser.add_argument(
-        "--save_best_model",
-        default=True,
-        type=distutils.util.strtobool,
-        help="Whether to save best model.")
-    parser.add_argument(
-        "--overwrite_cache",
-        default=False,
-        type=distutils.util.strtobool,
-        help="Whether to overwrite cache for dataset.")
+    parser.add_argument("--save_best_model",
+                        default=True,
+                        type=distutils.util.strtobool,
+                        help="Whether to save best model.")
+    parser.add_argument("--overwrite_cache",
+                        default=False,
+                        type=distutils.util.strtobool,
+                        help="Whether to overwrite cache for dataset.")
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument("--batch_size",
+                        default=8,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
     parser.add_argument(
-        "--batch_size",
-        default=8,
+        "--num_proc",
+        default=None,
         type=int,
-        help="Batch size per GPU/CPU for training.")
-    parser.add_argument(
-        "--eval_batch_size",
-        default=12,
-        type=int,
-        help="Batch size per GPU/CPU for training.")
-    parser.add_argument(
-        "--learning_rate",
-        default=5e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.01,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.")
+        help=
+        "Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument("--eval_batch_size",
+                        default=12,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--learning_rate",
+                        default=5e-5,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay",
+                        default=0.01,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="Max gradient norm.")
+    parser.add_argument("--num_train_epochs",
+                        default=3,
+                        type=int,
+                        help="Total number of training epochs to perform.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
     parser.add_argument(
         "--warmup_proportion",
         default=0.1,
         type=float,
-        help="Proportion of training steps to perform linear learning rate warmup for."
+        help=
+        "Proportion of training steps to perform linear learning rate warmup for."
     )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=500,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--seed", type=int, default=42, help="random seed for initialization")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=42,
+                        help="random seed for initialization")
     parser.add_argument(
         '--device',
         choices=['cpu', 'gpu'],
@@ -133,34 +139,45 @@ def parse_args():
         "--doc_stride",
         type=int,
         default=128,
-        help="When splitting up a long document into chunks, how much stride to take between chunks."
+        help=
+        "When splitting up a long document into chunks, how much stride to take between chunks."
     )
     parser.add_argument(
         "--n_best_size",
         type=int,
         default=20,
-        help="The total number of n-best predictions to generate in the nbest_predictions.json output file."
+        help=
+        "The total number of n-best predictions to generate in the nbest_predictions.json output file."
     )
-    parser.add_argument(
-        "--max_query_length", type=int, default=64, help="Max query length.")
-    parser.add_argument(
-        "--max_answer_length", type=int, default=50, help="Max answer length.")
+    parser.add_argument("--max_query_length",
+                        type=int,
+                        default=64,
+                        help="Max query length.")
+    parser.add_argument("--max_answer_length",
+                        type=int,
+                        default=50,
+                        help="Max answer length.")
     parser.add_argument(
         "--do_lower_case",
         action='store_false',
-        help="Whether to lower case the input text. Should be True for uncased models and False for cased models."
+        help=
+        "Whether to lower case the input text. Should be True for uncased models and False for cased models."
     )
-    parser.add_argument(
-        "--verbose", action='store_true', help="Whether to output verbose log.")
-    parser.add_argument(
-        "--do_train", action='store_true', help="Whether to train.")
-    parser.add_argument(
-        "--do_predict", action='store_true', help="Whether to predict.")
+    parser.add_argument("--verbose",
+                        action='store_true',
+                        help="Whether to output verbose log.")
+    parser.add_argument("--do_train",
+                        action='store_true',
+                        help="Whether to train.")
+    parser.add_argument("--do_predict",
+                        action='store_true',
+                        help="Whether to predict.")
     parser.add_argument(
         '--gradient_accumulation_steps',
         type=int,
         default=2,
-        help="Number of updates steps to accumualte before performing a backward/update pass."
+        help=
+        "Number of updates steps to accumualte before performing a backward/update pass."
     )
     args = parser.parse_args()
     return args
@@ -183,8 +200,8 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         start_logits, end_logits = model(**batch)
         for idx in range(start_logits.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
-                print("Processing example: %d" % len(all_start_logits))
-                print('time per 1000:', time.time() - tic_eval)
+                logger.info("Processing example: %d" % len(all_start_logits))
+                logger.info('time per 1000: %s' % (time.time() - tic_eval))
                 tic_eval = time.time()
 
             all_start_logits.append(start_logits.numpy()[idx])
@@ -203,13 +220,11 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
         filename = os.path.join(args.output_dir, 'cmrc2018_predict.json')
     with open(filename, "w", encoding='utf-8') as writer:
         writer.write(
-            json.dumps(
-                all_predictions, ensure_ascii=False, indent=4) + "\n")
+            json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
     if do_eval:
-        res = squad_evaluate(
-            examples=[raw_data for raw_data in raw_dataset],
-            preds=all_predictions,
-            is_whitespace_splited=False)
+        res = squad_evaluate(examples=[raw_data for raw_data in raw_dataset],
+                             preds=all_predictions,
+                             is_whitespace_splited=False)
         model.train()
         return res['exact'], res['f1']
 
@@ -217,6 +232,7 @@ def evaluate(model, raw_dataset, dataset, data_loader, args, do_eval=True):
 
 
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
@@ -225,10 +241,10 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.cross_entropy(
-            input=start_logits, label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(
-            input=end_logits, label=end_position)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
+                                                        label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
+                                                      label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 
@@ -278,7 +294,7 @@ def run(args):
     column_names = train_examples.column_names
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
-            print("init checkpoint from %s" % args.model_name_or_path)
+            logger.info("init checkpoint from %s" % args.model_name_or_path)
 
     model = AutoModelForQuestionAnswering.from_pretrained(
         args.model_name_or_path)
@@ -295,11 +311,10 @@ def run(args):
         contexts = examples['context']
         questions = examples['question']
 
-        tokenized_examples = tokenizer(
-            questions,
-            contexts,
-            stride=args.doc_stride,
-            max_seq_len=args.max_seq_length)
+        tokenized_examples = tokenizer(questions,
+                                       contexts,
+                                       stride=args.doc_stride,
+                                       max_seq_len=args.max_seq_length)
 
         # Since one example might give us several features if it has a long context, we need a map from a feature to
         # its corresponding example. This key gives us just that.
@@ -344,8 +359,8 @@ def run(args):
                 token_end_index -= 1
 
                 # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char and
-                        offsets[token_end_index][1] >= end_char):
+                if not (offsets[token_start_index][0] <= start_char
+                        and offsets[token_end_index][1] >= end_char):
                     tokenized_examples["start_positions"].append(cls_index)
                     tokenized_examples["end_positions"].append(cls_index)
                 else:
@@ -372,12 +387,11 @@ def run(args):
         contexts = examples['context']
         questions = examples['question']
 
-        tokenized_examples = tokenizer(
-            questions,
-            contexts,
-            stride=args.doc_stride,
-            max_seq_len=args.max_seq_length,
-            return_attention_mask=True)
+        tokenized_examples = tokenizer(questions,
+                                       contexts,
+                                       stride=args.doc_stride,
+                                       max_seq_len=args.max_seq_length,
+                                       return_attention_mask=True)
 
         # Since one example might give us several features if it has a long context, we need a map from a feature to
         # its corresponding example. This key gives us just that.
@@ -394,14 +408,14 @@ def run(args):
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
-            tokenized_examples["example_id"].append(examples["id"][
-                sample_index])
+            tokenized_examples["example_id"].append(
+                examples["id"][sample_index])
 
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
             # position is part of the context or not.
             tokenized_examples["offset_mapping"][i] = [
-                (o if sequence_ids[k] == context_index and
-                 k != len(sequence_ids) - 1 else None)
+                (o if sequence_ids[k] == context_index
+                 and k != len(sequence_ids) - 1 else None)
                 for k, o in enumerate(tokenized_examples["offset_mapping"][i])
             ]
 
@@ -417,24 +431,23 @@ def run(args):
                 batched=True,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
-                num_proc=4,
+                num_proc=args.num_proc,
                 desc="Running tokenizer on train dataset")
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
 
         batchify_fn = DataCollatorWithPadding(tokenizer)
-        train_data_loader = DataLoader(
-            dataset=train_ds,
-            batch_sampler=train_batch_sampler,
-            collate_fn=batchify_fn,
-            return_list=True)
+        train_data_loader = DataLoader(dataset=train_ds,
+                                       batch_sampler=train_batch_sampler,
+                                       collate_fn=batchify_fn,
+                                       return_list=True)
 
         with main_process_first(desc="evaluate dataset map pre-processing"):
             dev_ds = dev_examples.map(
                 prepare_validation_features,
                 batched=True,
                 remove_columns=column_names,
-                num_proc=4,
+                num_proc=args.num_proc,
                 load_from_cache_file=args.overwrite_cache,
                 desc="Running tokenizer on validation dataset")
         dev_ds_for_model = dev_ds.remove_columns(
@@ -442,15 +455,14 @@ def run(args):
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
 
-        dev_data_loader = DataLoader(
-            dataset=dev_ds_for_model,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            return_list=True)
+        dev_data_loader = DataLoader(dataset=dev_ds_for_model,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=batchify_fn,
+                                     return_list=True)
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
@@ -490,14 +502,16 @@ def run(args):
                     optimizer.clear_grad()
 
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
-                               loss,
-                               args.logging_steps / (time.time() - tic_train)))
+                               loss, args.logging_steps /
+                               (time.time() - tic_train)))
                         tic_train = time.time()
                     if global_step >= num_training_steps:
-                        break
+                        logger.info("best_result: %.2f/%.2f" %
+                                    (best_res[0], best_res[1]))
+                        return
             em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
                               args)
             if paddle.distributed.get_rank() == 0 and em > best_res[0]:
@@ -511,13 +525,13 @@ def run(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-        print("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
+        logger.info("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
         test_ds = test_examples.map(prepare_validation_features,
                                     batched=True,
                                     remove_columns=column_names,
-                                    num_proc=1)
+                                    num_proc=args.num_proc)
         test_ds_for_model = test_ds.remove_columns(
             ["example_id", "offset_mapping", "attention_mask"])
         dev_batchify_fn = DataCollatorWithPadding(tokenizer)
@@ -526,19 +540,17 @@ def run(args):
             test_ds_for_model, batch_size=args.eval_batch_size, shuffle=False)
 
         batchify_fn = DataCollatorWithPadding(tokenizer)
-        test_data_loader = DataLoader(
-            dataset=test_ds_for_model,
-            batch_sampler=test_batch_sampler,
-            collate_fn=batchify_fn,
-            return_list=True)
+        test_data_loader = DataLoader(dataset=test_ds_for_model,
+                                      batch_sampler=test_batch_sampler,
+                                      collate_fn=batchify_fn,
+                                      return_list=True)
 
-        evaluate(
-            model,
-            test_examples,
-            test_ds,
-            test_data_loader,
-            args,
-            do_eval=False)
+        evaluate(model,
+                 test_examples,
+                 test_ds,
+                 test_data_loader,
+                 args,
+                 do_eval=False)
 
 
 def print_arguments(args):

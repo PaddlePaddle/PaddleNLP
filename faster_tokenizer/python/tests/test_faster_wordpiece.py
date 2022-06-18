@@ -19,10 +19,12 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from faster_tokenizer import ErnieFasterTokenizer, models
+
 logger.logger.setLevel('ERROR')
 
 
 class TestWordpiece(unittest.TestCase):
+
     def set_flag(self):
         self.use_faster_wordpiece = False
         self.use_faster_wordpiece_with_pretokenization = False
@@ -40,8 +42,7 @@ class TestWordpiece(unittest.TestCase):
             use_faster_wordpiece_with_pretokenization)
         self.dataset = [
             example["sentence"]
-            for example in load_dataset(
-                'clue', 'tnews', splits=['train'])
+            for example in load_dataset('clue', 'tnews', splits=['train'])
         ]
 
     def test_encode(self):
@@ -73,12 +74,14 @@ class TestWordpiece(unittest.TestCase):
 
 
 class TestFasterWordpiece(TestWordpiece):
+
     def set_flag(self):
         self.use_faster_wordpiece = True
         self.use_faster_wordpiece_with_pretokenization = False
 
 
 class TestFasterWordpieceWithPretokenization(TestWordpiece):
+
     def set_flag(self):
         self.use_faster_wordpiece = True
         self.use_faster_wordpiece_with_pretokenization = True

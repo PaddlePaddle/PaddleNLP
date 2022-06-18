@@ -291,7 +291,7 @@ In-batch negatives 策略核心是在 1 个 Batch 内同时基于 N 个负例进
 HardestNeg 策略核心是在 1 个 Batch 内的所有负样本中先挖掘出最难区分的负样本，基于最难负样本进行梯度更新。例如: 上例中 *Source Text*: `我手机丢了，我想换个手机` 有 3 个负例(`1.求秋色之空全集漫画`，`2.手机学日语的软件`，`3.侠盗飞车罪恶都市怎么改车`)，其中最难区分的负例是 `手机学日语的软件`，模型训练过程中不断挖掘出类似这样的最难负样本，然后基于最难负样本进行梯度更新。
 
 ## Reference
-[1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.  
-[2] Jing Chen, Qingcai Chen, Xin Liu, Haijun Yang, Daohe Lu, Buzhou Tang, The BQ Corpus: A Large-scale Domain-specific Chinese Corpus For Sentence Semantic Equivalence Identification EMNLP2018.  
-[3] Yang, Y., Zhang, Y., Tar, C., and Baldridge, J., “PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification”, <i>arXiv e-prints</i>, 2019.  
+[1] Xin Liu, Qingcai Chen, Chong Deng, Huajun Zeng, Jing Chen, Dongfang Li, Buzhou Tang, LCQMC: A Large-scale Chinese Question Matching Corpus,COLING2018.
+[2] Jing Chen, Qingcai Chen, Xin Liu, Haijun Yang, Daohe Lu, Buzhou Tang, The BQ Corpus: A Large-scale Domain-specific Chinese Corpus For Sentence Semantic Equivalence Identification EMNLP2018.
+[3] Yang, Y., Zhang, Y., Tar, C., and Baldridge, J., “PAWS-X: A Cross-lingual Adversarial Dataset for Paraphrase Identification”, <i>arXiv e-prints</i>, 2019.
 [4] Vladimir Karpukhin, Barlas Oğuz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, Wen-tau Yih, Dense Passage Retrieval for Open-Domain Question Answering, Preprint 2020.

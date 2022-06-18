@@ -37,15 +37,15 @@ class DuReaderYesNo(DatasetBuilder):
     MD5 = '30c744d65e87fdce00cdc707fd008138'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('dureader_yesno-data', 'train.json'),
-            'c469a0ef3f975cfd705e3553ddb27cc1'),
-        'dev': META_INFO(
-            os.path.join('dureader_yesno-data', 'dev.json'),
-            'c38544f8b5a7b567492314e3232057b5'),
-        'test': META_INFO(
-            os.path.join('dureader_yesno-data', 'test.json'),
-            '1c7a1a3ea5b8992eeaeea017fdc2d55f')
+        'train':
+        META_INFO(os.path.join('dureader_yesno-data', 'train.json'),
+                  'c469a0ef3f975cfd705e3553ddb27cc1'),
+        'dev':
+        META_INFO(os.path.join('dureader_yesno-data', 'dev.json'),
+                  'c38544f8b5a7b567492314e3232057b5'),
+        'test':
+        META_INFO(os.path.join('dureader_yesno-data', 'test.json'),
+                  '1c7a1a3ea5b8992eeaeea017fdc2d55f')
     }
 
     def _get_data(self, mode, **kwargs):

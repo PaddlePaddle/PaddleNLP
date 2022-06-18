@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger()
 
 
 class PPMiniLMOp(Op):
+
     def init_op(self):
         pass
 
@@ -38,6 +39,7 @@ class PPMiniLMOp(Op):
 
 
 class PPMiniLMService(WebService):
+
     def get_pipeline_response(self, read_op):
         ppminilm_op = PPMiniLMOp(name="ppminilm", input_ops=[read_op])
         return ppminilm_op

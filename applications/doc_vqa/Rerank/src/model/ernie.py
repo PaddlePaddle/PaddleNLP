@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 
 
 class ErnieConfig(object):
+
     def __init__(self, config_path):
         self._config_dict = self._parse(config_path)
 
@@ -55,6 +56,7 @@ class ErnieConfig(object):
 
 
 class ErnieModel(object):
+
     def __init__(self,
                  src_ids,
                  position_ids,
@@ -109,26 +111,23 @@ class ErnieModel(object):
             input=src_ids,
             size=[self._voc_size, self._emb_size],
             dtype=self._emb_dtype,
-            param_attr=fluid.ParamAttr(
-                name=model_name + self._word_emb_name,
-                initializer=self._param_initializer),
+            param_attr=fluid.ParamAttr(name=model_name + self._word_emb_name,
+                                       initializer=self._param_initializer),
             is_sparse=False)
 
         position_emb_out = fluid.layers.embedding(
             input=position_ids,
             size=[self._max_position_seq_len, self._emb_size],
             dtype=self._emb_dtype,
-            param_attr=fluid.ParamAttr(
-                name=model_name + self._pos_emb_name,
-                initializer=self._param_initializer))
+            param_attr=fluid.ParamAttr(name=model_name + self._pos_emb_name,
+                                       initializer=self._param_initializer))
 
         sent_emb_out = fluid.layers.embedding(
             sentence_ids,
             size=[self._sent_types, self._emb_size],
             dtype=self._emb_dtype,
-            param_attr=fluid.ParamAttr(
-                name=model_name + self._sent_emb_name,
-                initializer=self._param_initializer))
+            param_attr=fluid.ParamAttr(name=model_name + self._sent_emb_name,
+                                       initializer=self._param_initializer))
 
         emb_out = emb_out + position_emb_out
         emb_out = emb_out + sent_emb_out
@@ -138,25 +137,28 @@ class ErnieModel(object):
                 task_ids,
                 size=[self._task_types, self._emb_size],
                 dtype=self._emb_dtype,
-                param_attr=fluid.ParamAttr(
-                    name=model_name + self._task_emb_name,
-                    initializer=self._param_initializer))
+                param_attr=fluid.ParamAttr(name=model_name +
+                                           self._task_emb_name,
+                                           initializer=self._param_initializer))
 
             emb_out = emb_out + task_emb_out
 
-        emb_out = pre_process_layer(
-            emb_out,
-            'nd',
-            self._prepostprocess_dropout,
-            name=model_name + 'pre_encoder')
+        emb_out = pre_process_layer(emb_out,
+                                    'nd',
+                                    self._prepostprocess_dropout,
+                                    name=model_name + 'pre_encoder')
 
-        self_attn_mask = fluid.layers.matmul(
-            x=input_mask, y=input_mask, transpose_y=True)
+        self_attn_mask = fluid.layers.matmul(x=input_mask,
+                                             y=input_mask,
+                                             transpose_y=True)
 
-        self_attn_mask = fluid.layers.scale(
-            x=self_attn_mask, scale=10000.0, bias=-1.0, bias_after_scale=False)
-        n_head_self_attn_mask = fluid.layers.stack(
-            x=[self_attn_mask] * self._n_head, axis=1)
+        self_attn_mask = fluid.layers.scale(x=self_attn_mask,
+                                            scale=10000.0,
+                                            bias=-1.0,
+                                            bias_after_scale=False)
+        n_head_self_attn_mask = fluid.layers.stack(x=[self_attn_mask] *
+                                                   self._n_head,
+                                                   axis=1)
         n_head_self_attn_mask.stop_gradient = True
 
         self._enc_out, self.checkpoints = encoder(
@@ -183,21 +185,25 @@ class ErnieModel(object):
 
     def get_cls_output(self):
         """Get the first feature of each sequence for classification"""
-        cls_output = fluid.layers.slice(
-            input=self._enc_out, axes=[1], starts=[0], ends=[1])
+        cls_output = fluid.layers.slice(input=self._enc_out,
+                                        axes=[1],
+                                        starts=[0],
+                                        ends=[1])
         cls_output = fluid.layers.squeeze(cls_output, axes=[1])
         return cls_output
 
     def get_pooled_output(self):
         """Get the first feature of each sequence for classification"""
-        next_sent_feat = fluid.layers.slice(
-            input=self._enc_out, axes=[1], starts=[0], ends=[1])
+        next_sent_feat = fluid.layers.slice(input=self._enc_out,
+                                            axes=[1],
+                                            starts=[0],
+                                            ends=[1])
         next_sent_feat = fluid.layers.fc(
             input=next_sent_feat,
             size=self._emb_size,
             act="tanh",
-            param_attr=fluid.ParamAttr(
-                name="pooled_fc.w_0", initializer=self._param_initializer),
+            param_attr=fluid.ParamAttr(name="pooled_fc.w_0",
+                                       initializer=self._param_initializer),
             bias_attr="pooled_fc.b_0")
         return next_sent_feat
 
@@ -208,8 +214,8 @@ class ErnieModel(object):
 
         # extract the first token feature in each sentence
         self.next_sent_feat = self.get_pooled_output()
-        reshaped_emb_out = fluid.layers.reshape(
-            x=self._enc_out, shape=[-1, self._emb_size])
+        reshaped_emb_out = fluid.layers.reshape(x=self._enc_out,
+                                                shape=[-1, self._emb_size])
         # extract masked tokens' feature
         mask_feat = fluid.layers.gather(input=reshaped_emb_out, index=mask_pos)
 
@@ -218,9 +224,8 @@ class ErnieModel(object):
             input=mask_feat,
             size=self._emb_size,
             act=self._hidden_act,
-            param_attr=fluid.ParamAttr(
-                name='mask_lm_trans_fc.w_0',
-                initializer=self._param_initializer),
+            param_attr=fluid.ParamAttr(name='mask_lm_trans_fc.w_0',
+                                       initializer=self._param_initializer),
             bias_attr=fluid.ParamAttr(name='mask_lm_trans_fc.b_0'))
 
         # transform: layer norm
@@ -246,11 +251,10 @@ class ErnieModel(object):
                 y=fluid.default_main_program().global_block().var(
                     self._word_emb_name),
                 transpose_y=True)
-            fc_out += fluid.layers.create_parameter(
-                shape=[self._voc_size],
-                dtype=self._emb_dtype,
-                attr=mask_lm_out_bias_attr,
-                is_bias=True)
+            fc_out += fluid.layers.create_parameter(shape=[self._voc_size],
+                                                    dtype=self._emb_dtype,
+                                                    attr=mask_lm_out_bias_attr,
+                                                    is_bias=True)
 
         else:
             fc_out = fluid.layers.fc(input=mask_trans_feat,
@@ -260,8 +264,8 @@ class ErnieModel(object):
                                          initializer=self._param_initializer),
                                      bias_attr=mask_lm_out_bias_attr)
 
-        mask_lm_loss = fluid.layers.softmax_with_cross_entropy(
-            logits=fc_out, label=mask_label)
+        mask_lm_loss = fluid.layers.softmax_with_cross_entropy(logits=fc_out,
+                                                               label=mask_label)
         mean_mask_lm_loss = fluid.layers.mean(mask_lm_loss)
 
         return mean_mask_lm_loss

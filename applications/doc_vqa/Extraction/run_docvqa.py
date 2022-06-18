@@ -72,7 +72,8 @@ def main(args):
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO
-        if paddle.distributed.get_rank() == 0 else logging.WARN, )
+        if paddle.distributed.get_rank() == 0 else logging.WARN,
+    )
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
@@ -90,14 +91,13 @@ def main(args):
     if args.do_test:
         model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(
             args.init_checkpoint)
-        evaluate(
-            args,
-            model,
-            tokenizer,
-            label2id_map,
-            id2label_map,
-            pad_token_label_id,
-            global_step=0)
+        evaluate(args,
+                 model,
+                 tokenizer,
+                 label2id_map,
+                 id2label_map,
+                 pad_token_label_id,
+                 global_step=0)
         exit(0)
 
     if args.init_checkpoint:
@@ -113,14 +113,13 @@ def main(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    train_dataset = DocVQA(
-        args,
-        tokenizer,
-        label2id_map,
-        max_seq_len=args.max_seq_len,
-        max_query_length=args.max_query_length,
-        max_doc_length=args.max_doc_length,
-        max_span_num=args.max_span_num)
+    train_dataset = DocVQA(args,
+                           tokenizer,
+                           label2id_map,
+                           max_seq_len=args.max_seq_len,
+                           max_query_length=args.max_query_length,
+                           max_doc_length=args.max_doc_length,
+                           max_span_num=args.max_span_num)
 
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=False)
@@ -128,12 +127,11 @@ def main(args):
     args.train_batch_size = args.per_gpu_train_batch_size * max(
         1, paddle.distributed.get_world_size())
 
-    train_dataloader = paddle.io.DataLoader(
-        train_dataset,
-        batch_sampler=train_sampler,
-        num_workers=0,
-        use_shared_memory=True,
-        collate_fn=None)
+    train_dataloader = paddle.io.DataLoader(train_dataset,
+                                            batch_sampler=train_sampler,
+                                            num_workers=0,
+                                            use_shared_memory=True,
+                                            collate_fn=None)
 
     t_total = len(train_dataloader) * args.num_train_epochs
     # build linear decay with warmup lr sch
@@ -149,11 +147,10 @@ def main(args):
             start_lr=0,
             end_lr=args.learning_rate)
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        epsilon=args.adam_epsilon,
-        weight_decay=args.weight_decay)
+    optimizer = paddle.optimizer.AdamW(learning_rate=lr_scheduler,
+                                       parameters=model.parameters(),
+                                       epsilon=args.adam_epsilon,
+                                       weight_decay=args.weight_decay)
 
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
@@ -162,7 +159,8 @@ def main(args):
                 args.per_gpu_train_batch_size)
     logger.info(
         "  Total train batch size (w. parallel, distributed) = %d",
-        args.train_batch_size * paddle.distributed.get_world_size(), )
+        args.train_batch_size * paddle.distributed.get_world_size(),
+    )
     logger.info("  Total optimization steps = %d", t_total)
 
     global_step = 0
@@ -176,22 +174,21 @@ def main(args):
             input_ids, input_mask, segment_ids, bboxes, labels = batch
             if input_ids.shape[0] != args.per_gpu_train_batch_size:
                 continue
-            outputs = model(
-                input_ids=input_ids,
-                bbox=bboxes,
-                attention_mask=input_mask,
-                token_type_ids=segment_ids,
-                labels=labels,
-                is_train=True)
+            outputs = model(input_ids=input_ids,
+                            bbox=bboxes,
+                            attention_mask=input_mask,
+                            token_type_ids=segment_ids,
+                            labels=labels,
+                            is_train=True)
             # model outputs are always tuple in ppnlp (see doc)
             loss = outputs[0]
             loss = loss.mean()
             if global_step % 50 == 0:
                 logger.info(
-                    "[epoch {}/{}][iter: {}/{}] lr: {:.5f}, train loss: {:.5f}, ".
-                    format(epoch_id, args.num_train_epochs, step,
-                           len(train_dataloader),
-                           lr_scheduler.get_lr(), loss.numpy()[0]))
+                    "[epoch {}/{}][iter: {}/{}] lr: {:.5f}, train loss: {:.5f}, "
+                    .format(epoch_id, args.num_train_epochs, step,
+                            len(train_dataloader), lr_scheduler.get_lr(),
+                            loss.numpy()[0]))
 
             loss.backward()
             tr_loss += loss.item()
@@ -307,9 +304,9 @@ def decode(tokenizer, res):
     save_f1 = []
     for i in range(len(res)):
         input_ids, label_ids, predict_ids, bbox = res[i]
-        remove_pos = len(' '.join([str(x) for x in input_ids]).split('2 6 ')[0]
-                         .strip(' ').split(
-                             ' ')) + 2  # remove the question bbox and sep bbox
+        remove_pos = len(' '.join(
+            [str(x) for x in input_ids]).split('2 6 ')[0].strip(' ').split(
+                ' ')) + 2  # remove the question bbox and sep bbox
         start_pos = input_ids.index(sep_id)
         query_text = []
         for idx in range(1, start_pos):
@@ -356,24 +353,22 @@ def evaluate(args,
              prefix="",
              global_step=0):
 
-    eval_dataset = DocVQA(
-        args,
-        tokenizer,
-        label2id_map,
-        max_seq_len=512,
-        max_query_length=20,
-        max_doc_length=512,
-        max_span_num=1)
+    eval_dataset = DocVQA(args,
+                          tokenizer,
+                          label2id_map,
+                          max_seq_len=512,
+                          max_query_length=20,
+                          max_doc_length=512,
+                          max_span_num=1)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
 
-    eval_dataloader = paddle.io.DataLoader(
-        eval_dataset,
-        batch_size=args.eval_batch_size,
-        num_workers=0,
-        use_shared_memory=True,
-        collate_fn=None)
+    eval_dataloader = paddle.io.DataLoader(eval_dataset,
+                                           batch_size=args.eval_batch_size,
+                                           num_workers=0,
+                                           use_shared_memory=True,
+                                           collate_fn=None)
 
     # Eval!
     logger.info("***** Running evaluation %s *****", prefix)
@@ -387,13 +382,12 @@ def evaluate(args,
 
             if input_ids.shape[0] != args.eval_batch_size:
                 continue
-            outputs = model(
-                input_ids=input_ids,
-                bbox=bboxes,
-                attention_mask=input_mask,
-                token_type_ids=segment_ids,
-                labels=labels,
-                is_train=False)
+            outputs = model(input_ids=input_ids,
+                            bbox=bboxes,
+                            attention_mask=input_mask,
+                            token_type_ids=segment_ids,
+                            labels=labels,
+                            is_train=False)
             labels = labels.numpy()
             crf_decode = outputs[1].numpy()
             bboxes = bboxes.squeeze().numpy()
@@ -401,7 +395,8 @@ def evaluate(args,
 
             for index in range(input_ids.shape[0]):
                 res.append([
-                    list(input_ids[index]), list(labels[index]),
+                    list(input_ids[index]),
+                    list(labels[index]),
                     list(crf_decode[index]), bboxes[index]
                 ])
 

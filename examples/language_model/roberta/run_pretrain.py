@@ -91,7 +91,7 @@ def do_train(args):
     # Load model and train from scratch
     # model = RobertaForMaskedLM(
     #     RobertaModel(**RobertaForMaskedLM.pretrained_init_configuration[
-    #         args.model_name_or_path])) 
+    #         args.model_name_or_path]))
     model = RobertaForMaskedLM(RobertaModel(**roberta_arch))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

@@ -63,8 +63,8 @@ def predict(model, data_loader):
             input_ids = paddle.to_tensor(input_ids)
             token_type_ids = paddle.to_tensor(token_type_ids)
 
-            batch_prob = model.predict(
-                input_ids=input_ids, token_type_ids=token_type_ids).numpy()
+            batch_prob = model.predict(input_ids=input_ids,
+                                       token_type_ids=token_type_ids).numpy()
 
             batch_probs.append(batch_prob)
         if (len(batch_prob) == 1):
@@ -87,26 +87,26 @@ if __name__ == "__main__":
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
         'ernie-gram-zh')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        phase="predict")
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         phase="predict")
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # segment_ids
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
-    valid_data_loader = create_dataloader(
-        valid_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    valid_data_loader = create_dataloader(valid_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     model = PairwiseMatching(pretrained_model)
 
@@ -120,8 +120,9 @@ if __name__ == "__main__":
 
     y_probs = predict(model, valid_data_loader)
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
     for idx, prob in enumerate(y_probs):
         text_pair = valid_ds[idx]

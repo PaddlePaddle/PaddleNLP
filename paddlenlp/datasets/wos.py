@@ -44,14 +44,15 @@ class WOS(DatasetBuilder):
     MD5 = 'b40f78f7fde54ce39590a7c34c6afba1'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('wos', 'train.tsv'),
-            '97713ac04f6b9deffa232c61cdf903ca '),
-        'dev': META_INFO(
-            os.path.join('wos', 'dev.tsv'), '378979bda3a0301d9cc2f9ff9f8a97d3'),
-        'test': META_INFO(
-            os.path.join('wos', 'test.tsv'),
-            '3ba984eee31d222cc6aa1d7812598540 ')
+        'train':
+        META_INFO(os.path.join('wos', 'train.tsv'),
+                  '97713ac04f6b9deffa232c61cdf903ca '),
+        'dev':
+        META_INFO(os.path.join('wos', 'dev.tsv'),
+                  '378979bda3a0301d9cc2f9ff9f8a97d3'),
+        'test':
+        META_INFO(os.path.join('wos', 'test.tsv'),
+                  '3ba984eee31d222cc6aa1d7812598540 ')
     }
 
     def _get_data(self, mode, **kwargs):

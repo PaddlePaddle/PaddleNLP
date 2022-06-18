@@ -99,11 +99,10 @@ class ErnieGramTokenizer(ErnieTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        super(ErnieGramTokenizer, self).__init__(
-            vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(ErnieGramTokenizer, self).__init__(vocab_file,
+                                                 do_lower_case=do_lower_case,
+                                                 unk_token=unk_token,
+                                                 sep_token=sep_token,
+                                                 pad_token=pad_token,
+                                                 cls_token=cls_token,
+                                                 mask_token=mask_token)

@@ -46,95 +46,95 @@ parser.add_argument(
     default=None,
     type=str,
     required=True,
-    help="The output directory where the model predictions and checkpoints will be written.",
+    help=
+    "The output directory where the model predictions and checkpoints will be written.",
 )
-parser.add_argument(
-    '--max_encode_len',
-    type=int,
-    default=5,
-    help="The max encoding sentence length")
-parser.add_argument(
-    '--max_decode_len',
-    type=int,
-    default=5,
-    help="The max decoding sentence length")
+parser.add_argument('--max_encode_len',
+                    type=int,
+                    default=5,
+                    help="The max encoding sentence length")
+parser.add_argument('--max_decode_len',
+                    type=int,
+                    default=5,
+                    help="The max decoding sentence length")
 parser.add_argument(
     "--batch_size",
     default=8,
     type=int,
-    help="Batch size per GPU/CPU for training.", )
-parser.add_argument(
-    "--learning_rate",
-    default=5e-5,
-    type=float,
-    help="The initial learning rate for Adam.")
-parser.add_argument(
-    "--weight_decay",
-    default=0.1,
-    type=float,
-    help="Weight decay if we apply some.")
-parser.add_argument(
-    "--adam_epsilon",
-    default=1e-8,
-    type=float,
-    help="Epsilon for Adam optimizer.")
+    help="Batch size per GPU/CPU for training.",
+)
+parser.add_argument("--learning_rate",
+                    default=5e-5,
+                    type=float,
+                    help="The initial learning rate for Adam.")
+parser.add_argument("--weight_decay",
+                    default=0.1,
+                    type=float,
+                    help="Weight decay if we apply some.")
+parser.add_argument("--adam_epsilon",
+                    default=1e-8,
+                    type=float,
+                    help="Epsilon for Adam optimizer.")
 parser.add_argument(
     "--num_epochs",
     default=3,
     type=int,
-    help="Total number of training epochs to perform.", )
-parser.add_argument(
-    "--warmup_proportion",
-    default=0.1,
-    type=float,
-    help="Linear warmup proportion.")
-parser.add_argument(
-    "--logging_steps", type=int, default=1, help="Log every X updates steps.")
-parser.add_argument(
-    "--save_steps",
-    type=int,
-    default=100,
-    help="Save checkpoint every X updates steps.")
+    help="Total number of training epochs to perform.",
+)
+parser.add_argument("--warmup_proportion",
+                    default=0.1,
+                    type=float,
+                    help="Linear warmup proportion.")
+parser.add_argument("--logging_steps",
+                    type=int,
+                    default=1,
+                    help="Log every X updates steps.")
+parser.add_argument("--save_steps",
+                    type=int,
+                    default=100,
+                    help="Save checkpoint every X updates steps.")
 parser.add_argument(
     "--device",
     default="gpu",
     type=str,
     choices=["cpu", "gpu", "xpu"],
     help="The device to select to train the model, is must be cpu/gpu/xpu.")
-parser.add_argument(
-    '--beam_width', type=int, default=1, help="Beam search width.")
-parser.add_argument(
-    '--noise_prob',
-    type=float,
-    default=0.,
-    help='Probability of token be repalced.')
+parser.add_argument('--beam_width',
+                    type=int,
+                    default=1,
+                    help="Beam search width.")
+parser.add_argument('--noise_prob',
+                    type=float,
+                    default=0.,
+                    help='Probability of token be repalced.')
 parser.add_argument(
     '--use_random_noice',
     action='store_true',
-    help='If set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`.'
+    help=
+    'If set, replace target tokens with random token from vocabulary, else replace with `[NOISE]`.'
 )
-parser.add_argument(
-    '--label_smooth',
-    type=float,
-    default=0.,
-    help="The soft label smooth rate.")
-parser.add_argument(
-    '--length_penalty',
-    type=float,
-    default=1.0,
-    help="The length penalty during decoding.")
-parser.add_argument(
-    '--init_checkpoint',
-    type=str,
-    default=None,
-    help='Checkpoint to warm start from.')
-parser.add_argument(
-    '--save_dir', type=str, default=None, help='Model output directory.')
+parser.add_argument('--label_smooth',
+                    type=float,
+                    default=0.,
+                    help="The soft label smooth rate.")
+parser.add_argument('--length_penalty',
+                    type=float,
+                    default=1.0,
+                    help="The length penalty during decoding.")
+parser.add_argument('--init_checkpoint',
+                    type=str,
+                    default=None,
+                    help='Checkpoint to warm start from.')
+parser.add_argument('--save_dir',
+                    type=str,
+                    default=None,
+                    help='Model output directory.')
 parser.add_argument(
     "--max_steps",
     default=-1,
     type=int,
-    help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+    help=
+    "If > 0: set total number of training steps to perform. Override num_train_epochs."
 )
 
 args = parser.parse_args()
@@ -157,21 +157,20 @@ def evaluate(model, data_loader, tokenizer, rouge1, rouge2, attn_id,
         (src_ids, src_tids, src_pids, _, _, _, _, _, _, _, _,
          raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
-        output_ids = beam_search_infilling(
-            model,
-            src_ids,
-            src_tids,
-            eos_id=eos_id,
-            sos_id=sos_id,
-            attn_id=attn_id,
-            pad_id=pad_id,
-            unk_id=unk_id,
-            vocab_size=vocab_size,
-            max_decode_len=args.max_decode_len,
-            max_encode_len=args.max_encode_len,
-            beam_width=args.beam_width,
-            length_penalty=args.length_penalty,
-            tgt_type_id=tgt_type_id)
+        output_ids = beam_search_infilling(model,
+                                           src_ids,
+                                           src_tids,
+                                           eos_id=eos_id,
+                                           sos_id=sos_id,
+                                           attn_id=attn_id,
+                                           pad_id=pad_id,
+                                           unk_id=unk_id,
+                                           vocab_size=vocab_size,
+                                           max_decode_len=args.max_decode_len,
+                                           max_encode_len=args.max_encode_len,
+                                           beam_width=args.beam_width,
+                                           length_penalty=args.length_penalty,
+                                           tgt_type_id=tgt_type_id)
 
         for ids in output_ids.tolist():
             if eos_id in ids:
@@ -221,20 +220,20 @@ def train():
         model_state = paddle.load(args.init_checkpoint)
         model.set_state_dict(model_state)
 
-    train_dataset, dev_dataset = load_dataset(
-        'poetry', splits=('train', 'dev'), lazy=False)
+    train_dataset, dev_dataset = load_dataset('poetry',
+                                              splits=('train', 'dev'),
+                                              lazy=False)
     attn_id = tokenizer.vocab[
         '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
 
-    trans_func = convert_example(
-        tokenizer=tokenizer,
-        attn_id=attn_id,
-        tgt_type_id=tgt_type_id,
-        max_encode_len=args.max_encode_len,
-        max_decode_len=args.max_decode_len,
-        noise_prob=args.noise_prob,
-        use_random_noice=args.use_random_noice)
+    trans_func = convert_example(tokenizer=tokenizer,
+                                 attn_id=attn_id,
+                                 tgt_type_id=tgt_type_id,
+                                 max_encode_len=args.max_encode_len,
+                                 max_decode_len=args.max_decode_len,
+                                 noise_prob=args.noise_prob,
+                                 use_random_noice=args.use_random_noice)
 
     train_dataset = train_dataset.map(trans_func)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
@@ -249,20 +248,18 @@ def train():
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # attn_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_labels
     ): after_padding(fn(samples))
-    train_data_loader = DataLoader(
-        dataset=train_dataset,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_dataset,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
 
     dev_dataset = dev_dataset.map(trans_func)
-    dev_data_loader = DataLoader(
-        dataset=dev_dataset,
-        batch_size=args.batch_size,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    dev_data_loader = DataLoader(dataset=dev_dataset,
+                                 batch_size=args.batch_size,
+                                 collate_fn=batchify_fn,
+                                 num_workers=0,
+                                 return_list=True)
 
     label_num = model.word_emb.weight.shape[0]
     train_model = StackModel(model)
