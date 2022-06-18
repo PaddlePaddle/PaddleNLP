@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../model_zoo/transformers/CTRL/contents.rst:5
 msgid "CTRL模型汇总"
-msgstr ""
+msgstr "Summary of CTRL Models"
 
 #: ../model_zoo/transformers/CTRL/contents.rst:9
 msgid "下表汇总介绍了目前PaddleNLP支持的CTRL模型对应预训练权重。"
-msgstr ""
+msgstr "The following table summerizes all weights of the currently supported pre-trained CTRL models in PaddleNLP. For more details, please refer to the relevant links."
 
 #: ../model_zoo/transformers/CTRL/contents.rst:12
 msgid "Pretrained Weight"

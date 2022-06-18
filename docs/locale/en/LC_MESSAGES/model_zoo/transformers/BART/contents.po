@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../model_zoo/transformers/BART/contents.rst:5
 msgid "BART模型汇总"
-msgstr ""
+msgstr "Summary of BART Models"
 
 #: ../model_zoo/transformers/BART/contents.rst:9
 msgid "下表汇总介绍了目前PaddleNLP支持的BART模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
-msgstr ""
+msgstr "The following tables summerizes the weights for all  supported pre-trained BART models. For more details of the models, please refer to their relevant links."
 
 #: ../model_zoo/transformers/BART/contents.rst:13
 msgid "Pretrained Weight"

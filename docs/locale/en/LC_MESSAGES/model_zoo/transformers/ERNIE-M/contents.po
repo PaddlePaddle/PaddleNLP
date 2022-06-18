@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../model_zoo/transformers/ERNIE-M/contents.rst:5
 msgid "ERNIE-M模型汇总"
-msgstr ""
+msgstr "Summary of ERNIE-M Models"
 
 #: ../model_zoo/transformers/ERNIE-M/contents.rst:9
 msgid "下表汇总介绍了目前PaddleNLP支持的ERNIE-M模型对应预训练权重。"
-msgstr ""
+msgstr "The following table summerizes all weights of the currently supported pre-trained ERNIE-M models in PaddleNLP. For more details, please refer to the relevant links."
 
 #: ../model_zoo/transformers/ERNIE-M/contents.rst:12
 msgid "Pretrained Weight"
