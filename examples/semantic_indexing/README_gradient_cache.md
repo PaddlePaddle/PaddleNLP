@@ -43,9 +43,10 @@ python data/download_data.py --resource data.retriever.qas.nq
 python train_dense_encoder.py \
    --batch_size 128 \
    --learning_rate 2e-05 \
+   --save_dir save_biencoder
    --warmup_steps 1237 \
    --epoches 40 \
-   --max_grad_norm 2.0 \
+   --max_grad_norm 2 \
    --train_data_path {data_path} \
    --chunk_size 16 \
 ```
@@ -53,6 +54,7 @@ python train_dense_encoder.py \
 参数含义说明
 * `batch_size`: 批次大小
 * `learning_rate`: 学习率
+* `save_dir`:模型保存位置
 * `warmupsteps`： 预热学习率参数
 * `epoches`: 训练批次大小
 * `max_grad_norm`: 详见ClipGradByGlobalNorm
@@ -67,36 +69,45 @@ python generate_dense_embeddings.py \
    --ctx_file {path to psgs_w100.tsv file} \
    --shard_id {shard_num, 0-based} --num_shards {total number of shards} \
    --out_file ${out files location + name PREFX}  \
+   --que_model_path {que_model_path} \
+   --con_model_path {con_model_path}
+``` 
+
+##如果只有一台机器，可以直接使用  
 
 ```
+python generate_dense_embedding \ 
+   --ctx_file {data/psgs_w100.tsv} \ 
+   --out_file {test_generate} \ 
+   --que_model_path {que_model_path} \
+   --con_model_path {con_model_path}
+```
+
 
 参数含义说明
-* `device`: 使用 cpu/gpu 进行训练
-* `save_dir`: 模型存储路径
-* `output_emb_size`: Transformer 顶层输出的文本向量维度
-* `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
-* `margin`: 正样本相似度与负样本之间的目标 Gap
-* `train_set_file`: 训练集文件  
+* `ctx_file`: 使用 cpu/gpu 进行训练
+* `out_file`: 模型存储路径
+* `que_model_path`: Transformer 顶层输出的文本向量维度
+* `con_model_path`： 模型存储 checkpoint 的间隔 steps 个数 
 
 
 ##针对全部文档的检索器验证
 ```
-python dense_retriever.py \
-   --model_file {path to checkpoint file from step 1} \
-   --ctx_file {path to psgs_w100.tsv file} \
-   --qa_file {path to test/dev qas file} \
-   --encoded_ctx_file "{glob expression for generated files from step 3}" \
-   --out_file {path for output json files} \
-   --n-docs 100 \
-   --validation_workers 32 \
-   --batch_size 64  
+python dense_retriever.py --hnsw_index \
+    --out_file {out_file} \
+    --encoded_ctx_file {encoded_ctx} \
+    --ctx_file {ctx} \
+    --qa_file {nq.qa.csv} \
+    --que_model_path {que_model_path} \
+    --con_model_path {con_model_path}
 ```
 参数含义说明
-* `device`: 使用 cpu/gpu 进行训练
-* `save_dir`: 模型存储路径
-* `output_emb_size`: Transformer 顶层输出的文本向量维度
-* `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
-* `margin`: 正样本相似度与负样本之间的目标 Gap
-* `train_set_file`: 训练集文件
+* `hnsw_index`：使用hnsw_index
+* `outfile`: 输出文件地址
+* `encoded_ctx_file`: 编码后的ctx文件
+* `ctx_file`: ctx文件
+* `qa_file`： qa_file文件
+* `que_model_path`: question encoder model
+* `con_model_path`: context encoder model
 
 
