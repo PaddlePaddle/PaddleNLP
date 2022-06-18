@@ -61,21 +61,21 @@ class DenseRetriever(object):
                 batch_token_tensors = [self.tensorizer.text_to_tensor(q) for q in
                                        questions[batch_start:batch_start + bsz]]
 
-                q_ids_batch = paddle.stack(batch_token_tensors, axis=0).cuda()
-                q_seg_batch = paddle.zeros_like(q_ids_batch).cuda()
-                #q_attn_mask = self.tensorizer.get_attn_mask(q_ids_batch)
-                _, out, _ = self.question_encoder.get_question_pooled_embedding(q_ids_batch, q_seg_batch)
+                q_ids_batch = paddle.stack(batch_token_tensors, axis=0)
+                q_seg_batch = paddle.zeros_like(q_ids_batch)
 
-                query_vectors.extend(out.cpu().split(1, axis=0))
+                out = self.question_encoder.get_question_pooled_embedding(q_ids_batch, q_seg_batch)
+
+                query_vectors.extend(out)
 
                 if len(query_vectors) % 100 == 0:
                     logger.info('Encoded queries %d', len(query_vectors))
 
-        query_tensor = paddle.concat(query_vectors, axis=0)
+        query_tensor = paddle.to_tensor(query_vectors)
 
-        logger.info('Total encoded queries tensor %s', query_tensor.shape)
+        logger.info('Total encoded queries tensor %s', query_tensor.shape[0])
 
-        assert query_tensor.size(0) == len(questions)
+        assert query_tensor.shape[0] == len(questions)
         return query_tensor
 
 
@@ -111,7 +111,6 @@ def validate(passages: Dict[object, Tuple[str, str]], answers: List[List[str]],
     top_k_hits = [v / len(result_ctx_ids) for v in top_k_hits]
     logger.info('Validation results: top k documents hits accuracy %s', top_k_hits)
     return match_stats.questions_doc_hits
-
 
 def load_passages(ctx_file: str) -> Dict[object, Tuple[str, str]]:
     docs = {}
@@ -180,12 +179,12 @@ def iterate_encoded_files(vector_files: list) -> Iterator[Tuple[object, np.array
 def main(args):
 
     tensorizer = BertTensorizer()
-    question_model = BertModel.from_pretrained("./question_model")
-    context_model = BertModel.from_pretrained("./context_model")
+    question_model = BertModel.from_pretrained(args.que_model_path)
+
+    context_model = BertModel.from_pretrained(args.con_model_path)
     model = BiEncoder(question_encoder=question_model, context_encoder=context_model)
 
     model.eval()
-
 
     if args.hnsw_index:
         index = DenseHNSWFlatIndexer(768, args.index_buffer)
@@ -203,30 +202,14 @@ def main(args):
         questions.append(question)
         question_answers.append(answers)
 
-    if args.q_encoding_path and not args.re_encode_q and os.path.exists(args.q_encoding_path):
-        questions_tensor = paddle.load(args.q_encoding_path)
-    else:
-        questions_tensor = retriever.generate_question_vectors(questions)
-        if args.encode_q_and_save:
-            paddle.save(questions_tensor, args.q_encoding_path)
-            "load和save也不需要改"
-
-    # finished encoding, exit
-    if args.encode_q_and_save:
-        return
+    questions_tensor = retriever.generate_question_vectors(questions)
 
     # index all passages
     ctx_files_pattern = args.encoded_ctx_file
     input_paths = glob.glob(ctx_files_pattern)
 
-    index_path = "_".join(input_paths[0].split("_")[:-1])
-    if args.save_or_load_index and (os.path.exists(index_path) or os.path.exists(index_path + ".index.dpr")):
-        retriever.index.deserialize_from(index_path)
-    else:
-        logger.info('Reading all passages data from files: %s', input_paths)
-        retriever.index.index_data(input_paths)
-        if args.save_or_load_index:
-            retriever.index.serialize(index_path)
+    logger.info('Reading all passages data from files: %s', input_paths)
+    retriever.index.index_data(input_paths)
 
     # get top k results
     top_ids_and_scores = retriever.get_top_docs(questions_tensor.numpy(), args.n_docs)
@@ -263,15 +246,11 @@ if __name__ == '__main__':
     parser.add_argument('--index_buffer', type=int, default=50000,
                         help="Temporal memory data buffer size (in samples) for indexer")
     parser.add_argument("--hnsw_index", action='store_true', help='If enabled, use inference time efficient HNSW index')
-    parser.add_argument("--save_or_load_index", action='store_true', help='If enabled, save index')
+    parser.add_argument('--que_model_path',required=True,type=str)
+    parser.add_argument('--con_model_path',required=True,type=str)
 
-    parser.add_argument("--encode_q_and_save", action='store_true')
-    parser.add_argument("--re_encode_q", action='store_true')
-    parser.add_argument("--q_encoding_path")
+    #python dense_retriever.py --hnsw_index --out_file test_dense_retriever --encoded_ctx_file newnewnew_0.pkl  --ctx_file data/psgs_w100.tsv --qa_file nq-dev.qa.csv --que_model_path {que_model_path} --con_model_path {con_model_path}
 
     args = parser.parse_args()
-
-    if args.encode_q_and_save and args.q_encoding_path is None:
-        raise ValueError(f'Requires q_encoding_path when encoding question')
 
     main(args)

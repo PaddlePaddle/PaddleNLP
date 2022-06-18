@@ -19,21 +19,14 @@ import logging
 import pickle
 from typing import List, Tuple
 from tqdm import tqdm
-
+import pickle
 import numpy as np
 from paddlenlp.transformers.bert.modeling import BertModel
 from biencoder_base_model import BiEncoder
-
-""
 import paddle
 from paddle.io import Dataset,DataLoader
 from paddle import nn
-""
-
-
 from NQdataset import BertTensorizer
-
-
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -63,7 +56,7 @@ def no_op_collate(xx: List[object]):
 
 
 def gen_ctx_vectors(ctx_rows: List[Tuple[object, str, str]], model: nn.Layer, tensorizer: BertTensorizer,
-                    insert_title: bool = True, fp16: bool = False) -> List[Tuple[object, np.array]]:
+                    insert_title: bool = True) -> List[Tuple[object, np.array]]:
     bsz = args.batch_size
     total = 0
     results = []
@@ -75,22 +68,26 @@ def gen_ctx_vectors(ctx_rows: List[Tuple[object, str, str]], model: nn.Layer, te
     for batch_id, batch_token_tensors in enumerate(tqdm(loader)):
         ctx_ids_batch = paddle.stack(batch_token_tensors, axis=0)
         ctx_seg_batch = paddle.zeros_like(ctx_ids_batch)
+        
         #ctx_attn_mask = move_to_device(tensorizer.get_attn_mask(ctx_ids_batch), args.device)
         with paddle.no_grad():
-                _, out, _ = model.get_context_pooled_embedding(ctx_ids_batch, ctx_seg_batch)
+                out = model.get_context_pooled_embedding(ctx_ids_batch, ctx_seg_batch)
 
         out = out.astype('float32').cpu()
+        print("out is:")
+        print(out)
 
+        
         batch_start = batch_id * bsz
         ctx_ids = [r[0] for r in ctx_rows[batch_start:batch_start + bsz]]
 
-        assert len(ctx_ids) == out.shape(0)
+        assert len(ctx_ids) == out.shape[0]
 
         total += len(ctx_ids)
 
         results.extend([
             (ctx_ids[i], out[i].reshape([-1]).numpy())
-            for i in range(out.shape(0))
+            for i in range(out.shape[0])
         ])
 
     return results
@@ -98,13 +95,10 @@ def gen_ctx_vectors(ctx_rows: List[Tuple[object, str, str]], model: nn.Layer, te
 
 def main(args):
 
-
     tensorizer = BertTensorizer()
-    question_model = BertModel.from_pretrained("./question_model")
-    context_model = BertModel.from_pretrained("./context_model")
+    question_model = BertModel.from_pretrained(args.que_model_path)
+    context_model = BertModel.from_pretrained(args.con_model_path)
     model = BiEncoder(question_encoder=question_model,context_encoder=context_model)
-
-
 
     rows = []
     with open(args.ctx_file) as tsvfile:
@@ -115,11 +109,15 @@ def main(args):
     shard_size = int(len(rows) / args.num_shards)
     start_idx = args.shard_id * shard_size
     end_idx = start_idx + shard_size
+    
+    #start_idx = 0
+    #end_idx = len(rows)
 
     logger.info('Producing encodings for passages range: %d to %d (out of total %d)', start_idx, end_idx, len(rows))
     rows = rows[start_idx:end_idx]
 
-    data = gen_ctx_vectors(rows, model, tensorizer, True, fp16=args.fp16)
+
+    data = gen_ctx_vectors(rows, model, tensorizer, True)
 
     file = args.out_file + '_' + str(args.shard_id) + '.pkl'
     pathlib.Path(os.path.dirname(file)).mkdir(parents=True, exist_ok=True)
@@ -128,7 +126,6 @@ def main(args):
         pickle.dump(data, f)
 
     logger.info('Total passages processed %d. Written to %s', len(data), file)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -139,7 +136,10 @@ if __name__ == '__main__':
     parser.add_argument('--shard_id', type=int, default=0, help="Number(0-based) of data shard to process")
     parser.add_argument('--num_shards', type=int, default=1, help="Total amount of data shards")
     parser.add_argument('--batch_size', type=int, default=32, help="Batch size for the passage encoder forward pass")
+    parser.add_argument('--que_model_path',type=str)
+    parser.add_argument('--con_model_path',type=str)
     args = parser.parse_args()
-
+    
+    #python generate_dense_embedding --ctx_file data/psgs_w100.tsv --out_file test_generate
 
     main(args)

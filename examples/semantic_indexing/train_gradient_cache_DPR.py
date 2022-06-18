@@ -12,14 +12,15 @@ from paddle.optimizer.lr import LambdaDecay
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--batch_size',required=True,type=int,default=None)
-parser.add_argument('--learning_rate',required=True,type=int,default=None)
+parser.add_argument('--learning_rate',required=True,type=float,default=None)
 parser.add_argument('--save_dir',required=True,type=str,default=None)
 parser.add_argument('--warmup_steps',required=True,type=int)
 parser.add_argument('--epoches',required=True,type=int)
 parser.add_argument('--max_grad_norm',required=True,type=int)
 parser.add_argument('--train_data_path',required=True,type=str)
-parser.add_argument('chunk_size',required=True,type=int)
+parser.add_argument('--chunk_size',required=True,type=int)
 args = parser.parse_args()
+# python train_gradient_cache_DPR.py --batch_size 128 --learning_rate 2e-05 --save_dir save_biencoder --warmup_steps 1237 --epoches 40 --max_grad_norm 2 --train_data_path {train_data} --chunk_size 16
 
 chunk_nums = args.batch_size // args.chunk_size
 data_path = args.train_data_path
@@ -60,9 +61,9 @@ def get_linear_scheduler(warmup_steps,training_steps):
         return max(
             0.0, float(training_steps - current_step) / float(max(1, training_steps - warmup_steps))
         )
-    return LambdaDecay(learning_rate=args.learning_rate,lr_lambda=lr_lambda(),last_epoch=-1,verbose=False)
+    return LambdaDecay(learning_rate=args.learning_rate,lr_lambda=lr_lambda,last_epoch=-1,verbose=False)
 
-training_steps = 58880  * args.epoches / args.batch_sizes
+training_steps = 58880  * args.epoches / args.batch_size
 scheduler = get_linear_scheduler(args.warmup_steps,training_steps)
 optimizer = paddle.optimizer.AdamW(
     learning_rate=scheduler,
@@ -98,7 +99,7 @@ def train():
                 # all_positions = []
                 all_CUDA_rnd_state = []
 
-                all_batch_input = util.create_biencoder_input(batch_data)
+                all_batch_input = util.create_biencoder_input(batch_data,inserted_title=True)
 
                 all_positions = all_batch_input.is_positive
 
@@ -120,25 +121,21 @@ def train():
                 all_questions = []
                 all_contexts = []
                 all_CUDA_rnd_state = []
+                all_CUDA_rnd_state_question = []
+                all_CUDA_rnd_state_context = []
 
-                for sub_q_id, sub_c_id, sub_q_segment, sub_c_segment in zip(sub_q_ids, sub_c_ids, sub_q_segments,
-                                                                            sub_c_segments):
-                    # sub_batch_input = util.create_biencoder_input(sub_batch)
+                for sub_q_id,sub_q_segment in zip(sub_q_ids,sub_q_segments):
                     with paddle.no_grad():
-                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state(
-                        )
-                        # sub_global_rnd_state = paddle.framework.random.get_random_seed_generator(global_random_generator)
-
-                        all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
-                        # all_global_rnd_state.append(sub_global_rnd_state)
-
+                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state()
+                        all_CUDA_rnd_state_question.append(sub_CUDA_rnd_state)
                         sub_question_output = model.get_question_pooled_embedding(sub_q_id, sub_q_segment)
-
-                        sub_context_ouput = model.get_context_pooled_embedding(sub_c_id, sub_c_segment)
-
                         all_questions.append(sub_question_output)
+                for sub_c_id,sub_c_segment in zip(sub_c_ids,sub_c_segments):
+                    with paddle.no_grad():
+                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state()
+                        all_CUDA_rnd_state_context.append(sub_CUDA_rnd_state)
+                        sub_context_ouput = model.get_context_pooled_embedding(sub_c_id,sub_c_segment)
                         all_contexts.append(sub_context_ouput)
-                        # all_positions.append(sub_batch_input.is_positive)
 
                 model_questions = paddle.concat(all_questions, axis=0)
                 all_questions = []
@@ -163,9 +160,8 @@ def train():
 
                 loss, _ = LOSS.calc(model_questions, model_contexts, model_positions)
 
-                print("损失是：")
-
-                print(loss)
+                print("loss is:")
+                print(loss.item())
 
                 loss.backward()
 
@@ -178,39 +174,35 @@ def train():
                 # all_grads = [repos.grad for repos in model_reps]
                 # all_grads.append(model_reps.grad)
 
-                for sub_q_id, sub_c_id, sub_q_segment, sub_c_segment, CUDA_state, grad_for_each_question, grad_for_each_context in zip(
-                        sub_q_ids,
-                        sub_c_ids,
-                        sub_q_segments,
-                        sub_c_segments,
-                        all_CUDA_rnd_state,
-                        grads_for_questions,
-                        grads_for_contexts
-                ):
+                for sub_q_id,sub_q_segment,CUDA_state,grad_for_each_question in zip(
+                    sub_q_ids,
+                    sub_q_segments,
+                    all_CUDA_rnd_state_question,
+                    grads_for_questions):
+
                     paddle.framework.random.set_cuda_rng_state(CUDA_state)
 
-                    # paddle.framework.random.set_random_seed_generator(global_random_generator,global_rnd_state)
-
-                    sub_question_output = model.get_question_pooled_embedding(sub_q_id,
-                                                                              sub_q_segment)
-
-                    sub_context_ouput = model.get_context_pooled_embedding(sub_c_id,
-                                                                           sub_c_segment)
-
+                    sub_question_output = model.get_question_pooled_embedding(sub_q_id,sub_q_segment)
+                    
                     finally_question_res_for_backward = paddle.dot(sub_question_output, grad_for_each_question)
-                    finally_context_res_for_backward = paddle.dot(sub_context_ouput, grad_for_each_context)
-
                     finally_question_res_for_backward = finally_question_res_for_backward * (1/8.)
-                    finally_context_res_for_backward = finally_context_res_for_backward * (1/8.)
 
                     finally_question_res_for_backward.backward(retain_graph=True)
+
+                for sub_c_id,sub_c_segment,CUDA_state,grad_for_each_context in zip(
+                    sub_c_ids,
+                    sub_c_segments,
+                    all_CUDA_rnd_state_context,
+                    grads_for_contexts):
+                    paddle.framework.random.set_cuda_rng_state(CUDA_state)
+
+                    sub_context_ouput = model.get_context_pooled_embedding(sub_c_id,sub_q_segment)
+
+                    finally_context_res_for_backward = paddle.dot(sub_question_output,grad_for_each_context)
+                    finally_context_res_for_backward = finally_context_res_for_backward * (1/8.)
+
                     finally_context_res_for_backward.backward(retain_graph=True)
-
-                    """print(finally_question_res_for_backward)
-                    print(finally_context_res_for_backward)"""
-
-
-
+                
                 paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm, group_name=model.parameters())
                 optimizer.step()
                 scheduler.step()
@@ -219,16 +211,11 @@ def train():
 
                 batch_data = []
 
-
-
-
         EPOCH = str(epoch)
-        model.question_encoder.save_pretrained('./question_model'/{EPOCH})
-        model.context_encoder.save_pretrained('./context_model'/{EPOCH})
-
-
-
-
+        save_path_que = args.save_dir+'/question_model_'+EPOCH
+        save_path_con = args.save_dir+'/context_model_'+EPOCH
+        model.question_encoder.save_pretrained(save_path_que)
+        model.context_encoder.save_pretrained(save_path_con)
 
 """if (global_step % save_steps == 0):
                     state = model.state_dict()
@@ -246,7 +233,5 @@ def train():
 
 if __name__ == '__main__':
     train()
-
-
 
 

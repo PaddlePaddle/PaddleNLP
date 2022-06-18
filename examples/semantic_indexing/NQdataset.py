@@ -7,7 +7,6 @@ from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 import collections
 from typing import Dict, List, Tuple
 import numpy as np
-BertTokenizer.pad_token_type_id
 
 BiEncoderPassage = collections.namedtuple("BiEncoderPassage", ["text", "title"])
 
@@ -50,8 +49,9 @@ class NQdataSetForDPR(Dataset):
         self.tokenizer = BertTokenizer
         self.query_special_suffix = query_special_suffix
         self.new_data = []
-        for i in range(0, self.lens()):
+        for i in range(0, self.__len__()):
             self.new_data.append(self.__getitem__(i))
+
     def _read_json_data(self,dataPath):
         results = []
         with open(dataPath, "r", encoding="utf-8") as f:
@@ -188,7 +188,7 @@ class DataUtil():
 
 
 class BertTensorizer():
-    def __init__(self,max_length:int,pad_to_max=True):
+    def __init__(self,pad_to_max=True,max_length=256):
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.max_length = max_length
         self.pad_to_max = pad_to_max
@@ -196,33 +196,30 @@ class BertTensorizer():
     def text_to_tensor(self,
                        text:str,
                        title=None,
-                       add_special_tokens=True,
-                       apply_max_len=True):
+                       ):
         text = text.strip()
 
         if title:
             token_ids = self.tokenizer.encode(
-                title,
-                text_pair=text,
-                add_special_tokens=add_special_tokens,
-                max_seq_len=self.max_length if apply_max_len else 10000,
+                text,
+                text_pair=title,
+                max_seq_len=self.max_length,
                 pad_to_max_seq_len=False,
-                truncation_strategy=True,
-            )
+                truncation_strategy="longest_first",
+            )["input_ids"]
         else:
             token_ids = self.tokenizer.encode(
                 text,
-                add_special_tokens=add_special_tokens,
-                max_seq_len=self.max_length if apply_max_len else 10000,
+                max_seq_len=self.max_length,
                 pad_to_max_seq_len=False,
-                truncation_strategy=True,
-            )
+                truncation_strategy="longest_first",
+            )["input_ids"]
 
         seq_len = self.max_length
         if self.pad_to_max and len(token_ids) < seq_len:
             token_ids = token_ids + [self.tokenizer.pad_token_type_id] * (seq_len - len(token_ids))
         if len(token_ids) >= seq_len:
-            token_ids = token_ids[0:seq_len] if apply_max_len else token_ids
-            token_ids[-1] = self.tokenizer.pad_token_type_id
+            token_ids = token_ids[0:seq_len]
+            token_ids[-1] = 102
 
         return paddle.to_tensor(token_ids)

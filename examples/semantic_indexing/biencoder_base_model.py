@@ -3,7 +3,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 class BiEncoder(nn.Layer):
-    def __init__(self,question_encoder,context_encoder,dropout,output_emb_size = 768,state=None):
+    def __init__(self,question_encoder,context_encoder,state=None):
         super(BiEncoder, self).__init__()
         self.state = state
         if self.state == None:
@@ -13,10 +13,7 @@ class BiEncoder(nn.Layer):
             self.question_encoder = question_encoder
         elif self.state == "FORCONTEXT":
             self.context_encoder = context_encoder
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-        self.emb_reduce_linear = paddle.nn.Linear(
-            768, output_emb_size, weight_attr=weight_attr)
+
 
     def get_question_pooled_embedding(self,
                              input_ids,
@@ -66,11 +63,13 @@ class BiEncoderNllLoss(object):
              ctx_vectors,
              positive_idx_per_question,
              loss_scale=None):
-        scorces = paddle.matmul(q_vectors,paddle.transpose(ctx_vectors,[0,1]))
 
-        if len(q_vectors.size()) > 1:
-            q_num = q_vectors.size(0)
-            scores = scorces.view(q_num, -1)
+        scorces = paddle.matmul(q_vectors,paddle.transpose(ctx_vectors,[1,0]))
+
+
+        #if len(q_vectors.shape()) > 1:
+        q_num = q_vectors.shape[0]
+        scores = scorces.reshape([q_num, -1])
 
         softmax_scorces = F.log_softmax(scores,axis=1)
 
