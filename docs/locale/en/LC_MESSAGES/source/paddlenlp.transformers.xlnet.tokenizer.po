@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base Class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
 msgid ""

@@ -324,7 +324,7 @@ msgstr "return_visual：Whether to return the visualisable result of dependency 
 
 #: ../model_zoo/taskflow.md:756
 msgid "信息抽取"
-msgstr "Information Sxtraction"
+msgstr "Information Extraction"
 
 #: ../model_zoo/taskflow.md:759
 msgid "开放域信息抽取是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。"
