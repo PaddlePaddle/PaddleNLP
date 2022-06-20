@@ -1,10 +1,10 @@
 model_item=gpt3
-dp_degree=2
+dp_degree=4
 mp_degree=8
-pp_degree=2
+pp_degree=1
 bs_item=16
 fp_item=fp16
-run_mode=DP2-MP8-PP2
+run_mode=DP4-MP8-PP1
 device_num=N4C32
 
 model=gpt
