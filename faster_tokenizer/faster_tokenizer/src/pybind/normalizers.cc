@@ -346,9 +346,9 @@ void BindNormalizers(pybind11::module* m) {
   py::class_<normalizers::SequenceNormalizer, PySequenceNormalizer>(
       submodule, "SequenceNormalizer")
       .def(
-          "__init__",
-          [](normalizers::SequenceNormalizer& self, const py::list& py_list) {
+          py::init([](const py::list& py_list) {
             normalizers::Normalizer* normalizer_ptr;
+            std::vector<normalizers::Normalizer*> normalizers;
             for (py::handle py_normalizer : py_list) {
               if (pybind11::type::of(py_normalizer)
                       .is(py::type::of<normalizers::LowercaseNormalizer>())) {
@@ -399,9 +399,10 @@ void BindNormalizers(pybind11::module* m) {
                 normalizer_ptr =
                     py_normalizer.cast<normalizers::StripNormalizer*>();
               }
-              self.AppendNormalizer(normalizer_ptr);
+              normalizers.push_back(normalizer_ptr);
             }
-          },
+            return normalizers::SequenceNormalizer(normalizers);
+          }),
           py::arg("normalizers"))
       .def("normalize_str",
            [](const normalizers::SequenceNormalizer& self,
