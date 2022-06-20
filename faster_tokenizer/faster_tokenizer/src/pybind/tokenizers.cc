@@ -137,6 +137,11 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
                  py::type::of<pretokenizers::Whitespace>())) {
     const auto& pretokenizer = py_obj.cast<const pretokenizers::Whitespace&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<pretokenizers::MetaSpacePreTokenizer>())) {
+    const auto& pretokenizer =
+        py_obj.cast<const pretokenizers::MetaSpacePreTokenizer&>();
+    self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePreTokenizer();
   } else {
@@ -166,6 +171,9 @@ static int TokenizerPropertiesSetModel(TokenizerObject* self,
   } else if (pybind11::type::of(py_obj).is(
                  py::type::of<models::FasterWordPiece>())) {
     const auto& model = py_obj.cast<const models::FasterWordPiece&>();
+    self->tokenizer.SetModel(model);
+  } else if (pybind11::type::of(py_obj).is(py::type::of<models::BPE>())) {
+    const auto& model = py_obj.cast<const models::BPE&>();
     self->tokenizer.SetModel(model);
   } else {
     ret = 1;
@@ -378,6 +386,9 @@ int TokenizerInit(PyObject* self, PyObject* args, PyObject* kwargs) {
     } else if (pybind11::type::of(py_obj).is(
                    py::type::of<models::FasterWordPiece>())) {
       const auto& model = py_obj.cast<const models::FasterWordPiece&>();
+      py_tokenizer_ptr->tokenizer.SetModel(model);
+    } else if (pybind11::type::of(py_obj).is(py::type::of<models::BPE>())) {
+      const auto& model = py_obj.cast<const models::BPE&>();
       py_tokenizer_ptr->tokenizer.SetModel(model);
     } else {
       std::ostringstream oss;

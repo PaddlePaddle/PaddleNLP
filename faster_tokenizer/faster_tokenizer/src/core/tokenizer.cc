@@ -497,6 +497,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
         typeid(pretokenizers::BertPreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::BertPreTokenizer*>(
           tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::MetaSpacePreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::MetaSpacePreTokenizer*>(
+          tokenizer.pretokenizer_.get());
     }
   }
 
@@ -508,6 +512,8 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(models::FasterWordPiece)) {
       j["model"] =
           *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::BPE)) {
+      j["model"] = *dynamic_cast<models::BPE*>(tokenizer.model_.get());
     }
   }
 
@@ -592,6 +598,9 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
       if (pretokenizer.at("type") == "BertPreTokenizer") {
         pretokenizers::BertPreTokenizer bert_pretokenizer;
         tokenizer.SetPreTokenizer(bert_pretokenizer);
+      } else if (pretokenizer.at("type") == "MetaSpacePreTokenizer") {
+        pretokenizers::MetaSpacePreTokenizer meta_pretokenizer;
+        tokenizer.SetPreTokenizer(meta_pretokenizer);
       }
     }
 
@@ -606,6 +615,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         models::FasterWordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);
+      } else if (model.at("type") == "BPE") {
+        models::BPE bpe;
+        model.get_to(bpe);
+        tokenizer.SetModel(bpe);
       }
     }
 

@@ -17,16 +17,15 @@
 #include <unordered_map>
 #include <vector>
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include "utils/shared_mutex.h"
 
 namespace tokenizers {
 namespace utils {
 
 static size_t DEFAULT_CACHE_CAPACITY = 10000;
-typedef boost::shared_mutex RWLock;
-typedef boost::unique_lock<RWLock> WLock;
-typedef boost::shared_lock<RWLock> RLock;
+typedef utils::shared_mutex RWLock;
+typedef std::unique_lock<RWLock> WLock;
+typedef utils::shared_lock<RWLock> RLock;
 
 template <typename K, typename V>
 struct Cache {
@@ -34,6 +33,19 @@ struct Cache {
   size_t capacity_;
   Cache(size_t capacity = DEFAULT_CACHE_CAPACITY) : capacity_(capacity) {
     Fresh();
+  }
+
+  Cache(const Cache& other) {
+    RLock guard(cache_mutex_);
+    map_ = other.map_;
+    capacity_ = other.capacity_;
+  }
+
+  Cache& operator=(const Cache& other) {
+    RLock guard(cache_mutex_);
+    map_ = other.map_;
+    capacity_ = other.capacity_;
+    return *this;
   }
 
   void Fresh() { CreateCacheMap(capacity_); }
