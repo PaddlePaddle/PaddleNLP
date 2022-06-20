@@ -155,6 +155,35 @@ class PretrainedModel(Layer, GenerationMixin):
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
 
+    def get_extended_attention_mask_for_decoder(self, attention_mask,
+                                                input_shape):
+        batch_size, seq_length = input_shape
+        causal_mask = paddle.tril(
+            paddle.ones([batch_size, seq_length, seq_length]))
+        causal_mask = causal_mask.astype(attention_mask.dtype)
+
+        # Padding mask of dimensions [batch_size, seq_length + past_key_values_length]
+        assert attention_mask.ndim == 2, "Decoder attention mask is only allowed to be 2-dim, " \
+                                         "but you provided a decoder attention mask of dim {}".format(
+            attention_mask.ndim)
+
+        if causal_mask.shape[1] < attention_mask.shape[1]:
+            prefix_seq_len = attention_mask.shape[1] - causal_mask.shape[1]
+            causal_mask = paddle.concat(
+                [
+                    paddle.ones([seq_length, prefix_seq_len],
+                                dtype=causal_mask.dtype),
+                    causal_mask,
+                ],
+                axis=-1,
+            )
+
+        extended_attention_mask = causal_mask.unsqueeze(
+            axis=[0, 1]) * attention_mask.unsqueeze(axis=[1, 2])
+        extended_attention_mask = extended_attention_mask.astype(self.dtype())
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        return extended_attention_mask
+
     def get_extended_attention_mask(self, attention_mask):
         """
         Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
@@ -166,19 +195,15 @@ class PretrainedModel(Layer, GenerationMixin):
         Returns:
             Tensor: The extended attention mask, with a the same dtype as `attention_mask.dtype`.
         """
-
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
-        # ourselves in which case we just need to make it broadcastable to all heads.
+        # [batch_size, from_seq_length, to_seq_length]
         if attention_mask.ndim == 3:
             attention_mask = attention_mask.unsqueeze(axis=1)
-        # Provided a padding mask of dimensions [batch_size, seq_length]
-        # Todo yingyibiao
-        # - if the model is a decoder, apply a causal mask in addition to the padding mask
-        # - if the model is an encoder, make the mask broadcastable to
-        # [batch_size, num_heads, seq_length, seq_length]
+        # Padding mask of dimensions [batch_size, seq_length]
         elif attention_mask.ndim == 2:
             attention_mask = attention_mask.unsqueeze(axis=[1, 2])
-
+        else:
+            assert attention_mask.ndim == 4, "Attention masks are only allowed to be either 2-dim, 3-dim or 4-dim, " \
+                                             "but you provided an attention mask of dim {}".format(attention_mask.ndim)
         extended_attention_mask = attention_mask.astype(self.dtype())
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         return extended_attention_mask
