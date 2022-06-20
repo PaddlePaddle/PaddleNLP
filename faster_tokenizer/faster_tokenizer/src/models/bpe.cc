@@ -63,7 +63,14 @@ void BPE::Init(const core::Merges& merges) {
 
   // construct unk
   if (unk_token_.size() > 0) {
-    unk_token_id_.emplace_back(vocab_.at(unk_token_.front()));
+    try {
+      unk_token_id_.emplace_back(vocab_.at(unk_token_.front()));
+    } catch (...) {
+      std::ostringstream oss;
+      oss << "Unk token `" << unk_token_.front()
+          << "` not found in the vocabulary";
+      throw std::runtime_error(oss.str());
+    }
   }
 }
 
@@ -168,7 +175,7 @@ void BPE::MergeWord(const std::string& word, core::BPEWord* bpe_word) {
       auto id = vocab_.at(curr_str);
       bpe_word->Add(id, content_char_width);
     } else {
-      if (unk_token_.size() > 0) {
+      if (unk_token_id_.size() > 0) {
         if (unk.size() == 0) {
           unk.push_back({unk_token_id_.front(), content_char_width});
         } else {
