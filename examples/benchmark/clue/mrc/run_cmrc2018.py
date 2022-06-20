@@ -509,9 +509,9 @@ def run(args):
                                (time.time() - tic_train)))
                         tic_train = time.time()
                     if global_step >= num_training_steps:
-                        logger.info("best_result: %.2f/%.2f" %
-                                    (best_res[0], best_res[1]))
-                        return
+                        break
+            if global_step > num_training_steps:
+                break
             em, f1 = evaluate(model, dev_examples, dev_ds, dev_data_loader,
                               args)
             if paddle.distributed.get_rank() == 0 and em > best_res[0]:
@@ -525,6 +525,8 @@ def run(args):
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
+            if global_step >= num_training_steps:
+                break
         logger.info("best_result: %.2f/%.2f" % (best_res[0], best_res[1]))
 
     if args.do_predict and rank == 0:
