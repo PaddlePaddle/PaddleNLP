@@ -28,8 +28,6 @@ from paddlenlp.utils.log import logger
 
 sys.path.append('.')
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
-
 from data import convert_example
 
 # yapf: disable
@@ -76,8 +74,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
+        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
