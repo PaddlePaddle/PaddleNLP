@@ -13,8 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #include <Python.h>
 
+#include "glog/logging.h"
 #include "models/models.h"
 #include "pybind/models.h"
+#include "pybind/utils.h"
 
 namespace py = pybind11;
 
@@ -136,6 +138,38 @@ class PyFasterWordPiece : public models::FasterWordPiece {
   }
 };
 
+class PyBPE : public models::BPE {
+  using BPE::BPE;
+  virtual std::vector<core::Token> Tokenize(
+      const std::string& tokens) override {
+    PYBIND11_OVERLOAD_NAME(
+        std::vector<core::Token>, BPE, "tokenize", Tokenize, tokens);
+  }
+
+  virtual bool TokenToId(const std::string& token, uint* id) const override {
+    PYBIND11_OVERLOAD_NAME(bool, BPE, "token_to_id", TokenToId, token, id);
+  }
+
+  virtual bool IdToToken(uint id, std::string* token) const override {
+    PYBIND11_OVERLOAD_NAME(bool, BPE, "id_to_token", IdToToken, id, token);
+  }
+
+  virtual core::Vocab GetVocab() const override {
+    PYBIND11_OVERLOAD_NAME(core::Vocab, BPE, "get_vocab", GetVocab);
+  }
+
+  virtual size_t GetVocabSize() const override {
+    PYBIND11_OVERLOAD_NAME(size_t, BPE, "get_vocab_size", GetVocabSize);
+  }
+
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override {
+    PYBIND11_OVERLOAD_NAME(
+        std::vector<std::string>, BPE, "save", Save, folder, filename_prefix);
+  }
+};
+
 void BindModels(pybind11::module* m) {
   auto submodule = m->def_submodule("models", "The models module");
   py::class_<models::Model, PyModel>(submodule, "Model")
@@ -220,6 +254,151 @@ void BindModels(pybind11::module* m) {
            },
            py::arg("folder"),
            py::arg("prefix") = py::none());
+  py::class_<models::BPE, PyBPE>(submodule, "BPE")
+      .def(py::init([](const py::object& py_vocab,
+                       const py::object& py_merges,
+                       const py::object& py_cache_capacity,
+                       const py::object& py_dropout,
+                       const py::object& py_unk_token,
+                       const py::object& py_continuing_subword_prefix,
+                       const py::object& py_end_of_word_suffix,
+                       const py::object& py_fuse_unk) {
+             core::Vocab vocab;
+             if (!py_vocab.is(py::none())) {
+               vocab = py_vocab.cast<core::Vocab>();
+             }
+
+             core::Merges merges;
+             if (!py_merges.is(py::none())) {
+               merges = py_merges.cast<core::Merges>();
+             }
+
+             size_t cache_capacity = utils::DEFAULT_CACHE_CAPACITY;
+             if (!py_cache_capacity.is(py::none())) {
+               cache_capacity = py_cache_capacity.cast<size_t>();
+             }
+
+             std::vector<float> dropout;
+             if (!py_dropout.is(py::none())) {
+               dropout.emplace_back(py_dropout.cast<float>());
+             }
+
+             std::vector<std::string> unk_token;
+             if (!py_unk_token.is(py::none())) {
+               unk_token.emplace_back(py_unk_token.cast<std::string>());
+             }
+
+             std::vector<std::string> continuing_subword_prefix;
+             if (!py_continuing_subword_prefix.is(py::none())) {
+               continuing_subword_prefix.emplace_back(
+                   py_continuing_subword_prefix.cast<std::string>());
+             }
+
+             std::vector<std::string> end_of_word_suffix;
+             if (!py_end_of_word_suffix.is(py::none())) {
+               end_of_word_suffix.emplace_back(
+                   py_end_of_word_suffix.cast<std::string>());
+             }
+
+             bool fuse_unk = false;
+             if (!py_fuse_unk.is(py::none())) {
+               fuse_unk = py_fuse_unk.cast<bool>();
+             }
+             models::BPE self(vocab,
+                              merges,
+                              cache_capacity,
+                              dropout,
+                              unk_token,
+                              continuing_subword_prefix,
+                              end_of_word_suffix,
+                              fuse_unk);
+             return self;
+           }),
+           py::arg("vocab") = py::none(),
+           py::arg("merges") = py::none(),
+           py::arg("cache_capacity") = py::none(),
+           py::arg("dropout") = py::none(),
+           py::arg("unk_token") = py::none(),
+           py::arg("continuing_subword_prefix") = py::none(),
+           py::arg("end_of_word_suffix") = py::none(),
+           py::arg("fuse_unk") = py::none())
+      .def("tokenize", &models::BPE::Tokenize)
+      .def("token_to_id", &models::BPE::TokenToId)
+      .def("id_to_token", &models::BPE::IdToToken)
+      .def("get_vocab", &models::BPE::GetVocab)
+      .def("get_vocab_size", &models::BPE::GetVocabSize)
+      .def_static(
+          "read_file",
+          [](const std::string& vocab_path, const std::string& merges_path) {
+            core::Vocab vocab;
+            core::Merges merges;
+            models::BPE::GetVocabAndMergesFromFile(
+                vocab_path, merges_path, &vocab, &merges);
+            return py::make_tuple(vocab, merges);
+          },
+          py::arg("vocab"),
+          py::arg("merges"))
+      .def_static(
+          "from_file",
+          [](const std::string& vocab_path,
+             const std::string& merges_path,
+             const py::kwargs& kwargs) {
+            core::Vocab vocab;
+            core::Merges merges;
+            models::BPE::GetVocabAndMergesFromFile(
+                vocab_path, merges_path, &vocab, &merges);
+            VLOG(6) << "In BPE from_file:";
+            size_t cache_capacity = utils::DEFAULT_CACHE_CAPACITY;
+            if (kwargs.contains("cache_capacity")) {
+              cache_capacity = kwargs["cache_capacity"].cast<size_t>();
+              VLOG(6) << "cache_capacity = " << cache_capacity;
+            }
+            std::vector<float> dropout;
+            if (kwargs.contains("dropout")) {
+              dropout.emplace_back(kwargs["dropout"].cast<float>());
+              VLOG(6) << "dropout = " << kwargs["dropout"].cast<float>();
+            }
+
+            std::vector<std::string> unk_token;
+            if (kwargs.contains("unk_token")) {
+              unk_token.emplace_back(kwargs["unk_token"].cast<std::string>());
+              VLOG(6) << "unk_token = "
+                      << kwargs["unk_token"].cast<std::string>();
+            }
+
+            std::vector<std::string> continuing_subword_prefix;
+            if (kwargs.contains("continuing_subword_prefix")) {
+              continuing_subword_prefix.emplace_back(
+                  kwargs["continuing_subword_prefix"].cast<std::string>());
+              VLOG(6)
+                  << "continuing_subword_prefix = "
+                  << kwargs["continuing_subword_prefix"].cast<std::string>();
+            }
+
+            std::vector<std::string> end_of_word_suffix;
+            if (kwargs.contains("end_of_word_suffix")) {
+              end_of_word_suffix.emplace_back(
+                  kwargs["end_of_word_suffix"].cast<std::string>());
+              VLOG(6) << "end_of_word_suffix = "
+                      << kwargs["end_of_word_suffix"].cast<std::string>();
+            }
+
+            bool fuse_unk = false;
+            if (kwargs.contains("fuse_unk")) {
+              fuse_unk = kwargs["fuse_unk"].cast<bool>();
+              VLOG(6) << "fuse_unk = " << kwargs["fuse_unk"].cast<bool>();
+            }
+            return models::BPE(vocab,
+                               merges,
+                               cache_capacity,
+                               dropout,
+                               unk_token,
+                               continuing_subword_prefix,
+                               end_of_word_suffix,
+                               fuse_unk);
+          },
+          py::arg("vocab"),
+          py::arg("merges"));
 }
 }  // pybind
 }  // tokenizers
