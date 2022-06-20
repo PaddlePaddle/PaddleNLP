@@ -24,19 +24,20 @@ from paddlenlp.transformers import BertTokenizer
 
 from text2sql.dataproc.dusql_dataset_v2 import load_tables
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(levelname)s: %(asctime)s %(filename)s'
-    ' [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
-    datefmt='%m-%d %H:%M:%S',
-    filename=None,
-    filemode='a')
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(levelname)s: %(asctime)s %(filename)s'
+                    ' [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
+                    datefmt='%m-%d %H:%M:%S',
+                    filename=None,
+                    filemode='a')
 
 g_date_patt = re.compile(
-    r'(([0-9]{2})[0-9]{2}年)?[0-9]{1,2}月[0-9]{2}日|([0-9]{2})[0-9]{2}年[0-9]{1,2}月')
+    r'(([0-9]{2})[0-9]{2}年)?[0-9]{1,2}月[0-9]{2}日|([0-9]{2})[0-9]{2}年[0-9]{1,2}月'
+)
 
 
 def get_char_list(sentence):
+
     def is_ascii(s):
         """check if s is English album or number
         Args:
@@ -189,8 +190,8 @@ def search_values(query, db, extra_values):
                 candi_cnt[str(gval)] += 2.0
 
         lst_match_values.append(
-            list(sorted(
-                candi_cnt.items(), key=lambda x: x[1], reverse=True))[:10])
+            list(sorted(candi_cnt.items(), key=lambda x: x[1],
+                        reverse=True))[:10])
 
     return lst_match_values
 
@@ -200,29 +201,32 @@ if __name__ == "__main__":
     try:
         arg_parser = argparse.ArgumentParser(
             description="linking candidate values for each column")
-        arg_parser.add_argument(
-            "input",
-            nargs="?",
-            type=argparse.FileType('r'),
-            default=sys.stdin,
-            help="input file path")
-        arg_parser.add_argument(
-            "-s", "--db-schema", required=True, help="file path")
-        arg_parser.add_argument(
-            "-c", "--db-content", required=True, help="file path")
-        arg_parser.add_argument(
-            "-o",
-            "--output",
-            type=argparse.FileType('w'),
-            default=sys.stdout,
-            help="output file path")
-        arg_parser.add_argument(
-            '-t', '--is-train', default=False, action="store_true")
-        arg_parser.add_argument(
-            '-f',
-            '--sql-format',
-            default='dusql',
-            choices=['dusql', 'nl2sql', 'cspider'])
+        arg_parser.add_argument("input",
+                                nargs="?",
+                                type=argparse.FileType('r'),
+                                default=sys.stdin,
+                                help="input file path")
+        arg_parser.add_argument("-s",
+                                "--db-schema",
+                                required=True,
+                                help="file path")
+        arg_parser.add_argument("-c",
+                                "--db-content",
+                                required=True,
+                                help="file path")
+        arg_parser.add_argument("-o",
+                                "--output",
+                                type=argparse.FileType('w'),
+                                default=sys.stdout,
+                                help="output file path")
+        arg_parser.add_argument('-t',
+                                '--is-train',
+                                default=False,
+                                action="store_true")
+        arg_parser.add_argument('-f',
+                                '--sql-format',
+                                default='dusql',
+                                choices=['dusql', 'nl2sql', 'cspider'])
         args = arg_parser.parse_args()
 
         sys.stderr.write('>>> loading databases...\n')

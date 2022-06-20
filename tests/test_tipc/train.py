@@ -47,8 +47,8 @@ def do_train(args):
     # Define data loader
     train_loader, eval_loader = benchmark_model.create_data_loader(args)
 
-    if args.max_steps is None or (args.max_steps is not None and
-                                  args.max_steps < 0):
+    if args.max_steps is None or (args.max_steps is not None
+                                  and args.max_steps < 0):
         args.max_steps = len(train_loader) * args.epoch
 
     # Define model
@@ -64,10 +64,11 @@ def do_train(args):
 
     # for amp training
     if args.use_amp:
-        scaler = paddle.amp.GradScaler(
-            enable=True, init_loss_scaling=args.scale_loss)
-        model = paddle.amp.decorate(
-            models=model, level=args.amp_level, save_dtype='float32')
+        scaler = paddle.amp.GradScaler(enable=True,
+                                       init_loss_scaling=args.scale_loss)
+        model = paddle.amp.decorate(models=model,
+                                    level=args.amp_level,
+                                    save_dtype='float32')
 
     # for distributed training
     if trainer_count > 1:
@@ -107,8 +108,8 @@ def do_train(args):
                 else:
                     optimizer.clear_grad()
             else:
-                loss, sample_per_cards = benchmark_model.forward(model, args,
-                                                                 input_data)
+                loss, sample_per_cards = benchmark_model.forward(
+                    model, args, input_data)
 
                 loss.backward()
 
@@ -188,12 +189,11 @@ def do_hapi(args):
 
     optimizer = benchmark_optimizer.build_optimizer(args, lr, model)
 
-    benchmark_model.forward(
-        model,
-        args,
-        optimizer=optimizer,
-        train_loader=train_loader,
-        eval_loader=eval_loader)
+    benchmark_model.forward(model,
+                            args,
+                            optimizer=optimizer,
+                            train_loader=train_loader,
+                            eval_loader=eval_loader)
 
 
 if __name__ == '__main__':

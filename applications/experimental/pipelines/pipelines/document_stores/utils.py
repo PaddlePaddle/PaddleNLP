@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 
 def eval_data_from_json(
         filename: str,
-        max_docs: Union[int, bool]=None,
-        preprocessor: PreProcessor=None,
-        open_domain: bool=False) -> Tuple[List[Document], List[Label]]:
+        max_docs: Union[int, bool] = None,
+        preprocessor: PreProcessor = None,
+        open_domain: bool = False) -> Tuple[List[Document], List[Label]]:
     """
     Read Documents + Labels from a SQuAD-style file.
     Document and Labels can then be indexed to the DocumentStore and be used for evaluation.
@@ -75,12 +75,12 @@ def eval_data_from_json(
 
 
 def eval_data_from_jsonl(
-        filename: str,
-        batch_size: Optional[int]=None,
-        max_docs: Union[int, bool]=None,
-        preprocessor: PreProcessor=None,
-        open_domain: bool=False, ) -> Generator[Tuple[List[Document], List[
-            Label]], None, None]:
+    filename: str,
+    batch_size: Optional[int] = None,
+    max_docs: Union[int, bool] = None,
+    preprocessor: PreProcessor = None,
+    open_domain: bool = False,
+) -> Generator[Tuple[List[Document], List[Label]], None, None]:
     """
     Read Documents + Labels from a SQuAD-style file in jsonl format, i.e. one document per line.
     Document and Labels can then be indexed to the DocumentStore and be used for evaluation.
@@ -126,8 +126,8 @@ def eval_data_from_jsonl(
 
 
 def _extract_docs_and_labels_from_dict(document_dict: Dict,
-                                       preprocessor: PreProcessor=None,
-                                       open_domain: bool=False):
+                                       preprocessor: PreProcessor = None,
+                                       open_domain: bool = False):
     """
     Set open_domain to True if you are trying to load open_domain labels (i.e. labels without doc id or start idx)
     """
@@ -193,17 +193,20 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                         # cur_id = '0'
                         label = Label(
                             query=qa["question"],
-                            answer=Answer(
-                                answer=ans, type="extractive", score=0.0),
+                            answer=Answer(answer=ans,
+                                          type="extractive",
+                                          score=0.0),
                             document=None,  # type: ignore
                             is_correct_answer=True,
                             is_correct_document=True,
                             no_answer=qa.get("is_impossible", False),
-                            origin="gold-label", )
+                            origin="gold-label",
+                        )
                         labels.append(label)
                     else:
-                        ans_position = cur_full_doc.content[answer[
-                            "answer_start"]:answer["answer_start"] + len(ans)]
+                        ans_position = cur_full_doc.content[
+                            answer["answer_start"]:answer["answer_start"] +
+                            len(ans)]
                         if ans != ans_position:
                             # do not use answer
                             problematic_ids.append(qa.get("id", "missing"))
@@ -223,13 +226,11 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                                              len(s.content))):
                                     cur_doc = s
                                     cur_ans_start = answer[
-                                        "answer_start"] - s.meta[
-                                            "_split_offset"]
+                                        "answer_start"] - s.meta["_split_offset"]
                                     # If a document is splitting an answer we add the whole answer text to the document
                                     if s.content[cur_ans_start:cur_ans_start +
                                                  len(ans)] != ans:
-                                        s.content = s.content[:
-                                                              cur_ans_start] + ans
+                                        s.content = s.content[:cur_ans_start] + ans
                                     break
                         cur_answer = Answer(
                             answer=ans,
@@ -237,16 +238,15 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                             score=0.0,
                             context=cur_doc.content,
                             offsets_in_document=[
-                                Span(
-                                    start=cur_ans_start,
-                                    end=cur_ans_start + len(ans))
+                                Span(start=cur_ans_start,
+                                     end=cur_ans_start + len(ans))
                             ],
                             offsets_in_context=[
-                                Span(
-                                    start=cur_ans_start,
-                                    end=cur_ans_start + len(ans))
+                                Span(start=cur_ans_start,
+                                     end=cur_ans_start + len(ans))
                             ],
-                            document_id=cur_doc.id, )
+                            document_id=cur_doc.id,
+                        )
                         label = Label(
                             query=qa["question"],
                             answer=cur_answer,
@@ -254,7 +254,8 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                             is_correct_answer=True,
                             is_correct_document=True,
                             no_answer=qa.get("is_impossible", False),
-                            origin="gold-label", )
+                            origin="gold-label",
+                        )
                         labels.append(label)
             else:
                 # for no_answer we need to assign each split as not fitting to the question
@@ -265,15 +266,15 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                             answer="",
                             type="extractive",
                             score=0.0,
-                            offsets_in_document=[Span(
-                                start=0, end=0)],
-                            offsets_in_context=[Span(
-                                start=0, end=0)], ),
+                            offsets_in_document=[Span(start=0, end=0)],
+                            offsets_in_context=[Span(start=0, end=0)],
+                        ),
                         document=s,
                         is_correct_answer=True,
                         is_correct_document=True,
                         no_answer=qa.get("is_impossible", False),
-                        origin="gold-label", )
+                        origin="gold-label",
+                    )
 
                     labels.append(label)
 
@@ -301,28 +302,29 @@ def convert_date_to_rfc3339(date: str) -> str:
 
 
 def es_index_to_document_store(
-        document_store: "BaseDocumentStore",
-        original_index_name: str,
-        original_content_field: str,
-        original_name_field: Optional[str]=None,
-        included_metadata_fields: Optional[List[str]]=None,
-        excluded_metadata_fields: Optional[List[str]]=None,
-        store_original_ids: bool=True,
-        index: Optional[str]=None,
-        preprocessor: Optional[PreProcessor]=None,
-        batch_size: int=10_000,
-        host: Union[str, List[str]]="localhost",
-        port: Union[int, List[int]]=9200,
-        username: str="",
-        password: str="",
-        api_key_id: Optional[str]=None,
-        api_key: Optional[str]=None,
-        aws4auth=None,
-        scheme: str="http",
-        ca_certs: Optional[str]=None,
-        verify_certs: bool=True,
-        timeout: int=30,
-        use_system_proxy: bool=False, ) -> "BaseDocumentStore":
+    document_store: "BaseDocumentStore",
+    original_index_name: str,
+    original_content_field: str,
+    original_name_field: Optional[str] = None,
+    included_metadata_fields: Optional[List[str]] = None,
+    excluded_metadata_fields: Optional[List[str]] = None,
+    store_original_ids: bool = True,
+    index: Optional[str] = None,
+    preprocessor: Optional[PreProcessor] = None,
+    batch_size: int = 10_000,
+    host: Union[str, List[str]] = "localhost",
+    port: Union[int, List[int]] = 9200,
+    username: str = "",
+    password: str = "",
+    api_key_id: Optional[str] = None,
+    api_key: Optional[str] = None,
+    aws4auth=None,
+    scheme: str = "http",
+    ca_certs: Optional[str] = None,
+    verify_certs: bool = True,
+    timeout: int = 30,
+    use_system_proxy: bool = False,
+) -> "BaseDocumentStore":
     """
     This function provides brownfield support of existing Elasticsearch indexes by converting each of the records in
     the provided index to pipelines `Document` objects and writing them to the specified `DocumentStore`. It can be used
@@ -381,7 +383,8 @@ def es_index_to_document_store(
         ca_certs=ca_certs,
         verify_certs=verify_certs,
         timeout=timeout,
-        use_system_proxy=use_system_proxy, )
+        use_system_proxy=use_system_proxy,
+    )
 
     # Get existing original ES IDs inside DocumentStore in order to not reindex the corresponding records
     existing_ids = [
@@ -400,13 +403,12 @@ def es_index_to_document_store(
         }).convert_to_elasticsearch()
         query["query"]["bool"]["filter"] = filters
     records = scan(client=es_client, query=query, index=original_index_name)
-    number_of_records = es_client.count(
-        index=original_index_name, body=query)["count"]
+    number_of_records = es_client.count(index=original_index_name,
+                                        body=query)["count"]
     pipelines_documents: List[Dict] = []
     for idx, record in enumerate(
-            tqdm(
-                records, total=number_of_records,
-                desc="Converting ES Records")):
+            tqdm(records, total=number_of_records,
+                 desc="Converting ES Records")):
         # Write batch_size number of documents to pipelines DocumentStore
         if (idx + 1) % batch_size == 0:
             document_store.write_documents(pipelines_documents, index=index)

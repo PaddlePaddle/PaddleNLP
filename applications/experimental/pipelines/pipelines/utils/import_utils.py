@@ -29,8 +29,7 @@ def safe_import(import_path: str, classname: str, dep_group: str):
     return classs
 
 
-def _missing_dependency_stub_factory(classname: str,
-                                     dep_group: str,
+def _missing_dependency_stub_factory(classname: str, dep_group: str,
                                      import_error: Exception):
     """
     Create custom versions of MissingDependency using the given parameters.
@@ -38,6 +37,7 @@ def _missing_dependency_stub_factory(classname: str,
     """
 
     class MissingDependency:
+
         def __init__(self, *args, **kwargs):
             _optional_component_not_installed(classname, dep_group,
                                               import_error)
@@ -48,8 +48,7 @@ def _missing_dependency_stub_factory(classname: str,
     return MissingDependency
 
 
-def _optional_component_not_installed(component: str,
-                                      dep_group: str,
+def _optional_component_not_installed(component: str, dep_group: str,
                                       source_error: Exception):
     raise ImportError(
         f"Failed to import '{component}', "
@@ -61,7 +60,7 @@ def _optional_component_not_installed(component: str,
 
 def fetch_archive_from_http(url: str,
                             output_dir: str,
-                            proxies: Optional[dict]=None) -> bool:
+                            proxies: Optional[dict] = None) -> bool:
     """
     Fetch an archive (zip or tar.gz) from a url via http and extract content to an output directory.
 
@@ -91,8 +90,8 @@ def fetch_archive_from_http(url: str,
             zip_archive = zipfile.ZipFile(io.BytesIO(request_data.content))
             zip_archive.extractall(output_dir)
         elif archive_extension in ["gz", "bz2", "xz"]:
-            tar_archive = tarfile.open(
-                fileobj=io.BytesIO(request_data.content), mode="r|*")
+            tar_archive = tarfile.open(fileobj=io.BytesIO(request_data.content),
+                                       mode="r|*")
             tar_archive.extractall(output_dir)
         else:
             logger.warning(

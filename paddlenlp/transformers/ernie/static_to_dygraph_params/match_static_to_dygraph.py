@@ -41,7 +41,7 @@ def match_encoder_param(convert_parameter_name_dict,
                 convert_parameter_name_dict[dygraph_format_name.format(i, dygraph_proj_name, dygraph_param_name)] = \
                     static_format_name.format(i, static_proj_name, static_param_name)
 
-    # Secondly, converts the encoder ffn parameter.     
+    # Secondly, converts the encoder ffn parameter.
     dygraph_ffn_linear_format_name = "encoder.layers.{}.linear{}.{}"
     static_ffn_linear_format_name = static_para_prefix + "encoder_layer_{}_ffn_fc_{}.{}_0"
     for i in range(0, layer_num):

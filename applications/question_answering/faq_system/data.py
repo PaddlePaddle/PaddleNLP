@@ -37,17 +37,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
@@ -113,10 +114,9 @@ def convert_example_test(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -182,8 +182,8 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         if (actual_len > 5):
             dup_len = random.randint(a=0, b=max(2, int(dup_rate * actual_len)))
             # Skip cls and sep position
-            dup_word_index = random.sample(
-                list(range(1, actual_len - 1)), k=dup_len)
+            dup_word_index = random.sample(list(range(1, actual_len - 1)),
+                                           k=dup_len)
 
         r_input_id = []
         r_token_type_id = []
@@ -207,6 +207,6 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         repetitied_input_ids[batch_id] += [0] * pad_len
         repetitied_token_type_ids[batch_id] += [0] * pad_len
 
-    return paddle.to_tensor(
-        repetitied_input_ids, dtype='int64'), paddle.to_tensor(
-            repetitied_token_type_ids, dtype='int64')
+    return paddle.to_tensor(repetitied_input_ids,
+                            dtype='int64'), paddle.to_tensor(
+                                repetitied_token_type_ids, dtype='int64')

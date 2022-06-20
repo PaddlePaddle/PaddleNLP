@@ -35,37 +35,37 @@ parser = argparse.ArgumentParser()
 # Required parameters
 parser.add_argument("--gold", type=str, help="Gold output file.")
 parser.add_argument("--pred", type=str, help="Input prediction file.")
-parser.add_argument(
-    "--split", type=str, default="", help="Data split (train/dev/test).")
+parser.add_argument("--split",
+                    type=str,
+                    default="",
+                    help="Data split (train/dev/test).")
 parser.add_argument("--save_best", action='store_true', help="Save best epoch.")
-parser.add_argument(
-    "--only_eval_best", action='store_true', help="Only evaluate best epoch.")
-parser.add_argument(
-    "--trunc_len",
-    type=int,
-    default=0,
-    help="Truncate line by the maximum length.")
+parser.add_argument("--only_eval_best",
+                    action='store_true',
+                    help="Only evaluate best epoch.")
+parser.add_argument("--trunc_len",
+                    type=int,
+                    default=0,
+                    help="Truncate line by the maximum length.")
 default_process_count = max(1, cpu_count() - 1)
-parser.add_argument(
-    "--processes",
-    type=int,
-    default=default_process_count,
-    help="Number of processes to use (default %(default)s)")
-parser.add_argument(
-    "--perl", action='store_true', help="Using the perl script.")
-parser.add_argument(
-    '--lazy_eval',
-    action='store_true',
-    help="Skip evaluation if the .rouge file exists.")
+parser.add_argument("--processes",
+                    type=int,
+                    default=default_process_count,
+                    help="Number of processes to use (default %(default)s)")
+parser.add_argument("--perl",
+                    action='store_true',
+                    help="Using the perl script.")
+parser.add_argument('--lazy_eval',
+                    action='store_true',
+                    help="Skip evaluation if the .rouge file exists.")
 args = parser.parse_args()
 
 SPECIAL_TOKEN = ["[UNK]", "[PAD]", "[CLS]", "[MASK]"]
-evaluator = rouge.Rouge(
-    metrics=['rouge-n', 'rouge-l'],
-    max_n=2,
-    limit_length=False,
-    apply_avg=True,
-    weight_factor=1.2)
+evaluator = rouge.Rouge(metrics=['rouge-n', 'rouge-l'],
+                        max_n=2,
+                        limit_length=False,
+                        apply_avg=True,
+                        weight_factor=1.2)
 
 
 def test_rouge(cand, ref):
@@ -85,15 +85,13 @@ def test_rouge(cand, ref):
         for i in range(cnt):
             if len(references[i]) < 1:
                 continue
-            with open(
-                    tmp_dir + "/candidate/cand.{}.txt".format(i),
-                    "w",
-                    encoding="utf-8") as f:
+            with open(tmp_dir + "/candidate/cand.{}.txt".format(i),
+                      "w",
+                      encoding="utf-8") as f:
                 f.write(candidates[i])
-            with open(
-                    tmp_dir + "/reference/ref.{}.txt".format(i),
-                    "w",
-                    encoding="utf-8") as f:
+            with open(tmp_dir + "/reference/ref.{}.txt".format(i),
+                      "w",
+                      encoding="utf-8") as f:
                 f.write(references[i])
         r = Rouge155(temp_dir=temp_dir)
         r.model_dir = tmp_dir + "/reference/"
@@ -111,10 +109,12 @@ def test_rouge(cand, ref):
 
 def rouge_results_to_str(results_dict):
     return ">> ROUGE-F(1/2/l): {:.2f}/{:.2f}/{:.2f}\nROUGE-R(1/2/3/l): {:.2f}/{:.2f}/{:.2f}\n".format(
-        results_dict["rouge_1_f_score"] * 100, results_dict["rouge_2_f_score"] *
-        100, results_dict["rouge_l_f_score"] * 100,
-        results_dict["rouge_1_recall"] * 100, results_dict["rouge_2_recall"] *
-        100, results_dict["rouge_l_recall"] * 100)
+        results_dict["rouge_1_f_score"] * 100,
+        results_dict["rouge_2_f_score"] * 100,
+        results_dict["rouge_l_f_score"] * 100,
+        results_dict["rouge_1_recall"] * 100,
+        results_dict["rouge_2_recall"] * 100,
+        results_dict["rouge_l_recall"] * 100)
 
 
 def count_tokens(tokens):
@@ -205,9 +205,9 @@ def fix_tokenization(text):
                 i + 1] == "." and input_tokens[i + 2] == ".":
             output_tokens.append("...")
             i += 3
-        elif tok == "," and len(output_tokens) > 0 and _is_digit(output_tokens[
-                -1]) and i < len(input_tokens) - 1 and _is_digit(input_tokens[
-                    i + 1]):
+        elif tok == "," and len(output_tokens) > 0 and _is_digit(
+                output_tokens[-1]) and i < len(input_tokens) - 1 and _is_digit(
+                    input_tokens[i + 1]):
             # $ 3 , 000 -> $ 3,000
             output_tokens[-1] += ',' + input_tokens[i + 1]
             i += 2
@@ -216,11 +216,11 @@ def fix_tokenization(text):
             # 3 . 03 -> $ 3.03
             output_tokens[-1] += '.' + input_tokens[i + 1]
             i += 2
-        elif tok == "." and len(output_tokens) > 0 and len(output_tokens[
-                -1]) == 1 and output_tokens[-1].isupper() and i < len(
-                    input_tokens) - 2 and len(input_tokens[
-                        i + 1]) == 1 and input_tokens[i + 1].isupper(
-                        ) and input_tokens[i + 2] == '.':
+        elif tok == "." and len(output_tokens) > 0 and len(
+                output_tokens[-1]) == 1 and output_tokens[-1].isupper(
+                ) and i < len(input_tokens) - 2 and len(
+                    input_tokens[i + 1]) == 1 and input_tokens[
+                        i + 1].isupper() and input_tokens[i + 2] == '.':
             # U . N . -> U.N.
             k = i + 3
             while k + 2 < len(input_tokens):
@@ -246,8 +246,8 @@ def fix_tokenization(text):
             else:
                 output_tokens.append("-")
                 i += 1
-        elif prev_dash and len(output_tokens) > 0 and tok[
-                0] not in string.punctuation:
+        elif prev_dash and len(
+                output_tokens) > 0 and tok[0] not in string.punctuation:
             output_tokens[-1] += tok
             i += 1
         else:
@@ -342,9 +342,9 @@ def main():
             print(rouge_results_to_str(scores))
         else:
             rg2_dict[fn] = scores['rouge-2']['f']
-            print("ROUGE-1: {}\tROUGE-2: {}\tROUGE-L: {}\n".format(scores[
-                'rouge-1']['f'], scores['rouge-2']['f'], scores['rouge-l'][
-                    'f']))
+            print("ROUGE-1: {}\tROUGE-2: {}\tROUGE-L: {}\n".format(
+                scores['rouge-1']['f'], scores['rouge-2']['f'],
+                scores['rouge-l']['f']))
             with open(fn + ".rouge", 'w') as f_out:
                 f_out.write(
                     json.dumps({

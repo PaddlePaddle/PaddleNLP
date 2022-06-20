@@ -56,8 +56,8 @@ class Vocabulary:
 
         # Create sorted list of tokens, by their counts. Reverse so it is in order of
         # most frequent to least frequent.
-        sorted_type_counts = sorted(
-            sorted(type_counts.items()), key=operator.itemgetter(1))[::-1]
+        sorted_type_counts = sorted(sorted(type_counts.items()),
+                                    key=operator.itemgetter(1))[::-1]
 
         sorted_types = [
             typecount[0] for typecount in sorted_type_counts

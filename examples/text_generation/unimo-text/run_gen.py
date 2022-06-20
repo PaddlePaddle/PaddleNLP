@@ -104,10 +104,12 @@ def run(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds = load_dataset(
-        args.dataset_name, splits='train', data_files=args.train_file)
-    dev_ds = load_dataset(
-        args.dataset_name, splits='dev', data_files=args.predict_file)
+    train_ds = load_dataset(args.dataset_name,
+                            splits='train',
+                            data_files=args.train_file)
+    dev_ds = load_dataset(args.dataset_name,
+                          splits='dev',
+                          data_files=args.predict_file)
 
     train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
                                                      'train')
@@ -117,8 +119,9 @@ def run(args):
     if args.do_train:
         num_training_steps = args.epochs * len(train_data_loader)
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_propotion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps,
+                                             args.warmup_propotion)
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
 
@@ -127,15 +130,15 @@ def run(args):
             if not any(nd in n for nd in ["bias", "norm"])
         ]
 
-        optimizer = AdamW(
-            learning_rate=lr_scheduler,
-            parameters=model.parameters(),
-            weight_decay=args.weight_decay,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=args.epsilon,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm))
+        optimizer = AdamW(learning_rate=lr_scheduler,
+                          parameters=model.parameters(),
+                          weight_decay=args.weight_decay,
+                          beta1=args.beta1,
+                          beta2=args.beta2,
+                          epsilon=args.epsilon,
+                          apply_decay_param_fun=lambda x: x in decay_params,
+                          grad_clip=paddle.nn.ClipGradByGlobalNorm(
+                              args.max_grad_norm))
 
         step = 0
         total_time = 0.0

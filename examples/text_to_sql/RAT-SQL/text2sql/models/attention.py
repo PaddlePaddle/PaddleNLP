@@ -47,6 +47,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 
 class Attention(paddle.nn.Layer):
+
     def __init__(self, pointer):
         super().__init__()
         self.pointer = pointer
@@ -67,6 +68,7 @@ class Attention(paddle.nn.Layer):
 
 
 class ScaledDotProductPointer(paddle.nn.Layer):
+
     def __init__(self, query_size, key_size):
         super().__init__()
         self.query_proj = paddle.nn.Linear(query_size, key_size)
@@ -86,18 +88,22 @@ class ScaledDotProductPointer(paddle.nn.Layer):
 
 
 class ScaledDotProductAttention(Attention):
+
     def __init__(self, query_size, value_size):
         super().__init__(ScaledDotProductPointer(query_size, value_size))
 
 
 class BahdanauPointer(paddle.nn.Layer):
+
     def __init__(self, query_size, key_size, proj_size):
         super().__init__()
         self.compute_scores = paddle.nn.Sequential(
             paddle.nn.Linear(query_size + key_size, proj_size),
             paddle.nn.Tanh(), paddle.nn.Linear(proj_size, 1))
 
-    def forward(self, query: paddle.Tensor, keys: paddle.Tensor,
+    def forward(self,
+                query: paddle.Tensor,
+                keys: paddle.Tensor,
                 attn_mask=None):
         # query shape: batch x query_size
         # keys shape: batch x num keys x key_size
@@ -109,8 +115,7 @@ class BahdanauPointer(paddle.nn.Layer):
         # scores shape: batch x num keys x 1
         attn_logits = self.compute_scores(
             # shape: batch x num keys x query_size + key_size
-            paddle.concat(
-                (query_expanded, keys), axis=2))
+            paddle.concat((query_expanded, keys), axis=2))
         # scores shape: batch x num keys
         attn_logits = attn_logits.squeeze(2)
         maybe_mask(attn_logits, attn_mask)
@@ -118,12 +123,14 @@ class BahdanauPointer(paddle.nn.Layer):
 
 
 class BahdanauAttention(Attention):
+
     def __init__(self, query_size, value_size, proj_size):
         super().__init__(BahdanauPointer(query_size, value_size, proj_size))
 
 
 # Adapted from The Annotated Transformers
 class MultiHeadedAttention(paddle.nn.Layer):
+
     def __init__(self, h, query_size, value_size, dropout=0.1):
         super().__init__()
         assert query_size % h == 0
@@ -150,17 +157,20 @@ class MultiHeadedAttention(paddle.nn.Layer):
             attn_mask = attn_mask.unsqueeze(1)
         nbatches = query.shape[0]
 
-        # 1) Do all the linear projections in batch from d_model => h x d_k 
+        # 1) Do all the linear projections in batch from d_model => h x d_k
         query, keys, values = \
             [l(x).reshape([nbatches, -1, self.h, self.d_k]).transpose([0, 2, 1, 3])
              for l, x in zip(self.linears, (query, values, values))]
 
-        # 2) Apply attention on all the projected vectors in batch. 
+        # 2) Apply attention on all the projected vectors in batch.
         # x, self.attn = transformer.sparse_attention(
-        x, self.attn = attention(
-            query, keys, values, mask=attn_mask, dropout=self.dropout)
+        x, self.attn = attention(query,
+                                 keys,
+                                 values,
+                                 mask=attn_mask,
+                                 dropout=self.dropout)
 
-        # 3) "Concat" using a view and apply a final linear. 
+        # 3) "Concat" using a view and apply a final linear.
         x = x.transpose([0, 2, 1, 3]).reshape([nbatches, -1, self.h * self.d_k])
         x = x.squeeze(1)
         return self.linears[3](x), self.attn
@@ -175,8 +185,8 @@ if __name__ == "__main__":
     mha = MultiHeadedAttention(h=2, query_size=8, value_size=16)
 
     q = paddle.to_tensor(list(range(1, 9)), dtype='float32').reshape([1, 8])
-    v = paddle.to_tensor(
-        list(range(1, 17)), dtype='float32').reshape([1, 1, 16])
+    v = paddle.to_tensor(list(range(1, 17)),
+                         dtype='float32').reshape([1, 1, 16])
 
     print(sdpp(q, v))
     print(sdpa(q, v))

@@ -45,10 +45,10 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ])
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")

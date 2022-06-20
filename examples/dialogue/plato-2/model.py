@@ -76,6 +76,7 @@ def get_in_turn_repetition(pred, is_cn=False):
 
 
 class Plato2EncoderLayer(nn.Layer):
+
     def __init__(self, n_head, hidden_size, attn_dropout, act_dropout):
         super(Plato2EncoderLayer, self).__init__()
 
@@ -112,6 +113,7 @@ class Plato2EncoderLayer(nn.Layer):
 
 
 class Plato2Encoder(nn.Layer):
+
     def __init__(self, vocab_size, type_size, max_position_seq_len, num_layers,
                  n_head, hidden_size, attn_dropout, act_dropout):
         super(Plato2Encoder, self).__init__()
@@ -165,10 +167,12 @@ class Plato2Encoder(nn.Layer):
 
         # generate n-head self-attention mask
         self_attn_mask = input_mask
-        self_attn_mask = paddle.scale(
-            x=self_attn_mask, scale=1e4, bias=-1.0, bias_after_scale=False)
-        n_head_self_attn_mask = paddle.stack(
-            x=[self_attn_mask] * self.n_head, axis=1)
+        self_attn_mask = paddle.scale(x=self_attn_mask,
+                                      scale=1e4,
+                                      bias=-1.0,
+                                      bias_after_scale=False)
+        n_head_self_attn_mask = paddle.stack(x=[self_attn_mask] * self.n_head,
+                                             axis=1)
         n_head_self_attn_mask.stop_gradient = True
 
         return emb_out, n_head_self_attn_mask
@@ -182,6 +186,7 @@ class Plato2Encoder(nn.Layer):
 
 
 class NSP(nn.Layer):
+
     def __init__(self, vocab_size, type_size, max_position_seq_len, num_layers,
                  n_head, hidden_size, attn_dropout, act_dropout):
         super(NSP, self).__init__()
@@ -194,9 +199,10 @@ class NSP(nn.Layer):
         self.pos_embedding_layer = nn.Embedding(max_position_seq_len,
                                                 hidden_size)
 
-        encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size, n_head, hidden_size * 4, act_dropout, 'gelu',
-            attn_dropout, act_dropout, 'True')
+        encoder_layer = nn.TransformerEncoderLayer(hidden_size, n_head,
+                                                   hidden_size * 4, act_dropout,
+                                                   'gelu', attn_dropout,
+                                                   act_dropout, 'True')
         encoder_norm = nn.LayerNorm(hidden_size)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers,
                                              encoder_norm)
@@ -245,16 +251,19 @@ class NSP(nn.Layer):
 
         # generate n-head self-attention mask
         self_attn_mask = input_mask
-        self_attn_mask = paddle.scale(
-            x=self_attn_mask, scale=1e4, bias=-1.0, bias_after_scale=False)
-        n_head_self_attn_mask = paddle.stack(
-            x=[self_attn_mask] * self.n_head, axis=1)
+        self_attn_mask = paddle.scale(x=self_attn_mask,
+                                      scale=1e4,
+                                      bias=-1.0,
+                                      bias_after_scale=False)
+        n_head_self_attn_mask = paddle.stack(x=[self_attn_mask] * self.n_head,
+                                             axis=1)
         n_head_self_attn_mask.stop_gradient = True
 
         return emb_out, n_head_self_attn_mask
 
 
 class Plato2InferModel(nn.Layer):
+
     def __init__(self,
                  nsp_reader,
                  num_layers,
@@ -289,14 +298,16 @@ class Plato2InferModel(nn.Layer):
         self.latent_weight = paddle.create_parameter(
             [hidden_size, latent_type_size], 'float32')
 
-        self.plato2_encoder = Plato2Encoder(
-            vocab_size, type_size, max_position_seq_len, num_layers, n_head,
-            hidden_size, attn_dropout, act_dropout)
+        self.plato2_encoder = Plato2Encoder(vocab_size, type_size,
+                                            max_position_seq_len, num_layers,
+                                            n_head, hidden_size, attn_dropout,
+                                            act_dropout)
 
         self.logits_fc_layer = nn.Linear(hidden_size, hidden_size)
         self.logits_layer_norm = nn.LayerNorm(hidden_size)
-        self.logits_bias = paddle.create_parameter(
-            [vocab_size], 'float32', is_bias=True)
+        self.logits_bias = paddle.create_parameter([vocab_size],
+                                                   'float32',
+                                                   is_bias=True)
 
         self.nsp_predictor = NSP(vocab_size, type_size, max_position_seq_len,
                                  num_layers, n_head, hidden_size, attn_dropout,
@@ -317,14 +328,16 @@ class Plato2InferModel(nn.Layer):
         # [-1, 1, latent_type_size]
         latent_id = F.one_hot(latent_id, self.latent_type_size)
         # [-1, 1, hidden_size]
-        latent_emb = paddle.matmul(
-            latent_id, self.latent_weight, transpose_y=True)
+        latent_emb = paddle.matmul(latent_id,
+                                   self.latent_weight,
+                                   transpose_y=True)
 
         caches = self.plato2_encoder.gen_caches(token_ids)
 
         # [-1, seq_len + 1, hidden_size]
-        enc_out, new_caches = self.plato2_encoder(
-            caches, token_ids, type_ids, pos_ids, generation_mask, latent_emb)
+        enc_out, new_caches = self.plato2_encoder(caches, token_ids, type_ids,
+                                                  pos_ids, generation_mask,
+                                                  latent_emb)
 
         pred_ids = self.decode(inputs, new_caches)
 
@@ -344,13 +357,14 @@ class Plato2InferModel(nn.Layer):
         step = 0
         while step < self.max_dec_len:
             # [-1, 1]
-            append_mask = paddle.cast(
-                tgt_ids != self.eos_id, dtype=tgt_generation_mask.dtype)
+            append_mask = paddle.cast(tgt_ids != self.eos_id,
+                                      dtype=tgt_generation_mask.dtype)
             tgt_generation_mask = paddle.concat(
-                [tgt_generation_mask, paddle.unsqueeze(append_mask, 1)],
+                [tgt_generation_mask,
+                 paddle.unsqueeze(append_mask, 1)],
                 axis=-1)
-            tgt_sent = paddle.ones(
-                [tgt_generation_mask.shape[0], 1], dtype=tgt_ids.dtype)
+            tgt_sent = paddle.ones([tgt_generation_mask.shape[0], 1],
+                                   dtype=tgt_ids.dtype)
 
             # [-1, 1, hidden_size]
             out, caches = self.plato2_encoder(caches, tgt_ids, tgt_sent,
@@ -399,26 +413,28 @@ class Plato2InferModel(nn.Layer):
             Example = namedtuple("Example", headers)
 
             for i, (raw, pred) in enumerate(zip(token_ids, pred_ids)):
-                context = post_process_context(
-                    raw, self.nsp_reader, merge=False)
-                _, response = post_process_response(
-                    pred, self.nsp_reader, merge=False)
+                context = post_process_context(raw,
+                                               self.nsp_reader,
+                                               merge=False)
+                _, response = post_process_response(pred,
+                                                    self.nsp_reader,
+                                                    merge=False)
                 context_tokenized_input = " [SEP] ".join(" ".join(utt)
                                                          for utt in context)
                 response_tokenized_input = " ".join(response)
-                example = Example(
-                    src=context_tokenized_input,
-                    tgt=response_tokenized_input,
-                    data_id=i)
-                data = self.nsp_reader._convert_example_to_record(
-                    example, is_infer=True)
+                example = Example(src=context_tokenized_input,
+                                  tgt=response_tokenized_input,
+                                  data_id=i)
+                data = self.nsp_reader._convert_example_to_record(example,
+                                                                  is_infer=True)
                 yield data
             return
 
         generator = self.nsp_reader.data_generator(
             reader=__reader__,
             is_infer=True,
-            phase="test", )
+            phase="test",
+        )
         inputs = next(generator())
 
         #print('\nnsp_inputs:')
@@ -439,8 +455,8 @@ class Plato2InferModel(nn.Layer):
         infos = []
         for raw, pred, prob in zip(token_ids, pred_ids, probs):
             tokens = post_process_context(raw, self.nsp_reader)
-            pred_token_ids, pred_tokens = post_process_response(pred,
-                                                                self.nsp_reader)
+            pred_token_ids, pred_tokens = post_process_response(
+                pred, self.nsp_reader)
             info = {}
             info['response'] = ' '.join(pred_tokens)
             cross_turn_repetition = get_cross_turn_repetition(

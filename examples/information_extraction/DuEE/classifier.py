@@ -65,6 +65,7 @@ parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Sel
 args = parser.parse_args()
 # yapf: enable.
 
+
 def set_seed(random_seed):
     """sets random seed"""
     random.seed(random_seed)
@@ -98,7 +99,11 @@ def evaluate(model, criterion, metric, data_loader):
     return float(np.mean(losses)), accuracy
 
 
-def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test=False):
+def convert_example(example,
+                    tokenizer,
+                    label_map=None,
+                    max_seq_len=512,
+                    is_test=False):
     """convert_example"""
     has_text_b = False
     if isinstance(example, dict):
@@ -110,13 +115,11 @@ def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test
     if has_text_b:
         text_b = example.text_b
 
-    tokenized_input = tokenizer(
-        text=example.text_a,
-        text_pair=text_b,
-        max_seq_len=max_seq_len)
+    tokenized_input = tokenizer(text=example.text_a,
+                                text_pair=text_b,
+                                max_seq_len=max_seq_len)
     input_ids = tokenized_input['input_ids']
     token_type_ids = tokenized_input['token_type_ids']
-
 
     if is_test:
         return input_ids, token_type_ids
@@ -127,6 +130,7 @@ def convert_example(example, tokenizer, label_map=None, max_seq_len=512, is_test
 
 class DuEventExtraction(paddle.io.Dataset):
     """Du"""
+
     def __init__(self, data_path, tag_path):
         self.label_vocab = load_dict(tag_path)
         self.examples = self._read_tsv(data_path)
@@ -137,7 +141,8 @@ class DuEventExtraction(paddle.io.Dataset):
             reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
             headers = next(reader)
             text_indices = [
-                index for index, h in enumerate(headers) if h != "label"]
+                index for index, h in enumerate(headers) if h != "label"
+            ]
             Example = namedtuple('Example', headers)
             examples = []
             for line in reader:
@@ -187,7 +192,8 @@ def do_train():
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
-    model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieForSequenceClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_map))
     model = paddle.DataParallel(model)
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
 
@@ -196,28 +202,30 @@ def do_train():
     dev_ds = DuEventExtraction(args.dev_data, args.tag_path)
     test_ds = DuEventExtraction(args.test_data, args.tag_path)
 
-    trans_func = partial(
-        convert_example, tokenizer=tokenizer, label_map=label_map, max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         label_map=label_map,
+                         max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token], dtype='int32'
+            ),
         Stack(dtype="int64")  # label
     ): fn(list(map(trans_func, samples)))
 
-    batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-    train_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_size=args.batch_size,
-        collate_fn=batchify_fn)
-    test_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_size=args.batch_size,
-        collate_fn=batchify_fn)
+    batch_sampler = paddle.io.DistributedBatchSampler(
+        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_loader = paddle.io.DataLoader(dataset=train_ds,
+                                        batch_sampler=batch_sampler,
+                                        collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_size=args.batch_size,
+                                      collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_size=args.batch_size,
+                                       collate_fn=batchify_fn)
 
     num_training_steps = len(train_loader) * args.num_epoch
     metric = paddle.metric.Accuracy()
@@ -252,19 +260,22 @@ def do_train():
                 print(f'train epoch: {epoch} - step: {step} (total: {num_training_steps}) ' \
                     f'- loss: {loss_item:.6f} acc {acc:.5f}')
             if step > 0 and step % args.valid_step == 0 and rank == 0:
-                loss_dev, acc_dev = evaluate(model, criterion, metric, dev_loader)
+                loss_dev, acc_dev = evaluate(model, criterion, metric,
+                                             dev_loader)
                 print(f'dev step: {step} - loss: {loss_dev:.6f} accuracy: {acc_dev:.5f}, ' \
                         f'current best {best_performerence:.5f}')
                 if acc_dev > best_performerence:
                     best_performerence = acc_dev
                     print(f'==============================================save best model ' \
                             f'best performerence {best_performerence:5f}')
-                    paddle.save(model.state_dict(), '{}/best.pdparams'.format(args.checkpoints))
+                    paddle.save(model.state_dict(),
+                                '{}/best.pdparams'.format(args.checkpoints))
             step += 1
 
     # save the final model
     if rank == 0:
-        paddle.save(model.state_dict(), '{}/final.pdparams'.format(args.checkpoints))
+        paddle.save(model.state_dict(),
+                    '{}/final.pdparams'.format(args.checkpoints))
 
 
 def do_predict():
@@ -274,7 +285,8 @@ def do_predict():
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
-    model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+    model = ErnieForSequenceClassification.from_pretrained(
+        "ernie-1.0", num_classes=len(label_map))
     model = paddle.DataParallel(model)
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
 
@@ -287,7 +299,7 @@ def do_predict():
         print("Loaded parameters from %s" % args.init_ckpt)
 
     # load data from predict file
-    sentences = read_by_lines(args.predict_data) # origin data format
+    sentences = read_by_lines(args.predict_data)  # origin data format
     sentences = [json.loads(sent) for sent in sentences]
 
     encoded_inputs_list = []
@@ -297,8 +309,8 @@ def do_predict():
         if "text_b" in sent:
             input_sent = [[sent, sent["text_b"]]]  # add text_b
         example = data_2_examples(input_sent)[0]
-        input_ids, token_type_ids = convert_example(example, tokenizer,
-                    max_seq_len=args.max_seq_len, is_test=True)
+        input_ids, token_type_ids = convert_example(
+            example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
         encoded_inputs_list.append((input_ids, token_type_ids))
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -306,8 +318,10 @@ def do_predict():
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
     ): fn(samples)
     # Seperates data into some batches.
-    batch_encoded_inputs = [encoded_inputs_list[i: i + args.batch_size]
-                            for i in range(0, len(encoded_inputs_list), args.batch_size)]
+    batch_encoded_inputs = [
+        encoded_inputs_list[i:i + args.batch_size]
+        for i in range(0, len(encoded_inputs_list), args.batch_size)
+    ]
     results = []
     model.eval()
     for batch in batch_encoded_inputs:

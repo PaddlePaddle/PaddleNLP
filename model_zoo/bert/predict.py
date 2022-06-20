@@ -30,7 +30,8 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--device",
         default="gpu",
@@ -41,8 +42,10 @@ def parse_args():
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     args = parser.parse_args()
     return args
 
@@ -57,6 +60,7 @@ def convert_example(example, tokenizer, label_list, max_seq_length=128):
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handle, tokenizer,
                  max_seq_length):
         self.predictor = predictor
@@ -86,8 +90,8 @@ class Predictor(object):
             predictor.get_input_handle(name)
             for name in predictor.get_input_names()
         ]
-        output_handle = predictor.get_output_handle(predictor.get_output_names()
-                                                    [0])
+        output_handle = predictor.get_output_handle(
+            predictor.get_output_names()[0])
         tokenizer = BertTokenizer.from_pretrained(
             os.path.dirname(args.model_path))
 
@@ -105,8 +109,10 @@ class Predictor(object):
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+                ),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         # Seperates data into some batches.
@@ -148,8 +154,8 @@ def main():
     outputs, results = predictor.predict(data, label_map)
     for idx, text in enumerate(data):
         print(
-            'Data: {} \n Label: {} \n Negative prob: {} \n Positive prob: {} \n '.
-            format(text, results[idx], outputs[idx][0], outputs[idx][1]))
+            'Data: {} \n Label: {} \n Negative prob: {} \n Positive prob: {} \n '
+            .format(text, results[idx], outputs[idx][0], outputs[idx][1]))
 
 
 if __name__ == "__main__":

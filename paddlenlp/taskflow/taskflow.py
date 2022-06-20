@@ -281,8 +281,8 @@ class Taskflow(object):
             self.model = TASKS[task]['default'][ind_tag]
 
         if "task_priority_path" in TASKS[self.task][tag][self.model]:
-            self.priority_path = TASKS[self.task][tag][self.model][
-                "task_priority_path"]
+            self.priority_path = TASKS[self.task][tag][
+                self.model]["task_priority_path"]
         else:
             self.priority_path = None
 
@@ -299,11 +299,10 @@ class Taskflow(object):
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task][tag][self.model]['task_class']
-        self.task_instance = task_class(
-            model=self.model,
-            task=self.task,
-            priority_path=self.priority_path,
-            **self.kwargs)
+        self.task_instance = task_class(model=self.model,
+                                        task=self.task,
+                                        priority_path=self.priority_path,
+                                        **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
 
@@ -349,6 +348,6 @@ class Taskflow(object):
 
     def set_schema(self, schema):
         assert self.task_instance.model in [
-            "uie-base", "uie-tiny", "uie-medical-base"
+            "uie-base", "uie-tiny", "uie-medical-base", "wordtag"
         ], 'This method can only used for the task with uie model.'
         self.task_instance.set_schema(schema)

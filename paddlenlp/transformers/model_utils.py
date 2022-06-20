@@ -204,19 +204,19 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
 
         # From built-in pretrained models
-        if pretrained_model_name_or_path in pretrained_models:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
-                cls.pretrained_init_configuration[
-                    pretrained_model_name_or_path])
+                cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            )
+
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
@@ -271,6 +271,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
@@ -292,8 +293,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = i
                     base_arg = arg
                     break
@@ -301,8 +302,8 @@ class PretrainedModel(Layer, GenerationMixin):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = arg_name
                     base_arg = arg
                     break
@@ -333,6 +334,14 @@ class PretrainedModel(Layer, GenerationMixin):
                 if k in derived_parameters_dict:
                     derived_kwargs[k] = v
             model = cls(*derived_args, **derived_kwargs)
+
+        # save the model config file into cache dir
+        model_config_file_path = os.path.join(default_root,
+                                              cls.model_config_file)
+        # check if there is model config file in cache directory
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration and init_kwargs is not None and not os.path.exists(
+                model_config_file_path):
+            model.save_model_config(default_root)
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
@@ -377,8 +386,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 "Weights of {} not initialized from pretrained model: {}".
                 format(model.__class__.__name__, missing_keys))
         if len(unexpected_keys) > 0:
-            logger.info("Weights from pretrained model not used in {}: {}".
-                        format(model.__class__.__name__, unexpected_keys))
+            logger.info(
+                "Weights from pretrained model not used in {}: {}".format(
+                    model.__class__.__name__, unexpected_keys))
         # Allow the float16 model to load float32 weights, which decreases memory
         # usage in model loading stage and is useful to big models.
         dtype_prefix_len = len("paddle.")  # paddle.float16
@@ -415,8 +425,8 @@ class PretrainedModel(Layer, GenerationMixin):
                     args = []
                     for arg in value:
                         args.append(
-                            get_config(arg)
-                            if isinstance(arg, PretrainedModel) else arg)
+                            get_config(arg) if isinstance(arg, PretrainedModel
+                                                          ) else arg)
                     model_config[key] = tuple(args)
                 elif isinstance(value, PretrainedModel):
                     model_config[key] = value.init_config
@@ -471,7 +481,8 @@ class PretrainedModel(Layer, GenerationMixin):
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(
-                save_dir, list(self.resource_files_names.values())[0])
+                save_dir,
+                list(self.resource_files_names.values())[0])
             paddle.save(self.state_dict(), file_name)
         else:
             logger.warning(

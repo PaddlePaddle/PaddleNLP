@@ -96,8 +96,9 @@ class GPTAccuarcy(unittest.TestCase):
             for k in gt.keys():
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], res[k]["loss"]))
-                self.assertAlmostEqual(
-                    gt[k]["loss"], res[k]["loss"], delta=1e-6)
+                self.assertAlmostEqual(gt[k]["loss"],
+                                       res[k]["loss"],
+                                       delta=1e-6)
             print("\n" * 5)
 
     def test_acc_dp(self):
@@ -171,13 +172,15 @@ class GPTAccuarcy(unittest.TestCase):
 
             print_test_results(task_name)
             for k in gt.keys():
-                self.assertAlmostEqual(
-                    res1[k]["loss"], res2[k]["loss"], delta=1e-7)
+                self.assertAlmostEqual(res1[k]["loss"],
+                                       res2[k]["loss"],
+                                       delta=1e-7)
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
                 print("%s step: %d, gt:%.9f res:%.9f " %
                       (task_name, k, gt[k]["loss"], mean))
-                self.assertAlmostEqual(
-                    gt[k]["loss"], res1[k]["loss"], delta=1e-7)
+                self.assertAlmostEqual(gt[k]["loss"],
+                                       res1[k]["loss"],
+                                       delta=1e-7)
             print("\n" * 5)
 
 

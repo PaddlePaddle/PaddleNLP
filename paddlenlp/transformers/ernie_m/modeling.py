@@ -57,6 +57,7 @@ class ErnieMEmbeddings(nn.Layer):
 
 
 class ErnieMPooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super(ErnieMPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -128,8 +129,8 @@ class ErnieMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_m.config["initializer_range"],
                         shape=layer.weight.shape))
 
@@ -283,8 +284,8 @@ class ErnieMModel(ErnieMPretrainedModel):
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
-        embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
@@ -311,8 +312,8 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         super(ErnieMForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_m.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_m.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -347,8 +348,9 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        _, pooled_output = self.ernie_m(input_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -412,8 +414,9 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_m(input_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -442,8 +445,8 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         super(ErnieMForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_m.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_m.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -477,8 +480,9 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        sequence_output, _ = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_m(input_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -505,8 +509,8 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
         super(ErnieMForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.ernie_m = ernie_m
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_m.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
@@ -536,8 +540,9 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        _, pooled_output = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        _, pooled_output = self.ernie_m(input_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
 
