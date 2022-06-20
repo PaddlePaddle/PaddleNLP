@@ -160,7 +160,6 @@ void BPE::MergeWord(const std::string& word, core::BPEWord* bpe_word) {
         curr_str = curr_str + end_of_word_suffix_.front();
       }
     }
-
     if (vocab_.find(curr_str) != vocab_.end()) {
       if (unk.size() > 0) {
         bpe_word->Add(unk.front().first, unk.front().second);
@@ -217,7 +216,20 @@ void BPE::TokenizeWithCache(const std::string& sequence,
   }
 }
 
-std::vector<core::Token> BPE::Tokenize(const std::string& tokens) { return {}; }
+std::vector<core::Token> BPE::Tokenize(const std::string& sequence) {
+  std::vector<core::Token> tokens;
+  if (sequence.empty()) {
+    return tokens;
+  }
+  if (dropout_.size() == 0) {
+    TokenizeWithCache(sequence, &tokens);
+    return tokens;
+  }
+  core::BPEWord bpe_word;
+  MergeWord(sequence, &bpe_word);
+  WordToTokens(bpe_word, &tokens);
+  return tokens;
+}
 
 bool BPE::TokenToId(const std::string& token, uint* id) const {
   if (vocab_.find(token) == vocab_.end()) {

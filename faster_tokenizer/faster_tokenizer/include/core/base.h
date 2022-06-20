@@ -145,7 +145,8 @@ using Pair = std::pair<uint, uint>;
 using MergeMap = std::unordered_map<Pair, std::pair<uint, uint>>;
 using Merges = std::vector<std::pair<std::string, std::string>>;
 
-inline void to_json(nlohmann::json& j, const SortedVocabReversed& sorted_vocab_r) {
+inline void to_json(nlohmann::json& j,
+                    const SortedVocabReversed& sorted_vocab_r) {
   j = nlohmann::ordered_json();
   for (const auto& item : sorted_vocab_r) {
     j[item.second] = item.first;
@@ -247,11 +248,13 @@ struct BPEWord {
     for (int i = 0; i < symbols_.size() - 1; ++i) {
       auto& first = symbols_[i];
       auto& second = symbols_[i + 1];
-
-      auto new_merge_info = merges.at({first.ch_, second.ch_});
-      core::Merge new_merge{
-          static_cast<size_t>(i), new_merge_info.first, new_merge_info.second};
-      queue.push(new_merge);
+      if (merges.find({first.ch_, second.ch_}) != merges.end()) {
+        auto new_merge_info = merges.at({first.ch_, second.ch_});
+        core::Merge new_merge{static_cast<size_t>(i),
+                              new_merge_info.first,
+                              new_merge_info.second};
+        queue.push(new_merge);
+      }
     }
     std::random_device
         rd;  // Will be used to obtain a seed for the random number engine
