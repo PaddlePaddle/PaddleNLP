@@ -39,7 +39,7 @@ from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import TermTree, BurkhardKellerTree
-from .utils import Customization
+from .utils import Customization, WordTagRelationExtractor
 from .task import Task
 
 LABEL_TO_SCHEMA = {
@@ -124,6 +124,12 @@ usage = r"""
           [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}, {'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
           '''
 
+          # 使用WordTag-IE进行信息抽取
+          wordtag = Taskflow("knowledge_mining", model="wordtag", with_ie=True)
+          '''
+          [[{'text': '《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 5, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 6, 'wordtag_label': '肯定词', 'length': 1}, {'item': '一首', 'offset': 7, 'wordtag_label': '数量词_单位数量词', 'length': 2}, {'item': '由', 'offset': 9, 'wordtag_label': '介词', 'length': 1}, {'item': '王杰', 'offset': 10, 'wordtag_label': '人物类_实体', 'length': 2}, {'item': '作词', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2}, {'item': '、', 'offset': 14, 'wordtag_label': 'w', 'length': 1}, {'item': '作曲', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '并', 'offset': 17, 'wordtag_label': '连词', 'length': 1}, {'item': '演唱', 'offset': 18, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 20, 'wordtag_label': '助词', 'length': 1}, {'item': '歌曲', 'offset': 21, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 23, 'wordtag_label': 'w', 'length': 1}, {'item': '收录', 'offset': 24, 'wordtag_label': '场景事件', 'length': 2}, {'item': '在', 'offset': 26, 'wordtag_label': '介词', 'length': 1}, {'item': '专辑', 'offset': 27, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '同名', 'offset': 29, 'wordtag_label': '场景事件', 'length': 2}, {'item': '《', 'offset': 31, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 32, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 36, 'wordtag_label': 'w', 'length': 1}, {'item': '中', 'offset': 37, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 38, 'wordtag_label': 'w', 'length': 1}, {'item': '由', 'offset': 39, 'wordtag_label': '介词', 'length': 1}, {'item': '波丽佳音', 'offset': 40, 'wordtag_label': '人物类_实体', 'length': 4}, {'item': '唱片', 'offset': 44, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '于', 'offset': 46, 'wordtag_label': '介词', 'length': 1}, {'item': '1996年08月31日', 'offset': 47, 'wordtag_label': '时间类_具体时间', 'length': 11}, {'item': '发行', 'offset': 58, 'wordtag_label': '场景事件', 'length': 2}, {'item': '。', 'offset': 60, 'wordtag_label': 'w', 'length': 1}]}], [[{'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '创作', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}], 'GROUP': '创作者', 'SRC': 'HTG', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '歌曲', 'offset': 21, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '收录', 'TRIG': [{'item': '收录', 'offset': 24}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '收录于', 'SRC': 'HGT', 'TRIG': [{'item': '收录', 'offset': 24}]}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '王杰', 'type': '人物类_实体', 'offset': 10}], 'GROUP': '创作者', 'TRIG': [{'item': '专辑', 'offset': 27}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '王杰', 'type': '人物类_实体', 'offset': 10}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '创作', 'SRC': 'HGT', 'TRIG': [{'item': '专辑', 'offset': 27}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 32}, 'TAIL_ROLE': [{'item': '唱片', 'offset': 44, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}]]]
+          '''
+          
           # 切换为NPTag名词短语标注工具
           nptag = Taskflow("knowledge_mining", model="nptag")
           nptag("糖醋排骨")
@@ -163,12 +169,13 @@ class WordTagTask(Task):
         "termtree_schema": "termtree_type.csv",
         "termtree_data": "termtree_data",
         "tags": "tags.txt",
+        "spo_config": "spo_config.pkl"
     }
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_state.pdparams",
-                "a93e4074c9440cc3f1d4d29e54cf766d"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.2/model_state.pdparams",
+                "d9d323d3c2ead54d18f517725c99e969"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
@@ -186,6 +193,10 @@ class WordTagTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
                 "f33feedd01d478b03bac81be19b48d00"
             ],
+            "spo_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/spo_config.pkl",
+                "07a0b8d0422198d8c4c0f70e68963275"
+            ]
         }
     }
 
@@ -198,6 +209,8 @@ class WordTagTask(Task):
                  term_data_path=None,
                  user_dict=None,
                  linking=True,
+                 spo_config_path=None,
+                 with_ie=False,
                  **kwargs):
         super().__init__(model=model, task=task, **kwargs)
         self._tag_path = tag_path
@@ -206,6 +219,8 @@ class WordTagTask(Task):
         self._term_data_path = term_data_path
         self._user_dict = user_dict
         self._linking = linking
+        self._spo_config_path = spo_config_path
+        self._with_ie = with_ie
         self._check_task_files()
         self._load_task_resources()
         self._construct_tokenizer(model)
@@ -228,6 +243,9 @@ class WordTagTask(Task):
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._split_sentence = self.kwargs[
             'split_sentence'] if 'split_sentence' in self.kwargs else False
+        if self._with_ie:
+            self._ie_extractor = WordTagRelationExtractor.from_pkl(
+                self._spo_config_path)
 
     @property
     def summary_num(self):
@@ -260,20 +278,29 @@ class WordTagTask(Task):
         return tags_to_idx, idx_to_tags, all_tags
 
     def _load_task_resources(self):
+        """
+        Load the resource of this task.
+        """
         if self._tag_path is None:
             self._tag_path = os.path.join(self._task_path, "tags.txt")
-        self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(
-            self._tag_path)
+            self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(
+                self._tag_path)
+
         if self._term_schema_path is None:
             self._term_schema_path = os.path.join(self._task_path,
                                                   "termtree_type.csv")
         if self._term_data_path is None:
             self._term_data_path = os.path.join(self._task_path,
                                                 "termtree_data")
+
         if self._linking is True:
             self._termtree = TermTree.from_dir(self._term_schema_path,
                                                self._term_data_path,
                                                self._linking)
+
+        if self._spo_config_path is None:
+            self._spo_config_path = os.path.join(self._task_path,
+                                                 "spo_config.pkl")
 
     def _preprocess_text(self, input_texts):
         """
@@ -484,7 +511,20 @@ class WordTagTask(Task):
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
+        if self._with_ie:
+            ie_results = []
+            for result in results:
+                spo_result = self._ie_extractor.extract_spo(result['items'])
+                ie_results.append(spo_result)
+            return [results, ie_results]
         return results
+
+    def set_schema(self, schema):
+        """User define the schema for the information extraction.
+        Args:
+            schema (List[ Dict[str, Any]]): Dictionary data contain all k-v data. 
+        """
+        self._ie_extractor = WordTagRelationExtractor.from_dict(schema)
 
 
 @add_docstrings(usage)
