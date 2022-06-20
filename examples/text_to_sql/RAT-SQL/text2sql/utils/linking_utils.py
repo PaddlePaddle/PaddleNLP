@@ -286,12 +286,20 @@ def compute_schema_linking(tokens, db):
             # partial match case
             for col_id, col in col_id2list.items():
                 if partial_match(n_gram_list, col):
-                    set_q_relation(
-                        q_col_match, i, n, col_id, "CPM", force=False)
+                    set_q_relation(q_col_match,
+                                   i,
+                                   n,
+                                   col_id,
+                                   "CPM",
+                                   force=False)
             for tab_id, tab in tab_id2list.items():
                 if partial_match(n_gram_list, tab):
-                    set_q_relation(
-                        q_tab_match, i, n, tab_id, "TEM", force=False)
+                    set_q_relation(q_tab_match,
+                                   i,
+                                   n,
+                                   tab_id,
+                                   "TEM",
+                                   force=False)
         n -= 1
     return {"q_col_match": q_col_match, "q_tab_match": q_tab_match}
 
@@ -327,10 +335,10 @@ def compute_cell_value_linking(tokens, db):
 
         num_flag = isnumber(word)
         for col_id, column in enumerate(db.columns):
-            # word is number 
+            # word is number
             if num_flag:
-                if column.dtype in ("number", "real", "time"
-                                    ):  # TODO fine-grained date
+                if column.dtype in ("number", "real",
+                                    "time"):  # TODO fine-grained date
                     rel = 'NUMBER' if column.dtype == 'real' else column.dtype.upper(
                     )
                     num_date_match[f"{q_id},{col_id}"] = rel
@@ -370,9 +378,10 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
     """build relation matrix
     """
     sc_link = other_links.get('sc_link', {'q_col_match': {}, 'q_tab_match': {}})
-    cv_link = other_links.get('cv_link',
-                              {'num_date_match': {},
-                               'cell_match': {}})
+    cv_link = other_links.get('cv_link', {
+        'num_date_match': {},
+        'cell_match': {}
+    })
 
     # Catalogue which things are where
     loc_types = {}
@@ -380,13 +389,13 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
         loc_types[i] = ('question', )
 
     c_base = q_length
-    for c_id, (c_start,
-               c_end) in enumerate(zip(c_boundaries, c_boundaries[1:])):
+    for c_id, (c_start, c_end) in enumerate(zip(c_boundaries,
+                                                c_boundaries[1:])):
         for i in range(c_start + c_base, c_end + c_base):
             loc_types[i] = ('column', c_id)
     t_base = q_length + c_length
-    for t_id, (t_start,
-               t_end) in enumerate(zip(t_boundaries, t_boundaries[1:])):
+    for t_id, (t_start, t_end) in enumerate(zip(t_boundaries,
+                                                t_boundaries[1:])):
         for i in range(t_start + t_base, t_end + t_base):
             loc_types[i] = ('table', t_id)
 
@@ -444,8 +453,8 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
             elif j_type[0] == 'column':  ## relation cc
                 col1, col2 = i_type[1], j_type[1]
                 if col1 == col2:
-                    _set_relation(
-                        ('cc_dist', clamp(j - i, RELATIONS.cc_max_dist)))
+                    _set_relation(('cc_dist', clamp(j - i,
+                                                    RELATIONS.cc_max_dist)))
                 else:
                     _set_relation('cc_default')
                     # TODO: foreign keys and table match
@@ -454,14 +463,14 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
                             _set_relation('cc_foreign_key_forward')
                         if _foreign_key_id(db, col2) == col1:
                             _set_relation('cc_foreign_key_backward')
-                    if (RELATIONS.cc_table_match and
-                            _table_id(db, col1) == _table_id(db, col2)):
+                    if (RELATIONS.cc_table_match
+                            and _table_id(db, col1) == _table_id(db, col2)):
                         _set_relation('cc_table_match')
             elif j_type[0] == 'table':  ## relation ct
                 col, table = i_type[1], j_type[1]
                 _set_relation('ct_default')
-                if RELATIONS.ct_foreign_key and _match_foreign_key(db, col,
-                                                                   table):
+                if RELATIONS.ct_foreign_key and _match_foreign_key(
+                        db, col, table):
                     _set_relation('ct_foreign_key')
                 if RELATIONS.ct_table_match:
                     col_table = _table_id(db, col)
@@ -482,8 +491,8 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
                 table, col = i_type[1], j_type[1]
                 _set_relation('tc_default')
 
-                if RELATIONS.tc_foreign_key and _match_foreign_key(db, col,
-                                                                   table):
+                if RELATIONS.tc_foreign_key and _match_foreign_key(
+                        db, col, table):
                     _set_relation('tc_foreign_key')
                 if RELATIONS.tc_table_match:
                     col_table = _table_id(db, col)
@@ -497,8 +506,8 @@ def build_relation_matrix(other_links, total_length, q_length, c_length,
             elif j_type[0] == 'table':
                 table1, table2 = i_type[1], j_type[1]
                 if table1 == table2:
-                    _set_relation(
-                        ('tt_dist', clamp(j - i, RELATIONS.tt_max_dist)))
+                    _set_relation(('tt_dist', clamp(j - i,
+                                                    RELATIONS.tt_max_dist)))
                 else:
                     _set_relation('tt_default')
                     if RELATIONS.tt_foreign_key:

@@ -294,8 +294,8 @@ def get_keywords(sql):
 
     # in keyword
     if len([
-            cond_unit for cond_unit in cond_units
-            if cond_unit[1] == WHERE_OPS.index('in')
+            cond_unit
+            for cond_unit in cond_units if cond_unit[1] == WHERE_OPS.index('in')
     ]) > 0:
         res.add('in')
 
@@ -363,9 +363,9 @@ def count_others(sql):
     agg_count += count_agg(sql['where'][::2])
     agg_count += count_agg(sql['groupBy'])
     if len(sql['orderBy']) > 0:
-        agg_count += count_agg([
-            unit[1] for unit in sql['orderBy'][1] if unit[1]
-        ] + [unit[2] for unit in sql['orderBy'][1] if unit[2]])
+        agg_count += count_agg(
+            [unit[1] for unit in sql['orderBy'][1] if unit[1]] +
+            [unit[2] for unit in sql['orderBy'][1] if unit[2]])
     agg_count += count_agg(sql['having'])
     if agg_count > 1:
         count += 1
@@ -542,8 +542,8 @@ def print_scores(scores, etype):
 
     print("{:20} {:20} {:20} {:20} {:20} {:20}".format("", *levels))
     counts = [scores[level]['count'] for level in levels]
-    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format("count", *
-                                                                 counts))
+    print("{:20} {:<20d} {:<20d} {:<20d} {:<20d} {:<20d}".format(
+        "count", *counts))
 
     if etype in ["all", "exec"]:
         print(
@@ -761,8 +761,10 @@ def eval_exec_match(db, p_str, g_str, pred, gold):
     def res_map(res, val_units):
         rmap = {}
         for idx, val_unit in enumerate(val_units):
-            key = tuple(val_unit[1]) if not val_unit[2] else (
-                val_unit[0], tuple(val_unit[1]), tuple(val_unit[2]))
+            key = tuple(
+                val_unit[1]) if not val_unit[2] else (val_unit[0],
+                                                      tuple(val_unit[1]),
+                                                      tuple(val_unit[2]))
             rmap[key] = [r[idx] for r in res]
         return rmap
 

@@ -44,10 +44,9 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         new_masked_positions = paddle.to_tensor(
             np.array(new_masked_positions).astype('int32'))
 
-        prediction_scores = model(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=new_masked_positions)
+        prediction_scores = model(input_ids=src_ids,
+                                  token_type_ids=token_type_ids,
+                                  masked_positions=new_masked_positions)
         softmax_fn = paddle.nn.Softmax()
         prediction_probs = softmax_fn(prediction_scores)
 
@@ -55,8 +54,9 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs,
+                                          shape=[batch_size, -1,
+                                                 vocab_size]).numpy()
 
         # [label_num, label_length]
         label_ids = np.array(
@@ -119,10 +119,9 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
         new_masked_positions = paddle.to_tensor(
             np.array(new_masked_positions).astype('int32'))
 
-        prediction_scores = model(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=new_masked_positions)
+        prediction_scores = model(input_ids=src_ids,
+                                  token_type_ids=token_type_ids,
+                                  masked_positions=new_masked_positions)
         softmax_fn = paddle.nn.Softmax()
         prediction_probs = softmax_fn(prediction_scores)
 
@@ -130,8 +129,9 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs,
+                                          shape=[batch_size, -1,
+                                                 vocab_size]).numpy()
 
         candidate_num = candidate_label_ids.shape[1]
 
@@ -140,7 +140,7 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
 
         for label_idx in range(candidate_num):
 
-            # [bathc_size, label_length(4)] 
+            # [bathc_size, label_length(4)]
             single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
             # Calculate joint distribution of candidate labels
             for index in range(label_length):

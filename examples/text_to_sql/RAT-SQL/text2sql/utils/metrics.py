@@ -77,8 +77,8 @@ class MetricSimpleSQLAcc(object):
             if pred_aggs == true_aggs:
                 sel_col_agg_correct += 1
                 n_correct += 1
-            pred_conds = set(
-                [(cond[0], cond[1], cond[2]) for cond in pred_sql['conds']])
+            pred_conds = set([(cond[0], cond[1], cond[2])
+                              for cond in pred_sql['conds']])
             if not self._eval_value:
                 true_conds_tmp = [(cond[0], cond[1], None)
                                   for cond in true_sql.conds]
@@ -93,10 +93,10 @@ class MetricSimpleSQLAcc(object):
             true_conds_col = set([cond[0] for cond in true_sql['conds']])
             if pred_conds_col == true_conds_col:
                 conds_col_correct += 1
-            pred_conds_col_op = set(
-                [(cond[0], cond[1]) for cond in pred_sql['conds']])
-            true_conds_col_op = set(
-                [(cond[0], cond[1]) for cond in true_sql['conds']])
+            pred_conds_col_op = set([(cond[0], cond[1])
+                                     for cond in pred_sql['conds']])
+            true_conds_col_op = set([(cond[0], cond[1])
+                                     for cond in true_sql['conds']])
             if pred_conds_col_op == true_conds_col_op:
                 conds_col_op_correct += 1
 
@@ -197,10 +197,9 @@ class MetricDuSQLAcc(object):
             db_id: dusql_evaluation.build_foreign_key_map(db.orig)
             for db_id, db in self.dataset.db_dict.items()
         }
-        self.evaluator = dusql_evaluation.Evaluator(
-            self.dataset.db_schema_file,
-            self.foreign_key_maps,
-            eval_value=self.eval_value)
+        self.evaluator = dusql_evaluation.Evaluator(self.dataset.db_schema_file,
+                                                    self.foreign_key_maps,
+                                                    eval_value=self.eval_value)
         self.results = []
 
     def update(self, item, inferred_code):

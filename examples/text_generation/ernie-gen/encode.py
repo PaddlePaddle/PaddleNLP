@@ -25,19 +25,22 @@ def convert_example(tokenizer,
                     is_test=False,
                     noise_prob=0.,
                     use_random_noice=False):
+
     def warpper(example):
         """convert an example into necessary features"""
         tokens = example['tokens']
         labels = example['labels']
-        encoded_src = tokenizer(
-            tokens, max_seq_len=max_encode_len, pad_to_max_seq_len=False)
+        encoded_src = tokenizer(tokens,
+                                max_seq_len=max_encode_len,
+                                pad_to_max_seq_len=False)
         src_ids, src_sids = encoded_src["input_ids"], encoded_src[
             "token_type_ids"]
         src_pids = np.arange(len(src_ids))
 
         if not is_test:
-            encoded_tgt = tokenizer(
-                labels, max_seq_len=max_decode_len, pad_to_max_seq_len=False)
+            encoded_tgt = tokenizer(labels,
+                                    max_seq_len=max_decode_len,
+                                    pad_to_max_seq_len=False)
             tgt_ids, tgt_sids = encoded_tgt["input_ids"], encoded_tgt[
                 "token_type_ids"]
             tgt_ids = np.array(tgt_ids).astype("int64")
@@ -48,8 +51,9 @@ def convert_example(tokenizer,
         if noise_prob > 0.:
             tgt_labels = deepcopy(tgt_ids)
             if use_random_noice:
-                noice_ids = np.random.randint(
-                    1, len(tokenizer.vocab), size=tgt_ids.shape)
+                noice_ids = np.random.randint(1,
+                                              len(tokenizer.vocab),
+                                              size=tgt_ids.shape)
             else:
                 noice_ids = np.ones_like(tgt_ids) * tokenizer.vocab['[NOISE]']
             pos, = np.where(np.ones_like(tgt_ids))

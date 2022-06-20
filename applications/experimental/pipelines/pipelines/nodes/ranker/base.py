@@ -35,20 +35,20 @@ class BaseRanker(BaseComponent):
     def predict(self,
                 query: str,
                 documents: List[Document],
-                top_k: Optional[int]=None):
+                top_k: Optional[int] = None):
         pass
 
     @abstractmethod
     def predict_batch(self,
                       query_doc_list: List[dict],
-                      top_k: Optional[int]=None,
-                      batch_size: Optional[int]=None):
+                      top_k: Optional[int] = None,
+                      batch_size: Optional[int] = None):
         pass
 
     def run(self,
             query: str,
             documents: List[Document],
-            top_k: Optional[int]=None):  # type: ignore
+            top_k: Optional[int] = None):  # type: ignore
         self.query_count += 1
         if documents:
             predict = self.timing(self.predict, "query_time")
@@ -88,13 +88,14 @@ class BaseRanker(BaseComponent):
             print(f"{self.query_time / self.query_count} seconds per query")
 
     def eval(
-            self,
-            label_index: str="label",
-            doc_index: str="eval_document",
-            label_origin: str="gold_label",
-            top_k: int=10,
-            open_domain: bool=False,
-            return_preds: bool=False, ) -> dict:
+        self,
+        label_index: str = "label",
+        doc_index: str = "eval_document",
+        label_origin: str = "gold_label",
+        top_k: int = 10,
+        open_domain: bool = False,
+        return_preds: bool = False,
+    ) -> dict:
         """
         Performs evaluation of the Ranker.
         Ranker is evaluated in the same way as a Retriever based on whether it finds the correct document given the query string and at which

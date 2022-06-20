@@ -45,11 +45,11 @@ class Docs2Answers(BaseComponent):
                     score=doc.score,
                     context=doc.meta["answer"],
                     offsets_in_context=[
-                        Span(
-                            start=0, end=len(doc.meta["answer"]))
+                        Span(start=0, end=len(doc.meta["answer"]))
                     ],
                     document_id=doc.id,
-                    meta=doc.meta, )
+                    meta=doc.meta,
+                )
             else:
                 # Regular docs
                 cur_answer = Answer(
@@ -58,7 +58,8 @@ class Docs2Answers(BaseComponent):
                     score=doc.score,
                     context=doc.content,
                     document_id=doc.id,
-                    meta=doc.meta, )
+                    meta=doc.meta,
+                )
             answers.append(cur_answer)
 
         output = {"query": query, "answers": answers}

@@ -95,8 +95,10 @@ class Clue(DatasetBuilder):
             'labels': ["0", "1"]
         },
         'tnews': {
-            'url': "https://bj.bcebos.com/paddlenlp/datasets/tnews_public.zip",
-            'md5': '38186ed0a751bc33e3ae0c1b59319777',
+            'url':
+            "https://bj.bcebos.com/paddlenlp/datasets/tnews_public.zip",
+            'md5':
+            '38186ed0a751bc33e3ae0c1b59319777',
             'splits': {
                 'train': [
                     os.path.join('tnews_public', 'train.json'),

@@ -11,32 +11,28 @@ from paddlenlp.transformers import ElectraTokenizer
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--client_config_file",
-        type=str,
-        required=True,
-        help="client prototxt config file")
-    parser.add_argument(
-        "--server_ip_port",
-        type=str,
-        default="127.0.0.1:8383",
-        help="server_ip:port")
-    parser.add_argument(
-        "--predict_sentences",
-        type=str,
-        nargs="*",
-        help="one or more sentence to predict")
+    parser.add_argument("--client_config_file",
+                        type=str,
+                        required=True,
+                        help="client prototxt config file")
+    parser.add_argument("--server_ip_port",
+                        type=str,
+                        default="127.0.0.1:8383",
+                        help="server_ip:port")
+    parser.add_argument("--predict_sentences",
+                        type=str,
+                        nargs="*",
+                        help="one or more sentence to predict")
     parser.add_argument(
         "--predict_file",
         type=str,
         nargs="*",
         help="one or more file which contain sentence to predict")
     parser.add_argument("--batch_size", type=int, default=1, help="batch size")
-    parser.add_argument(
-        "--max_seq_length",
-        type=int,
-        default=128,
-        help="max length of each sequence")
+    parser.add_argument("--max_seq_length",
+                        type=int,
+                        default=128,
+                        help="max length of each sequence")
     parser.add_argument(
         "--model_name",
         type=str,
@@ -132,8 +128,8 @@ def predict(args, sentences=[], paths=[]):
     client.connect([args.server_ip_port])
 
     # initialize data
-    if sentences != [] and isinstance(sentences, list) and (paths == [] or
-                                                            paths is None):
+    if sentences != [] and isinstance(sentences, list) and (paths == []
+                                                            or paths is None):
         predicted_data = sentences
     elif (sentences == [] or sentences is None) and isinstance(
             paths, list) and paths != []:
@@ -150,10 +146,9 @@ def predict(args, sentences=[], paths=[]):
     for i, sen in enumerate(predicted_input):
         sen = np.array(sen).astype("int64")
 
-        fetch_map = client.predict(
-            feed={"input_ids": sen},
-            fetch=["save_infer_model/scale_0.tmp_0"],
-            batch=True)
+        fetch_map = client.predict(feed={"input_ids": sen},
+                                   fetch=["save_infer_model/scale_0.tmp_0"],
+                                   batch=True)
         output_data = np.array(fetch_map["save_infer_model/scale_0.tmp_0"])
         output_res = np.argmax(output_data, axis=1)
 

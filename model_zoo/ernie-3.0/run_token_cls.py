@@ -34,80 +34,82 @@ parser = argparse.ArgumentParser()
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--model_name_or_path", default=None, type=str, required=True)
-    parser.add_argument(
-        "--task_name",
-        default="msra_ner",
-        type=str,
-        choices=["msra_ner"],
-        help="The named entity recognition datasets.")
+    parser.add_argument("--model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True)
+    parser.add_argument("--task_name",
+                        default="msra_ner",
+                        type=str,
+                        choices=["msra_ner"],
+                        help="The named entity recognition datasets.")
     parser.add_argument(
         "--output_dir",
         default="best_msra_ner_model",
         type=str,
-        help="The output directory where the model predictions and checkpoints will be written."
+        help=
+        "The output directory where the model predictions and checkpoints will be written."
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
     )
-    parser.add_argument(
-        "--batch_size",
-        default=8,
-        type=int,
-        help="Batch size per GPU/CPU for training.")
-    parser.add_argument(
-        "--learning_rate",
-        default=5e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--do_train", action='store_true', help="Whether to train.")
-    parser.add_argument(
-        "--do_eval", action='store_true', help="Whether to predict.")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.")
+    parser.add_argument("--batch_size",
+                        default=8,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--learning_rate",
+                        default=5e-5,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--do_train",
+                        action='store_true',
+                        help="Whether to train.")
+    parser.add_argument("--do_eval",
+                        action='store_true',
+                        help="Whether to predict.")
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="Max gradient norm.")
+    parser.add_argument("--num_train_epochs",
+                        default=3,
+                        type=int,
+                        help="Total number of training epochs to perform.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps.")
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--seed", type=int, default=42, help="random seed for initialization")
+    parser.add_argument("--warmup_steps",
+                        default=0,
+                        type=int,
+                        help="Linear warmup over warmup_steps.")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=100,
+                        help="Save checkpoint every X updates steps.")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=42,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -130,8 +132,8 @@ def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             batch['seq_len'], preds, batch['labels'])
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
     print("%s: eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (mode, avg_loss, precision, recall, f1_score))
@@ -189,12 +191,11 @@ def run(args):
     test_ds = test_ds.map(tokenize_and_align_labels,
                           batched=True,
                           remove_columns=column_names)
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  batch_size=args.batch_size,
+                                  return_list=True)
 
     if args.do_train:
         train_ds = train_ds.select(range(len(train_ds) - 1))
@@ -206,18 +207,18 @@ def run(args):
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
-        train_data_loader = DataLoader(
-            dataset=train_ds,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            batch_sampler=train_batch_sampler,
-            return_list=True)
+        train_data_loader = DataLoader(dataset=train_ds,
+                                       collate_fn=batchify_fn,
+                                       num_workers=0,
+                                       batch_sampler=train_batch_sampler,
+                                       return_list=True)
 
         num_training_steps = args.max_steps if args.max_steps > 0 else len(
             train_data_loader) * args.num_train_epochs
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_steps)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps,
+                                             args.warmup_steps)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -276,12 +277,11 @@ def run(args):
         print("best_f1: ", best_f1)
 
     if args.do_eval:
-        eval_data_loader = DataLoader(
-            dataset=test_ds,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            batch_size=args.batch_size,
-            return_list=True)
+        eval_data_loader = DataLoader(dataset=test_ds,
+                                      collate_fn=batchify_fn,
+                                      num_workers=0,
+                                      batch_size=args.batch_size,
+                                      return_list=True)
 
         # Define the model netword and its loss
         model = AutoModelForTokenClassification.from_pretrained(
@@ -299,8 +299,8 @@ def run(args):
             preds = logits.argmax(axis=2)
             num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
                 batch["length"], preds, batch["labels"])
-            metric.update(num_infer_chunks.numpy(),
-                          num_label_chunks.numpy(), num_correct_chunks.numpy())
+            metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                          num_correct_chunks.numpy())
             precision, recall, f1_score = metric.accumulate()
         print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
               (avg_loss, precision, recall, f1_score))

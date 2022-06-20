@@ -73,8 +73,8 @@ def do_predict(args):
     paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
-    train_examples, predict_examples = load_dataset(
-        'msra_ner', split=('train', 'test'))
+    train_examples, predict_examples = load_dataset('msra_ner',
+                                                    split=('train', 'test'))
     column_names = train_examples.column_names
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
@@ -113,16 +113,15 @@ def do_predict(args):
     predict_ds = predict_examples.map(tokenize_and_align_labels,
                                       batched=True,
                                       remove_columns=column_names)
-    predict_data_loader = DataLoader(
-        dataset=predict_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+    predict_data_loader = DataLoader(dataset=predict_ds,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     batch_size=args.batch_size,
+                                     return_list=True)
 
     # Define the model netword
-    model = BertForTokenClassification.from_pretrained(
-        args.model_name_or_path, num_classes=label_num)
+    model = BertForTokenClassification.from_pretrained(args.model_name_or_path,
+                                                       num_classes=label_num)
     if args.init_checkpoint_path:
         model_dict = paddle.load(args.init_checkpoint_path)
         model.set_dict(model_dict)

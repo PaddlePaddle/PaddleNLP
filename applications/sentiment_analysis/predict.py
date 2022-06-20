@@ -45,25 +45,28 @@ def predict_ext(args):
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(
-        read_test_file, data_path=args.test_path, lazy=False)
-    trans_func = partial(
-        convert_example_to_feature_ext,
-        tokenizer=tokenizer,
-        label2id=ext_label2id,
-        max_seq_len=args.ext_max_seq_len,
-        is_test=True)
+    ori_test_ds = load_dataset(read_test_file,
+                               data_path=args.test_path,
+                               lazy=False)
+    trans_func = partial(convert_example_to_feature_ext,
+                         tokenizer=tokenizer,
+                         label2id=ext_label2id,
+                         max_seq_len=args.ext_max_seq_len,
+                         is_test=True)
     test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
-        Stack(dtype="int64"), ): fn(samples)
+        Stack(dtype="int64"),
+    ): fn(samples)
 
-    test_batch_sampler = paddle.io.BatchSampler(
-        test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(
-        test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds,
+                                                batch_size=args.batch_size,
+                                                shuffle=False)
+    test_loader = paddle.io.DataLoader(test_ds,
+                                       batch_sampler=test_batch_sampler,
+                                       collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load ext model
@@ -106,24 +109,25 @@ def predict_cls(args, ext_results):
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     test_ds = MapDataset(ext_results)
-    trans_func = partial(
-        convert_example_to_feature_cls,
-        tokenizer=tokenizer,
-        label2id=cls_label2id,
-        max_seq_len=args.cls_max_seq_len,
-        is_test=True)
+    trans_func = partial(convert_example_to_feature_cls,
+                         tokenizer=tokenizer,
+                         label2id=cls_label2id,
+                         max_seq_len=args.cls_max_seq_len,
+                         is_test=True)
     test_ds = test_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(dtype="int64")): fn(samples)
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id), Stack(dtype="int64")
+    ): fn(samples)
 
     # set shuffle is False
-    test_batch_sampler = paddle.io.BatchSampler(
-        test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(
-        test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds,
+                                                batch_size=args.batch_size,
+                                                shuffle=False)
+    test_loader = paddle.io.DataLoader(test_ds,
+                                       batch_sampler=test_batch_sampler,
+                                       collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load cls model
@@ -199,6 +203,6 @@ if __name__ == "__main__":
     cls_results = predict_cls(args, ext_results)
     print("predicting with classification model done!")
 
-    # post_process prediction results 
+    # post_process prediction results
     post_process(ext_results, cls_results)
     print(f"sentiment analysis results has been saved to path: {args.save_path}")

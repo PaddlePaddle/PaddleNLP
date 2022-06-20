@@ -49,6 +49,7 @@ def convert_example(example,
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -143,7 +144,9 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    results = predictor.predict(
-        data, tokenizer, label_map, batch_size=args.batch_size)
+    results = predictor.predict(data,
+                                tokenizer,
+                                label_map,
+                                batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

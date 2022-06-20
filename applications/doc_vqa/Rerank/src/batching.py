@@ -52,8 +52,8 @@ def pad_batch_data(insts,
 
     if return_input_mask:
         # This is used to avoid attention on paddings.
-        input_mask_data = np.array([[1] * len(inst) + [0] *
-                                    (max_len - len(inst)) for inst in insts])
+        input_mask_data = np.array(
+            [[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
         input_mask_data = np.expand_dims(input_mask_data, axis=-1)
         return_list += [input_mask_data.astype("float32")]
 

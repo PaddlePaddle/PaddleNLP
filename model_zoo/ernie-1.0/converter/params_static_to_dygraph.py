@@ -5,15 +5,16 @@ from paddlenlp.utils.log import logger
 
 paddle.set_device("cpu")
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--model", type=str, help="The name of pretrained weights in PaddleNLP.")
-parser.add_argument(
-    "--path", type=str, help="The path of checkpoint to be loaded.")
-parser.add_argument(
-    "--output_path",
-    type=str,
-    default=None,
-    help="The path of checkpoint to be loaded.")
+parser.add_argument("--model",
+                    type=str,
+                    help="The name of pretrained weights in PaddleNLP.")
+parser.add_argument("--path",
+                    type=str,
+                    help="The path of checkpoint to be loaded.")
+parser.add_argument("--output_path",
+                    type=str,
+                    default=None,
+                    help="The path of checkpoint to be loaded.")
 args = parser.parse_args()
 
 

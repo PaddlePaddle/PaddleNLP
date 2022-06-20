@@ -71,7 +71,7 @@ def delete_feedback():
 
 
 @router.post("/eval-feedback")
-def get_feedback_metrics(filters: FilterRequest=None):
+def get_feedback_metrics(filters: FilterRequest = None):
     """
     This endpoint returns basic accuracy metrics based on user feedback,
     e.g., the ratio of correct answers or correctly identified documents.
@@ -115,9 +115,9 @@ def get_feedback_metrics(filters: FilterRequest=None):
 
 
 @router.get("/export-feedback")
-def export_feedback(context_size: int=100_000,
-                    full_document_context: bool=True,
-                    only_positive_labels: bool=False):
+def export_feedback(context_size: int = 100_000,
+                    full_document_context: bool = True,
+                    only_positive_labels: bool = False):
     """
     This endpoint returns JSON output in the SQuAD format for question/answer pairs
     that were marked as "relevant" by user feedback through the `POST /feedback` endpoint.
@@ -125,18 +125,18 @@ def export_feedback(context_size: int=100_000,
     The context_size param can be used to limit response size for large documents.
     """
     if only_positive_labels:
-        labels = DOCUMENT_STORE.get_all_labels(
-            filters={"is_correct_answer": [True],
-                     "origin": ["user-feedback"]})
+        labels = DOCUMENT_STORE.get_all_labels(filters={
+            "is_correct_answer": [True],
+            "origin": ["user-feedback"]
+        })
     else:
         labels = DOCUMENT_STORE.get_all_labels(
             filters={"origin": ["user-feedback"]})
         # Filter out the labels where the passage is correct but answer is wrong (in SQuAD this matches
         # neither a "positive example" nor a negative "is_impossible" one)
         labels = [
-            l for l in labels
-            if not (l.is_correct_document is True and l.is_correct_answer is
-                    False)
+            l for l in labels if not (
+                l.is_correct_document is True and l.is_correct_answer is False)
         ]
 
     export_data = []
@@ -157,9 +157,10 @@ def export_feedback(context_size: int=100_000,
                 label.answer.offsets_in_document[0].start - context_to_add, 0)
             additional_context_at_end = max(
                 context_to_add - label.answer.offsets_in_document[0].start, 0)
-            end_pos = min(label.answer.offsets_in_document[0].start +
-                          len(label.answer.answer) + context_to_add,
-                          len(text) - 1)
+            end_pos = min(
+                label.answer.offsets_in_document[0].start +
+                len(label.answer.answer) + context_to_add,
+                len(text) - 1)
             additional_context_at_start = max(
                 label.answer.offsets_in_document[0].start +
                 len(label.answer.answer) + context_to_add - len(text), 0)
@@ -171,8 +172,10 @@ def export_feedback(context_size: int=100_000,
         if label.is_correct_answer is False and label.is_correct_document is False:  # No answer
             squad_label = {
                 "paragraphs": [{
-                    "context": context,
-                    "id": label.document.id,
+                    "context":
+                    context,
+                    "id":
+                    label.document.id,
                     "qas": [{
                         "question": label.query,
                         "id": label.id,
@@ -184,12 +187,17 @@ def export_feedback(context_size: int=100_000,
         else:
             squad_label = {
                 "paragraphs": [{
-                    "context": context,
-                    "id": label.document.id,
+                    "context":
+                    context,
+                    "id":
+                    label.document.id,
                     "qas": [{
-                        "question": label.query,
-                        "id": label.id,
-                        "is_impossible": False,
+                        "question":
+                        label.query,
+                        "id":
+                        label.id,
+                        "is_impossible":
+                        False,
                         "answers": [{
                             "text": label.answer.answer,
                             "answer_start": answer_start

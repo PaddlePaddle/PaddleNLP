@@ -59,7 +59,8 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -70,19 +71,22 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--input_dir",
         default=None,
         type=str,
         required=True,
-        help="The input directory where the data will be read from.", )
+        help="The input directory where the data will be read from.",
+    )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
 
     parser.add_argument(
@@ -95,81 +99,86 @@ def parse_args():
         "--batch_size",
         default=8,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=5e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+        help="Batch size per GPU/CPU for training.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=5e-5,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="Max gradient norm.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
+        help="Total number of training epochs to perform.",
+    )
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--warmup_steps",
-        default=0,
-        type=int,
-        help="Linear warmup over warmup_steps.")
+    parser.add_argument("--warmup_steps",
+                        default=0,
+                        type=int,
+                        help="Linear warmup over warmup_steps.")
 
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=500,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=500,
-        help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--seed", type=int, default=42, help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["cpu", "gpu", "xpu"],
-        help="Device for selecting for the training.")
-    parser.add_argument(
-        "--use_amp",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=2**15,
-        help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--to_static",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable training under @to_static.")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=500,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=500,
+                        help="Save checkpoint every X updates steps.")
+    parser.add_argument("--seed",
+                        type=int,
+                        default=42,
+                        help="random seed for initialization")
+    parser.add_argument("--device",
+                        type=str,
+                        default="gpu",
+                        choices=["cpu", "gpu", "xpu"],
+                        help="Device for selecting for the training.")
+    parser.add_argument("--use_amp",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Enable mixed precision training.")
+    parser.add_argument("--scale_loss",
+                        type=float,
+                        default=2**15,
+                        help="The value of scale_loss for fp16.")
+    parser.add_argument("--to_static",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Enable training under @to_static.")
 
     # For benchmark.
     parser.add_argument(
         '--profiler_options',
         type=str,
         default=None,
-        help='The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+        help=
+        'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
+    parser.add_argument(
+        "--fuse_transformer",
+        type=distutils.util.strtobool,
+        default=False,
+        help=
+        "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."
     )
     args = parser.parse_args()
     return args
@@ -182,6 +191,7 @@ def set_seed(args):
 
 
 class WorkerInitObj(object):
+
     def __init__(self, seed):
         self.seed = seed
 
@@ -192,11 +202,12 @@ class WorkerInitObj(object):
 
 def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
                                worker_init):
-    train_data = PretrainingDataset(
-        input_file=input_file, max_pred_length=max_pred_length)
+    train_data = PretrainingDataset(input_file=input_file,
+                                    max_pred_length=max_pred_length)
     # files have been sharded, no need to dispatch again
-    train_batch_sampler = paddle.io.BatchSampler(
-        train_data, batch_size=args.batch_size, shuffle=True)
+    train_batch_sampler = paddle.io.BatchSampler(train_data,
+                                                 batch_size=args.batch_size,
+                                                 shuffle=True)
 
     # DataLoader cannot be pickled because of its place.
     # If it can be pickled, use global function instead of lambda and use
@@ -228,32 +239,36 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args,
         out.append(np.asarray([mask_token_num], dtype=np.float32))
         return out
 
-    train_data_loader = DataLoader(
-        dataset=train_data,
-        batch_sampler=train_batch_sampler,
-        collate_fn=_collate_data,
-        num_workers=0,
-        worker_init_fn=worker_init,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_data,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=_collate_data,
+                                   num_workers=0,
+                                   worker_init_fn=worker_init,
+                                   return_list=True)
     return train_data_loader, input_file
 
 
 def create_input_specs():
-    input_ids = paddle.static.InputSpec(
-        name="input_ids", shape=[-1, -1], dtype="int64")
-    segment_ids = paddle.static.InputSpec(
-        name="segment_ids", shape=[-1, -1], dtype="int64")
+    input_ids = paddle.static.InputSpec(name="input_ids",
+                                        shape=[-1, -1],
+                                        dtype="int64")
+    segment_ids = paddle.static.InputSpec(name="segment_ids",
+                                          shape=[-1, -1],
+                                          dtype="int64")
     position_ids = None
-    input_mask = paddle.static.InputSpec(
-        name="input_mask", shape=[-1, 1, 1, -1], dtype="float32")
-    masked_lm_positions = paddle.static.InputSpec(
-        name="masked_lm_positions", shape=[-1], dtype="int32")
+    input_mask = paddle.static.InputSpec(name="input_mask",
+                                         shape=[-1, 1, 1, -1],
+                                         dtype="float32")
+    masked_lm_positions = paddle.static.InputSpec(name="masked_lm_positions",
+                                                  shape=[-1],
+                                                  dtype="int32")
     return [
         input_ids, segment_ids, position_ids, input_mask, masked_lm_positions
     ]
 
 
 class PretrainingDataset(Dataset):
+
     def __init__(self, input_file, max_pred_length):
         self.input_file = input_file
         self.max_pred_length = max_pred_length
@@ -281,8 +296,8 @@ class PretrainingDataset(Dataset):
         ]
         # TODO: whether to use reversed mask by changing 1s and 0s to be
         # consistent with nv bert
-        input_mask = (1 - np.reshape(
-            input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])) * -1e9
+        input_mask = (1 - np.reshape(input_mask.astype(np.float32),
+                                     [1, 1, input_mask.shape[0]])) * -1e9
 
         index = self.max_pred_length
         # store number of  masked tokens in index
@@ -325,9 +340,10 @@ def do_train(args):
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
-        model = model_class(
-            base_class(**model_class.pretrained_init_configuration[
-                args.model_name_or_path]))
+        config = model_class.pretrained_init_configuration[
+            args.model_name_or_path]
+        config['fuse'] = args.fuse_transformer
+        model = model_class(base_class(**config))
     else:
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
@@ -336,8 +352,8 @@ def do_train(args):
     if args.to_static:
         specs = create_input_specs()
         model = paddle.jit.to_static(model, input_spec=specs)
-        logger.info("Successfully to apply @to_static with specs: {}".format(
-            specs))
+        logger.info(
+            "Successfully to apply @to_static with specs: {}".format(specs))
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -347,8 +363,10 @@ def do_train(args):
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.num_train_epochs
 
-    lr_scheduler = LinearDecayWithWarmup(
-        args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                         num_training_steps,
+                                         args.warmup_steps,
+                                         last_epoch=0)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -382,10 +400,10 @@ def do_train(args):
 
         if paddle.distributed.get_world_size() > num_files:
             remainder = paddle.distributed.get_world_size() % num_files
-            data_file = files[(
-                f_start_id * paddle.distributed.get_world_size() +
-                paddle.distributed.get_rank() + remainder * f_start_id) %
-                              num_files]
+            data_file = files[
+                (f_start_id * paddle.distributed.get_world_size() +
+                 paddle.distributed.get_rank() + remainder * f_start_id) %
+                num_files]
         else:
             data_file = files[(f_start_id * paddle.distributed.get_world_size()
                                + paddle.distributed.get_rank()) % num_files]
@@ -403,10 +421,9 @@ def do_train(args):
             if not single_file and f_id == f_start_id:
                 continue
             if paddle.distributed.get_world_size() > num_files:
-                data_file = files[(
-                    f_id * paddle.distributed.get_world_size() +
-                    paddle.distributed.get_rank() + remainder * f_id) %
-                                  num_files]
+                data_file = files[(f_id * paddle.distributed.get_world_size() +
+                                   paddle.distributed.get_rank() +
+                                   remainder * f_id) % num_files]
             else:
                 data_file = files[(f_id * paddle.distributed.get_world_size() +
                                    paddle.distributed.get_rank()) % num_files]
@@ -426,9 +443,12 @@ def do_train(args):
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
                  masked_lm_scale) = batch
-                with paddle.amp.auto_cast(
-                        args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu"]):
+                with paddle.amp.auto_cast(args.use_amp,
+                                          custom_white_list=[
+                                              "layer_norm", "softmax", "gelu",
+                                              "fused_attention",
+                                              "fused_feedforward"
+                                          ]):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
@@ -461,13 +481,13 @@ def do_train(args):
                             % (global_step, epoch, step, loss,
                                reader_cost_avg.get_average(),
                                train_cost_avg.get_average(), total_samples /
-                               args.logging_steps, total_samples / (
-                                   args.logging_steps *
-                                   train_cost_avg.get_average())))
+                               args.logging_steps, total_samples /
+                               (args.logging_steps *
+                                train_cost_avg.get_average())))
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
-                if global_step % args.save_steps == 0:
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
@@ -481,7 +501,7 @@ def do_train(args):
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:
+                if global_step >= args.max_steps:            
                     del train_data_loader
                     return
                 batch_start = time.time()

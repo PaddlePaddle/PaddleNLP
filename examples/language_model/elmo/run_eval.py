@@ -19,15 +19,14 @@ def eval(args):
         raise ValueError('init_from_ckpt should be set when eval.')
     vocab = load_vocab(args.vocab_file, args.max_characters_per_token)
 
-    elmo = ELMo(
-        args.batch_size,
-        args.char_embed_dim,
-        args.projection_dim,
-        vocab.size,
-        dropout=args.dropout,
-        num_layers=args.num_layers,
-        num_highways=args.num_highways,
-        char_vocab_size=vocab.char_size)
+    elmo = ELMo(args.batch_size,
+                args.char_embed_dim,
+                args.projection_dim,
+                vocab.size,
+                dropout=args.dropout,
+                num_layers=args.num_layers,
+                num_highways=args.num_highways,
+                char_vocab_size=vocab.char_size)
     elmo.eval()
 
     elmo_loss = ELMoLoss()
@@ -37,14 +36,13 @@ def eval(args):
     elmo.set_state_dict(weight_state_dict)
     print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
-    dev_dataset = OneBillionWordDataset(
-        args.dev_data_path,
-        vocab,
-        args.batch_size,
-        args.unroll_steps,
-        mode='test',
-        shuffle=False,
-        seed=args.seed)
+    dev_dataset = OneBillionWordDataset(args.dev_data_path,
+                                        vocab,
+                                        args.batch_size,
+                                        args.unroll_steps,
+                                        mode='test',
+                                        shuffle=False,
+                                        seed=args.seed)
 
     dev_dataloader = DataLoader(dev_dataset, return_list=True, batch_size=None)
 

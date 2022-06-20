@@ -217,7 +217,9 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
@@ -264,8 +266,8 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         sep = [self.sep_token_id]
         if token_ids_1 is None:
             return (self.cls_num + len(token_ids_0 + sep)) * [0]
-        return (self.cls_num + len(token_ids_0 + sep)
-                ) * [0] + len(token_ids_1 + sep) * [1]
+        return (self.cls_num + len(token_ids_0 + sep)) * [0] + len(token_ids_1 +
+                                                                   sep) * [1]
 
     def num_special_tokens_to_add(self, pair=False):
         """
