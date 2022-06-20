@@ -67,11 +67,6 @@ def predict(model, data_loader):
         for batch_data in data_loader:
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
 
-            query_input_ids = paddle.to_tensor(query_input_ids)
-            query_token_type_ids = paddle.to_tensor(query_token_type_ids)
-            title_input_ids = paddle.to_tensor(title_input_ids)
-            title_token_type_ids = paddle.to_tensor(title_token_type_ids)
-
             batch_cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
