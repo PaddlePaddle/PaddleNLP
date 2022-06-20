@@ -23,6 +23,10 @@ except ImportError:
     FusedTransformerEncoderLayer = None
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+)
 
 __all__ = [
     'BertModel',
@@ -542,7 +546,9 @@ class BertModel(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -639,22 +645,28 @@ class BertModel(BertPretrainedModel):
             else:
                 return hidden_states, pooled_output
         else:
-            if output_hidden_states:
-                output = embedding_output
-                encoder_outputs = []
-                for mod in self.encoder.layers:
-                    output = mod(output, src_mask=attention_mask)
-                    encoder_outputs.append(output)
-                if self.encoder.norm is not None:
-                    encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-                pooled_output = self.pooler(encoder_outputs[-1])
-            else:
-                sequence_output = self.encoder(embedding_output, attention_mask)
+            encoder_outputs = self.encoder(
+                embedding_output,
+                src_mask=attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict)
+            if isinstance(encoder_outputs, paddle.Tensor):
+                sequence_output = encoder_outputs
                 pooled_output = self.pooler(sequence_output)
-            if output_hidden_states:
-                return encoder_outputs, pooled_output
+                return (sequence_output, pooled_output)
             else:
-                return sequence_output, pooled_output
+                sequence_output = encoder_outputs[0]
+                pooled_output = self.pooler(sequence_output)
+                if not return_dict:
+                    return (sequence_output,
+                            pooled_output) + encoder_outputs[1:]
+                return BaseModelOutputWithPoolingAndCrossAttentions(
+                    last_hidden_state=sequence_output,
+                    pooler_output=pooled_output,
+                    past_key_values=encoder_outputs.past_key_values,
+                    hidden_states=encoder_outputs.hidden_states,
+                    attentions=encoder_outputs.attentions)
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
