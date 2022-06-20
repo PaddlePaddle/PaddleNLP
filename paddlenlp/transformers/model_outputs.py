@@ -327,3 +327,153 @@ class BaseModelOutputWithPoolingAndCrossAttentions(ModelOutput):
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
     cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class SequenceClassifierOutput(ModelOutput):
+    """
+    Base class for outputs of sentence classification models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class TokenClassifierOutput(ModelOutput):
+    """
+    Base class for outputs of token classification models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided) :
+            Classification loss.
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.num_labels)`):
+            Classification scores (before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class QuestionAnsweringModelOutput(ModelOutput):
+    """
+    Base class for outputs of question answering models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Total span extraction loss is the sum of a Cross-Entropy for the start and end positions.
+        start_logits (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+            Span-start scores (before SoftMax).
+        end_logits (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+            Span-end scores (before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    start_logits: paddle.Tensor = None
+    end_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class MultipleChoiceModelOutput(ModelOutput):
+    """
+    Base class for outputs of multiple choice models.
+
+    Args:
+        loss (`paddle.Tensor` of shape *(1,)*, *optional*, returned when `labels` is provided):
+            Classification loss.
+        logits (`paddle.Tensor` of shape `(batch_size, num_choices)`):
+            *num_choices* is the second dimension of the input tensors. (see *input_ids* above).
+
+            Classification scores (before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class MaskedLMOutput(ModelOutput):
+    """
+    Base class for masked language models outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Masked language modeling (MLM) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
