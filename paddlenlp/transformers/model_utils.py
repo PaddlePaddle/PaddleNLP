@@ -537,16 +537,9 @@ class PretrainedModel(Layer, GenerationMixin):
         # Build new embeddings
         new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
 
-        # custom weight for new embedding
-        if old_num_tokens < new_num_tokens:
-            custom_weight = paddle.concat(
-                x=[
-                    old_embeddings.weight[:old_num_tokens, :],
-                    new_embeddings.weight[old_num_tokens:, :]
-                ],
-                axis=0)
-        else:
-            custom_weight = old_embeddings.weight[:new_num_tokens, :]
-        new_embeddings.weight.set_value(custom_weight)
+        # numbers of tokens to copy
+        n = min(old_num_tokens, new_num_tokens)
+        with paddle.no_grad():
+            new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
 
         return new_embeddings
