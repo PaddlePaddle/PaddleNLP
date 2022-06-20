@@ -13,7 +13,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
+from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
@@ -68,10 +68,9 @@ if __name__ == "__main__":
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
 
-            text_embeddings = model(input_ids, token_type_ids)
+            text_embeddings = model.get_pooled_embedding(
+                input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
 
     text_embedding = all_embeddings[0]
