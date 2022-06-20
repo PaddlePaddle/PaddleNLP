@@ -13,7 +13,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase
+from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from tqdm import tqdm
@@ -63,7 +63,8 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexBase(pretrained_model, output_emb_size=output_emb_size)
+    model = SemanticIndexBaseStatic(pretrained_model,
+                                    output_emb_size=output_emb_size)
 
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
