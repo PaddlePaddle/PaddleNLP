@@ -17,8 +17,8 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../source/paddlenlp.ops.optimizer.rst:2
-msgid "optimizer"
+#: ../source/paddlenlp.ops.optimizer.adamwdl.rst:2
+msgid "adamwdl"
 msgstr ""
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:1
