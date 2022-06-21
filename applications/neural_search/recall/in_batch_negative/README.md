@@ -323,6 +323,25 @@ recall@50=78.84
 
 <a name="预测"></a>
 
+### 6.1 边训练边评估，寻找最优模型
+```
+python -u -m paddle.distributed.launch --gpus "0" \
+    train_batch_neg_evaluate.py \
+    --device gpu \
+    --save_dir ./model_inbatch/ \
+    --batch_size 32 \
+    --learning_rate 5E-6 \
+    --epochs 100 \
+    --output_emb_size 256 \
+    --save_steps 10 \
+    --max_seq_length 512 \
+    --margin 0.2 \
+    --train_set_file ./recall/train.csv \
+    --dev_set_file ./recall/dev.csv \
+    --recall_result_dir ./recall_result_dir_inbatch
+```
+
+
 ## 7. 预测
 
 我们可以基于语义索引模型预测文本的语义向量或者计算文本 Pair 的语义相似度。
