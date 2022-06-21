@@ -316,24 +316,27 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 
   | 模型 |  结构  |
   | :---: | :--------: |
-  | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
   | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
   | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
+  | `uie-medium`| 6-layers, 768-hidden, 12-heads |
+  | `uie-mini`| 6-layers, 384-hidden, 12-heads |
+  | `uie-micro`| 4-layers, 384-hidden, 12-heads |
+  | `uie-nano`| 4-layers, 312-hidden, 12-heads |
 
-- 使用`UIE-Tiny`进行预测
+- 使用`UIE-Nano`进行预测
 
   ```python
   >>> from paddlenlp import Taskflow
 
   >>> schema = ['时间', '选手', '赛事名称']
-  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-tiny")
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
-  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9492842181233527}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.7277186614493836}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8751028059367947}]}]
+  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
   ```
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`。
 * `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
@@ -446,7 +449,7 @@ python finetune.py \
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
@@ -472,7 +475,7 @@ python evaluate.py \
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
+- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 
 #### 定制模型一键预测
 
@@ -511,8 +514,11 @@ python evaluate.py \
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-tiny<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
+<tr><td>uie-medium<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
+<tr><td>uie-mini<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
+<tr><td>uie-micro<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.222
+<tr><td>uie-nano<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果。
