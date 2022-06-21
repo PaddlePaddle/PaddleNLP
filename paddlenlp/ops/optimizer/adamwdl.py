@@ -14,9 +14,7 @@
 from functools import partial
 
 import paddle
-import paddle.fluid as fluid
-from paddle.fluid import core, framework
-from paddle.optimizer import AdamW, Adam
+from paddle.optimizer import AdamW
 
 __all__ = ['AdamWDL', 'layerwise_lr_decay']
 
@@ -149,7 +147,7 @@ class AdamWDL(AdamW):
                  name_dict=None,
                  name=None):
         if not isinstance(layerwise_decay, float) and \
-                not isinstance(layerwise_decay, fluid.framework.Variable):
+                not isinstance(layerwise_decay, paddle.framework.Variable):
             raise TypeError("coeff should be float or Tensor.")
         self.layerwise_decay = layerwise_decay
         self.n_layers = n_layers
@@ -223,7 +221,7 @@ class AdamWDL(AdamW):
             learning_rate = self._create_param_lr(param_and_grad)
 
         with block.program._optimized_guard(
-            [param, grad]), framework.name_scope('weight decay'):
+            [param, grad]), paddle.static.name_scope('weight decay'):
             self._params_name.add(param.name)
 
             # If it has been calculated, the result will be reused.
@@ -238,7 +236,7 @@ class AdamWDL(AdamW):
                 self._lr_to_coeff[learning_rate] = decay_coeff
 
             find_master = (self._multi_precision
-                           and param.dtype == core.VarDesc.VarType.FP16)
+                           and param.dtype == paddle.float16)
             if find_master:
                 master_weight = self._master_weights[param.name]
                 scaled_param = master_weight * decay_coeff
