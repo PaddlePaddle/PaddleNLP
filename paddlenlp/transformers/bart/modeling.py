@@ -459,14 +459,15 @@ class BartModel(BartPretrainedModel):
                 Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
                 by shifting the `input_ids` to the right.
             decoder_attention_mask (Tensor, optional):
-                Mask tensor used in decoder layers' multi-head attention(MHA) to avoid performing attention on some
-                unwanted decoder input positions, usually the paddings or the subsequent positions.
-                It has a shape of `[batch_size, num_attention_heads, sequence_length, sequence_length]`, the data type
-                can be int, float or boolean.
-                When dtype is int, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
-                When dtype is float, 0 for tokens that are **not masked** and -INF for tokens that are **masked**.
+                Padding mask used in decoder layers' multi-head attention(MHA).
+                It has a shape of `[batch_size, sequence_length+past_key_values_length]` and its dtype can be int, float or boolean.
+                When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
                 When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
-                Default behavior: generate a tensor that ignores pad tokens in decoder_input_ids. Causal mask will also be used by default.
+                Defaults to `None` and causal mask will be used by default.
+
+                .. note::
+                    `decoder_attention_mask` doesn't include `causal_mask` internally. On the contrary,
+                    `causal_mask` will be automatically created and added to decoder_attention_mask.
             encoder_output (tuple, optional):
                 The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
                 The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, hidden_size]`.

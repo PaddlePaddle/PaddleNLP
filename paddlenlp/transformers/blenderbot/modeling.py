@@ -649,34 +649,33 @@ class BlenderbotModel(BlenderbotPretrainedModel):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
-
             attention_mask (Tensor, optional):
-                Mask to indicate whether to perform attention on each input token or not.
-                The values should be either 0 or 1. The attention scores will be set
-                to **-infinity** for any positions in the mask that are **0**, and will be
-                **unchanged** for positions that are **1**.
-
-                - **1** for tokens that are **not masked**,
-                - **0** for tokens that are **masked**.
-
-                It's data type should be `float32` and has a shape of [batch_size, sequence_length].
-                Defaults to `None`.
-
+                Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+                positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+                `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For all shapes above, the tensor's data type can be int, float or boolean.
+                When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
             decoder_input_ids (Tensor, optional):
                 If not provided, ``decoder_input_ids`` will be automatically generated based
                 on ``decoder_start_token_id`` and ``input_ids``.
-
             decoder_attention_mask (Tensor, optional):
-                If not provided, the default ``decoder_attention_mask`` will be a tensor with
-                upper triangular part being ``-np.inf``. the shape will be ``(decoder_length, decoder_length)``
+                Padding mask used in decoder layers' multi-head attention(MHA).
+                It has a shape of `[batch_size, sequence_length+past_key_values_length]` and its dtype can be int, float or boolean.
+                When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None` and causal mask will be used by default.
 
+                .. note::
+                    `decoder_attention_mask` doesn't include `causal_mask` internally. On the contrary,
+                    `causal_mask` will be automatically created and added to decoder_attention_mask.
             encoder_output (Tensor, optional):
                 The output of encoder. If not provided, a ``encoder_output`` will be generated
                 from BlenderbotEncoder. Defaults to ``None``.
-
             use_cache (bool, optional):
                 Indicates whether to use cache to speed up decoding. Defaults to ``False``
-
             cache (list, optional): It is a list, and each element in the list
                 is a tuple( :code:`(incremental_cache, static_cache)` ). See
                 `paddle.nn.TransformerDecoder.gen_cache` for more details. It is only

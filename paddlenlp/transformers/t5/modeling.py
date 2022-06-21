@@ -863,7 +863,7 @@ class T5PretrainedModel(PretrainedModel):
         return shifted_input_ids
 
 
-class T5Stack(nn.Layer):
+class T5Stack(T5PretrainedModel):
 
     def __init__(self,
                  d_model,
@@ -916,50 +916,34 @@ class T5Stack(nn.Layer):
                 output_attentions=False,
                 output_hidden_states=False):
         assert input_ids is not None, "input_ids can not be None"
-        input_shape = input_ids.shape
-        input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
-
-        inputs_embeds = self.embed_tokens(input_ids)
-
-        batch_size, seq_length = input_shape
-
-        # required mask seq length can be calculated via length of past
-        mask_seq_length = (cache[0][0].shape[2] +
-                           seq_length if cache is not None else seq_length)
-
         if use_cache is True:
             assert (
                 self.is_decoder
             ), f"`use_cache` can only be set to `True` if {self} is used as a decoder"
 
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
-        # ourselves in which case we just need to make it broadcastable to all heads.
-        if attention_mask is None:
-            extended_attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            extended_attention_mask = self.get_extended_attention_mask(
+        input_shape = input_ids.shape
+        input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
+        inputs_embeds = self.embed_tokens(input_ids)
+        batch_size, seq_length = input_shape
+
+        if self.is_decoder:
+            if attention_mask is None:
+                # required mask seq length can be calculated via length of past
+                mask_seq_length = (cache[0][0].shape[2] + seq_length
+                                   if cache is not None else seq_length)
+                attention_mask = paddle.ones([batch_size, mask_seq_length])
+            attention_mask = self.get_extended_attention_mask_for_decoder(
                 attention_mask, input_shape)
+        else:
+            attention_mask = self.get_extended_attention_mask(attention_mask)
 
-        if (self.is_decoder and encoder_attention_mask is None
-                and encoder_hidden_states is not None):
-            encoder_seq_length = encoder_hidden_states.shape[1]
-            encoder_attention_mask = paddle.ones(
-                [batch_size, encoder_seq_length], dtype=paddle.int64)
-
-        # initialize caches with `None` if past does not exist
-        if cache is None:
-            cache = [None] * len(self.block)
-
-        # If a 2D or 3D attention mask is provided for the cross-attention
-        # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
+        # Dealing with cross attention
         if self.is_decoder and encoder_hidden_states is not None:
             encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.shape
-            encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
-                encoder_attention_mask = paddle.ones(shape=encoder_hidden_shape)
-            encoder_extended_attention_mask = self.invert_attention_mask(
+                encoder_attention_mask = paddle.ones(
+                    [encoder_batch_size, encoder_sequence_length])
+            encoder_extended_attention_mask = self.get_extended_attention_mask(
                 encoder_attention_mask)
         else:
             encoder_extended_attention_mask = None
@@ -971,8 +955,11 @@ class T5Stack(nn.Layer):
                                       and self.is_decoder) else None
         position_bias = None
         encoder_decoder_position_bias = None
-
         hidden_states = self.dropout(inputs_embeds)
+
+        # initialize caches with `None` if past does not exist
+        if cache is None:
+            cache = [None] * len(self.block)
 
         for i, (layer_module,
                 past_key_value) in enumerate(zip(self.block, cache)):
@@ -1031,73 +1018,6 @@ class T5Stack(nn.Layer):
             all_attentions,
             all_cross_attentions,
         ] if v is not None)
-
-    def get_extended_attention_mask(self, attention_mask, input_shape):
-        if attention_mask.ndim == 3:
-            extended_attention_mask = attention_mask.unsqueeze(1)
-        elif attention_mask.ndim == 2:
-            # Provided a padding mask of dimensions [batch_size, seq_length]
-            # - if the model is a decoder, apply a causal mask in addition to the padding mask
-            # - if the model is an encoder, make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
-            if self.is_decoder:
-                batch_size, seq_length = input_shape
-                seq_ids = paddle.arange(seq_length)
-                causal_mask = paddle.tile(seq_ids.unsqueeze(axis=[0, 1]),
-                                          [batch_size, seq_length, 1
-                                           ]) <= seq_ids.unsqueeze(axis=[0, 2])
-                # in case cache are used we need to add a prefix ones mask to the causal mask
-                # causal and attention masks must have same type with pytorch version < 1.3
-                causal_mask = causal_mask.astype(attention_mask.dtype)
-
-                if causal_mask.shape[1] < attention_mask.shape[1]:
-                    prefix_seq_len = attention_mask.shape[
-                        1] - causal_mask.shape[1]
-                    causal_mask = paddle.concat(
-                        [
-                            paddle.ones(
-                                [batch_size, seq_length, prefix_seq_len],
-                                dtype=causal_mask.dtype,
-                            ),
-                            causal_mask,
-                        ],
-                        axis=-1,
-                    )
-
-                extended_attention_mask = causal_mask.unsqueeze(
-                    1) * attention_mask.unsqueeze([1, 2])
-            else:
-                extended_attention_mask = attention_mask.unsqueeze([1, 2])
-        else:
-            raise ValueError(
-                f"Wrong shape for input_ids (shape {input_shape}) or attention_mask (shape {attention_mask.shape})"
-            )
-
-        extended_attention_mask = extended_attention_mask.astype(self.dtype)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        return extended_attention_mask
-
-    def invert_attention_mask(self, encoder_attention_mask):
-        if encoder_attention_mask.ndim == 3:
-            encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
-                1)
-        if encoder_attention_mask.ndim == 2:
-            encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
-                [1, 2])
-        encoder_extended_attention_mask = encoder_extended_attention_mask.astype(
-            self.dtype)  # fp16 compatibility
-
-        if self.dtype == paddle.float16:
-            encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e4
-        elif self.dtype == paddle.float32:
-            encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e9
-        else:
-            raise ValueError(
-                f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"
-            )
-
-        return encoder_extended_attention_mask
 
 
 @register_base_model
@@ -1240,23 +1160,29 @@ class T5Model(T5PretrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on 
-                to some unwanted positions, usually the paddings or the subsequent positions.
-                Its data type can be int, float.
-                When the data type is int, the `masked` tokens have `0` values and the others 
-                have `1` values.
-                When the data type is float, the `masked` tokens have `0.0` values and the 
-                others have `1.0` values.
-                It is a tensor with shape broadcasted to [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`, which means nothing needed to be prevented attention to.
+                Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+                positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+                `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For all shapes above, the tensor's data type can be int, float or boolean.
+                When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
             decoder_input_ids (Tensor, optional):
                 Indices of decoder input sequence tokens in the vocabulary.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
                 by shifting the `input_ids` to the right.
             decoder_attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions in `decoder_input_ids`.
-                Its data type and shape is the same as `attention_mask`. Defaults to `None`.
+                Padding mask used in decoder layers' multi-head attention(MHA).
+                It has a shape of `[batch_size, sequence_length+past_key_values_length]` and its dtype can be int, float or boolean.
+                When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None` and causal mask will be used by default.
+
+                .. note::
+                    `decoder_attention_mask` doesn't include `causal_mask` internally. On the contrary,
+                    `causal_mask` will be automatically created and added to decoder_attention_mask.
             encoder_output (tuple, optional):
                 The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
                 The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
@@ -1347,8 +1273,10 @@ class T5Model(T5PretrainedModel):
                 last_hidden_state = outputs[0]
                 print(last_hidden_state.shape)
                 # [1, 5, 768]
-
         """
+
+        if attention_mask is None and input_ids is not None:
+            attention_mask = (input_ids != self.pad_token_id)
 
         # Encode if needed (training, first prediction pass)
         if encoder_output is None:

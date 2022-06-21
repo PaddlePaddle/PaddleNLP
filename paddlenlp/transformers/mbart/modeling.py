@@ -520,24 +520,29 @@ class MBartModel(MBartPretrainedModel):
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
-                [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`, which means nothing needed to be prevented attention to.
+                Mask tensor used in multi-head attention layer (MHA) to avoid performing attention on some unwanted
+                positions, usually the paddings or the subsequent positions. It can be a tensor of 2-dimensional shape
+                `[batch_size, sequence_length]` or 3-dimensional shape `[batch_size, sequence_length, sequence_length]`
+                or 4-dimensional shape `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For all shapes above, the tensor's data type can be int, float or boolean.
+                When dtype is int or float, 1 stands for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True stands for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None`. We will mask padding tokens(tokens with indices equal to pad_token_id) by default.
             decoder_input_ids (Tensor, optional):
                 Indices of decoder input sequence tokens in the vocabulary.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
                 by shifting the `input_ids` to the right.
             decoder_attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions in `decoder_input_ids`.
-                Its data type and shape is the same as `attention_mask`. Defaults to `None`.
+                Padding mask used in decoder layers' multi-head attention(MHA).
+                It has a shape of `[batch_size, sequence_length+past_key_values_length]` and its dtype can be int, float or boolean.
+                When dtype is int or float, 1 for tokens that are **not masked** and 0 for tokens that are **masked**.
+                When dtype is boolean, True for tokens that are **not masked** and False for tokens that are **masked**.
+                Defaults to `None` and causal mask will be used by default.
+
+                .. note::
+                    `decoder_attention_mask` doesn't include `causal_mask` internally. On the contrary,
+                    `causal_mask` will be automatically created and added to decoder_attention_mask.
             encoder_output (tuple, optional):
                 The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
                 The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, hidden_size]`.
