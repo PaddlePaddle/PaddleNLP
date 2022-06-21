@@ -333,11 +333,8 @@ class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
         encoder_input = self.encoder_dropout(hidden_states)
 
         if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        else:
-            attention_mask = self.get_extended_attention_mask(attention_mask)
+            attention_mask = (input_ids != self.pad_token_id)
+        attention_mask = self.get_extended_attention_mask(attention_mask)
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
@@ -409,20 +406,24 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         """
         if decoder_input_ids is None:
             raise ValueError("Decoder_input_ids cannot be None.")
-        if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu((paddle.full(
-                (decoder_length, decoder_length),
-                -np.inf,
-                dtype=paddle.get_default_dtype())), 1)
-        decoder_inputs_embeds = self.embed_tokens(
-            decoder_input_ids) * self.embed_scale
+
+        input_shape = paddle.shape(decoder_input_ids)
+        batch_size, seq_length = input_shape
+
         # cache[num_layer][0] is an instance of `MultiHeadAttention.Cache` containing
         # tensor k and v with shape of `[batch_size, num_heads, len_seq, embed_dim // num_heads]`
-        # ``len_seq`` refer to the length of ``decoder_input_ids``
         # Refer to paddle.nn.MultiHeadAttention.gen_cache for more details regarding cache.
         past_key_values_length = cache[0][0].k.shape[
             2] if cache is not None else 0
+        mask_seq_length = past_key_values_length + seq_length if past_key_values_length != 0 else seq_length
+
+        if decoder_attention_mask is None:
+            decoder_attention_mask = paddle.ones([batch_size, mask_seq_length])
+        decoder_attention_mask = self.get_extended_attention_mask_for_decoder(
+            decoder_attention_mask, input_shape)
+
+        decoder_inputs_embeds = self.embed_tokens(
+            decoder_input_ids) * self.embed_scale
 
         decoder_inputs_embed_pos = self.decoder_embed_positions(
             input_ids_shape=decoder_input_ids.shape,
@@ -654,6 +655,10 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
             decoder_input_ids = shift_tokens_right(
                 input_ids=input_ids,
                 decoder_start_token_id=self.decoder_start_token_id)
+
+        if attention_mask is None and input_ids is not None:
+            attention_mask = (input_ids != self.pad_token_id)
+
         if encoder_output is None:
             encoder_output = self.encoder(input_ids=input_ids,
                                           attention_mask=attention_mask)
@@ -664,18 +669,11 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
         else:
             cache = None
 
-        if attention_mask is not None:
-            memory_mask = attention_mask
-        elif input_ids is not None:
-            memory_mask = (input_ids != self.pad_token_id)
-        else:
-            memory_mask = None
-
         decoder_output = self.decoder(
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
             encoder_output=encoder_output,
-            memory_mask=memory_mask,
+            memory_mask=attention_mask,
             use_cache=use_cache,
             cache=cache)
         return decoder_output

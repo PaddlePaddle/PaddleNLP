@@ -692,8 +692,7 @@ class SqueezeBertModel(SqueezeBertPreTrainedModel):
         input_shape = input_ids.shape
 
         if attention_mask is None:
-            attention_mask = input_ids != self.pad_token_id
-
+            attention_mask = (input_ids != self.pad_token_id)
         extended_attention_mask = self.get_extended_attention_mask(
             attention_mask)
 

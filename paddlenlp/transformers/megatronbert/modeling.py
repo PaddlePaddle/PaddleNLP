@@ -650,7 +650,7 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
         input_shape = input_ids.shape
         if attention_mask is None:
-            attention_mask = input_ids != self.pad_token_id
+            attention_mask = (input_ids != self.pad_token_id)
         attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if token_type_ids is None:

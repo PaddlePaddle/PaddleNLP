@@ -1223,7 +1223,7 @@ class MobileBertModel(MobileBertPretrainedModel):
                 "You have to specify either input_ids or inputs_embeds")
 
         if attention_mask is None:
-            attention_mask = input_ids != self.pad_token_id
+            attention_mask = (input_ids != self.pad_token_id)
         extended_attention_mask = self.get_extended_attention_mask(
             attention_mask)
 

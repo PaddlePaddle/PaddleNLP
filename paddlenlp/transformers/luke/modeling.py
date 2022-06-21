@@ -788,7 +788,7 @@ class LukeModel(LukePretrainedModel):
         batch_size, seq_length = input_shape
 
         if attention_mask is None:
-            attention_mask = input_ids != self.pad_token_id
+            attention_mask = (input_ids != self.pad_token_id)
         attention_mask = self.get_extended_attention_mask(attention_mask)
 
         if entity_ids is not None:

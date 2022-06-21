@@ -290,8 +290,7 @@ class BartDecoder(BartPretrainedModel):
         mask_seq_length = past_key_values_length + seq_length if past_key_values_length != 0 else seq_length
 
         if decoder_attention_mask is None:
-            decoder_attention_mask = paddle.ones([batch_size, mask_seq_length],
-                                                 dtype=self.dtype())
+            decoder_attention_mask = paddle.ones([batch_size, mask_seq_length])
         decoder_attention_mask = self.get_extended_attention_mask_for_decoder(
             decoder_attention_mask, input_shape)
 
@@ -514,6 +513,7 @@ class BartModel(BartPretrainedModel):
 
         if attention_mask is None and input_ids is not None:
             attention_mask = (input_ids != self.pad_token_id)
+
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
         if use_cache:

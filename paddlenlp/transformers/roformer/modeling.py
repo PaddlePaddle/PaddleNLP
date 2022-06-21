@@ -620,8 +620,7 @@ class RoFormerModel(RoFormerPretrainedModel):
                 output = model(**inputs)
         """
         if attention_mask is None:
-            attention_mask = input_ids != self.pad_token_id
-
+            attention_mask = (input_ids != self.pad_token_id)
         attention_mask = self.get_extended_attention_mask(attention_mask)
 
         embedding_output = self.embeddings(

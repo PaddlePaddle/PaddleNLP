@@ -195,15 +195,15 @@ class PretrainedModel(Layer, GenerationMixin):
         Returns:
             Tensor: The extended attention mask, with a the same dtype as `attention_mask.dtype`.
         """
-        # [batch_size, from_seq_length, to_seq_length]
+        # If it's a mask of dimensions [batch_size, from_seq_length, to_seq_length]
         if attention_mask.ndim == 3:
             attention_mask = attention_mask.unsqueeze(axis=1)
-        # Padding mask of dimensions [batch_size, seq_length]
+        # If it's padding mask of dimensions [batch_size, seq_length]
         elif attention_mask.ndim == 2:
             attention_mask = attention_mask.unsqueeze(axis=[1, 2])
         else:
             assert attention_mask.ndim == 4, "Attention masks are only allowed to be either 2-dim, 3-dim or 4-dim, " \
-                                             "but you provided an attention mask of dim {}".format(attention_mask.ndim)
+                                             "but you provided an attention mask of {}-dim".format(attention_mask.ndim)
         extended_attention_mask = attention_mask.astype(self.dtype())
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         return extended_attention_mask
