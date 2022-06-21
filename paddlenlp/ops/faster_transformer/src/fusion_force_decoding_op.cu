@@ -283,7 +283,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         reinterpret_cast<const DataType_*>(
             cross_attn_query_bias[i].data<data_t_>());
     // key
-    if (use_int8) {
+    if (cross_attn_key_weight[i].type() == paddle::DataType::INT8) {
       params[i].cross_attention.key_weight.int8_kernel =
           cross_attn_key_weight[i].data<int8_t>();
       params[i].cross_attention.key_weight.kernel_scale =
@@ -299,7 +299,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         reinterpret_cast<const DataType_*>(
             cross_attn_key_bias[i].data<data_t_>());
     // value
-    if (use_int8) {
+    if (cross_attn_value_weight[i].type() == paddle::DataType::INT8) {
       params[i].cross_attention.value_weight.int8_kernel =
           cross_attn_value_weight[i].data<int8_t>();
       params[i].cross_attention.value_weight.kernel_scale =

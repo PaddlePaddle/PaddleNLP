@@ -1540,7 +1540,7 @@ public:
 
     if (is_fuse_QKV_in_normal_gemm_ == true) {
       if (use_int8_) {
-        if (not normalization_before_) {
+        if (!normalization_before_) {
           channel_wise_quantize_kernelLauncher(from_tensor,
                                                input_quantize_buf_,
                                                scale_,
@@ -1603,6 +1603,7 @@ public:
             3 * n,
             param_.stream,
             use_COL32_);
+
       } else {
         cublasMM_cublasLtMM_wrapper_decoder(
             param_.cublaslt_handle,
@@ -1682,7 +1683,7 @@ public:
                                              cublasAlgo));
       } else {
         if (use_int8_) {
-          if (not normalization_before_) {
+          if (!normalization_before_) {
             channel_wise_quantize_kernelLauncher(from_tensor,
                                                  input_quantize_buf_,
                                                  scale_,
@@ -2026,7 +2027,7 @@ public:
            0);  // this is the only difference with masked_multi_head_attention
 
     if (use_int8_) {
-      if (not normalization_before_) {
+      if (!normalization_before_) {
         channel_wise_quantize_kernelLauncher(from_tensor,
                                              input_quantize_buf_,
                                              scale_,
@@ -2324,7 +2325,7 @@ public:
       m *= max_seq_len;
       k = memory_hidden_units_;
 
-      if (use_int8_) {
+      if (use_int8_ && sizeof(DataType_) != 2) {
         channel_wise_quantize_kernelLauncher(memory_tensor,
                                              quant_in_mem_cache_,
                                              mem_scale_,

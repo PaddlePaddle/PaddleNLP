@@ -377,15 +377,15 @@ __global__ void dequant_add_bias_relu_quant(int32_t* input,
                                             const T* __restrict bias,
                                             const T* __restrict w_scale,
                                             int n,
-                                            const T max_range) {
+                                            const float max_range) {
   float local_i = -1e20f;
   int row_idx = blockIdx.x;
 
   for (int id = threadIdx.x; id < n; id += blockDim.x) {
     T reg_bias = __ldg(&bias[id]);
 
-    T val = (T)input[row_idx * n + id] * scale[row_idx] / max_range *
-            w_scale[id] / max_range;
+    T val = (T)((float)input[row_idx * n + id] * (float)scale[row_idx] /
+                max_range * (float)w_scale[id] / max_range);
     val = val + reg_bias;
     val = val > (T)0.0f ? val : (T)0.0f;
 
@@ -401,8 +401,9 @@ __global__ void dequant_add_bias_relu_quant(int32_t* input,
   __syncthreads();
 
   for (int idx = threadIdx.x; idx < n; idx += blockDim.x) {
-    output[row_idx * n + idx] = __float2int_rn(ffn_inner[row_idx * n + idx] /
-                                               scale[row_idx] * max_range);
+    output[row_idx * n + idx] =
+        __float2int_rn((float)ffn_inner[row_idx * n + idx] /
+                       (float)scale[row_idx] * max_range);
   }
 }
 
@@ -414,15 +415,16 @@ __global__ void dequant_add_bias_gelu_quant(int32_t* input,
                                             const T* __restrict bias,
                                             const T* __restrict w_scale,
                                             int n,
-                                            const T max_range) {
+                                            const float max_range) {
   float local_i = -1e20f;
   int row_idx = blockIdx.x;
 
   for (int id = threadIdx.x; id < n; id += blockDim.x) {
-    T reg_bias = __ldg(&bias[id]);
+    float reg_bias = (float)__ldg(&bias[id]);
 
-    T val = (T)((float)input[row_idx * n + id]) * (scale[row_idx] / max_range) *
-            (w_scale[id] / max_range);
+    float val = (float)input[row_idx * n + id] *
+                ((float)scale[row_idx] / max_range) *
+                ((float)w_scale[id] / max_range);
     val = val + reg_bias;
     val = gelu<float>(val);
 
@@ -438,8 +440,9 @@ __global__ void dequant_add_bias_gelu_quant(int32_t* input,
   __syncthreads();
 
   for (int idx = threadIdx.x; idx < n; idx += blockDim.x) {
-    output[row_idx * n + idx] = __float2int_rn(ffn_inner[row_idx * n + idx] /
-                                               scale[row_idx] * max_range);
+    output[row_idx * n + idx] =
+        __float2int_rn((float)ffn_inner[row_idx * n + idx] /
+                       (float)scale[row_idx] * max_range);
   }
 }
 
@@ -465,7 +468,7 @@ void dequant_add_bias_act_quant_kernelLauncher(int32_t* out_quant_buf,
                                                                bias,
                                                                w_scale,
                                                                n,
-                                                               (T)127.0f);
+                                                               127.0f);
   } else if (activation_type == ActivationType::GELU) {
     dequant_add_bias_gelu_quant<T><<<grid, block, 0, stream>>>(out_quant_buf,
                                                                input_quant_buf,
@@ -474,7 +477,7 @@ void dequant_add_bias_act_quant_kernelLauncher(int32_t* out_quant_buf,
                                                                bias,
                                                                w_scale,
                                                                n,
-                                                               (T)127.0f);
+                                                               127.0f);
   }
 }
 
@@ -608,7 +611,7 @@ __global__ void dequant_add_bias_input_layernorm_2_quant_COL32(
     T* scale,
     const int m,
     const int n,
-    const T max_range) {
+    const float max_range) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
 
@@ -620,8 +623,8 @@ __global__ void dequant_add_bias_input_layernorm_2_quant_COL32(
   float local_sum = 0.0f;
   for (int i = tid; i < n; i += blockDim.x) {
     output[bid * n + i] =
-        (T)(quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)]) *
-        scale[bid] / max_range * w_scale[i] / max_range;
+        (T)((float)quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)] *
+            (float)scale[bid] / max_range * (float)w_scale[i] / max_range);
 
     float local_out = (float)(__ldg(&input[bid * n + i]));
     local_out += (float)(output[bid * n + i]);
@@ -660,7 +663,7 @@ __global__ void dequant_add_bias_input_layernorm_2_quant_COL32(
   }
   __syncthreads();
 
-  const float scale_val = (float)(max_range / scale[bid]);
+  const float scale_val = max_range / (float)scale[bid];
 
   for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
     char4 tmp4;
@@ -693,7 +696,7 @@ __global__ void dequant_add_bias_input_layernorm_2_quant(
     T* scale,
     const int m,
     const int n,
-    const T max_range) {
+    const float max_range) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
 
@@ -704,8 +707,9 @@ __global__ void dequant_add_bias_input_layernorm_2_quant(
 
   float local_sum = 0.0f;
   for (int i = tid; i < n; i += blockDim.x) {
-    output[bid * n + i] = (T)(quant_input[bid * n + i]) * scale[bid] /
-                          max_range * w_scale[i] / max_range;
+    output[bid * n + i] =
+        (T)((float)quant_input[bid * n + i] * (float)scale[bid] / max_range *
+            (float)w_scale[i] / max_range);
 
     float local_out = (float)(__ldg(&input[bid * n + i]));
     local_out += (float)(output[bid * n + i]);
@@ -744,7 +748,7 @@ __global__ void dequant_add_bias_input_layernorm_2_quant(
   }
   __syncthreads();
 
-  const float scale_val = (float)(max_range / scale[bid]);
+  const float scale_val = max_range / (float)scale[bid];
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     quant_out[bid * n + tid] =
@@ -795,7 +799,7 @@ void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
                                        scale,
                                        m,
                                        n,
-                                       (T)127.0f);
+                                       127.0f);
   } else {
     dequant_add_bias_input_layernorm_2_quant<T><<<grid, block, 0, stream>>>(
         quant_output_buf,
@@ -810,7 +814,7 @@ void dequant_add_bias_input_layernorm_2_quant_kernelLauncher(
         scale,
         m,
         n,
-        (T)127.0f);
+        127.0f);
   }
 }
 
@@ -828,7 +832,7 @@ __global__ void dequant_add_bias_input_layernorm_2_kernel(
     T* scale,
     const int m,
     const int n,
-    const T max_range,
+    const float max_range,
     bool use_COL32) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
@@ -842,11 +846,12 @@ __global__ void dequant_add_bias_input_layernorm_2_kernel(
   for (int i = tid; i < n; i += blockDim.x) {
     if (use_COL32) {
       output[bid * n + i] =
-          (T)(quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)]) *
-          scale[bid] / max_range * w_scale[i] / max_range;
+          (T)((float)quant_input[(i & 0xffffffe0) * m + (bid << 5) + (i & 31)] *
+              (float)scale[bid] / max_range * (float)w_scale[i] / max_range);
     } else {
-      output[bid * n + i] = (T)(quant_input[bid * n + i]) * scale[bid] /
-                            max_range * w_scale[i] / max_range;
+      output[bid * n + i] =
+          (T)((float)quant_input[bid * n + i] * (float)scale[bid] / max_range *
+              (float)w_scale[i] / max_range);
     }
 
     float local_out = (float)(__ldg(&input[bid * n + i]));
@@ -921,7 +926,7 @@ void dequant_add_bias_input_layernorm_2_kernelLauncher(
       scale,
       m,
       n,
-      (T)127.0f,
+      127.0f,
       use_COL32);
 }
 
@@ -938,7 +943,7 @@ __global__ void add_bias_input_layernorm_2_quant(const int32_t* quant_input,
                                                  T* scale,
                                                  const int m,
                                                  const int n,
-                                                 const T max_range,
+                                                 const float max_range,
                                                  bool use_COL32) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
@@ -987,7 +992,7 @@ __global__ void add_bias_input_layernorm_2_quant(const int32_t* quant_input,
   }
   __syncthreads();
 
-  const float scale_val = (float)(max_range / scale[bid]);
+  const float scale_val = max_range / (float)scale[bid];
 
   for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
     char4 tmp4;
@@ -1052,7 +1057,7 @@ void add_bias_input_layernorm_2_quant_kernelLauncher(
       scale,
       m,
       n,
-      (T)127.0f,
+      127.0f,
       use_COL32);
 }
 
@@ -1065,7 +1070,7 @@ __global__ void layer_norm_quant_COL32_kernel(const T* __restrict input,
                                               char4* quant_out,
                                               int m,
                                               int n,
-                                              T max_range) {
+                                              float max_range) {
   const int tid = threadIdx.x;
 
   __shared__ float s_mean;
@@ -1109,7 +1114,7 @@ __global__ void layer_norm_quant_COL32_kernel(const T* __restrict input,
   }
   __syncthreads();
 
-  const float scale_val = (float)(max_range / scale[blockIdx.x]);
+  const float scale_val = max_range / (float)scale[blockIdx.x];
 
   for (int tid = threadIdx.x; tid < n / 4; tid += blockDim.x) {
     char4 tmp4;
@@ -1138,7 +1143,7 @@ __global__ void layer_norm_quant_kernel(const T* __restrict input,
                                         int8_t* quant_out,
                                         int m,
                                         int n,
-                                        T max_range) {
+                                        float max_range) {
   const int tid = threadIdx.x;
 
   __shared__ float s_mean;
@@ -1182,7 +1187,7 @@ __global__ void layer_norm_quant_kernel(const T* __restrict input,
   }
   __syncthreads();
 
-  const float scale_val = (float)(max_range / scale[blockIdx.x]);
+  const float scale_val = max_range / (float)scale[blockIdx.x];
 
   for (int tid = threadIdx.x; tid < n; tid += blockDim.x) {
     quant_out[blockIdx.x * n + tid] =
@@ -1218,7 +1223,7 @@ void layer_norm_quant(const T* from_tensor,
         (char4*)quantize_input_buf_,
         m,
         n,
-        (T)127.0f);
+        127.0f);
   } else {
     layer_norm_quant_kernel<T><<<grid, block, 0, stream>>>(
         from_tensor,
@@ -1229,7 +1234,7 @@ void layer_norm_quant(const T* from_tensor,
         quantize_input_buf_,
         m,
         n,
-        (T)127.0f);
+        127.0f);
   }
 }
 
@@ -1272,7 +1277,7 @@ __global__ void dequant_add_bias_input(const int32_t* quant_in,
                                        const T* bias,
                                        const int m,
                                        const int n,
-                                       const T max_range,
+                                       const float max_range,
                                        const bool use_COL32) {
   const int bid = blockIdx.x;
 
@@ -1280,13 +1285,16 @@ __global__ void dequant_add_bias_input(const int32_t* quant_in,
     T bias_val = __ldg(&bias[tid]);
     if (use_COL32) {
       output[bid * n + tid] =
-          (T)(quant_in[(tid & 0xffffffe0) * m + (bid << 5) + (tid & 31)]) *
-              scale[bid] / max_range * weight_scale[tid] / max_range +
+          (T)((float)
+                  quant_in[(tid & 0xffffffe0) * m + (bid << 5) + (tid & 31)] *
+              (float)scale[bid] / max_range * (float)weight_scale[tid] /
+              max_range) +
           input[bid * n + tid] + bias_val;
     } else {
-      output[bid * n + tid] = (T)(quant_in[bid * n + tid]) * scale[bid] /
-                                  max_range * weight_scale[tid] / max_range +
-                              input[bid * n + tid] + bias_val;
+      output[bid * n + tid] =
+          (T)((float)quant_in[bid * n + tid] * (float)scale[bid] / max_range *
+              (float)weight_scale[tid] / max_range) +
+          input[bid * n + tid] + bias_val;
     }
   }
 }
@@ -1313,7 +1321,7 @@ void dequant_add_bias_input_kernelLauncher(const int32_t* quant_in,
                                                      bias,
                                                      m,
                                                      n,
-                                                     (T)127.0f,
+                                                     127.0f,
                                                      use_COL32);
 }
 
