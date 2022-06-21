@@ -18,7 +18,7 @@
 from typing import Dict, List, Tuple
 
 from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizer.models import WordPiece, FasterWordPiece
+from faster_tokenizer.models import WordPiece, FasterWordPiece, BPE
 
 
 # Extract the vocab and merge file from sentencepiece file
@@ -101,6 +101,83 @@ class ErnieConverter(BertConverter):
 
 class TinyBertConverter(BertConverter):
     pass
+
+
+# For sentencepiece tokenzier
+class SpmConverter(Converter):
+
+    def __init__(self, *args):
+        import sentencepiece_model_pb2 as model_pb2
+        m = model_pb2.ModelProto()
+        with open(self.original_tokenizer.vocab_file, "rb") as f:
+            m.ParseFromString(f.read())
+        self.proto = m
+
+    def vocab(self, proto):
+        return [(piece.piece, piece.score) for piece in proto.pieces]
+
+    def unk_id(self, proto):
+        return proto.trainer_spec.unk_id
+
+    def tokenizer(self, proto):
+        model_type = proto.trainer_spec.model_type
+        vocab = self.vocab(proto)
+        unk_id = self.unk_id(proto)
+
+        if model_type == 1:
+            # TODO(zhoushunjie): Need to implement Unigram tokenizer.
+            pass
+        elif model_type == 2:
+            _, merges = SentencePieceExtractor(
+                self.original_tokenizer.vocab_file).extract()
+            bpe_vocab = {word: i for i, (word, score) in enumerate(vocab)}
+            tokenizer = Tokenizer(
+                BPE(
+                    bpe_vocab,
+                    merges,
+                    unk_token=proto.trainer_spec.unk_piece,
+                    fuse_unk=True,
+                ))
+        else:
+            raise Exception(
+                "You're trying to run a `Unigram` model but you're file was trained with a different algorithm"
+            )
+
+        return tokenizer
+
+    def normalizer(self, proto):
+        precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
+        if not precompiled_charsmap:
+            return normalizers.Sequence([normalizers.Replace(" {2,}", " ")])
+        else:
+            return normalizers.Sequence([
+                normalizers.Precompiled(precompiled_charsmap),
+                normalizers.Replace(" {2,}", " ")
+            ])
+
+    def pretokenizer(self, replacement, add_prefix_space):
+        return pretokenizers.MetaSpace(replacement=replacement,
+                                       add_prefix_space=add_prefix_space)
+
+    def postprocessor(self):
+        return None
+
+    def converted(self) -> Tokenizer:
+        tokenizer = self.tokenizer(self.proto)
+
+        # Tokenizer assemble
+        tokenizer.normalizer = self.normalizer(self.proto)
+
+        replacement = "▁"
+        add_prefix_space = True
+        tokenizer.pretokenizer = self.pretokenizer(replacement,
+                                                   add_prefix_space)
+        # tokenizer.decoder = decoders.MetaSpace(replacement=replacement, add_prefix_space=add_prefix_space)
+        postprocessor = self.postprocessor()
+        if postprocessor:
+            tokenizer.postprocessor = postprocessor
+
+        return tokenizer
 
 
 SLOW_TO_FAST_CONVERTERS = {
