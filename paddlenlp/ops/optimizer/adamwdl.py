@@ -16,7 +16,7 @@ from functools import partial
 import paddle
 import paddle.fluid as fluid
 from paddle.fluid import core, framework
-from paddle.optimizer import AdamW
+from paddle.optimizer import AdamW, Adam
 
 __all__ = ['AdamWDL', 'layerwise_lr_decay']
 
@@ -171,9 +171,18 @@ class AdamWDL(AdamW):
                              lazy_mode=lazy_mode,
                              multi_precision=multi_precision)
 
+    def _set_auxiliary_var(self, key, val):
+        self._auxiliary_vars[key] = val
+
+    def _get_auxiliary_var(self, key):
+        if key in self._auxiliary_vars:
+            return self._auxiliary_vars[key]
+        else:
+            return None
+
     def _append_optimize_op(self, block, param_and_grad):
         if self.set_param_lr_fun is None:
-            return super(AdamLW,
+            return super(AdamWDL,
                          self)._append_optimize_op(block, param_and_grad)
 
         self._append_decoupled_weight_decay(block, param_and_grad)
@@ -182,14 +191,9 @@ class AdamWDL(AdamW):
         param_and_grad[0].optimize_attr["learning_rate"] *= ratio
 
         # excute Adam op
-        res = super(AdamW, self)._append_optimize_op(block, param_and_grad)
+        res = super(AdamWDL, self)._append_optimize_op(block, param_and_grad)
         param_and_grad[0].optimize_attr["learning_rate"] = prev_lr
         return res
-
-    def _update_param_group(self, parameters):
-        self._coeff = parameters.get('coeff', self._default_dict['coeff'])
-        parameters = parameters.get('params')
-        return parameters
 
     def _append_decoupled_weight_decay(self, block, param_and_grad):
         """
@@ -243,3 +247,18 @@ class AdamWDL(AdamW):
             else:
                 scaled_param = param * decay_coeff
                 paddle.fluid.layers.assign(input=scaled_param, output=param)
+
+    def _create_optimization_pass(self, parameters_and_grads):
+        optimize_ops = super(
+            AdamWDL, self)._create_optimization_pass(parameters_and_grads)
+        # In dygraph mode, clear _lr_to_coeff after applied gradient
+        self._lr_to_coeff = dict()
+        return optimize_ops
+
+    def __str__(self):
+        return " ".join(["Weight Decay, params:", ",".join(self._params_name)])
+
+    def _update_param_group(self, parameters):
+        self._coeff = parameters.get('coeff', self._default_dict['coeff'])
+        parameters = parameters.get('params')
+        return parameters
