@@ -115,6 +115,7 @@ def _transformer_encoder_fwd(self,
 
 
 import inspect
+import dataclasses
 from collections import OrderedDict, UserDict
 from collections.abc import MutableMapping
 from contextlib import ExitStack
@@ -146,6 +147,14 @@ class ModelOutput(OrderedDict):
 
     def __post_init__(self):
         class_fields = fields(self)
+
+        # note(guosheng): Convert list to tuple automatically, and better to
+        # check if it is frozen.
+        # assert not getattr(self, dataclasses._PARAMS).frozen
+        for f in class_fields:
+            value = getattr(self, f.name)
+            if isinstance(value, list):
+                setattr(self, f.name, tuple(value))
 
         # Safety and consistency checks
         if not len(class_fields):
