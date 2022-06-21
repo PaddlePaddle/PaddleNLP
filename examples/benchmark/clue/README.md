@@ -1121,9 +1121,9 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 #### 环境依赖
 
-Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库。pynvml 库提供了 GPU 管理的 Python 接口。
+Grid Search 需要在 GPU 环境下进行，需要注意的是 C<sup>3</sup> 任务需要显存大于 16 GB，最好是在显存 32 GB的环境下启动。
 
-可启动以下命令进行安装 pynvml：
+Grid Search 中的 GPU 调度需要依赖 pynvml 库，pynvml 库提供了 GPU 管理的 Python 接口。可启动以下命令进行安装 pynvml：
 
 ```shell
 pip install pynvml
@@ -1156,16 +1156,16 @@ AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
 Best hyper-parameters list:
 ====================================================================
 TASK	result	(lr, batch_size, dropout_p)
-AFQMC	75.93	(3e-05, 16, 0.1)
-TNEWS	58.26	(3e-05, 32, 0.1)
-IFLYTEK	61.56	(5e-05, 32, 0.0)
-CMNLI	83.02	(3e-05, 32, 0.1)
-OCNLI	80.10	(2e-05, 64, 0.1)
-CLUEWSC2020	86.18	(2e-05, 16, 0.0)
-CSL	82.63	(2e-05, 32, 0.1)
-CMRC2018	70.71/90.41	(2e-05, 24, 0.1)
-CHID	84.26	(3e-05, 24, 0.1)
-C3	77.88	(3e-05, 32, 0.1)
+AFQMC	75.93	(3e-05,16,0.1)
+TNEWS	58.26	(3e-05,32,0.1)
+IFLYTEK	61.56	(5e-05,32,0.0)
+CMNLI	83.02	(3e-05,32,0.1)
+OCNLI	80.10	(2e-05,64,0.1)
+CLUEWSC2020	86.18	(2e-05,16,0.0)
+CSL	82.63	(2e-05,32,0.1)
+CMRC2018	70.71/90.41	(2e-05,24,0.1)
+CHID	84.26	(3e-05,24,0.1)
+C3	77.88	(3e-05,32,0.1)
 ```
 
 另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。
