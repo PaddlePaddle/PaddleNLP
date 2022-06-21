@@ -925,10 +925,6 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         # cut decoder_input_ids if past is used
         if cache is not None:
             decoder_input_ids = decoder_input_ids[:, -1].unsqueeze(-1)
-            if decoder_attention_mask is not None:
-                decoder_attention_mask = decoder_attention_mask[:, :,
-                                                                -1, :].unsqueeze(
-                                                                    2)
 
         return {
             "input_ids": None,
