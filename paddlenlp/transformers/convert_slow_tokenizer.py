@@ -21,6 +21,36 @@ from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocesso
 from faster_tokenizer.models import WordPiece, FasterWordPiece
 
 
+# Extract the vocab and merge file from sentencepiece file
+class SentencePieceExtractor:
+
+    def __init__(self, model: str):
+        from sentencepiece import SentencePieceProcessor
+
+        self.sp = SentencePieceProcessor()
+        self.sp.Load(model)
+
+    def extract(self):
+        sp = self.sp
+        vocab = {
+            sp.id_to_piece(index): index
+            for index in range(sp.GetPieceSize())
+        }
+
+        # Merges
+        merges = []
+        for piece_l in vocab.keys():
+            for piece_r in vocab.keys():
+                merge = f"{piece_l}{piece_r}"
+                piece_id = vocab.get(merge, None)
+                if piece_id:
+                    merges += [(piece_l, piece_r, piece_id)]
+        merges = sorted(merges, key=lambda val: val[2])
+        merges = [(val[0], val[1]) for val in merges]
+
+        return vocab, merges
+
+
 class Converter:
 
     def __init__(self, original_tokenizer):
