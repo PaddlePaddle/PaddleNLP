@@ -49,13 +49,19 @@ void MetaSpacePreTokenizer::operator()(PreTokenizedString* pretokenized) const {
                           std::vector<StringSplit>* string_splits) {
     normalized->Replace(pattern, replacement_);
     if (add_prefix_space_ &&
-        normalized->GetStr().find_first_of(replacement_) == std::string::npos) {
+        normalized->GetStr().find_first_of(replacement_) != 0) {
       normalized->Prepend(replacement_);
     }
     normalized->Split(
         [&](char32_t ch) -> bool { return ch == replacement_char_; },
         normalizers::MERGED_WITH_NEXT,
         &normalized_splits);
+    for (auto&& normalize : normalized_splits) {
+      if (!normalize.IsEmpty()) {
+        VLOG(6) << "After pretokenized: " << normalize.GetStr();
+        string_splits->emplace_back(std::move(normalize));
+      }
+    }
   });
 }
 

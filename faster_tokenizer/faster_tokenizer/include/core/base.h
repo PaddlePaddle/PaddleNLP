@@ -21,6 +21,7 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
+#include "glog/logging.h"
 #include "nlohmann/json.hpp"
 
 namespace std {
@@ -171,10 +172,13 @@ struct Merge {
     return pos_ == other.pos_ && rank_ == other.rank_;
   }
   bool operator<(const Merge& other) const {
+    // Used in priority queue
+    // The queue will output the Merge value
+    // in ascending order of rank_
     if (rank_ != other.rank_) {
-      return rank_ < other.rank_;
+      return rank_ > other.rank_;
     }
-    return pos_ < other.pos_;
+    return pos_ > other.pos_;
   }
 };
 
@@ -244,7 +248,6 @@ struct BPEWord {
     std::priority_queue<core::Merge> queue;
     std::vector<core::Merge> skip;
     skip.reserve(symbols_.size());
-
     for (int i = 0; i < symbols_.size() - 1; ++i) {
       auto& first = symbols_[i];
       auto& second = symbols_[i + 1];
@@ -263,7 +266,9 @@ struct BPEWord {
     std::uniform_real_distribution<float> distrib(0.0, 1.0);
     bool can_skip = (dropout.size() > 0);
     while (!queue.empty()) {
-      auto& top = queue.top();
+      // Can't use reference there, because the pop operation will change the
+      // top value
+      auto top = queue.top();
       queue.pop();
       if (can_skip && distrib(gen) < dropout[0]) {
         // May dropout some merges
@@ -279,7 +284,7 @@ struct BPEWord {
         if (symbols_[top.pos_].next_ == -1) {
           continue;
         }
-        auto next_pos = symbols_[top.pos_].next_;
+        size_t next_pos = symbols_[top.pos_].next_;
         auto& right = symbols_[next_pos];
         // Make sure we are not processing an expired queue entry
         auto target_new_pair = Pair{symbols_[top.pos_].ch_, right.ch_};
@@ -290,7 +295,7 @@ struct BPEWord {
         // Otherwise, let's merge
         symbols_[top.pos_].MergeWith(right, top.new_id_);
         // Tag the right part as removed
-        right.len_ = 0;
+        symbols_[next_pos].len_ = 0;
         // Update `prev` on the new `next` to the current pos
         if (right.next_ > -1 && (right.next_ < symbols_.size())) {
           symbols_[right.next_].prev_ = top.pos_;
@@ -310,7 +315,7 @@ struct BPEWord {
         }
 
         // Insert the new pair formed with the next symbol
-        auto next = current.next_;
+        size_t next = current.next_;
         if (next < symbols_.size()) {
           auto& next_symbol = symbols_[next];
           auto next_pair = Pair{current.ch_, next_symbol.ch_};
@@ -321,10 +326,11 @@ struct BPEWord {
         }
       }
     }
-
-    std::remove_if(symbols_.begin(), symbols_.end(), [](const Symbol& symbol) {
-      return symbol.len_ == 0;
-    });
+    symbols_.erase(
+        std::remove_if(symbols_.begin(),
+                       symbols_.end(),
+                       [](const Symbol& symbol) { return symbol.len_ == 0; }),
+        symbols_.end());
   }
 
   void GetChars(std::vector<uint32_t>* result) const {

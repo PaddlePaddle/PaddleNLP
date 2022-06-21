@@ -120,11 +120,9 @@ void BPE::ConstructMergesPair(const std::string word_line,
 core::Merges BPE::GetMergesFromFile(const std::string& merge_path) {
   std::ifstream fin(merge_path);
   core::Merges merges;
-  constexpr int MAX_BUFFER_SIZE = 256;
-  char word[MAX_BUFFER_SIZE];
-  while (fin.getline(word, MAX_BUFFER_SIZE)) {
-    std::string word_str = word;
-    if (word_str.find_first_of("#version") == 0) {
+  std::string word_str;
+  while (std::getline(fin, word_str)) {
+    if (word_str.find("#version") == 0) {
       continue;
     }
     std::pair<std::string, std::string> result;

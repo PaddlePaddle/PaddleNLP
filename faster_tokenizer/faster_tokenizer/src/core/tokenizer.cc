@@ -698,12 +698,16 @@ template void Tokenizer::SetNormalizer(const normalizers::StripNormalizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
 template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::MetaSpacePreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
 template void Tokenizer::SetModel(const models::WordPiece&);
 template Tokenizer::Tokenizer(const models::FasterWordPiece&);
 template void Tokenizer::SetModel(const models::FasterWordPiece&);
+template Tokenizer::Tokenizer(const models::BPE&);
+template void Tokenizer::SetModel(const models::BPE&);
 
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(
