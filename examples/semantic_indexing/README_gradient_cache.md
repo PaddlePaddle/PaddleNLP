@@ -85,10 +85,10 @@ python generate_dense_embedding \
 
 
 参数含义说明
-* `ctx_file`: 使用 cpu/gpu 进行训练
-* `out_file`: 模型存储路径
-* `que_model_path`: Transformer 顶层输出的文本向量维度
-* `con_model_path`： 模型存储 checkpoint 的间隔 steps 个数 
+* `ctx_file`: ctx文件读取地址
+* `out_file`: 生成后的文件输出地址
+* `que_model_path`: question model path
+* `con_model_path`： context model path
 
 
 ## 针对全部文档的检索器验证
