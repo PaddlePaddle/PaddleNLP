@@ -48,5 +48,54 @@ private:
   std::unique_ptr<Darts::DoubleArray> trie_;
 };
 
+class Normalizer {
+public:
+  // Instantiates Normalizer with |spec|.
+  // |spec| should not be deleted until Normalizer is destroyed.
+  explicit Normalizer(const std::string& precompiled_charsmap);
+  virtual ~Normalizer();
+
+  virtual void SetPrefixMatcher(const PrefixMatcher* matcher) {
+    matcher_ = matcher;
+  }
+
+  virtual void Normalize(const char* input,
+                         size_t input_len,
+                         std::string* normalized,
+                         std::vector<size_t>* norm_to_orig) const;
+
+private:
+  void Init();
+  std::pair<const char*, int> NormalizePrefix(const char* input,
+                                              size_t input_len) const;
+
+
+  // // Encodes trie_blob and normalized string and return compiled blob.
+  // static std::string EncodePrecompiledCharsMap(absl::string_view trie_blob,
+  //                                              absl::string_view normalized);
+
+  // Decodes blob into trie_blob and normalized string.
+  static void DecodePrecompiledCharsMap(const char* blob,
+                                        size_t blob_size,
+                                        std::string* trie_blob,
+                                        std::string* normalized,
+                                        std::string* buffer = nullptr);
+
+  static constexpr int kMaxTrieResultsSize = 32;
+
+  std::unique_ptr<Darts::DoubleArray> trie_;
+
+  const char* normalized_ = nullptr;
+
+  // Prefix matcher;
+  const PrefixMatcher* matcher_ = nullptr;
+
+  // Split hello world into "hello_" and "world_" instead of
+  // "_hello" and "_world".
+  const bool treat_whitespace_as_suffix_ = false;
+  std::string precompiled_charsmap_buffer_;
+  std::string precompiled_charsmap_;
+};
+
 }  // namespace utils
 }  // namespace tokenizers

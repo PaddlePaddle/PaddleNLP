@@ -18,6 +18,8 @@ limitations under the License. */
 namespace tokenizers {
 namespace utils {
 
+static constexpr uint32_t kUnicodeError = 0xFFFD;
+
 inline bool IsUnicodeNonChar(uint32_t c) {
   return ((c) >= 0xfdd0 && ((c) <= 0xfdef || ((c)&0xfffe) == 0xfffe) &&
           (c) <= 0x10ffff);
@@ -166,6 +168,51 @@ inline void GetUnicodeStr(const char* pSrc,
     count = UTF8ToUInt32(pSrc, &curr_unicode_char);
     curr_unicode_char = UTF8ToUnicode(curr_unicode_char);
   }
+}
+
+inline bool IsTrailByte(char x) { return static_cast<signed char>(x) < -0x40; }
+
+// mblen sotres the number of bytes consumed after decoding.
+inline uint32_t DecodeUTF8(const char* begin, const char* end, size_t* mblen) {
+  const size_t len = end - begin;
+
+  if (static_cast<unsigned char>(begin[0]) < 0x80) {
+    *mblen = 1;
+    return static_cast<unsigned char>(begin[0]);
+  } else if (len >= 2 && (begin[0] & 0xE0) == 0xC0) {
+    const uint32_t cp = (((begin[0] & 0x1F) << 6) | ((begin[1] & 0x3F)));
+    if (IsTrailByte(begin[1]) && cp >= 0x0080 && IsUnicodeChar(cp)) {
+      *mblen = 2;
+      return cp;
+    }
+  } else if (len >= 3 && (begin[0] & 0xF0) == 0xE0) {
+    const uint32_t cp = (((begin[0] & 0x0F) << 12) | ((begin[1] & 0x3F) << 6) |
+                         ((begin[2] & 0x3F)));
+    if (IsTrailByte(begin[1]) && IsTrailByte(begin[2]) && cp >= 0x0800 &&
+        IsUnicodeChar(cp)) {
+      *mblen = 3;
+      return cp;
+    }
+  } else if (len >= 4 && (begin[0] & 0xf8) == 0xF0) {
+    const uint32_t cp = (((begin[0] & 0x07) << 18) | ((begin[1] & 0x3F) << 12) |
+                         ((begin[2] & 0x3F) << 6) | ((begin[3] & 0x3F)));
+    if (IsTrailByte(begin[1]) && IsTrailByte(begin[2]) &&
+        IsTrailByte(begin[3]) && cp >= 0x10000 && IsUnicodeChar(cp)) {
+      *mblen = 4;
+      return cp;
+    }
+  }
+
+  // Invalid UTF-8.
+  *mblen = 1;
+  return kUnicodeError;
+}
+
+inline bool IsValidDecodeUTF8(const char* begin,
+                              const char* end,
+                              size_t* mblen) {
+  const uint32_t c = DecodeUTF8(begin, end, mblen);
+  return c != kUnicodeError || *mblen == 3;
 }
 
 }  // namespace utils

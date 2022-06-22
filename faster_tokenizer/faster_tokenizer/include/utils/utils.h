@@ -20,6 +20,16 @@ limitations under the License. */
 #include <unordered_map>
 #include "unicode/uchar.h"
 
+#if defined(_FREEBSD)
+#include <sys/endian.h>
+#endif
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined(_FREEBSD)
+#include <endian.h>
+#if BYTE_ORDER == __BIG_ENDIAN
+#define IS_BIG_ENDIAN
+#endif
+#endif
+
 namespace tokenizers {
 namespace utils {
 
@@ -172,6 +182,23 @@ inline bool IsSuffixWord(const std::string& word,
                          const std::string& continuing_subword_prefix) {
   return word.rfind(continuing_subword_prefix) == 0;
 }
+
+template <typename T>
+inline bool DecodePOD(const char* str, size_t str_len, T* result) {
+  if (sizeof(*result) != str_len) {
+    return false;
+  }
+  memcpy(result, str, sizeof(T));
+  return true;
+}
+
+inline size_t OneCharLen(const char* src) {
+  return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
+}
+
+#ifdef IS_BIG_ENDIAN
+inline uint32 Swap32(uint32 x) { return __builtin_bswap32(x); }
+#endif
 
 }  // namespace utils
 }  // namespace tokenizers

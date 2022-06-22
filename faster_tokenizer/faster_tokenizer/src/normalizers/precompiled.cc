@@ -12,16 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#pragma once
-
-#include <string>
-#include "normalizers/normalizer.h"
-#include "utils/sentencepiece_normalizer.h"
+#include "normalizers/precompiled.h"
 
 namespace tokenizers {
 namespace normalizers {
-struct PrecompiledNormalizer : public Normalizer {
-  virtual void operator()(NormalizedString* mut_str) const override;
-};
+
+void PrecompiledNormalizer::operator()(
+    NormalizedString* mut_str) const {}
+
 }  // normalizers
 }  // tokenizers
