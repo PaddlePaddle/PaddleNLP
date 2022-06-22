@@ -317,7 +317,7 @@ public:
       decoder_int8_buf_ = nullptr;
     }
 
-    if (sizeof(DataType_) == sizeof(half)) {
+    if (sizeof(DataType_) == sizeof(half) && !use_int8_) {
       cublas_workspace_ = buf_;
       from_tensor_[0] =
           (DataType_ *)((char *)cublas_workspace_ + CUBLAS_WORKSPACE_SIZE);

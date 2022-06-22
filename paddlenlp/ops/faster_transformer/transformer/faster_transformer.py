@@ -327,10 +327,6 @@ class FasterTransformer(TransformerModel):
 
             for item in self.state_dict():
                 if "decoder" in item and "weight" in item and "norm" not in item and "embedding" not in item:
-                    if self.use_fp16_decoding and ("cross_attn.v_proj" in item
-                                                   or "cross_attn.k_proj"
-                                                   in item):
-                        continue
 
                     item_list = item.split(".")
                     num_layer = item_list[3]
@@ -341,6 +337,10 @@ class FasterTransformer(TransformerModel):
                         w_int8, w_scale = quantize_function(
                             weight=model_dict["decoding.slf_q_" + param_type +
                                               "_" + num_layer])
+                        model_dict["decoding.slf_q_" + param_type + "_" +
+                                   num_layer] = None
+                        del model_dict["decoding.slf_q_" + param_type + "_" +
+                                       num_layer]
                     else:
                         w_int8, w_scale = quantize_function(
                             weight=model_dict[item])

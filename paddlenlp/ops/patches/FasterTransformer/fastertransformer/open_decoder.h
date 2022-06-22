@@ -2325,7 +2325,7 @@ public:
       m *= max_seq_len;
       k = memory_hidden_units_;
 
-      if (use_int8_ && sizeof(DataType_) != 2) {
+      if (use_int8_) {
         channel_wise_quantize_kernelLauncher(memory_tensor,
                                              quant_in_mem_cache_,
                                              mem_scale_,
