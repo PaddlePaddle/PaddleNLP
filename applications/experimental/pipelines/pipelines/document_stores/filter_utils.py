@@ -102,9 +102,8 @@ class LogicalFilterClause(ABC):
 
     """
 
-    def __init__(self,
-                 conditions: List[Union["LogicalFilterClause",
-                                        "ComparisonOperation"]]):
+    def __init__(self, conditions: List[Union["LogicalFilterClause",
+                                              "ComparisonOperation"]]):
         self.conditions = conditions
 
     @abstractmethod
@@ -112,8 +111,9 @@ class LogicalFilterClause(ABC):
         pass
 
     @classmethod
-    def parse(cls, filter_term: Union[dict, List[dict]]) -> Union[
-            "LogicalFilterClause", "ComparisonOperation"]:
+    def parse(
+        cls, filter_term: Union[dict, List[dict]]
+    ) -> Union["LogicalFilterClause", "ComparisonOperation"]:
         """
         Parses a filter dictionary/list and returns a LogicalFilterClause instance.
 
@@ -170,9 +170,8 @@ class LogicalFilterClause(ABC):
         """
 
         range_conditions = [
-            cond["range"]
-            for cond in filter(lambda condition: "range" in condition,
-                               conditions)
+            cond["range"] for cond in filter(
+                lambda condition: "range" in condition, conditions)
         ]
         if range_conditions:
             conditions = [
@@ -188,11 +187,10 @@ class LogicalFilterClause(ABC):
 
             for field_name, comparison_operations in range_conditions_dict.items(
             ):
-                conditions.append({
-                    "range": {
+                conditions.append(
+                    {"range": {
                         field_name: comparison_operations
-                    }
-                })
+                    }})
 
         return conditions
 
@@ -207,9 +205,9 @@ class LogicalFilterClause(ABC):
 
 
 class ComparisonOperation(ABC):
-    def __init__(self,
-                 field_name: str,
-                 comparison_value: Union[str, int, float, bool, List]):
+
+    def __init__(self, field_name: str, comparison_value: Union[str, int, float,
+                                                                bool, List]):
         self.field_name = field_name
         self.comparison_value = comparison_value
 
@@ -218,8 +216,9 @@ class ComparisonOperation(ABC):
         pass
 
     @classmethod
-    def parse(cls, field_name, comparison_clause: Union[Dict, List, str, float]
-              ) -> List["ComparisonOperation"]:
+    def parse(
+        cls, field_name, comparison_clause: Union[Dict, List, str, float]
+    ) -> List["ComparisonOperation"]:
         comparison_operations: List[ComparisonOperation] = []
 
         if isinstance(comparison_clause, dict):
@@ -256,8 +255,8 @@ class ComparisonOperation(ABC):
             comparison_operations.append(
                 InOperation(field_name, comparison_clause))
         else:
-            comparison_operations.append(
-                (EqOperation(field_name, comparison_clause)))
+            comparison_operations.append((EqOperation(field_name,
+                                                      comparison_clause)))
 
         return comparison_operations
 
@@ -292,8 +291,9 @@ class ComparisonOperation(ABC):
         pass
 
     def _get_weaviate_datatype(
-            self, value: Optional[Union[str, int, float, bool]]=None) -> Tuple[
-                str, Union[str, int, float, bool]]:
+        self,
+        value: Optional[Union[str, int, float, bool]] = None
+    ) -> Tuple[str, Union[str, int, float, bool]]:
         """
         Determines the type of the comparison value and converts it to RFC3339 format if it is as date,
         as Weaviate requires dates to be in RFC3339 format including the time and timezone.
@@ -535,8 +535,10 @@ class NeOperation(ComparisonOperation):
             return False
         return fields[self.field_name] != self.comparison_value
 
-    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Dict[
-            str, Union[str, int, float, bool]]]]]:
+    def convert_to_elasticsearch(
+        self
+    ) -> Dict[str, Dict[str, Dict[str, Dict[str, Union[str, int, float,
+                                                       bool]]]]]:
         assert not isinstance(
             self.comparison_value,
             list), "Use '$nin' operation for lists as comparison values."
@@ -642,9 +644,9 @@ class GtOperation(ComparisonOperation):
         return {"range": {self.field_name: {"gt": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
-        return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value > self.comparison_value)
+        return select([meta_document_orm.document_id
+                       ]).where(meta_document_orm.name == self.field_name,
+                                meta_document_orm.value > self.comparison_value)
 
     def convert_to_weaviate(
             self) -> Dict[str, Union[List[str], str, float, int]]:
@@ -718,9 +720,9 @@ class LtOperation(ComparisonOperation):
         return {"range": {self.field_name: {"lt": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
-        return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value < self.comparison_value)
+        return select([meta_document_orm.document_id
+                       ]).where(meta_document_orm.name == self.field_name,
+                                meta_document_orm.value < self.comparison_value)
 
     def convert_to_weaviate(
             self) -> Dict[str, Union[List[str], str, float, int]]:

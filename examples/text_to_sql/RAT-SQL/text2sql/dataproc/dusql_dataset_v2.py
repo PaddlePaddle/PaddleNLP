@@ -117,11 +117,10 @@ def load_tables(schema_file, content_file):
                 schema_dict['column_names_original'] = schema_dict[
                     'column_names']
             tables = tuple(
-                Table(
-                    id=i, name=text_utils.wordseg(name), orig_name=orig_name)
+                Table(id=i, name=text_utils.wordseg(name), orig_name=orig_name)
                 for i, (name, orig_name) in enumerate(
-                    zip(schema_dict['table_names'], schema_dict[
-                        'table_names_original'])))
+                    zip(schema_dict['table_names'],
+                        schema_dict['table_names_original'])))
             columns = tuple(
                 Column(
                     id=i,
@@ -134,11 +133,12 @@ def load_tables(schema_file, content_file):
                     cells=[
                         x for x in set([str(c) for c in lst_column_cells[i]])
                         if len(x) <= 20 or x.startswith('item_')
-                    ], )
-                for i, ((table_id, col_name), (_, orig_col_name), col_type) in
-                enumerate(
-                    zip(schema_dict['column_names'], schema_dict[
-                        'column_names_original'], schema_dict['column_types'])))
+                    ],
+                ) for i, ((table_id, col_name), (_, orig_col_name),
+                          col_type) in enumerate(
+                              zip(schema_dict['column_names'],
+                                  schema_dict['column_names_original'],
+                                  schema_dict['column_types'])))
 
             # Link columns to tables
             for column in columns:
@@ -159,14 +159,14 @@ def load_tables(schema_file, content_file):
                 source_column.foreign_key_for = dest_column
                 columns[source_column_id].table.foreign_keys_tables.add(
                     dest_column_id)
-                foreign_key_graph.add_edge(
-                    source_column.table.id,
-                    dest_column.table.id,
-                    columns=(source_column_id, dest_column_id))
-                foreign_key_graph.add_edge(
-                    dest_column.table.id,
-                    source_column.table.id,
-                    columns=(dest_column_id, source_column_id))
+                foreign_key_graph.add_edge(source_column.table.id,
+                                           dest_column.table.id,
+                                           columns=(source_column_id,
+                                                    dest_column_id))
+                foreign_key_graph.add_edge(dest_column.table.id,
+                                           source_column.table.id,
+                                           columns=(dest_column_id,
+                                                    source_column_id))
 
             schemas[db_id] = DB(db_id, tables, columns, foreign_key_graph,
                                 schema_dict)
@@ -189,8 +189,8 @@ class DuSQLExample(object):
         self.tables = db.tables
         self.db = db
 
-        self.column_match_cells = self._filter_match_values(json_example[
-            'match_values'])
+        self.column_match_cells = self._filter_match_values(
+            json_example['match_values'])
 
         ernie_inputs = input_encoder.encode(self.question, db,
                                             self.column_match_cells)
@@ -235,8 +235,8 @@ class DuSQLExample(object):
         t_len = len(self.tables)
         total_len = q_len + c_len + t_len
         relation_matrix = linking_utils.build_relation_matrix(
-            link_info_dict, total_len, q_len, c_len,
-            list(range(c_len + 1)), list(range(t_len + 1)), self.db)
+            link_info_dict, total_len, q_len, c_len, list(range(c_len + 1)),
+            list(range(t_len + 1)), self.db)
         return relation_matrix
 
     def _linking_wrapper(self, fn_linking):
@@ -293,8 +293,8 @@ class DuSQLDatasetV2(paddle.io.Dataset):
             match_value_file = Path(os.path.dirname(data_file)) / (
                 'match_values_' + os.path.basename(data_file))
             if not match_value_file.exists():
-                raise FileNotFoundError('match value file not found: ' + str(
-                    match_value_file))
+                raise FileNotFoundError('match value file not found: ' +
+                                        str(match_value_file))
             with open(data_file) as ifs_data, open(
                     match_value_file) as ifs_mval:
                 self.collate_examples(json.load(ifs_data), json.load(ifs_mval))
@@ -302,8 +302,8 @@ class DuSQLDatasetV2(paddle.io.Dataset):
     def collate_examples(self, orig_examples, match_values):
         """collate examples, and append to self._examples
         """
-        for idx, (item, m_val
-                  ) in tqdm.tqdm(enumerate(zip(orig_examples, match_values))):
+        for idx, (item, m_val) in tqdm.tqdm(
+                enumerate(zip(orig_examples, match_values))):
             if 'question_id' in item:
                 assert item['question_id'] == m_val['question_id'], \
                         f'data no match: {item["question_id"]} != {m_val["question_id"]}'
@@ -317,8 +317,8 @@ class DuSQLDatasetV2(paddle.io.Dataset):
             if 'question_id' not in item:
                 item['question_id'] = f'qid{idx:06d}'
             inputs = DuSQLExample(item, db, self.input_encoder)
-            if 'sql' not in item or type(item[
-                    'sql']) is not dict or not self.has_label:
+            if 'sql' not in item or type(
+                    item['sql']) is not dict or not self.has_label:
                 outputs = None
             else:
                 outputs = self.label_encoder.add_item(self.name, item['sql'],

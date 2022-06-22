@@ -62,6 +62,7 @@ def create_dataloader(batch_size,
                       tokenizer,
                       config,
                       pad_val=0):
+
     def _tokenize(text):
         input_ids = [tokenizer.cls_id]
         input_ids.extend(
@@ -92,13 +93,13 @@ def create_dataloader(batch_size,
 
     def _create_dataloader(mode, tokenizer, max_encoder_length, pad_val=0):
         dataset = load_dataset("imdb", splits=mode)
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=(mode == "train"))
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=_collate_data,
-            return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=(mode == "train"))
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           batch_sampler=batch_sampler,
+                                           collate_fn=_collate_data,
+                                           return_list=True)
         return data_loader
 
     train_data_loader = _create_dataloader("train", tokenizer,
@@ -112,7 +113,7 @@ def main():
     # Initialization for the parallel enviroment
     paddle.set_device(args.device)
     set_seed(args)
-    # Define the model and metric 
+    # Define the model and metric
     # In finetune task, bigbird performs better when setting dropout to zero.
     model = BigBirdForSequenceClassification.from_pretrained(
         args.model_name_or_path,
@@ -129,11 +130,10 @@ def main():
     train_data_loader, test_data_loader = \
             create_dataloader(args.batch_size, args.max_encoder_length, tokenizer, config)
 
-    # Define the Adam optimizer 
-    optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(),
-        learning_rate=args.learning_rate,
-        epsilon=1e-6)
+    # Define the Adam optimizer
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
+                                      learning_rate=args.learning_rate,
+                                      epsilon=1e-6)
 
     # Finetune the classification model
     do_train(model, criterion, metric, optimizer, train_data_loader, tokenizer)

@@ -83,11 +83,17 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-large-zh-cw":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
-            "ernie-2.0-en":
+            "ernie-2.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_base_zh_vocab.txt",
+            "ernie-2.0-large-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_large_zh_vocab.txt",
+            "ernie-2.0-base-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-en-finetuned-squad":
+            "ernie-2.0-base-en-finetuned-squad":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-2.0-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
@@ -111,8 +117,16 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
             "ernie-3.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "ernie-3.0-xbase-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_xbase_zh_vocab.txt",
             "ernie-3.0-medium-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "ernie-3.0-mini-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "ernie-3.0-micro-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "ernie-3.0-nano-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -122,13 +136,22 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-1.0-base-zh": {
             "do_lower_case": True
         },
+        "ernie-1.0-large-zh-cw": {
+            "do_lower_case": True
+        },
         "ernie-tiny": {
             "do_lower_case": True
         },
-        "ernie-2.0-en": {
+        "ernie-2.0-base-zh": {
             "do_lower_case": True
         },
-        "ernie-2.0-en-finetuned-squad": {
+        "ernie-2.0-large-zh": {
+            "do_lower_case": True
+        },
+        "ernie-2.0-base-en": {
+            "do_lower_case": True
+        },
+        "ernie-2.0-base-en-finetuned-squad": {
             "do_lower_case": True
         },
         "ernie-2.0-large-en": {
@@ -141,9 +164,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-gen-large-en-430g": {
-            "do_lower_case": True
-        },
-        "ppminilm-6l-768h": {
             "do_lower_case": True
         },
         "rocketqa-zh-dureader-query-encoder": {
@@ -167,7 +187,19 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-3.0-base-zh": {
             "do_lower_case": True
         },
+        "ernie-3.0-xbase-zh": {
+            "do_lower_case": True
+        },
         "ernie-3.0-medium-zh": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-mini-zh": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-micro-zh": {
+            "do_lower_case": True
+        },
+        "ernie-3.0-nano-zh": {
             "do_lower_case": True
         },
     }
@@ -191,8 +223,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -265,8 +297,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -462,7 +494,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         self.dict = pickle.load(open(word_dict, 'rb'))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
 
-        # if the sentencepiece_model_file is not exists, just the default sentence-piece model 
+        # if the sentencepiece_model_file is not exists, just the default sentence-piece model
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
@@ -563,7 +595,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             source_path = os.path.join(MODEL_HOME, 'ernie-tiny', file_name)
             save_path = os.path.join(save_directory,
                                      self.resource_files_names[name])
-            shutil.copyfile(source_path, save_path)
+            if not os.path.samefile(source_path, save_path):
+                shutil.copyfile(source_path, save_path)
 
     def num_special_tokens_to_add(self, pair=False):
         r"""
@@ -584,8 +617,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -701,7 +734,9 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:

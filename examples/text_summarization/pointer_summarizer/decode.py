@@ -16,6 +16,7 @@ from train_util import get_input_from_batch
 
 
 class Beam(object):
+
     def __init__(self, tokens, log_probs, state, context, coverage):
         self.tokens = tokens
         self.log_probs = log_probs
@@ -24,12 +25,11 @@ class Beam(object):
         self.coverage = coverage
 
     def extend(self, token, log_prob, state, context, coverage):
-        return Beam(
-            tokens=self.tokens + [token],
-            log_probs=self.log_probs + [log_prob],
-            state=state,
-            context=context,
-            coverage=coverage)
+        return Beam(tokens=self.tokens + [token],
+                    log_probs=self.log_probs + [log_prob],
+                    state=state,
+                    context=context,
+                    coverage=coverage)
 
     @property
     def latest_token(self):
@@ -41,6 +41,7 @@ class Beam(object):
 
 
 class BeamSearch(object):
+
     def __init__(self, model_file_path):
         model_name = re.findall(r'train_\d+', model_file_path)[0] + '_' + \
                      re.findall(r'model_\d+_\d+\.\d+', model_file_path)[0]
@@ -53,12 +54,11 @@ class BeamSearch(object):
                 os.mkdir(p)
 
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(
-            config.decode_data_path,
-            self.vocab,
-            mode='decode',
-            batch_size=config.beam_size,
-            single_pass=True)
+        self.batcher = Batcher(config.decode_data_path,
+                               self.vocab,
+                               mode='decode',
+                               batch_size=config.beam_size,
+                               single_pass=True)
         self.model = Model(model_file_path, is_eval=True)
 
     def sort_beams(self, beams):
@@ -74,8 +74,9 @@ class BeamSearch(object):
 
             # Extract the output ids from the hypothesis and convert back to words
             output_ids = [int(t) for t in best_summary.tokens[1:]]
-            decoded_words = data.outputids2words(output_ids, self.vocab, (
-                batch.art_oovs[0] if config.pointer_gen else None))
+            decoded_words = data.outputids2words(
+                output_ids, self.vocab,
+                (batch.art_oovs[0] if config.pointer_gen else None))
 
             # Remove the [STOP] token from decoded_words, if necessary
             try:
@@ -89,8 +90,8 @@ class BeamSearch(object):
             write_for_rouge(original_abstract_sents, decoded_words, counter,
                             self._rouge_ref_dir, self._rouge_dec_dir)
             counter += 1
-            print('global step %d, %.2f step/s' % (counter,
-                                                   1.0 / (time.time() - start)))
+            print('global step %d, %.2f step/s' % (counter, 1.0 /
+                                                   (time.time() - start)))
             start = time.time()
             batch = self.batcher.next_batch()
 
@@ -114,12 +115,11 @@ class BeamSearch(object):
 
         # Prepare decoder batch
         beams = [
-            Beam(
-                tokens=[self.vocab.word2id(data.START_DECODING)],
-                log_probs=[0.0],
-                state=(dec_h[0], dec_c[0]),
-                context=c_t_0[0],
-                coverage=(coverage_t_0[0] if config.is_coverage else None))
+            Beam(tokens=[self.vocab.word2id(data.START_DECODING)],
+                 log_probs=[0.0],
+                 state=(dec_h[0], dec_c[0]),
+                 context=c_t_0[0],
+                 coverage=(coverage_t_0[0] if config.is_coverage else None))
             for _ in range(config.beam_size)
         ]
         results = []
@@ -141,8 +141,9 @@ class BeamSearch(object):
 
                 all_context.append(h.context)
 
-            s_t_1 = (paddle.stack(all_state_h, 0).unsqueeze(0),
-                     paddle.stack(all_state_c, 0).unsqueeze(0))
+            s_t_1 = (paddle.stack(all_state_h,
+                                  0).unsqueeze(0), paddle.stack(all_state_c,
+                                                                0).unsqueeze(0))
             c_t_1 = paddle.stack(all_context, 0)
 
             coverage_t_1 = None
@@ -174,12 +175,12 @@ class BeamSearch(object):
 
                 for j in range(config.beam_size *
                                2):  # for each of the top 2*beam_size hyps:
-                    new_beam = h.extend(
-                        token=topk_ids[i, j].numpy()[0],
-                        log_prob=topk_log_probs[i, j].numpy()[0],
-                        state=state_i,
-                        context=context_i,
-                        coverage=coverage_i)
+                    new_beam = h.extend(token=topk_ids[i, j].numpy()[0],
+                                        log_prob=topk_log_probs[i,
+                                                                j].numpy()[0],
+                                        state=state_i,
+                                        context=context_i,
+                                        coverage=coverage_i)
                     all_beams.append(new_beam)
 
             beams = []

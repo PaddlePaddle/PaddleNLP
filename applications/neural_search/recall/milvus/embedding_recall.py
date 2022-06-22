@@ -31,10 +31,9 @@ data_size = len(embedding_ids)
 client = RecallByMilvus()
 embeddings = embeddings[np.arange(1, 2)]
 time_start = time.time()  #开始计时
-status, resultes = client.search(
-    collection_name=collection_name,
-    vectors=embeddings,
-    partition_tag=partition_tag)
+status, resultes = client.search(collection_name=collection_name,
+                                 vectors=embeddings,
+                                 partition_tag=partition_tag)
 time_end = time.time()  #结束计时
 
 sum_t = time_end - time_start  #运行所花时间

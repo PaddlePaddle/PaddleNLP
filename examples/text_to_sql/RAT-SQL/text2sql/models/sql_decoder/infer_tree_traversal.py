@@ -59,7 +59,10 @@ class InferenceTreeTraversal(TreeTraversal):
         'str': str,
         'int': int,
         'float': float,
-        'bool': lambda n: {'True': True, 'False': False}.get(n, False),
+        'bool': lambda n: {
+            'True': True,
+            'False': False
+        }.get(n, False),
     }
 
     SIMPLE_TERMINAL_TYPES_DEFAULT = {
@@ -101,10 +104,12 @@ class InferenceTreeTraversal(TreeTraversal):
             return pointer_logprobs
 
         pointer_logprobs = dict(pointer_logprobs)
-        return [(orig_index, paddle.logsumexp(
-            paddle.stack(
-                tuple(pointer_logprobs[i] for i in mapped_indices), axis=0),
-            axis=0)) for orig_index, mapped_indices in pointer_map.items()]
+        return [(orig_index,
+                 paddle.logsumexp(paddle.stack(tuple(pointer_logprobs[i]
+                                                     for i in mapped_indices),
+                                               axis=0),
+                                  axis=0))
+                for orig_index, mapped_indices in pointer_map.items()]
 
     def update_using_last_choice(self, last_choice, extra_choice_info,
                                  attention_offset):
@@ -141,10 +146,9 @@ class InferenceTreeTraversal(TreeTraversal):
 
         elif self.cur_item.state == TreeTraversal.State.POINTER_APPLY:
             self.actions = self.actions.append(
-                self.SetParentField(
-                    self.cur_item.parent_field_name,
-                    node_type=None,
-                    node_value=last_choice))
+                self.SetParentField(self.cur_item.parent_field_name,
+                                    node_type=None,
+                                    node_value=last_choice))
 
         # NODE_FINISHED
         elif self.cur_item.state == TreeTraversal.State.NODE_FINISHED:

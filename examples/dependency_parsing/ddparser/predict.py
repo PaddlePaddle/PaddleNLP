@@ -48,12 +48,13 @@ args = parser.parse_args()
 
 @paddle.no_grad()
 def batch_predict(
-        model,
-        data_loader,
-        rel_vocab,
-        word_pad_index,
-        word_bos_index,
-        word_eos_index, ):
+    model,
+    data_loader,
+    rel_vocab,
+    word_pad_index,
+    word_bos_index,
+    word_eos_index,
+):
 
     model.eval()
     arcs, rels = [], []
@@ -70,16 +71,17 @@ def batch_predict(
         mask = paddle.logical_and(
             paddle.logical_and(words != word_pad_index,
                                words != word_bos_index),
-            words != word_eos_index, )
+            words != word_eos_index,
+        )
 
         lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
         arcs.extend(
-            paddle.split(
-                paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
+            paddle.split(paddle.masked_select(arc_preds, mask),
+                         lens.numpy().tolist()))
         rels.extend(
-            paddle.split(
-                paddle.masked_select(rel_preds, mask), lens.numpy().tolist()))
+            paddle.split(paddle.masked_select(rel_preds, mask),
+                         lens.numpy().tolist()))
 
     arcs = [[str(s) for s in seq.numpy().tolist()] for seq in arcs]
     rels = [rel_vocab.to_tokens(seq.numpy().tolist()) for seq in rels]
@@ -126,14 +128,16 @@ def do_predict(args):
         vocabs=[word_vocab, feat_vocab, rel_vocab],
         encoding_model=args.encoding_model,
         feat=args.feat,
-        mode="test", )
+        mode="test",
+    )
 
     test_data_loader, buckets = create_dataloader(
         test_ds,
         batch_size=args.batch_size,
         mode="test",
         n_buckets=args.n_buckets,
-        trans_fn=trans_fn, )
+        trans_fn=trans_fn,
+    )
 
     # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
     if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
@@ -154,7 +158,8 @@ def do_predict(args):
         n_words=n_words,
         pad_index=word_pad_index,
         eos_index=word_eos_index,
-        pretrained_model=pretrained_model, )
+        pretrained_model=pretrained_model,
+    )
 
     # Load saved model parameters
     if os.path.isfile(args.params_path):
@@ -171,7 +176,8 @@ def do_predict(args):
         rel_vocab,
         word_pad_index,
         word_bos_index,
-        word_eos_index, )
+        word_eos_index,
+    )
 
     # Restore the order of sentences in the buckets
     if buckets:

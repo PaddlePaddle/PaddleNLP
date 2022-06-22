@@ -151,7 +151,8 @@ class AccuracyAndF1(Metric):
             precision,
             recall,
             f1,
-            (acc + f1) / 2, )
+            (acc + f1) / 2,
+        )
 
     def reset(self):
         """
@@ -382,7 +383,8 @@ class PearsonAndSpearman(Metric):
         return (
             pearson,
             spearman,
-            (pearson + spearman) / 2, )
+            (pearson + spearman) / 2,
+        )
 
     def pearson(self, preds, labels):
         n = len(preds)
@@ -490,7 +492,8 @@ class MultiLabelsMetric(Metric):
         super(MultiLabelsMetric, self).__init__()
         if num_labels <= 1:
             raise ValueError(
-                f"The num_labels is {num_labels}, which must be greater than 1.")
+                f"The num_labels is {num_labels}, which must be greater than 1."
+            )
         self.num_labels = num_labels
         self._name = name
         self._confusion_matrix = np.zeros((num_labels, 2, 2), dtype=int)
@@ -563,8 +566,8 @@ class MultiLabelsMetric(Metric):
 
         confusion_matrix = None  # [*, 2, 2]
         if average == 'binary':
-            confusion_matrix = np.expand_dims(
-                self._confusion_matrix[pos_label], axis=0)
+            confusion_matrix = np.expand_dims(self._confusion_matrix[pos_label],
+                                              axis=0)
         elif average == 'micro':
             confusion_matrix = self._confusion_matrix.sum(axis=0, keepdims=True)
         #  if average is 'macro' or 'weighted' or None
@@ -662,10 +665,10 @@ class MultiLabelsMetric(Metric):
     def _multi_labels_confusion_matrix(self, pred, label):
         tp_bins = label[pred == label]
         tp = np.bincount(tp_bins, minlength=self.num_labels)  # [num_labels,]
-        tp_plus_fp = np.bincount(
-            pred, minlength=self.num_labels)  # [num_labels,]
-        tp_plus_fn = np.bincount(
-            label, minlength=self.num_labels)  # [num_labels,]
+        tp_plus_fp = np.bincount(pred,
+                                 minlength=self.num_labels)  # [num_labels,]
+        tp_plus_fn = np.bincount(label,
+                                 minlength=self.num_labels)  # [num_labels,]
         fp = tp_plus_fp - tp  # [num_labels,]
         fn = tp_plus_fn - tp  # [num_labels,]
         tn = pred.shape[0] - tp - fp - fn  # [num_labels,]

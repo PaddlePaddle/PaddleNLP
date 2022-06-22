@@ -10,10 +10,10 @@ import paddle
 import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
+from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
+from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
@@ -29,8 +29,9 @@ if __name__ == "__main__":
     paddle.set_device(device)
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    trans_func = partial(
-        convert_example, tokenizer=tokenizer, max_seq_length=max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -40,8 +41,8 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexBaseStatic(
-        pretrained_model, output_emb_size=output_emb_size)
+    model = SemanticIndexBaseStatic(pretrained_model,
+                                    output_emb_size=output_emb_size)
 
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
@@ -56,22 +57,20 @@ if __name__ == "__main__":
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(
-        corpus_ds,
-        mode='predict',
-        batch_size=batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(corpus_ds,
+                                           mode='predict',
+                                           batch_size=batch_size,
+                                           batchify_fn=batchify_fn,
+                                           trans_fn=trans_func)
 
     all_embeddings = []
     model.eval()
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
 
-            text_embeddings = model(input_ids, token_type_ids)
+            text_embeddings = model.get_pooled_embedding(
+                input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
 
     text_embedding = all_embeddings[0]

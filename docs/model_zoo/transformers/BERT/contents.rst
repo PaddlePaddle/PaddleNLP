@@ -57,30 +57,29 @@ BERT模型汇总
 |                                                                                  |              | and Traditional text using                                                       |
 |                                                                                  |              | Whole-Word-Masking with extented data.                                           |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-| ``junnyu/ckiplab-bert-base-chinese-ner``                                         | Chinese      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 102M parameters.                                                       |
-|                                                                                  |              | Finetuned on NER task.                                                           |
+| ``uer/chinese-roberta-base``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-12_H-768`_                                                |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-| ``junnyu/ckiplab-bert-base-chinese-pos``                                         | Chinese      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 102M parameters.                                                       |
-|                                                                                  |              | Finetuned on POS task.                                                           |
+| ``uer/chinese-roberta-medium``                                                   | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-8_H-512`_                                                 |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-| ``junnyu/ckiplab-bert-base-chinese-ws``                                          | Chinese      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 102M parameters.                                                       |
-|                                                                                  |              | Finetuned on WS task.                                                            |
+| ``uer/chinese-roberta-small``                                                    | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-4_H-512`_                                                 |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-| ``junnyu/nlptown-bert-base-multilingual-uncased-sentiment``                      | Multilingual | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 167M parameters.                                                       |
-|                                                                                  |              | Finetuned for sentiment analysis                                                 |
-|                                                                                  |              | in six languages:                                                                |
-|                                                                                  |              | English, Dutch, German, French,                                                  |
-|                                                                                  |              | Spanish and Italian.                                                             |
+| ``uer/chinese-roberta-mini``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-4_H-256`_                                                 |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-| ``junnyu/tbs17-MathBERT``                                                        | English      | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 110M parameters.                                                       |
-|                                                                                  |              | Trained on pre-k to graduate math                                                |
-|                                                                                  |              | language (English) using a masked                                                |
-|                                                                                  |              | language modeling (MLM) objective.                                               |
+| ``uer/chinese-roberta-tiny``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-2_H-128`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-6l-768h``                                                  | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-6_H-768`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``ckiplab/bert-base-chinese-pos``                                                | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `ckiplab/bert-base-chinese-pos`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``tbs17/MathBERT``                                                               | English      | Please refer to:                                                                 |
+|                                                                                  |              | `tbs17/MathBERT`_                                                                |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``macbert-base-chinese``                                                         | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
@@ -538,25 +537,15 @@ BERT模型汇总
 | ``fabriceyhc/bert-base-uncased-amazon_polarity``                                 | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `fabriceyhc/bert-base-uncased-amazon_polarity`_                                  |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``iverxin/bert-base-japanese``                                                    | Japanese     | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 110M parameters.                                                       |
-|                                                                                  |              | Trained on Japanese text.                                                        |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``iverxin/bert-base-japanese-whole-word-masking``                                 | Japanese     | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 109M parameters.                                                       |
-|                                                                                  |              | Trained on Japanese text using                                                   |
-|                                                                                  |              | Whole-Word-Masking.                                                              |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``iverxin/bert-base-japanese-char``                                               | Japanese     | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 89M parameters.                                                        |
-|                                                                                  |              | Trained on Japanese char text.                                                   |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``iverxin/bert-base-japanese-char-whole-word-masking``                            | Japanese     | 12-layer, 768-hidden,                                                            |
-|                                                                                  |              | 12-heads, 89M parameters.                                                        |
-|                                                                                  |              | Trained on Japanese char text using                                              |
-|                                                                                  |              | Whole-Word-Masking.                                                              |
-+----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
+.. _ckiplab/bert-base-chinese-pos: https://huggingface.co/ckiplab/bert-base-chinese-pos
+.. _uer/chinese_roberta_L-12_H-768: https://huggingface.co/uer/chinese_roberta_L-12_H-768
+.. _uer/chinese_roberta_L-6_H-768: https://huggingface.co/uer/chinese_roberta_L-6_H-768
+.. _uer/chinese_roberta_L-8_H-512: https://huggingface.co/uer/chinese_roberta_L-8_H-512
+.. _uer/chinese_roberta_L-4_H-512: https://huggingface.co/uer/chinese_roberta_L-4_H-512
+.. _uer/chinese_roberta_L-4_H-256: https://huggingface.co/uer/chinese_roberta_L-4_H-256
+.. _uer/chinese_roberta_L-2_H-128: https://huggingface.co/uer/chinese_roberta_L-2_H-128
+.. _tbs17/MathBERT: https://huggingface.co/tbs17/MathBERT
 .. _cross-encoder/ms-marco-MiniLM-L-12-v2: https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-12-v2
 .. _cl-tohoku/bert-base-japanese-char: https://huggingface.co/cl-tohoku/bert-base-japanese-char
 .. _cl-tohoku/bert-base-japanese-whole-word-masking: https://huggingface.co/cl-tohoku/bert-base-japanese-whole-word-masking
@@ -701,4 +690,3 @@ BERT模型汇总
 .. _sshleifer/tiny-distilbert-base-cased: https://huggingface.co/sshleifer/tiny-distilbert-base-cased
 .. _ckiplab/bert-base-chinese: https://huggingface.co/ckiplab/bert-base-chinese
 .. _fabriceyhc/bert-base-uncased-amazon_polarity: https://huggingface.co/fabriceyhc/bert-base-uncased-amazon_polarity
-

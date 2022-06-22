@@ -75,6 +75,7 @@ ACT2FN = {
 
 
 class NeZhaAttention(nn.Layer):
+
     def __init__(self,
                  hidden_size=768,
                  num_attention_heads=12,
@@ -110,24 +111,24 @@ class NeZhaAttention(nn.Layer):
                                                max_relative_position=127):
         vocab_size = max_relative_position * 2 + 1
         range_vec = paddle.arange(length)
-        range_mat = paddle.tile(
-            range_vec, repeat_times=[length]).reshape((length, length))
+        range_mat = paddle.tile(range_vec, repeat_times=[length]).reshape(
+            (length, length))
         distance_mat = range_mat - paddle.t(range_mat)
-        distance_mat_clipped = paddle.clip(
-            distance_mat.astype('float32'), -max_relative_position,
-            max_relative_position)
+        distance_mat_clipped = paddle.clip(distance_mat.astype('float32'),
+                                           -max_relative_position,
+                                           max_relative_position)
         final_mat = distance_mat_clipped + max_relative_position
         embeddings_table = np.zeros([vocab_size, depth])
 
         for pos in range(vocab_size):
             for i in range(depth // 2):
-                embeddings_table[pos, 2 * i] = np.sin(pos / np.power(10000, 2 *
-                                                                     i / depth))
-                embeddings_table[pos, 2 * i + 1] = np.cos(pos / np.power(
-                    10000, 2 * i / depth))
+                embeddings_table[pos, 2 * i] = np.sin(
+                    pos / np.power(10000, 2 * i / depth))
+                embeddings_table[pos, 2 * i + 1] = np.cos(
+                    pos / np.power(10000, 2 * i / depth))
 
-        embeddings_table_tensor = paddle.to_tensor(
-            embeddings_table, dtype='float32')
+        embeddings_table_tensor = paddle.to_tensor(embeddings_table,
+                                                   dtype='float32')
         flat_relative_positions_matrix = final_mat.reshape((-1, ))
         one_hot_relative_positions_matrix = paddle.nn.functional.one_hot(
             flat_relative_positions_matrix.astype('int64'),
@@ -216,6 +217,7 @@ class NeZhaAttention(nn.Layer):
 
 
 class NeZhaLayer(nn.Layer):
+
     def __init__(self,
                  hidden_size=768,
                  num_attention_heads=12,
@@ -255,6 +257,7 @@ class NeZhaLayer(nn.Layer):
 
 
 class NeZhaEncoder(nn.Layer):
+
     def __init__(self,
                  hidden_size=768,
                  num_hidden_layers=12,
@@ -291,6 +294,7 @@ class NeZhaEncoder(nn.Layer):
 
 
 class NeZhaEmbeddings(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  hidden_size=768,
@@ -336,6 +340,7 @@ class NeZhaEmbeddings(nn.Layer):
 
 
 class NeZhaPooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super(NeZhaPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -444,12 +449,11 @@ class NeZhaPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.nezha.config["initializer_range"],
-                        shape=layer.weight.shape))
+                    paddle.tensor.normal(mean=0.0,
+                                         std=self.initializer_range if hasattr(
+                                             self, "initializer_range") else
+                                         self.nezha.config["initializer_range"],
+                                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -639,6 +643,7 @@ class NeZhaModel(NeZhaPretrainedModel):
 
 
 class NeZhaLMPredictionHead(nn.Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -788,8 +793,8 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
         """
         sequence_output, pooled_output = self.nezha(input_ids, token_type_ids,
                                                     attention_mask)
-        prediction_scores, seq_relationship_score = self.cls(sequence_output,
-                                                             pooled_output)
+        prediction_scores, seq_relationship_score = self.cls(
+            sequence_output, pooled_output)
 
         if masked_lm_labels is not None and next_sentence_label is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
@@ -907,8 +912,8 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
         super(NeZhaForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.nezha.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  nezha.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.nezha.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -974,8 +979,8 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
         super(NeZhaForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.nezha.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  nezha.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.nezha.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -1041,8 +1046,8 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         super(NeZhaForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.nezha.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  nezha.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.nezha.config["hidden_size"], 1)
         self.apply(self.init_weights)
 

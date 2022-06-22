@@ -23,33 +23,29 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # Required parameters
     # yapf: disable
-    parser.add_argument("--model_name_or_path", default=None, type=str, required=True,)
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True)
     parser.add_argument("--do_train", default=False, type=bool, required=False)
     parser.add_argument("--do_test", default=False, type=bool, required=False)
-    parser.add_argument("--train_data_dir", default=None, type=str, required=False,)
-    parser.add_argument("--train_label_path", default=None, type=str, required=False,)
-    parser.add_argument("--eval_data_dir", default=None, type=str, required=False,)
-    parser.add_argument("--eval_label_path", default=None, type=str, required=False,)
-    parser.add_argument("--test_file", default=None, type=str, required=False,)
-    parser.add_argument("--train_file", default=None, type=str, required=False,)
-    parser.add_argument("--use_vdl", default=False, type=bool, required=False,)
-    parser.add_argument("--output_dir", default=None, type=str, required=True,)
-    parser.add_argument("--max_seq_length", default=512, type=int,)
-    parser.add_argument("--evaluate_during_training", action="store_true",)
-    parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.",)
-    parser.add_argument("--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for eval.",)
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.",)
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.",)
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.",)
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.",)
-    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.",)
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.",)
-    parser.add_argument("--eval_steps", type=int, default=10, help="eval every X updates steps.",)
-    parser.add_argument("--save_steps", type=int, default=50, help="Save checkpoint every X updates steps.",)
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization",)
+    parser.add_argument("--test_file", default=None, type=str, required=False)
+    parser.add_argument("--train_file", default=None, type=str, required=False)
+    parser.add_argument("--output_dir", default=None, type=str, required=True)
+    parser.add_argument("--max_seq_len", default=512, type=int)
+    parser.add_argument("--max_query_length", default=20, type=int)
+    parser.add_argument("--max_doc_length", default=512, type=int)
+    parser.add_argument("--max_span_num", default=1, type=int)
+    parser.add_argument("--per_gpu_train_batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--per_gpu_eval_batch_size", default=8, type=int, help="Batch size per GPU/CPU for eval.")
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
+    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument("--eval_steps", type=int, default=10, help="eval every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=50, help="Save checkpoint every X updates steps.")
+    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument("--init_checkpoint", type=str, default=None, help="the initialized checkpoint")
+    parser.add_argument("--save_path", type=str, default=None, help="the initialized checkpoint")
     # yapf: enable
     args = parser.parse_args()
     return args
@@ -76,7 +72,8 @@ def main(args):
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO
-        if paddle.distributed.get_rank() == 0 else logging.WARN, )
+        if paddle.distributed.get_rank() == 0 else logging.WARN,
+    )
 
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
@@ -94,14 +91,13 @@ def main(args):
     if args.do_test:
         model = LayoutXLMForTokenClassification_with_CRF.from_pretrained(
             args.init_checkpoint)
-        evaluate(
-            args,
-            model,
-            tokenizer,
-            label2id_map,
-            id2label_map,
-            pad_token_label_id,
-            global_step=0)
+        evaluate(args,
+                 model,
+                 tokenizer,
+                 label2id_map,
+                 id2label_map,
+                 pad_token_label_id,
+                 global_step=0)
         exit(0)
 
     if args.init_checkpoint:
@@ -117,16 +113,13 @@ def main(args):
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    train_dataset = DocVQA(
-        args,
-        tokenizer,
-        data_dir=args.train_data_dir,
-        label_path=args.train_label_path,
-        label2id_map=label2id_map,
-        pad_token_label_id=pad_token_label_id,
-        contains_re=False,
-        add_special_ids=False,
-        return_attention_mask=True)
+    train_dataset = DocVQA(args,
+                           tokenizer,
+                           label2id_map,
+                           max_seq_len=args.max_seq_len,
+                           max_query_length=args.max_query_length,
+                           max_doc_length=args.max_doc_length,
+                           max_span_num=args.max_span_num)
 
     train_sampler = paddle.io.DistributedBatchSampler(
         train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=False)
@@ -134,15 +127,13 @@ def main(args):
     args.train_batch_size = args.per_gpu_train_batch_size * max(
         1, paddle.distributed.get_world_size())
 
-    train_dataloader = paddle.io.DataLoader(
-        train_dataset,
-        batch_sampler=train_sampler,
-        num_workers=0,
-        use_shared_memory=True,
-        collate_fn=None, )
+    train_dataloader = paddle.io.DataLoader(train_dataset,
+                                            batch_sampler=train_sampler,
+                                            num_workers=0,
+                                            use_shared_memory=True,
+                                            collate_fn=None)
 
     t_total = len(train_dataloader) * args.num_train_epochs
-    print('t_total:{}'.format(t_total))
     # build linear decay with warmup lr sch
     lr_scheduler = paddle.optimizer.lr.PolynomialDecay(
         learning_rate=args.learning_rate,
@@ -154,13 +145,12 @@ def main(args):
             lr_scheduler,
             args.warmup_steps,
             start_lr=0,
-            end_lr=args.learning_rate, )
+            end_lr=args.learning_rate)
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        epsilon=args.adam_epsilon,
-        weight_decay=args.weight_decay)
+    optimizer = paddle.optimizer.AdamW(learning_rate=lr_scheduler,
+                                       parameters=model.parameters(),
+                                       epsilon=args.adam_epsilon,
+                                       weight_decay=args.weight_decay)
 
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
@@ -169,7 +159,8 @@ def main(args):
                 args.per_gpu_train_batch_size)
     logger.info(
         "  Total train batch size (w. parallel, distributed) = %d",
-        args.train_batch_size * paddle.distributed.get_world_size(), )
+        args.train_batch_size * paddle.distributed.get_world_size(),
+    )
     logger.info("  Total optimization steps = %d", t_total)
 
     global_step = 0
@@ -183,22 +174,21 @@ def main(args):
             input_ids, input_mask, segment_ids, bboxes, labels = batch
             if input_ids.shape[0] != args.per_gpu_train_batch_size:
                 continue
-            outputs = model(
-                input_ids=input_ids,
-                bbox=bboxes,
-                attention_mask=input_mask,
-                token_type_ids=segment_ids,
-                labels=labels,
-                is_train=True)
+            outputs = model(input_ids=input_ids,
+                            bbox=bboxes,
+                            attention_mask=input_mask,
+                            token_type_ids=segment_ids,
+                            labels=labels,
+                            is_train=True)
             # model outputs are always tuple in ppnlp (see doc)
             loss = outputs[0]
             loss = loss.mean()
             if global_step % 50 == 0:
                 logger.info(
-                    "[epoch {}/{}][iter: {}/{}] lr: {:.5f}, train loss: {:.5f}, ".
-                    format(epoch_id, args.num_train_epochs, step,
-                           len(train_dataloader),
-                           lr_scheduler.get_lr(), loss.numpy()[0]))
+                    "[epoch {}/{}][iter: {}/{}] lr: {:.5f}, train loss: {:.5f}, "
+                    .format(epoch_id, args.num_train_epochs, step,
+                            len(train_dataloader), lr_scheduler.get_lr(),
+                            loss.numpy()[0]))
 
             loss.backward()
             tr_loss += loss.item()
@@ -314,9 +304,9 @@ def decode(tokenizer, res):
     save_f1 = []
     for i in range(len(res)):
         input_ids, label_ids, predict_ids, bbox = res[i]
-        remove_pos = len(' '.join([str(x) for x in input_ids]).split('2 6 ')[0]
-                         .strip(' ').split(
-                             ' ')) + 2  # remove the question bbox and sep bbox
+        remove_pos = len(' '.join(
+            [str(x) for x in input_ids]).split('2 6 ')[0].strip(' ').split(
+                ' ')) + 2  # remove the question bbox and sep bbox
         start_pos = input_ids.index(sep_id)
         query_text = []
         for idx in range(1, start_pos):
@@ -362,35 +352,28 @@ def evaluate(args,
              pad_token_label_id,
              prefix="",
              global_step=0):
-    eval_dataset = DocVQA(
-        args,
-        tokenizer,
-        data_dir=args.eval_data_dir,
-        label_path=args.eval_label_path,
-        label2id_map=label2id_map,
-        pad_token_label_id=pad_token_label_id,
-        contains_re=False,
-        add_special_ids=False,
-        return_attention_mask=True)
+
+    eval_dataset = DocVQA(args,
+                          tokenizer,
+                          label2id_map,
+                          max_seq_len=512,
+                          max_query_length=20,
+                          max_doc_length=512,
+                          max_span_num=1)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(
         1, paddle.distributed.get_world_size())
 
-    eval_dataloader = paddle.io.DataLoader(
-        eval_dataset,
-        batch_size=args.eval_batch_size,
-        num_workers=0,
-        use_shared_memory=True,
-        collate_fn=None, )
+    eval_dataloader = paddle.io.DataLoader(eval_dataset,
+                                           batch_size=args.eval_batch_size,
+                                           num_workers=0,
+                                           use_shared_memory=True,
+                                           collate_fn=None)
 
     # Eval!
     logger.info("***** Running evaluation %s *****", prefix)
     logger.info("  Num examples = %d", len(eval_dataset))
     logger.info("  Batch size = %d", args.eval_batch_size)
-    eval_loss = 0.0
-    nb_eval_steps = 0
-    preds = None
-    out_label_ids = None
     model.eval()
     res = []
     for idx, batch in enumerate(eval_dataloader):
@@ -399,13 +382,12 @@ def evaluate(args,
 
             if input_ids.shape[0] != args.eval_batch_size:
                 continue
-            outputs = model(
-                input_ids=input_ids,
-                bbox=bboxes,
-                attention_mask=input_mask,
-                token_type_ids=segment_ids,
-                labels=labels,
-                is_train=False)
+            outputs = model(input_ids=input_ids,
+                            bbox=bboxes,
+                            attention_mask=input_mask,
+                            token_type_ids=segment_ids,
+                            labels=labels,
+                            is_train=False)
             labels = labels.numpy()
             crf_decode = outputs[1].numpy()
             bboxes = bboxes.squeeze().numpy()
@@ -413,7 +395,8 @@ def evaluate(args,
 
             for index in range(input_ids.shape[0]):
                 res.append([
-                    list(input_ids[index]), list(labels[index]),
+                    list(input_ids[index]),
+                    list(labels[index]),
                     list(crf_decode[index]), bboxes[index]
                 ])
 
@@ -422,7 +405,7 @@ def evaluate(args,
         for line in f:
             line = json.loads(line.strip())
             origin_inputs.append({
-                'id': line['id'],
+                'img_name': line['img_name'],
                 'question': line['question'],
                 'bboxes': line['document_bbox'],
                 'img_id': line['img_id']
@@ -430,12 +413,11 @@ def evaluate(args,
 
     text_res = decode(tokenizer, res)
 
-    save_path = 'data/decode_res.json'
-    with open(save_path, 'w', encoding='utf8') as f:
+    with open(args.save_path, 'w', encoding='utf8') as f:
         for line_res, line_text, line_label in zip(res, text_res,
                                                    origin_inputs):
             line_json = {}
-            line_json['id'] = line_label['id']
+            line_json['img_name'] = line_label['img_name']
             line_json['img_id'] = line_label['img_id']
             line_json['question'] = line_label['question']
             line_json['label_answer'] = line_text[1]

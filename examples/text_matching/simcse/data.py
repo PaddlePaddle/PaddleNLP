@@ -31,17 +31,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
@@ -121,8 +122,8 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         if (actual_len > 5):
             dup_len = random.randint(a=0, b=max(2, int(dup_rate * actual_len)))
             # Skip cls and sep position
-            dup_word_index = random.sample(
-                list(range(1, actual_len - 1)), k=dup_len)
+            dup_word_index = random.sample(list(range(1, actual_len - 1)),
+                                           k=dup_len)
 
         r_input_id = []
         r_token_type_id = []

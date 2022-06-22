@@ -57,7 +57,7 @@ def pad_sequence_paddle(inputs, lens, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(inputs[idx:idx + l])
+        sequences.append(np.array(inputs[idx:idx + l]))
         idx += l
     outputs = Pad(pad_val=pad_index)(sequences)
     output_tensor = paddle.to_tensor(outputs)
@@ -137,17 +137,16 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(
-        x[offset[0]:, offset[1]:],
-        shape=[n, w] + list(x.shape[2:]),
-        strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
+                                           shape=[n, w] + list(x.shape[2:]),
+                                           strides=[m, k] + list(strides[2:]))
 
 
 def flat_words(words, pad_index=0):
     mask = words != pad_index
     lens = paddle.sum(paddle.cast(mask, "int64"), axis=-1)
-    position = paddle.cumsum(
-        lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
+    position = paddle.cumsum(lens + paddle.cast(
+        (lens == 0), "int64"), axis=1) - 1
     select = paddle.nonzero(mask)
     words = paddle.gather_nd(words, select)
     lens = paddle.sum(lens, axis=-1)

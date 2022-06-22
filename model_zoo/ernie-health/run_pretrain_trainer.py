@@ -60,10 +60,12 @@ class DataArguments:
             "help":
             "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
-        }, )
+        },
+    )
     masked_lm_prob: float = field(
         default=0.15,
-        metadata={"help": "Mask token prob."}, )
+        metadata={"help": "Mask token prob."},
+    )
 
 
 @dataclass
@@ -111,8 +113,8 @@ def main():
             training_args.output_dir
     ) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(
-                os.listdir(training_args.output_dir)) > 1:
+        if last_checkpoint is None and len(os.listdir(
+                training_args.output_dir)) > 1:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
                 "Use --overwrite_output_dir to overcome.")
@@ -125,8 +127,8 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES['ernie-health']
 
     # Loads or initialize a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys(
-    ))
+    pretrained_models = list(
+        tokenizer_class.pretrained_init_configuration.keys())
 
     if model_args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(
@@ -146,8 +148,8 @@ def main():
     logger.info("start load data : %s" %
                 (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
-    train_dataset = MedicalCorpus(
-        data_path=data_args.input_dir, tokenizer=tokenizer)
+    train_dataset = MedicalCorpus(data_path=data_args.input_dir,
+                                  tokenizer=tokenizer)
     logger.info("load data done, total : %s s" % (time.time() - tic_load_data))
 
     # Reads data and generates mini-batches.
@@ -197,7 +199,8 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=None,
-        tokenizer=tokenizer, )
+        tokenizer=tokenizer,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:

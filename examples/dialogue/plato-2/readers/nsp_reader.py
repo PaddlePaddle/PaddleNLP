@@ -30,33 +30,35 @@ class NSPReader(DialogReader):
     def add_cmdline_args(cls, parser):
         """Add cmdline argurments."""
         group = DialogReader.add_cmdline_args(parser)
-        group.add_argument(
-            "--attention_style",
-            type=str,
-            default="bidirectional",
-            choices=["bidirectional", "unidirectional"])
-        group.add_argument(
-            "--mix_negative_sample", type=str2bool, default=False)
+        group.add_argument("--attention_style",
+                           type=str,
+                           default="bidirectional",
+                           choices=["bidirectional", "unidirectional"])
+        group.add_argument("--mix_negative_sample",
+                           type=str2bool,
+                           default=False)
         return group
 
     def __init__(self, args):
         super(NSPReader, self).__init__(args)
         self.fields.append("label")
-        self.Record = namedtuple(
-            "Record", self.fields, defaults=(None, ) * len(self.fields))
+        self.Record = namedtuple("Record",
+                                 self.fields,
+                                 defaults=(None, ) * len(self.fields))
 
         self.attention_style = args.attention_style
         self.mix_negative_sample = args.mix_negative_sample
         return
 
     def _convert_example_to_record(self, example, is_infer):
-        record = super(NSPReader, self)._convert_example_to_record(example,
-                                                                   False)
+        record = super(NSPReader,
+                       self)._convert_example_to_record(example, False)
         if "label" in example._fields:
             record = record._replace(label=int(example.label))
         return record
 
     def _mix_negative_sample(self, reader, neg_pool_size=2**16):
+
         def gen_from_pool(pool):
             num_samples = len(pool)
             if num_samples == 1:
@@ -76,8 +78,10 @@ class NSPReader(DialogReader):
                     j].type_ids[idx_j:]
                 field_values["pos_ids"] = list(
                     range(len(field_values["token_ids"])))
-                neg_record = self.Record(
-                    **field_values, tgt_start_idx=idx_i, data_id=-1, label=0)
+                neg_record = self.Record(**field_values,
+                                         tgt_start_idx=idx_i,
+                                         data_id=-1,
+                                         label=0)
                 pool.append(neg_record)
                 assert len(neg_record.token_ids) <= self.max_seq_len
             self.global_rng.shuffle(pool)
@@ -105,11 +109,11 @@ class NSPReader(DialogReader):
                       sort_pool_size=2**16):
         if self.mix_negative_sample:
             reader = self._mix_negative_sample(reader)
-        return super(NSPReader, self)._batch_reader(
-            reader,
-            phase=phase,
-            is_infer=is_infer,
-            sort_pool_size=sort_pool_size)
+        return super(NSPReader,
+                     self)._batch_reader(reader,
+                                         phase=phase,
+                                         is_infer=is_infer,
+                                         sort_pool_size=sort_pool_size)
 
     def _pad_batch_records(self, batch_records, is_infer):
         """
@@ -123,10 +127,10 @@ class NSPReader(DialogReader):
         batch_label = [record.label for record in batch_records]
 
         if self.attention_style == "unidirectional":
-            batch["token_ids"] = pad_batch_data(
-                batch_token_ids, pad_id=self.pad_id)
-            batch["type_ids"] = pad_batch_data(
-                batch_type_ids, pad_id=self.pad_id)
+            batch["token_ids"] = pad_batch_data(batch_token_ids,
+                                                pad_id=self.pad_id)
+            batch["type_ids"] = pad_batch_data(batch_type_ids,
+                                               pad_id=self.pad_id)
             batch["pos_ids"] = pad_batch_data(batch_pos_ids, pad_id=self.pad_id)
             tgt_label, tgt_pos, label_pos = mask(
                 batch_tokens=batch_token_ids,
@@ -149,13 +153,13 @@ class NSPReader(DialogReader):
                 is_unidirectional=False)
             if not is_infer:
                 batch_token_ids = batch_mask_token_ids
-            batch["token_ids"] = pad_batch_data(
-                batch_token_ids, pad_id=self.pad_id)
-            batch["type_ids"] = pad_batch_data(
-                batch_type_ids, pad_id=self.pad_id)
+            batch["token_ids"] = pad_batch_data(batch_token_ids,
+                                                pad_id=self.pad_id)
+            batch["type_ids"] = pad_batch_data(batch_type_ids,
+                                               pad_id=self.pad_id)
             batch["pos_ids"] = pad_batch_data(batch_pos_ids, pad_id=self.pad_id)
-            attention_mask = self._gen_self_attn_mask(
-                batch_token_ids, is_unidirectional=False)
+            attention_mask = self._gen_self_attn_mask(batch_token_ids,
+                                                      is_unidirectional=False)
 
         batch["attention_mask"] = attention_mask
         batch["label_pos"] = label_pos

@@ -16,7 +16,8 @@ from typing import List, Union
 
 
 class Question:
-    def __init__(self, text: str, uid: str=None):
+
+    def __init__(self, text: str, uid: str = None):
         self.text = text
         self.uid = uid
 
@@ -26,9 +27,9 @@ class Question:
 
 
 class QAInput:
-    def __init__(self,
-                 doc_text: str,
-                 questions: Union[List[Question], Question]):
+
+    def __init__(self, doc_text: str, questions: Union[List[Question],
+                                                       Question]):
         self.doc_text = doc_text
         if type(questions) == Question:
             self.questions = [questions]

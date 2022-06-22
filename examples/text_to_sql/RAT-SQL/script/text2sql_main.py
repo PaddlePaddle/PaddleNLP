@@ -52,19 +52,22 @@ def preprocess(config):
 
     output_base = config.data.output
     if config.data.train_set is not None:
-        dataset = DatasetClass(
-            name='train', data_file=config.data.train_set, **dataset_config)
+        dataset = DatasetClass(name='train',
+                               data_file=config.data.train_set,
+                               **dataset_config)
         dataset.save(output_base, save_db=True)
         g_label_encoder.save(Path(output_base) / 'label_vocabs')
 
     if config.data.dev_set is not None:
-        dataset = DatasetClass(
-            name='dev', data_file=config.data.dev_set, **dataset_config)
+        dataset = DatasetClass(name='dev',
+                               data_file=config.data.dev_set,
+                               **dataset_config)
         dataset.save(output_base, save_db=False)
 
     if config.data.test_set is not None:
-        dataset = DatasetClass(
-            name='test', data_file=config.data.test_set, **dataset_config)
+        dataset = DatasetClass(name='test',
+                               data_file=config.data.test_set,
+                               **dataset_config)
         dataset.save(output_base, save_db=False)
 
 
@@ -80,17 +83,18 @@ def train(config):
         'label_encoder': g_label_encoder,
         'is_cached': True
     }
-    train_set = DatasetClass(
-        name='train', data_file=config.data.train_set, **dataset_config)
-    dev_set = DatasetClass(
-        name='dev', data_file=config.data.dev_set, **dataset_config)
+    train_set = DatasetClass(name='train',
+                             data_file=config.data.train_set,
+                             **dataset_config)
+    dev_set = DatasetClass(name='dev',
+                           data_file=config.data.dev_set,
+                           **dataset_config)
 
     shuf_train = True if not config.general.is_debug else False
-    train_reader = DataLoaderClass(
-        config,
-        train_set,
-        batch_size=config.general.batch_size,
-        shuffle=shuf_train)
+    train_reader = DataLoaderClass(config,
+                                   train_set,
+                                   batch_size=config.general.batch_size,
+                                   shuffle=shuf_train)
     #dev_reader = dataproc.DataLoader(config, dev_set, batch_size=config.general.batch_size, shuffle=False)
     dev_reader = DataLoaderClass(config, dev_set, batch_size=1, shuffle=False)
     max_train_steps = config.train.epochs * (
@@ -129,8 +133,9 @@ def inference(config):
         'label_encoder': g_label_encoder,
         'is_cached': True
     }
-    test_set = DatasetClass(
-        name='test', data_file=config.data.test_set, **dataset_config)
+    test_set = DatasetClass(name='test',
+                            data_file=config.data.test_set,
+                            **dataset_config)
     test_reader = DataLoaderClass(config, test_set, batch_size=1, shuffle=False)
 
     model = ModelClass(config.model, g_label_encoder)
@@ -139,12 +144,11 @@ def inference(config):
     model.set_state_dict(state_dict)
 
     logging.info("start of inference...")
-    launch.infer.inference(
-        model,
-        test_reader,
-        config.data.output,
-        beam_size=config.general.beam_size,
-        model_name=config.model.model_name)
+    launch.infer.inference(model,
+                           test_reader,
+                           config.data.output,
+                           beam_size=config.general.beam_size,
+                           model_name=config.model.model_name)
     logging.info("end of inference...")
 
 
@@ -156,15 +160,18 @@ def evaluate(config):
         'is_cached': True,
         'schema_file': config.data.db_schema
     }
-    test_set = DatasetClass(
-        name='test', data_file=config.data.test_set, **dataset_config)
+    test_set = DatasetClass(name='test',
+                            data_file=config.data.test_set,
+                            **dataset_config)
     with open(config.data.eval_file) as ifs:
         infer_results = list(ifs)
     model = None
 
     logging.info("start of evaluating...")
-    launch.eval.evaluate(
-        model, test_set, infer_results, eval_value=config.general.is_eval_value)
+    launch.eval.evaluate(model,
+                         test_set,
+                         infer_results,
+                         eval_value=config.general.is_eval_value)
     logging.info("end of evaluating....")
 
 
@@ -224,8 +231,8 @@ def _set_proc_name(config, tag_base):
     if tag_base.startswith('train'):
         tag_base = 'train'
     import setproctitle
-    setproctitle.setproctitle(tag_base + '_' + config.data.output.rstrip('/')
-                              .split('/')[-1])
+    setproctitle.setproctitle(tag_base + '_' +
+                              config.data.output.rstrip('/').split('/')[-1])
 
 
 if __name__ == "__main__":

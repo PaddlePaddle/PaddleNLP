@@ -49,7 +49,9 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
 
     """
 
-    resource_files_names = {"sentencepiece_model_file": "spiece.model", }
+    resource_files_names = {
+        "sentencepiece_model_file": "spiece.model",
+    }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
             "reformer-crime-and-punishment":

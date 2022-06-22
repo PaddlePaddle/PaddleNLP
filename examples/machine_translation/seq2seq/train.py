@@ -30,14 +30,14 @@ def do_train(args):
         args)
 
     model = paddle.Model(
-        Seq2SeqAttnModel(src_vocab_size, tgt_vocab_size, args.hidden_size, args.
-                         hidden_size, args.num_layers, args.dropout, eos_id))
+        Seq2SeqAttnModel(src_vocab_size, tgt_vocab_size, args.hidden_size,
+                         args.hidden_size, args.num_layers, args.dropout,
+                         eos_id))
 
     grad_clip = nn.ClipGradByGlobalNorm(args.max_grad_norm)
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=args.learning_rate,
-        parameters=model.parameters(),
-        grad_clip=grad_clip)
+    optimizer = paddle.optimizer.Adam(learning_rate=args.learning_rate,
+                                      parameters=model.parameters(),
+                                      grad_clip=grad_clip)
 
     ppl_metric = Perplexity()
     model.prepare(optimizer, CrossEntropyCriterion(), ppl_metric)
@@ -47,8 +47,8 @@ def do_train(args):
         model.load(args.init_from_ckpt)
         print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
-    benchmark_logger = paddle.callbacks.ProgBarLogger(
-        log_freq=args.log_freq, verbose=3)
+    benchmark_logger = paddle.callbacks.ProgBarLogger(log_freq=args.log_freq,
+                                                      verbose=3)
 
     model.fit(train_data=train_loader,
               eval_data=eval_loader,

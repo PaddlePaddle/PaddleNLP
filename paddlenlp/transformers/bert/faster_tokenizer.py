@@ -16,7 +16,7 @@
 import json
 from typing import List, Optional, Tuple
 
-from faster_tokenizers import normalizers
+from faster_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFasterTokenizer
 from .tokenizer import BertTokenizer
 
@@ -28,73 +28,9 @@ VOCAB_FILES_NAMES = {
 
 class BertFasterTokenizer(PretrainedFasterTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "bert-base-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
-            "bert-large-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-uncased-vocab.txt",
-            "bert-base-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
-            "bert-large-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-cased-vocab.txt",
-            "bert-base-multilingual-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-uncased-vocab.txt",
-            "bert-base-multilingual-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-cased-vocab.txt",
-            "bert-base-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "bert-wwm-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese-vocab.txt",
-            "bert-wwm-ext-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
-            "macbert-large-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "macbert-base-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "simbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
-        }
-    }
-    pretrained_init_configuration = {
-        "bert-base-uncased": {
-            "do_lower_case": True
-        },
-        "bert-large-uncased": {
-            "do_lower_case": True
-        },
-        "bert-base-cased": {
-            "do_lower_case": False
-        },
-        "bert-large-cased": {
-            "do_lower_case": False
-        },
-        "bert-base-multilingual-uncased": {
-            "do_lower_case": True
-        },
-        "bert-base-multilingual-cased": {
-            "do_lower_case": False
-        },
-        "bert-base-chinese": {
-            "do_lower_case": False
-        },
-        "bert-wwm-chinese": {
-            "do_lower_case": False
-        },
-        "bert-wwm-ext-chinese": {
-            "do_lower_case": False
-        },
-        "macbert-large-chinese": {
-            "do_lower_case": False
-        },
-        "macbert-base-chinese": {
-            "do_lower_case": False
-        },
-        "simbert-base-chinese": {
-            "do_lower_case": True
-        },
-    }
     slow_tokenizer_class = BertTokenizer
+    pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
     padding_side = 'right'
 
@@ -121,13 +57,14 @@ class BertFasterTokenizer(PretrainedFasterTokenizer):
             mask_token=mask_token,
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            **kwargs, )
+            **kwargs,
+        )
 
         normalizer_state = json.loads(
             self.backend_tokenizer.normalizer.__getstate__())
-        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case or
-                normalizer_state.get("strip_accents", strip_accents) !=
-                strip_accents or normalizer_state.get(
+        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case
+                or normalizer_state.get("strip_accents", strip_accents)
+                != strip_accents or normalizer_state.get(
                     "handle_chinese_chars",
                     tokenize_chinese_chars) != tokenize_chinese_chars):
             normalizer_class = getattr(normalizers,
@@ -142,6 +79,7 @@ class BertFasterTokenizer(PretrainedFasterTokenizer):
 
     def save_vocabulary(self,
                         save_directory: str,
-                        filename_prefix: Optional[str]=None) -> Tuple[str]:
-        files = self._tokenizer.model.save(save_directory, name=filename_prefix)
+                        filename_prefix: Optional[str] = None) -> Tuple[str]:
+        files = self._tokenizer.model.save(save_directory,
+                                           prefix=filename_prefix)
         return tuple(files)

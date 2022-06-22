@@ -26,7 +26,8 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (
     CosineDecayWithWarmup,
     LinearDecayWithWarmup,
-    PolyDecayWithWarmup, )
+    PolyDecayWithWarmup,
+)
 
 scheduler_type2cls = {
     "linear": LinearDecayWithWarmup,
@@ -71,11 +72,12 @@ def get_writer(args):
 
 
 def get_scheduler(
-        learning_rate,
-        scheduler_type,
-        num_warmup_steps=None,
-        num_training_steps=None,
-        **scheduler_kwargs, ):
+    learning_rate,
+    scheduler_type,
+    num_warmup_steps=None,
+    num_training_steps=None,
+    **scheduler_kwargs,
+):
     if scheduler_type not in scheduler_type2cls.keys():
         data = " ".join(scheduler_type2cls.keys())
         raise ValueError(f"scheduler_type must be choson from {data}")
@@ -92,7 +94,8 @@ def get_scheduler(
         learning_rate=learning_rate,
         total_steps=num_training_steps,
         warmup=num_warmup_steps,
-        **scheduler_kwargs, )
+        **scheduler_kwargs,
+    )
 
 
 def save_json(data, file_name):
@@ -101,6 +104,7 @@ def save_json(data, file_name):
 
 
 class CrossEntropyLossForSQuAD(nn.Layer):
+
     def forward(self, logits, labels):
         start_logits, end_logits = logits
         start_position, end_position = labels
@@ -135,13 +139,16 @@ def create_dataloader(dataset,
     # shuffle = True if mode == 'train' else False
     shuffle = False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
@@ -210,7 +217,7 @@ def load_ds(datafiles):
         MapDataset
     '''
 
-    datas = []
+    data = []
 
     def read(ds_file):
         with open(ds_file, 'r', encoding='utf-8') as fp:
@@ -229,7 +236,7 @@ def load_ds(datafiles):
 
 
 def load_ds_xnli(datafiles):
-    datas = []
+    data = []
 
     def read(ds_file):
         with open(ds_file, 'r', encoding='utf-8') as fp:

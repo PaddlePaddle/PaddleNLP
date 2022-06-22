@@ -27,10 +27,9 @@ except (ModuleNotFoundError, ImportError):
 # This configuration must be done before any import to apply to all submodules
 import logging
 
-logging.basicConfig(
-    format="%(levelname)s - %(name)s -  %(message)s",
-    datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.WARNING)
+logging.basicConfig(format="%(levelname)s - %(name)s -  %(message)s",
+                    datefmt="%m/%d/%Y %H:%M:%S",
+                    level=logging.WARNING)
 logging.getLogger("pipelines").setLevel(logging.INFO)
 
 from pipelines import utils
@@ -51,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 
 # Wrapper emitting a warning on import
-def DeprecatedModule(mod, deprecated_attributes=None,
+def DeprecatedModule(mod,
+                     deprecated_attributes=None,
                      is_module_deprecated=True):
     """
     Return a wrapped object that warns about deprecated accesses at import
@@ -113,10 +113,9 @@ sys.modules["pipelines.preprocessor.cleaning"] = DeprecatedModule(cleaning)
 
 setattr(pipelines, "document_store", DeprecatedModule(document_stores))
 setattr(
-    pipelines,
-    "file_converter",
-    DeprecatedModule(
-        file_converter, deprecated_attributes=["FileTypeClassifier"]))
+    pipelines, "file_converter",
+    DeprecatedModule(file_converter,
+                     deprecated_attributes=["FileTypeClassifier"]))
 setattr(
     pipelines,
     "pipeline",
@@ -125,12 +124,12 @@ setattr(
         deprecated_attributes=[
             "JoinDocuments",
             "Docs2Answers",
-        ], ), )
+        ],
+    ),
+)
 setattr(
-    pipelines,
-    "preprocessor",
-    DeprecatedModule(
-        preprocessor, deprecated_attributes=["utils", "cleaning"]))
+    pipelines, "preprocessor",
+    DeprecatedModule(preprocessor, deprecated_attributes=["utils", "cleaning"]))
 setattr(pipelines, "ranker", DeprecatedModule(ranker))
 setattr(pipelines, "reader", DeprecatedModule(reader))
 setattr(pipelines, "retriever", DeprecatedModule(retriever))

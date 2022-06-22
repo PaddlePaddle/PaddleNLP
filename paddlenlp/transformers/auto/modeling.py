@@ -62,6 +62,7 @@ MAPPING_NAMES = OrderedDict([
     ("PPMiniLM", "ppminilm"),
     ("ProphetNet", "prophetnet"),
     ("Reformer", "reformer"),
+    ("RemBert", "rembert"),
     ("Roberta", "roberta"),
     ("RoFormerv2", "roformerv2"),
     ("RoFormer", "roformer"),
@@ -71,10 +72,12 @@ MAPPING_NAMES = OrderedDict([
     ("UnifiedTransformer", "unified_transformer"),
     ("UNIMO", "unimo"),
     ("XLNet", "xlnet"),
+    ("XLM", "xlm"),
     ("GPT", "gpt"),
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
+    ("GAUAlpha", "gau_alpha"),
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -189,9 +192,9 @@ class _BaseAutoModelClass:
                             raise AttributeError(
                                 f"module '{import_class.__name__}' only supports the following classes: "
                                 + ", ".join(m for m in all_model_classes) + "\n"
-                                "Hint: you can use interface " + "or ".join(
-                                    task + ".from_pretrained"
-                                    for task in all_tasks) +
+                                "Hint: you can use interface " +
+                                "or ".join(task + ".from_pretrained"
+                                           for task in all_tasks) +
                                 f" to load '{pretrained_model_name_or_path}'\n")
                         logger.info(
                             "We are using %s to load '%s'." %
@@ -208,6 +211,8 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                init_class = init_class[:-5] if init_class.endswith(
+                    "Model") else init_class
                 if init_class:
                     for model_flag, name in MAPPING_NAMES.items():
                         if model_flag in init_class:
@@ -236,8 +241,9 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "Hint: you can use interface " + "or ".join(
-                            task + ".from_pretrained" for task in all_tasks) +
+                        "Hint: you can use interface " +
+                        "or ".join(task + ".from_pretrained"
+                                   for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -298,8 +304,9 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "Hint: you can use interface " + "or ".join(
-                            task + ".from_pretrained" for task in all_tasks) +
+                        "Hint: you can use interface " +
+                        "or ".join(task + ".from_pretrained"
+                                   for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
