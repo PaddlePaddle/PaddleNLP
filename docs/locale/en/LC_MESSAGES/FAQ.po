@@ -320,7 +320,7 @@ msgstr "<a name=\"PaddleNLPPractical Questions\"></a>"
 
 #: ../FAQ.md:173
 msgid "⭐️【实战篇】PaddleNLP实战问题"
-msgstr "⭐️【Practocal】PaddleNLP Practical Questions"
+msgstr "⭐️【Practical】PaddleNLP Practical Questions"
 
 #: ../FAQ.md:175
 msgid "<a name=\"数据问题\"></a>"
