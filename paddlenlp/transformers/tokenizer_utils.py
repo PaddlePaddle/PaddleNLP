@@ -777,7 +777,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if token in no_split_token:
                 tokenized_text.append(token)
             else:
-                tokenized_text.extend(self._tokenize(token))
+                tokenized_text.extend(self._tokenize(token, **kwargs))
         # ["This", " is", " something", "<special_token_1>", "else"]
         return tokenized_text
 
@@ -1331,8 +1331,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         for i, ch in enumerate(text):
             if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
-                ch = unicodedata.normalize('NFD', ch)
-                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
+            ch = unicodedata.normalize('NFD', ch)
+            ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
 
             ch = ''.join([
                 c for c in ch

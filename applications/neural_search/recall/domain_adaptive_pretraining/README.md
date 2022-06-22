@@ -110,7 +110,6 @@ python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --max_seq_len 512 \
     --micro_batch_size 32 \
-    --global_batch_size 128 \
     --sharding_degree 1\
     --dp_degree 4 \
     --use_sharding false \
@@ -144,7 +143,7 @@ sh scripts/run_pretrain_static.sh
 - `micro_batch_size` 单卡单次的 batch size大小。即单张卡运行一次前向网络的 batch size大小。
 - `global_batch_size` 全局的batch size大小，即一次参数更新等效的batch size。
 - `sharding_degree` 切参数切分的分组大小（如 sharding_degree=4 表示参数分为4组，分别到4个设备）。
-- `dp_degree` 数据并行参数。
+- `dp_degree` 数据并行参数，多卡时候不使用sharding的情况下，请设置为卡数。
 - `use_sharding` 开启sharding策略，sharding_degree > 1时，请设置为True。
 - `use_amp` 开启混合精度策略。
 - `use_recompute` 开启重计算策略。暂时未支持，后续将支持。
