@@ -22,12 +22,13 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.metric import Accuracy
+from paddle.optimizer import AdamW
 from modeling import ErnieDocForSequenceClassification
 from paddlenlp.transformers import ErnieDocTokenizer, ErnieDocBPETokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
-from paddlenlp.ops.optimizer import AdamWDL
+from paddlenlp.ops.optimizer import layerwise_lr_decay
 from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
 from metrics import F1
 
@@ -50,7 +51,7 @@ parser.add_argument("--memory_length", type=int, default=128, help="Length of th
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float,
                     help="Linear warmup proption over the training process.")
-parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
+parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
                     help="The training dataset")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
 parser.add_argument("--max_steps", default=-1, type=int,
@@ -244,13 +245,14 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(learning_rate=lr_scheduler,
-                        parameters=model.parameters(),
-                        weight_decay=args.weight_decay,
-                        apply_decay_param_fun=lambda x: x in decay_params,
-                        n_layers=model_config["num_hidden_layers"],
-                        layerwise_decay=args.layerwise_decay,
-                        name_dict=name_dict)
+    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay,
+                                name_dict, model_config["num_hidden_layers"])
+
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      lr_ratio=simple_lr_setting)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()

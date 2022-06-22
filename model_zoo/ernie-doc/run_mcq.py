@@ -24,6 +24,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddle.optimizer import AdamW
 from paddle.metric import Accuracy
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieDocModel
@@ -32,7 +33,7 @@ from paddlenlp.transformers import ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
-from paddlenlp.ops.optimizer import AdamWDL
+from paddlenlp.ops.optimizer import layerwise_lr_decay
 
 from data import MCQIterator
 
@@ -230,13 +231,14 @@ def do_train(args):
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    optimizer = AdamWDL(learning_rate=lr_scheduler,
-                        parameters=model.parameters(),
-                        weight_decay=args.weight_decay,
-                        apply_decay_param_fun=lambda x: x in decay_params,
-                        n_layers=model_config["num_hidden_layers"],
-                        layerwise_decay=args.layerwise_decay,
-                        name_dict=name_dict)
+    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay,
+                                name_dict, model_config["num_hidden_layers"])
+
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      lr_ratio=simple_lr_setting)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()

@@ -145,8 +145,6 @@ class SemanticIndexBaseStatic(nn.Layer):
         with paddle.no_grad():
             for batch_data in data_loader:
                 input_ids, token_type_ids = batch_data
-                input_ids = paddle.to_tensor(input_ids)
-                token_type_ids = paddle.to_tensor(token_type_ids)
 
                 text_embeddings = self.get_pooled_embedding(
                     input_ids, token_type_ids=token_type_ids)

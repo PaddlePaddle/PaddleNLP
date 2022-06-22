@@ -203,7 +203,7 @@ from paddlenlp import Taskflow
 #### 支持两种模式
 
 ```python
-# 精确模式（默认），基于百度解语，内置66种词性及专名类别标签
+# 精确模式（默认），基于百度解语，内置91种词性及专名类别标签
 >>> from paddlenlp import Taskflow
 >>> ner = Taskflow("ner")
 >>> ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
@@ -232,23 +232,131 @@ from paddlenlp import Taskflow
 
 - 精确模式采用的标签集合
 
-包含66种词性及专名类别标签，标签集合如下表：
+包含91种词性及专名类别标签，标签集合如下表：
 
 <table>
-
-<tr><th colspan='6'>WordTag标签集合
-<tr><td>人物类_实体<td>物体类<td>生物类_动物<td>医学术语类<td>链接地址<td>肯定词
-<tr><td>人物类_概念<td>物体类_兵器<td>品牌名<td>术语类_生物体<td>个性特征<td>否定词
-<tr><td>作品类_实体<td>物体类_化学物质<td>场所类<td>疾病损伤类<td>感官特征<td>数量词
-<tr><td>作品类_概念<td>其他角色类<td>场所类_交通场所<td>疾病损伤类_植物病虫害<td>场景事件<td>叹词
-<tr><td>组织机构类<td>文化类<td>位置方位<td>宇宙类<td>介词<td>拟声词
-<tr><td>组织机构类_企事业单位<td>文化类_语言文字<td>世界地区类<td>事件类<td>介词_方位介词<td>修饰词
-<tr><td>组织机构类_医疗卫生机构<td>文化类_奖项赛事活动<td>饮食类<td>时间类<td>助词<td>外语单词
-<tr><td>组织机构类_国家机关<td>文化类_制度政策协议<td>饮食类_菜品<td>时间类_特殊日<td>代词<td>英语单词
-<tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
-<tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
-<tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
-
+    <thead>
+        <th colspan='7'>WordTag标签集合</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>人物类_实体</td>
+            <td>组织机构类_军事组织机构_概念</td>
+            <td>文化类_制度政策协议</td>
+            <td>位置方位</td>
+            <td>术语类_医药学术语</td>
+            <td>信息资料_性别</td>
+            <td>否定词</td>
+        </tr>
+        <tr>
+            <td>人物类_概念</td>
+            <td>组织机构类_医疗卫生机构</td>
+            <td>文化类_姓氏与人名</td>
+            <td>世界地区类</td>
+            <td>术语类_生物体</td>
+            <td>链接地址</td>
+            <td>数量词</td>
+        </tr>
+        <tr>
+            <td>作品类_实体</td>
+            <td>组织机构类_医疗卫生机构_概念</td>
+            <td>生物类</td>
+            <td>世界地区类_国家</td>
+            <td>疾病损伤类</td>
+            <td>个性特征</td>
+            <td>数量词_序数词</td>
+        </tr>
+        <tr>
+            <td>作品类_概念</td>
+            <td>组织机构类_教育组织机构</td>
+            <td>生物类_植物</td>
+            <td>世界地区类_区划概念</td>
+            <td>疾病损伤类_植物病虫害</td>
+            <td>感官特征</td>
+            <td>数量词_单位数量词</td>
+        </tr>
+        <tr>
+            <td>组织机构类</td>
+            <td>组织机构类_教育组织机构_概念</td>
+            <td>生物类_动物</td>
+            <td>世界地区类_地理概念</td>
+            <td>宇宙类</td>
+            <td>场景事件</td>
+            <td>叹词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_概念</td>
+            <td>物体类</td>
+            <td>品牌名</td>
+            <td>饮食类</td>
+            <td>事件类</td>
+            <td>介词</td>
+            <td>拟声词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位</td>
+            <td>物体类_概念</td>
+            <td>品牌名_品牌类型</td>
+            <td>饮食类_菜品</td>
+            <td>时间类</td>
+            <td>介词_方位介词</td>
+            <td>修饰词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位_概念</td>
+            <td>物体类_兵器</td>
+            <td>场所类</td>
+            <td>饮食类_饮品</td>
+            <td>时间类_特殊日</td>
+            <td>助词</td>
+            <td>修饰词_性质</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关</td>
+            <td>物体类_化学物质</td>
+            <td>场所类_概念</td>
+            <td>药物类</td>
+            <td>时间类_朝代</td>
+            <td>代词</td>
+            <td>修饰词_类型</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关_概念</td>
+            <td>其他角色类</td>
+            <td>场所类_交通场所</td>
+            <td>药物类_中药</td>
+            <td>时间类_具体时间</td>
+            <td>连词</td>
+            <td>修饰词_化</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构</td>
+            <td>文化类</td>
+            <td>场所类_交通场所_概念</td>
+            <td>术语类</td>
+            <td>时间类_时长</td>
+            <td>副词</td>
+            <td>外语单词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构_概念</td>
+            <td>文化类_语言文字</td>
+            <td>场所类_网上场所</td>
+            <td>术语类_术语类型</td>
+            <td>词汇用语</td>
+            <td>疑问词</td>
+            <td>汉语拼音</td>
+        </tr>
+        <tr>
+            <td>组织机构类_军事组织机构</td>
+            <td>文化类_奖项赛事活动</td>
+            <td>场所类_网上场所_概念</td>
+            <td>术语类_符号指标类</td>
+            <td>信息资料</td>
+            <td>肯定词</td>
+            <td>w（标点）</td>
+        </tr>
+    </tbody>
 </table>
 
 - 快速模式采用的标签集合
@@ -717,24 +825,180 @@ from paddlenlp import Taskflow
 * `user_dict`：用户自定义词典文件，默认为None。
 
 
-知识挖掘-词类知识标注任务共包含66种词性及专名类别标签，标签集合如下表：
+知识挖掘-词类知识标注任务共包含91种词性及专名类别标签，标签集合如下表：
 
 <table>
-
-<tr><th colspan='6'>WordTag标签集合
-<tr><td>人物类_实体<td>物体类<td>生物类_动物<td>医学术语类<td>链接地址<td>肯定词
-<tr><td>人物类_概念<td>物体类_兵器<td>品牌名<td>术语类_生物体<td>个性特征<td>否定词
-<tr><td>作品类_实体<td>物体类_化学物质<td>场所类<td>疾病损伤类<td>感官特征<td>数量词
-<tr><td>作品类_概念<td>其他角色类<td>场所类_交通场所<td>疾病损伤类_植物病虫害<td>场景事件<td>叹词
-<tr><td>组织机构类<td>文化类<td>位置方位<td>宇宙类<td>介词<td>拟声词
-<tr><td>组织机构类_企事业单位<td>文化类_语言文字<td>世界地区类<td>事件类<td>介词_方位介词<td>修饰词
-<tr><td>组织机构类_医疗卫生机构<td>文化类_奖项赛事活动<td>饮食类<td>时间类<td>助词<td>外语单词
-<tr><td>组织机构类_国家机关<td>文化类_制度政策协议<td>饮食类_菜品<td>时间类_特殊日<td>代词<td>英语单词
-<tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
-<tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
-<tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
-
+    <thead>
+        <th colspan='7'>WordTag标签集合</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>人物类_实体</td>
+            <td>组织机构类_军事组织机构_概念</td>
+            <td>文化类_制度政策协议</td>
+            <td>位置方位</td>
+            <td>术语类_医药学术语</td>
+            <td>信息资料_性别</td>
+            <td>否定词</td>
+        </tr>
+        <tr>
+            <td>人物类_概念</td>
+            <td>组织机构类_医疗卫生机构</td>
+            <td>文化类_姓氏与人名</td>
+            <td>世界地区类</td>
+            <td>术语类_生物体</td>
+            <td>链接地址</td>
+            <td>数量词</td>
+        </tr>
+        <tr>
+            <td>作品类_实体</td>
+            <td>组织机构类_医疗卫生机构_概念</td>
+            <td>生物类</td>
+            <td>世界地区类_国家</td>
+            <td>疾病损伤类</td>
+            <td>个性特征</td>
+            <td>数量词_序数词</td>
+        </tr>
+        <tr>
+            <td>作品类_概念</td>
+            <td>组织机构类_教育组织机构</td>
+            <td>生物类_植物</td>
+            <td>世界地区类_区划概念</td>
+            <td>疾病损伤类_植物病虫害</td>
+            <td>感官特征</td>
+            <td>数量词_单位数量词</td>
+        </tr>
+        <tr>
+            <td>组织机构类</td>
+            <td>组织机构类_教育组织机构_概念</td>
+            <td>生物类_动物</td>
+            <td>世界地区类_地理概念</td>
+            <td>宇宙类</td>
+            <td>场景事件</td>
+            <td>叹词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_概念</td>
+            <td>物体类</td>
+            <td>品牌名</td>
+            <td>饮食类</td>
+            <td>事件类</td>
+            <td>介词</td>
+            <td>拟声词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位</td>
+            <td>物体类_概念</td>
+            <td>品牌名_品牌类型</td>
+            <td>饮食类_菜品</td>
+            <td>时间类</td>
+            <td>介词_方位介词</td>
+            <td>修饰词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位_概念</td>
+            <td>物体类_兵器</td>
+            <td>场所类</td>
+            <td>饮食类_饮品</td>
+            <td>时间类_特殊日</td>
+            <td>助词</td>
+            <td>修饰词_性质</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关</td>
+            <td>物体类_化学物质</td>
+            <td>场所类_概念</td>
+            <td>药物类</td>
+            <td>时间类_朝代</td>
+            <td>代词</td>
+            <td>修饰词_类型</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关_概念</td>
+            <td>其他角色类</td>
+            <td>场所类_交通场所</td>
+            <td>药物类_中药</td>
+            <td>时间类_具体时间</td>
+            <td>连词</td>
+            <td>修饰词_化</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构</td>
+            <td>文化类</td>
+            <td>场所类_交通场所_概念</td>
+            <td>术语类</td>
+            <td>时间类_时长</td>
+            <td>副词</td>
+            <td>外语单词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构_概念</td>
+            <td>文化类_语言文字</td>
+            <td>场所类_网上场所</td>
+            <td>术语类_术语类型</td>
+            <td>词汇用语</td>
+            <td>疑问词</td>
+            <td>汉语拼音</td>
+        </tr>
+        <tr>
+            <td>组织机构类_军事组织机构</td>
+            <td>文化类_奖项赛事活动</td>
+            <td>场所类_网上场所_概念</td>
+            <td>术语类_符号指标类</td>
+            <td>信息资料</td>
+            <td>肯定词</td>
+            <td>w（标点）</td>
+        </tr>
+    </tbody>
 </table>
+
+#### 知识模板信息抽取
+```python
+>>> from paddlenlp import Taskflow
+>>> wordtag_ie = Taskflow("knowledge_mining", with_ie=True)
+>>> wordtag_ie('《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。')
+[[{'text': '《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 5, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 6, 'wordtag_label': '肯定词', 'length': 1}, {'item': '一首', 'offset': 7, 'wordtag_label': '数量词_单位数量词', 'length': 2}, {'item': '由', 'offset': 9, 'wordtag_label': '介词', 'length': 1}, {'item': '王杰', 'offset': 10, 'wordtag_label': '人物类_实体', 'length': 2}, {'item': '作词', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2}, {'item': '、', 'offset': 14, 'wordtag_label': 'w', 'length': 1}, {'item': '作曲', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '并', 'offset': 17, 'wordtag_label': '连词', 'length': 1}, {'item': '演唱', 'offset': 18, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 20, 'wordtag_label': '助词', 'length': 1}, {'item': '歌曲', 'offset': 21, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 23, 'wordtag_label': 'w', 'length': 1}, {'item': '收录', 'offset': 24, 'wordtag_label': '场景事件', 'length': 2}, {'item': '在', 'offset': 26, 'wordtag_label': '介词', 'length': 1}, {'item': '专辑', 'offset': 27, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '同名', 'offset': 29, 'wordtag_label': '场景事件', 'length': 2}, {'item': '《', 'offset': 31, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 32, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 36, 'wordtag_label': 'w', 'length': 1}, {'item': '中', 'offset': 37, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 38, 'wordtag_label': 'w', 'length': 1}, {'item': '由', 'offset': 39, 'wordtag_label': '介词', 'length': 1}, {'item': '波丽佳音', 'offset': 40, 'wordtag_label': '人物类_实体', 'length': 4}, {'item': '唱片', 'offset': 44, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '于', 'offset': 46, 'wordtag_label': '介词', 'length': 1}, {'item': '1996年08月31日', 'offset': 47, 'wordtag_label': '时间类_具体时间', 'length': 11}, {'item': '发行', 'offset': 58, 'wordtag_label': '场景事件', 'length': 2}, {'item': '。', 'offset': 60, 'wordtag_label': 'w', 'length': 1}]}], [[{'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '创作', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}], 'GROUP': '创作者', 'SRC': 'HTG', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '歌曲', 'offset': 21, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '收录', 'TRIG': [{'item': '收录', 'offset': 24}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '收录于', 'SRC': 'HGT', 'TRIG': [{'item': '收录', 'offset': 24}]}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '王杰', 'type': '人物类_实体', 'offset': 10}], 'GROUP': '创作者', 'TRIG': [{'item': '专辑', 'offset': 27}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '王杰', 'type': '人物类_实体', 'offset': 10}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '创作', 'SRC': 'HGT', 'TRIG': [{'item': '专辑', 'offset': 27}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 32}, 'TAIL_ROLE': [{'item': '唱片', 'offset': 44, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}]]]
+
+```
+
+**自定义抽取的schema**
+
+``` python
+>>> from pprint import pprint
+>>> schema = [
+     {
+        "head_role": "作品类_实体", #头实体词类
+        "group": "创作者", #关系名
+        "tail_role": [
+            {
+                "main": [
+                    "人物类_实体" #尾实体词类
+                ],
+                "support": [] #相关词类，可作为该关系的补充，不可作为尾实体独立存在
+            }
+        ],
+        "trig_word": [
+            "作词", #触发词，对于没有触发词，而是由头尾实体直接触发的关系，可为null
+        ],
+        "trig_type": "trigger", #trigger表明由触发词触发，tail表明为尾实体触发
+        "reverse": False, #是否为反向配置，即尾实体实际是头，头实体实际是尾
+        "trig_direction": "B", #触发P的方向，表示在自然表达中，尾实体在触发词的哪一边，L为左，R为右，B为双向都有可能，默认为B
+        "rel_group": "创作" #对应的反关系，即头尾实体对调后，对应的关系，用于逻辑推断
+    }]
+>>> wordtag_ie.set_schema(schema)
+>>> pprint(wordtag_ie('《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。')[1])
+[[{'GROUP': '创作',
+   'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'},
+   'SRC': 'REVERSE',
+   'TAIL_ROLE': [{'item': '忘了所有', 'offset': 1, 'type': '作品类_实体'}],
+   'TRIG': [{'item': '作词', 'offset': 12}]},
+  {'GROUP': '创作者',
+   'HEAD_ROLE': {'item': '忘了所有', 'offset': 1, 'type': '作品类_实体'},
+   'SRC': 'HTG',
+   'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}],
+   'TRIG': [{'item': '作词', 'offset': 12}]}]]
+```
+具体的WordTag-IE信息抽取的功能可以见[WordTag-IE具体介绍](../../examples/text_to_knowledge/wordtag-ie/README.md) .
 
 
 #### 名词短语标注
