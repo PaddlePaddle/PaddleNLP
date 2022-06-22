@@ -173,6 +173,13 @@ def parse_args():
         help=
         'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
+    parser.add_argument(
+        "--fuse_transformer",
+        type=distutils.util.strtobool,
+        default=False,
+        help=
+        "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."
+    )
     args = parser.parse_args()
     return args
 
@@ -333,9 +340,10 @@ def do_train(args):
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
-        model = model_class(
-            base_class(**model_class.pretrained_init_configuration[
-                args.model_name_or_path]))
+        config = model_class.pretrained_init_configuration[
+            args.model_name_or_path]
+        config['fuse'] = args.fuse_transformer
+        model = model_class(base_class(**config))
     else:
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
@@ -435,9 +443,12 @@ def do_train(args):
                 (input_ids, segment_ids, input_mask, masked_lm_positions,
                  masked_lm_labels, next_sentence_labels,
                  masked_lm_scale) = batch
-                with paddle.amp.auto_cast(
-                        args.use_amp,
-                        custom_white_list=["layer_norm", "softmax", "gelu"]):
+                with paddle.amp.auto_cast(args.use_amp,
+                                          custom_white_list=[
+                                              "layer_norm", "softmax", "gelu",
+                                              "fused_attention",
+                                              "fused_feedforward"
+                                          ]):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
@@ -476,7 +487,7 @@ def do_train(args):
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
-                if global_step % args.save_steps == 0:
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
@@ -490,7 +501,7 @@ def do_train(args):
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:
+                if global_step >= args.max_steps:            
                     del train_data_loader
                     return
                 batch_start = time.time()

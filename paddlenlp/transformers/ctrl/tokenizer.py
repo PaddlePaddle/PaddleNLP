@@ -366,5 +366,10 @@ class CTRLTokenizer(PretrainedTokenizer):
             
         """
         for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name)
+            if not os.path.exists(source_path):
+                continue
+
             save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(getattr(self, "_%s" % name), save_path)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)

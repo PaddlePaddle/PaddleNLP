@@ -165,6 +165,13 @@ def parse_args():
         help=
         'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
     )
+    parser.add_argument(
+        "--fuse_transformer",
+        type=distutils.util.strtobool,
+        default=False,
+        help=
+        "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."
+    )
     args = parser.parse_args()
     return args
 
@@ -302,6 +309,7 @@ def do_train(args):
     config = model_class.pretrained_init_configuration[args.model_name_or_path]
     if config["vocab_size"] % 8 != 0:
         config["vocab_size"] += 8 - (config["vocab_size"] % 8)
+    config['fuse'] = args.fuse_transformer
     model = BertForPretraining(BertModel(**config))
     criterion = BertPretrainingCriterion(model.bert.config["vocab_size"])
     prediction_scores, seq_relationship_score = model(
@@ -403,7 +411,7 @@ def do_train(args):
 
                 if global_step % args.logging_steps == 0:
                     print(
-                        "tobal step: %d, epoch: %d, batch: %d, loss: %f, "
+                        "total step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
                         % (global_step, epoch, step, loss_return[0],
                            reader_cost_avg.get_average(),

@@ -34,15 +34,21 @@ do
 done
 
 echo -e "\n====================================================================\nBest hyper-parameters list: \n===================================================================="
+echo -e TASK"\t"result"\t(lr, batch_size, dropout_p)"
+
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
     if [ -z ${dict[$task]} ]
     then
-    echo ${dict[$task]} > test
     continue
     fi
-    s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_result: ${dict[$task]}"|awk '{split($1, hy, "/"); print(hy[3])}'`
+    s=`find  ${MODEL_PATH}/${task}/* | xargs grep -rin "best_result: ${dict[$task]}"`
+    if [ $task == 'cmrc2018' ]; then
+    s=${s%/*}
+    fi
+    s=${s##*/}
     s=`echo $s|awk '{split($1, hy, "."); print hy[1]"."hy[2]}'`
-    s=`echo $s|awk '{split($1, hy, "_"); print hy[1] " " hy[2] " "hy[3]}'`
-    echo -e "${task}'s best result is ${dict[$task]}, and lr, bs, dropout_p are: "$s
+    s=`echo $s|awk '{split($1, hy, "_"); print hy[1]"," hy[2]"," hy[3]}'`
+    echo -n ${task}| tr 'a-z' 'A-Z'
+    echo -e "\t"${dict[$task]}"\t("$s")"
 done
