@@ -21,27 +21,27 @@ long_description = "PIPELINES: An End to End Natural Language Proceessing Develo
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
 
-setuptools.setup(
-    name="pipelines",
-    version=pipelines.__version__,
-    author="PaddlePaddle Speech and Language Team",
-    author_email="paddlenlp@baidu.com",
-    description=long_description,
-    long_description=long_description,
-    long_description_content_type="text/plain",
-    url="https://github.com/PaddlePaddle/PaddleNLP",
-    packages=setuptools.find_packages(
-        where='.',
-        exclude=('examples*', 'tests*', 'docs*', 'ui*', 'rest_api*')),
-    setup_requires=['cython', 'numpy'],
-    install_requires=REQUIRED_PACKAGES,
-    python_requires='>=3.7',
-    classifiers=[
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: OS Independent',
-    ],
-    license='Apache 2.0')
+setuptools.setup(name="pipelines",
+                 version=pipelines.__version__,
+                 author="PaddlePaddle Speech and Language Team",
+                 author_email="paddlenlp@baidu.com",
+                 description=long_description,
+                 long_description=long_description,
+                 long_description_content_type="text/plain",
+                 url="https://github.com/PaddlePaddle/PaddleNLP",
+                 packages=setuptools.find_packages(
+                     where='.',
+                     exclude=('examples*', 'tests*', 'docs*', 'ui*',
+                              'rest_api*')),
+                 setup_requires=['cython', 'numpy'],
+                 install_requires=REQUIRED_PACKAGES,
+                 python_requires='>=3.7',
+                 classifiers=[
+                     'Programming Language :: Python :: 3',
+                     'Programming Language :: Python :: 3.7',
+                     'Programming Language :: Python :: 3.8',
+                     'Programming Language :: Python :: 3.9',
+                     'License :: OSI Approved :: Apache Software License',
+                     'Operating System :: OS Independent',
+                 ],
+                 license='Apache 2.0')

@@ -22,7 +22,9 @@ from paddlenlp.transformers import BasicTokenizer, PretrainedTokenizer, Wordpiec
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.env import MODEL_HOME
 
-__all__ = ['SkepTokenizer', ]
+__all__ = [
+    'SkepTokenizer',
+]
 
 
 def bytes_to_unicode():
@@ -160,8 +162,8 @@ class BpeEncoder(object):
         decode
         """
         text = ''.join([self.decoder[token] for token in tokens])
-        text = bytearray([self.byte_decoder[c] for c in text]).decode(
-            'utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
         return text
 
 
@@ -232,14 +234,18 @@ class SkepTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.txt",
         },
         "bpe_vocab_file": {
-            "skep_ernie_1.0_large_ch": None,
-            "skep_ernie_2.0_large_en": None,
+            "skep_ernie_1.0_large_ch":
+            None,
+            "skep_ernie_2.0_large_en":
+            None,
             "skep_roberta_large_en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
         },
         "bpe_json_file": {
-            "skep_ernie_1.0_large_ch": None,
-            "skep_ernie_2.0_large_en": None,
+            "skep_ernie_1.0_large_ch":
+            None,
+            "skep_ernie_2.0_large_en":
+            None,
             "skep_roberta_large_en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
         }
@@ -289,8 +295,9 @@ class SkepTokenizer(PretrainedTokenizer):
         self.vocab_file = vocab_file
         self.bpe_vocab_file = bpe_vocab_file
         self.bpe_json_file = bpe_json_file
-        self.vocab = self.load_vocabulary(
-            vocab_file, unk_token=unk_token, pad_token=pad_token)
+        self.vocab = self.load_vocabulary(vocab_file,
+                                          unk_token=unk_token,
+                                          pad_token=pad_token)
 
         self.use_bpe_encoder = use_bpe_encoder
         self.need_token_type_id = need_token_type_id
@@ -298,8 +305,8 @@ class SkepTokenizer(PretrainedTokenizer):
 
         if not self.use_bpe_encoder:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-            self.wordpiece_tokenizer = WordpieceTokenizer(
-                vocab=self.vocab, unk_token=unk_token)
+            self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                          unk_token=unk_token)
         else:
             assert (bpe_vocab_file and bpe_json_file) is not None, (
                 f"bpe_vocab_file and bpe_json_file must be not None.")
@@ -353,8 +360,8 @@ class SkepTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""

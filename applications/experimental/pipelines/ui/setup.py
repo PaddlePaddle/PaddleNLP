@@ -7,7 +7,8 @@ VERSION = "0.0.1a0"
 setup(
     name="pipelines-ui",
     version=VERSION,
-    description="Demo UI for pipelines (https://github.com/PaddlePaddle/pipelines)",
+    description=
+    "Demo UI for pipelines (https://github.com/PaddlePaddle/pipelines)",
     author="paddlenlp",
     author_email="paddlenlp@baidu.com",
     url=" https://github.com/PaddlePaddle/pipelines/tree/master/ui",
@@ -28,4 +29,5 @@ setup(
     install_requires=[
         "streamlit>=1.2.0, <=1.7.0", "st-annotated-text>=2.0.0, <3",
         "markdown>=3.3.4, <4"
-    ], )
+    ],
+)

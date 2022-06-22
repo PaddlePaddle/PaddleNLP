@@ -87,14 +87,13 @@ class ErnieDocTokenizer(ErnieTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        super(ErnieDocTokenizer, self).__init__(
-            vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(ErnieDocTokenizer, self).__init__(vocab_file,
+                                                do_lower_case=do_lower_case,
+                                                unk_token=unk_token,
+                                                sep_token=sep_token,
+                                                pad_token=pad_token,
+                                                cls_token=cls_token,
+                                                mask_token=mask_token)
 
 
 class ErnieDocBPETokenizer(BPETokenizer):
@@ -173,15 +172,15 @@ class ErnieDocBPETokenizer(BPETokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        super(ErnieDocBPETokenizer, self).__init__(
-            vocab_file,
-            encoder_json_path=encoder_json_path,
-            vocab_bpe_path=vocab_bpe_path,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(ErnieDocBPETokenizer,
+              self).__init__(vocab_file,
+                             encoder_json_path=encoder_json_path,
+                             vocab_bpe_path=vocab_bpe_path,
+                             unk_token=unk_token,
+                             sep_token=sep_token,
+                             pad_token=pad_token,
+                             cls_token=cls_token,
+                             mask_token=mask_token)
 
     @property
     def vocab_size(self):

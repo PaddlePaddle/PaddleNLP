@@ -16,8 +16,8 @@
 更详细的MKLDNN、TensorRT等预测加速相关功能的支持情况可以查看各测试工具的[更多教程](#more)。
 
 | 模型名称 | 模型类型 | 基础<br>训练预测 | 更多<br>训练方式 | 模型压缩 |
-| :--- |  :----:  | :--------: |  :----  |   :----  |  
-| bigru_crf | 序列标注  | 支持 | - | - |  
+| :--- |  :----:  | :--------: |  :----  |   :----  |
+| bigru_crf | 序列标注  | 支持 | - | - |
 | Transformer | 机器翻译 | 支持 | - | - |
 
 
@@ -76,11 +76,11 @@ bash test_tipc/test_train_inference_python.sh configs/[model_name]/[params_file_
 bash test_tipc/prepare.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'lite_train_lite_infer'
 # 运行测试
 bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/train_infer_python.txt 'lite_train_lite_infer'
-```  
+```
 关于本示例命令的更多信息可查看[基础训练预测使用文档](docs/test_train_inference_python.md)。
 
 
 <a name="more"></a>
 ## 4. 开始测试
-各功能测试中涉及MKLDNN、TensorRT等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：  
+各功能测试中涉及MKLDNN、TensorRT等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：
 - [test_train_inference_python 使用](docs/test_train_inference_python.md) ：测试基于Python的模型训练、推理等基本功能。

@@ -40,17 +40,18 @@ class QACandidate:
     """
 
     def __init__(
-            self,
-            answer_type: str,
-            score: float,
-            offset_answer_start: int,
-            offset_answer_end: int,
-            offset_unit: str,
-            aggregation_level: str,
-            probability: Optional[float]=None,
-            n_passages_in_doc: Optional[int]=None,
-            passage_id: Optional[str]=None,
-            confidence: Optional[float]=None, ):
+        self,
+        answer_type: str,
+        score: float,
+        offset_answer_start: int,
+        offset_answer_end: int,
+        offset_unit: str,
+        aggregation_level: str,
+        probability: Optional[float] = None,
+        n_passages_in_doc: Optional[int] = None,
+        passage_id: Optional[str] = None,
+        confidence: Optional[float] = None,
+    ):
         """
         :param answer_type: The category that this answer falls into e.g. "no_answer", "yes", "no" or "span"
         :param score: The score representing the model's confidence of this answer
@@ -248,17 +249,18 @@ class QAPred(Pred):
     """
 
     def __init__(
-            self,
-            id: str,
-            prediction: List[QACandidate],
-            context: str,
-            question: str,
-            token_offsets: List[int],
-            context_window_size: int,
-            aggregation_level: str,
-            no_answer_gap: float,
-            ground_truth_answer: str=None,
-            answer_types: List[str]=[], ):
+        self,
+        id: str,
+        prediction: List[QACandidate],
+        context: str,
+        question: str,
+        token_offsets: List[int],
+        context_window_size: int,
+        aggregation_level: str,
+        no_answer_gap: float,
+        ground_truth_answer: str = None,
+        answer_types: List[str] = [],
+    ):
         """
         :param id: The id of the passage or document
         :param prediction: A list of QACandidate objects for the given question and document
@@ -293,7 +295,8 @@ class QAPred(Pred):
         """
         answers = self._answers_to_json(self.id, squad)
         ret = {
-            "task": "qa",
+            "task":
+            "qa",
             "predictions": [{
                 "question": self.question,
                 "id": self.id,

@@ -16,8 +16,8 @@
 import sys
 import logging
 
-logging.basicConfig(
-    format="%(asctime)s %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
+logging.basicConfig(format="%(asctime)s %(message)s",
+                    datefmt="%m/%d/%Y %I:%M:%S %p")
 logger = logging.getLogger(__name__)
 logging.getLogger("elasticsearch").setLevel(logging.WARNING)
 logging.getLogger("pipelines").setLevel(logging.INFO)
@@ -40,11 +40,10 @@ except:
 
 
 def get_application() -> FastAPI:
-    application = FastAPI(
-        title="pipelines REST API",
-        debug=True,
-        version=pipelines_version,
-        root_path=ROOT_PATH)
+    application = FastAPI(title="pipelines REST API",
+                          debug=True,
+                          version=pipelines_version,
+                          root_path=ROOT_PATH)
 
     # This middleware enables allow all cross-domain requests to the API from a browser. For production
     # deployments, it could be made more restrictive.
@@ -53,7 +52,8 @@ def get_application() -> FastAPI:
         allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"], )
+        allow_headers=["*"],
+    )
     application.add_exception_handler(HTTPException, http_error_handler)
     application.include_router(api_router)
 
@@ -72,7 +72,8 @@ def get_openapi_specs() -> dict:
         version=app.version,
         openapi_version=app.openapi_version,
         description=app.description,
-        routes=app.routes, )
+        routes=app.routes,
+    )
 
 
 def use_route_names_as_operation_ids(app: FastAPI) -> None:

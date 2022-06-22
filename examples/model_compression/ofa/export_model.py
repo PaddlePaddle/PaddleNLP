@@ -32,7 +32,9 @@ from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 from paddleslim.nas.ofa.layers import BaseBlock
 
-MODEL_CLASSES = {"bert": (BertForSequenceClassification, BertTokenizer), }
+MODEL_CLASSES = {
+    "bert": (BertForSequenceClassification, BertTokenizer),
+}
 
 
 def bert_forward(self,
@@ -51,10 +53,9 @@ def bert_forward(self,
             # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
             attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-    embedding_output = self.embeddings(
-        input_ids=input_ids,
-        position_ids=position_ids,
-        token_type_ids=token_type_ids)
+    embedding_output = self.embeddings(input_ids=input_ids,
+                                       position_ids=position_ids,
+                                       token_type_ids=token_type_ids)
     if output_hidden_states:
         output = embedding_output
         encoder_outputs = []
@@ -86,7 +87,8 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -97,51 +99,51 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--sub_model_output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the sub model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the sub model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--static_sub_model",
         default=None,
         type=str,
-        help="The output directory where the sub static model will be written. If set to None, not export static model",
+        help=
+        "The output directory where the sub static model will be written. If set to None, not export static model",
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
-    parser.add_argument(
-        '--width_mult',
-        type=float,
-        default=1.0,
-        help="width mult you want to export")
-    parser.add_argument(
-        '--depth_mult',
-        type=float,
-        default=1.0,
-        help="depth mult you want to export")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--n_gpu",
+                        type=int,
+                        default=1,
+                        help="number of gpus to use, 0 for cpu.")
+    parser.add_argument('--width_mult',
+                        type=float,
+                        default=1.0,
+                        help="width mult you want to export")
+    parser.add_argument('--depth_mult',
+                        type=float,
+                        default=1.0,
+                        help="depth mult you want to export")
     args = parser.parse_args()
     return args
 
 
 def export_static_model(model, model_path, max_seq_length):
     input_shape = [
-        paddle.static.InputSpec(
-            shape=[None, max_seq_length], dtype='int64'),
-        paddle.static.InputSpec(
-            shape=[None, max_seq_length], dtype='int64')
+        paddle.static.InputSpec(shape=[None, max_seq_length], dtype='int64'),
+        paddle.static.InputSpec(shape=[None, max_seq_length], dtype='int64')
     ]
     net = paddle.jit.to_static(model, input_spec=input_shape)
     paddle.jit.save(net, model_path)
@@ -168,11 +170,11 @@ def do_train(args):
 
     num_labels = cfg_dict['num_classes']
 
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_labels)
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        num_classes=num_labels)
 
-    origin_model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_labels)
+    origin_model = model_class.from_pretrained(args.model_name_or_path,
+                                               num_classes=num_labels)
 
     os.rename(config_path + '_bak', config_path)
 
@@ -202,11 +204,11 @@ def do_train(args):
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
 
-    ofa_model.export(
-        best_config,
-        input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
-        input_dtypes=['int64', 'int64'],
-        origin_model=origin_model)
+    ofa_model.export(best_config,
+                     input_shapes=[[1, args.max_seq_length],
+                                   [1, args.max_seq_length]],
+                     input_dtypes=['int64', 'int64'],
+                     origin_model=origin_model)
     for name, sublayer in origin_model.named_sublayers():
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)

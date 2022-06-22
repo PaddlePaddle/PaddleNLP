@@ -78,10 +78,9 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                             start_logit=result.start_logits[start_index],
                             end_logit=result.end_logits[end_index]))
 
-        prelim_predictions = sorted(
-            prelim_predictions,
-            key=lambda x: (x.start_logit + x.end_logit),
-            reverse=True)
+        prelim_predictions = sorted(prelim_predictions,
+                                    key=lambda x: (x.start_logit + x.end_logit),
+                                    reverse=True)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
             "NbestPrediction", ["text", "start_logit", "end_logit"])
@@ -93,8 +92,8 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1
-                                                              )]
+                tok_tokens = feature.tokens[pred.start_index:(pred.end_index +
+                                                              1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
                 orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
@@ -121,10 +120,9 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 seen_predictions[final_text] = True
 
             nbest.append(
-                _NbestPrediction(
-                    text=final_text,
-                    start_logit=pred.start_logit,
-                    end_logit=pred.end_logit))
+                _NbestPrediction(text=final_text,
+                                 start_logit=pred.start_logit,
+                                 end_logit=pred.end_logit))
 
         # if we didn't inlude the empty option in the n-best, inlcude it
 
@@ -132,8 +130,7 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
             nbest.append(
-                _NbestPrediction(
-                    text="empty", start_logit=0.0, end_logit=0.0))
+                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         assert len(nbest) >= 1
 
@@ -145,8 +142,9 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 if entry.text:
                     best_non_null_entry = entry
                 else:
-                    best_non_null_entry = _NbestPrediction(
-                        text="empty", start_logit=0.0, end_logit=0.0)
+                    best_non_null_entry = _NbestPrediction(text="empty",
+                                                           start_logit=0.0,
+                                                           end_logit=0.0)
 
         preds_for_eval[example.qas_id] = best_non_null_entry.text
 
@@ -279,8 +277,9 @@ def _compute_softmax(scores):
 
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
-    index_and_score = sorted(
-        enumerate(logits), key=lambda x: x[1], reverse=True)
+    index_and_score = sorted(enumerate(logits),
+                             key=lambda x: x[1],
+                             reverse=True)
 
     best_indexes = []
     for i in range(len(index_and_score)):

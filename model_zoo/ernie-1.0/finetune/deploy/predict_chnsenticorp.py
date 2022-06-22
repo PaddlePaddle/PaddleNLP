@@ -48,6 +48,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -80,10 +81,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -120,11 +120,10 @@ class Predictor(object):
         examples = []
         for text in data:
             example = {"text": text}
-            ret = convert_example(
-                example,
-                tokenizer,
-                max_seq_length=self.max_seq_length,
-                is_test=True)
+            ret = convert_example(example,
+                                  tokenizer,
+                                  max_seq_length=self.max_seq_length,
+                                  is_test=True)
             examples.append((ret["input_ids"], ret["token_type_ids"]))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -176,7 +175,7 @@ if __name__ == "__main__":
             for batch in batches:
                 labels = predictor.predict(batch, tokenizer, label_map)
             epoch_end = time.time()
-            print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end -
-                                                                  epoch_start)))
+            print("Epoch {} predict time {:.4f} s".format(
+                epoch, (epoch_end - epoch_start)))
         end = time.time()
         print("Predict time {:.4f} s/epoch".format((end - start) / epochs))

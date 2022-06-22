@@ -38,11 +38,9 @@ def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
     return seq
 
 
-def prepare_input(tokenizer, sentences, pad_id):
-    word_pad = Pad(pad_id, dtype="int64")
-    tokenized = tokenizer(sentences, return_length=True)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
-    input_ids = paddle.to_tensor(inputs)
+def prepare_input(tokenizer, sentences):
+    tokenized = tokenizer(sentences, padding=True)
+    input_ids = paddle.to_tensor(tokenized['input_ids'], dtype='int64')
     return input_ids
 
 
@@ -52,19 +50,20 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
-        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
+        help=
+        "The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
     )
     parser.add_argument(
         "--decoding_strategy",
-        default='sampling',
+        default='beam_search',
         type=str,
-        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
+        help=
+        "The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
     )
-    parser.add_argument(
-        "--beam_size",
-        default=4,
-        type=int,
-        help="The parameters for beam search. ")
+    parser.add_argument("--beam_size",
+                        default=5,
+                        type=int,
+                        help="The parameters for beam search. ")
     parser.add_argument(
         "--top_k",
         default=4,
@@ -75,22 +74,21 @@ def parse_args():
         default=1.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
-    parser.add_argument(
-        "--max_length", default=50, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity of beam search. ")
-    parser.add_argument(
-        "--length_penalty",
-        default=0.6,
-        type=float,
-        help="The power number in length penalty calculation")
-    parser.add_argument(
-        "--use_fp16_decoding",
-        action="store_true",
-        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--max_length",
+                        default=20,
+                        type=int,
+                        help="Maximum output length. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity of beam search. ")
+    parser.add_argument("--length_penalty",
+                        default=0.6,
+                        type=float,
+                        help="The power number in length penalty calculation")
+    parser.add_argument("--use_fp16_decoding",
+                        action="store_true",
+                        help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
@@ -103,6 +101,7 @@ def do_predict(args):
     logger.info('Loading the model parameters, please wait...')
     model = BartForConditionalGeneration.from_pretrained(
         args.model_name_or_path)
+
     # Set evaluate mode
     model.eval()
     sentences = [
@@ -115,7 +114,7 @@ def do_predict(args):
     bos_id = model.bart.config['bos_token_id']
     eos_id = model.bart.config['eos_token_id']
     pad_id = model.bart.config['pad_token_id']
-    input_ids = prepare_input(tokenizer, sentences, pad_id)
+    input_ids = prepare_input(tokenizer, sentences)
     # Define model
     faster_bart = model
 
@@ -142,8 +141,8 @@ def do_predict(args):
                 use_faster=True)
 
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" % (
-            (time.perf_counter() - start) / 50 * 1000))
+        logger.info("Average test time for decoding is %f ms" %
+                    ((time.perf_counter() - start) / 50 * 1000))
 
         # Output
         finished_seq = finished_seq.numpy()
@@ -155,4 +154,5 @@ def do_predict(args):
 if __name__ == "__main__":
     args = parse_args()
     pprint(args)
+
     do_predict(args)

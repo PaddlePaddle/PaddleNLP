@@ -131,10 +131,10 @@ class LacTask(Task):
        Construct the input spec for the convert dygraph model to static model.
        """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='token_ids'),
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64", name='length')
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_ids'),
+            paddle.static.InputSpec(shape=[None], dtype="int64", name='length')
         ]
 
     def _construct_vocabs(self):
@@ -212,13 +212,12 @@ class LacTask(Task):
             Pad(axis=0, pad_val=0, dtype="int64"),  # input_ids
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
-        infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            shuffle=False,
-            return_list=True)
+        infer_data_loader = paddle.io.DataLoader(infer_ds,
+                                                 collate_fn=batchify_fn,
+                                                 num_workers=num_workers,
+                                                 batch_size=batch_size,
+                                                 shuffle=False,
+                                                 return_list=True)
         outputs = {}
         outputs['text'] = short_input_texts
         outputs['data_loader'] = infer_data_loader
@@ -283,6 +282,7 @@ class LacTask(Task):
             single_result['segs'] = sent_out
             single_result['tags'] = tags_out
             final_results.append(single_result)
-        final_results = self._auto_joiner(
-            final_results, self.input_mapping, is_dict=True)
+        final_results = self._auto_joiner(final_results,
+                                          self.input_mapping,
+                                          is_dict=True)
         return final_results

@@ -60,24 +60,25 @@ def evaluate(model, loss_fct, metric, data_loader):
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             length, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
     print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (avg_loss, precision, recall, f1_score))
     model.train()
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
+def tokenize_and_align_labels(example,
+                              tokenizer,
+                              no_entity_id,
                               max_seq_len=512):
     labels = example['labels']
     example = example['tokens']
-    tokenized_input = tokenizer(
-        example,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len,
-        return_token_type_ids=False)
+    tokenized_input = tokenizer(example,
+                                return_length=True,
+                                is_split_into_words=True,
+                                max_seq_len=max_seq_len,
+                                return_token_type_ids=False)
 
     tokenized_input['labels'] = labels[:len(tokenized_input["input_ids"])]
     return tokenized_input
@@ -89,8 +90,9 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, test_ds = load_dataset(
-        'msra_ner', splits=('train', 'test'), lazy=False)
+    train_ds, test_ds = load_dataset('msra_ner',
+                                     splits=('train', 'test'),
+                                     lazy=False)
 
     tokenizer = GPTChineseTokenizer.from_pretrained(args.model_name_or_path)
 
@@ -98,44 +100,42 @@ def do_train(args):
     label_num = len(label_list)
     no_entity_id = label_num - 1
 
-    trans_func = partial(
-        tokenize_and_align_labels,
-        tokenizer=tokenizer,
-        no_entity_id=no_entity_id,
-        max_seq_len=args.max_seq_length)
+    trans_func = partial(tokenize_and_align_labels,
+                         tokenizer=tokenizer,
+                         no_entity_id=no_entity_id,
+                         max_seq_len=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func)
 
     ignore_label = -100
 
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=0, dtype='int64'),  # input
-        'seq_len': Stack(dtype='int64'),  # seq_len
-        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
-    }): fn(samples)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            'input_ids': Pad(axis=0, pad_val=0, dtype='int64'),  # input
+            'seq_len': Stack(dtype='int64'),  # seq_len
+            'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
+        }): fn(samples)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_sampler=train_batch_sampler,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   batch_sampler=train_batch_sampler,
+                                   return_list=True)
 
     test_ds = test_ds.map(trans_func)
 
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  batch_size=args.batch_size,
+                                  return_list=True)
 
     # Define the model netword and its loss
-    model = GPTForTokenClassification.from_pretrained(
-        args.model_name_or_path, num_classes=label_num)
+    model = GPTForTokenClassification.from_pretrained(args.model_name_or_path,
+                                                      num_classes=label_num)
     #model = ErnieCtmForTokenClassification.from_pretrained(
     #    args.model_name_or_path, num_classes=label_num)
     if paddle.distributed.get_world_size() > 1:
@@ -181,16 +181,17 @@ def do_train(args):
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       args.logging_steps / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if paddle.distributed.get_rank() == 0:
                     evaluate(model, loss_fct, metric, test_data_loader)
-                    paddle.save(model.state_dict(),
-                                os.path.join(args.output_dir,
-                                             "model_%d.pdparams" % global_step))
+                    paddle.save(
+                        model.state_dict(),
+                        os.path.join(args.output_dir,
+                                     "model_%d.pdparams" % global_step))
 
 
 if __name__ == "__main__":

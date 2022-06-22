@@ -49,8 +49,8 @@ class BlenderbotSmallLearnedPositionalEmbedding(Embedding):
     """
 
     def __init__(self, num_embeddings, embedding_dim):
-        super().__init__(
-            num_embeddings=num_embeddings, embedding_dim=embedding_dim)
+        super().__init__(num_embeddings=num_embeddings,
+                         embedding_dim=embedding_dim)
 
     def forward(self, input_ids_shape, past_key_values_length=0):
         """
@@ -64,10 +64,9 @@ class BlenderbotSmallLearnedPositionalEmbedding(Embedding):
             (Tensor): The generated positional embedding.
         """
         bsz, seq_len = input_ids_shape[:2]
-        positions = paddle.arange(
-            past_key_values_length,
-            past_key_values_length + seq_len,
-            dtype="int64")
+        positions = paddle.arange(past_key_values_length,
+                                  past_key_values_length + seq_len,
+                                  dtype="int64")
         return super().forward(positions)
 
 
@@ -147,17 +146,17 @@ class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
                  normalize_before=True,
                  weight_attr=None,
                  bias_attr=None):
-        super(BlenderbotSmallDecoderLayer, self).__init__(
-            d_model=d_model,
-            nhead=nhead,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout,
-            activation=activation,
-            attn_dropout=attn_dropout,
-            act_dropout=act_dropout,
-            normalize_before=normalize_before,
-            weight_attr=weight_attr,
-            bias_attr=bias_attr)
+        super(BlenderbotSmallDecoderLayer,
+              self).__init__(d_model=d_model,
+                             nhead=nhead,
+                             dim_feedforward=dim_feedforward,
+                             dropout=dropout,
+                             activation=activation,
+                             attn_dropout=attn_dropout,
+                             act_dropout=act_dropout,
+                             normalize_before=normalize_before,
+                             weight_attr=weight_attr,
+                             bias_attr=bias_attr)
 
     def forward(self,
                 tgt,
@@ -174,15 +173,17 @@ class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
         if self.normalize_before:
             tgt = self.norm1(tgt)
         if cache is None:
-            tgt = self.self_attn(
-                query=tgt, key=tgt, value=tgt, attn_mask=tgt_mask, cache=None)
+            tgt = self.self_attn(query=tgt,
+                                 key=tgt,
+                                 value=tgt,
+                                 attn_mask=tgt_mask,
+                                 cache=None)
         else:
-            tgt, incremental_cache = self.self_attn(
-                query=tgt,
-                key=tgt,
-                value=tgt,
-                attn_mask=tgt_mask,
-                cache=cache[0])
+            tgt, incremental_cache = self.self_attn(query=tgt,
+                                                    key=tgt,
+                                                    value=tgt,
+                                                    attn_mask=tgt_mask,
+                                                    cache=cache[0])
         tgt = residual + self.dropout1(tgt)
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -194,19 +195,17 @@ class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
                 tgt = self.norm2(tgt)
             memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
             if cache is None:
-                tgt = self.cross_attn(
-                    query=tgt,
-                    key=memory,
-                    value=memory,
-                    attn_mask=memory_mask,
-                    cache=None)
+                tgt = self.cross_attn(query=tgt,
+                                      key=memory,
+                                      value=memory,
+                                      attn_mask=memory_mask,
+                                      cache=None)
             else:
-                tgt, static_cache = self.cross_attn(
-                    query=tgt,
-                    key=memory,
-                    value=memory,
-                    attn_mask=memory_mask,
-                    cache=cache[1])
+                tgt, static_cache = self.cross_attn(query=tgt,
+                                                    key=memory,
+                                                    value=memory,
+                                                    attn_mask=memory_mask,
+                                                    cache=cache[1])
             tgt = residual + self.dropout2(tgt)
             if not self.normalize_before:
                 tgt = self.norm2(tgt)
@@ -230,8 +229,9 @@ class TransformerDecoder(nn.TransformerDecoder):
     """
 
     def __init__(self, decoder_layer, num_layers, norm=None):
-        super(TransformerDecoder, self).__init__(
-            decoder_layer=decoder_layer, num_layers=num_layers, norm=norm)
+        super(TransformerDecoder, self).__init__(decoder_layer=decoder_layer,
+                                                 num_layers=num_layers,
+                                                 norm=norm)
 
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, cache=None):
         """
@@ -296,10 +296,9 @@ class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(
-                num_embeddings=vocab_size,
-                embedding_dim=d_model,
-                padding_idx=pad_token_id)
+            self.embed_tokens = nn.Embedding(num_embeddings=vocab_size,
+                                             embedding_dim=d_model,
+                                             padding_idx=pad_token_id)
         self.encoder_embed_positions = BlenderbotSmallLearnedPositionalEmbedding(
             num_embeddings=max_position_embeddings, embedding_dim=d_model)
         self.embed_scale = math.sqrt(d_model) if scale_embedding else 1.0
@@ -314,8 +313,8 @@ class BlenderbotSmallEncoder(BlenderbotSmallPretrainedModel):
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout,
             normalize_before=normalize_before)
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer=encoder_layer, num_layers=num_encoder_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer=encoder_layer,
+                                             num_layers=num_encoder_layers)
         self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
@@ -372,10 +371,9 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(
-                num_embeddings=vocab_size,
-                embedding_dim=d_model,
-                padding_idx=pad_token_id)
+            self.embed_tokens = nn.Embedding(num_embeddings=vocab_size,
+                                             embedding_dim=d_model,
+                                             padding_idx=pad_token_id)
 
         self.decoder_embed_positions = BlenderbotSmallLearnedPositionalEmbedding(
             num_embeddings=max_position_embeddings, embedding_dim=d_model)
@@ -393,8 +391,8 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout,
             normalize_before=normalize_before)
-        self.decoder = TransformerDecoder(
-            decoder_layer=decoder_layer, num_layers=num_decoder_layers)
+        self.decoder = TransformerDecoder(decoder_layer=decoder_layer,
+                                          num_layers=num_decoder_layers)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -412,12 +410,10 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
             raise ValueError("Decoder_input_ids cannot be None.")
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.full(
-                    (decoder_length, decoder_length),
-                    -np.inf,
-                    dtype=paddle.get_default_dtype())),
-                1)
+            decoder_attention_mask = paddle.tensor.triu((paddle.full(
+                (decoder_length, decoder_length),
+                -np.inf,
+                dtype=paddle.get_default_dtype())), 1)
         decoder_inputs_embeds = self.embed_tokens(
             decoder_input_ids) * self.embed_scale
         # cache[num_layer][0] is an instance of `MultiHeadAttention.Cache` containing
@@ -438,12 +434,11 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         decoder_input = self.decoder_dropout(hidden_states)
 
-        decoder_output = self.decoder(
-            tgt=decoder_input,
-            memory=encoder_output,
-            tgt_mask=decoder_attention_mask,
-            memory_mask=memory_mask,
-            cache=cache)
+        decoder_output = self.decoder(tgt=decoder_input,
+                                      memory=encoder_output,
+                                      tgt_mask=decoder_attention_mask,
+                                      memory_mask=memory_mask,
+                                      cache=cache)
         return decoder_output
 
 
@@ -541,10 +536,9 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=d_model,
-            padding_idx=pad_token_id)
+        self.shared = nn.Embedding(num_embeddings=vocab_size,
+                                   embedding_dim=d_model,
+                                   padding_idx=pad_token_id)
         self.encoder = BlenderbotSmallEncoder(
             vocab_size=vocab_size,
             embed_tokens=self.shared,
@@ -657,8 +651,8 @@ class BlenderbotSmallModel(BlenderbotSmallPretrainedModel):
                 input_ids=input_ids,
                 decoder_start_token_id=self.decoder_start_token_id)
         if encoder_output is None:
-            encoder_output = self.encoder(
-                input_ids=input_ids, attention_mask=attention_mask)
+            encoder_output = self.encoder(input_ids=input_ids,
+                                          attention_mask=attention_mask)
         # initialize cache based on encoder output for decoding at 1st time step.
         if use_cache:
             if cache is None:
@@ -740,9 +734,8 @@ class BlenderbotSmallForConditionalGeneration(BlenderbotSmallPretrainedModel):
             is_bias=False)
         self.register_buffer(
             "final_logits_bias",
-            paddle.zeros(
-                (1, self.blenderbot_small.config['vocab_size']),
-                dtype=paddle.get_default_dtype()))
+            paddle.zeros((1, self.blenderbot_small.config['vocab_size']),
+                         dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
     def forward(self,
@@ -845,9 +838,8 @@ class BlenderbotSmallForCausalLM(BlenderbotSmallPretrainedModel):
             is_bias=False)
         self.register_buffer(
             "final_logits_bias",
-            paddle.zeros(
-                (1, blenderbot_small.config['vocab_size']),
-                dtype=paddle.get_default_dtype()))
+            paddle.zeros((1, blenderbot_small.config['vocab_size']),
+                         dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
     def forward(self,
@@ -910,14 +902,14 @@ class BlenderbotSmallForCausalLM(BlenderbotSmallPretrainedModel):
             # (batch_size, len_seq, hidden_size) is passed for memory argument.
             # since the `static_cache` will not be used in BlenderbotSmallForCausalLM
             batch_size, len_seq = input_ids.shape
-            cache = self.decoder.decoder.gen_cache(memory=paddle.zeros(
-                (batch_size, len_seq, self.blenderbot_small.config['d_model'])))
-        decoder_outputs = self.decoder(
-            decoder_input_ids=input_ids,
-            encoder_output=None,
-            memory_mask=None,
-            use_cache=use_cache,
-            cache=cache)
+            cache = self.decoder.decoder.gen_cache(
+                memory=paddle.zeros((batch_size, len_seq,
+                                     self.blenderbot_small.config['d_model'])))
+        decoder_outputs = self.decoder(decoder_input_ids=input_ids,
+                                       encoder_output=None,
+                                       memory_mask=None,
+                                       use_cache=use_cache,
+                                       cache=cache)
 
         lm_logits = paddle.tensor.matmul(
             decoder_outputs[0] if use_cache else decoder_outputs,

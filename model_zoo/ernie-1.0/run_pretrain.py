@@ -47,15 +47,16 @@ MODEL_CLASSES = {
 
 
 def create_pretrained_dataset(
-        args,
-        data_file,
-        tokenizer,
-        data_world_size,
-        data_world_rank,
-        max_seq_len,
-        places=None,
-        data_holders=None,
-        current_step=0, ):
+    args,
+    data_file,
+    tokenizer,
+    data_world_size,
+    data_world_rank,
+    max_seq_len,
+    places=None,
+    data_holders=None,
+    current_step=0,
+):
 
     train_valid_test_num_samples = [
         args.global_batch_size * args.max_steps,
@@ -117,19 +118,19 @@ def create_pretrained_dataset(
             shuffle=False,
             drop_last=True,
             consumed_samples=consumed_samples)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            num_workers=args.num_workers,
-            worker_init_fn=None,
-            collate_fn=_collate_data,
-            return_list=False)
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           batch_sampler=batch_sampler,
+                                           num_workers=args.num_workers,
+                                           worker_init_fn=None,
+                                           collate_fn=_collate_data,
+                                           return_list=False)
         return data_loader
 
     train_dl = loader(train_ds, args.global_batch_size * current_step)
-    valid_dl = loader(valid_ds, args.micro_batch_size * (
-        (current_step + 1) // args.eval_freq) * args.eval_iters *
-                      data_world_size)
+    valid_dl = loader(
+        valid_ds,
+        args.micro_batch_size * ((current_step + 1) // args.eval_freq) *
+        args.eval_iters * data_world_size)
     test_dl = loader(test_ds, 0)
 
     return train_dl, valid_dl, test_dl
@@ -138,8 +139,8 @@ def create_pretrained_dataset(
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and "_idx.npz" in str(f))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     return files
@@ -205,10 +206,10 @@ def run_evaluate(data_loader,
                         time.time() - local_time)
                 logger.info(
                     "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f seqs/s"
-                    % (task_name, global_step, iter_steps,
-                       log_info_dict["loss"], log_info_dict["lm_loss"],
-                       log_info_dict["sop_loss"],
-                       log_info_dict["samples_per_second"]))
+                    %
+                    (task_name, global_step, iter_steps, log_info_dict["loss"],
+                     log_info_dict["lm_loss"], log_info_dict["sop_loss"],
+                     log_info_dict["samples_per_second"]))
 
                 for k, v in log_info_dict.items():
                     log_writer.add_scalar("%s/%s" % (task_name, k), v,
@@ -295,7 +296,7 @@ def do_train(args):
     assert args.dp_degree * args.sharding_degree == worker_num, \
         "The product of degree num should be equal to worker_num."
 
-    # Create log write, 
+    # Create log write,
     log_writer = None
     if worker_index == 0:
         log_writer = LogWriter(os.path.join(args.output_dir, default_logdir()))
@@ -336,9 +337,10 @@ def do_train(args):
     criterion = criterion_class()
 
     if worker_index == 0:
-        # log the model config and args 
-        model_config_json = json.dumps(
-            model.get_model_config(), ensure_ascii=False, indent=2)
+        # log the model config and args
+        model_config_json = json.dumps(model.get_model_config(),
+                                       ensure_ascii=False,
+                                       indent=2)
         log_writer.add_text("model_config", model_config_json)
         args_dict = {"paddle commit id": str(paddle.version.commit)}
         for arg in vars(args):
@@ -351,12 +353,11 @@ def do_train(args):
     assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
     args.warmup_steps = args.warmup_rate * args.max_steps
 
-    lr_scheduler = LinearAnnealingWithWarmupDecay(
-        args.max_lr,
-        args.min_lr,
-        warmup_step=args.warmup_steps,
-        decay_step=args.decay_steps,
-        last_epoch=global_step)
+    lr_scheduler = LinearAnnealingWithWarmupDecay(args.max_lr,
+                                                  args.min_lr,
+                                                  warmup_step=args.warmup_steps,
+                                                  decay_step=args.decay_steps,
+                                                  last_epoch=global_step)
 
     clip = None
     if args.grad_clip > 0:
@@ -382,8 +383,9 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(
-            models=model, level='O2', save_dtype='float32')
+        model = paddle.amp.decorate(models=model, level='O2')
+    else:
+        scaler = None
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
@@ -392,7 +394,6 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     data_file = get_train_data_file(args)
-
     train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
         args,
         data_file,
@@ -402,7 +403,7 @@ def do_train(args):
         max_seq_len=args.max_seq_len,
         current_step=global_step)
 
-    # load checkpoint vars 
+    # load checkpoint vars
     if os.path.exists(checkpoint_dir):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
             logger.info("Try to load checkpoint from %s " % checkpoint_dir)
@@ -410,15 +411,26 @@ def do_train(args):
             params_path = os.path.join(checkpoint_dir, "model_state.pdparams")
 
             if os.path.exists(opt_path):
+                load_dict = paddle.load(params_path)
+                model_dict = model.state_dict()
+                if args.use_amp:
+                    for k, v in load_dict.items():
+                        if "layer_norm" not in model_dict[k].name:
+                            load_dict[k] = v.astype("float16")
+                model.set_state_dict(load_dict)
                 opt_dict = paddle.load(opt_path)
                 optimizer.set_state_dict(opt_dict)
-                model_dict = paddle.load(params_path)
-                model.set_state_dict(model_dict)
+
             else:
                 logger.warning("No optimizer checkpoint file found in %s." %
                                opt_path)
-            logger.info("Checkpoint loaded from global step: {}".format(
-                global_step))
+            if scaler is not None and os.path.isfile(
+                    os.path.join(checkpoint_dir, "scaler.pdparams")):
+                scaler.load_state_dict(
+                    paddle.load(os.path.join(checkpoint_dir, "scaler.pdparams"),
+                                return_numpy=True))
+            logger.info(
+                "Checkpoint loaded from global step: {}".format(global_step))
 
     loss_global = {
         "loss": paddle.to_tensor(0.0),
@@ -451,13 +463,13 @@ def do_train(args):
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
 
-            with paddle.amp.auto_cast(
-                    args.use_amp,
-                    custom_black_list=[
-                        "reduce_sum", "c_softmax_with_cross_entropy",
-                        "elementwise_div"
-                    ],
-                    level='O2'):
+            with paddle.amp.auto_cast(args.use_amp,
+                                      custom_black_list=[
+                                          "reduce_sum",
+                                          "c_softmax_with_cross_entropy",
+                                          "elementwise_div"
+                                      ],
+                                      level='O2'):
 
                 # Create the model for the ernie pretrain
                 prediction_scores, seq_relationship_score = model(
@@ -467,9 +479,10 @@ def do_train(args):
                     attention_mask=input_mask,
                     masked_positions=masked_lm_positions)
 
-                lm_loss, sop_loss = criterion(
-                    prediction_scores, seq_relationship_score, masked_lm_labels,
-                    next_sentence_labels)
+                lm_loss, sop_loss = criterion(prediction_scores,
+                                              seq_relationship_score,
+                                              masked_lm_labels,
+                                              next_sentence_labels)
                 loss = lm_loss + sop_loss
 
             if args.use_amp:
@@ -537,18 +550,18 @@ def do_train(args):
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
 
-                run_evaluate(
-                    valid_data_loader,
-                    model,
-                    criterion,
-                    args.eval_iters,
-                    log_writer,
-                    global_step,
-                    args,
-                    task_name="valid")
+                run_evaluate(valid_data_loader,
+                             model,
+                             criterion,
+                             args.eval_iters,
+                             log_writer,
+                             global_step,
+                             args,
+                             task_name="valid")
                 tic_train = time.time()
 
-            def save_ckpt(output_dir, model, tokenizer, args, global_step):
+            def save_ckpt(output_dir, model, tokenizer, optimizer, scaler, args,
+                          global_step):
                 step_config = {
                     "model_name": args.model_name_or_path,
                     "global_step": global_step,
@@ -560,20 +573,32 @@ def do_train(args):
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
 
-                model_to_save.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
+                model_to_save.save_model_config(output_dir)
+                model_dict = model_to_save.state_dict()
+                if scaler is not None:
+                    paddle.save(scaler.state_dict(),
+                                os.path.join(output_dir, "scaler.pdparams"))
+                    for k, v in model_dict.items():
+                        if v.dtype is paddle.float16:
+                            model_dict[k] = v.astype("float32")
+                paddle.save(model_dict,
+                            os.path.join(output_dir, "model_state.pdparams"))
                 paddle.save(optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
 
                 with open(os.path.join(output_dir, "config.yml"), "w") as f:
-                    yaml.dump(
-                        step_config, f, encoding='utf-8', allow_unicode=True)
+                    yaml.dump(step_config,
+                              f,
+                              encoding='utf-8',
+                              allow_unicode=True)
 
             if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % global_step)
                 if worker_index == 0:
-                    save_ckpt(output_dir, model, tokenizer, args, global_step)
+                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler,
+                              args, global_step)
 
                 if worker_num > 1:
                     paddle.distributed.barrier()
@@ -591,21 +616,21 @@ def do_train(args):
                             shutil.rmtree(output_dir_bak)
                         shutil.move(output_dir, output_dir_bak)
                         os.mkdir(output_dir)
-                    save_ckpt(output_dir, model, tokenizer, args, global_step)
+                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler,
+                              args, global_step)
 
                 if worker_num > 1:
                     paddle.distributed.barrier()
 
             if global_step >= args.max_steps:
-                run_evaluate(
-                    test_data_loader,
-                    model,
-                    criterion,
-                    args.test_iters,
-                    log_writer,
-                    global_step,
-                    args,
-                    task_name="test")
+                run_evaluate(test_data_loader,
+                             model,
+                             criterion,
+                             args.test_iters,
+                             log_writer,
+                             global_step,
+                             args,
+                             task_name="test")
                 del train_data_loader
                 return
 

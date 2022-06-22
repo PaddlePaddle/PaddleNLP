@@ -34,27 +34,23 @@ def parse_args():
         type=str,
         required=True,
         help='The path to input text files where a sentence per line.')
-    parser.add_argument(
-        '--output_file',
-        type=str,
-        required=True,
-        help='The output file path of preprocessed ids.')
-    parser.add_argument(
-        '--tokenize_tool',
-        type=str,
-        default='lac',
-        choices=['lac', 'seg', 'jieba'],
-        help='The tokenization tool for chinese words.')
-    parser.add_argument(
-        '--logging_steps',
-        type=int,
-        default=100,
-        help='The interval between progress updates.')
-    parser.add_argument(
-        '--num_worker',
-        type=int,
-        default=1,
-        help='Number of worker processes to launch.')
+    parser.add_argument('--output_file',
+                        type=str,
+                        required=True,
+                        help='The output file path of preprocessed ids.')
+    parser.add_argument('--tokenize_tool',
+                        type=str,
+                        default='lac',
+                        choices=['lac', 'seg', 'jieba'],
+                        help='The tokenization tool for chinese words.')
+    parser.add_argument('--logging_steps',
+                        type=int,
+                        default=100,
+                        help='The interval between progress updates.')
+    parser.add_argument('--num_worker',
+                        type=int,
+                        default=1,
+                        help='Number of worker processes to launch.')
 
     args = parser.parse_args()
     return args
@@ -100,6 +96,7 @@ SEGMENTATION_FN = {
 
 
 class ProcessFn(object):
+
     def __init__(self, args):
         self.args = args
 
@@ -168,8 +165,8 @@ def main():
     save_dtype = np.uint16 if tokenizer.vocab_size < 2**16 - 1 else np.int32
     processer = ProcessFn(args)
 
-    pool = multiprocessing.Pool(
-        args.num_worker, initializer=processer.initializer)
+    pool = multiprocessing.Pool(args.num_worker,
+                                initializer=processer.initializer)
 
     token_id_stream = io.BytesIO()
     sent_len_stream = io.BytesIO()
@@ -191,20 +188,17 @@ def main():
             if sentence_len == 0:
                 continue
             sent_len_stream.write(
-                sentence_len.to_bytes(
-                    4, byteorder='little', signed=True))
+                sentence_len.to_bytes(4, byteorder='little', signed=True))
             sent_count += 1
             token_id_stream.write(
-                np.array(
-                    tokens, dtype=save_dtype).tobytes(order='C'))
+                np.array(tokens, dtype=save_dtype).tobytes(order='C'))
 
             if step % args.logging_steps == 0:
                 time_cost = time.time() - start_tic
                 mbs = total_bytes_processed / time_cost / 1024 / 1024
-                print(
-                    f'Processed {step} sentences',
-                    f'({step/time_cost:.2f} sentences/s, {mbs:.4f} MB/s).',
-                    file=sys.stderr)
+                print(f'Processed {step} sentences',
+                      f'({step/time_cost:.2f} sentences/s, {mbs:.4f} MB/s).',
+                      file=sys.stderr)
 
     pool.close()
     print('Saving tokens to files...')

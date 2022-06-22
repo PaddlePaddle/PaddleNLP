@@ -42,102 +42,103 @@ def parse_args():
         default="gpu",
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model or shortcut name.")
+    parser.add_argument("--output_dir",
+                        default="best_chid_model",
+                        type=str,
+                        help="The path of the checkpoints .")
+    parser.add_argument("--save_best_model",
+                        default=True,
+                        type=distutils.util.strtobool,
+                        help="Whether to save best model.")
+    parser.add_argument("--overwrite_cache",
+                        default=False,
+                        type=distutils.util.strtobool,
+                        help="Whether to overwrite cache for dataset.")
+    parser.add_argument("--num_train_epochs",
+                        default=3,
+                        type=int,
+                        help="Total number of training epochs to perform.")
     parser.add_argument(
-        "--model_name_or_path",
+        "--num_proc",
         default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model or shortcut name.")
-    parser.add_argument(
-        "--output_dir",
-        default="best_chid_model",
-        type=str,
-        help="The path of the checkpoints .")
-    parser.add_argument(
-        "--save_best_model",
-        default=True,
-        type=distutils.util.strtobool,
-        help="Whether to save best model.")
-    parser.add_argument(
-        "--overwrite_cache",
-        default=False,
-        type=distutils.util.strtobool,
-        help="Whether to overwrite cache for dataset.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
         type=int,
-        help="Total number of training epochs to perform.")
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
+        help=
+        "Max number of processes when generating cache. Already cached shards are loaded sequentially."
+    )
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs."
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs."
     )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--warmup_proportion",
+                        default=0.1,
+                        type=float,
+                        help="Linear warmup proportion over total steps.")
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--learning_rate",
-        default=2e-5,
-        type=float,
-        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument(
-        "--max_grad_norm",
-        default=1.0,
-        type=float,
-        help="The max value of grad norm.")
-    parser.add_argument(
-        "--batch_size",
-        default=4,
-        type=int,
-        help="Batch size per GPU/CPU for training.")
-    parser.add_argument(
-        "--eval_batch_size",
-        default=24,
-        type=int,
-        help="Batch size per GPU/CPU for training.")
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-6,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--learning_rate",
+                        default=2e-5,
+                        type=float,
+                        help="The initial learning rate for Adam.")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
+    parser.add_argument("--max_grad_norm",
+                        default=1.0,
+                        type=float,
+                        help="The max value of grad norm.")
+    parser.add_argument("--batch_size",
+                        default=4,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--eval_batch_size",
+                        default=24,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
     parser.add_argument(
         '--gradient_accumulation_steps',
         type=int,
         default=1,
-        help="Number of updates steps to accumualte before performing a backward/update pass."
+        help=
+        "Number of updates steps to accumualte before performing a backward/update pass."
     )
-    parser.add_argument(
-        "--do_train", action='store_true', help="Whether to train.")
-    parser.add_argument(
-        "--do_predict", action='store_true', help="Whether to predict.")
+    parser.add_argument("--do_train",
+                        action='store_true',
+                        help="Whether to train.")
+    parser.add_argument("--do_predict",
+                        action='store_true',
+                        help="Whether to predict.")
     parser.add_argument(
         "--max_seq_length",
         default=64,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.")
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
     args = parser.parse_args()
     return args
 
@@ -207,7 +208,6 @@ def evaluate(model, data_loader, do_predict=False):
     model.train()
     if not do_predict:
         acc = right_num / total_num
-        print("acc", acc)
         return acc
     return all_results
 
@@ -370,8 +370,8 @@ def run(args):
                 for tag_index, tag in enumerate(tags):
                     pos = all_doc_tokens.index(tag)
 
-                    tmp_l, tmp_r = add_tokens_for_around(all_doc_tokens, pos,
-                                                         num_tokens)
+                    tmp_l, tmp_r = add_tokens_for_around(
+                        all_doc_tokens, pos, num_tokens)
                     num_l = len(tmp_l)
                     num_r = len(tmp_r)
                     tokens_l = []
@@ -413,7 +413,7 @@ def run(args):
                         result["labels"].append(label)
                     candidate += 1
             if (idx + 1) % 10000 == 0:
-                print(idx + 1, "samples have been processed.")
+                logger.info("%d samples have been processed." % (idx + 1))
         return result
 
     if paddle.distributed.get_world_size() > 1:
@@ -438,16 +438,19 @@ def run(args):
                 partial(preprocess_function),
                 batched=True,
                 batch_size=len(train_ds),
-                num_proc=4,
+                num_proc=args.num_proc,
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
-        batchify_fn = lambda samples, fn=Dict({
-            'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
-            'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
-            'labels': Stack(dtype="int64"),  # label
-            'example_ids': Stack(dtype="int64"),  # example id
-        }): fn(samples)
+        batchify_fn = lambda samples, fn=Dict(
+            {
+                'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id
+                                 ),  # input
+                'token_type_ids': Pad(
+                    axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
+                'labels': Stack(dtype="int64"),  # label
+                'example_ids': Stack(dtype="int64"),  # example id
+            }): fn(samples)
 
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
@@ -462,22 +465,21 @@ def run(args):
                                 batched=True,
                                 batch_size=len(dev_ds),
                                 remove_columns=column_names,
-                                num_proc=4,
+                                num_proc=args.num_proc,
                                 load_from_cache_file=args.overwrite_cache,
                                 desc="Running tokenizer on validation dataset")
 
         dev_batch_sampler = paddle.io.BatchSampler(
             dev_ds, batch_size=args.eval_batch_size, shuffle=False)
 
-        dev_data_loader = paddle.io.DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            return_list=True)
+        dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
+                                               batch_sampler=dev_batch_sampler,
+                                               collate_fn=batchify_fn,
+                                               return_list=True)
 
         num_training_steps = int(
             args.max_steps /
-            args.gradient_accumulation_steps) if args.max_steps > 0 else int(
+            args.gradient_accumulation_steps) if args.max_steps >= 0 else int(
                 len(train_data_loader) * args.num_train_epochs /
                 args.gradient_accumulation_steps)
 
@@ -518,19 +520,20 @@ def run(args):
                     lr_scheduler.step()
                     optimizer.clear_grad()
                     if global_step % args.logging_steps == 0:
-                        print(
+                        logger.info(
                             "global step %d/%d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
                             % (global_step, num_training_steps, epoch, step + 1,
-                               loss,
-                               args.logging_steps / (time.time() - tic_train)))
+                               loss, args.logging_steps /
+                               (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    print("best_acc: %.2f" % (best_acc * 100))
-                    return
+                    break
+            if global_step > num_training_steps:
+                break
             tic_eval = time.time()
             acc = evaluate(model, dev_data_loader)
-            print("eval acc: %.5f, eval done total : %s s" %
-                  (acc, time.time() - tic_eval))
+            logger.info("eval acc: %.5f, eval done total : %s s" %
+                        (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
                 best_acc = acc
                 if args.save_best_model:
@@ -540,24 +543,27 @@ def run(args):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
-
-        print("best_acc: %.2f" % (best_acc * 100))
+            if global_step >= num_training_steps:
+                break
+        logger.info("best_result: %.2f" % (best_acc * 100))
 
     if args.do_predict:
         column_names = test_ds.column_names
-        test_ds = test_ds.map(partial(
-            preprocess_function, do_predict=True),
+        test_ds = test_ds.map(partial(preprocess_function, do_predict=True),
                               batched=True,
                               batch_size=len(test_ds),
                               remove_columns=column_names,
-                              num_proc=1)
+                              num_proc=args.num_proc)
         test_batch_sampler = paddle.io.BatchSampler(
             test_ds, batch_size=args.eval_batch_size, shuffle=False)
 
         batchify_fn = lambda samples, fn=Dict({
-            'input_ids': Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
-            'token_type_ids': Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
-            'example_ids': Stack(dtype="int64"),  # example id
+            'input_ids':
+            Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
+            'token_type_ids':
+            Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
+            'example_ids':
+            Stack(dtype="int64"),  # example id
         }): fn(samples)
 
         test_data_loader = paddle.io.DataLoader(

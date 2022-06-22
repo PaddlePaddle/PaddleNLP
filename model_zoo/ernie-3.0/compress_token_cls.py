@@ -32,20 +32,24 @@ from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
-    Trainer, )
+    Trainer,
+)
 
 from paddlenlp.transformers import (
     AutoTokenizer,
-    AutoModelForTokenClassification, )
+    AutoModelForTokenClassification,
+)
 from paddlenlp.utils.log import logger
 
 from compress_trainer import CompressConfig, PTQConfig
+
 sys.path.append("../ernie-1.0/finetune")
 from token_classification import ner_trans_fn
 from utils import (
     ALL_DATASETS,
     DataArguments,
-    ModelArguments, )
+    ModelArguments,
+)
 
 
 def main():
@@ -77,7 +81,8 @@ def main():
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
         dataset_config[0],
-        None if len(dataset_config) <= 1 else dataset_config[1], )
+        None if len(dataset_config) <= 1 else dataset_config[1],
+    )
 
     label_list = raw_datasets['train'].features['ner_tags'].feature.names
     data_args.label_list = label_list
@@ -86,12 +91,13 @@ def main():
     data_args.no_entity_id = 0
     num_classes = 1 if label_list == None else len(label_list)
 
-    # Define tokenizer, model, loss function. 
+    # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForTokenClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
 
     class criterion(nn.Layer):
+
         def __init__(self):
             super(criterion, self).__init__()
             self.loss_fn = paddle.nn.loss.CrossEntropyLoss(
@@ -119,14 +125,13 @@ def main():
     eval_dataset = raw_datasets["test"].map(trans_fn,
                                             remove_columns=column_names)
 
-    trainer = Trainer(
-        model=model,
-        criterion=loss_fct,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer)
+    trainer = Trainer(model=model,
+                      criterion=loss_fct,
+                      args=training_args,
+                      data_collator=data_collator,
+                      train_dataset=train_dataset,
+                      eval_dataset=eval_dataset,
+                      tokenizer=tokenizer)
 
     output_dir = os.path.join(model_args.model_name_or_path, "compress")
 
@@ -136,12 +141,11 @@ def main():
     compress_config = CompressConfig(quantization_config=PTQConfig(
         algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
 
-    trainer.compress(
-        data_args.dataset,
-        output_dir,
-        pruning=True,
-        quantization=True,
-        compress_config=compress_config)
+    trainer.compress(data_args.dataset,
+                     output_dir,
+                     pruning=True,
+                     quantization=True,
+                     compress_config=compress_config)
 
 
 if __name__ == "__main__":

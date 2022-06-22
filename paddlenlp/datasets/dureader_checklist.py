@@ -34,19 +34,22 @@ class DuReaderChecklist(DatasetBuilder):
 
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('dataset', 'train.json'),
-            '28881033c067c690826a841d2d72a18a',
+        'train':
+        META_INFO(
+            os.path.join('dataset',
+                         'train.json'), '28881033c067c690826a841d2d72a18a',
             'https://bj.bcebos.com/paddlenlp/datasets/lic2021/dureader_checklist.dataset.tar.gz'
         ),
-        'dev': META_INFO(
-            os.path.join('dataset', 'dev.json'),
-            '28881033c067c690826a841d2d72a18a',
+        'dev':
+        META_INFO(
+            os.path.join('dataset',
+                         'dev.json'), '28881033c067c690826a841d2d72a18a',
             'https://bj.bcebos.com/paddlenlp/datasets/lic2021/dureader_checklist.dataset.tar.gz'
         ),
-        'test1': META_INFO(
-            os.path.join('test1', 'test1.json'),
-            'd7047ada5fb6734b4e58bfa198d47f6e',
+        'test1':
+        META_INFO(
+            os.path.join('test1',
+                         'test1.json'), 'd7047ada5fb6734b4e58bfa198d47f6e',
             'https://bj.bcebos.com/paddlenlp/datasets/lic2021/dureader_checklist.test1.tar.gz'
         )
     }

@@ -27,25 +27,23 @@ def train(args):
 
     vocab = load_vocab(args.vocab_file, args.max_characters_per_token)
 
-    elmo = ELMo(
-        args.batch_size,
-        args.char_embed_dim,
-        args.projection_dim,
-        vocab.size,
-        dropout=args.dropout,
-        num_layers=args.num_layers,
-        num_highways=args.num_highways,
-        char_vocab_size=vocab.char_size)
+    elmo = ELMo(args.batch_size,
+                args.char_embed_dim,
+                args.projection_dim,
+                vocab.size,
+                dropout=args.dropout,
+                num_layers=args.num_layers,
+                num_highways=args.num_highways,
+                char_vocab_size=vocab.char_size)
     if n_procs > 1:
         elmo = paddle.DataParallel(elmo)
     elmo.train()
 
     gloabl_norm_clip = nn.ClipGradByGlobalNorm(args.max_grad_norm)
-    optimizer = paddle.optimizer.Adagrad(
-        learning_rate=args.lr,
-        parameters=elmo.parameters(),
-        initial_accumulator_value=1.0,
-        grad_clip=gloabl_norm_clip)
+    optimizer = paddle.optimizer.Adagrad(learning_rate=args.lr,
+                                         parameters=elmo.parameters(),
+                                         initial_accumulator_value=1.0,
+                                         grad_clip=gloabl_norm_clip)
     elmo_loss = ELMoLoss()
 
     # Loads pre-trained parameters.
@@ -56,19 +54,19 @@ def train(args):
         optimizer.set_state_dict(opt_state_dict)
         print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
-    train_dataset = OneBillionWordDataset(
-        args.train_data_path,
-        vocab,
-        args.batch_size,
-        args.unroll_steps,
-        n_procs=n_procs,
-        rank=rank,
-        mode='train',
-        shuffle=True,
-        seed=args.seed)
+    train_dataset = OneBillionWordDataset(args.train_data_path,
+                                          vocab,
+                                          args.batch_size,
+                                          args.unroll_steps,
+                                          n_procs=n_procs,
+                                          rank=rank,
+                                          mode='train',
+                                          shuffle=True,
+                                          seed=args.seed)
 
-    train_dataloader = DataLoader(
-        train_dataset, return_list=True, batch_size=None)
+    train_dataloader = DataLoader(train_dataset,
+                                  return_list=True,
+                                  batch_size=None)
 
     n_tokens_per_batch = args.batch_size * args.unroll_steps * n_procs
     n_steps_per_epoch = int(train_dataset.number_of_tokens / n_tokens_per_batch)

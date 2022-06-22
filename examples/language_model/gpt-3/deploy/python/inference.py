@@ -44,6 +44,7 @@ def parse_args():
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -108,8 +109,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -158,11 +159,10 @@ def main():
             "问题：中国的首都是哪里？答案：",
             "问题：世界上最高的山峰是? 答案：",
         ]
-    inputs = tokenizer(
-        text,
-        padding=True,
-        return_attention_mask=True,
-        return_position_ids=True)
+    inputs = tokenizer(text,
+                       padding=True,
+                       return_attention_mask=True,
+                       return_position_ids=True)
     ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype('int64')
     attention_mask = np.array(inputs["attention_mask"]).reshape(
         len(text), -1).astype('float32')
