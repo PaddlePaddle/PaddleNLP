@@ -814,8 +814,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         )
         self.config["max_position_embeddings"] = new_num_position_embeddings
 
-        old_position_embeddings_weight = self.embeddings.position_embeddings.weight.clone(
-        )
+        old_position_embeddings_weight = self.embeddings.position_embeddings.weight
 
         self.embeddings.position_embeddings = nn.Embedding(
             self.config["max_position_embeddings"], self.config["hidden_size"])
