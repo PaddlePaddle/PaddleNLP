@@ -53,7 +53,7 @@ msgstr "2. "
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:16
 msgid "非常欢迎大家贡献优质模型参数权重。 参数权重类型包括但不限于（以BERT模型网络为例）："
-msgstr 
+msgstr ""
 "Contributions of high quality model parameter weights are very welcome."
 "Parameter weight types include but are not limited to (take the BERT model network as an example):"
 

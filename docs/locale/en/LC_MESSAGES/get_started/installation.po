@@ -111,10 +111,27 @@ msgstr "Code Installation"
 msgid "github代码会跟随开发进度不断更新"
 msgstr "The code on Github will be updated accordingly."
 
-#: ../get_started/installation.rst:96
+#: ../get_started/installation.rst:97
 msgid "使用Docker镜像体验PaddleNLP"
 msgstr "Use PaddleNLP by Docker Image"
 
-#: ../get_started/installation.rst:99   
+#: ../get_started/installation.rst:99
 msgid "如果您没有Docker运行环境，请参考 `Docker官网`_ 进行安装"
-msgstr "If you don't have the Docker installed, please refer to `Docker Official Website`_"
+msgstr ""
+"If you don't have the Docker installed, please refer to `Docker Official "
+"Website`_"
+
+#: ../get_started/installation.rst:103
+msgid "PaddleNLP提供了带有最新代码的docker镜像供您使用，您只需要*拉取docker镜像*，然后*运行docker镜像*，无需其他任何额外操作，即可开始使用PaddleNLP的所有功能。"
+
+msgstr ""
+"PaddleNLP provides the docker image with its latest code, all you need to do is to *pull the docker image*, then *run the docker image*, and that's it."
+
+#: ../get_started/installation.rst:105
+msgid "在 `Docker Hub`_ 中获取这些镜像及相应的使用指南，包括CPU、GPU、ROCm版本。"
+msgstr "Please refer to `Docker Hub`_ to get the instructions about how to use this docker image, including CPU, GPU, ROCm versions."
+
+#: ../get_started/installation.rst:109
+msgid "如果您对自动化制作docker镜像感兴趣，或有自定义需求，请访问 `PaddlePaddle/PaddleCloud`_ 做进一步了解。"
+msgstr "If you were interested in automating the docker image process, or would like to customize it, please refer to `PaddlePaddle/PaddleCloud`_ for more details."
+

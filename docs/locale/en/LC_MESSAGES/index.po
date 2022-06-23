@@ -222,6 +222,7 @@ msgid "基于飞桨核心框架领先的自动混合精度优化策略，结合�
 msgstr "Based on the leading automatic mixed precision optimization strategy of the flying paddle core framework, combined with the distributed Fleet API, it supports 4D hybrid parallel strategy, and can efficiently complete large-scale pre-training model training."
 
 #: ../index.rst:20
+#, fuzzy
 msgid "项目GitHub: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README_cn.md"
 msgstr "Project GitHub: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README_en.md"
 
