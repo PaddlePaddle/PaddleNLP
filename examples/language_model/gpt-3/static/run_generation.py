@@ -263,11 +263,11 @@ def do_generation(args):
     attention_mask = np.array(inputs["attention_mask"]).reshape(
         len(text), -1).astype('float32')
 
-    t_ids = paddle.fluid.core.Tensor()
+    t_ids = paddle.framework.core.Tensor()
     t_ids.set(ids, place)
-    t_mask = paddle.fluid.core.Tensor()
+    t_mask = paddle.framework.core.Tensor()
     t_mask.set(attention_mask, place)
-    t_pos = paddle.fluid.core.Tensor()
+    t_pos = paddle.framework.core.Tensor()
     t_pos.set(position_ids, place)
     feed_data = {'src_ids': t_ids, 'pos_ids': t_pos, 'input_mask': t_mask}
     ret = exe.run(main_program, feed=feed_data, fetch_list=fetchs)
