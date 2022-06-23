@@ -221,10 +221,9 @@ msgstr "**High-Performance Distributed Training**"
 msgid "基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成大规模预训练模型训练。"
 msgstr "Based on the leading automatic mixed precision optimization strategy of the flying paddle core framework, combined with the distributed Fleet API, it supports 4D hybrid parallel strategy, and can efficiently complete large-scale pre-training model training."
 
-#: ../index.rst:20
-#, fuzzy
-msgid "项目GitHub: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README_cn.md"
-msgstr "Project GitHub: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README_en.md"
+#: ../../index.rst:20
+msgid "项目GitHub: https://github.com/PaddlePaddle/PaddleNLP"
+msgstr "Project  GitHub : https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README_en.md"
 
 #: ../index.rst:21
 msgid "项目Gitee: https://gitee.com/paddlepaddle/PaddleNLP"
