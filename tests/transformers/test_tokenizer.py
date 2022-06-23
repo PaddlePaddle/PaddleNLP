@@ -17,7 +17,7 @@ import os
 from typing import Type, List, Tuple
 import shutil
 import unittest
-from multiprocessing import Process
+from multiprocessing import Process, Pool
 from tempfile import TemporaryDirectory
 from parameterized import parameterized
 
@@ -84,6 +84,10 @@ def get_pretrained_tokenzier_params(
     return name_class_params
 
 
+def bert_tokenizer_from_pretrained(model_name: str):
+    BertTokenizer.from_pretrained(model_name)
+
+
 class TestPretrainedFromPretrained(CpuCommonTest):
     """module for test pretrained model"""
 
@@ -95,11 +99,28 @@ class TestPretrainedFromPretrained(CpuCommonTest):
     def do_pretrained_in_process(self):
         FakePretrainedModel.from_pretrained(self.temp_dir.name)
 
-    @parameterized.expand([(1, ), (8, ), (20, ), (50, ), (100, ), (1000, )])
+    @parameterized.expand([(1, ), (8, ), (20, )])
     def test_model_config_writing(self, process_num: int):
-        for _ in range(process_num):
-            process = Process(target=self.do_pretrained_in_process)
-            process.start()
+        # do 10 times
+        for _ in range(10):
+            with Pool(processes=process_num) as pool:
+                pool.starmap(self.do_pretrained_in_process, [])
+                pool.close()
+                pool.join()
+
+    @parameterized.expand([(1, ), (8, ), (20, )])
+    def test_tokenizer_config_writing(self, process_num: int):
+        # do 10 times
+        model_name = 'bert-base-uncased'
+        for _ in range(10):
+            with Pool(processes=process_num) as pool:
+                pool.starmap(bert_tokenizer_from_pretrained, [(model_name, )])
+                pool.close()
+                pool.join()
+
+            # remove the cached dir
+            cached_dir = os.path.join(MODEL_HOME, model_name)
+            shutil.rmtree(cached_dir, ignore_errors=True)
 
     @parameterized.expand(get_pretrained_models_params())
     def test_pretrained_model(self, model_name: str,
@@ -115,7 +136,7 @@ class TestPretrainedFromPretrained(CpuCommonTest):
 
         # TODO(wj-Mcat): make this test code pass
         # from pretrained from the dir
-        # PretrainedModelClass.from_pretrained(cache_dir)
+        PretrainedModelClass.from_pretrained(cache_dir)
 
         # remove the cache model file
         shutil.rmtree(cache_dir, ignore_errors=True)
@@ -141,7 +162,7 @@ class TestPretrainedFromPretrained(CpuCommonTest):
 
         # TODO(wj-Mcat): make this test code pass
         # from_pretrained from the dir
-        # PretrainedTokenzierClass.from_pretrained(cache_dir)
+        PretrainedTokenzierClass.from_pretrained(cache_dir)
 
         # remove the cache model file
         shutil.rmtree(cache_dir, ignore_errors=True)
