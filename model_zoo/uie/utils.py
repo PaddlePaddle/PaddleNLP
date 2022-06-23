@@ -70,13 +70,13 @@ def convert_example(example, tokenizer, max_seq_len):
     """
     encoded_inputs = tokenizer(text=[example["prompt"]],
                                text_pair=[example["content"]],
-                               stride=len(example["prompt"]),
                                truncation=True,
                                max_seq_len=max_seq_len,
                                pad_to_max_seq_len=True,
                                return_attention_mask=True,
                                return_position_ids=True,
-                               return_dict=False)
+                               return_dict=False,
+                               return_offsets_mapping=True)
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -122,7 +122,7 @@ def reader(data_path, max_seq_len=512):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             json_line = json.loads(line)
-            content = json_line['content']
+            content = json_line['content'].strip()
             prompt = json_line['prompt']
             # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
             # It include three summary tokens.

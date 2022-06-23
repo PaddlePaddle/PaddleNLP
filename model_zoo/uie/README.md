@@ -443,7 +443,7 @@ python finetune.py \
 - `dev_path`: 验证集文件路径。
 - `save_dir`: 模型存储路径，默认为`./checkpoint`。
 - `learning_rate`: 学习率，默认为1e-5。
-- `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
 - `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
@@ -470,7 +470,7 @@ python evaluate.py \
 
 - `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 - `test_path`: 进行评估的测试集文件。
-- `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
 
@@ -572,6 +572,7 @@ python evaluate.py \
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
 
   - GPU端推理样例
 
@@ -587,6 +588,7 @@ python evaluate.py \
     - `use_fp16`: 是否使用FP16进行加速，默认关闭。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
 
 <a name="CCKS比赛"></a>
 
