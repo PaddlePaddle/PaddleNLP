@@ -407,7 +407,7 @@ python doccano.py \
 - ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
-- ``seperator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
@@ -461,7 +461,8 @@ python evaluate.py \
     --model_path "./checkpoint/model_best" \
     --test_path "./data/dev.txt" \
     --batch_size 16 \
-    --max_seq_len 512
+    --max_seq_len 512 \
+    --separated
 ```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
@@ -473,6 +474,7 @@ python evaluate.py \
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
+- `separated`: 是否对每个类别分别进行评估，默认关闭。
 
 #### 定制模型一键预测
 
