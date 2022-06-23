@@ -120,6 +120,13 @@ class FasterTransformer(TransformerModel):
             The power number in length penalty calculation. Only works in `v2`
             temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Default to 0.6 if not set.
+        use_int8(bool, optional):
+            Whether to use int8 to decode. Defaults to False which mean do NOT use
+            int8 to decode.
+        sm(int, optional):
+            When `use_int8` is True. It's necessary to provide the compute capability
+            of the GPU to use. Otherwise, if it's None, the compute capability of the
+            current GPU will be used. For example, T4(sm = 75), P4(sm = 61).
     """
 
     def __init__(self,
