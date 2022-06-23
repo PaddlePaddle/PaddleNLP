@@ -117,9 +117,7 @@ def evaluate(model, model_dev, corpus_data_loader, query_data_loader,
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(
                 batch_query_embedding.numpy(), args.recall_num)
-
             batch_size = len(cosine_sims)
-
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
