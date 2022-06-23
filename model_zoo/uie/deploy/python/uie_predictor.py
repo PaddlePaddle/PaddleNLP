@@ -170,15 +170,12 @@ class UIEPredictor(object):
         start_probs = []
         end_probs = []
         for idx in range(0, len(texts), self._batch_size):
+            l, r = idx, idx + self._batch_size
             input_dict = {
-                "input_ids":
-                encoded_inputs['input_ids'][idx:idx + self._batch_size],
-                "token_type_ids":
-                encoded_inputs['token_type_ids'][idx:idx + self._batch_size],
-                "pos_ids":
-                encoded_inputs['position_ids'][idx:idx + self._batch_size],
-                "att_mask":
-                encoded_inputs["attention_mask"][idx:idx + self._batch_size]
+                "input_ids": encoded_inputs['input_ids'][l:r],
+                "token_type_ids": encoded_inputs['token_type_ids'][l:r],
+                "pos_ids": encoded_inputs['position_ids'][l:r],
+                "att_mask": encoded_inputs["attention_mask"][l:r]
             }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()
