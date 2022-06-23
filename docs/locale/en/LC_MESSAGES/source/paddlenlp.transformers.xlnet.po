@@ -25,7 +25,7 @@ msgstr ""
 msgid ""
 "`XLNet: Generalized Autoregressive Pretraining for Language Understanding"
 " <https://arxiv.org/abs/1906.08237>`__ 是一款无监督的自回归预训练语言模型。"
-msgstr ""
+msgstr "`XLNet: Generalized Autoregressive Pretraining for Language Understanding <https://arxiv.org/abs/1906.08237>`__ is an unsupervised auto-regressive pre-trained language model."
 
 #: of paddlenlp.transformers.xlnet:7
 msgid ""

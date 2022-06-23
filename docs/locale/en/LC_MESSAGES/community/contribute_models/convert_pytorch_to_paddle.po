@@ -787,14 +787,16 @@ msgid ""
 "前向精度的对齐十分简单，我们只需要保证两者输入是一致的前提下，观察得到的输出是否一致。 "
 "这里有几个注意事项，我们运行推理时需要打开eval模式，设置dropout为0等操作去除随机性造成的影响。"
 msgstr ""
+"The alignment of forward methods in different precisions is simple, We need to ensure that the two inputs are consistent and observe whether the obtained output is also consistent."
+"Notice, we need to enable eval mode when doing the inference, also set the dropout to 0 etc. to avoid to be affected by the randomness."
 
 #: ../community/contribute_models/convert_pytorch_to_paddle.rst:399
 msgid ""
 "除了得到的模型权重文件，我们还需要准备模型配置文件。将模型权重文件（model_state.pdparams）和模型配置文件（model_config.json）"
 " 这两个文件放在同一个路径下，我们就可以进行模型前向精度的对齐验证，下面提供了bert模型对齐前向精度的代码示例："
 msgstr ""
-"The alignment of forward precision is very simple. We only need to ensure that the two inputs are consistent and observe whether the obtained output is consistent."
-"There are several considerations here. We need to turn on eval mode when running inference, and set dropout to 0 to remove the influence of randomness."
+"Beside the weight file, we also need to prepare the configuration file. The model weights file(model_state.pdparams) and model configuration file(model_config.json) need to be placed under a same folder, "
+"then we can evaluate the alignment of forward methods in different precisions. The demo of the following code shows how to do the alignment for bert based model:"
 
 #: ../community/contribute_models/convert_pytorch_to_paddle.rst:453
 msgid "代码最后会打印模型输出矩阵的每个元素最大差值，根据这个差值可以判定我们是否对齐了前向精度。"
