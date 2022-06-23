@@ -157,6 +157,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 <a name="模型训练"></a>
 
+
 ## 5. 模型训练
 
 **语义索引训练模型下载链接：**
@@ -206,7 +207,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --similar_text_pair "recall/dev.csv" \
     --corpus_file "recall/corpus.csv"  \
     --similar_text_pair "recall/dev.csv" \
-    --recall_result_file "./recall_result_dir/recall_result.txt" 
+    --recall_result_file "./recall_result_dir/recall_result.txt"
 ```
 
 参数含义说明
@@ -237,7 +238,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 ```
 sh scripts/train_batch_neg.sh
 ```
-
 
 
 <a name="评估"></a>
