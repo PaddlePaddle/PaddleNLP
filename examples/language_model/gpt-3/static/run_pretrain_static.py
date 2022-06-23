@@ -264,6 +264,7 @@ def do_train(args):
 
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
+                tokenizer.pad_token = tokenizer.eos_to_token
                 eos_id = tokenizer.eos_token_id
 
                 train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(

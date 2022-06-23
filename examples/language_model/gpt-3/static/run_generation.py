@@ -200,6 +200,7 @@ def do_generation(args):
                 feeds = create_data_holder(args)
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
+                tokenizer.pad_token = tokenizer.eos_to_token
                 eos_id = tokenizer.eos_token_id
 
                 _, _, test_data_loader = create_pretrained_dataset(
