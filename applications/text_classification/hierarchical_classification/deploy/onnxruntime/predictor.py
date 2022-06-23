@@ -125,12 +125,14 @@ def sigmoid_(x):
 
 class Predictor(object):
 
-    def __init__(self, args):
+    def __init__(self, args, label_list):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
                                                        use_faster=True)
-        self.label_names = []
+        self.label_list = label_list
+        self.depth = args.depth
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
+
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               args.device, args.device_id,
                                               args.use_fp16, args.use_quantize,
@@ -155,20 +157,17 @@ class Predictor(object):
         sigmoid = np.vectorize(sigmoid_)
         probs = sigmoid(infer_data)
         labels = []
-        confidences = []
 
         for prob in probs:
             label = []
-            confidence = []
+
             for i, p in enumerate(prob):
                 if p > threshold:
                     label.append(i)
-                    confidence.append('%.3f' % p)
-            labels.append(label)
-            confidences.append(confidence)
 
-        out_dict = {"label": labels, "confidence": confidences}
-        return out_dict
+            labels.append(label)
+
+        return labels
 
     def infer(self, data):
         infer_data = self.inference_backend.infer(data)
@@ -198,30 +197,21 @@ class Predictor(object):
                 infer_result = np.append(infer_result, result, axis=0)
         return infer_result
 
-    def printer(self, infer_result, input_datas):
-        label_list = self.get_label_list()
-        label = infer_result["label"]
-        confidence = infer_result["confidence"]
-        for i, input_data in enumerate(input_datas):
-            logger.info("input data: %s" % input_data)
-            label1 = []
-            confidence1 = []
-            label2 = []
-            confidence2 = []
-            for l, c in zip(label[i], confidence[i]):
-                if l < 7:
-                    label1.append(label_list[l])
-                    confidence1.append(c)
-                else:
-                    label2.append(label_list[l])
-                    confidence2.append(c)
-            logger.info("level 1: ")
-            logger.info("label: %s  confidence: %s" %
-                        (', '.join(label1), ', '.join(confidence1)))
-            logger.info("level 2: ")
-            logger.info("label: %s  confidence: %s" %
-                        (', '.join(label2), ', '.join(confidence2)))
-            logger.info("-----------------------------")
+    def printer(self, result, input_data):
+
+        for idx, text in enumerate(input_data):
+            logger.info("input data: {}".format(text))
+
+            hierarchical_labels = {d: [] for d in range(self.depth)}
+
+            for r in result[idx]:
+                for i, l in enumerate(self.label_list[r].split('--')):
+                    if l not in hierarchical_labels[i]:
+                        hierarchical_labels[i].append(l)
+            for d in range(self.depth):
+                logger.info('level {}: {}'.format(
+                    d + 1, ', '.join(hierarchical_labels[d])))
+            logger.info('----------------------------')
 
     def predict(self, input_data: list):
         preprocess_result = self.preprocess(input_data)
@@ -252,56 +242,47 @@ class Predictor(object):
                     (micro_f1_score * 100, macro_f1_score * 100))
         return
 
-    def get_label_list(self):
+    def get_text_and_label(self, ds):
         """
-        Return labels of the WOS.
+        Return text and label list
         """
-        return [
-            'CS', 'ECE', 'Psychology', 'MAE', 'Civil', 'Medical',
-            'biochemistry', 'Computer vision', 'Machine learning',
-            'network security', 'Cryptography', 'Operating systems',
-            'Computer graphics', 'Image processing', 'Parallel computing',
-            'Relational databases', 'Software engineering',
-            'Distributed computing', 'Structured Storage',
-            'Symbolic computation', 'Algorithm design', 'Computer programming',
-            'Data structures', 'Bioinformatics', 'Electricity',
-            'Lorentz force law', 'Electrical circuits', 'Voltage law',
-            'Digital control', 'System identification', 'Electrical network',
-            'Microcontroller', 'Electrical generator', 'Electric motor',
-            'Satellite radio', 'Control engineering', 'Signal',
-            'State space representation', 'PID controller',
-            'Operational amplifier', 'Prejudice', 'Social cognition',
-            'Person perception', 'Nonverbal communication',
-            'Prosocial behavior', 'Leadership', 'Eating disorders',
-            'Depression', 'Borderline personality disorder',
-            'Seasonal affective disorder', 'Schizophrenia',
-            'Antisocial personality disorder', 'Media violence',
-            'Prenatal development', 'Child abuse', 'Gender roles',
-            'False memories', 'Attention', 'Problem', 'computer', 'Hydraulics',
-            'Manufacturing engineering', 'Machine design', 'Fluid mechanics',
-            'Internal combustion engine', 'Thermodynamics',
-            'Materials Engineering', 'Strength of materials',
-            'Ambient Intelligence', 'Geotextile', 'Remote Sensing',
-            'Rainwater Harvesting', 'Water Pollution', 'Suspension Bridge',
-            'Stealth Technology', 'Green Building', 'Solar Energy',
-            'Construction Management', 'Smart Material', 'Addiction',
-            'Allergies', "Alzheimer's Disease", 'Ankylosing Spondylitis',
-            'Anxiety', 'Asthma', 'Atopic Dermatitis', 'Atrial Fibrillation',
-            'Autism', 'Skin Care', 'Bipolar Disorder', 'Birth Control',
-            "Children's Health", "Crohn's Disease", 'Dementia', 'Diabetes',
-            'Weight Loss', 'Digestive Health', 'Emergency Contraception',
-            'Mental Health', 'Fungal Infection', 'Headache', 'Healthy Sleep',
-            'Heart Disease', 'Hepatitis C', 'Hereditary Angioedema', 'HIV/AIDS',
-            'Hypothyroidism', 'Idiopathic Pulmonary Fibrosis',
-            'Irritable Bowel Syndrome', 'Kidney Health', 'Low Testosterone',
-            'Lymphoma', 'Medicare', 'Menopause', 'Migraine',
-            'Multiple Sclerosis', 'Myelofibrosis', 'Cancer', 'Osteoarthritis',
-            'Osteoporosis', 'Overactive Bladder', 'Parenting',
-            "Parkinson's Disease", 'Polycythemia Vera', 'Psoriasis',
-            'Psoriatic Arthritis', 'Rheumatoid Arthritis', 'Senior Health',
-            'Smoking Cessation', 'Sports Injuries', 'Sprains and Strains',
-            'Stress Management', 'Molecular biology', 'Cell biology',
-            'Human Metabolism', 'Immunology', 'Genetics', 'Enzymology',
-            'Polymerase chain reaction', 'Northern blotting',
-            'Southern blotting'
-        ]
+        all_texts = []
+        all_labels = []
+        label_list = {
+            self.label_list[i]: i
+            for i in range(len(self.label_list))
+        }
+        for i in range(len(ds)):
+            text = ds[i]['sentence']
+
+            labels = []
+            layers = [
+                ds[i]["level {}".format(d + 1)] for d in range(self.depth)
+            ]
+            shape = [len(layer) for layer in layers]
+            offsets = [0] * len(shape)
+            has_next = True
+            while has_next:
+                l = ''
+                for i, off in enumerate(offsets):
+                    if l == '':
+                        l = layers[i][off]
+                    else:
+                        l += '--{}'.format(layers[i][off])
+                    if l in label_list and label_list[l] not in labels:
+                        labels.append(label_list[l])
+                for i in range(len(shape) - 1, -1, -1):
+                    if offsets[i] + 1 >= shape[i]:
+                        offsets[i] = 0
+                        if i == 0:
+                            has_next = False
+                    else:
+                        offsets[i] += 1
+                        break
+            label = [
+                float(1) if ii in labels else float(0)
+                for ii in range(len(label_list))
+            ]
+            all_texts.append(text)
+            all_labels.append(label)
+        return all_texts, all_labels

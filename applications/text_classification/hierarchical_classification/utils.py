@@ -51,7 +51,7 @@ def evaluate(model, criterion, metric, data_loader):
     return micro_f1_score, macro_f1_score
 
 
-def preprocess_function(examples, tokenizer, max_seq_length, label_nums):
+def preprocess_function(examples, tokenizer, max_seq_length, label_list, depth):
     """
     Builds model inputs from a sequence for sequence classification tasks
     by concatenating and adding special tokens.
@@ -68,9 +68,31 @@ def preprocess_function(examples, tokenizer, max_seq_length, label_nums):
     """
     result = tokenizer(text=examples["sentence"], max_seq_len=max_seq_length)
     # One-Hot label
+    labels = []
+    layers = [examples["level {}".format(d + 1)] for d in range(depth)]
+    shape = [len(layer) for layer in layers]
+    offsets = [0] * len(shape)
+    has_next = True
+    while has_next:
+        l = ''
+        for i, off in enumerate(offsets):
+            if l == '':
+                l = layers[i][off]
+            else:
+                l += '--{}'.format(layers[i][off])
+            if l in label_list and label_list[l] not in labels:
+                labels.append(label_list[l])
+        for i in range(len(shape) - 1, -1, -1):
+            if offsets[i] + 1 >= shape[i]:
+                offsets[i] = 0
+                if i == 0:
+                    has_next = False
+            else:
+                offsets[i] += 1
+                break
+
     result["labels"] = [
-        float(1) if i in examples["label"] else float(0)
-        for i in range(label_nums)
+        float(1) if i in labels else float(0) for i in range(len(label_list))
     ]
     return result
 
@@ -81,45 +103,68 @@ def get_wos_label_list():
     """
     return [
         'CS', 'ECE', 'Psychology', 'MAE', 'Civil', 'Medical', 'biochemistry',
-        'Computer vision', 'Machine learning', 'network security',
-        'Cryptography', 'Operating systems', 'Computer graphics',
-        'Image processing', 'Parallel computing', 'Relational databases',
-        'Software engineering', 'Distributed computing', 'Structured Storage',
-        'Symbolic computation', 'Algorithm design', 'Computer programming',
-        'Data structures', 'Bioinformatics', 'Electricity', 'Lorentz force law',
-        'Electrical circuits', 'Voltage law', 'Digital control',
-        'System identification', 'Electrical network', 'Microcontroller',
-        'Electrical generator', 'Electric motor', 'Satellite radio',
-        'Control engineering', 'Signal', 'State space representation',
-        'PID controller', 'Operational amplifier', 'Prejudice',
-        'Social cognition', 'Person perception', 'Nonverbal communication',
-        'Prosocial behavior', 'Leadership', 'Eating disorders', 'Depression',
-        'Borderline personality disorder', 'Seasonal affective disorder',
-        'Schizophrenia', 'Antisocial personality disorder', 'Media violence',
-        'Prenatal development', 'Child abuse', 'Gender roles', 'False memories',
-        'Attention', 'Problem', 'computer', 'Hydraulics',
-        'Manufacturing engineering', 'Machine design', 'Fluid mechanics',
-        'Internal combustion engine', 'Thermodynamics', 'Materials Engineering',
-        'Strength of materials', 'Ambient Intelligence', 'Geotextile',
-        'Remote Sensing', 'Rainwater Harvesting', 'Water Pollution',
-        'Suspension Bridge', 'Stealth Technology', 'Green Building',
-        'Solar Energy', 'Construction Management', 'Smart Material',
-        'Addiction', 'Allergies', "Alzheimer's Disease",
-        'Ankylosing Spondylitis', 'Anxiety', 'Asthma', 'Atopic Dermatitis',
-        'Atrial Fibrillation', 'Autism', 'Skin Care', 'Bipolar Disorder',
-        'Birth Control', "Children's Health", "Crohn's Disease", 'Dementia',
-        'Diabetes', 'Weight Loss', 'Digestive Health',
-        'Emergency Contraception', 'Mental Health', 'Fungal Infection',
-        'Headache', 'Healthy Sleep', 'Heart Disease', 'Hepatitis C',
-        'Hereditary Angioedema', 'HIV/AIDS', 'Hypothyroidism',
-        'Idiopathic Pulmonary Fibrosis', 'Irritable Bowel Syndrome',
-        'Kidney Health', 'Low Testosterone', 'Lymphoma', 'Medicare',
-        'Menopause', 'Migraine', 'Multiple Sclerosis', 'Myelofibrosis',
-        'Cancer', 'Osteoarthritis', 'Osteoporosis', 'Overactive Bladder',
-        'Parenting', "Parkinson's Disease", 'Polycythemia Vera', 'Psoriasis',
-        'Psoriatic Arthritis', 'Rheumatoid Arthritis', 'Senior Health',
-        'Smoking Cessation', 'Sports Injuries', 'Sprains and Strains',
-        'Stress Management', 'Molecular biology', 'Cell biology',
-        'Human Metabolism', 'Immunology', 'Genetics', 'Enzymology',
-        'Polymerase chain reaction', 'Northern blotting', 'Southern blotting'
+        'CS--Computer vision', 'CS--Machine learning', 'CS--network security',
+        'CS--Cryptography', 'CS--Operating systems', 'CS--Computer graphics',
+        'CS--Image processing', 'CS--Parallel computing',
+        'CS--Relational databases', 'CS--Software engineering',
+        'CS--Distributed computing', 'CS--Structured Storage',
+        'CS--Symbolic computation', 'CS--Algorithm design',
+        'CS--Computer programming', 'CS--Data structures', 'CS--Bioinformatics',
+        'ECE--Electricity', 'ECE--Lorentz force law',
+        'ECE--Electrical circuits', 'ECE--Voltage law', 'ECE--Digital control',
+        'ECE--System identification', 'ECE--Electrical network',
+        'ECE--Microcontroller',
+        'ECE--Electrical generator/Analog signal processing',
+        'ECE--Electric motor', 'ECE--Satellite radio',
+        'ECE--Control engineering', 'ECE--Signal-flow graph',
+        'ECE--State space representation', 'ECE--PID controller',
+        'ECE--Operational amplifier', 'Psychology--Prejudice',
+        'Psychology--Social cognition', 'Psychology--Person perception',
+        'Psychology--Nonverbal communication', 'Psychology--Prosocial behavior',
+        'Psychology--Leadership', 'Psychology--Eating disorders',
+        'Psychology--Depression', 'Psychology--Borderline personality disorder',
+        'Psychology--Seasonal affective disorder', 'Medical--Schizophrenia',
+        'Psychology--Antisocial personality disorder',
+        'Psychology--Media violence', 'Psychology--Prenatal development',
+        'Psychology--Child abuse', 'Psychology--Gender roles',
+        'Psychology--False memories', 'Psychology--Attention',
+        'Psychology--Problem-solving', 'MAE--computer-aided design',
+        'MAE--Hydraulics', 'MAE--Manufacturing engineering',
+        'MAE--Machine design', 'MAE--Fluid mechanics',
+        'MAE--Internal combustion engine', 'MAE--Thermodynamics',
+        'MAE--Materials Engineering', 'MAE--Strength of materials',
+        'Civil--Ambient Intelligence', 'Civil--Geotextile',
+        'Civil--Remote Sensing', 'Civil--Rainwater Harvesting',
+        'Civil--Water Pollution', 'Civil--Suspension Bridge',
+        'Civil--Stealth Technology', 'Civil--Green Building',
+        'Civil--Solar Energy', 'Civil--Construction Management',
+        'Civil--Smart Material', 'Medical--Addiction', 'Medical--Allergies',
+        "Medical--Alzheimer's Disease", 'Medical--Ankylosing Spondylitis',
+        'Medical--Anxiety', 'Medical--Asthma', 'Medical--Atopic Dermatitis',
+        'Medical--Atrial Fibrillation', 'Medical--Autism', 'Medical--Skin Care',
+        'Medical--Bipolar Disorder', 'Medical--Birth Control',
+        "Medical--Children's Health", "Medical--Crohn's Disease",
+        'Medical--Dementia', 'Medical--Diabetes', 'Medical--Weight Loss',
+        'Medical--Digestive Health', 'Medical--Emergency Contraception',
+        'Medical--Mental Health', 'Medical--Fungal Infection',
+        'Medical--Headache', 'Medical--Healthy Sleep', 'Medical--Heart Disease',
+        'Medical--Hepatitis C', 'Medical--Hereditary Angioedema',
+        'Medical--HIV/AIDS', 'Medical--Hypothyroidism',
+        'Medical--Idiopathic Pulmonary Fibrosis',
+        'Medical--Irritable Bowel Syndrome', 'Medical--Kidney Health',
+        'Medical--Low Testosterone', 'Medical--Lymphoma', 'Medical--Medicare',
+        'Medical--Menopause', 'Medical--Migraine',
+        'Medical--Multiple Sclerosis', 'Medical--Myelofibrosis',
+        'Medical--Cancer', 'Medical--Osteoarthritis', 'Medical--Osteoporosis',
+        'Medical--Overactive Bladder', 'Medical--Parenting',
+        "Medical--Parkinson's Disease", 'Medical--Polycythemia Vera',
+        'Medical--Psoriasis', 'Medical--Psoriatic Arthritis',
+        'Medical--Rheumatoid Arthritis', 'Medical--Senior Health',
+        'Medical--Smoking Cessation', 'Medical--Sports Injuries',
+        'Medical--Sprains and Strains', 'Medical--Stress Management',
+        'biochemistry--Molecular biology', 'biochemistry--Cell biology',
+        'biochemistry--Human Metabolism', 'biochemistry--Immunology',
+        'biochemistry--Genetics', 'biochemistry--Enzymology',
+        'biochemistry--Polymerase chain reaction',
+        'biochemistry--Northern blotting', 'biochemistry--Southern blotting'
     ]

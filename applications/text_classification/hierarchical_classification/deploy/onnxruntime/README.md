@@ -32,7 +32,7 @@ python infer.py --model_path_prefix ../../export/float32
 可支持配置的参数：
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
-* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 * `dataset`：训练数据集;默认为wos数据集。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `use_fp16`：选择是否开启FP16进行加速；默认为False。
@@ -40,6 +40,8 @@ python infer.py --model_path_prefix ../../export/float32
 * `device`: 选用什么设备进行训练，可选cpu、gpu。
 * `device_id`: 选择GPU卡号；默认为0。
 * `perf`：选择进行模型性能和精度评估；默认为False。
+* `depth`：层次分类结构最大深度；默认为2。
+* `dataset_dir`：本地数据集地址，需包含data.tsv, taxonomy.tsv,test.tsv(可选，如果启动模型性能和精度评估)；默认为None。
 
 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。可以使用如下命令开启ONNXRuntime的FP16进行推理加速：
 
@@ -53,6 +55,7 @@ python infer.py --model_path_prefix ../../export/float32 --use_fp16
 python infer.py --model_path_prefix ../../export/float32 --perf
 ```
 
+如需使用本地数据集,请指定本地数据集路径参数 `dataset_dir` ，更多本地数据集使用方式详见[以内置数据集格式读取本地数据集](../../README.md)
 
 ## 基于CPU部署推理样例
 
@@ -64,7 +67,7 @@ python infer.py --device cpu --model_path_prefix ../../export/float32
 可支持配置的参数：
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
-* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 * `dataset`：训练数据集;默认为wos数据集。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `use_quantize`：选择是否开启INT8动态量化进行加速；默认为False。
@@ -86,6 +89,8 @@ python infer.py --device cpu --model_path_prefix ../../export/float32 --use_quan
 ```
 python infer.py --device cpu --model_path_prefix ../../export/float32 --perf
 ```
+
+如需使用本地数据集,请指定本地数据集路径参数 `dataset_dir` ，更多本地数据集使用方式详见[以内置数据集格式读取本地数据集](../../README.md)
 
 ## 性能与精度测试
 

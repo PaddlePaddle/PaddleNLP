@@ -44,6 +44,17 @@ class DataArguments:
         default="wos",
         metadata={"help": "Dataset for hierarchical classfication tasks."})
 
+    dataset_dir: str = field(
+        default=None,
+        metadata={
+            "help":
+            "The dataset directory should include train.tsv,"
+            "dev.tsv and taxonomy.tsv files."
+        })
+
+    depth: int = field(default=2,
+                       metadata={"help": "The maximum level of hierarchy."})
+
     max_seq_length: int = field(
         default=512,
         metadata={
@@ -91,20 +102,36 @@ def main():
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
-    train_ds, dev_ds = load_dataset(data_args.dataset, splits=["train", "dev"])
+    # load and preprocess dataset
+    if data_args.dataset_dir is not None:
+        train_dir = os.path.join(data_args.dataset_dir, "train.tsv")
+        dev_dir = os.path.join(data_args.dataset_dir, "dev.tsv")
+        taxonomy_dir = os.path.join(data_args.dataset_dir, "taxonomy.tsv")
+        train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
+        label_list = {}
+        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                label_list[line.strip()] = i
+    else:
+        train_ds, dev_ds = load_dataset(data_args.dataset,
+                                        splits=["train", "dev"])
+        label_list = {
+            train_ds.label_list[i]: i
+            for i in range(len(train_ds.label_list))
+        }
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=len(train_ds.label_list))
+        model_args.model_name_or_path, num_classes=len(label_list))
     model.set_dict(paddle.load(model_args.params_dir))
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
                                    max_seq_length=data_args.max_seq_length,
-                                   label_nums=len(train_ds.label_list))
+                                   label_list=label_list,
+                                   depth=data_args.depth)
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
-
     # Define data collector， criterion
     data_collator = DataCollatorWithPadding(tokenizer)
     criterion = paddle.nn.BCEWithLogitsLoss()

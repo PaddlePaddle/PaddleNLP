@@ -39,6 +39,11 @@ parser.add_argument("--save_dir",
                     type=str,
                     help="The output directory where the model "
                     "checkpoints will be written.")
+parser.add_argument("--dataset_dir",
+                    default=None,
+                    type=str,
+                    help="The dataset directory should include train.tsv,"
+                    "dev.tsv and taxonomy.tsv files.")
 parser.add_argument("--dataset",
                     default="wos",
                     type=str,
@@ -100,6 +105,10 @@ parser.add_argument("--seed",
                     type=int,
                     default=3,
                     help="random seed for initialization")
+parser.add_argument("--depth",
+                    type=int,
+                    default=2,
+                    help="The maximum level of hierarchy")
 
 args = parser.parse_args()
 
@@ -130,12 +139,28 @@ def train():
         paddle.distributed.init_parallel_env()
 
     # load and preprocess dataset
-    train_ds, dev_ds = load_dataset(args.dataset, splits=["train", "dev"])
+    if args.dataset_dir is not None:
+        train_dir = os.path.join(args.dataset_dir, "train.tsv")
+        dev_dir = os.path.join(args.dataset_dir, "dev.tsv")
+        taxonomy_dir = os.path.join(args.dataset_dir, "taxonomy.tsv")
+        train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
+        label_list = {}
+        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                label_list[line.strip()] = i
+    else:
+        train_ds, dev_ds = load_dataset(args.dataset, splits=["train", "dev"])
+        label_list = {
+            train_ds.label_list[i]: i
+            for i in range(len(train_ds.label_list))
+        }
+
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
                                    max_seq_length=args.max_seq_length,
-                                   label_nums=len(train_ds.label_list))
+                                   label_list=label_list,
+                                   depth=args.depth)
     train_ds = train_ds.map(trans_func)
     dev_ds = dev_ds.map(trans_func)
 
@@ -160,7 +185,7 @@ def train():
 
     # define model
     model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(train_ds.label_list))
+        args.model_name, num_classes=len(label_list))
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)

@@ -4,8 +4,9 @@
    * [多标签层次分类任务介绍](#层次分类任务介绍)
    * [代码结构说明](#代码结构说明)
    * [模型微调](#模型微调)
+       * [以内置数据集格式读取本地数据集](#以内置数据集格式读取本地数据集)
    * [模型预测](#模型预测)
-   * [模型静态图导出](#模型预测)
+   * [模型静态图导出](#模型静态图导出)
    * [模型裁剪](#模型裁剪)
        * [环境准备](#环境准备)
        * [裁剪API使用](#裁剪API使用)
@@ -13,12 +14,12 @@
 
 ## 层次分类任务介绍
 
-多标签层次分类任务指自然语言处理任务中，每个样本具有多个标签标记，并且标签集合中标签之间存在预定义的层次结构，多标签层次分类需要充分考虑标签集之间的层次结构关系来预测层次化预测结果。在现实场景中，大量的数据如新闻分类、专利分类、学术论文分类等标签集合存在层次化结构，需要利用算法为文本自动标注更细粒度和更准确的标签。
+多标签层次分类任务指自然语言处理任务中，每个样本具有多个标签标记，并且标签集合中标签之间存在预定义的层次结构，多标签层次分类需要充分考虑标签集之间的层次结构关系来预测层次化预测结果。层次分类任务中标签层次结构分为两类，一类为树状结构，另一类为有向无环图(DAG)结构。有向无环图结构与树状结构区别在于，有向无环图中的节点可能存在不止一个父节点。在现实场景中，大量的数据如新闻分类、专利分类、学术论文分类等标签集合存在层次化结构，需要利用算法为文本自动标注更细粒度和更准确的标签。
 
-如下图所示(R代表根节点)，层次分类任务中标签层次结构分为两类，一类为树状结构，另一类为有向无环图(DAG)结构。有向无环图结构与树状结构区别在于，有向无环图中的节点可能存在不止一个父节点。层次分类问题可以被视为一个多标签问题，以左图树状结构为例，如果一个样本属于类别1.2.1，样本也天然地同时属于类别1和类别1.2两个样本标签。本项目采用通用多标签层次分类算法，将每个结点的标签路径视为一个多分类标签，使用单个多标签分类器进行决策。以上面的例子为例，该样本包含三个标签：1、1->1.2、1->1.2->1.2.1。
+层次分类问题可以被视为一个多标签问题，以下图一个树状标签结构(宠物为根节点)为例，如果一个样本属于美短虎斑，样本也天然地同时属于类别美国短毛猫和类别猫两个样本标签。本项目采用通用多标签层次分类算法，将每个结点的标签路径视为一个多分类标签，使用单个多标签分类器进行决策。以上面的例子为例，该样本包含三个标签：猫、猫--美国短毛猫、猫--美国短毛猫--美短虎斑。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/63761690/173803862-e87bbf62-a749-460c-8362-6f661ebc6013.png" width="800">
+    <img src="https://user-images.githubusercontent.com/63761690/175248039-ce1673f1-9b03-4804-b1cb-29e4b4193f86.png" width="600">
 </div>
 
 ## 代码结构说明
@@ -86,9 +87,10 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop
 可支持配置的参数：
 
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
+* `dataset_dir`：本地训练数据集;默认为None。
 * `dataset`：训练数据集;默认为wos数据集。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
-* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"。
+* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu。如使用gpu训练则参数gpus指定GPU卡号。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为12。
 * `learning_rate`：Fine-tune的最大学习率；默认为3e-5。
@@ -99,7 +101,9 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop
 * `warmup`：是否使用学习率warmup策略；默认为False。
 * `warmup_steps`：学习率warmup策略的steps数，如果设为2000，则学习率会在前2000 steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为2000。
 * `logging_steps`: 日志打印的间隔steps数，默认100。
+* `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
+* `depth`：层次结构最大深度，默认为2。
 
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
@@ -117,6 +121,91 @@ checkpoint/
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoints/macro/model_state.pdparams` 。
 * 如需训练中文层次分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
+### 以内置数据集格式读取本地数据集
+
+在许多情况下，我们希望使用本地的数据集来训练层次分类模型。本项目将以wos数据集为例，介绍如何使用本地指定格式数据集文件以内置数据集方式读取层次分类训练数据，本项目默认不同层的标签之间存在层次关系。
+
+下载wos数据集到本地(如果有本地数据集，跳过此步骤)
+
+```shell
+wget https://paddlenlp.bj.bcebos.com/datasets/wos_data.tar.gz
+
+tar -zxvf wos_data.tar.gz
+```
+
+本地数据集目录结构如下：
+
+```text
+wos_data/
+├── train.tsv # 训练数据集文件
+├── dev.tsv # 开发数据集文件
+├── test.tsv # 可选，测试训练集文件
+├── taxonomy.tsv # 层次分类标签文件
+└── data.tsv # 可选，待预测数据文件
+
+```
+
+- train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中数据格式为：
+```text
+
+<输入序列1>'\t'<level 1 标签>'\t'<level 2 标签>'\t'...'\t'<level n 标签>'\n'
+
+<输入序列2>'\t'<level 1 标签>'\t'<level 2 标签>'\t'...'\t'<level n 标签>'\n'
+
+...
+
+```
+其中n表示标签层次结构中最大层数，<level i 标签> 代表数据的第i层标签。输入文本序列及不同层的标签数据用`'\t'`分隔开，每一层标签中多个标签之间用`','`逗号分隔开。注意，对于第i层数据没有标签的，使用空字符`''`来表示<level i 标签>。
+
+- taxonomy.tsv(层次分类标签文件)记录数据集中所有标签路径集合，标签格式为：
+
+```text
+
+<level 1: 标签1>'\n'
+
+<level 1: 标签1>'--'<level 2: 标签1>'\n'
+
+...
+
+<level 1: 标签 i1>'--'...'--'<level n: 标签in>'\n'
+
+```
+
+标签路径中，高层的标签指向底层标签，标签之间用`'--'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
+
+- data.tsv(可选，待预测数据文件)，数据格式为：
+
+```text
+
+<输入序列1>'\n'
+
+<输入序列2>'\n'
+
+...
+
+在训练过程中通过指定数据集路径参数`dataset_dir`进行训练：
+
+```
+
+单卡训练
+```shell
+
+python train.py --early_stop --dataset_dir 'wos_data'
+
+```
+
+指定GPU卡号/多卡训练
+```shell
+
+unset CUDA_VISIBLE_DEVICES
+
+python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir 'wos_data'
+
+```
+使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
+
+更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
+
 ## 模型预测
 
 输入待预测数据和数据标签对照列表，模型预测数据对应的标签
@@ -126,13 +215,21 @@ checkpoint/
 python predict.py --params_path ./checkpoints/model_state.pdparams
 ```
 
+也可以通过指定本地数据文件路径进行预测：
+```shell
+python predict.py --params_path ./checkpoints/model_state.pdparams --dataset_dir "wos_data"
+```
+
 可支持配置的参数：
 
 * `params_path`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为12。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"。
+* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
+* `depth`：层次结构最大深度，默认为2。
+* `dataset_dir`：本地训练数据集;默认为None。
+
 
 ## 模型静态图导出
 
@@ -146,7 +243,7 @@ python export_model.py --params_path=./checkpoint/model_state.pdparams --output_
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 * `num_classes`：任务标签类别数;默认为wos数据集类别数141。
-* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"。
+* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -161,7 +258,11 @@ export/
 导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/paddle2onnx/infer.py),用法详见[ONNX Runtime推理部署](./deploy/paddle2onnx/README.md)。运行方式：
 
 ```shell
+# 使用默认数据集
 python deploy/paddle2onnx/infer.py --model_path_prefix ./export/float32
+
+# 使用本地数据集
+python deploy/paddle2onnx/infer.py --model_path_prefix ./export/float32 --data_dir "wos_data"
 ```
 
 ## 模型裁剪
@@ -214,21 +315,28 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 
 启动裁剪：
 ```shell
+# 使用默认数据集
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
+
+# 使用本地数据集
+python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --data_dir "wos_data"
 ```
+
 
 可支持配置的参数：
 * `TrainingArguments`
   * `output_dir`：必须，保存模型输出和和中间checkpoints的输出目录;默认为 `None` 。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例通过`prune_config.json`对TrainingArguments 参数进行配置
+  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例默认通过`prune_config.json`对TrainingArguments 参数进行配置
 
 * `DataArguments`
   * `dataset`：训练数据集;默认为wos数据集。
+  * `dataset`：本地数据集路径，路径内需要包含train.tsv, dev.tsv, taxonomy.tsv文件;默认为None。
+  * `depth`：层次分类数据标签最大深度;默认为2。
   * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"。
+  * `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 
 以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
 
@@ -256,13 +364,17 @@ prune/
 导出模型之后用于部署，项目提供了[onnxruntime部署预测示例](./deploy/paddle2onnx/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/paddle2onnx.README.md)。运行方式：
 
 ```shell
+# 使用内置数据集
 python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32
+
+#使用本地数据集
+python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32 --data_dir "wos_data"
 ```
 
 ### 裁剪效果
 本案例我们对ERNIE 2.0模型微调后的模型使用裁剪 API 进行裁剪,将模型转为ONNX模型，并基于ONNXRuntime引擎GPU部署，测试配置如下：
 
-1. 数据集：WOS（英文层次分类数据集）
+1. 数据集：WOS（英文层次分类测试集）
 
 2. 物理机环境
 

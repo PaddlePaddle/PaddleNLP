@@ -114,23 +114,4 @@ if __name__ == "__main__":
     for text in texts:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)
         result = runner.Run([text])
-        label1 = []
-        label2 = []
-        confidence1 = []
-        confidence2 = []
-        for l, c in zip(result['label'], result['confidence']):
-            if l < 7:
-                label1.append(str(l))
-                confidence1.append('%.3f' % c)
-            else:
-                label2.append(str(l))
-                confidence2.append('%.3f' % c)
-        print("text: ")
-        print(text[0])
-        print("- level 1")
-        print("label: %s  confidence: %s" %
-              (', '.join(label1), ', '.join(confidence1)))
-        print("- level 2")
-        print("label: %s  confidence: %s" %
-              (', '.join(label2), ', '.join(confidence2)))
-        print("-----------------------------")
+        print(result)
