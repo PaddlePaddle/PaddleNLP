@@ -35,7 +35,7 @@ from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UNIMOPretrainedModel, BartPretrainedModel,
                                     GPTPretrainedModel, MBartPretrainedModel)
 
-from .utils import weight_channel_wise_quantize, weight_COL4_4R2_8C_channel_wise_quantize
+from .utils import weight_channel_wise_quantize, weight_COL_channel_wise_quantize
 
 
 class FasterTransformer(TransformerModel):
@@ -325,8 +325,9 @@ class FasterTransformer(TransformerModel):
 
             if self.sm >= 75:
                 quantize_function = partial(
-                    weight_COL4_4R2_8C_channel_wise_quantize,
-                    use_fp16_decoding=self.use_fp16_decoding)
+                    weight_COL_channel_wise_quantize,
+                    use_fp16_decoding=self.use_fp16_decoding,
+                    sm=self.sm)
             else:
                 quantize_function = partial(
                     weight_channel_wise_quantize,
