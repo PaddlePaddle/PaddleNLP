@@ -134,8 +134,7 @@ class TestPretrainedFromPretrained(CpuCommonTest):
         self.assertTrue(
             os.path.exists(os.path.join(cache_dir, model.model_config_file)))
 
-        # TODO(wj-Mcat): make this test code pass
-        # from pretrained from the dir
+        # load model from the cache dir
         PretrainedModelClass.from_pretrained(cache_dir)
 
         # remove the cache model file
@@ -160,8 +159,7 @@ class TestPretrainedFromPretrained(CpuCommonTest):
             self.assertTrue(
                 os.path.exists(os.path.join(cache_dir, resource_file_name)))
 
-        # TODO(wj-Mcat): make this test code pass
-        # from_pretrained from the dir
+        # load tokenizer from cache dir
         PretrainedTokenzierClass.from_pretrained(cache_dir)
 
         # remove the cache model file
