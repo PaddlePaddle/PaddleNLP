@@ -71,8 +71,8 @@ private:
 
 
   // // Encodes trie_blob and normalized string and return compiled blob.
-  // static std::string EncodePrecompiledCharsMap(absl::string_view trie_blob,
-  //                                              absl::string_view normalized);
+  static std::string EncodePrecompiledCharsMap(const std::string& trie_blob,
+                                               const std::string& normalized);
 
   // Decodes blob into trie_blob and normalized string.
   static void DecodePrecompiledCharsMap(const char* blob,
@@ -86,6 +86,8 @@ private:
   std::unique_ptr<Darts::DoubleArray> trie_;
 
   const char* normalized_ = nullptr;
+  std::string normalized_blob_;
+  std::string trie_blob_;
 
   // Prefix matcher;
   const PrefixMatcher* matcher_ = nullptr;

@@ -143,6 +143,16 @@ public:
   }
 };
 
+class PyPrecompiledNormalizer : public normalizers::PrecompiledNormalizer {
+public:
+  using PrecompiledNormalizer::PrecompiledNormalizer;
+  virtual void operator()(
+      normalizers::NormalizedString* mut_str) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, PrecompiledNormalizer, "__call__", operator(), mut_str);
+  }
+};
+
 void BindNormalizers(pybind11::module* m) {
   auto submodule = m->def_submodule("normalizers", "The normalizers module");
   py::class_<normalizers::NormalizedString>(submodule, "NormalizedString")
@@ -417,6 +427,19 @@ void BindNormalizers(pybind11::module* m) {
         nlohmann::json j = self;
         return j.dump();
       });
+  py::class_<normalizers::PrecompiledNormalizer, PyPrecompiledNormalizer>(
+      submodule, "PrecompiledNormalizer")
+      .def(py::init<>())
+      .def(py::init<const std::string&>(), py::arg("precompiled_charsmap"))
+      .def("normalize_str",
+           [](const normalizers::PrecompiledNormalizer& self,
+              const std::string& str) {
+             normalizers::NormalizedString normalized(str);
+             self(&normalized);
+             return normalized.GetStr();
+           },
+           py::arg("sequence"))
+      .def("__call__", &normalizers::PrecompiledNormalizer::operator());
 }
 
 }  // pybind

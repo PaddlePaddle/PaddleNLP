@@ -13,12 +13,48 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "normalizers/precompiled.h"
+#include <iomanip>
+#include <sstream>
+#include "glog/logging.h"
 
 namespace tokenizers {
 namespace normalizers {
 
-void PrecompiledNormalizer::operator()(
-    NormalizedString* mut_str) const {}
+PrecompiledNormalizer::PrecompiledNormalizer(
+    const std::string& precompiled_charsmap) {
+  SetPrecompiledCharsMap(precompiled_charsmap);
+}
+
+static std::string GetByteFromString(const std::string& str) {
+  std::ostringstream oss;
+  oss << std::hex << std::setfill('0');
+  for (int i = 0; i < str.length(); ++i) {
+    oss << "\\x" << std::setw(2) << (static_cast<int>(str[i]) & 0xFF);
+  }
+  return oss.str();
+}
+
+void PrecompiledNormalizer::SetPrecompiledCharsMap(
+    const std::string& precompiled_charsmap) {
+  sentencepiece_normalizer_ = std::unique_ptr<utils::Normalizer>(
+      new utils::Normalizer(precompiled_charsmap));
+}
+
+void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {
+  std::string normalized;
+  std::vector<size_t> norm_to_orig;
+  sentencepiece_normalizer_->Normalize(mut_str->GetStr().data(),
+                                       mut_str->GetStr().length(),
+                                       &normalized,
+                                       &norm_to_orig);
+  // mut_str->UpdateNormalized();
+}
+
+void to_json(nlohmann::json& j,
+             const PrecompiledNormalizer& replace_normalizer) {}
+
+void from_json(const nlohmann::json& j,
+               PrecompiledNormalizer& replace_normalizer) {}
 
 }  // normalizers
 }  // tokenizers

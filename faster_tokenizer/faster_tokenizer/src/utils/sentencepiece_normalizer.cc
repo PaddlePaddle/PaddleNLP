@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include "utils/sentencepiece_normalizer.h"
+#include "glog/logging.h"
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
@@ -78,28 +79,26 @@ Normalizer::~Normalizer() {}
 
 void Normalizer::Init() {
   if (!precompiled_charsmap_.empty()) {
-    std::string trie_blob, normalized;
 #ifdef IS_BIG_ENDIAN
     DecodePrecompiledCharsMap(precompiled_charsmap_.data(),
                               precompiled_charsmap_.length(),
-                              &trie_blob,
-                              &normalized,
+                              &trie_blob_,
+                              &normalized_blob_,
                               &precompiled_charsmap_buffer_);
 #else
     DecodePrecompiledCharsMap(precompiled_charsmap_.data(),
                               precompiled_charsmap_.length(),
-                              &trie_blob,
-                              &normalized);
+                              &trie_blob_,
+                              &normalized_blob_);
 #endif
     // Reads the body of double array.
     trie_ = std::unique_ptr<Darts::DoubleArray>(new Darts::DoubleArray());
 
     // The second arg of set_array is not the size of blob,
     // but the number of double array units.
-    trie_->set_array(const_cast<char*>(trie_blob.data()),
-                     trie_blob.size() / trie_->unit_size());
-
-    normalized_ = normalized.data();
+    trie_->set_array(const_cast<char*>(trie_blob_.data()),
+                     trie_blob_.size() / trie_->unit_size());
+    normalized_ = normalized_blob_.data();
   }
 }
 
@@ -109,6 +108,7 @@ void Normalizer::DecodePrecompiledCharsMap(const char* blob,
                                            std::string* normalized,
                                            std::string* buffer) {
   uint32_t trie_blob_size = 0;
+  uint32_t offset = 0;
   if (blob_size <= sizeof(trie_blob_size) ||
       !DecodePOD<uint32_t>(blob, sizeof(trie_blob_size), &trie_blob_size) ||
       trie_blob_size >= blob_size) {
@@ -120,16 +120,34 @@ void Normalizer::DecodePrecompiledCharsMap(const char* blob,
   if (trie_blob_size >= blob_size) {
     throw std::runtime_error("Trie data size exceeds the input blob size.");
   }
+  offset += sizeof(trie_blob_size);
 #ifdef IS_BIG_ENDIAN
-  buffer->assign(blob.data(), trie_blob_size);
+  buffer->assign(blob + offset, trie_blob_size);
   uint32* data = reinterpret_cast<uint32*>(const_cast<char*>(buffer->data()));
   for (int i = 0; i < trie_blob_size / 4; ++i) data[i] = util::Swap32(data[i]);
   *trie_blob = std::string(buffer->data(), trie_blob_size);
 #else
-  *trie_blob = std::string(blob, trie_blob_size);
+  *trie_blob = std::string(blob + offset, trie_blob_size);
 #endif
-  *normalized = std::string(blob + sizeof(trie_blob_size),
-                            blob_size - sizeof(trie_blob_size));
+  offset += trie_blob_size;
+  *normalized = std::string(blob + offset, blob_size - offset);
+}
+
+std::string Normalizer::EncodePrecompiledCharsMap(
+    const std::string& trie_blob, const std::string& normalized) {
+  // <trie size(4byte)><double array trie><normalized string>
+  std::string blob;
+  blob.append(EncodePOD<uint32_t>(trie_blob.size()));
+  blob.append(trie_blob.data(), trie_blob.size());
+  blob.append(normalized.data(), normalized.size());
+
+#ifdef IS_BIG_ENDIAN
+  uint32* data = reinterpret_cast<uint32*>(const_cast<char*>(blob.data()));
+  for (int i = 0; i <= trie_blob.size() / 4; ++i) {
+    data[i] = util::Swap32(data[i]);
+  }
+#endif
+  return blob;
 }
 
 std::pair<const char*, int> Normalizer::NormalizePrefix(
@@ -154,7 +172,6 @@ std::pair<const char*, int> Normalizer::NormalizePrefix(
     // 0.5kByte in stack, which is less than default stack frames (16kByte).
     Darts::DoubleArray::result_pair_type
         trie_results[Normalizer::kMaxTrieResultsSize];
-
     const size_t num_nodes = trie_->commonPrefixSearch(
         input, trie_results, Normalizer::kMaxTrieResultsSize, input_len);
 
@@ -169,7 +186,7 @@ std::pair<const char*, int> Normalizer::NormalizePrefix(
 
   if (longest_length == 0) {
     size_t length = 0;
-    if (IsValidDecodeUTF8(input, input + input_len, &length)) {
+    if (!IsValidDecodeUTF8(input, input + input_len, &length)) {
       // Found a malformed utf8.
       // The rune is set to be 0xFFFD (REPLACEMENT CHARACTER),
       // which is a valid Unicode of three bytes in utf8,
@@ -185,7 +202,7 @@ std::pair<const char*, int> Normalizer::NormalizePrefix(
     result.second = longest_length;
     // No need to pass the size of normalized sentence,
     // since |normalized| is delimitered by "\0".
-    result.first = &normalized_[longest_value];
+    result.first = &(normalized_[longest_value]);
   }
   return result;
 }

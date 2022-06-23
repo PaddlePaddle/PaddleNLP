@@ -192,6 +192,15 @@ inline bool DecodePOD(const char* str, size_t str_len, T* result) {
   return true;
 }
 
+
+template <typename T>
+inline std::string EncodePOD(const T& value) {
+  std::string s;
+  s.resize(sizeof(T));
+  memcpy(const_cast<char*>(s.data()), &value, sizeof(T));
+  return s;
+}
+
 inline size_t OneCharLen(const char* src) {
   return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
 }
