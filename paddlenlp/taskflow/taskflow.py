@@ -348,6 +348,6 @@ class Taskflow(object):
 
     def set_schema(self, schema):
         assert self.task_instance.model in [
-            "uie-base", "uie-tiny", "uie-medical-base"
+            "uie-base", "uie-tiny", "uie-medical-base", "wordtag"
         ], 'This method can only used for the task with uie model.'
         self.task_instance.set_schema(schema)

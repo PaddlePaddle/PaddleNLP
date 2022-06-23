@@ -323,6 +323,8 @@ class GPTTokenizer(PretrainedTokenizer):
     gpt_merges_link = "http://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
+            "gpt3-175B-en": gpt_vocab_link,
+            "gpt3-89B-en": gpt_vocab_link,
             "gpt3-13B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
             "gpt2-xl-en": gpt_vocab_link,
@@ -332,6 +334,8 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-small-en": gpt_vocab_link,
         },
         "merges_file": {
+            "gpt3-175B-en": gpt_merges_link,
+            "gpt3-89B-en": gpt_merges_link,
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
             "gpt2-xl-en": gpt_merges_link,
@@ -342,6 +346,8 @@ class GPTTokenizer(PretrainedTokenizer):
         }
     }
     pretrained_init_configuration = {
+        "gpt3-175B-en": {},
+        "gpt3-89B-en": {},
         "gpt3-13B-en": {},
         "gpt3-1.3B-en": {},
         "gpt2-xl-en": {},
@@ -513,5 +519,10 @@ class GPTTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name, None)
+            if source_path is None:
+                continue
+
             save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(getattr(self, "_%s" % name), save_path)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)

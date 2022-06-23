@@ -16,3 +16,4 @@ limitations under the License. */
 
 #include "postprocessors/bert.h"
 #include "postprocessors/postprocessor.h"
+#include "postprocessors/template.h"
