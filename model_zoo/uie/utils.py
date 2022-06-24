@@ -356,6 +356,7 @@ def convert_ext_examples(raw_examples,
                     relation_mode = True
                 text = items["data"]
                 entities = []
+                relations = []
                 if not relation_mode:
                     # Export file in JSONL format which doccano < 1.7.0
                     # e.g. {"data": "", "label": [ [0, 2, "ORG"], ... ]}
@@ -371,16 +372,12 @@ def convert_ext_examples(raw_examples,
                 else:
                     # Export file in JSONL format for relation labeling task which doccano < 1.7.0
                     # e.g. {"data": "", "label": {"relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}}
-                    for item in items["label"]["entities"]:
-                        entity = {
-                            "id": entity_id,
-                            "start_offset": item["start_offset"],
-                            "end_offset": item["end_offset"],
-                            "label": item["label"]
-                        }
-                        entities.append(entity)
-                        entity_id += 1
-                relations = []
+                    entities.extend(
+                        [entity for entity in items["label"]["entities"]])
+                    if "relations" in items["label"].keys():
+                        relations.extend([
+                            relation for relation in items["label"]["relations"]
+                        ])
             else:
                 # Export file in JSONL format which doccano >= 1.7.0
                 # e.g. {"text": "", "label": [ [0, 2, "ORG"], ... ]}

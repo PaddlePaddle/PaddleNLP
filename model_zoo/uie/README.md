@@ -390,7 +390,7 @@ schema = ['出发地', '目的地', '费用', '时间']
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
-    --task_type "ext" \
+    --task_type ext \
     --save_dir ./data \
     --splits 0.1 0.9 0
 ```
@@ -423,18 +423,18 @@ python doccano.py \
 
 ```shell
 python finetune.py \
-    --train_path "./data/train.txt" \
-    --dev_path "./data/dev.txt" \
-    --save_dir "./checkpoint" \
+    --train_path ./data/train.txt \
+    --dev_path ./data/dev.txt \
+    --save_dir ./checkpoint \
     --learning_rate 1e-5 \
     --batch_size 16 \
     --max_seq_len 512 \
     --num_epochs 100 \
-    --model "uie-base" \
+    --model uie-base \
     --seed 1000 \
     --logging_steps 10 \
     --valid_steps 100 \
-    --device "gpu"
+    --device gpu
 ```
 
 可配置参数说明：
@@ -458,14 +458,39 @@ python finetune.py \
 
 ```shell
 python evaluate.py \
-    --model_path "./checkpoint/model_best" \
-    --test_path "./data/dev.txt" \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
     --batch_size 16 \
-    --max_seq_len 512 \
-    --separated
+    --max_seq_len 512
 ```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
+
+可开启`debug`模式对每个类别分别评估：
+
+```shell
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --debug
+```
+
+输出打印示例：
+
+```text
+[2022-06-23 08:25:23,017] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,017] [    INFO] - Class name: 时间
+[2022-06-23 08:25:23,018] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
+[2022-06-23 08:25:23,145] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,146] [    INFO] - Class name: 目的地
+[2022-06-23 08:25:23,146] [    INFO] - Evaluation precision: 0.64286 | recall: 0.90000 | F1: 0.75000
+[2022-06-23 08:25:23,272] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,273] [    INFO] - Class name: 费用
+[2022-06-23 08:25:23,273] [    INFO] - Evaluation precision: 0.11111 | recall: 0.10000 | F1: 0.10526
+[2022-06-23 08:25:23,399] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,399] [    INFO] - Class name: 出发地
+[2022-06-23 08:25:23,400] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
+```
 
 可配置参数说明：
 
@@ -474,7 +499,7 @@ python evaluate.py \
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
-- `separated`: 是否对每个类别分别进行评估，默认关闭。
+- `debug`: 是否开启debug模式对每个类别分别进行评估，默认关闭。
 
 #### 定制模型一键预测
 
@@ -551,7 +576,7 @@ python evaluate.py \
   将训练后的动态图参数导出为静态图参数：
 
   ```shell
-  python export_model.py --model_path=./checkpoint/model_best --output_path=./export
+  python export_model.py --model_path ./checkpoint/model_best --output_path ./export
   ```
 
   可配置参数说明：

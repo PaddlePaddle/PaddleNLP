@@ -60,23 +60,20 @@ def do_eval():
                            max_seq_len=args.max_seq_len,
                            lazy=False)
     class_dict = {}
-    if args.separated:
+    if args.debug:
         for data in test_ds:
             class_dict.setdefault(data['prompt'], []).append(data)
     else:
-        class_dict["All classes"] = test_ds
-
+        class_dict["all_classes"] = test_ds
     for key in class_dict.keys():
-        if args.separated:
+        if args.debug:
             test_ds = MapDataset(class_dict[key])
         else:
             test_ds = class_dict[key]
-
         test_ds = test_ds.map(
             partial(convert_example,
                     tokenizer=tokenizer,
                     max_seq_len=args.max_seq_len))
-
         test_batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
                                                     batch_size=args.batch_size,
                                                     shuffle=False)
@@ -86,8 +83,8 @@ def do_eval():
         metric = SpanEvaluator()
         precision, recall, f1 = evaluate(model, metric, test_data_loader)
         logger.info("-----------------------------")
-        logger.info("Class name: %s" % key)
-        logger.info("Evaluation precision: %.5f | recall: %.5f | F1: %.5f" %
+        logger.info("Class Name: %s" % key)
+        logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
                     (precision, recall, f1))
 
 
@@ -99,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--separated", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
+    parser.add_argument("--debug", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
 
     args = parser.parse_args()
     # yapf: enable
