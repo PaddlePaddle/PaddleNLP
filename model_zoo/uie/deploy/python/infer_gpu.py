@@ -47,6 +47,10 @@ def parse_args():
         help=
         "The maximum input sequence length. Sequences longer than this will be split automatically.",
     )
+    parser.add_argument("--batch_size",
+                        default=4,
+                        type=int,
+                        help="Batch size per GPU for inference.")
     args = parser.parse_args()
     return args
 
