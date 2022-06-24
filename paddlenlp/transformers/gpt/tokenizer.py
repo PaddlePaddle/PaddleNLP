@@ -389,7 +389,9 @@ class GPTTokenizer(PretrainedTokenizer):
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 
-        self.encoder = json.load(open(vocab_file))
+        with open(vocab_file, 'r', encoding='utf-8') as f:
+            self.encoder = json.load(f)
+
         self.decoder = {v: k for k, v in self.encoder.items()}
 
         self.num_tokens = len(self.encoder)
@@ -397,7 +399,10 @@ class GPTTokenizer(PretrainedTokenizer):
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-        bpe_data = open(merges_file, encoding='utf-8').read().split('\n')[1:-1]
+
+        with open(merges_file, encoding='utf-8') as f:
+            bpe_data = f.read().split('\n')[1:-1]
+
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
@@ -519,9 +524,7 @@ class GPTTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
-            source_path = getattr(self, "_%s" % name, None)
-            if source_path is None:
-                continue
+            source_path = getattr(self, "_%s" % name)
 
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
