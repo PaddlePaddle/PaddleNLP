@@ -69,7 +69,8 @@ def _transformer_encoder_fwd(self,
     output = src
     new_caches = [] if cache is not None else None
     all_attentions = [] if output_attentions else None
-    all_hidden_states = [] if output_hidden_states else None
+    # NOTE: Also includes embeding output which is same as HF.
+    all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
         layer_outputs = mod(output,
                             src_mask=src_mask,
@@ -93,15 +94,16 @@ def _transformer_encoder_fwd(self,
         output = self.norm(output)
 
         if output_hidden_states:
-            all_hidden_states.append(output)
+            all_hidden_states[-1] = output
 
     if not return_dict:
-        outputs = tuple(v for v in [
-            output,
-            new_caches,
-            all_hidden_states,
-            all_attentions,
-        ] if v is not None)
+        outputs = tuple(
+            tuple(v) if isinstance(v, list) else v for v in [
+                output,
+                new_caches,
+                all_hidden_states,
+                all_attentions,
+            ] if v is not None)
         if len(outputs) == 1:
             return output
         else:
