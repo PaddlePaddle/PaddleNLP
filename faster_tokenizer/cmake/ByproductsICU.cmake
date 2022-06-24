@@ -30,8 +30,7 @@ function(GetICUByproducts ICU_PATH ICU_LIB_VAR ICU_INCLUDE_VAR ICU_BASE_NAMES_VA
         set(ICU_STATIC_SUFFIX ".a")
     else()
         # unix basenames and pre/suffixes
-        set(ICU_LIB_BASE_NAMES data i18n io tu uc)
-        
+        set(ICU_LIB_BASE_NAMES i18n data uc io tu)
         set(ICU_SHARED_PREFIX ${CMAKE_SHARED_LIBRARY_PREFIX})
         set(ICU_STATIC_PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX})
         set(ICU_SHARED_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
