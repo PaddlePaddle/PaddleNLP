@@ -31,6 +31,28 @@ struct Cstrless {
   }
 };
 
+struct simple_string_view {
+  const char* ptr_;
+  size_t offset_;
+  size_t size_;
+  explicit simple_string_view(const char* ptr = nullptr)
+      : ptr_(ptr), offset_(0), size_(0) {
+    while (ptr_ && ptr_[size_] != '\0') {
+      size_++;
+    }
+  }
+  simple_string_view(const char* ptr, size_t size) : ptr_(ptr), size_(size) {}
+
+  const char* data() {
+    if (!ptr_) {
+      return ptr_ + offset_;
+    }
+    return ptr_;
+  }
+  size_t size() { return size_; }
+  bool empty() { return size_ == 0; }
+};
+
 class PrefixMatcher {
 public:
   // Initializes the PrefixMatcher with `dic`.
@@ -66,8 +88,8 @@ public:
 
 private:
   void Init();
-  std::pair<const char*, int> NormalizePrefix(const char* input,
-                                              size_t input_len) const;
+  std::pair<simple_string_view, int> NormalizePrefix(const char* input,
+                                                     size_t input_len) const;
 
 
   // // Encodes trie_blob and normalized string and return compiled blob.

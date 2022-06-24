@@ -14,9 +14,11 @@
 // limitations under the License.
 
 #include "utils/sentencepiece_normalizer.h"
-#include "glog/logging.h"
+#include <algorithm>
 #include "utils/utf8.h"
 #include "utils/utils.h"
+
+#include "glog/logging.h"
 
 namespace tokenizers {
 namespace utils {
@@ -150,9 +152,9 @@ std::string Normalizer::EncodePrecompiledCharsMap(
   return blob;
 }
 
-std::pair<const char*, int> Normalizer::NormalizePrefix(
+std::pair<simple_string_view, int> Normalizer::NormalizePrefix(
     const char* input, size_t input_len) const {
-  std::pair<const char*, int> result;
+  std::pair<simple_string_view, int> result;
   if (input_len == 0) {
     return result;
   }
@@ -160,7 +162,7 @@ std::pair<const char*, int> Normalizer::NormalizePrefix(
     bool found = false;
     const int mblen = matcher_->PrefixMatch(input, input_len, &found);
     if (found) {
-      return std::make_pair(input, mblen);
+      return std::make_pair(simple_string_view(input, input_len), mblen);
     }
   }
   size_t longest_length = 0;
@@ -193,16 +195,16 @@ std::pair<const char*, int> Normalizer::NormalizePrefix(
       // but here we only consume one byte.
       result.second = 1;
       static const char kReplacementChar[] = "\xEF\xBF\xBD";
-      result.first = kReplacementChar;
+      result.first = simple_string_view(kReplacementChar);
     } else {
       result.second = length;
-      result.first = input;
+      result.first = simple_string_view(input, length);
     }
   } else {
     result.second = longest_length;
     // No need to pass the size of normalized sentence,
     // since |normalized| is delimitered by "\0".
-    result.first = &(normalized_[longest_value]);
+    result.first = simple_string_view(&(normalized_[longest_value]));
   }
   return result;
 }
@@ -226,10 +228,10 @@ void Normalizer::Normalize(const char* input,
   while (curr_idx < input_len) {
     size_t curr_len = input_len - curr_idx;
     auto p = NormalizePrefix(input + curr_idx, curr_len);
-    const char* sp = p.first;
-    if (p.second > 0) {
-      for (size_t n = 0; n < p.second; ++n) {
-        *normalized += sp[n];
+    simple_string_view sp = p.first;
+    if (!sp.empty()) {
+      for (size_t n = 0; n < sp.size(); ++n) {
+        *normalized += sp.data()[n];
         norm_to_orig->push_back(consumed);
       }
     }
