@@ -36,6 +36,7 @@ from paddlenlp.utils.log import logger
 import paddlenlp.ops as ops
 
 from paddle.distributed import init_parallel_env
+from paddle.static.amp import AutoMixedPrecisionLists
 
 from modeling import GPTModel, GPTForPretraining, GPTForGeneration
 
@@ -129,6 +130,25 @@ def do_generation(args):
         "tensor_parallel_degree": args.mp_degree
     }
 
+    white_list = [
+        'softmax', 'layer_norm', 'gelu', 'fused_softmax_mask_upper_triangle',
+        'elementwise_add'
+    ]
+    black_list = [
+        'reduce_sum', 'c_softmax_with_cross_entropy', 'elementwise_div'
+    ]
+
+    if args.use_amp:
+        strategy.amp = True
+        strategy.amp_configs = {
+            "custom_white_list": white_list,
+            "custom_black_list": black_list,
+            "init_loss_scaling": 32768,
+            "use_dynamic_loss_scaling": True,
+            "use_pure_fp16": args.amp_level == "O2",
+            "use_fp16_guard": False
+        }
+
     fleet.init(is_collective=True, strategy=strategy)
 
     # temp use dynamic init, use HybridParallelInferenceHelper in future?
@@ -219,6 +239,30 @@ def do_generation(args):
                 model.eval()
                 ins = {v.name: v for v in feeds}
                 preds = model(ins)
+
+            if args.use_amp:
+                amp_lists = AutoMixedPrecisionLists(
+                    custom_white_list=set(white_list),
+                    custom_black_list=set(black_list))
+                # Cast model with while loop to fp16
+                from utils.fp16_util import cast_model_to_fp16_block
+                fp16_var_names = cast_model_to_fp16_block(
+                    main_program, amp_lists, False)
+
+                # Change parameters' and ops' dtype to fp16, or will cause OOM while running
+                # startup program
+                block = startup_program.block(0)
+                for var_name in fp16_var_names:
+                    var = block.var(var_name)
+                    block._remove_var(var_name, sync=False)
+                    cast_var = block.create_var(name=var_name,
+                                                dtype='float16',
+                                                shape=var.shape,
+                                                persistable=True)
+                    for op in block.ops:
+                        for out_name in op.output_arg_names:
+                            if out_name == var_name:
+                                op._set_attr("dtype", paddle.float16)
 
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
