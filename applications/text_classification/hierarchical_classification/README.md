@@ -31,11 +31,15 @@
 ```text
 hierarchical_classification/
 ├── deploy # 部署
-│   └── onnxruntime
-│   │   ├── infer.py # onnxruntime推理部署示例
+│   └── onnxruntime # 导出ONNX模型并基于ONNXRuntime部署
+│   │   ├── infer.py # ONNXRuntime推理部署示例
 │   │   ├── predictor.py
 │   │   └── README.md # 使用说明
-│   └── triton
+│   ├── serving # 基于Paddle Serving 部署
+│   │   ├──config.yml # 层次分类任务启动服务端的配置文件
+│   │   ├──rpc_client.py # 层次分类任务发送pipeline预测请求的脚本
+│   │   └──service.py # 层次分类任务启动服务端的脚本
+│   └── triton # 基于Triton server 部署
 │       ├── README.md # 使用说明
 │       ├── seqcls_grpc_client.py # 客户端测试代码
 │       └── models # 部署模型

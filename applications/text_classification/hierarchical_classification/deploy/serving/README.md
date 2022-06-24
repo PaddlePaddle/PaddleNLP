@@ -67,6 +67,7 @@ serving_server/
 serving目录包含启动pipeline服务和发送预测请求的代码和模型，包括：
 
 ```
+serving/
 ├──serving_server
 │  ├── float32.pdiparams
 │  ├── float32.pdmodel
