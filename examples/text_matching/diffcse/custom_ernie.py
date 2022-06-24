@@ -648,7 +648,8 @@ class ErnieModel(ErniePretrainedModel):
                                            task_type_ids=task_type_ids)
 
         if cls_input is not None:
-            embedding_output = paddle.concat([cls_input.unsqueeze(1), embedding_output[:, 1:, :]], axis=1)
+            embedding_output = paddle.concat(
+                [cls_input.unsqueeze(1), embedding_output[:, 1:, :]], axis=1)
 
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import time
 import random
@@ -32,7 +31,6 @@ from model import DiffCSE, Extractor
 from utils import set_seed
 from eval_metrics import eval_metrics
 from data import read_text_single, read_text_pair, convert_example, create_dataloader, word_repetition
-
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -69,7 +67,9 @@ args = parser.parse_args()
 
 
 def do_infer(model, tokenizer, data_loader):
-    assert isinstance(model, Extractor), "please make sure that model is instance of Extractor."
+    assert isinstance(
+        model,
+        Extractor), "please make sure that model is instance of Extractor."
     sims = []
     model.eval()
     with paddle.no_grad():
@@ -82,7 +82,7 @@ def do_infer(model, tokenizer, data_loader):
                 key_token_type_ids=key_token_type_ids,
                 query_attention_mask=query_attention_mask,
                 key_attention_mask=key_attention_mask,
-                )
+            )
             sims.append(cosine_sim.numpy())
         sims = np.concatenate(sims, axis=0)
     model.train()
@@ -90,7 +90,9 @@ def do_infer(model, tokenizer, data_loader):
 
 
 def do_eval(model, tokenizer, data_loader):
-    assert isinstance(model, Extractor), "please make sure that model is instance of Extractor."
+    assert isinstance(
+        model,
+        Extractor), "please make sure that model is instance of Extractor."
     total_num = 0
     spearman_corr = 0.0
     sims = []
@@ -107,7 +109,7 @@ def do_eval(model, tokenizer, data_loader):
                 key_token_type_ids=key_token_type_ids,
                 query_attention_mask=query_attention_mask,
                 key_attention_mask=key_attention_mask,
-                )
+            )
             sims.append(cosine_sim.numpy())
             labels.append(label.numpy())
 
@@ -118,28 +120,27 @@ def do_eval(model, tokenizer, data_loader):
     return eval_res, total_num
 
 
-
 def do_train(model, tokenizer, train_data_loader, dev_data_loader):
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(
+        train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(
-        args.learning_rate,
-        num_training_steps,
-        args.warmup_proportion
-    )
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
+                                         args.warmup_proportion)
 
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    decay_params = [
+        p.name for n, p in model.named_parameters()
+        if not any(nd in n for nd in ["bias", "norm"])
+    ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params
-    )
+        apply_decay_param_fun=lambda x: x in decay_params)
 
     global_step = 0
     best_spearman = 0.0
     best_pre_rec = 0.0
-    best_rec95 = 0.0 
+    best_rec95 = 0.0
     tic_train = time.time()
     model = paddle.DataParallel(model)
     model.train()
@@ -147,76 +148,106 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask = batch
 
-            if(args.dup_rate > 0):
-                query_input_ids, query_token_type_ids = word_repetition(query_input_ids, query_token_type_ids, args.dup_rate)
-                key_input_ids, key_token_type_ids = word_repetition(key_input_ids, key_token_type_ids, args.dup_rate)
+            if (args.dup_rate > 0):
+                query_input_ids, query_token_type_ids = word_repetition(
+                    query_input_ids, query_token_type_ids, args.dup_rate)
+                key_input_ids, key_token_type_ids = word_repetition(
+                    key_input_ids, key_token_type_ids, args.dup_rate)
 
-            loss = model(
-                query_input_ids,
-                key_input_ids,
-                query_token_type_ids=query_token_type_ids,
-                key_token_type_ids=key_token_type_ids,
-                query_attention_mask=query_attention_mask,
-                key_attention_mask=key_attention_mask,
-                cls_token=tokenizer.cls_token_id
-            )
+            loss = model(query_input_ids,
+                         key_input_ids,
+                         query_token_type_ids=query_token_type_ids,
+                         key_token_type_ids=key_token_type_ids,
+                         query_attention_mask=query_attention_mask,
+                         key_attention_mask=key_attention_mask,
+                         cls_token=tokenizer.cls_token_id)
 
             global_step += 1
             if global_step % (args.eval_steps // 10) == 0 and rank == 0:
-                print("global step {}, epoch: {}, batch: {}, loss: {:.5f}, speed: {:.2f} step/s".format(global_step, epoch, step, loss.item(), (args.eval_steps // 10) / (time.time() - tic_train)))
+                print(
+                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, speed: {:.2f} step/s"
+                    .format(global_step, epoch, step, loss.item(),
+                            (args.eval_steps // 10) /
+                            (time.time() - tic_train)))
                 tic_train = time.time()
 
             if global_step % args.eval_steps == 0 and rank == 0:
-                eval_res, total_num = do_eval(model._layers.extractor, tokenizer, dev_data_loader)
+                eval_res, total_num = do_eval(model._layers.extractor,
+                                              tokenizer, dev_data_loader)
                 spearman = eval_res["spearman_corr"]
                 if best_spearman < spearman:
-                    print("best checkpoint has been updated: from last best_spearman {} --> new spearman {}.".format(best_spearman, spearman))
+                    print(
+                        "best checkpoint has been updated: from last best_spearman {} --> new spearman {}."
+                        .format(best_spearman, spearman))
                     best_spearman = spearman
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_spearman")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(), save_param_path)
+                    save_param_path = os.path.join(save_dir,
+                                                   "model_state.pdparams")
+                    paddle.save(model._layers.extractor.state_dict(),
+                                save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
-                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(batch))
+                    with open(os.path.join(save_dir, "best_step.txt"),
+                              "w",
+                              encoding="utf-8") as f:
+                        f.write(
+                            str(global_step) + " " + str(epoch) + " " +
+                            str(batch))
 
                 pre_rec = eval_res["best_pre_rec_thr"][0]
                 if best_pre_rec < pre_rec:
-                    print("best checkpoint has been updated: from last best_pre_rec {} --> new pre_rec {}.".format(best_pre_rec, pre_rec))
+                    print(
+                        "best checkpoint has been updated: from last best_pre_rec {} --> new pre_rec {}."
+                        .format(best_pre_rec, pre_rec))
                     best_pre_rec = pre_rec
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_pre_rec")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(), save_param_path)
+                    save_param_path = os.path.join(save_dir,
+                                                   "model_state.pdparams")
+                    paddle.save(model._layers.extractor.state_dict(),
+                                save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
-                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(batch))
-                
+                    with open(os.path.join(save_dir, "best_step.txt"),
+                              "w",
+                              encoding="utf-8") as f:
+                        f.write(
+                            str(global_step) + " " + str(epoch) + " " +
+                            str(batch))
+
                 rec95 = eval_res["best_pre_rec_thr_at_K"][1]
                 if best_rec95 < rec95:
-                    print("best checkpoint has been updated: from last best_rec95 {} --> new rec95 {}.".format(best_rec95, rec95))
+                    print(
+                        "best checkpoint has been updated: from last best_rec95 {} --> new rec95 {}."
+                        .format(best_rec95, rec95))
                     best_rec95 = rec95
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_rec95")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(), save_param_path)
+                    save_param_path = os.path.join(save_dir,
+                                                   "model_state.pdparams")
+                    paddle.save(model._layers.extractor.state_dict(),
+                                save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
-                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(batch))
+                    with open(os.path.join(save_dir, "best_step.txt"),
+                              "w",
+                              encoding="utf-8") as f:
+                        f.write(
+                            str(global_step) + " " + str(epoch) + " " +
+                            str(batch))
                 model.train()
-                
+
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "checkpoint_{}".format(global_step))
+                save_dir = os.path.join(args.save_dir,
+                                        "checkpoint_{}".format(global_step))
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
@@ -240,20 +271,23 @@ if __name__ == "__main__":
         os.makedirs(args.save_dir)
 
     # define token for processing data
-    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.extractor_name)
+    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(
+        args.extractor_name)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length
-    )
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     if args.mode == "train":
         start_time = time.time()
         # intializing DiffCSE model
         model = DiffCSE(args, tokenizer)
-        train_ds = load_dataset(read_text_single, data_path=args.train_set_file, lazy=False)
-        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
+        train_ds = load_dataset(read_text_single,
+                                data_path=args.train_set_file,
+                                lazy=False)
+        dev_ds = load_dataset(read_text_pair,
+                              data_path=args.eval_set_file,
+                              lazy=False)
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -273,40 +307,42 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        train_data_loader = create_dataloader(
-            train_ds,
-            mode="train",
-            batch_size=args.batch_size,
-            batchify_fn=batchify_fn,
-            trans_fn=trans_func
-        )
-        dev_data_loader = create_dataloader(
-            dev_ds,
-            mode="eval",
-            batch_size=args.batch_size,
-            batchify_fn=dev_batchify_fn,
-            trans_fn=trans_func
-        )
+        train_data_loader = create_dataloader(train_ds,
+                                              mode="train",
+                                              batch_size=args.batch_size,
+                                              batchify_fn=batchify_fn,
+                                              trans_fn=trans_func)
+        dev_data_loader = create_dataloader(dev_ds,
+                                            mode="eval",
+                                            batch_size=args.batch_size,
+                                            batchify_fn=dev_batchify_fn,
+                                            trans_fn=trans_func)
 
         do_train(model, tokenizer, train_data_loader, dev_data_loader)
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
 
-
     if args.mode == "eval":
         start_time = time.time()
         # initalizing Extractor model for eval
-        model = Extractor(args.extractor_name, margin=args.margin, scale=args.scale, output_emb_size=args.output_emb_size)
+        model = Extractor(args.extractor_name,
+                          margin=args.margin,
+                          scale=args.scale,
+                          output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
-                print("*************************initializing model from {}*****************************".format(init_from_ckpt))
+                print(
+                    "*************************initializing model from {}*****************************"
+                    .format(init_from_ckpt))
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
+        dev_ds = load_dataset(read_text_pair,
+                              data_path=args.eval_set_file,
+                              lazy=False)
 
         dev_batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -318,33 +354,39 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        dev_data_loader = create_dataloader(
-            dev_ds,
-            mode="eval",
-            batch_size=args.batch_size,
-            batchify_fn=dev_batchify_fn,
-            trans_fn=trans_func
-        )
+        dev_data_loader = create_dataloader(dev_ds,
+                                            mode="eval",
+                                            batch_size=args.batch_size,
+                                            batchify_fn=dev_batchify_fn,
+                                            trans_fn=trans_func)
 
         eval_res, total_num = do_eval(model, tokenizer, dev_data_loader)
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
 
-    if args.mode == "infer": 
+    if args.mode == "infer":
         start_time = time.time()
         # initalizing Extractor model for eval
-        model = Extractor(args.extractor_name, margin=args.margin, scale=args.scale, output_emb_size=args.output_emb_size)
+        model = Extractor(args.extractor_name,
+                          margin=args.margin,
+                          scale=args.scale,
+                          output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
-                print("*************************initializing model from {}*****************************".format(init_from_ckpt))
+                print(
+                    "*************************initializing model from {}*****************************"
+                    .format(init_from_ckpt))
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        infer_ds = load_dataset(read_text_pair, data_path=args.infer_set_file, lazy=False, is_infer=True)
-        
+        infer_ds = load_dataset(read_text_pair,
+                                data_path=args.infer_set_file,
+                                lazy=False,
+                                is_infer=True)
+
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
@@ -354,13 +396,11 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
 
-        infer_data_loader = create_dataloader(
-            infer_ds,
-            mode="predict",
-            batch_size=args.batch_size,
-            batchify_fn=batchify_fn,
-            trans_fn=trans_func
-        )
+        infer_data_loader = create_dataloader(infer_ds,
+                                              mode="predict",
+                                              batch_size=args.batch_size,
+                                              batchify_fn=batchify_fn,
+                                              trans_fn=trans_func)
 
         cosin_sim = do_infer(model, tokenizer, infer_data_loader)
 
@@ -371,6 +411,3 @@ if __name__ == "__main__":
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
-
-        
-
