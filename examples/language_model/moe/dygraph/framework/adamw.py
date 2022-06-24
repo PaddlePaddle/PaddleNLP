@@ -16,7 +16,7 @@ from paddle.optimizer import Optimizer
 from paddle.optimizer.adam import Adam
 from paddle.framework import core
 from paddle import framework
-from paddle.framework import Variable
+from paddle.static import Variable
 from paddle.fluid.dygraph import base as imperative_base
 from collections.abc import Callable
 import paddle
@@ -290,7 +290,7 @@ class AdamW(Adam):
                 self._beta2, Variable) else self._beta2.numpy().item(0)
 
             lr = paddle.cast(lr, dtype="float32")
-            if framework.in_dygraph_mode():
+            if paddle.in_dynamic_mode():
                 found_inf = self._get_auxiliary_var('found_inf')
                 _, _, _, _, _, _ = _C_ops.final_state_adamw(
                     param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
