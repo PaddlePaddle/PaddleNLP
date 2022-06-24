@@ -11,6 +11,8 @@
        * [环境准备](#环境准备)
        * [裁剪API使用](#裁剪API使用)
        * [裁剪效果](#裁剪效果)
+   * [模型部署](#模型部署)
+
 
 ## 层次分类任务介绍
 
@@ -407,3 +409,11 @@ python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32 --da
 | ERNIE 2.0+裁剪(保留比例3/4)    | 86.83(+1.12) | 81.78(+0.96) | 6.85   |
 | ERNIE 2.0+裁剪(保留比例2/3)    | 86.74(+1.03) | 81.64(+0.82) | 5.98  |
 | ERNIE 2.0+裁剪(保留比例1/4)    | 85.79(+0.08) | 79.53(-1.29) | 2.51   |
+
+## 模型部署
+
+- Paddle2ONNX 导出 ONNX 模型及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](deploy/onnxruntime/README.md)
+
+- 基于Paddle Serving的服务化部署请参考：[基于Paddle Serving的服务化部署指南](deploy/serving/README.md)
+
+- 基于ONNXRuntime的服务化部署请参考：[基于Triton Inference Server的服务化部署指南](deploy/triton/README.md)
