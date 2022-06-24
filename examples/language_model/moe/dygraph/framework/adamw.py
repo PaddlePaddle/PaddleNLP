@@ -15,7 +15,7 @@
 from paddle.optimizer import Optimizer
 from paddle.optimizer.adam import Adam
 from paddle.framework import core
-from paddle import framework
+from paddle.fluid import framework
 from paddle.static import Variable
 from paddle.fluid.dygraph import base as imperative_base
 from collections.abc import Callable
