@@ -31,15 +31,15 @@
 ```text
 hierarchical_classification/
 ├── deploy # 部署
-│   └── onnxruntime # 导出ONNX模型并基于ONNXRuntime部署
+│   └── predictor # 导出ONNX模型并基于ONNXRuntime部署
 │   │   ├── infer.py # ONNXRuntime推理部署示例
 │   │   ├── predictor.py
 │   │   └── README.md # 使用说明
-│   ├── serving # 基于Paddle Serving 部署
+│   ├── paddle_serving # 基于Paddle Serving 部署
 │   │   ├──config.yml # 层次分类任务启动服务端的配置文件
 │   │   ├──rpc_client.py # 层次分类任务发送pipeline预测请求的脚本
 │   │   └──service.py # 层次分类任务启动服务端的脚本
-│   └── triton # 基于Triton server 部署
+│   └── triton_serving # 基于Triton server 部署
 │       ├── README.md # 使用说明
 │       ├── seqcls_grpc_client.py # 客户端测试代码
 │       └── models # 部署模型
@@ -261,14 +261,14 @@ export/
 ```
 
 
-导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/paddle2onnx/infer.py),用法详见[ONNX Runtime推理部署](./deploy/paddle2onnx/README.md)。运行方式：
+导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
 
 ```shell
 # 使用默认数据集
-python deploy/paddle2onnx/infer.py --model_path_prefix ./export/float32
+python deploy/predictor/infer.py --model_path_prefix ./export/float32
 
 # 使用本地数据集
-python deploy/paddle2onnx/infer.py --model_path_prefix ./export/float32 --data_dir "wos_data"
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --data_dir "wos_data"
 ```
 
 ## 模型裁剪
@@ -367,14 +367,14 @@ prune/
 
 3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
-导出模型之后用于部署，项目提供了[onnxruntime部署预测示例](./deploy/paddle2onnx/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/paddle2onnx.README.md)。运行方式：
+导出模型之后用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
 
 ```shell
 # 使用内置数据集
-python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.25/float32
 
 #使用本地数据集
-python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32 --data_dir "wos_data"
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.25/float32 --data_dir "wos_data"
 ```
 
 ### 裁剪效果
@@ -416,8 +416,9 @@ python deploy/paddle2onnx/infer.py --model_path_prefix ./prune/0.25/float32 --da
 
 ## 模型部署
 
-- Paddle2ONNX 导出 ONNX 模型及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](deploy/onnxruntime/README.md)
 
-- 基于Paddle Serving的服务化部署请参考：[基于Paddle Serving的服务化部署指南](deploy/serving/README.md)
+- 服务化部署请参考：[基于Paddle Serving的服务化部署指南](deploy/paddle_serving/README.md)，Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件的服务化部署
 
-- 基于ONNXRuntime的服务化部署请参考：[基于Triton Inference Server的服务化部署指南](deploy/triton/README.md)
+- ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](deploy/predictor/README.md)
+
+- 基于ONNXRuntime的服务化部署请参考：[基于Triton Inference Server的服务化部署指南](deploy/triton_serving/README.md)
