@@ -157,4 +157,4 @@ python run_diffcse.py \
 
 
 ## Reference
-[1] [1] Chuang Y S ,  Dangovski R ,  Luo H , et al. DiffCSE: Difference-based Contrastive Learning for Sentence Embeddings[J]. arXiv e-prints, 2022. https://arxiv.org/pdf/2204.10298.pdf.
+[1] Chuang Y S ,  Dangovski R ,  Luo H , et al. DiffCSE: Difference-based Contrastive Learning for Sentence Embeddings[J]. arXiv e-prints, 2022. https://arxiv.org/pdf/2204.10298.pdf.
