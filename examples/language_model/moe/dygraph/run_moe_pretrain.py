@@ -525,7 +525,6 @@ def do_train(args):
         num_files = len(files)
         for f_id in range(file_id, num_files):
             data_file = files[f_id]
-            print(tokenizer.eos_token_id)
             train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
                 args,
                 data_file,
