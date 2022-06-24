@@ -15,9 +15,9 @@
 
 import paddle
 import numpy as np
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.nn import TransformerEncoderLayer, TransformerEncoder
+from collections import OrderedDict
+from dataclasses import fields, dataclass
+from typing import Any, List, Tuple, Optional
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 
@@ -114,16 +114,6 @@ def _transformer_encoder_fwd(self,
         past_key_values=new_caches,
         hidden_states=all_hidden_states,
         attentions=all_attentions)
-
-
-import inspect
-import dataclasses
-from collections import OrderedDict, UserDict
-from collections.abc import MutableMapping
-from contextlib import ExitStack
-from dataclasses import fields, dataclass
-from enum import Enum
-from typing import Any, ContextManager, List, Tuple, Optional
 
 
 def is_tensor(x):
