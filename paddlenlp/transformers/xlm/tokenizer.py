@@ -980,10 +980,7 @@ class XLMTokenizer(PretrainedTokenizer):
             
         """
         for name, file_name in self.resource_files_names.items():
-            source_path = getattr(self, "_%s" % name, None)
-            if source_path is None:
-                continue
-
+            source_path = getattr(self, "_%s" % name)
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
                 shutil.copyfile(source_path, save_path)
