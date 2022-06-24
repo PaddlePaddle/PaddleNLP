@@ -389,8 +389,9 @@ def run(args):
                                (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    logger.info("best_result: %.2f" % (best_acc * 100))
-                    return
+                    break
+            if global_step > num_training_steps:
+                break
             tic_eval = time.time()
             acc = evaluate(model, loss_fct, dev_data_loader, metric)
             logger.info("eval acc: %.5f, eval done total : %s s" %
@@ -404,7 +405,8 @@ def run(args):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
-
+            if global_step >= num_training_steps:
+                break
         logger.info("best_result: %.2f" % (best_acc * 100))
 
     if args.do_predict:

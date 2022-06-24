@@ -136,7 +136,8 @@ class BartLearnedPositionalEmbedding(Embedding):
         positions = paddle.arange(past_key_values_length,
                                   past_key_values_length + seq_len,
                                   dtype="int64")
-        return super().forward(positions + self.offset)
+        # (gongenlei) For dygraph to static graph
+        return Embedding.forward(self, positions + self.offset)
 
 
 class BartEncoder(BartPretrainedModel):
@@ -200,7 +201,7 @@ class BartEncoder(BartPretrainedModel):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)
-        inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
+        inputs_embed_pos = self.encoder_embed_positions(paddle.shape(input_ids))
         hidden_states = inputs_embeds + inputs_embed_pos
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)
@@ -298,7 +299,7 @@ class BartDecoder(BartPretrainedModel):
         past_key_values_length = paddle.shape(
             cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
-            decoder_input_ids.shape, past_key_values_length)
+            paddle.shape(decoder_input_ids), past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
@@ -756,6 +757,8 @@ class BartForConditionalGeneration(BartPretrainedModel):
         from paddlenlp.ops import FasterBART
         decode_strategy = kwargs.get('decode_strategy')
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decoding_lib = kwargs.get('decoding_lib', None)
+        enable_faster_encoder = kwargs.get('enable_faster_encoder', True)
         if decode_strategy == 'sampling' and kwargs.get(
                 'top_k') != 0 and kwargs.get('top_p') != 1:
             raise AttributeError(
@@ -776,7 +779,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 "'forced_bos_token_id != None' is not supported yet in the faster version"
             )
         self._faster_entry = FasterBART(
-            self, use_fp16_decoding=use_fp16_decoding).forward
+            self,
+            use_fp16_decoding=use_fp16_decoding,
+            decoding_lib=decoding_lib,
+            enable_faster_encoder=enable_faster_encoder).forward
         return self._faster_entry
 
     def forward(self,
