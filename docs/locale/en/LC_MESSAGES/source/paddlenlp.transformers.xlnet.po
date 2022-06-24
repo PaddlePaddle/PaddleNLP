@@ -41,4 +41,3 @@ msgstr ""
 #: of paddlenlp.transformers.xlnet:12
 msgid "本项目是XLNet在 Paddle 2.0上的开源实现，由modeling和tokenizer两部分组成。"
 msgstr "This project is an open source implementation of XLNet on Paddle 2.0. It consists of two parts: modeling and tokenizer."
-
