@@ -63,7 +63,7 @@ def do_eval():
     if args.debug:
         for data in test_ds:
             class_name = unify_prompt_name(data['prompt'])
-            # Evaluate positive examples only in debug mode
+            # Only positive examples are evaluated in debug mode
             if len(data['result_list']) != 0:
                 class_dict.setdefault(class_name, []).append(data)
     else:
