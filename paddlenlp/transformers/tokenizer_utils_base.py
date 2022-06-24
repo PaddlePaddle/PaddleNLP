@@ -778,15 +778,20 @@ class SpecialTokensMixin:
     ]
 
     def __init__(self, verbose=True, **kwargs):
-        self._bos_token = None
-        self._eos_token = None
-        self._unk_token = None
-        self._sep_token = None
-        self._pad_token = None
-        self._cls_token = None
-        self._mask_token = None
-        self._pad_token_type_id = 0
-        self._additional_special_tokens = []
+        # note(guosheng): Since `__init__` might be called multiple times which
+        # is hooked before `PretrainedTokenizer` init, we do not set to None as
+        # HF to avoid unintentional overriding.
+        self._bos_token = getattr(self, "_bos_token", None)
+        self._eos_token = getattr(self, "_eos_token", None)
+        self._unk_token = getattr(self, "_unk_token", None)
+        self._sep_token = getattr(self, "_sep_token", None)
+        self._pad_token = getattr(self, "_pad_token", None)
+        self._cls_token = getattr(self, "_cls_token", None)
+        self._mask_token = getattr(self, "_mask_token", None)
+        self._pad_token_type_id = getattr(self, "_pad_token_type_id", 0)
+        self._additional_special_tokens = getattr(self,
+                                                  "_additional_special_tokens",
+                                                  [])
         self.verbose = verbose
 
         # We directly set the hidden value to allow initialization with special tokens
@@ -1497,8 +1502,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         vocab_files = {}
         init_configuration = {}
 
-        pretrained_models = list(cls.pretrained_init_configuration.keys())
-
         additional_files_names = {
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
@@ -1511,7 +1514,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         }
 
         # From built-in pretrained models
-        if pretrained_model_name_or_path in pretrained_models:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
@@ -1577,6 +1580,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
@@ -1689,6 +1693,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             logger.info(
                 "Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained."
             )
+
+        # save all of related things into default root dir
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+            tokenizer.save_pretrained(default_root)
 
         return tokenizer
 

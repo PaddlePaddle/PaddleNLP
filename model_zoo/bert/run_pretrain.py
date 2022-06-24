@@ -487,7 +487,7 @@ def do_train(args):
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()
-                if global_step % args.save_steps == 0:
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     if paddle.distributed.get_rank() == 0:
                         output_dir = os.path.join(args.output_dir,
                                                   "model_%d" % global_step)
@@ -501,7 +501,7 @@ def do_train(args):
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:
+                if global_step >= args.max_steps:            
                     del train_data_loader
                     return
                 batch_start = time.time()

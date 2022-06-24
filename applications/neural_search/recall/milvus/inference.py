@@ -92,10 +92,9 @@ if __name__ == "__main__":
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
 
-            text_embeddings = model(input_ids, token_type_ids)
+            text_embeddings = model.get_pooled_embedding(
+                input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
 
     text_embedding = all_embeddings[0]

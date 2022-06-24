@@ -70,7 +70,9 @@ class SpanEvaluator(Metric):
         label_set = get_span(label_start_ids, label_end_ids)
         num_correct = len(pred_set & label_set)
         num_infer = len(pred_set)
-        num_label = len(label_set)
+        # For the case of overlapping in the same category,
+        # length of label_start_ids and label_end_ids is not equal
+        num_label = max(len(label_start_ids), len(label_end_ids))
         return (num_correct, num_infer, num_label)
 
     def accumulate(self):
