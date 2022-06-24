@@ -109,7 +109,10 @@ python run_diffcse.py \
 	--seed "0" \
 	--device "gpu"
 ```
+可支持配置的参数：
+* `ckpt_dir`: 用于指定进行模型评估的checkpoint路径。
 
+其他参数解释同上。
 
 ### 基于动态图模型预测
 
@@ -145,6 +148,12 @@ python run_diffcse.py \
 	--device "gpu"
 
 ```
+
+可支持配置的参数：
+* `infer_set_file`: 可选，用于指定测试集的路径。
+* `save_infer_path`: 可选，用于保存模型预测结果的文件路径。
+
+其他参数解释同上。
 
 
 ## Reference
