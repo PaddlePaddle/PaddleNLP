@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import math
 import json
 import random
@@ -195,6 +196,19 @@ def reader(data_path, max_seq_len=512):
                     yield json_line
 
 
+def unify_prompt_name(prompt):
+    # The classification labels are shuffled during finetuning, so they need
+    # to be unified during evaluation.
+    if re.search(r'\[.*?\]$', prompt):
+        prompt_prefix = prompt[:prompt.find("[", 1)]
+        cls_options = re.search(r'\[.*?\]$', prompt).group()[1:-1].split(",")
+        cls_options = sorted(list(set(cls_options)))
+        cls_options = ",".join(cls_options)
+        prompt = prompt_prefix + "[" + cls_options + "]"
+        return prompt
+    return prompt
+
+
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
     negative_examples = []
     positive_examples = []
@@ -264,12 +278,8 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
 
 def generate_cls_example(text, labels, prompt_prefix, options):
     random.shuffle(options)
-    prompt = ""
-    sep = ","
-    for option in options:
-        prompt += option
-        prompt += sep
-    prompt = prompt_prefix + "[" + prompt.rstrip(sep) + "]"
+    cls_options = ",".join(options)
+    prompt = prompt_prefix + "[" + cls_options + "]"
 
     result_list = []
     example = {"content": text, "result_list": result_list, "prompt": prompt}
@@ -306,14 +316,14 @@ def convert_ext_examples(raw_examples,
                          negative_ratio,
                          prompt_prefix="情感倾向",
                          options=["正向", "负向"],
-                         seperator="##",
+                         separator="##",
                          is_train=True):
     """
     Convert labeled data export from doccano for extraction and aspect-level classification task.
     """
 
-    def _sep_cls_label(label, seperator):
-        label_list = label.split(seperator)
+    def _sep_cls_label(label, separator):
+        label_list = label.split(separator)
         if len(label_list) == 1:
             return label_list[0], None
         return label_list[0], label_list[1:]
@@ -414,7 +424,7 @@ def convert_ext_examples(raw_examples,
                 }
 
                 entity_label, entity_cls_label = _sep_cls_label(
-                    entity["label"], seperator)
+                    entity["label"], separator)
 
                 # Define the prompt prefix for entity-level classification
                 entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix

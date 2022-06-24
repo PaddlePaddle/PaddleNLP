@@ -23,7 +23,7 @@ from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
 from model import UIE
-from utils import convert_example, reader
+from utils import convert_example, reader, unify_prompt_name
 
 
 @paddle.no_grad()
@@ -62,7 +62,8 @@ def do_eval():
     class_dict = {}
     if args.debug:
         for data in test_ds:
-            class_dict.setdefault(data['prompt'], []).append(data)
+            class_name = unify_prompt_name(data['prompt'])
+            class_dict.setdefault(class_name, []).append(data)
     else:
         class_dict["all_classes"] = test_ds
     for key in class_dict.keys():
