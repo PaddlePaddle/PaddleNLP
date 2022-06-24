@@ -290,7 +290,7 @@ class AdamW(Adam):
                 self._beta2, Variable) else self._beta2.numpy().item(0)
 
             lr = paddle.cast(lr, dtype="float32")
-            if paddle.in_dynamic_mode():
+            if framework.in_dygraph_mode():
                 found_inf = self._get_auxiliary_var('found_inf')
                 _, _, _, _, _, _ = _C_ops.final_state_adamw(
                     param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
