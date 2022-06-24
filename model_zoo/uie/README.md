@@ -390,7 +390,7 @@ schema = ['出发地', '目的地', '费用', '时间']
 ```shell
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
-    --task_type "ext" \
+    --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.2 0
 ```
@@ -407,7 +407,7 @@ python doccano.py \
 - ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
-- ``seperator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
@@ -423,18 +423,18 @@ python doccano.py \
 
 ```shell
 python finetune.py \
-    --train_path "./data/train.txt" \
-    --dev_path "./data/dev.txt" \
-    --save_dir "./checkpoint" \
+    --train_path ./data/train.txt \
+    --dev_path ./data/dev.txt \
+    --save_dir ./checkpoint \
     --learning_rate 1e-5 \
     --batch_size 16 \
     --max_seq_len 512 \
     --num_epochs 100 \
-    --model "uie-base" \
+    --model uie-base \
     --seed 1000 \
     --logging_steps 10 \
     --valid_steps 100 \
-    --device "gpu"
+    --device gpu
 ```
 
 可配置参数说明：
@@ -443,7 +443,7 @@ python finetune.py \
 - `dev_path`: 验证集文件路径。
 - `save_dir`: 模型存储路径，默认为`./checkpoint`。
 - `learning_rate`: 学习率，默认为1e-5。
-- `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
 - `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
@@ -458,21 +458,48 @@ python finetune.py \
 
 ```shell
 python evaluate.py \
-    --model_path "./checkpoint/model_best" \
-    --test_path "./data/dev.txt" \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
     --batch_size 16 \
     --max_seq_len 512
 ```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 
+可开启`debug`模式对每个正例类别分别进行评估，该模式仅用于模型调试：
+
+```shell
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --debug
+```
+
+输出打印示例：
+
+```text
+[2022-06-23 08:25:23,017] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,017] [    INFO] - Class name: 时间
+[2022-06-23 08:25:23,018] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
+[2022-06-23 08:25:23,145] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,146] [    INFO] - Class name: 目的地
+[2022-06-23 08:25:23,146] [    INFO] - Evaluation precision: 0.64286 | recall: 0.90000 | F1: 0.75000
+[2022-06-23 08:25:23,272] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,273] [    INFO] - Class name: 费用
+[2022-06-23 08:25:23,273] [    INFO] - Evaluation precision: 0.11111 | recall: 0.10000 | F1: 0.10526
+[2022-06-23 08:25:23,399] [    INFO] - -----------------------------
+[2022-06-23 08:25:23,399] [    INFO] - Class name: 出发地
+[2022-06-23 08:25:23,400] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
+```
+
 可配置参数说明：
 
 - `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 - `test_path`: 进行评估的测试集文件。
-- `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数，默认为16。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`和`uie-tiny`，默认为`uie-base`。
+- `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
 
 #### 定制模型一键预测
 
@@ -549,7 +576,7 @@ python evaluate.py \
   将训练后的动态图参数导出为静态图参数：
 
   ```shell
-  python export_model.py --model_path=./checkpoint/model_best --output_path=./export
+  python export_model.py --model_path ./checkpoint/model_best --output_path ./export
   ```
 
   可配置参数说明：
@@ -572,6 +599,7 @@ python evaluate.py \
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
 
   - GPU端推理样例
 
@@ -587,6 +615,7 @@ python evaluate.py \
     - `use_fp16`: 是否使用FP16进行加速，默认关闭。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
 
 <a name="CCKS比赛"></a>
 
