@@ -71,7 +71,7 @@ msgstr "Pretrained Word Vectors"
 
 #: ../index.rst:43
 msgid "模型库"
-msgstr "Model Library"
+msgstr "Model Zoo"
 
 #: ../index.rst:53
 msgid "评价指标"
