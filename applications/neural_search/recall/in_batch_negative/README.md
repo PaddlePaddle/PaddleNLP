@@ -206,7 +206,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --recall_num 50 \
     --similar_text_pair "recall/dev.csv" \
     --corpus_file "recall/corpus.csv"  \
-    --similar_text_pair "recall/dev.csv" 
+    --similar_text_pair "recall/dev.csv"
 ```
 
 参数含义说明

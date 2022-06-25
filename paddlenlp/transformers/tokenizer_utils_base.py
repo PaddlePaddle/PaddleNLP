@@ -546,8 +546,8 @@ class BatchEncoding(UserDict):
         else:
             batch_index = 0
             token_index = batch_or_token_index
-        return CharSpan(
-            *(self._encodings[batch_index].token_to_chars(token_index)))
+        return CharSpan(*(
+            self._encodings[batch_index].token_to_chars(token_index)))
 
     def char_to_token(self,
                       batch_or_char_index: int,
