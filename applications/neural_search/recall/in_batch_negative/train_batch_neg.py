@@ -30,7 +30,7 @@ from ann_util import build_index
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./model_inbatch', type=str,
+parser.add_argument("--save_dir", default='./checkpoint', type=str,
                     help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=512, type=int,
                     help="The maximum total input sequence length after tokenization. "
@@ -47,13 +47,13 @@ parser.add_argument("--epochs", default=10, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float,
                     help="Linear warmup proption over the training process.")
-parser.add_argument("--init_from_ckpt", type=str, default='./model_init_inbatch/model_state.pdparams',
+parser.add_argument("--init_from_ckpt", type=str, default=None,
                     help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000,
                     help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu",
                     help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--save_steps', type=int, default=10,
+parser.add_argument('--save_steps', type=int, default=10000,
                     help="Inteval steps to save checkpoint")
 parser.add_argument('--log_steps', type=int, default=10,
                     help="Inteval steps to print log")
@@ -86,7 +86,7 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt',
                     help="evaluate_result")
-parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
+parser.add_argument('--evaluate', default=False, type=eval, choices=[True, False],
                     help='whether evaluate while training')
 args = parser.parse_args()
 # yapf: enable
@@ -105,12 +105,9 @@ def recall(rs, N=10):
 
 
 @paddle.no_grad()
-def evaluate(model, model_dev, corpus_data_loader, query_data_loader,
-             recall_result_file, text_list, id2corpus):
+def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file, text_list, id2corpus):
     # Load pretrained semantic model
-    model_dev.set_dict(model.state_dict())
-    logger.info("Loaded parameters from")
-    inner_model = model_dev._layers
+    inner_model = model._layers
     final_index = build_index(args, corpus_data_loader, inner_model)
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
     with open(recall_result_file, 'w', encoding='utf-8') as f:
@@ -121,9 +118,9 @@ def evaluate(model, model_dev, corpus_data_loader, query_data_loader,
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(
-                        text_list[text_index]["text"], id2corpus[doc_idx],
-                        1.0 - cosine_sims[row_index][idx]))
+                    f.write("{}\t{}\t{}\n".format(text_list[text_index]["text"],
+                                                  id2corpus[doc_idx],
+                                                  1.0 - cosine_sims[row_index][idx]))
     text2similar = {}
     with open(args.similar_text_pair_file, 'r', encoding='utf-8') as f:
         for line in f:
@@ -149,8 +146,7 @@ def evaluate(model, model_dev, corpus_data_loader, query_data_loader,
     for topN in recall_num:
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
-    evaluate_result_file = os.path.join(args.recall_result_dir,
-                                        args.evaluate_result)
+    evaluate_result_file = os.path.join(args.recall_result_dir, args.evaluate_result)
     result = open(evaluate_result_file, 'a')
     res = []
     timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
@@ -170,40 +166,38 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_text_pair,
-                            data_path=args.train_set_file,
-                            lazy=False)
+    train_ds = load_dataset(
+        read_text_pair, data_path=args.train_set_file, lazy=False)
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         'ernie-1.0')
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds,
+        mode='train',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn,
+        trans_fn=trans_func)
 
-    model = SemanticIndexBatchNeg(pretrained_model,
-                                  margin=args.margin,
-                                  scale=args.scale,
-                                  output_emb_size=args.output_emb_size)
+    model = SemanticIndexBatchNeg(
+        pretrained_model,
+        margin=args.margin,
+        scale=args.scale,
+        output_emb_size=args.output_emb_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -213,15 +207,9 @@ def do_train():
     model = paddle.DataParallel(model)
 
     batchify_fn_dev = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # text_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # text_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # text_segment
     ): [data for data in fn(samples)]
-
-    model_dev = SemanticIndexBase(pretrained_model,
-                                  output_emb_size=args.output_emb_size)
-    model_dev = paddle.DataParallel(model_dev)
 
     id2corpus = gen_id2corpus(args.corpus_file)
 
@@ -229,27 +217,28 @@ def do_train():
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(corpus_ds,
-                                           mode='predict',
-                                           batch_size=args.batch_size,
-                                           batchify_fn=batchify_fn_dev,
-                                           trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(
+        corpus_ds,
+        mode='predict',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn_dev,
+        trans_fn=trans_func)
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
 
     query_ds = MapDataset(text_list)
 
-    query_data_loader = create_dataloader(query_ds,
-                                          mode='predict',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn_dev,
-                                          trans_fn=trans_func)
+    query_data_loader = create_dataloader(
+        query_ds,
+        mode='predict',
+        batch_size=args.batch_size,
+        batchify_fn=batchify_fn_dev,
+        trans_fn=trans_func)
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
 
-    recall_result_file = os.path.join(args.recall_result_dir,
-                                      args.recall_result_file)
+    recall_result_file = os.path.join(args.recall_result_dir, args.recall_result_file)
 
     num_training_steps = len(train_data_loader) * args.epochs
 
@@ -275,17 +264,18 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
 
-            loss = model(query_input_ids=query_input_ids,
-                         title_input_ids=title_input_ids,
-                         query_token_type_ids=query_token_type_ids,
-                         title_token_type_ids=title_token_type_ids)
+            loss = model(
+                query_input_ids=query_input_ids,
+                title_input_ids=title_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                title_token_type_ids=title_token_type_ids)
 
             global_step += 1
             if global_step % args.log_steps == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, 10 /
-                       (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss,
+                       10 / (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
@@ -293,19 +283,16 @@ def do_train():
             optimizer.clear_grad()
             if not args.evaluate:
                 if global_step % args.save_steps == 0 and rank == 0:
-                    save_dir = os.path.join(args.save_dir,
-                                            "model_%d" % global_step)
+                    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   'model_state.pdparams')
+                    save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
         if args.evaluate:
             print("evaluating")
-            recall_5 = evaluate(model, model_dev, corpus_data_loader,
-                                query_data_loader, recall_result_file,
-                                text_list, id2corpus)
+            recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
+                                recall_result_file, text_list, id2corpus)
             if recall_5 > best_recall:
                 best_recall = recall_5
 
@@ -315,11 +302,8 @@ def do_train():
                 save_param_path = os.path.join(save_dir, 'model_state.pdparams')
                 paddle.save(model.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
-                with open(os.path.join(save_dir, "train_result.txt"),
-                          'a',
-                          encoding='utf-8') as fp:
-                    fp.write('epoch=%d, global_step: %d, recall: %s\n' %
-                             (epoch, global_step, recall_5))
+                with open(os.path.join(save_dir, "train_result.txt"), 'a', encoding='utf-8') as fp:
+                    fp.write('epoch=%d, global_step: %d, recall: %s\n' % (epoch, global_step, recall_5))
 
 
 if __name__ == "__main__":
