@@ -30,7 +30,7 @@ from ann_util import build_index
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./model_inbatch', type=str,
+parser.add_argument("--save_dir", default='./checkpoint', type=str,
                     help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=512, type=int,
                     help="The maximum total input sequence length after tokenization. "
@@ -47,13 +47,13 @@ parser.add_argument("--epochs", default=10, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float,
                     help="Linear warmup proption over the training process.")
-parser.add_argument("--init_from_ckpt", type=str, default='./model_init_inbatch/model_state.pdparams',
+parser.add_argument("--init_from_ckpt", type=str, default=None,
                     help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000,
                     help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="cpu",
                     help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--save_steps', type=int, default=10,
+parser.add_argument('--save_steps', type=int, default=10000,
                     help="Inteval steps to save checkpoint")
 parser.add_argument('--log_steps', type=int, default=10,
                     help="Inteval steps to print log")
@@ -86,7 +86,7 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt',
                     help="evaluate_result")
-parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
+parser.add_argument('--evaluate', default=False, type=eval, choices=[True, False],
                     help='whether evaluate while training')
 args = parser.parse_args()
 # yapf: enable
@@ -105,12 +105,10 @@ def recall(rs, N=10):
 
 
 @paddle.no_grad()
-def evaluate(model, model_dev, corpus_data_loader, query_data_loader,
-             recall_result_file, text_list, id2corpus):
+def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
+             text_list, id2corpus):
     # Load pretrained semantic model
-    model_dev.set_dict(model.state_dict())
-    logger.info("Loaded parameters from")
-    inner_model = model_dev._layers
+    inner_model = model._layers
     final_index = build_index(args, corpus_data_loader, inner_model)
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
     with open(recall_result_file, 'w', encoding='utf-8') as f:
@@ -219,10 +217,6 @@ def do_train():
             ),  # text_segment
     ): [data for data in fn(samples)]
 
-    model_dev = SemanticIndexBase(pretrained_model,
-                                  output_emb_size=args.output_emb_size)
-    model_dev = paddle.DataParallel(model_dev)
-
     id2corpus = gen_id2corpus(args.corpus_file)
 
     # conver_example function's input must be dict
@@ -303,9 +297,8 @@ def do_train():
                     tokenizer.save_pretrained(save_dir)
         if args.evaluate:
             print("evaluating")
-            recall_5 = evaluate(model, model_dev, corpus_data_loader,
-                                query_data_loader, recall_result_file,
-                                text_list, id2corpus)
+            recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
+                                recall_result_file, text_list, id2corpus)
             if recall_5 > best_recall:
                 best_recall = recall_5
 

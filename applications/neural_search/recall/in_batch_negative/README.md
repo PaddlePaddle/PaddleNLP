@@ -198,7 +198,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --max_seq_length 64 \
     --margin 0.2 \
     --train_set_file recall/train.csv \
-    --evaluate True \
+    --evaluate False \
     --recall_result_dir "recall_result_dir" \
     --recall_result_file "recall_result.txt" \
     --hnsw_m 100 \
@@ -206,8 +206,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --recall_num 50 \
     --similar_text_pair "recall/dev.csv" \
     --corpus_file "recall/corpus.csv"  \
-    --similar_text_pair "recall/dev.csv" \
-    --recall_result_file "./recall_result_dir/recall_result.txt"
+    --similar_text_pair "recall/dev.csv"
 ```
 
 参数含义说明
@@ -222,7 +221,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `max_seq_length`: 输入序列的最大长度
 * `margin`: 正样本相似度与负样本之间的目标 Gap
 * `train_set_file`: 训练集文件
-* `evaluate`: 是否开启边训练边评估模型训练效果，默认开启
+* `evaluate`: 是否开启边训练边评估模型训练效果，默认关闭，针对数据量小的场景，建议开启
 * `recall_result_dir`: 召回结果存储目录
 * `recall_result_file`: 召回结果的文件名
 * `hnsw_m`: hnsw 算法相关参数，保持默认即可
@@ -231,7 +230,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
 * `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
-* `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 
 也可以使用bash脚本：
 
