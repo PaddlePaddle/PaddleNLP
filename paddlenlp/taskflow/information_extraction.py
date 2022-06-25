@@ -178,6 +178,10 @@ class UIETask(Task):
             'split_sentence'] if 'split_sentence' in self.kwargs else False
         self._position_prob = self.kwargs[
             'position_prob'] if 'position_prob' in self.kwargs else 0.5
+        self._lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
+        self._num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -252,15 +256,14 @@ class UIETask(Task):
             for example in inputs:
                 encoded_inputs = self._tokenizer(text=[example["prompt"]],
                                                  text_pair=[example["text"]],
-                                                 stride=len(example["prompt"]),
                                                  truncation=True,
                                                  max_seq_len=self._max_seq_len,
                                                  pad_to_max_seq_len=True,
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
-                                                 return_dict=False)
+                                                 return_dict=False,
+                                                 return_offsets_mapping=True)
                 encoded_inputs = encoded_inputs[0]
-
                 tokenized_output = [
                     encoded_inputs["input_ids"],
                     encoded_inputs["token_type_ids"],
@@ -271,16 +274,16 @@ class UIETask(Task):
                 tokenized_output = [
                     np.array(x, dtype="int64") for x in tokenized_output
                 ]
-
                 yield tuple(tokenized_output)
 
-        infer_ds = load_dataset(read, inputs=short_inputs, lazy=False)
+        infer_ds = load_dataset(read, inputs=short_inputs, lazy=self._lazy_load)
         batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
                                                batch_size=self._batch_size,
                                                shuffle=False)
 
         infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
                                                  batch_sampler=batch_sampler,
+                                                 num_workers=self._num_workers,
                                                  return_list=True)
 
         sentence_ids = []
