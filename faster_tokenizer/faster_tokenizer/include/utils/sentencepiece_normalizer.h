@@ -87,6 +87,7 @@ public:
                          std::string* normalized,
                          std::vector<int>* norm_to_orig,
                          std::u32string* u32content = nullptr) const;
+  std::string GetPrecompiledCharsmap() const;
 
 private:
   void Init();

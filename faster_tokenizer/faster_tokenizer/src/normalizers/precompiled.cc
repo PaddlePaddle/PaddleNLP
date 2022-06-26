@@ -60,10 +60,17 @@ void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {
 
 void to_json(nlohmann::json& j,
              const PrecompiledNormalizer& precompiled_normalizer) {
+  j = {{"type", "PrecompiledNormalizer"},
+       {"precompiled_charsmap",
+        precompiled_normalizer.sentencepiece_normalizer_
+            ->GetPrecompiledCharsmap()}};
 }
 
 void from_json(const nlohmann::json& j,
-               PrecompiledNormalizer& precompiled_normalizer) {}
+               PrecompiledNormalizer& precompiled_normalizer) {
+  precompiled_normalizer.SetPrecompiledCharsMap(
+      j.at("precompiled_charsmap").get<std::string>());
+}
 
 }  // normalizers
 }  // tokenizers

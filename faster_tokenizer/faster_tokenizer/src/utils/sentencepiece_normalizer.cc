@@ -86,6 +86,10 @@ Normalizer::Normalizer(const Normalizer& other)
 
 Normalizer::~Normalizer() {}
 
+std::string Normalizer::GetPrecompiledCharsmap() const {
+  return precompiled_charsmap_;
+}
+
 void Normalizer::Init() {
   if (!precompiled_charsmap_.empty()) {
 #ifdef IS_BIG_ENDIAN

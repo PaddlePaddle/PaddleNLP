@@ -488,6 +488,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::SequenceNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::SequenceNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::PrecompiledNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::PrecompiledNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
