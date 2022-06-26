@@ -251,7 +251,8 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader):
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                paddle.save(model.state_dict(), save_param_path)
+                paddle.save(model._layers.extractor.state_dict(),
+                            save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
             if args.max_steps > 0 and global_step >= args.max_steps:
