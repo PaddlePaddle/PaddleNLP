@@ -21,8 +21,19 @@ try:
     from paddle.incubate.nn import FusedTransformerEncoderLayer
 except ImportError:
     FusedTransformerEncoderLayer = None
-
+from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+    MultipleChoiceModelOutput,
+    MaskedLMOutput,
+    ModelOutput,
+)
 
 __all__ = [
     'BertModel',
@@ -542,7 +553,9 @@ class BertModel(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -628,33 +641,47 @@ class BertModel(BertPretrainedModel):
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids)
         if self.fuse:
+            assert not output_attentions, "Not support attentions output currently."
             hidden_states = embedding_output
-            all_encoder_outputs = []
+            all_hidden_states = [] if output_hidden_states else None
             for layer in self.encoder:
                 hidden_states = layer(hidden_states, attention_mask)
-                all_encoder_outputs.append(hidden_states)
+                if output_hidden_states:
+                    all_hidden_states.append(hidden_states)
             pooled_output = self.pooler(hidden_states)
-            if output_hidden_states:
-                return all_encoder_outputs, pooled_output
+
+            if return_dict:
+                return BaseModelOutputWithPoolingAndCrossAttentions(
+                    last_hidden_state=hidden_states,
+                    pooler_output=pooled_output,
+                    hidden_states=all_hidden_states)
             else:
-                return hidden_states, pooled_output
+                return (hidden_states, pooled_output,
+                        all_hidden_states) if output_hidden_states else (
+                            hidden_states, pooled_output)
         else:
-            if output_hidden_states:
-                output = embedding_output
-                encoder_outputs = []
-                for mod in self.encoder.layers:
-                    output = mod(output, src_mask=attention_mask)
-                    encoder_outputs.append(output)
-                if self.encoder.norm is not None:
-                    encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-                pooled_output = self.pooler(encoder_outputs[-1])
-            else:
-                sequence_output = self.encoder(embedding_output, attention_mask)
+            encoder_outputs = self.encoder(
+                embedding_output,
+                src_mask=attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict)
+            if isinstance(encoder_outputs, paddle.Tensor):
+                sequence_output = encoder_outputs
                 pooled_output = self.pooler(sequence_output)
-            if output_hidden_states:
-                return encoder_outputs, pooled_output
+                return (sequence_output, pooled_output)
             else:
-                return sequence_output, pooled_output
+                sequence_output = encoder_outputs[0]
+                pooled_output = self.pooler(sequence_output)
+                if not return_dict:
+                    return (sequence_output,
+                            pooled_output) + encoder_outputs[1:]
+                return BaseModelOutputWithPoolingAndCrossAttentions(
+                    last_hidden_state=sequence_output,
+                    pooler_output=pooled_output,
+                    past_key_values=encoder_outputs.past_key_values,
+                    hidden_states=encoder_outputs.hidden_states,
+                    attentions=encoder_outputs.attentions)
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
@@ -683,7 +710,10 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -724,16 +754,32 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 end_logits = outputs[1]
         """
 
-        sequence_output, _ = self.bert(input_ids,
-                                       token_type_ids=token_type_ids,
-                                       position_ids=position_ids,
-                                       attention_mask=attention_mask)
+        outputs = self.bert(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class BertForSequenceClassification(BertPretrainedModel):
@@ -766,7 +812,10 @@ class BertForSequenceClassification(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -803,14 +852,29 @@ class BertForSequenceClassification(BertPretrainedModel):
 
         """
 
-        _, pooled_output = self.bert(input_ids,
-                                     token_type_ids=token_type_ids,
-                                     position_ids=position_ids,
-                                     attention_mask=attention_mask)
+        outputs = self.bert(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+        pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        return logits
+
+        # TODO(guosheng): Support loss
+        loss = None
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else output
+
+        return SequenceClassifierOutput(
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class BertForTokenClassification(BertPretrainedModel):
@@ -843,7 +907,10 @@ class BertForTokenClassification(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -879,14 +946,30 @@ class BertForTokenClassification(BertPretrainedModel):
                 # [1, 13, 2]
 
         """
-        sequence_output, _ = self.bert(input_ids,
-                                       token_type_ids=token_type_ids,
-                                       position_ids=position_ids,
-                                       attention_mask=attention_mask)
+        outputs = self.bert(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        return logits
+
+        # TODO(guosheng): Support loss
+        loss = None
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else output
+
+        return TokenClassifierOutput(
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class BertLMPredictionHead(Layer):
@@ -990,6 +1073,40 @@ class BertPretrainingHeads(Layer):
         return prediction_scores, seq_relationship_score
 
 
+@dataclass
+class BertForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`BertForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+            (classification) loss.
+        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
+            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    prediction_logits: paddle.Tensor = None
+    seq_relationship_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
 class BertForPretraining(BertPretrainedModel):
     """
     Bert Model with pretraining tasks on top.
@@ -1016,7 +1133,10 @@ class BertForPretraining(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                masked_positions=None):
+                masked_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -1050,11 +1170,27 @@ class BertForPretraining(BertPretrainedModel):
             outputs = self.bert(input_ids,
                                 token_type_ids=token_type_ids,
                                 position_ids=position_ids,
-                                attention_mask=attention_mask)
+                                attention_mask=attention_mask,
+                                output_attentions=output_attentions,
+                                output_hidden_states=output_hidden_states,
+                                return_dict=return_dict)
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, masked_positions)
-            return prediction_scores, seq_relationship_score
+
+            total_loss = None
+            if not return_dict:
+                output = (prediction_scores,
+                          seq_relationship_score) + outputs[2:]
+                return ((total_loss, ) +
+                        output) if total_loss is not None else output
+
+            return BertForPreTrainingOutput(
+                prediction_logits=prediction_scores,
+                seq_relationship_logits=seq_relationship_score,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+            )
 
 
 class BertPretrainingCriterion(paddle.nn.Layer):
@@ -1143,7 +1279,10 @@ class BertForMultipleChoice(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1228,17 +1367,31 @@ class BertForMultipleChoice(BertPretrainedModel):
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        _, pooled_output = self.bert(input_ids,
-                                     token_type_ids=token_type_ids,
-                                     position_ids=position_ids,
-                                     attention_mask=attention_mask)
+        outputs = self.bert(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape(
             shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
-        return reshaped_logits
+        # TODO(guosheng): Support loss
+        loss = None
+        if not return_dict:
+            output = (reshaped_logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else output
+
+        return MultipleChoiceModelOutput(
+            logits=reshaped_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class BertOnlyMLMHead(nn.Layer):
@@ -1281,7 +1434,10 @@ class BertForMaskedLM(BertPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -1319,7 +1475,22 @@ class BertForMaskedLM(BertPretrainedModel):
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
-                            attention_mask=attention_mask)
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
-        return prediction_scores
+
+        # TODO(guosheng): Support loss
+        masked_lm_loss = None
+        if not return_dict:
+            output = (prediction_scores, ) + outputs[2:]
+            return ((masked_lm_loss, ) +
+                    output) if masked_lm_loss is not None else output
+
+        return MaskedLMOutput(
+            logits=prediction_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
