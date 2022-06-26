@@ -25,6 +25,11 @@ PrecompiledNormalizer::PrecompiledNormalizer(
   SetPrecompiledCharsMap(precompiled_charsmap);
 }
 
+PrecompiledNormalizer::PrecompiledNormalizer(
+    const PrecompiledNormalizer& precompiled_normalizer)
+    : sentencepiece_normalizer_(new utils::Normalizer(
+          *precompiled_normalizer.sentencepiece_normalizer_.get())) {}
+
 static std::string GetByteFromString(const std::string& str) {
   std::ostringstream oss;
   oss << std::hex << std::setfill('0');
@@ -54,10 +59,11 @@ void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {
 }
 
 void to_json(nlohmann::json& j,
-             const PrecompiledNormalizer& replace_normalizer) {}
+             const PrecompiledNormalizer& precompiled_normalizer) {
+}
 
 void from_json(const nlohmann::json& j,
-               PrecompiledNormalizer& replace_normalizer) {}
+               PrecompiledNormalizer& precompiled_normalizer) {}
 
 }  // normalizers
 }  // tokenizers

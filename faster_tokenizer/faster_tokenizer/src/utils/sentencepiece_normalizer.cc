@@ -78,6 +78,12 @@ Normalizer::Normalizer(const std::string& precompiled_charsmap)
   Init();
 }
 
+Normalizer::Normalizer(const Normalizer& other)
+    : precompiled_charsmap_(other.precompiled_charsmap_) {
+  Init();
+}
+
+
 Normalizer::~Normalizer() {}
 
 void Normalizer::Init() {

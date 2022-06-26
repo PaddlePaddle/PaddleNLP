@@ -75,6 +75,7 @@ public:
   // Instantiates Normalizer with |spec|.
   // |spec| should not be deleted until Normalizer is destroyed.
   explicit Normalizer(const std::string& precompiled_charsmap);
+  Normalizer(const Normalizer& other);
   virtual ~Normalizer();
 
   virtual void SetPrefixMatcher(const PrefixMatcher* matcher) {

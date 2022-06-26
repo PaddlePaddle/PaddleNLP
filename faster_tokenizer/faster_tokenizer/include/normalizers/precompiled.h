@@ -25,15 +25,17 @@ namespace normalizers {
 struct PrecompiledNormalizer : public Normalizer {
   PrecompiledNormalizer() = default;
   explicit PrecompiledNormalizer(const std::string& precompiled_charsmap);
+  PrecompiledNormalizer(const PrecompiledNormalizer& precompiled_normalizer);
+
   virtual void operator()(NormalizedString* mut_str) const override;
   void SetPrecompiledCharsMap(const std::string& precompiled_charsmap);
 
 private:
   std::unique_ptr<utils::Normalizer> sentencepiece_normalizer_;
   friend void to_json(nlohmann::json& j,
-                      const PrecompiledNormalizer& replace_normalizer);
+                      const PrecompiledNormalizer& precompiled_normalizer);
   friend void from_json(const nlohmann::json& j,
-                        PrecompiledNormalizer& replace_normalizer);
+                        PrecompiledNormalizer& precompiled_normalizer);
 };
 }  // normalizers
 }  // tokenizers

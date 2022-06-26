@@ -589,6 +589,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::SequenceNormalizer unicode_normalizer;
         normalizer.get_to(unicode_normalizer);
         tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "PrecompiledNormalizer") {
+        normalizers::PrecompiledNormalizer precompiled_normalizer;
+        normalizer.get_to(precompiled_normalizer);
+        tokenizer.SetNormalizer(precompiled_normalizer);
       }
     }
 
@@ -685,9 +689,8 @@ template void Tokenizer::SetNormalizer(const normalizers::NFKCNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFKDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NmtNormalizer&);
-// TODO(zhoushunjie): Need to implement PrecompiledNormalizer later
-// template void Tokenizer::SetNormalizer(const
-// normalizers::PrecompiledNormalizer&);
+template void Tokenizer::SetNormalizer(
+    const normalizers::PrecompiledNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::ReplaceNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::SequenceNormalizer&);
 template void Tokenizer::SetNormalizer(
