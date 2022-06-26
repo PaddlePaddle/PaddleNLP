@@ -105,6 +105,10 @@ static int TokenizerPropertiesSetNormalizer(TokenizerObject* self,
                  py::type::of<normalizers::StripNormalizer>())) {
     const auto& normalizer = py_obj.cast<const normalizers::StripNormalizer&>();
     self->tokenizer.SetNormalizer(normalizer);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<normalizers::PrecompiledNormalizer>())) {
+    const auto& normalizer = py_obj.cast<const normalizers::PrecompiledNormalizer&>();
+    self->tokenizer.SetNormalizer(normalizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleaseNormaizer();
   } else {

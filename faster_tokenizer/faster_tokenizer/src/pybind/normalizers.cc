@@ -408,6 +408,11 @@ void BindNormalizers(pybind11::module* m) {
                                  normalizers::StripNormalizer>())) {
                 normalizer_ptr =
                     py_normalizer.cast<normalizers::StripNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::PrecompiledNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::PrecompiledNormalizer*>();
               }
               normalizers.push_back(normalizer_ptr);
             }
