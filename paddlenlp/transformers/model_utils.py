@@ -156,6 +156,12 @@ class PretrainedModel(Layer, GenerationMixin):
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
 
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        raise NotImplementedError(
+            f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
+            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
+        )
+
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
