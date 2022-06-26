@@ -121,3 +121,10 @@ if is_faster_tokenizer_available():
     from .bert.faster_tokenizer import *
     from .ernie.faster_tokenizer import *
     from .tinybert.faster_tokenizer import *
+
+# patches of paddle.nn.Transformer to get all hidden_states and attentions
+import paddle
+from .model_outputs import _transformer_encoder_layer_fwd, _transformer_encoder_fwd
+
+paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
+paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
