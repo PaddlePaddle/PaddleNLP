@@ -43,14 +43,14 @@ struct simple_string_view {
   }
   simple_string_view(const char* ptr, size_t size) : ptr_(ptr), size_(size) {}
 
-  const char* data() {
+  const char* data() const {
     if (!ptr_) {
       return ptr_ + offset_;
     }
     return ptr_;
   }
-  size_t size() { return size_; }
-  bool empty() { return size_ == 0; }
+  size_t size() const { return size_; }
+  bool empty() const { return size_ == 0; }
 };
 
 class PrefixMatcher {
@@ -81,13 +81,18 @@ public:
     matcher_ = matcher;
   }
 
-  virtual void Normalize(const char* input,
+  virtual bool Normalize(const char* input,
                          size_t input_len,
                          std::string* normalized,
-                         std::vector<size_t>* norm_to_orig) const;
+                         std::vector<int>* norm_to_orig,
+                         std::u32string* u32content = nullptr) const;
 
 private:
   void Init();
+  void Replace(const simple_string_view& new_part,
+               const simple_string_view& old_part,
+               std::vector<int>* changes,
+               std::u32string* u32content = nullptr) const;
   std::pair<simple_string_view, int> NormalizePrefix(const char* input,
                                                      size_t input_len) const;
 

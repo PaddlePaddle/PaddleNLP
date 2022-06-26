@@ -19,6 +19,7 @@
 #include "utils/utils.h"
 
 #include "glog/logging.h"
+#include "unicode/brkiter.h"
 
 namespace tokenizers {
 namespace utils {
@@ -209,36 +210,119 @@ std::pair<simple_string_view, int> Normalizer::NormalizePrefix(
   return result;
 }
 
-void Normalizer::Normalize(const char* input,
+bool Normalizer::Normalize(const char* input,
                            size_t input_len,
                            std::string* normalized,
-                           std::vector<size_t>* norm_to_orig) const {
+                           std::vector<int>* norm_to_orig,
+                           std::u32string* u32content) const {
+  bool modified = false;
   norm_to_orig->clear();
   normalized->clear();
   if (input_len == 0) {
-    return;
+    return modified;
   }
-  int consumed = 0;
 
   // Reserves the output buffer to avoid re-allocations.
   const size_t kReservedSize = input_len * 3;
   normalized->reserve(kReservedSize);
   norm_to_orig->reserve(kReservedSize);
-  size_t curr_idx = 0;
-  while (curr_idx < input_len) {
-    size_t curr_len = input_len - curr_idx;
-    auto p = NormalizePrefix(input + curr_idx, curr_len);
-    simple_string_view sp = p.first;
-    if (!sp.empty()) {
-      for (size_t n = 0; n < sp.size(); ++n) {
-        *normalized += sp.data()[n];
-        norm_to_orig->push_back(consumed);
+  if (u32content != nullptr) {
+    u32content->reserve(kReservedSize);
+  }
+  UErrorCode err = U_ZERO_ERROR;
+  std::unique_ptr<icu::BreakIterator> iter(
+      icu::BreakIterator::createCharacterInstance(icu::Locale::getDefault(),
+                                                  err));
+  UText utext = UTEXT_INITIALIZER;
+  utext_openUTF8(&utext, input, input_len, &err);
+  iter->setText(&utext, err);
+  int curr_pos = iter->current();
+  while (iter->next() != icu::BreakIterator::DONE) {
+    int next_pos = iter->current();
+    int curr_len = next_pos - curr_pos;
+    std::pair<simple_string_view, int> p;
+    if (curr_len < 6) {
+      p = NormalizePrefix(input + curr_pos, curr_len);
+      simple_string_view sp = p.first;
+      if (sp.data() != input + curr_pos) {
+        if (!sp.empty()) {
+          for (size_t n = 0; n < sp.size(); ++n) {
+            *normalized += sp.data()[n];
+          }
+        }
+        Replace(sp,
+                simple_string_view(input + curr_pos, curr_len),
+                norm_to_orig,
+                u32content);
+        modified = true;
+        curr_pos = next_pos;
+        continue;
       }
     }
-    consumed += p.second;
-    curr_idx += p.second;
+    int curr_grapheme_pos = curr_pos;
+    while (curr_grapheme_pos < next_pos) {
+      uint32_t content_char;
+      auto content_char_width =
+          utils::UTF8ToUInt32(input + curr_grapheme_pos, &content_char);
+      content_char = utils::UTF8ToUnicode(content_char);
+      p = NormalizePrefix(input + curr_grapheme_pos, content_char_width);
+      simple_string_view sp = p.first;
+      if (sp.data() != input + curr_grapheme_pos) {
+        if (!sp.empty()) {
+          for (size_t n = 0; n < sp.size(); ++n) {
+            *normalized += sp.data()[n];
+          }
+        }
+        Replace(
+            sp,
+            simple_string_view(input + curr_grapheme_pos, content_char_width),
+            norm_to_orig,
+            u32content);
+        modified = true;
+      } else {
+        for (int i = curr_grapheme_pos; i < sp.size(); ++i) {
+          *normalized += sp.data()[i];
+        }
+        if (u32content != nullptr) {
+          u32content->push_back(content_char);
+        }
+        norm_to_orig->push_back(0);
+      }
+      curr_grapheme_pos += content_char_width;
+    }
+    curr_pos = next_pos;
   }
-  norm_to_orig->push_back(consumed);
+  utext_close(&utext);
+  return modified;
+}
+
+void Normalizer::Replace(const simple_string_view& new_part,
+                         const simple_string_view& old_part,
+                         std::vector<int>* changes,
+                         std::u32string* u32content) const {
+  auto new_unicode_len =
+      GetUnicodeLenFromUTF8(new_part.data(), new_part.size());
+  auto old_unicode_len =
+      GetUnicodeLenFromUTF8(old_part.data(), old_part.size());
+  if (u32content != nullptr) {
+    size_t utf8_len = 0;
+    while (utf8_len < new_part.size()) {
+      uint32_t content_char;
+      auto content_char_width =
+          utils::UTF8ToUInt32(new_part.data() + utf8_len, &content_char);
+      content_char = utils::UTF8ToUnicode(content_char);
+      u32content->push_back(content_char);
+      utf8_len += new_part.size();
+    }
+  }
+  changes->insert(changes->end(), new_unicode_len, 0);
+  if (new_unicode_len > old_unicode_len) {
+    for (auto i = old_unicode_len; i < new_unicode_len; ++i) {
+      (*changes)[i] = 1;
+    }
+  } else {
+    changes->back() -= old_unicode_len - new_unicode_len;
+  }
 }
 
 }  // namespace utils

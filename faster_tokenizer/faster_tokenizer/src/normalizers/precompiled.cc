@@ -42,12 +42,15 @@ void PrecompiledNormalizer::SetPrecompiledCharsMap(
 
 void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {
   std::string normalized;
-  std::vector<size_t> norm_to_orig;
-  sentencepiece_normalizer_->Normalize(mut_str->GetStr().data(),
-                                       mut_str->GetStr().length(),
-                                       &normalized,
-                                       &norm_to_orig);
-  // mut_str->UpdateNormalized();
+  std::vector<int> norm_to_orig;
+  std::u32string u32content;
+  if (sentencepiece_normalizer_->Normalize(mut_str->GetStr().data(),
+                                           mut_str->GetStr().length(),
+                                           &normalized,
+                                           &norm_to_orig,
+                                           &u32content)) {
+    mut_str->UpdateNormalized({u32content, norm_to_orig}, 0);
+  }
 }
 
 void to_json(nlohmann::json& j,

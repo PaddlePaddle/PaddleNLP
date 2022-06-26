@@ -8,7 +8,7 @@ add_custom_target(copy_python_tokenizers ALL
 add_custom_target(copy_setup ALL
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/setup.py ${CMAKE_BINARY_DIR}/setup.py)
 
-# 3. Copy the core_tokenizers.so libicuuc.so.70 to python tokenizers directory
+# 3. Copy the core_tokenizers.so to python tokenizers directory
 set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_DST_DIR ${CMAKE_BINARY_DIR}/python/faster_tokenizer)
 
