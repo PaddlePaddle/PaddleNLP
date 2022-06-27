@@ -18,19 +18,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    ModelOutput,
-)
 
 __all__ = [
     'RobertaModel',
@@ -342,9 +330,7 @@ class RobertaModel(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                output_hidden_states=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -428,27 +414,20 @@ class RobertaModel(RobertaPretrainedModel):
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids)
 
-        encoder_outputs = self.encoder(
-            embedding_output,
-            src_mask=attention_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
-        if isinstance(encoder_outputs, paddle.Tensor):
-            sequence_output = encoder_outputs
-            pooled_output = self.pooler(sequence_output)
-            return (sequence_output, pooled_output)
+        if output_hidden_states:
+            output = embedding_output
+            encoder_outputs = [embedding_output]
+            for mod in self.encoder.layers:
+                output = mod(output, src_mask=attention_mask)
+                encoder_outputs.append(output)
+            if self.encoder.norm is not None:
+                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
+            pooled_output = self.pooler(encoder_outputs[-1])
+            return encoder_outputs, pooled_output
         else:
-            sequence_output = encoder_outputs[0]
+            sequence_output = self.encoder(embedding_output, attention_mask)
             pooled_output = self.pooler(sequence_output)
-            if not return_dict:
-                return (sequence_output, pooled_output) + encoder_outputs[1:]
-            return BaseModelOutputWithPoolingAndCrossAttentions(
-                last_hidden_state=sequence_output,
-                pooler_output=pooled_output,
-                past_key_values=encoder_outputs.past_key_values,
-                hidden_states=encoder_outputs.hidden_states,
-                attentions=encoder_outputs.attentions)
+            return sequence_output, pooled_output
 
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
@@ -467,14 +446,14 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        output_hidden_states=False,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -521,32 +500,23 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.roberta(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
-
-        sequence_output = outputs[0]
-
+        encoder_outputs, _ = self.roberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=output_hidden_states,
+        )
+        sequence_output = encoder_outputs[
+            -1] if output_hidden_states else encoder_outputs
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        total_loss = None
-        if not return_dict:
-            output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
-
-        return QuestionAnsweringModelOutput(
-            start_logits=start_logits,
-            end_logits=end_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return start_logits, end_logits, encoder_outputs
+        else:
+            return start_logits, end_logits
 
 
 class RobertaForSequenceClassification(RobertaPretrainedModel):
@@ -580,9 +550,7 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                output_hidden_states=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -625,28 +593,18 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.roberta(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
-        pooled_output = outputs[1]
+        encoder_outputs, pooled_output = self.roberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=output_hidden_states)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-
-        loss = None
-        if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
-
-        return SequenceClassifierOutput(
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return logits, encoder_outputs
+        return logits
 
 
 class RobertaForTokenClassification(RobertaPretrainedModel):
@@ -680,9 +638,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                output_hidden_states=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -725,29 +681,20 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.roberta(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
-
-        sequence_output = outputs[0]
-
+        encoder_outputs, _ = self.roberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=output_hidden_states)
+        sequence_output = encoder_outputs[
+            -1] if output_hidden_states else encoder_outputs
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        loss = None
-        if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
-
-        return TokenClassifierOutput(
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return logits, encoder_outputs
+        return logits
 
 
 class RobertaForMultipleChoice(RobertaPretrainedModel):
@@ -766,46 +713,35 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                output_hidden_states=False):
 
         num_choices = input_ids.shape[1]
 
-        input_ids = input_ids.reshape(
+        flat_input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1])) if input_ids is not None else None
-        position_ids = position_ids.reshape(
+        flat_position_ids = position_ids.reshape(
             (-1, position_ids.shape[-1])) if position_ids is not None else None
-        token_type_ids = token_type_ids.reshape(
+        flat_token_type_ids = token_type_ids.reshape(
             (-1,
              token_type_ids.shape[-1])) if token_type_ids is not None else None
-        attention_mask = attention_mask.reshape(
+        flat_attention_mask = attention_mask.reshape(
             (-1,
              attention_mask.shape[-1])) if attention_mask is not None else None
 
-        outputs = self.roberta(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
-        pooled_output = outputs[1]
+        encoder_outputs, pooled_output = self.roberta(
+            flat_input_ids,
+            position_ids=flat_position_ids,
+            token_type_ids=flat_token_type_ids,
+            attention_mask=flat_attention_mask,
+            output_hidden_states=output_hidden_states)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        reshaped_logits = logits.reshape((-1, num_choices))
+        output = logits.reshape((-1, num_choices))
 
-        loss = None
-        if not return_dict:
-            output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
-
-        return MultipleChoiceModelOutput(
-            logits=reshaped_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return output, encoder_outputs
+        return output
 
 
 class RobertaForMaskedLM(RobertaPretrainedModel):
@@ -841,9 +777,7 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                output_hidden_states=False):
         r"""
 
         Args:
@@ -890,28 +824,20 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 # [1, 13, 30522]
         """
 
-        outputs = self.roberta(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
+        encoder_outputs, pooled_output = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            output_hidden_states=output_hidden_states)
 
-        sequence_output = outputs[0]
+        sequence_output = encoder_outputs[
+            -1] if output_hidden_states else encoder_outputs
         prediction_scores = self.lm_head(sequence_output)
 
-        masked_lm_loss = None
-        if not return_dict:
-            output = (prediction_scores, ) + outputs[2:]
-            return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else output
-
-        return MaskedLMOutput(
-            logits=prediction_scores,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return prediction_scores, encoder_outputs
+        return prediction_scores
 
 
 class RobertaLMHead(nn.Layer):
@@ -968,9 +894,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_hidden_states=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -1017,27 +941,20 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 # [1, 13, 30522]
         """
 
-        outputs = self.roberta(input_ids,
-                               attention_mask=attention_mask,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               output_attentions=output_attentions,
-                               output_hidden_states=output_hidden_states,
-                               return_dict=return_dict)
+        encoder_outputs, pooled_output = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            output_hidden_states=output_hidden_states)
 
-        sequence_output = outputs[0]
+        sequence_output = encoder_outputs[
+            -1] if output_hidden_states else encoder_outputs
         prediction_scores = self.lm_head(sequence_output)
 
-        lm_loss = None
-        if not return_dict:
-            output = (prediction_scores, ) + outputs[2:]
-            return ((lm_loss, ) + output) if lm_loss is not None else output
-
-        return MaskedLMOutput(
-            logits=prediction_scores,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        if output_hidden_states:
+            return prediction_scores, encoder_outputs
+        return prediction_scores
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
