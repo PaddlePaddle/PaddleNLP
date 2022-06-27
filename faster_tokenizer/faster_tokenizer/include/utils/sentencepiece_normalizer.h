@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "utils/string_view.h"
+
 #include "darts.h"
 
 namespace tokenizers {
@@ -29,28 +31,6 @@ struct Cstrless {
   bool operator()(const char* a, const char* b) const {
     return std::strcmp(a, b) < 0;
   }
-};
-
-struct simple_string_view {
-  const char* ptr_;
-  size_t offset_;
-  size_t size_;
-  explicit simple_string_view(const char* ptr = nullptr)
-      : ptr_(ptr), offset_(0), size_(0) {
-    while (ptr_ && ptr_[size_] != '\0') {
-      size_++;
-    }
-  }
-  simple_string_view(const char* ptr, size_t size) : ptr_(ptr), size_(size) {}
-
-  const char* data() const {
-    if (!ptr_) {
-      return ptr_ + offset_;
-    }
-    return ptr_;
-  }
-  size_t size() const { return size_; }
-  bool empty() const { return size_ == 0; }
 };
 
 class PrefixMatcher {

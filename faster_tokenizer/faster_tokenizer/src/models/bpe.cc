@@ -313,7 +313,7 @@ void to_json(nlohmann::json& j, const BPE& model) {
   core::SortedVocabReversed sorted_vocab_r(model.vocab_reversed_.begin(),
                                            model.vocab_reversed_.end());
 
-  j = {{"type", "WordPiece"},
+  j = {{"type", "BPE"},
        {"unk_token", model.unk_token_},
        {"continuing_subword_prefix", model.continuing_subword_prefix_},
        {"end_of_word_suffix", model.end_of_word_suffix_},

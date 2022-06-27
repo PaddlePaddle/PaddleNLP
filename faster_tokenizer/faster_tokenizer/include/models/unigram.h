@@ -29,6 +29,16 @@ struct Unigram : public Model {
   Unigram();
   Unigram(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
 
+  virtual bool TokenToId(const std::string& token, uint* id) const override;
+  virtual bool IdToToken(uint id, std::string* token) const override;
+  virtual core::Vocab GetVocab() const override;
+  virtual size_t GetVocabSize() const override;
+  virtual std::vector<core::Token> Tokenize(
+      const std::string& sequence) override;
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override;
+
 private:
   void Init(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
   core::Vocab token_to_ids_;
@@ -41,6 +51,9 @@ private:
   size_t eos_id_;
   bool fuse_unk_;
   bool is_optimized_;
+
+  friend void to_json(nlohmann::json& j, const Unigram& model);
+  friend void from_json(const nlohmann::json& j, Unigram& model);
 };
 
 }  // models

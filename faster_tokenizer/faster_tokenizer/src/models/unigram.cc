@@ -16,6 +16,7 @@ limitations under the License. */
 #include <limits>
 #include <sstream>
 
+#include "utils/path.h"
 #include "utils/unique_ptr.h"
 #include "utils/utils.h"
 
@@ -83,6 +84,56 @@ void Unigram::Init(const core::VocabList& vocab,
 
   fuse_unk_ = true;
   is_optimized_ = true;
+}
+
+bool Unigram::TokenToId(const std::string& token, uint* id) const {
+  if (token_to_ids_.find(token) == token_to_ids_.end()) {
+    return false;
+  }
+  *id = token_to_ids_.at(token);
+  return true;
+}
+
+bool Unigram::IdToToken(uint id, std::string* token) const {
+  if (id >= vocab_.size()) {
+    return false;
+  }
+  *token = vocab_[id].first;
+  return true;
+}
+
+core::Vocab Unigram::GetVocab() const { return token_to_ids_; }
+
+size_t Unigram::GetVocabSize() const { return vocab_.size(); }
+
+std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
+  return {};
+}
+
+std::vector<std::string> Unigram::Save(
+    const std::string& folder, const std::string& filename_prefix) const {
+  std::string vocab_path;
+  if (filename_prefix == "") {
+    vocab_path = utils::PathJoin(folder, "unigram.json");
+  } else {
+    vocab_path = utils::PathJoin({folder, filename_prefix, "-unigram.json"});
+  }
+  VLOG(6) << "Vocab path" << vocab_path;
+  std::ofstream fout(vocab_path);
+  nlohmann::json j = *this;
+  fout << j.dump();
+  fout.close();
+  return {vocab_path};
+}
+
+
+void to_json(nlohmann::json& j, const Unigram& model) {
+  j = {{"type", "Unigram"}, {"unk_id", model.unk_id_}, {"vocab", model.vocab_}};
+}
+
+void from_json(const nlohmann::json& j, Unigram& model) {
+  model.Init(j.at("vocab").get<core::VocabList>(),
+             j.at("unk_id").get<std::vector<size_t>>());
 }
 
 }  // model
