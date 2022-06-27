@@ -518,6 +518,8 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
           *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
     } else if (typeid(*tokenizer.model_.get()) == typeid(models::BPE)) {
       j["model"] = *dynamic_cast<models::BPE*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::Unigram)) {
+      j["model"] = *dynamic_cast<models::Unigram*>(tokenizer.model_.get());
     }
   }
 
@@ -627,6 +629,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         models::BPE bpe;
         model.get_to(bpe);
         tokenizer.SetModel(bpe);
+      } else if (model.at("type") == "Unigram") {
+        models::Unigram unigram;
+        model.get_to(unigram);
+        tokenizer.SetModel(unigram);
       }
     }
 
@@ -715,6 +721,8 @@ template Tokenizer::Tokenizer(const models::FasterWordPiece&);
 template void Tokenizer::SetModel(const models::FasterWordPiece&);
 template Tokenizer::Tokenizer(const models::BPE&);
 template void Tokenizer::SetModel(const models::BPE&);
+template Tokenizer::Tokenizer(const models::Unigram&);
+template void Tokenizer::SetModel(const models::Unigram&);
 
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(

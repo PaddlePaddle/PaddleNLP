@@ -170,6 +170,42 @@ class PyBPE : public models::BPE {
   }
 };
 
+class PyUnigram : public models::Unigram {
+  using Unigram::Unigram;
+  virtual std::vector<core::Token> Tokenize(
+      const std::string& tokens) override {
+    PYBIND11_OVERLOAD_NAME(
+        std::vector<core::Token>, Unigram, "tokenize", Tokenize, tokens);
+  }
+
+  virtual bool TokenToId(const std::string& token, uint* id) const override {
+    PYBIND11_OVERLOAD_NAME(bool, Unigram, "token_to_id", TokenToId, token, id);
+  }
+
+  virtual bool IdToToken(uint id, std::string* token) const override {
+    PYBIND11_OVERLOAD_NAME(bool, Unigram, "id_to_token", IdToToken, id, token);
+  }
+
+  virtual core::Vocab GetVocab() const override {
+    PYBIND11_OVERLOAD_NAME(core::Vocab, Unigram, "get_vocab", GetVocab);
+  }
+
+  virtual size_t GetVocabSize() const override {
+    PYBIND11_OVERLOAD_NAME(size_t, Unigram, "get_vocab_size", GetVocabSize);
+  }
+
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override {
+    PYBIND11_OVERLOAD_NAME(std::vector<std::string>,
+                           Unigram,
+                           "save",
+                           Save,
+                           folder,
+                           filename_prefix);
+  }
+};
+
 void BindModels(pybind11::module* m) {
   auto submodule = m->def_submodule("models", "The models module");
   py::class_<models::Model, PyModel>(submodule, "Model")
@@ -327,6 +363,18 @@ void BindModels(pybind11::module* m) {
       .def("id_to_token", &models::BPE::IdToToken)
       .def("get_vocab", &models::BPE::GetVocab)
       .def("get_vocab_size", &models::BPE::GetVocabSize)
+      .def("save",
+           [](const models::BPE& bpe,
+              const std::string& folder,
+              const py::object& py_obj) {
+             std::string prefix = "";
+             if (!py_obj.is(py::none())) {
+               prefix = py_obj.cast<std::string>();
+             }
+             return bpe.Save(folder, prefix);
+           },
+           py::arg("folder"),
+           py::arg("prefix") = py::none())
       .def_static(
           "read_file",
           [](const std::string& vocab_path, const std::string& merges_path) {
@@ -399,6 +447,46 @@ void BindModels(pybind11::module* m) {
           },
           py::arg("vocab"),
           py::arg("merges"));
+  py::class_<models::Unigram, PyUnigram>(submodule, "Unigram")
+      .def(py::init([](const py::object& py_vocab_list,
+                       const py::object& py_unk_token_id) {
+             if (py_vocab_list.is(py::none()) &&
+                 py_unk_token_id.is(py::none())) {
+               return models::Unigram();
+             } else if (!py_vocab_list.is(py::none()) &&
+                        !py_unk_token_id.is(py::none())) {
+               try {
+                 core::VocabList vocab_list =
+                     py_vocab_list.cast<core::VocabList>();
+                 size_t unk_id = py_unk_token_id.cast<size_t>();
+                 return models::Unigram(vocab_list, {unk_id});
+               } catch (...) {
+                 goto error;
+               }
+             }
+           error:
+             throw py::value_error(
+                 "`vocab` and `unk_id` must be both specified");
+           }),
+           py::arg("vocab") = py::none(),
+           py::arg("unk_id") = py::none())
+      .def("tokenize", &models::Unigram::Tokenize)
+      .def("token_to_id", &models::Unigram::TokenToId)
+      .def("id_to_token", &models::Unigram::IdToToken)
+      .def("get_vocab", &models::Unigram::GetVocab)
+      .def("get_vocab_size", &models::Unigram::GetVocabSize)
+      .def("save",
+           [](const models::Unigram& unigram,
+              const std::string& folder,
+              const py::object& py_obj) {
+             std::string prefix = "";
+             if (!py_obj.is(py::none())) {
+               prefix = py_obj.cast<std::string>();
+             }
+             return unigram.Save(folder, prefix);
+           },
+           py::arg("folder"),
+           py::arg("prefix") = py::none());
 }
 }  // pybind
 }  // tokenizers

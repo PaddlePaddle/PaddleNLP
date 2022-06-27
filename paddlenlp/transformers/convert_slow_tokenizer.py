@@ -18,7 +18,7 @@
 from typing import Dict, List, Tuple
 
 from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizer.models import WordPiece, FasterWordPiece, BPE
+from faster_tokenizer.models import WordPiece, FasterWordPiece, BPE, Unigram
 
 
 # Extract the vocab and merge file from sentencepiece file
@@ -193,10 +193,10 @@ class ErnieMConverter(SpmConverter):
 
     def normalizer(self, proto):
         list_normalizers = [
-            normalizers.Replace("“", '"'),
-            normalizers.Replace("”", '"'),
-            normalizers.Replace("’", '"'),
-            normalizers.Replace("—", '"'),
+            normalizers.ReplaceNormalizer("“", '"'),
+            normalizers.ReplaceNormalizer("”", '"'),
+            normalizers.ReplaceNormalizer("’", '"'),
+            normalizers.ReplaceNormalizer("—", '"'),
         ]
         list_normalizers.append(
             normalizers.BertNormalizer(

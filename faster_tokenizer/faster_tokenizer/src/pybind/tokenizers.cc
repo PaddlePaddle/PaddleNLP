@@ -107,7 +107,8 @@ static int TokenizerPropertiesSetNormalizer(TokenizerObject* self,
     self->tokenizer.SetNormalizer(normalizer);
   } else if (pybind11::type::of(py_obj).is(
                  py::type::of<normalizers::PrecompiledNormalizer>())) {
-    const auto& normalizer = py_obj.cast<const normalizers::PrecompiledNormalizer&>();
+    const auto& normalizer =
+        py_obj.cast<const normalizers::PrecompiledNormalizer&>();
     self->tokenizer.SetNormalizer(normalizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleaseNormaizer();
@@ -178,6 +179,9 @@ static int TokenizerPropertiesSetModel(TokenizerObject* self,
     self->tokenizer.SetModel(model);
   } else if (pybind11::type::of(py_obj).is(py::type::of<models::BPE>())) {
     const auto& model = py_obj.cast<const models::BPE&>();
+    self->tokenizer.SetModel(model);
+  } else if (pybind11::type::of(py_obj).is(py::type::of<models::Unigram>())) {
+    const auto& model = py_obj.cast<const models::Unigram&>();
     self->tokenizer.SetModel(model);
   } else {
     ret = 1;
@@ -393,6 +397,9 @@ int TokenizerInit(PyObject* self, PyObject* args, PyObject* kwargs) {
       py_tokenizer_ptr->tokenizer.SetModel(model);
     } else if (pybind11::type::of(py_obj).is(py::type::of<models::BPE>())) {
       const auto& model = py_obj.cast<const models::BPE&>();
+      py_tokenizer_ptr->tokenizer.SetModel(model);
+    } else if (pybind11::type::of(py_obj).is(py::type::of<models::Unigram>())) {
+      const auto& model = py_obj.cast<const models::Unigram&>();
       py_tokenizer_ptr->tokenizer.SetModel(model);
     } else {
       std::ostringstream oss;

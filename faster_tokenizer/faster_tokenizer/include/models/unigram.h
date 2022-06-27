@@ -29,7 +29,7 @@ namespace models {
 struct Unigram : public Model {
   Unigram();
   Unigram(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
-
+  Unigram(const Unigram& other);
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual bool IdToToken(uint id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;

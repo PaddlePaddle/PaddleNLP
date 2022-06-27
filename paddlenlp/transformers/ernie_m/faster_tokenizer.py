@@ -16,6 +16,7 @@
 import os
 import json
 from typing import List, Optional, Tuple
+from shutil import copyfile
 
 from faster_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFasterTokenizer

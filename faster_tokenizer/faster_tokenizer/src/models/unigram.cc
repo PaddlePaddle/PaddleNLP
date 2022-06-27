@@ -36,6 +36,8 @@ Unigram::Unigram(const core::VocabList& vocab,
   Init(vocab, unk_id);
 }
 
+Unigram::Unigram(const Unigram& other) { Init(other.vocab_, other.unk_id_); }
+
 void Unigram::Init(const core::VocabList& vocab,
                    const std::vector<size_t>& unk_id) {
   size_t n = vocab.size();
