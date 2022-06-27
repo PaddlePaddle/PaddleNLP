@@ -236,6 +236,28 @@ class ErnieTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def extend_chinese_char(self):
+        """
+        For, char level model such as ERNIE, we need add ## chinese token 
+        to demonstrate the segment information.
+        """
+        vocab_set = set(self.vocab.token_to_idx.keys())
+        extend_list = []
+        for i in range(len(self.vocab)):
+            if i not in self.vocab.idx_to_token:
+                continue
+            w = self.vocab.idx_to_token[i]
+            if len(w) == 1 and ord(w) >= 0x4E00 and ord(w) <= 0x9FA5:
+                new_char = "##" + w
+                if new_char not in vocab_set:
+                    extend_list.append(new_char)
+        if len(self.vocab) + len(extend_list) > 2**16:
+            warnings.warn("The vocab size if larger than uint16")
+        verbose = self.verbose
+        self.verbose = False
+        self.add_tokens(extend_list)
+        self.verbose = verbose
+
     def _tokenize(self, text):
         r"""
         End-to-end tokenization for ERNIE models.
