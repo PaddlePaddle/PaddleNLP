@@ -778,23 +778,20 @@ class SpecialTokensMixin:
     ]
 
     def __init__(self, verbose=True, **kwargs):
-        # TODO(guosheng): `SpecialTokensMixin.__init__` would be called by
-        # `PretrainedTokenizer._wrap_init` using args which might be str rather
-        # than instances of `AddedToken`, and this causes `AddedToken` settings
-        # made by `_build_special_tokens_map_extended` overwrited.
-        # Maybe `PretrainedTokenizer._wrap_init` should be called before init
-        # later.
-        if getattr(self, "_has_built_special_tokens", None):
-            return
-        self._bos_token = None
-        self._eos_token = None
-        self._unk_token = None
-        self._sep_token = None
-        self._pad_token = None
-        self._cls_token = None
-        self._mask_token = None
-        self._pad_token_type_id = 0
-        self._additional_special_tokens = []
+        # note(guosheng): Since `__init__` might be called multiple times which
+        # is hooked before `PretrainedTokenizer` init, we do not set to None as
+        # HF to avoid unintentional overriding.
+        self._bos_token = getattr(self, "_bos_token", None)
+        self._eos_token = getattr(self, "_eos_token", None)
+        self._unk_token = getattr(self, "_unk_token", None)
+        self._sep_token = getattr(self, "_sep_token", None)
+        self._pad_token = getattr(self, "_pad_token", None)
+        self._cls_token = getattr(self, "_cls_token", None)
+        self._mask_token = getattr(self, "_mask_token", None)
+        self._pad_token_type_id = getattr(self, "_pad_token_type_id", 0)
+        self._additional_special_tokens = getattr(self,
+                                                  "_additional_special_tokens",
+                                                  [])
         self.verbose = verbose
 
         # We directly set the hidden value to allow initialization with special tokens
