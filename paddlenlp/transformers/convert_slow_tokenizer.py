@@ -107,9 +107,15 @@ class TinyBertConverter(BertConverter):
 class SpmConverter(Converter):
 
     def __init__(self, *args):
+        super().__init__(*args)
         import sentencepiece_model_pb2 as model_pb2
         m = model_pb2.ModelProto()
-        with open(self.original_tokenizer.vocab_file, "rb") as f:
+        # For ernie_m sentencepiece tokenizer
+        if hasattr(self.original_tokenizer, "sentencepiece_model_file"):
+            spm_vocab_file = self.original_tokenizer.sentencepiece_model_file
+        else:
+            spm_vocab_file = self.original_tokenizer.vocab_file
+        with open(spm_vocab_file, "rb") as f:
             m.ParseFromString(f.read())
         self.proto = m
 
@@ -123,13 +129,17 @@ class SpmConverter(Converter):
         model_type = proto.trainer_spec.model_type
         vocab = self.vocab(proto)
         unk_id = self.unk_id(proto)
-
+        print("model_type: ", model_type, flush=True)
         if model_type == 1:
             # TODO(zhoushunjie): Need to implement Unigram tokenizer.
             pass
         elif model_type == 2:
-            _, merges = SentencePieceExtractor(
-                self.original_tokenizer.vocab_file).extract()
+            # Special case for ernie-m
+            if hasattr(self.original_tokenizer, "sentencepiece_model_file"):
+                orginal_vocab_file = self.original_tokenizer.sentencepiece_model_file
+            else:
+                orginal_vocab_file = self.original_tokenizer.vocab_file
+            _, merges = SentencePieceExtractor(orginal_vocab_file).extract()
             bpe_vocab = {word: i for i, (word, score) in enumerate(vocab)}
             tokenizer = Tokenizer(
                 BPE(
@@ -148,16 +158,17 @@ class SpmConverter(Converter):
     def normalizer(self, proto):
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
         if not precompiled_charsmap:
-            return normalizers.Sequence([normalizers.Replace(" {2,}", " ")])
+            return normalizers.SequenceNormalizer(
+                [normalizers.ReplaceNormalizer(" {2,}", " ")])
         else:
-            return normalizers.Sequence([
-                normalizers.Precompiled(precompiled_charsmap),
-                normalizers.Replace(" {2,}", " ")
+            return normalizers.SequenceNormalizer([
+                normalizers.PrecompiledNormalizer(precompiled_charsmap),
+                normalizers.ReplaceNormalizer(" {2,}", " ")
             ])
 
     def pretokenizer(self, replacement, add_prefix_space):
-        return pretokenizers.MetaSpace(replacement=replacement,
-                                       add_prefix_space=add_prefix_space)
+        return pretokenizers.MetaSpacePreTokenizer(
+            replacement=replacement, add_prefix_space=add_prefix_space)
 
     def postprocessor(self):
         return None
@@ -180,10 +191,47 @@ class SpmConverter(Converter):
         return tokenizer
 
 
+class ErnieMConverter(SpmConverter):
+
+    def normalizer(self, proto):
+        list_normalizers = [
+            normalizers.Replace("“", '"'),
+            normalizers.Replace("”", '"'),
+            normalizers.Replace("’", '"'),
+            normalizers.Replace("—", '"'),
+        ]
+        list_normalizers.append(
+            normalizers.BertNormalizer(
+                clean_text=True,
+                handle_chinese_chars=False,
+                strip_accents=False,
+                lowercase=False,
+            ))
+
+        precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
+        list_normalizers.append(
+            normalizers.PrecompiledNormalizer(precompiled_charsmap))
+        list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
+        return normalizers.SequenceNormalizer(list_normalizers)
+
+    def post_processor(self):
+        return postprocessors.TemplatePostProcessor(
+            single="[CLS]:0 $A:0 [SEP]:0",
+            pair="[CLS]:0 $A:0 [SEP]:0 $B:1 [SEP]:1",
+            special_tokens=[
+                ("[CLS]",
+                 self.original_tokenizer.convert_tokens_to_ids("[CLS]")),
+                ("[SEP]",
+                 self.original_tokenizer.convert_tokens_to_ids("[SEP]")),
+            ],
+        )
+
+
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
     "TinyBertTokenizer": TinyBertConverter,
+    "ErnieMTokenizer": ErnieMConverter
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 

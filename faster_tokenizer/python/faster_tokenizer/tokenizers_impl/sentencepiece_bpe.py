@@ -16,7 +16,7 @@ from .base_tokenizer import BaseFasterTokenizer
 from faster_tokenizer.models import BPE
 from faster_tokenizer.normalizers import NFKCNormalizer
 from faster_tokenizer import Tokenizer
-from faster_tokenizer.pretokenizers import MetaSpace
+from faster_tokenizer.pretokenizers import MetaSpacePreTokenizer
 
 __all__ = ['SentencePieceBPEFasterTokenizer']
 
@@ -43,8 +43,8 @@ class SentencePieceBPEFasterTokenizer(BaseFasterTokenizer):
         if tokenizer.token_to_id(str(unk_token)) is not None:
             tokenizer.add_special_tokens([str(unk_token)])
         tokenizer.normalizer = NFKCNormalizer()
-        tokenizer.pretokenizer = MetaSpace(replacement=replacement,
-                                           add_prefix_space=add_prefix_space)
+        tokenizer.pretokenizer = MetaSpacePreTokenizer(
+            replacement=replacement, add_prefix_space=add_prefix_space)
         parameters = {
             "model": "SentencePieceBPE",
             "unk_token": unk_token,

@@ -108,7 +108,7 @@ void BindPreTokenizers(pybind11::module* m) {
       .def(py::init<>())
       .def("__call__", &pretokenizers::BertPreTokenizer::operator());
   py::class_<pretokenizers::MetaSpacePreTokenizer, PyMetaSpacePreTokenizer>(
-      sub_module, "MetaSpace")
+      sub_module, "MetaSpacePreTokenizer")
       .def(py::init<const std::string&, bool>(),
            py::arg("replacement") = "_",
            py::arg("add_prefix_space") = true)
