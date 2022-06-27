@@ -90,7 +90,7 @@ class CAIL2018Small(DatasetBuilder):
                     else:
                         lp = line['meta']['term_of_imprisonment'][
                             'imprisonment']
-                    yield {"sentence": sentence, "imprisonment": lp}
+                    yield {"sentence": sentence, "label": lp}
                 else:
                     assert "Dataset name {} does not exist".format(self.name)
         f.close()
