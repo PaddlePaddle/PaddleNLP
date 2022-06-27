@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <cassert>
 #include <cstring>
 
 namespace tokenizers {
@@ -38,6 +39,12 @@ struct simple_string_view {
   }
   size_t size() const { return size_; }
   bool empty() const { return size_ == 0; }
+
+  void remove_prefix(size_t n) {
+    assert(n <= size_);
+    ptr_ += n;
+    size_ -= n;
+  }
 };
 
 }  // namespace utils
