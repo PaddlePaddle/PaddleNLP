@@ -372,5 +372,5 @@ class Taskflow(object):
                 print("[Bot]:%s" % robot)
 
     def set_schema(self, schema):
-        assert self.task_instance.model in support_schema_list, 'This method can only used for the task of information extraction.'
+        assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)

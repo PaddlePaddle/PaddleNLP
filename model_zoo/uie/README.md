@@ -261,8 +261,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   ```python
   >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
   >>> ie.set_schema(schema) # Reset schema
-
-  ie('这个产品用起来真的很流畅，我非常喜欢')
+  >>> ie('这个产品用起来真的很流畅，我非常喜欢')
   [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
   ```
 
