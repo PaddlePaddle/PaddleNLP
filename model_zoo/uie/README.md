@@ -261,7 +261,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   ```python
   >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
   >>> ie.set_schema(schema) # Reset schema
-  
+
   ie('这个产品用起来真的很流畅，我非常喜欢')
   [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
   ```
@@ -423,22 +423,22 @@ python doccano.py \
 
 #### 模型微调
 
-通过运行以下命令进行模型微调：
+通过运行以下命令，使用GPU0卡进行模型微调：
 
 ```shell
-python finetune.py \
-    --train_path ./data/train.txt \
-    --dev_path ./data/dev.txt \
-    --save_dir ./checkpoint \
-    --learning_rate 1e-5 \
-    --batch_size 16 \
-    --max_seq_len 512 \
-    --num_epochs 100 \
-    --model uie-base \
-    --seed 1000 \
-    --logging_steps 10 \
-    --valid_steps 100 \
-    --device gpu
+python -u -m paddle.distributed.launch --gpus "0" finetune.py \
+  --train_path ./data/train.txt \
+  --dev_path ./data/dev.txt \
+  --save_dir ./checkpoint \
+  --learning_rate 1e-5 \
+  --batch_size 16 \
+  --max_seq_len 512 \
+  --num_epochs 100 \
+  --model uie-base \
+  --seed 1000 \
+  --logging_steps 10 \
+  --valid_steps 100 \
+  --device gpu
 ```
 
 可配置参数说明：
