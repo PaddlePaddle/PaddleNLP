@@ -1166,7 +1166,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 4:
                 attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.fluid.data_feeder.convert_dtype(
+            if "int" in paddle.common_ops_import.convert_dtype(
                     attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
