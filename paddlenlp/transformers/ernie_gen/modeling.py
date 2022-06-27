@@ -421,7 +421,7 @@ class ErnieGenPretrainedModel(object):
                                  list(self.resource_files_names.values())[0])
         paddle.save(self.state_dict(), file_name)
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _post_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the prtrained model instance.

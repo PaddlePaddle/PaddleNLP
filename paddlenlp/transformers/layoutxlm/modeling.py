@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
+from paddlenlp.utils.log import logger
 from .. import PretrainedModel, register_base_model
 from .visual_backbone import build_resnet_fpn_backbone
 from .visual_backbone import read_config
@@ -791,6 +792,41 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         embeddings = self.visual_dropout(embeddings)
         return embeddings
 
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        num_position_embeds_diff = new_num_position_embeddings - self.config[
+            "max_position_embeddings"]
+
+        # no resizing needs to be done if the length stays the same
+        if num_position_embeds_diff == 0:
+            return
+
+        logger.info(
+            f"Setting `config.max_position_embeddings={new_num_position_embeddings}`..."
+        )
+        self.config["max_position_embeddings"] = new_num_position_embeddings
+
+        old_position_embeddings_weight = self.embeddings.position_embeddings.weight
+
+        self.embeddings.position_embeddings = nn.Embedding(
+            self.config["max_position_embeddings"], self.config["hidden_size"])
+
+        with paddle.no_grad():
+            if num_position_embeds_diff > 0:
+                self.embeddings.position_embeddings.weight[:
+                                                           -num_position_embeds_diff] = old_position_embeddings_weight
+            else:
+                self.embeddings.position_embeddings.weight = old_position_embeddings_weight[:
+                                                                                            num_position_embeds_diff]
+
     def forward(self,
                 input_ids=None,
                 bbox=None,
@@ -925,6 +961,18 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
 
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutxlm.resize_position_embeddings(new_num_position_embeddings)
+
     def forward(
         self,
         input_ids=None,
@@ -995,6 +1043,18 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
 
     def get_input_embeddings(self):
         return self.layoutxlm.embeddings.word_embeddings
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutxlm.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(
         self,
@@ -1117,6 +1177,18 @@ class LayoutXLMForPretraining(LayoutXLMPretrainedModel):
             self.layoutxlm.config["vocab_size"],
             self.layoutxlm.config["hidden_act"],
             embedding_weights=self.layoutxlm.embeddings.word_embeddings.weight)
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutxlm.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(self,
                 input_ids=None,
@@ -1312,6 +1384,18 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer.weight.set_value(paddle.tensor.ones(shape=layer.bias.shape))
             layer.bias.set_value(paddle.tensor.zeros(shape=layer.bias.shape))
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutxlm.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(
         self,

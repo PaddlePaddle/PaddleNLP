@@ -203,7 +203,7 @@ from paddlenlp import Taskflow
 #### 支持两种模式
 
 ```python
-# 精确模式（默认），基于百度解语，内置66种词性及专名类别标签
+# 精确模式（默认），基于百度解语，内置91种词性及专名类别标签
 >>> from paddlenlp import Taskflow
 >>> ner = Taskflow("ner")
 >>> ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
