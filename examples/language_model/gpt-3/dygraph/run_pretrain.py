@@ -151,6 +151,9 @@ def do_train(args):
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
 
+    mp_group = hcg.get_model_parallel_group()
+    mp_ring_id = mp_group.id
+
     # sharding stage2/3 not support hybrid parallel
     if args.sharding_stage in [2, 3]:
         assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support hybrid parallel later"
@@ -193,6 +196,9 @@ def do_train(args):
 
         model_config['num_partitions'] = args.mp_degree
         model_config['use_recompute'] = args.use_recompute
+        model_config['mp_ring_id'] = mp_ring_id
+        model_config['fuse'] = args.fuse
+        model_config['mp_nranks'] = args.mp_degree
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:

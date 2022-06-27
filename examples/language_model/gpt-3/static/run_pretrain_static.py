@@ -299,8 +299,7 @@ def do_train(args):
                         hidden_dropout_prob=args.hidden_dropout_prob,
                         attention_probs_dropout_prob=args.
                         attention_probs_dropout_prob,
-                        topo=topo,
-                        fuse=args.fuse)
+                        topo=topo)
                 # Create the model for the gpt pretrain
                 preds = model(tokens, position_ids)
 
