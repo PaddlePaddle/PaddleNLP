@@ -53,7 +53,7 @@ def get_availble(est=15, is_mrc=False):
 
 def get_mrc_tasks(model_name_or_path):
     learning_rate_list = [1e-5, 2e-5, 3e-5]
-    batch_size_list = [32, 16]
+    batch_size_list = [32, 24]
     cls_base_grd_acc = 4
     tasks = []
     for lr in learning_rate_list:

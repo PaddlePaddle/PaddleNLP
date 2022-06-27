@@ -9,7 +9,7 @@ function _set_params(){
     pp_degree=${5:-"1"}             # (必选) pp数据并行度
     micro_batch_size=${6:-"2"}      # (必选) micro_batch_size
     global_batch_size=${7:-"16"}    # （必选）global_batch_size
-    run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1
+    run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
     device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
@@ -68,9 +68,12 @@ function _train(){
     # data_path="./data/"
 
     use_pure_fp16=False
+
+    model_config="gpt2-medium-en"
+    [ ${mp_degree} -lt 8 ] && model_config="gpt2-small-en"
     if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
     train_cmd="--model_type gpt \
-                --model_name_or_path gpt2-small-en \
+                --model_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
                 --weight_decay 0.01\
@@ -100,7 +103,7 @@ function _train(){
               run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP2-MP2-PP2|DP2-MP8-PP2) echo "run run_mode: ${run_mode}"
+    DP2-MP2-PP2|DP2-MP8-PP2|DP4-MP8-PP1|DP1-MP8-PP4) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
               run_pretrain.py ${train_cmd}"
         workerlog_id=0

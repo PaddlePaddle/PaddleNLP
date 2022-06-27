@@ -595,7 +595,9 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             source_path = os.path.join(MODEL_HOME, 'ernie-tiny', file_name)
             save_path = os.path.join(save_directory,
                                      self.resource_files_names[name])
-            shutil.copyfile(source_path, save_path)
+
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)
 
     def num_special_tokens_to_add(self, pair=False):
         r"""
