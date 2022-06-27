@@ -196,6 +196,9 @@ def do_train(args):
 
         model_config['num_partitions'] = args.mp_degree
         model_config['use_recompute'] = args.use_recompute
+        if args.pp_degree > 1:
+            args.fuse = False
+            args.mp_ring_id = -1
         model_config['mp_ring_id'] = mp_ring_id
         model_config['fuse'] = args.fuse
         model_config['mp_nranks'] = args.mp_degree
@@ -273,9 +276,10 @@ def do_train(args):
         # level O2 means converting the network to FP16
         if args.sharding_stage not in [2, 3]:
             scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(models=model,
-                                    level='O2',
-                                    save_dtype='float32')
+        if not args.fuse:
+            model = paddle.amp.decorate(models=model,
+                                        level='O2',
+                                        save_dtype='float32')
 
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
@@ -346,6 +350,9 @@ def do_train(args):
                                     "reduce_sum",
                                     "c_softmax_with_cross_entropy",
                                     "elementwise_div"
+                                ],
+                                custom_white_list=[
+                                    "fused_attention", "fused_feedforward"
                                 ],
                                 level='O2'):
                             preds = model(

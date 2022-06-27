@@ -393,6 +393,7 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         if self.fuse:
+            ring_id = mp_ring_id if mp_nranks > 1 else -1
             self.self_attn = incubate.nn.FusedMultiHeadAttention(
                 d_model,
                 nhead,
@@ -405,7 +406,7 @@ class TransformerDecoderLayer(nn.Layer):
                 linear_bias_attr=bias_attrs[0],
                 epsilon=1e-5,
                 nranks=mp_nranks,
-                ring_id=mp_ring_id)
+                ring_id=ring_id)
             self.ffn = incubate.nn.FusedFeedForward(
                 d_model,
                 dim_feedforward,
@@ -419,7 +420,7 @@ class TransformerDecoderLayer(nn.Layer):
                 linear2_weight_attr=weight_attrs[2],
                 linear2_bias_attr=bias_attrs[2],
                 nranks=mp_nranks,
-                ring_id=mp_ring_id)
+                ring_id=ring_id)
         else:
             self.self_attn = MultiHeadAttention(d_model,
                                                 nhead,
