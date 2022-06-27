@@ -1,6 +1,6 @@
 # 基于Triton Inference Server的服务化部署指南
 
-本文档将介绍如何使用[Triton Inference Server](https://github.com/triton-inference-server/server)工具部署基于ERNIE 3.0中文模型文本层次分类的pipeline在线服务。
+本文档将介绍如何使用[Triton Inference Server](https://github.com/triton-inference-server/server)工具部署基于ERNIE 3.0中文模型文本多标签分类的pipeline在线服务。
 
 ## 目录
 - [服务端环境准备](#服务端环境准备)

@@ -1,6 +1,6 @@
 # 基于Paddle Serving的服务化部署
 
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署基于ERNIE 2.0的层次分类部署pipeline在线服务。
+本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署基于ERNIE 3.0的分类部署pipeline在线服务。
 
 ## 目录
 - [环境准备](#环境准备)
@@ -73,9 +73,9 @@ serving/
 │  ├── float32.pdmodel
 │  ├── serving_server_conf.prototxt
 │  └── serving_server_conf.stream.prototxt
-├──config.yml        # 层次分类任务启动服务端的配置文件
-├──rpc_client.py     # 层次分类任务发送pipeline预测请求的脚本
-└──service.py        # 层次分类任务启动服务端的脚本
+├──config.yml        # 分类任务启动服务端的配置文件
+├──rpc_client.py     # 分类任务发送pipeline预测请求的脚本
+└──service.py        # 分类任务启动服务端的脚本
 
 ```
 
