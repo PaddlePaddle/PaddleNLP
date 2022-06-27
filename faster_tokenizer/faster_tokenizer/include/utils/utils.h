@@ -13,11 +13,15 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <string>
 #include <unordered_map>
+
 #include "unicode/uchar.h"
 
 #if defined(_FREEBSD)
@@ -208,6 +212,28 @@ inline size_t OneCharLen(const char* src) {
 #ifdef IS_BIG_ENDIAN
 inline uint32 Swap32(uint32 x) { return __builtin_bswap32(x); }
 #endif
+
+inline void GetSortedVocab(const std::vector<const char*>& keys,
+                           const std::vector<int>& values,
+                           std::vector<const char*>* sorted_keys,
+                           std::vector<int>* sorted_values) {
+  // Sort the vocab
+  std::vector<int> sorted_vocab_index(keys.size());
+  std::iota(sorted_vocab_index.begin(), sorted_vocab_index.end(), 0);
+  std::sort(sorted_vocab_index.begin(),
+            sorted_vocab_index.end(),
+            [&keys](const int a, const int b) {
+              return std::strcmp(keys[a], keys[b]) < 0;
+            });
+
+  sorted_keys->resize(keys.size());
+  sorted_values->resize(keys.size());
+  for (int i = 0; i < sorted_vocab_index.size(); ++i) {
+    auto idx = sorted_vocab_index[i];
+    (*sorted_keys)[i] = keys[idx];
+    (*sorted_values)[i] = values[idx];
+  }
+}
 
 }  // namespace utils
 }  // namespace tokenizers

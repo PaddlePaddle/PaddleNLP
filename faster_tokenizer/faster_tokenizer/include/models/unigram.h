@@ -14,14 +14,34 @@ limitations under the License. */
 
 #pragma once
 
+#include "core/base.h"
 #include "models/model.h"
-#include "nlohmann/json.hpp"
 #include "utils/cache.h"
+#include "utils/trie.h"
+
+#include "darts.h"
+#include "nlohmann/json.hpp"
 
 namespace tokenizers {
 namespace models {
 
-struct Unigram : public Model {};
+struct Unigram : public Model {
+  Unigram();
+  Unigram(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
+
+private:
+  void Init(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
+  core::Vocab token_to_ids_;
+  core::VocabList vocab_;
+  utils::Cache<std::string, core::BPEWord> cache_;
+  std::unique_ptr<Darts::DoubleArray> trie_;
+  double min_score_;
+  std::vector<size_t> unk_id_;
+  size_t bos_id_;
+  size_t eos_id_;
+  bool fuse_unk_;
+  bool is_optimized_;
+};
 
 }  // models
 }  // tokenizers

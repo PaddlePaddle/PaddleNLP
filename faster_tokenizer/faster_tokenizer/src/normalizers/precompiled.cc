@@ -15,7 +15,10 @@ limitations under the License. */
 #include "normalizers/precompiled.h"
 #include <iomanip>
 #include <sstream>
+
 #include "glog/logging.h"
+#include "utils/unique_ptr.h"
+
 
 namespace tokenizers {
 namespace normalizers {
@@ -41,8 +44,8 @@ static std::string GetByteFromString(const std::string& str) {
 
 void PrecompiledNormalizer::SetPrecompiledCharsMap(
     const std::string& precompiled_charsmap) {
-  sentencepiece_normalizer_ = std::unique_ptr<utils::Normalizer>(
-      new utils::Normalizer(precompiled_charsmap));
+  sentencepiece_normalizer_ =
+      utils::make_unique<utils::Normalizer>(precompiled_charsmap);
 }
 
 void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include "utils/utf8.h"
 #include "utils/utils.h"
+#include "utils/unique_ptr.h"
 
 #include "glog/logging.h"
 #include "unicode/brkiter.h"
@@ -29,7 +30,7 @@ PrefixMatcher::PrefixMatcher(const std::set<const char*, Cstrless>& dic) {
   std::vector<const char*> key;
   key.reserve(dic.size());
   for (const auto& it : dic) key.push_back(it);
-  trie_ = std::unique_ptr<Darts::DoubleArray>(new Darts::DoubleArray());
+  trie_= utils::make_unique<Darts::DoubleArray>();
   trie_->build(key.size(), const_cast<char**>(&key[0]), nullptr, nullptr);
 }
 
@@ -105,8 +106,7 @@ void Normalizer::Init() {
                               &normalized_blob_);
 #endif
     // Reads the body of double array.
-    trie_ = std::unique_ptr<Darts::DoubleArray>(new Darts::DoubleArray());
-
+    trie_ = utils::make_unique<Darts::DoubleArray>();
     // The second arg of set_array is not the size of blob,
     // but the number of double array units.
     trie_->set_array(const_cast<char*>(trie_blob_.data()),
