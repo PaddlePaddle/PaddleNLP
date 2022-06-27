@@ -129,10 +129,8 @@ class SpmConverter(Converter):
         model_type = proto.trainer_spec.model_type
         vocab = self.vocab(proto)
         unk_id = self.unk_id(proto)
-        print("model_type: ", model_type, flush=True)
         if model_type == 1:
-            # TODO(zhoushunjie): Need to implement Unigram tokenizer.
-            pass
+            tokenizer = Tokenizer(Unigram(vocab, unk_id))
         elif model_type == 2:
             # Special case for ernie-m
             if hasattr(self.original_tokenizer, "sentencepiece_model_file"):
