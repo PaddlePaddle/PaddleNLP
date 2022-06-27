@@ -36,7 +36,6 @@ namespace utils {
 // Size of nodes pre-allocated in Lattice.
 constexpr size_t kPreallocateLatticeNodeSize = 1024;
 
-constexpr float kUnkPenalty = 10.0;
 constexpr float kEpsilon = 1e-7;
 
 constexpr unsigned int kDefaultSeed = static_cast<unsigned int>(-1);

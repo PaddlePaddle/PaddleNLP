@@ -17,6 +17,7 @@ limitations under the License. */
 #include "core/base.h"
 #include "models/model.h"
 #include "utils/cache.h"
+#include "utils/lattice.h"
 #include "utils/trie.h"
 
 #include "darts.h"
@@ -41,9 +42,17 @@ struct Unigram : public Model {
 
 private:
   void Init(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
+  void PopulateNodes(utils::Lattice* lattice) const;
+  void Encode(const std::string& normalized,
+              std::vector<std::string>* encode_result);
+  void EncodeOptimized(const std::string& normalized,
+                       std::vector<std::string>* encode_result);
+  void EncodeUnoptimized(const std::string& normalized,
+                         std::vector<std::string>* encode_result);
+
   core::Vocab token_to_ids_;
   core::VocabList vocab_;
-  utils::Cache<std::string, core::BPEWord> cache_;
+  utils::Cache<std::string, std::vector<std::string>> cache_;
   std::unique_ptr<Darts::DoubleArray> trie_;
   double min_score_;
   std::vector<size_t> unk_id_;
@@ -51,6 +60,7 @@ private:
   size_t eos_id_;
   bool fuse_unk_;
   bool is_optimized_;
+  int trie_results_size_;
 
   friend void to_json(nlohmann::json& j, const Unigram& model);
   friend void from_json(const nlohmann::json& j, Unigram& model);
