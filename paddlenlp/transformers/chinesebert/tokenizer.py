@@ -124,28 +124,20 @@ class ChineseBertTokenizer(BertTokenizer):
     }
     padding_side = "right"
 
-    def __init__(
-        self,
-        vocab_file,
-        do_lower_case=True,
-        pinyin_map=None,
-        id2pinyin=None,
-        pinyin2tensor=None,
-        unk_token="[UNK]",
-        sep_token="[SEP]",
-        pad_token="[PAD]",
-        cls_token="[CLS]",
-        mask_token="[MASK]",
-    ):
-        super().__init__(
-            vocab_file,
-            do_lower_case,
-            unk_token,
-            sep_token,
-            pad_token,
-            cls_token,
-            mask_token,
-        )
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=True,
+                 pinyin_map=None,
+                 id2pinyin=None,
+                 pinyin2tensor=None,
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]",
+                 **kwargs):
+        super().__init__(vocab_file, do_lower_case, unk_token, sep_token,
+                         pad_token, cls_token, mask_token, **kwargs)
         self.pinyin_dict = pinyin_map
         self.id2pinyin = id2pinyin
         self.pinyin2tensor = pinyin2tensor

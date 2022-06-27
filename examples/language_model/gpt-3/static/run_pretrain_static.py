@@ -77,7 +77,7 @@ def dist_optimizer(args, topo):
         args.global_batch_size, micro_batch_size)
     acc_steps = bsz_per_dp // micro_batch_size
 
-    exec_strategy = paddle.fluid.ExecutionStrategy()
+    exec_strategy = paddle.static.ExecutionStrategy()
     exec_strategy.num_threads = 2
     exec_strategy.num_iteration_per_drop_scope = 1
 
@@ -320,8 +320,7 @@ def do_train(args):
 
             clip = None
             if args.grad_clip > 0:
-                clip = paddle.fluid.clip.GradientClipByGlobalNorm(
-                    clip_norm=args.grad_clip)
+                clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
             decay_param = [
                 p.name for n, p in model.named_parameters()
