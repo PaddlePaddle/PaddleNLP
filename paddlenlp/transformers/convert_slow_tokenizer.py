@@ -210,7 +210,12 @@ class ErnieMConverter(SpmConverter):
         list_normalizers.append(
             normalizers.PrecompiledNormalizer(precompiled_charsmap))
         list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
+        list_normalizers.append(normalizers.ReplaceNormalizer("\\s$", ""))
         return normalizers.SequenceNormalizer(list_normalizers)
+
+    def unk_id(self, proto):
+        return self.original_tokenizer.convert_tokens_to_ids(
+            str(self.original_tokenizer.unk_token))
 
     def postprocessor(self):
         '''

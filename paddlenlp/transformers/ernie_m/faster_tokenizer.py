@@ -32,7 +32,7 @@ VOCAB_FILES_NAMES = {
 SPIECE_UNDERLINE = "▁"
 
 
-class ErnieMTFasterTokenizer(PretrainedFasterTokenizer):
+class ErnieMFasterTokenizer(PretrainedFasterTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieMTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

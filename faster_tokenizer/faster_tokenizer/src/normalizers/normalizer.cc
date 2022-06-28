@@ -466,21 +466,20 @@ NormalizedString& NormalizedString::Replace(const re2::RE2& pattern,
     size_t curr_start = result.data() - normalized_.data();
     size_t old_len = result.length();
     size_t curr_end = curr_start + old_len;
-    // update start
-    start = curr_end;
-    if (offset >= 0) {
-      curr_start += offset;
-      curr_end += offset;
-    } else {
-      size_t uoffset = -offset;
-      curr_start = (curr_start >= uoffset) ? curr_start - uoffset : 0;
-      curr_end = (curr_end >= uoffset) ? curr_end - uoffset : 0;
-    }
     size_t removed_chars =
         utils::GetUnicodeLenFromUTF8(normalized_.data() + curr_start, old_len);
     UpdateNormalizedRange(
         new_normalized, removed_chars, {curr_start, curr_end}, false);
-    offset += new_len - old_len;
+    offset = new_len - old_len;
+    // update start
+    start = curr_end;
+    if (offset >= 0) {
+      start = curr_end + offset;
+    } else {
+      size_t uoffset = -offset;
+      start = (curr_end >= uoffset) ? curr_end - uoffset : 0;
+    }
+    end = normalized_.length();
   }
   return *this;
 }

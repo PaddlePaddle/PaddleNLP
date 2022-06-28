@@ -310,7 +310,7 @@ void Unigram::EncodeOptimized(const std::string& normalized,
       if (!token.empty()) {
         encode_result->push_back("");
         auto& back = encode_result->back();
-        for (auto i = token.size() - 1; i >= 0; --i) {
+        for (int i = token.size() - 1; i >= 0; --i) {
           back.append(token[i]);
         }
         token.clear();
@@ -323,7 +323,7 @@ void Unigram::EncodeOptimized(const std::string& normalized,
   if (!token.empty()) {
     encode_result->push_back("");
     auto& back = encode_result->back();
-    for (auto i = token.size() - 1; i >= 0; --i) {
+    for (int i = token.size() - 1; i >= 0; --i) {
       back.append(token[i]);
     }
   }
