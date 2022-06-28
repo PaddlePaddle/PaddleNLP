@@ -179,7 +179,7 @@ class Trainer:
                           paddle.optimizer.lr.LRScheduler] = (None, None),
     ):
         if paddle.distributed.get_world_size() > 1:
-            if not paddle.fluid.dygraph.parallel_helper._is_parallel_ctx_initialized(
+            if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
             ):
                 paddle.distributed.init_parallel_env()
 
@@ -874,7 +874,7 @@ class Trainer:
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
 
-        core = paddle.fluid.core
+        core = paddle.framework.core
         if core.is_compiled_with_cuda():
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i)._is_init_py = True
@@ -1125,8 +1125,8 @@ class Trainer:
             np.random.get_state(),
             "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
             "cpu":
-            paddle.fluid.core.default_cpu_generator().get_state().current_seed(
-            ),
+            paddle.framework.core.default_cpu_generator().get_state().
+            current_seed(),
         }
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
