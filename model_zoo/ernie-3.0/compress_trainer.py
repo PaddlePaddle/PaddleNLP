@@ -211,7 +211,7 @@ def _dynabert(self, model, output_dir, dynabert_config):
     train_dataloader = self.get_train_dataloader()
 
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-    if "QuestionAnswering" in model.init_config["init_class"]:
+    if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
         ofa_model, teacher_model = _dynabert_init(
@@ -315,7 +315,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                        eval_dataloader, width_mult_list, criterion,
                        num_train_epochs, output_dir):
     metric = Accuracy()
-    if "TokenClassification" in model.init_config["init_class"]:
+    if "TokenClassification" in model.__class__.__name__:
         metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
 
     @paddle.no_grad()
@@ -326,9 +326,9 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         metric.reset()
         for batch in data_loader:
             if isinstance(model, OFA):
-                class_name = model.model.init_config["init_class"]
+                class_name = model.model.__class__.__name__
             else:
-                class_name = model.init_config["init_class"]
+                class_name = model.__class__.__name__
 
             if "QuestionAnswering" in class_name:
                 input_ids, token_type_ids = batch['input_ids'], batch[
@@ -423,7 +423,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
 
         for step, batch in enumerate(train_dataloader):
             global_step += 1
-            if "QuestionAnswering" in model.init_config["init_class"]:
+            if "QuestionAnswering" in model.__class__.__name__:
                 input_ids, token_type_ids, start_positions, end_positions = batch[
                     'input_ids'], batch['token_type_ids'], batch[
                         'start_positions'], batch['end_positions']
@@ -439,7 +439,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                                                    token_type_ids,
                                                    attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
-                if "QuestionAnswering" in model.init_config["init_class"]:
+                if "QuestionAnswering" in model.__class__.__name__:
                     logit_loss = (soft_cross_entropy(logits[0], teacher_logits[0].detach()) \
                                 + \
                                 soft_cross_entropy(logits[1], teacher_logits[1].detach()))/2
@@ -460,8 +460,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                            self.args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if "QuestionAnswering" not in model.init_config[
-                    "init_class"] and global_step % self.args.save_steps == 0:
+            if "QuestionAnswering" not in model.__class__.__name__ and global_step % self.args.save_steps == 0:
                 tic_eval = time.time()
 
                 evaluate(teacher_model,
@@ -500,7 +499,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 logger.info("Best acc: %.4f" % (best_acc))
                 return ofa_model
 
-        if "QuestionAnswering" in model.init_config["init_class"]:
+        if "QuestionAnswering" in model.__class__.__name__:
             tic_eval = time.time()
             evaluate(teacher_model, criterion, eval_dataloader, width_mult=100)
             logger.info("eval done total : %s s" % (time.time() - tic_eval))
@@ -537,10 +536,10 @@ def _dynabert_export(ofa_model, dynabert_config, output_dir):
         model_dir = os.path.join(output_dir, str(width_mult))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
-        if "QuestionAnswering" in ofa_model.model.init_config["init_class"]:
+        if "QuestionAnswering" in ofa_model.model.__class__.__name__:
             origin_model = AutoModelForQuestionAnswering.from_pretrained(
                 model_dir)
-        elif "TokenClassification" in ofa_model.model.init_config["init_class"]:
+        elif "TokenClassification" in ofa_model.model.__class__.__name__:
             origin_model = AutoModelForTokenClassification.from_pretrained(
                 model_dir)
         else:
@@ -725,7 +724,7 @@ def compute_neuron_head_importance(model,
 
     for batch in data_loader:
         if isinstance(batch, dict):
-            if "QuestionAnswering" in model.init_config["init_class"]:
+            if "QuestionAnswering" in model.__class__.__name__:
                 input_ids, segment_ids, start_positions, end_positions = batch[
                     'input_ids'], batch['token_type_ids'], batch[
                         'start_positions'], batch['end_positions']
@@ -735,7 +734,7 @@ def compute_neuron_head_importance(model,
         else:
             input_ids, segment_ids, labels = batch
         logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
-        if "QuestionAnswering" in model.init_config["init_class"]:
+        if "QuestionAnswering" in model.__class__.__name__:
             start_logits, end_logits = logits
             loss = (loss_fct(start_logits, start_positions) +
                     loss_fct(end_logits, end_positions)) / 2
