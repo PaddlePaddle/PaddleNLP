@@ -273,10 +273,9 @@ def do_train(args):
         # level O2 means converting the network to FP16
         if args.sharding_stage not in [2, 3]:
             scaler = fleet.distributed_scaler(scaler)
-        if not args.fuse or args.pp_degree > 1:
-            model = paddle.amp.decorate(models=model,
-                                        level='O2',
-                                        save_dtype='float32')
+        model = paddle.amp.decorate(models=model,
+                                    level='O2',
+                                    save_dtype='float32')
 
     # wrap sharding stage2/3 and add collective group
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
