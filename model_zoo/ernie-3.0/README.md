@@ -1316,7 +1316,6 @@ compress_config = CompressConfig(quantization_config=PTQConfig(
         DynabertConfig(width_mul_ist=[3/4]))
 
 trainer.compress(
-    data_args.dataset,
     output_dir,
     pruning=True, # 开启裁剪
     quantization=True, # 开启量化
@@ -1324,7 +1323,7 @@ trainer.compress(
 ```
 由于压缩 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型压缩来说必要传入的参数如下：
 
-- `model`：ERNIE、BERT 等模型，是在 `task_name` 任务中微调后的模型。以分类模型为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 来获取
+- `model`：ERNIE、BERT 等模型，是在下游任务中微调后的模型。以分类模型为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 来获取
 - `data_collator`：三类任务均可使用 PaddleNLP 预定义好的[DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考本项目中代码即可
 - `train_dataset`：裁剪训练需要使用的训练集
 - `eval_dataset`：裁剪训练使用的评估集，也是量化使用的校准数据
@@ -1332,7 +1331,6 @@ trainer.compress(
 
 然后可以直接调用 `compress` 启动压缩，其中 `compress` 的参数释义如下：
 
-- `task_name`：任务名，例如 `tnews`、`msra_ner`、`clue cmrc2018`等
 - `output_dir`：裁剪、量化后的模型保存目录
 - `pruning`：是否裁剪，默认为`True`
 - `quantization`：是否量化，默认为 `True`
