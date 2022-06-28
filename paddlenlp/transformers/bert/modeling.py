@@ -868,7 +868,8 @@ class BertForSequenceClassification(BertPretrainedModel):
         loss = None
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
             logits=logits,
@@ -963,7 +964,8 @@ class BertForTokenClassification(BertPretrainedModel):
         loss = None
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
             logits=logits,
@@ -1385,7 +1387,8 @@ class BertForMultipleChoice(BertPretrainedModel):
         loss = None
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(
             logits=reshaped_logits,
@@ -1487,7 +1490,8 @@ class BertForMaskedLM(BertPretrainedModel):
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
             return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else output
+                    output) if masked_lm_loss is not None else (
+                        output[0] if len(output) == 1 else output)
 
         return MaskedLMOutput(
             logits=prediction_scores,

@@ -640,7 +640,8 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         loss = None
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
             logits=logits,
@@ -741,7 +742,8 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         loss = None
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
             logits=logits,
@@ -799,7 +801,8 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
         loss = None
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else output
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(
             logits=reshaped_logits,
@@ -905,7 +908,8 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
             return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else output
+                    output) if masked_lm_loss is not None else (
+                        output[0] if len(output) == 1 else output)
 
         return MaskedLMOutput(
             logits=prediction_scores,
@@ -1031,7 +1035,8 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         lm_loss = None
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
-            return ((lm_loss, ) + output) if lm_loss is not None else output
+            return ((lm_loss, ) + output) if lm_loss is not None else (
+                output[0] if len(output) == 1 else output)
 
         return MaskedLMOutput(
             logits=prediction_scores,
