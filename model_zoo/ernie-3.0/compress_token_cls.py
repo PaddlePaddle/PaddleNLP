@@ -141,8 +141,7 @@ def main():
     compress_config = CompressConfig(quantization_config=PTQConfig(
         algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
 
-    trainer.compress(data_args.dataset,
-                     output_dir,
+    trainer.compress(output_dir,
                      pruning=True,
                      quantization=True,
                      compress_config=compress_config)
