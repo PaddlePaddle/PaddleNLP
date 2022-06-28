@@ -445,7 +445,7 @@ def do_train(args):
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
 
-    tokenizer = tokenizer_class.from_pretrained(args.tokenize_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
     tokenizer.extend_chinese_char()
 
     data_file = get_train_data_file(args)

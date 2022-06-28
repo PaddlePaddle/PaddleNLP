@@ -419,7 +419,7 @@ def do_train(args):
             masked_lm_labels, next_sentence_labels
         ] = data_holders
 
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+        tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
         tokenizer.extend_chinese_char()
 
         train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(

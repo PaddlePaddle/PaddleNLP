@@ -140,7 +140,7 @@ class ModelArguments:
             "help":
             "Pretrained config name or path if not the same as model_name"
         })
-    tokenizer_name: Optional[str] = field(
+    tokenizer_name_or_path: Optional[str] = field(
         default=None,
         metadata={
             "help":
@@ -339,6 +339,9 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, PreTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if model_args.tokenizer_name_or_path is None:
+        model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -448,7 +451,8 @@ def main():
         decay_step=training_args.decay_steps)
 
     data_file = get_train_data_file(data_args)
-    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(
+        model_args.tokenizer_name_or_path)
     tokenizer.extend_chinese_char()
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
