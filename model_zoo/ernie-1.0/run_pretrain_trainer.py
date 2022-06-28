@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -148,7 +148,13 @@ class ModelArguments:
         })
 
 
-def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
+def create_pretrained_dataset(
+    data_args,
+    training_args,
+    data_file,
+    tokenizer,
+    binary_head=True,
+):
 
     train_valid_test_num_samples = [
         training_args.per_device_train_batch_size * training_args.world_size *
@@ -170,7 +176,7 @@ def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
         short_seq_prob=data_args.short_seq_prob,
         seed=training_args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
 
@@ -230,12 +236,26 @@ def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f))
-            and "_idx.npz" in str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f))
+                and "_idx.npz" in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -357,6 +377,10 @@ def main():
 
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
         model_args.model_type]
+
+    if model_args.binary_head is False:
+        model_class = ErnieForMaskedLM
+
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
@@ -382,7 +406,8 @@ def main():
             """CriterionWrapper
             """
             super(CriterionWrapper, self).__init__()
-            self.criterion = criterion_class()
+            self.criterion = criterion_class(
+                with_nsp_loss=model_args.binary_head)
 
         def forward(self, output, labels):
             """forward function
@@ -394,15 +419,21 @@ def main():
             Returns:
                 Tensor: final loss.
             """
-            prediction_scores, seq_relationship_score = output
             masked_lm_labels, next_sentence_labels = labels
+            if model_args.binary_head:
+                prediction_scores, seq_relationship_score = output
 
-            lm_loss, sop_loss = self.criterion(prediction_scores,
-                                               seq_relationship_score,
-                                               masked_lm_labels,
-                                               next_sentence_labels)
+                lm_loss, sop_loss = self.criterion(prediction_scores,
+                                                   seq_relationship_score,
+                                                   masked_lm_labels,
+                                                   next_sentence_labels)
 
-            loss = lm_loss + sop_loss
+                loss = lm_loss + sop_loss
+
+            else:
+                prediction_scores = output
+                loss = self.criterion(prediction_scores, None, masked_lm_labels)
+
             return loss
 
     # Create the learning_rate sheduler and optimizer
@@ -421,7 +452,7 @@ def main():
     tokenizer.extend_chinese_char()
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer)
+        data_args, training_args, data_file, tokenizer, model_args.binary_head)
 
     trainer = PretrainingTrainer(
         model=model,

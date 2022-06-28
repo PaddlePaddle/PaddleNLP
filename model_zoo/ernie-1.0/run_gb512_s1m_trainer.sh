@@ -22,6 +22,7 @@ python -u  -m paddle.distributed.launch \
     --fp16  \
     --fp16_opt_level "O2"  \
     --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
     --max_steps 1000000 \
     --save_steps 50000 \
     --weight_decay 0.01 \

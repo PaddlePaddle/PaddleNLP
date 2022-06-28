@@ -143,7 +143,7 @@ class ErniePretrainedModel(PretrainedModel):
             "hidden_dropout_prob": 0.1,
             "hidden_size": 768,
             "initializer_range": 0.02,
-            "max_position_embeddings": 513,
+            "max_position_embeddings": 512,
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
@@ -1012,6 +1012,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, masked_positions)
+
             return prediction_scores, seq_relationship_score
 
 
@@ -1111,7 +1112,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                masked_positions=None):
         r"""
 
         Args:
@@ -1123,6 +1125,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
                 See :class:`ErnieModel`.
+            masked_positions:
+                masked positions of output. 
 
         Returns:
             Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
@@ -1151,7 +1155,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                              position_ids=position_ids,
                              attention_mask=attention_mask)
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output,
+                                     masked_positions=masked_positions)
         return prediction_scores
 
 
