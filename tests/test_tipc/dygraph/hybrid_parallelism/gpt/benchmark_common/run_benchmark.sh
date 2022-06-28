@@ -126,6 +126,7 @@ function _train(){
     fi
 }
 
+export LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
