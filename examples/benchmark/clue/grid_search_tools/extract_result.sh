@@ -19,10 +19,11 @@ declare -A dict
 
 for task in afqmc tnews iflytek cmnli ocnli cluewsc2020 csl cmrc2018 chid c3
 do
+    # `awk '{print substr($0,1,11)}'` is to prevent '[' brought by logger.
     if [ $task == 'cmrc2018' ]; then
-        dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_result|awk '{print $7}' |awk '{print substr($0,1,11)}'|awk '$0>x{x=$0};END{print x}'`
+        dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_result|awk '{print $7}' |awk '{print substr($0,1,11)}'|awk 'BEGIN {max = 0} {if ($1+0 > max+0) max=$1} END {print  max}'`
     else
-    dict[${task}]=`cat ${MODEL_PATH}/${task}/*|grep best_result|awk '{print $7}' |awk '{print substr($0,1,5)}'|awk '$0>x{x=$0};END{print x}'`
+    dict[${task}]=`tail -n 1  ${MODEL_PATH}/${task}/*|grep best_result|awk '{print $7}'|awk '{print substr($0,1,5)}'|awk 'BEGIN {max = 0} {if ($1+0 > max+0) max=$1} END {print  max}'`
     fi
 done
 

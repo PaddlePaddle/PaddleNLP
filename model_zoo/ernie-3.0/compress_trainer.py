@@ -1,4 +1,3 @@
-# Copyright 2020-present the HuggingFace Inc. team.
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -134,7 +133,6 @@ class CompressConfig:
 
 
 def compress(self,
-             task_name,
              output_dir,
              pruning=True,
              quantization=True,
@@ -143,8 +141,6 @@ def compress(self,
     Supports pruning and quantization. If both are needed, pruning would be
     performed before quantizaton.
     Args:
-        task_name (str):
-            Task name. For example: tnews, msra_ner.
         output_dir (str):
             Directory name of Pruning or quantized models.
         pruning (bool):
@@ -158,10 +154,9 @@ def compress(self,
             quantization.
             Defaults to `CompressConfig()`.
     """
-    task_name = task_name.lower()
     if pruning:
         try_import_paddleslim()
-        self.prune(task_name, output_dir, compress_config.prune_config)
+        self.prune(output_dir, compress_config.prune_config)
         if quantization:
             for width_mult in compress_config.prune_config.width_mult_list:
                 output_dir_width = os.path.join(output_dir, str(width_mult))
@@ -185,14 +180,14 @@ def compress(self,
                    compress_config.quantization_config)
 
 
-def prune(self, task_name, output_dir, prune_config=DynabertConfig()):
+def prune(self, output_dir, prune_config=DynabertConfig()):
     """
     Supports DynaBERT strategy now.
     """
     assert isinstance(prune_config, (DynabertConfig)), \
         "`prune_config` should be an instance of `DynabertConfig`."
     if prune_config.compress_type == "dynabert":
-        _dynabert(self, task_name, self.model, output_dir, prune_config)
+        _dynabert(self, self.model, output_dir, prune_config)
 
 
 def quant(self, input_dir, output_dir, quantization_config=PTQConfig()):
@@ -208,7 +203,7 @@ def quant(self, input_dir, output_dir, quantization_config=PTQConfig()):
                                             quantization_config)
 
 
-def _dynabert(self, task_name, model, output_dir, dynabert_config):
+def _dynabert(self, model, output_dir, dynabert_config):
     model.base_model_class._ori_forward = model.base_model_class.forward
     model.base_model_class.forward = auto_model_forward
 
@@ -216,18 +211,18 @@ def _dynabert(self, task_name, model, output_dir, dynabert_config):
     train_dataloader = self.get_train_dataloader()
 
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-    if "cmrc2018" in task_name:
+    if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
         ofa_model, teacher_model = _dynabert_init(
-            task_name, model, eval_dataloader_with_label, self.criterion,
+            model, eval_dataloader_with_label, self.criterion,
             dynabert_config.width_mult_list)
     else:
         ofa_model, teacher_model = _dynabert_init(
-            task_name, model, eval_dataloader, self.criterion,
+            model, eval_dataloader, self.criterion,
             dynabert_config.width_mult_list)
-
     args = self.args
+
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
         args.num_training_steps = args.max_steps
@@ -235,19 +230,17 @@ def _dynabert(self, task_name, model, output_dir, dynabert_config):
                                           len(train_dataloader))
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
-        args.num_train_epochs = args.num_train_epochs
     self.create_optimizer_and_scheduler(
         num_training_steps=args.num_training_steps)
 
-    ofa_model = _dynabert_training(self, task_name, ofa_model, model,
-                                   teacher_model, train_dataloader,
-                                   eval_dataloader,
+    ofa_model = _dynabert_training(self, ofa_model, model, teacher_model,
+                                   train_dataloader, eval_dataloader,
                                    dynabert_config.width_mult_list,
                                    self.criterion, args.num_train_epochs,
                                    output_dir)
 
     # Each width_mult best model would be exported.
-    _dynabert_export(task_name, ofa_model, dynabert_config, output_dir)
+    _dynabert_export(ofa_model, dynabert_config, output_dir)
 
     model.base_model_class.forward = model.base_model_class._ori_forward
     logger.info("DynaBERT training finished.")
@@ -260,8 +253,7 @@ def _recover_transormer_func():
     # nn.MultiHeadAttention._prepare_qkv = nn.MultiHeadAttention._ori_prepare_qkv
 
 
-def _dynabert_init(task_name, model, eval_dataloader, criterion,
-                   width_mult_list):
+def _dynabert_init(model, eval_dataloader, criterion, width_mult_list):
     from paddleslim.nas.ofa.convert_super import Convert, supernet
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
 
@@ -305,7 +297,6 @@ def _dynabert_init(task_name, model, eval_dataloader, criterion,
     from paddleslim.nas.ofa.utils import nlp_utils
 
     head_importance, neuron_importance = compute_neuron_head_importance(
-        task_name=task_name,
         model=ofa_model.model,
         data_loader=eval_dataloader,
         loss_fct=criterion,
@@ -320,11 +311,11 @@ def _dynabert_init(task_name, model, eval_dataloader, criterion,
     return ofa_model, teacher_model
 
 
-def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
-                       train_dataloader, eval_dataloader, width_mult_list,
-                       criterion, num_train_epochs, output_dir):
+def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
+                       eval_dataloader, width_mult_list, criterion,
+                       num_train_epochs, output_dir):
     metric = Accuracy()
-    if task_name == "msra_ner":
+    if "TokenClassification" in model.__class__.__name__:
         metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
 
     @paddle.no_grad()
@@ -334,7 +325,12 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
         all_end_logits = []
         metric.reset()
         for batch in data_loader:
-            if "cmrc2018" in task_name:
+            if isinstance(model, OFA):
+                class_name = model.model.__class__.__name__
+            else:
+                class_name = model.__class__.__name__
+
+            if "QuestionAnswering" in class_name:
                 input_ids, token_type_ids = batch['input_ids'], batch[
                     'token_type_ids']
                 logits = model(input_ids,
@@ -361,7 +357,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 if isinstance(logits, tuple):
                     logits = logits[0]
                 loss = criterion(logits, labels)
-                if task_name == "msra_ner":
+                if "TokenClassification" in class_name:
                     preds = logits.argmax(axis=2)
                     num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
                         batch['seq_len'], preds, batch['labels'])
@@ -371,7 +367,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 else:
                     correct = metric.compute(logits, labels)
                     metric.update(correct)
-        if "cmrc2018" in task_name:
+        if "QuestionAnswering" in class_name:
             n_best_size = 20
             max_answer_length = 50
             all_predictions, _, _ = compute_prediction(
@@ -392,7 +388,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
         else:
             res = metric.accumulate()
             # Teacher model's evaluation
-            if task_name == "msra_ner":
+            if "TokenClassification" in class_name:
                 if width_mult == 100:
                     logger.info(
                         "teacher model, eval loss: %f, precision: %f, recall: %f, f1_score: %f"
@@ -427,7 +423,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
 
         for step, batch in enumerate(train_dataloader):
             global_step += 1
-            if "cmrc2018" in task_name:
+            if "QuestionAnswering" in model.__class__.__name__:
                 input_ids, token_type_ids, start_positions, end_positions = batch[
                     'input_ids'], batch['token_type_ids'], batch[
                         'start_positions'], batch['end_positions']
@@ -443,7 +439,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                                                    token_type_ids,
                                                    attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
-                if "cmrc2018" in task_name:
+                if "QuestionAnswering" in model.__class__.__name__:
                     logit_loss = (soft_cross_entropy(logits[0], teacher_logits[0].detach()) \
                                 + \
                                 soft_cross_entropy(logits[1], teacher_logits[1].detach()))/2
@@ -464,7 +460,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                            self.args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if "cmrc2018" not in task_name and global_step % self.args.save_steps == 0:
+            if "QuestionAnswering" not in model.__class__.__name__ and global_step % self.args.save_steps == 0:
                 tic_eval = time.time()
 
                 evaluate(teacher_model,
@@ -503,7 +499,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
                 logger.info("Best acc: %.4f" % (best_acc))
                 return ofa_model
 
-        if "cmrc2018" in task_name:
+        if "QuestionAnswering" in model.__class__.__name__:
             tic_eval = time.time()
             evaluate(teacher_model, criterion, eval_dataloader, width_mult=100)
             logger.info("eval done total : %s s" % (time.time() - tic_eval))
@@ -530,7 +526,7 @@ def _dynabert_training(self, task_name, ofa_model, model, teacher_model,
     return ofa_model
 
 
-def _dynabert_export(task_name, ofa_model, dynabert_config, output_dir):
+def _dynabert_export(ofa_model, dynabert_config, output_dir):
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     ofa_model.model.base_model_class.forward = auto_model_forward
     ofa_model._add_teacher = False
@@ -540,10 +536,10 @@ def _dynabert_export(task_name, ofa_model, dynabert_config, output_dir):
         model_dir = os.path.join(output_dir, str(width_mult))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
-        if "cmrc2018" in task_name:
+        if "QuestionAnswering" in ofa_model.model.__class__.__name__:
             origin_model = AutoModelForQuestionAnswering.from_pretrained(
                 model_dir)
-        elif task_name == "msra_ner":
+        elif "TokenClassification" in ofa_model.model.__class__.__name__:
             origin_model = AutoModelForTokenClassification.from_pretrained(
                 model_dir)
         else:
@@ -672,8 +668,7 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
             model.base_model.encoder.layers[layer].linear2.fn, idx, dim=0)
 
 
-def compute_neuron_head_importance(task_name,
-                                   model,
+def compute_neuron_head_importance(model,
                                    data_loader,
                                    num_layers,
                                    num_heads,
@@ -685,8 +680,6 @@ def compute_neuron_head_importance(task_name,
     each transformer layer.
 
     Args:
-        task_name (str):
-            Task name.
         model(paddle.nn.Layer):
             The instance of transformer model.
         data_loader (DataLoader):
@@ -729,42 +722,36 @@ def compute_neuron_head_importance(task_name,
     for w in intermediate_weight:
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype='float32'))
 
-    if task_name.lower() != 'glue mnli':
-        data_loader = (data_loader, )
-    for data in data_loader:
-        for batch in data:
-            if isinstance(batch, dict):
-                if "cmrc2018" in task_name:
-                    input_ids, segment_ids, start_positions, end_positions = batch[
-                        'input_ids'], batch['token_type_ids'], batch[
-                            'start_positions'], batch['end_positions']
-                else:
-                    input_ids, segment_ids, labels = batch['input_ids'], batch[
-                        'token_type_ids'], batch['labels']
+    for batch in data_loader:
+        if isinstance(batch, dict):
+            if "QuestionAnswering" in model.__class__.__name__:
+                input_ids, segment_ids, start_positions, end_positions = batch[
+                    'input_ids'], batch['token_type_ids'], batch[
+                        'start_positions'], batch['end_positions']
             else:
-                input_ids, segment_ids, labels = batch
-            logits = model(input_ids,
-                           segment_ids,
-                           attention_mask=[None, head_mask])
-            if "cmrc2018" in task_name:
-                start_logits, end_logits = logits
-                loss = (loss_fct(start_logits, start_positions) +
-                        loss_fct(end_logits, end_positions)) / 2
-            else:
-                loss = loss_fct(logits, labels)
-            loss.backward()
-            head_importance += paddle.abs(paddle.to_tensor(
-                head_mask.gradient()))
+                input_ids, segment_ids, labels = batch['input_ids'], batch[
+                    'token_type_ids'], batch['labels']
+        else:
+            input_ids, segment_ids, labels = batch
+        logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
+        if "QuestionAnswering" in model.__class__.__name__:
+            start_logits, end_logits = logits
+            loss = (loss_fct(start_logits, start_positions) +
+                    loss_fct(end_logits, end_positions)) / 2
+        else:
+            loss = loss_fct(logits, labels)
+        loss.backward()
+        head_importance += paddle.abs(paddle.to_tensor(head_mask.gradient()))
 
-            for w1, b1, w2, current_importance in zip(intermediate_weight,
-                                                      intermediate_bias,
-                                                      output_weight,
-                                                      neuron_importance):
-                current_importance += np.abs(
-                    (np.sum(w1.numpy() * w1.gradient(), axis=0) +
-                     b1.numpy() * b1.gradient()))
-                current_importance += np.abs(
-                    np.sum(w2.numpy() * w2.gradient(), axis=1))
+        for w1, b1, w2, current_importance in zip(intermediate_weight,
+                                                  intermediate_bias,
+                                                  output_weight,
+                                                  neuron_importance):
+            current_importance += np.abs(
+                (np.sum(w1.numpy() * w1.gradient(), axis=0) +
+                 b1.numpy() * b1.gradient()))
+            current_importance += np.abs(
+                np.sum(w2.numpy() * w2.gradient(), axis=1))
 
     return head_importance, neuron_importance
 
