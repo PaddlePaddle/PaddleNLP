@@ -250,6 +250,11 @@ def parse_args(MODEL_CLASSES):
         "use recompute_offload to save the memory by offload when use_recompute is True ."
     )
 
+    parser.add_argument("--fuse_attn",
+                        type=str2bool,
+                        default=False,
+                        help="Whether to use fused attention or not.")
+
     parser.add_argument(
         "--resume_dir",
         default="",

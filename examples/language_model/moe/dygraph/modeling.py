@@ -22,6 +22,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from paddle.incubate.nn import FusedMultiHeadAttention
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
@@ -410,7 +411,8 @@ class TransformerDecoderLayer(nn.Layer):
                  top_k=2,
                  hcg=None,
                  gate=None,
-                 recompute_interval=0):
+                 recompute_interval=0,
+                 fuse_attn=False):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -420,6 +422,7 @@ class TransformerDecoderLayer(nn.Layer):
         act_dropout = dropout if act_dropout is None else act_dropout
         self.normalize_before = normalize_before
         self.recompute_interval = recompute_interval
+        self.fuse_attn = fuse_attn
 
         # moe config
         self.top_k = top_k
@@ -430,12 +433,23 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        self.self_attn = MultiHeadAttention(d_model,
-                                            nhead,
-                                            dropout=attn_dropout,
-                                            weight_attr=weight_attrs[0],
-                                            bias_attr=bias_attrs[0],
-                                            num_partitions=num_partitions)
+        if self.fuse_attn:
+            assert num_partitions == 1, "benchmark not monitor mp for now"
+            self.self_attn = FusedMultiHeadAttention(
+                d_model,
+                nhead,
+                attn_dropout_rate=attn_dropout,
+                qkv_weight_attr=weight_attrs[0],
+                qkv_bias_attr=bias_attrs[0],
+                linear_weight_attr=weight_attrs[0],
+                linear_bias_attr=bias_attrs[0])
+        else:
+            self.self_attn = MultiHeadAttention(d_model,
+                                                nhead,
+                                                dropout=attn_dropout,
+                                                weight_attr=weight_attrs[0],
+                                                bias_attr=bias_attrs[0],
+                                                num_partitions=num_partitions)
 
         if expert_mode:
             import os
@@ -489,20 +503,28 @@ class TransformerDecoderLayer(nn.Layer):
                 cache=None):
         residual = tgt
 
-        if self.normalize_before:
-            tgt = self.norm1(tgt)
-
-        if use_cache is False:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+        if self.fuse_attn:
+            if use_cache is False:
+                tgt = self.self_attn(tgt, attn_mask=tgt_mask)
+            else:
+                tgt, incremental_cache = self.self_attn(tgt,
+                                                        attn_mask=tgt_mask,
+                                                        cache=cache)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    use_cache, cache)
+            if self.normalize_before:
+                tgt = self.norm1(tgt)
 
-        with get_rng_state_tracker().rng_state('global_seed'):
-            tgt = residual + self.dropout1(tgt)
+            if use_cache is False:
+                tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            else:
+                tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
+                                                        use_cache, cache)
 
-        if not self.normalize_before:
-            tgt = self.norm1(tgt)
+            with get_rng_state_tracker().rng_state('global_seed'):
+                tgt = residual + self.dropout1(tgt)
+
+            if not self.normalize_before:
+                tgt = self.norm1(tgt)
 
         residual = tgt
         if self.normalize_before:
@@ -761,7 +783,8 @@ class GPTModel(GPTPretrainedModel):
                  gate=None,
                  recompute_interval=0,
                  recompute_partition=False,
-                 recompute_offload=False):
+                 recompute_offload=False,
+                 fuse_attn=False):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -800,7 +823,8 @@ class GPTModel(GPTPretrainedModel):
                     top_k=top_k,
                     hcg=hcg,
                     gate=gate,
-                    recompute_interval=recompute_interval))
+                    recompute_interval=recompute_interval,
+                    fuse_attn=fuse_attn))
 
         self.decoder = TransformerDecoder(decoder_layers,
                                           num_hidden_layers,

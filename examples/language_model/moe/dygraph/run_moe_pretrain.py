@@ -399,6 +399,7 @@ def do_train(args):
             model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model_config["recompute_partition"] = args.recompute_partition
             model_config["recompute_offload"] = args.recompute_offload
+            model_config["fuse_attn"] = args.fuse_attn
             if args.use_recompute and args.recompute_partition:
                 raise Exception(
                     "when use_recompute is True, recompute_partition must be False in MoE."
@@ -559,6 +560,9 @@ def do_train(args):
                                 "reduce_sum",
                                 "c_softmax_with_cross_entropy",
                                 "elementwise_div",
+                            ],
+                            custom_white_list=[
+                                "fused_attention, fused_feedforward"
                             ],
                             level='O2'):
                         preds = model(tokens[start_index:end_index, :])
