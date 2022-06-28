@@ -137,11 +137,8 @@ public:
           previous_match = curr_match;
         }
         matches = std::move(new_matches);
-        int end = matches.size();
         normalizes_size = matches.size();
-        for (int i = 0; i < end / 2; ++i) {
-          std::swap(matches[i], matches[end - i - 1]);
-        }
+        std::reverse(matches.begin(), matches.end());
         break;
       }
       case CONTIGUOUS: {

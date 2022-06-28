@@ -35,7 +35,7 @@ namespace normalizers {
 
 NormalizedString::NormalizedString(const std::string& original)
     : original_(original), normalized_(original), original_shift_(0) {
-  // calculate alginments
+  // calculate alignments
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
   std::u32string u32normalized = conv.from_bytes(normalized_);
   for (int i = 0; i < u32normalized.length(); ++i) {
@@ -104,7 +104,7 @@ void NormalizedString::UpdateNormalizedRange(
   uint initial_removed = 0;
   // calculate initial_removed
   for (int i = 0; i < initial_offset; ++i) {
-    size_t chwidth = utils::BytesInUTF8Char(normalized_[initial_removed]);
+    size_t chwidth = utils::GetUTF8CharLen(u32replaced_normalized[i]);
     initial_removed += chwidth;
   }
 
@@ -443,34 +443,44 @@ NormalizedString& NormalizedString::Replace(const re2::RE2& pattern,
   size_t end = normalized_.length();
   int64_t offset = 0;
 
-  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
-  std::u32string u32content = conv.from_bytes(content);
-  std::vector<int> changes(u32content.length(), 1);
-  OffsetMapping new_normalized{u32content, changes};
-  size_t new_len = 0;
-  // Calculate new length
-  for (const auto& ch : u32content) {
-    new_len += utils::GetUTF8CharLen(ch);
+  std::u32string u32content;
+  u32content.reserve(content.size());
+  std::vector<int> changes;
+  changes.reserve(content.size());
+
+  size_t content_utf8_len = 0;
+  while (content_utf8_len < content.length()) {
+    uint32_t content_char;
+    auto content_char_width =
+        utils::UTF8ToUInt32(content.data() + content_utf8_len, &content_char);
+    content_char = utils::UTF8ToUnicode(content_char);
+    u32content.push_back(content_char);
+    changes.push_back(1);
+    content_utf8_len += content_char_width;
   }
+  size_t new_len = content.length();
+
+  OffsetMapping new_normalized{u32content, changes};
 
   while (pattern.Match(normalized_, start, end, RE2::UNANCHORED, &result, 1)) {
-    // update start, end
     size_t curr_start = result.data() - normalized_.data();
-    size_t curr_end = curr_start + result.length();
-    offset = new_len - result.length();
+    size_t old_len = result.length();
+    size_t curr_end = curr_start + old_len;
+    // update start
+    start = curr_end;
     if (offset >= 0) {
-      start = curr_end + offset;
+      curr_start += offset;
+      curr_end += offset;
     } else {
       size_t uoffset = -offset;
-      start = (curr_end >= uoffset) ? curr_end - uoffset : 0;
+      curr_start = (curr_start >= uoffset) ? curr_start - uoffset : 0;
+      curr_end = (curr_end >= uoffset) ? curr_end - uoffset : 0;
     }
-    // Calculate the number of chars that needs to be removed
     size_t removed_chars =
-        conv.from_bytes(normalized_.substr(curr_start, result.length()))
-            .length();
-    core::Range range = {curr_start, curr_end};
-    UpdateNormalizedRange(new_normalized, removed_chars, range, false);
-    end = normalized_.length();
+        utils::GetUnicodeLenFromUTF8(normalized_.data() + curr_start, old_len);
+    UpdateNormalizedRange(
+        new_normalized, removed_chars, {curr_start, curr_end}, false);
+    offset += new_len - old_len;
   }
   return *this;
 }
@@ -528,7 +538,6 @@ bool NormalizedString::Slice(core::Range range,
       ConvertOffsets(&original_range, false);
     }
     uint n_shift = original_range.first;
-
     normalized->original_ = this->original_.substr(
         original_range.first, original_range.second - original_range.first);
     normalized->normalized_ = this->normalized_.substr(
@@ -600,7 +609,6 @@ uint32_t NormalizedString::GetMatch(
     }
     utf8_len += chwidth;
   }
-
   if (start < normalized.length()) {
     matches->emplace_back(core::Range{start, normalized.length()}, false);
     ++reserved_num;
