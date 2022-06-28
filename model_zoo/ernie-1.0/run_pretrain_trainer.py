@@ -174,6 +174,22 @@ def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
         max_seq_length_dec=None,
         dataset_type='ernie')
 
+    def print_dataset(data, mode="train"):
+        logger.info(f"Sample data for {mode} mode")
+        input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = data
+        if tokenizer.pad_token_id in input_ids:
+            input_ids = input_ids[0:list(input_ids).index(tokenizer.pad_token_id
+                                                          )]
+        logger.info(tokenizer._decode(input_ids))
+        for pos, label in zip(masked_lm_positions, masked_lm_labels):
+            input_ids[pos] = label
+        logger.info(tokenizer._decode(input_ids))
+        logger.info(tokenizer.convert_ids_to_tokens(masked_lm_labels))
+
+    print_dataset(train_ds[0], "train")
+    print_dataset(valid_ds[0], "valid")
+    print_dataset(test_ds[0], "test")
+
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
         out = [None] * num_fields

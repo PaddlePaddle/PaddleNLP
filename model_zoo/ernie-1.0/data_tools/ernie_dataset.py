@@ -14,9 +14,11 @@
 # limitations under the License.
 """BERT Style dataset."""
 
+import re
+import copy
+
 import numpy as np
 import paddle
-import re
 
 from .dataset_utils import (
     get_samples_mapping,
@@ -76,8 +78,10 @@ class ErnieDataset(paddle.io.Dataset):
         # self.vocab_id_list = list(tokenizer.inv_vocab.keys())
         # self.vocab_id_to_token_dict = tokenizer.inv_vocab
         self.vocab_id_list = list(tokenizer.vocab.idx_to_token.keys())
-        self.vocab_id_to_token_dict = tokenizer.vocab.idx_to_token
-        self.vocab_token_to_id_dict = tokenizer.vocab.token_to_idx
+        self.vocab_id_to_token_dict = copy.deepcopy(
+            tokenizer.vocab.idx_to_token)
+        self.vocab_token_to_id_dict = copy.deepcopy(
+            tokenizer.vocab.token_to_idx)
 
         self.vocab_id_to_token_dict.update(tokenizer.added_tokens_decoder)
         self.vocab_token_to_id_dict.update(tokenizer.added_tokens_encoder)
@@ -93,6 +97,7 @@ class ErnieDataset(paddle.io.Dataset):
     def __getitem__(self, idx):
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
+
         # Note that this rng state should be numpy and not python since
         # python randint is inclusive whereas the numpy one is exclusive.
         # We % 2**32 since numpy requres the seed to be between 0 and 2**32 - 1
