@@ -79,6 +79,9 @@ class ErnieDataset(paddle.io.Dataset):
         self.vocab_id_to_token_dict = tokenizer.vocab.idx_to_token
         self.vocab_token_to_id_dict = tokenizer.vocab.token_to_idx
 
+        self.vocab_id_to_token_dict.update(tokenizer.added_tokens_decoder)
+        self.vocab_token_to_id_dict.update(tokenizer.added_tokens_encoder)
+
         self.cls_id = tokenizer.cls_token_id
         self.sep_id = tokenizer.sep_token_id
         self.mask_id = tokenizer.mask_token_id

@@ -34,6 +34,9 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
         sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
+    parser.add_argument("--tokenize_name_or_path", default=None, type=str, required=True,
+        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
+        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
 
     # Train I/O config
     parser.add_argument("--input_dir", default=None, type=str, required=True, help="The input directory where the data will be read from.", )

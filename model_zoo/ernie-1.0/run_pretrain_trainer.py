@@ -402,6 +402,7 @@ def main():
 
     data_file = get_train_data_file(data_args)
     tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+    tokenizer.extend_chinese_char()
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args, training_args, data_file, tokenizer)

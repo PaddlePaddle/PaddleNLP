@@ -253,10 +253,30 @@ class ErnieTokenizer(PretrainedTokenizer):
                     extend_list.append(new_char)
         if len(self.vocab) + len(extend_list) > 2**16:
             warnings.warn("The vocab size if larger than uint16")
-        verbose = self.verbose
-        self.verbose = False
-        self.add_tokens(extend_list)
-        self.verbose = verbose
+        new_tokens = [str(tok) for tok in extend_list]
+
+        tokens_to_add = []
+        for token in new_tokens:
+            if not isinstance(token, str):
+                raise TypeError(
+                    f"Token {token} is not a string but a {type(token)}.")
+            if hasattr(self, "do_lower_case") and self.do_lower_case:
+                token = token.lower()
+            if (token != self.unk_token and self.convert_tokens_to_ids(token)
+                    == self.convert_tokens_to_ids(self.unk_token)
+                    and token not in tokens_to_add):
+                tokens_to_add.append(token)
+
+        if self.verbose:
+            print(
+                f"Adding {len(tokens_to_add)} ## chinese tokens to the vocabulary"
+            )
+
+        added_tok_encoder = dict(
+            (tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
+        added_tok_decoder = {v: k for k, v in added_tok_encoder.items()}
+        self.added_tokens_encoder.update(added_tok_encoder)
+        self.added_tokens_decoder.update(added_tok_decoder)
 
     def _tokenize(self, text):
         r"""
