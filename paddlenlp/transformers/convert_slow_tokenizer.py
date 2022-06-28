@@ -212,10 +212,15 @@ class ErnieMConverter(SpmConverter):
         list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
         return normalizers.SequenceNormalizer(list_normalizers)
 
-    def post_processor(self):
+    def postprocessor(self):
+        '''
+         An ERNIE-M sequence has the following format:
+        - single sequence:       ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] [SEP] B [SEP]``
+        '''
         return postprocessors.TemplatePostProcessor(
             single="[CLS]:0 $A:0 [SEP]:0",
-            pair="[CLS]:0 $A:0 [SEP]:0 $B:1 [SEP]:1",
+            pair="[CLS]:0 $A:0 [SEP]:0 [SEP]:1 $B:1 [SEP]:1",
             special_tokens=[
                 ("[CLS]",
                  self.original_tokenizer.convert_tokens_to_ids("[CLS]")),

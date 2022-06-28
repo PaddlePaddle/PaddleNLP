@@ -66,6 +66,7 @@ class ErnieMTFasterTokenizer(PretrainedFasterTokenizer):
         self.encoding = encoding
         self.vocab_file = vocab_file
         self.sentencepiece_model_file = sentencepiece_model_file
+        self.can_save_slow_tokenizer = False if not self.vocab_file else True
 
     def save_vocabulary(self,
                         save_directory: str,

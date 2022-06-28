@@ -16,6 +16,7 @@ limitations under the License. */
 #include <limits>
 #include <sstream>
 
+#include "glog/logging.h"
 #include "utils/path.h"
 #include "utils/unique_ptr.h"
 #include "utils/utils.h"
@@ -56,17 +57,17 @@ void Unigram::Init(const core::VocabList& vocab,
   vocab_ = vocab;
   unk_id_ = unk_id;
 
-  size_t bos_id = n + 1;
-  size_t eos_id = n + 2;
+  bos_id_ = n + 1;
+  eos_id_ = n + 2;
   double min_score = std::numeric_limits<double>::max();
 
   std::vector<const char*> keys;
   std::vector<int> values;
 
   for (size_t id = 0; id < n; ++id) {
-    token_to_ids_.insert({vocab[id].first, id});
+    token_to_ids_.insert({vocab[id].first, id + 1});
     keys.push_back(vocab[id].first.c_str());
-    values.push_back(id);
+    values.push_back(id + 1);
     if (vocab[id].second < min_score) {
       min_score = vocab[id].second;
     }
@@ -299,11 +300,32 @@ void Unigram::EncodeOptimized(const std::string& normalized,
     starts_at += mblen;
   }
   int ends_at = size;
+  std::vector<std::string> token;
   while (ends_at > 0) {
     const auto& node = best_path_ends_at[ends_at];
-    encode_result->emplace_back(
-        normalized.substr(node.starts_at, ends_at - node.starts_at), node.id);
+    auto starts_at = node.starts_at;
+    if (fuse_unk_ && unk_id_.size() > 0 && node.id == unk_id_[0]) {
+      token.push_back(normalized.substr(starts_at, ends_at - starts_at));
+    } else {
+      if (!token.empty()) {
+        encode_result->push_back("");
+        auto& back = encode_result->back();
+        for (auto i = token.size() - 1; i >= 0; --i) {
+          back.append(token[i]);
+        }
+        token.clear();
+      }
+      encode_result->push_back(
+          normalized.substr(starts_at, ends_at - starts_at));
+    }
     ends_at = node.starts_at;
+  }
+  if (!token.empty()) {
+    encode_result->push_back("");
+    auto& back = encode_result->back();
+    for (auto i = token.size() - 1; i >= 0; --i) {
+      back.append(token[i]);
+    }
   }
   std::reverse(encode_result->begin(), encode_result->end());
 }
