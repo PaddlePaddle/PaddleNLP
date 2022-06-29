@@ -6,5 +6,5 @@
     "logging_steps": 600,
     "save_steps": 2400,
     "seed": 3,
-    "device": "gpu:6"
+    "device": "gpu"
 }

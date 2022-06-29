@@ -43,12 +43,11 @@ parser.add_argument("--dataset",
                     default="cail2018_small",
                     type=str,
                     help="Dataset for multi label classfication.")
-parser.add_argument(
-    "--dataset_dir",
-    default=None,
-    type=str,
-    help=
-    "Local dataset directory should include train.tsv, dev.tsv and label.tsv")
+parser.add_argument("--dataset_dir",
+                    default=None,
+                    type=str,
+                    help="Local dataset directory should "
+                    "include train.tsv, dev.tsv and label.tsv")
 parser.add_argument("--task_name",
                     default="charges",
                     type=str,

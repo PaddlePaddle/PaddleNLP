@@ -27,11 +27,11 @@ parser.add_argument("--params_path",
                     default="./checkpoint/model_state.pdparams",
                     type=str,
                     help="The path to model parameters to be loaded.")
-parser.add_argument(
-    "--dataset_dir",
-    default=None,
-    type=str,
-    help="Local dataset directory should include data.tsv and label.tsv")
+parser.add_argument("--dataset_dir",
+                    default=None,
+                    type=str,
+                    help="Local dataset directory should"
+                    " include data.tsv and label.tsv")
 parser.add_argument("--max_seq_length",
                     default=512,
                     type=int,
@@ -66,7 +66,8 @@ def predict(data, label_list):
     paddle.set_device(args.device)
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_list))
-    model.set_dict(paddle.load(os.path.join(args.params_path)))
+    if args.params_path and os.path.isfile(args.params_path):
+        model.set_dict(paddle.load(os.path.join(args.params_path)))
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     examples = []

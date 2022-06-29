@@ -96,7 +96,7 @@ class SyncGRPCTritonRunner:
 if __name__ == "__main__":
     model_name = "seqcls"
     model_version = "1"
-    url = "10.9.189.6:8001"
+    url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
 
     texts = [
