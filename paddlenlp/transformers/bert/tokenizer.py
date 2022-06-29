@@ -105,6 +105,7 @@ class BasicTokenizer(object):
         output = []
         while i < len(chars):
             char = chars[i]
+            # punctuation and symbol should be treat as single char.
             if _is_punctuation(char) or _is_symbol(char):
                 output.append([char])
                 start_new_word = True

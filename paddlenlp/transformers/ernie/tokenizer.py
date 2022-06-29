@@ -247,6 +247,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             if i not in self.vocab.idx_to_token:
                 continue
             w = self.vocab.idx_to_token[i]
+            # Chose chinese char in [0x4E00, Ox9FA5], and try add  ## char to vocab.
             if len(w) == 1 and ord(w) >= 0x4E00 and ord(w) <= 0x9FA5:
                 new_char = "##" + w
                 if new_char not in vocab_set:
