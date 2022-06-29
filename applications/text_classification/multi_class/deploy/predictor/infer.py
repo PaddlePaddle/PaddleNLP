@@ -64,7 +64,7 @@ parser.add_argument("--num_threads",
                     " when deploying on cpu.")
 parser.add_argument('--device',
                     choices=['cpu', 'gpu'],
-                    default="cpu",
+                    default="gpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--device_id',
                     default=0,
@@ -77,17 +77,23 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including "
-                    "data.tsv, taxonomy.tsv, test.tsv(optional, "
+                    "data.tsv, taxonomy.tsv, test.tsv/dev.tsv(optional),"
                     "if evaluate the performance).")
+parser.add_argument("--perf_dataset",
+                    choices=['dev', 'test'],
+                    default='test',
+                    type=str,
+                    help="evaluate the performance on"
+                    "dev dataset or test dataset")
 args = parser.parse_args()
 
 
-def read_local_dataset(path, label_list_o):
-    label_list = {label_list_o[i]: i for i in range(len(label_list_o))}
+def read_local_dataset(path, label_list):
+    label_list_dict = {label_list[i]: i for i in range(len(label_list))}
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
             sentence, label = line.strip().split('\t')
-            yield {'text_a': sentence, 'label': label_list[label]}
+            yield {'text_a': sentence, 'label': label_list_dict[label]}
 
 
 def predict(data, label_list):
@@ -105,17 +111,18 @@ def predict(data, label_list):
     if args.perf:
 
         if args.dataset_dir is not None:
-            dev_dir = os.path.join(args.dataset_dir, "dev.tsv")
-            dev_ds = load_dataset(read_local_dataset,
-                                  path=dev_dir,
-                                  label_list_o=label_list,
-                                  lazy=False)
+            eval_dir = os.path.join(args.dataset_dir,
+                                    "{}.tsv".format(args.perf_dataset))
+            eval_ds = load_dataset(read_local_dataset,
+                                   path=eval_dir,
+                                   label_list=label_list,
+                                   lazy=False)
         else:
-            dev_ds = load_dataset(args.dataset,
-                                  name=args.task_name,
-                                  splits=["dev"])
+            eval_ds = load_dataset(args.dataset,
+                                   name=args.task_name,
+                                   splits=[args.perf_dataset])
 
-        texts, labels = predictor.get_text_and_label(dev_ds)
+        texts, labels = predictor.get_text_and_label(eval_ds)
 
         preprocess_result = predictor.preprocess(texts)
 
