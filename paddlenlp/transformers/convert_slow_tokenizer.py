@@ -51,6 +51,10 @@ class SentencePieceExtractor:
         return vocab, merges
 
 
+def check_number_comma(piece: str) -> bool:
+    return len(piece) < 2 or piece[-1] != "," or not piece[-2].isdigit()
+
+
 class Converter:
 
     def __init__(self, original_tokenizer):
@@ -212,6 +216,22 @@ class ErnieMConverter(SpmConverter):
         list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
         list_normalizers.append(normalizers.ReplaceNormalizer("\\s$", ""))
         return normalizers.SequenceNormalizer(list_normalizers)
+
+    def vocab(self, proto):
+        # construct a dict that map word and score
+        word_score_dict = {}
+        for piece in proto.pieces:
+            word_score_dict[piece.piece] = piece.score
+
+        vocab_list = [None] * len(self.original_tokenizer.vocab)
+        for _token, _id in self.original_tokenizer.vocab.token_to_idx.items():
+            if _token in word_score_dict:
+                score = word_score_dict[_token] if check_number_comma(
+                    _token) else word_score_dict[_token] - 100
+                vocab_list[_id] = (_token, score)
+            else:
+                vocab_list[_id] = (_token, 0.0)
+        return vocab_list
 
     def unk_id(self, proto):
         return self.original_tokenizer.convert_tokens_to_ids(

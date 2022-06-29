@@ -59,17 +59,18 @@ void Unigram::Init(const core::VocabList& vocab,
 
   bos_id_ = n + 1;
   eos_id_ = n + 2;
-  double min_score = std::numeric_limits<double>::max();
+  min_score_ = std::numeric_limits<double>::max();
 
   std::vector<const char*> keys;
   std::vector<int> values;
-
+  // id = 0 is unk_id_
   for (size_t id = 0; id < n; ++id) {
-    token_to_ids_.insert({vocab[id].first, id + 1});
+    size_t actual_id = id;
+    token_to_ids_.insert({vocab[id].first, actual_id});
     keys.push_back(vocab[id].first.c_str());
-    values.push_back(id + 1);
-    if (vocab[id].second < min_score) {
-      min_score = vocab[id].second;
+    values.push_back(actual_id);
+    if (vocab[id].second < min_score_) {
+      min_score_ = vocab[id].second;
     }
   }
 
@@ -106,6 +107,8 @@ void Unigram::Init(const core::VocabList& vocab,
     throw std::runtime_error(oss.str());
   }
 }
+
+double Unigram::GetVocabScore(uint id) const { return vocab_.at(id).second; }
 
 bool Unigram::TokenToId(const std::string& token, uint* id) const {
   if (token_to_ids_.find(token) == token_to_ids_.end()) {
@@ -268,7 +271,7 @@ void Unigram::EncodeOptimized(const std::string& normalized,
         // Update the best path node.
         auto& target_node = best_path_ends_at[key_pos];
         const auto length = (key_pos - starts_at);
-        const auto score = vocab_[ret].second;
+        const auto score = GetVocabScore(ret);
         const auto candidate_best_path_score =
             score + best_path_score_till_here;
         if (target_node.starts_at == -1 ||
