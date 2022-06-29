@@ -1,0 +1,36 @@
+platform: "onnxruntime_onnx"
+max_batch_size: 64
+input [
+    {
+      name: "input_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    },
+    {
+      name: "token_type_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    }
+]
+output [
+    {
+      name: "linear_147.tmp_1"
+      data_type: TYPE_FP32
+      dims: [ 141 ]
+    }
+]
+
+instance_group [
+  {
+      count: 1
+      kind: KIND_GPU
+  }
+]
+
+optimization { 
+  graph: {level: -1}
+}
+
+parameters { key: "intra_op_thread_count" value: { string_value: "0" } }
+parameters { key: "execution_mode" value: { string_value: "0" } }
+parameters { key: "inter_op_thread_count" value: { string_value: "0" } }
