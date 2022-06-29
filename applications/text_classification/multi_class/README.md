@@ -205,12 +205,12 @@ python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export
+python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export --num_classes 11
 ```
 可支持配置的参数：
 
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
-* `num_classes`：任务标签类别数;默认为 KUAKE_QIC 数据集类别数11。
+* `num_classes`：必须，任务标签类别数。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
