@@ -199,7 +199,7 @@ def parse_args(MODEL_CLASSES):
                         default=10,
                         help="Evaluate the model use X steps data.")
     parser.add_argument(
-        "--fuse",
+        "--fuse_transformer",
         type=str2bool,
         default=False,
         help="Whether to use fuse attention and fuse feedforward or not.")
