@@ -35,7 +35,7 @@ import types
 from utils import get_timers, set_timers
 from types import MethodType
 from paddle import _C_ops
-from paddle.framework import core
+from paddle.framework import core, in_dygraph_mode
 import paddle.distributed as dist
 from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
@@ -441,7 +441,7 @@ def do_train(args):
             scaler = fleet.distributed_scaler(scaler)
             scaler._unscale = MethodType(unscale_method, scaler)
         else:
-            wrap_scale_func = GroupShardedScaler if paddle.in_dynamic_mode(
+            wrap_scale_func = GroupShardedScaler if in_dygraph_mode(
             ) else ShardingScaler
             scaler = wrap_scale_func(scaler)
 
