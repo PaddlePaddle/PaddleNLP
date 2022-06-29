@@ -143,7 +143,7 @@ class ErniePretrainedModel(PretrainedModel):
             "hidden_dropout_prob": 0.1,
             "hidden_size": 768,
             "initializer_range": 0.02,
-            "max_position_embeddings": 512,
+            "max_position_embeddings": 513,
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
