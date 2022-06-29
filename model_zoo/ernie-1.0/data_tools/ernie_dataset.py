@@ -83,6 +83,9 @@ class ErnieDataset(paddle.io.Dataset):
         self.vocab_token_to_id_dict = copy.deepcopy(
             tokenizer.vocab.token_to_idx)
 
+        # ERNIE is chinse char level model, sometime is need
+        # add ## chinse char to encode and decode.
+        # Here we extend the vocab dict.
         self.vocab_id_to_token_dict.update(tokenizer.added_tokens_decoder)
         self.vocab_token_to_id_dict.update(tokenizer.added_tokens_encoder)
 

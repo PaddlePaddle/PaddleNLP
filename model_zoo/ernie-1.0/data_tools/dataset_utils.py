@@ -368,6 +368,7 @@ def create_masked_lm_predictions(tokens,
                 token_boundary[i] = 1
 
     if to_chinese_char:
+        # set ## chinse char to original chinese char
         char_tokens = []
         assert vocab_token_to_id_dict is not None
         for i, b in enumerate(token_boundary):
