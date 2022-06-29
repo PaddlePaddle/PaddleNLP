@@ -18,7 +18,7 @@ import paddle
 from paddle import tensor
 import paddle.nn.functional as F
 from paddle.nn import MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder
-from paddle.fluid.data_feeder import convert_dtype
+from paddle.common_ops_import import convert_dtype
 
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import PPMiniLMForSequenceClassification
