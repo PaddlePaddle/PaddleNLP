@@ -47,7 +47,7 @@ op:
             devices: "0"
 
             #use_mkldnn
-            #use_mkldnn: True
+            use_mkldnn: True
 
             #thread_num
             thread_num: 12

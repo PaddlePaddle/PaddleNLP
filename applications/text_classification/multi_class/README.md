@@ -10,17 +10,19 @@
    * [模型裁剪](#模型裁剪)
        * [环境准备](#环境准备)
        * [裁剪API使用](#裁剪API使用)
+       * [裁剪效果](#裁剪效果)
+   * [模型部署](#模型部署)
 
 ## 多分类任务介绍
 
-文本分类是自然语言处理（NLP）基本任务之一，文本多分类任务的目标是预测输入的文本样本最可能来自`n_classes` 个标签类别中的某一类别，多分类任务在商品分类、网页标签、新闻分类、医疗文本分类等各种现实场景中具有广泛的适用性。在医学搜索中，对搜索问题的意图分类可以极大提升搜索结果的相关性，本项目将以CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为例，介绍如何使用PaddleNLP进行文本多分类任务,对检索的文本进行意图分类。
+文本分类是自然语言处理（NLP）基本任务之一，文本多分类任务的目标是预测输入的文本样本最可能来自`n_classes` 个标签类别中的某一类别，多分类任务在商品分类、网页标签、新闻分类、医疗文本分类等各种现实场景中具有广泛的适用性。在医学搜索中，对搜索问题的意图分类可以极大提升搜索结果的相关性，CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务共有10880条医学问题检索文本涵盖11种意图分类类型，接下来我们将介绍如何使用多分类模型,根据输入的检索文本进行多分类任务。
 
 ## 代码结构说明
 
 以下是本项目主要代码结构及说明：
 
 ```text
-multi_classification/
+multi_class/
 ├── deploy # 部署
 │   └── predictor # 导出ONNX模型并基于ONNXRuntime部署
 │   │   ├── infer.py # ONNXRuntime推理部署示例
@@ -45,13 +47,7 @@ multi_classification/
 
 ## 模型微调
 
-我们以公开数据集CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为示例，在训练集上进行模型微调，并在开发集上验证。KUAKE-QIC任务是一个包含11种医学问题意图类型的文本多分类数据集，使用准确率Accuracy评估模型表现。
-
-```python
-from paddlenlp.datasets import load_dataset
-# 可以使用paddlenlp直接加载数据集
-train_ds, dev_ds, test_ds = load_dataset("cblue",name="KUAKE-QIC",splits=["train", "dev", "test"])
-```
+我们以公开数据集CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为示例，在训练集上进行模型微调，并在开发集上使用准确率Accuracy评估模型表现。
 
 单卡训练
 ```shell
@@ -71,7 +67,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup
 * `dataset`：训练数据集;默认为"cblue"。
 * `dataset_dir`：本地数据集路径，数据集路径中应包含train.tsv，dev.tsv和label.tsv文件;默认为None。
 * `task_name`：训练数据集;默认为"KUAKE-QIC"。
-* `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
+* `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu。如使用gpu训练，可使用参数gpus指定GPU卡号。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -90,13 +86,11 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
 ```text
-
 checkpoint/
 ├── model_config.json
 ├── model_state.pdparams
 ├── tokenizer_config.json
 └── vocab.txt
-
 ```
 
 **NOTE:**
@@ -109,7 +103,6 @@ checkpoint/
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/KUAKE_QIC.tar.gz
-
 tar -zxvf KUAKE_QIC.tar.gz
 ```
 
@@ -121,65 +114,65 @@ KUAKE_QIC/
 ├── dev.tsv # 开发数据集文件
 ├── label.tsv # 分类标签文件
 └── data.tsv # 可选，待预测数据文件
-
 ```
 
-- train.tsv(训练数据集文件), dev.tsv(开发数据集文件)中数据格式为：
+train.tsv(训练数据集文件), dev.tsv(开发数据集文件),输入文本序列与标签类别名用`'\t'`分隔开。
+- train.tsv/dev.tsv 文件格式：
 ```text
-
 <输入序列1>'\t'<标签1>'\n'
-
 <输入序列2>'\t'<标签2>'\n'
-
 ...
-
 ```
-输入文本序列与标签类别名用`'\t'`分隔开。
-
-- label.tsv(分类标签文件)记录数据集中所有标签集合，标签格式为：
-
+- train.tsv/dev.tsv 文件样例：
 ```text
+25岁已经感觉脸部松弛了怎么办	治疗方案
+小孩的眉毛剪了会长吗？	其他
+172的身高还能长高吗？	其他
+冻疮用三金冻疮酊有效果么？	功效作用
+...
+```
 
+
+label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
+- label.tsv 文件格式：
+```text
 <标签名1>'\n'
-
 <标签名2>'\n'
-
 ...
-
-<标签名n>'\n'
-
 ```
-
-n代表多分类任务中的分类数，每一行为一个类名
-
-- data.tsv(可选，待预测数据文件)，数据格式为：
-
+- label.tsv 文件样例：
 ```text
-
-<输入序列1>'\n'
-
-<输入序列2>'\n'
-
+病情诊断
+治疗方案
+病因分析
+指标解读
+就医建议
 ...
-
-在训练过程中通过指定数据集路径参数`dataset_dir`进行：
-
 ```
 
+data.tsv(可选，待预测数据文件)。
+- data.tsv 文件格式：
+```text
+<输入序列1>'\n'
+<输入序列2>'\n'
+...
+```
+- data.tsv 文件样例：
+```text
+黑苦荞茶的功效与作用及食用方法
+交界痣会凸起吗
+...
+```
+在训练过程中通过指定数据集路径参数`dataset_dir`进行：
 单卡训练
 ```shell
-
 python train.py --warmup --dataset_dir KUAKE_QIC
-
 ```
 
 指定GPU卡号/多卡训练
 ```shell
-
 unset CUDA_VISIBLE_DEVICES
-
 python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir KUAKE_QIC
-
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -195,7 +188,6 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir K
 # 使用默认数据进行预测
 python predict.py --params_path ./checkpoint/model_state.pdparams
 
-
 # 预测本地数据文件KUAKE_QIC/data.tsv
 python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir KUAKE_QIC
 ```
@@ -203,7 +195,7 @@ python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir 
 
 * `params_path`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
 * `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
-* `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
+* `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
@@ -213,15 +205,13 @@ python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-
 python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export
-
 ```
 可支持配置的参数：
 
-* `params_path`：必须，动态图训练保存的参数路径。
-* `output_path`：静态图图保存的参数路径；默认为"./export"。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
 * `num_classes`：任务标签类别数;默认为 KUAKE_QIC 数据集类别数11。
+* `output_path`：静态图图保存的参数路径；默认为"./export"。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
@@ -237,8 +227,14 @@ export/
 导出模型之后，可以用于部署，项目提供了[onnxruntime部署脚本](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署指南](./deploy/predictor/README.md)。运行方式：
 
 ```shell
+# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
+
+# 使用本地数据集
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir KUAKE_QIC
 ```
+
+此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
 ## 模型裁剪
 ### 环境准备
@@ -250,12 +246,11 @@ pip install paddleslim
 ```
 
 ### 裁剪 API 使用
-本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用 `prune()` 即可一键启动裁剪和并自动保存裁剪后的模型。
+本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用 `prune()` 即可一键启动裁剪和并自动保存裁剪后的模型。
 
 可以这样使用裁剪 API (示例代码只提供了核心调用，如需跑通完整的例子可参考[完整样例脚本](prune.py)):
 
 ```python
-
 trainer = Trainer(
         model=model,
         args=training_args,
@@ -268,11 +263,10 @@ trainer = Trainer(
 output_dir = os.path.join(training_args.output_dir, data_args.dataset)
 
 trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
-
 ```
 由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
 
-* `model`：ERNIE、BERT 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
+* `model`：ERNIE 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
 * `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
 * `train_dataset`：裁剪训练需要使用的训练集
 * `eval_dataset`：裁剪训练使用的评估集(开发集)
@@ -300,13 +294,13 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
 可支持配置的参数：
 * `TrainingArguments`
   * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例通过`prune_config.json`对TrainingArguments 参数进行配置
+  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例通过`prune_config.json`对TrainingArguments 参数进行配置。
 
 * `DataArguments`
   * `dataset`：训练数据集;默认为 cblue 数据集。
   * `task_name`：训练数据集任务名;默认为"KUAKE-QIC"。
   * `dataset_dir`：本地数据集路径，需包含train.tsv,dev.tsv,label.tsv;默认为None。
-  * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
+  * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
@@ -335,7 +329,7 @@ prune/
 
 3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
-导出模型之后用于部署，项目提供了[onnxruntime部署脚本](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署指南](./deploy/predictor/README.md)。运行方式：
+4. 导出模型之后用于部署，项目提供了[onnxruntime部署脚本](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署指南](./deploy/predictor/README.md)。运行方式：
 
 ```shell
 # 使用内置数据集
@@ -344,6 +338,7 @@ python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/f
 # 使用本地数据集
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir KUAKE_QIC
 ```
+5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
 ### 裁剪效果
 本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪,将模型转为ONNX模型，并基于ONNXRuntime引擎GPU部署，测试配置如下：
@@ -354,7 +349,7 @@ python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/f
 
     系统: CentOS Linux release 7.7.1908 (Core)
 
-    GPU: Tesla V100-SXM2-32GB * 8
+    GPU: Tesla V100-SXM2-32GB
 
     CPU: Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz
 

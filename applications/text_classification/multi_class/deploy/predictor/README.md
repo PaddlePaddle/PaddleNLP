@@ -106,7 +106,7 @@ python infer.py --device cpu --model_path_prefix ../../export/float32 --perf
 
     系统: CentOS Linux release 7.7.1908 (Core)
 
-    GPU: Tesla V100-SXM2-32GB * 8
+    GPU: Tesla V100-SXM2-32GB
 
     CPU: Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz
 
