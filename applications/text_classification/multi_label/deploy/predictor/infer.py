@@ -79,6 +79,12 @@ parser.add_argument("--dataset_dir",
                     help="The dataset directory including "
                     "data.tsv, taxonomy.tsv, test.tsv(optional, "
                     "if evaluate the performance).")
+parser.add_argument("--perf_dataset",
+                    choices=['dev', 'test'],
+                    default='test',
+                    type=str,
+                    help="evaluate the performance on"
+                    "dev dataset or test dataset")
 args = parser.parse_args()
 
 
@@ -106,17 +112,18 @@ def predict(data, label_list):
     if args.perf:
 
         if args.dataset_dir is not None:
-            test_dir = os.path.join(args.dataset_dir, "test.tsv")
-            test_ds = load_dataset(read_local_dataset,
-                                   path=test_dir,
+            eval_dir = os.path.join(args.dataset_dir,
+                                    "{}.tsv".format(args.perf_dataset))
+            eval_ds = load_dataset(read_local_dataset,
+                                   path=eval_dir,
                                    label_list=label_list,
                                    lazy=False)
         else:
-            test_ds = load_dataset(args.dataset,
+            eval_ds = load_dataset(args.dataset,
                                    name=args.task_name,
-                                   splits=["test"])
+                                   splits=[args.perf_dataset])
 
-        texts, labels = predictor.get_text_and_label(test_ds)
+        texts, labels = predictor.get_text_and_label(eval_ds)
 
         preprocess_result = predictor.preprocess(texts)
 
