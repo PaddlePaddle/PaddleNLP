@@ -30,7 +30,6 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-
 * 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
   * 💎 发布通用信息抽取技术[**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**一键抽取**与全流程**小样本**高效定制开发。
   * 😊 发布文心大模型[**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在[CLUE](https://www.cluebenchmarks.com/)上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案。
@@ -73,6 +72,19 @@ albert = AutoModel.from_pretrained('albert-chinese-tiny')
 roberta = AutoModel.from_pretrained('roberta-wwm-ext')
 electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
+```
+
+针对预训练模型计算瓶颈，可以使用API一键使用文心ERNIE-Tiny全系列轻量化模型，降低预训练模型部署难度。
+
+```python
+# 6L768H
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh') 
+# 6L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh') 
+# 4L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh') 
+# 4L312H
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh') 
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
