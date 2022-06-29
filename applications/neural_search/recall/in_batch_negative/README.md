@@ -157,6 +157,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 <a name="模型训练"></a>
 
+
 ## 5. 模型训练
 
 **语义索引训练模型下载链接：**
@@ -196,30 +197,45 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 10 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file recall/train.csv
-
+    --train_set_file recall/train.csv \
+    --evaluate True \
+    --recall_result_dir "recall_result_dir" \
+    --recall_result_file "recall_result.txt" \
+    --hnsw_m 100 \
+    --hnsw_ef 100 \
+    --recall_num 50 \
+    --similar_text_pair "recall/dev.csv" \
+    --corpus_file "recall/corpus.csv"  \
+    --similar_text_pair "recall/dev.csv"
 ```
 
 参数含义说明
 
 * `device`: 使用 cpu/gpu 进行训练
+* `save_dir`: 模型存储路径
 * `batch_size`: 训练的batch size的大小
 * `learning_rate`: 训练的学习率的大小
 * `epochs`: 训练的epoch数
-* `save_dir`: 模型存储路径
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
 * `max_seq_length`: 输入序列的最大长度
 * `margin`: 正样本相似度与负样本之间的目标 Gap
 * `train_set_file`: 训练集文件
-
+* `evaluate`: 是否开启边训练边评估模型训练效果，默认开启
+* `recall_result_dir`: 召回结果存储目录
+* `recall_result_file`: 召回结果的文件名
+* `hnsw_m`: hnsw 算法相关参数，保持默认即可
+* `hnsw_ef`: hnsw 算法相关参数，保持默认即可
+* `recall_num`: 对 1 个文本召回的相似文本数量
+* `similar_text_pair`: 由相似文本对构成的评估集
+* `corpus_file`: 召回库数据 corpus_file
+* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
 
 也可以使用bash脚本：
 
 ```
 sh scripts/train_batch_neg.sh
 ```
-
 
 
 <a name="评估"></a>
