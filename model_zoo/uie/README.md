@@ -544,7 +544,7 @@ python evaluate.py \
 <tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
 <tr><td>uie-medium<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-mini<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
-<tr><td>uie-micro<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.222
+<tr><td>uie-micro<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 </table>
 
