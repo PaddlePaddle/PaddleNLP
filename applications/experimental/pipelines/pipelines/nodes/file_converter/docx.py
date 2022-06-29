@@ -25,13 +25,15 @@ logger = logging.getLogger(__name__)
 
 
 class DocxToTextConverter(BaseConverter):
+
     def convert(
-            self,
-            file_path: Path,
-            meta: Optional[Dict[str, str]]=None,
-            remove_numeric_tables: Optional[bool]=None,
-            valid_languages: Optional[List[str]]=None,
-            encoding: Optional[str]=None, ) -> List[Dict[str, Any]]:
+        self,
+        file_path: Path,
+        meta: Optional[Dict[str, str]] = None,
+        remove_numeric_tables: Optional[bool] = None,
+        valid_languages: Optional[List[str]] = None,
+        encoding: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Extract text from a .docx file.
         Note: As docx doesn't contain "page" information, we actually extract and return a list of paragraphs here.

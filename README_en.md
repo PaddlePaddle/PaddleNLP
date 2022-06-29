@@ -1,7 +1,7 @@
 [简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
+  <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
 ### Awesome Chinese Model Zoo
 
-#### 🀄 Comprehensive Chinese Transformer Models  
+#### 🀄 Comprehensive Chinese Transformer Models
 
 We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
@@ -199,7 +199,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+#### ⚡ FasterTokenizer: High Performance Text Preprocessing Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -209,7 +209,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizer](./faster_tokenizer).
 
 #### ⚡ FasterGeneration: High Perforance Generation Library
 

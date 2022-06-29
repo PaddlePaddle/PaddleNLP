@@ -80,8 +80,8 @@ def evaluate(model, criterion, metric, data_loader, phase="dev"):
         correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
-    print("eval {} loss: {:.5}, accu: {:.5}".format(phase,
-                                                    np.mean(losses), accu))
+    print("eval {} loss: {:.5}, accu: {:.5}".format(phase, np.mean(losses),
+                                                    accu))
     model.train()
     metric.reset()
 
@@ -105,10 +105,9 @@ def do_train():
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
         'ernie-gram-zh')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_pair_input
@@ -116,19 +115,17 @@ def do_train():
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     model = PointwiseMatching(pretrained_model)
 
@@ -180,8 +177,8 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, acc, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             loss.backward()
             optimizer.step()

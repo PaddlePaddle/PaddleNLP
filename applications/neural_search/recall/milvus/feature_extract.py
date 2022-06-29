@@ -28,8 +28,6 @@ from paddlenlp.utils.log import logger
 
 sys.path.append('.')
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
-
 from data import convert_example
 
 # yapf: disable
@@ -63,6 +61,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -75,8 +74,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
+        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -95,10 +94,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads

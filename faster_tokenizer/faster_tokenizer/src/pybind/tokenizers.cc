@@ -193,6 +193,11 @@ static int TokenizerPropertiesSetPostProcessor(TokenizerObject* self,
     const auto& processor =
         py_obj.cast<const postprocessors::BertPostProcessor&>();
     self->tokenizer.SetPostProcessor(processor);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<postprocessors::TemplatePostProcessor>())) {
+    const auto& processor =
+        py_obj.cast<const postprocessors::TemplatePostProcessor&>();
+    self->tokenizer.SetPostProcessor(processor);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePostProcessor();
   } else {

@@ -124,26 +124,20 @@ class ChineseBertTokenizer(BertTokenizer):
     }
     padding_side = "right"
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=True,
-            pinyin_map=None,
-            id2pinyin=None,
-            pinyin2tensor=None,
-            unk_token="[UNK]",
-            sep_token="[SEP]",
-            pad_token="[PAD]",
-            cls_token="[CLS]",
-            mask_token="[MASK]", ):
-        super().__init__(
-            vocab_file,
-            do_lower_case,
-            unk_token,
-            sep_token,
-            pad_token,
-            cls_token,
-            mask_token, )
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=True,
+                 pinyin_map=None,
+                 id2pinyin=None,
+                 pinyin2tensor=None,
+                 unk_token="[UNK]",
+                 sep_token="[SEP]",
+                 pad_token="[PAD]",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]",
+                 **kwargs):
+        super().__init__(vocab_file, do_lower_case, unk_token, sep_token,
+                         pad_token, cls_token, mask_token, **kwargs)
         self.pinyin_dict = pinyin_map
         self.id2pinyin = id2pinyin
         self.pinyin2tensor = pinyin2tensor
@@ -294,7 +288,8 @@ class ChineseBertTokenizer(BertTokenizer):
                 token_offset_mapping=token_offset_mapping,
                 token_pair_offset_mapping=token_pair_offset_mapping,
                 num_tokens_to_remove=total_len - max_seq_len,
-                truncation_strategy=truncation_strategy, )
+                truncation_strategy=truncation_strategy,
+            )
 
             if return_overflowing_tokens:
                 encoded_inputs["overflowing_tokens"] = overflowing_tokens
@@ -303,29 +298,29 @@ class ChineseBertTokenizer(BertTokenizer):
         # Add special tokens
 
         sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
-        token_type_ids = self.create_token_type_ids_from_sequences(ids,
-                                                                   pair_ids)
+        token_type_ids = self.create_token_type_ids_from_sequences(
+            ids, pair_ids)
 
         offset_mapping = self.build_offset_mapping_with_special_tokens(
             token_offset_mapping, token_pair_offset_mapping)
 
         # Build output dictionnary
         encoded_inputs["input_ids"] = sequence
-        encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(text, text_pair,
-                                                           offset_mapping)
+        encoded_inputs["pinyin_ids"] = self.get_pinyin_ids(
+            text, text_pair, offset_mapping)
 
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = token_type_ids
         if return_special_tokens_mask:
             encoded_inputs[
-                "special_tokens_mask"] = self.get_special_tokens_mask(ids,
-                                                                      pair_ids)
+                "special_tokens_mask"] = self.get_special_tokens_mask(
+                    ids, pair_ids)
         if return_length:
             encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
 
         # Check lengths
-        assert max_seq_len is None or len(encoded_inputs[
-            "input_ids"]) <= max_seq_len
+        assert max_seq_len is None or len(
+            encoded_inputs["input_ids"]) <= max_seq_len
 
         # Padding
         needs_to_be_padded = pad_to_max_seq_len and \
@@ -337,8 +332,8 @@ class ChineseBertTokenizer(BertTokenizer):
                 "pinyin_ids"] + self.special_tokens_pinyin_ids * difference
             if self.padding_side == 'right':
                 if return_attention_mask:
-                    encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
-                        "input_ids"]) + [0] * difference
+                    encoded_inputs["attention_mask"] = [1] * len(
+                        encoded_inputs["input_ids"]) + [0] * difference
                 if return_token_type_ids:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] +
@@ -346,8 +341,9 @@ class ChineseBertTokenizer(BertTokenizer):
                 if return_special_tokens_mask:
                     encoded_inputs["special_tokens_mask"] = encoded_inputs[
                         "special_tokens_mask"] + [1] * difference
-                encoded_inputs["input_ids"] = encoded_inputs[
-                    "input_ids"] + [self.pad_token_id] * difference
+                encoded_inputs["input_ids"] = encoded_inputs["input_ids"] + [
+                    self.pad_token_id
+                ] * difference
             elif self.padding_side == 'left':
                 if return_attention_mask:
                     encoded_inputs["attention_mask"] = [0] * difference + [
@@ -366,8 +362,8 @@ class ChineseBertTokenizer(BertTokenizer):
                 ] * difference + encoded_inputs["input_ids"]
         else:
             if return_attention_mask:
-                encoded_inputs["attention_mask"] = [1] * len(encoded_inputs[
-                    "input_ids"])
+                encoded_inputs["attention_mask"] = [1] * len(
+                    encoded_inputs["input_ids"])
 
         if return_position_ids:
             encoded_inputs["position_ids"] = list(
@@ -534,8 +530,8 @@ class ChineseBertTokenizer(BertTokenizer):
                     offset_mapping = self.build_offset_mapping_with_special_tokens(
                         mapping, pair_mapping)
 
-                    sequence = self.build_inputs_with_special_tokens(ids,
-                                                                     pair_ids)
+                    sequence = self.build_inputs_with_special_tokens(
+                        ids, pair_ids)
                     token_type_ids = self.create_token_type_ids_from_sequences(
                         ids, pair_ids)
 
@@ -551,12 +547,12 @@ class ChineseBertTokenizer(BertTokenizer):
                             "special_tokens_mask"] = self.get_special_tokens_mask(
                                 ids, pair_ids)
                     if return_length:
-                        encoded_inputs["seq_len"] = len(encoded_inputs[
-                            "input_ids"])
+                        encoded_inputs["seq_len"] = len(
+                            encoded_inputs["input_ids"])
 
                     # Check lengths
-                    assert max_seq_len is None or len(encoded_inputs[
-                        "input_ids"]) <= max_seq_len
+                    assert max_seq_len is None or len(
+                        encoded_inputs["input_ids"]) <= max_seq_len
 
                     # Padding
                     needs_to_be_padded = pad_to_max_seq_len and \
@@ -565,16 +561,16 @@ class ChineseBertTokenizer(BertTokenizer):
                     encoded_inputs['offset_mapping'] = offset_mapping
 
                     if needs_to_be_padded:
-                        difference = max_seq_len - len(encoded_inputs[
-                            "input_ids"])
+                        difference = max_seq_len - len(
+                            encoded_inputs["input_ids"])
                         # padding pinyin_ids
                         encoded_inputs["pinyin_ids"] = encoded_inputs[
                             "pinyin_ids"] + self.special_tokens_pinyin_ids * difference
                         if self.padding_side == 'right':
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [1] * len(
-                                    encoded_inputs[
-                                        "input_ids"]) + [0] * difference
+                                    encoded_inputs["input_ids"]
+                                ) + [0] * difference
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
@@ -593,8 +589,8 @@ class ChineseBertTokenizer(BertTokenizer):
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [
                                     0
-                                ] * difference + [1] * len(encoded_inputs[
-                                    "input_ids"])
+                                ] * difference + [1] * len(
+                                    encoded_inputs["input_ids"])
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
@@ -737,7 +733,8 @@ class ChineseBertTokenizer(BertTokenizer):
             text,
             style=Style.TONE3,
             heteronym=True,
-            errors=lambda x: [["not chinese"] for _ in x], )
+            errors=lambda x: [["not chinese"] for _ in x],
+        )
         pinyin_locs = {}
         # get pinyin of each location
         for index, item in enumerate(pinyin_list):

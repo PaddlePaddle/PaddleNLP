@@ -80,10 +80,12 @@ def evaluate(model, eval_data_loader):
     det_f1, det_precision, det_recall = det_metric.accumulate()
     corr_f1, corr_precision, corr_recall = corr_metric.accumulate()
     logger.info("Sentence-Level Performance:")
-    logger.info("Detection  metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".
-                format(det_f1, det_recall, det_precision))
-    logger.info("Correction metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".
-                format(corr_f1, corr_recall, corr_precision))
+    logger.info(
+        "Detection  metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".format(
+            det_f1, det_recall, det_precision))
+    logger.info(
+        "Correction metric: F1={:.4f}, Recall={:.4f}, Precision={:.4f}".format(
+            corr_f1, corr_recall, corr_precision))
     model.train()
     return det_f1, corr_f1
 
@@ -94,21 +96,21 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    pinyin_vocab = Vocab.load_vocabulary(
-        args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
+                                         unk_token='[UNK]',
+                                         pad_token='[PAD]')
 
     tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
     ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = ErnieForCSC(
-        ernie,
-        pinyin_vocab_size=len(pinyin_vocab),
-        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
+    model = ErnieForCSC(ernie,
+                        pinyin_vocab_size=len(pinyin_vocab),
+                        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     train_ds, eval_ds = load_dataset('sighan-cn', splits=['train', 'dev'])
 
-    # Extend current training dataset by providing extra training 
-    # datasets directory. The suffix of dataset file name in extra 
+    # Extend current training dataset by providing extra training
+    # datasets directory. The suffix of dataset file name in extra
     # dataset directory has to be ".txt". The data format of
     # dataset need to be a couple of senteces at every line, such as:
     # "城府宫员表示，这是过去三十六小时内第三期强烈的余震。\t政府官员表示，这是过去三十六小时内第三起强烈的余震。\n"
@@ -121,46 +123,43 @@ def do_train(args):
             if data_file.endswith(".txt")
         ]
         for data_file in data_files:
-            ds = load_dataset(
-                read_train_ds,
-                data_path=data_file,
-                splits=["train"],
-                lazy=False)
+            ds = load_dataset(read_train_ds,
+                              data_path=data_file,
+                              splits=["train"],
+                              lazy=False)
             data += ds.data
         train_ds = MapDataset(data)
 
-    det_loss_act = paddle.nn.CrossEntropyLoss(
-        ignore_index=args.ignore_label, use_softmax=False)
-    corr_loss_act = paddle.nn.CrossEntropyLoss(
-        ignore_index=args.ignore_label, reduction='none')
+    det_loss_act = paddle.nn.CrossEntropyLoss(ignore_index=args.ignore_label,
+                                              use_softmax=False)
+    corr_loss_act = paddle.nn.CrossEntropyLoss(ignore_index=args.ignore_label,
+                                               reduction='none')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        pinyin_vocab=pinyin_vocab,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         pinyin_vocab=pinyin_vocab,
+                         max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]),  # pinyin
+        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token]
+            ),  # pinyin
         Pad(axis=0, dtype="int64"),  # detection label
         Pad(axis=0, dtype="int64"),  # correction label
         Stack(axis=0, dtype="int64")  # length
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    eval_data_loader = create_dataloader(
-        eval_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    eval_data_loader = create_dataloader(eval_ds,
+                                         mode='eval',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
         train_data_loader) * args.epochs
@@ -208,8 +207,8 @@ def do_train(args):
             if global_steps % args.logging_steps == 0:
                 logger.info(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_steps, epoch, step, loss,
-                       args.logging_steps / (time.time() - tic_train)))
+                    % (global_steps, epoch, step, loss, args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             if global_steps % args.save_steps == 0:
                 if paddle.distributed.get_rank() == 0:
@@ -219,11 +218,12 @@ def do_train(args):
                     model_file = "model_%d" % global_steps
                     if f1 > best_f1:
                         # save best model
-                        paddle.save(model.state_dict(),
-                                    os.path.join(args.output_dir,
-                                                 "best_model.pdparams"))
-                        logger.info("Save best model at {} step.".format(
-                            global_steps))
+                        paddle.save(
+                            model.state_dict(),
+                            os.path.join(args.output_dir,
+                                         "best_model.pdparams"))
+                        logger.info(
+                            "Save best model at {} step.".format(global_steps))
                         best_f1 = f1
                         model_file = model_file + "_best"
                     model_file = model_file + ".pdparams"

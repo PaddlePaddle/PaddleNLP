@@ -90,9 +90,8 @@ def calc_multi_relation_loss(loss_fct,
             x=t1, y=t1, transpose_y=True) / math.sqrt(t_head_dim)
         del t1
         scaled_dot_product_t1 += attn_mask
-        loss_token_token = loss_fct(
-            F.log_softmax(scaled_dot_product_s1),
-            F.softmax(scaled_dot_product_t1))
+        loss_token_token = loss_fct(F.log_softmax(scaled_dot_product_s1),
+                                    F.softmax(scaled_dot_product_t1))
 
     if alpha == 0.0:
         loss_head_head = 0.0
@@ -105,9 +104,8 @@ def calc_multi_relation_loss(loss_fct,
         scaled_dot_product_t = tensor.matmul(
             x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
         scaled_dot_product_t += attn_mask_head_head
-        loss_head_head = loss_fct(
-            F.log_softmax(scaled_dot_product_s),
-            F.softmax(scaled_dot_product_t))
+        loss_head_head = loss_fct(F.log_softmax(scaled_dot_product_s),
+                                  F.softmax(scaled_dot_product_t))
     if beta == 0.0:
         loss_sample_sample = 0.0
     else:
@@ -117,8 +115,8 @@ def calc_multi_relation_loss(loss_fct,
 
         del s, s2
         # Shape: [seq_len, 1, batch_size, 1]
-        attn_mask_sample_sample = tensor.transpose(
-            x=attn_mask, perm=[3, 1, 0, 2])
+        attn_mask_sample_sample = tensor.transpose(x=attn_mask,
+                                                   perm=[3, 1, 0, 2])
 
         # Shape: [seq_len, head_num, batch_size, batch_size]
         scaled_dot_product_s2 += attn_mask_sample_sample
@@ -128,9 +126,8 @@ def calc_multi_relation_loss(loss_fct,
 
         del t, t2
         scaled_dot_product_t2 += attn_mask_sample_sample
-        loss_sample_sample = loss_fct(
-            F.log_softmax(scaled_dot_product_s2),
-            F.softmax(scaled_dot_product_t2))
+        loss_sample_sample = loss_fct(F.log_softmax(scaled_dot_product_s2),
+                                      F.softmax(scaled_dot_product_t2))
 
     return (
         1 - alpha - beta
@@ -181,8 +178,8 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
         x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
     del t
     scaled_dot_product_t += attn_mask
-    loss = loss_fct(
-        F.log_softmax(scaled_dot_product_s), F.softmax(scaled_dot_product_t))
+    loss = loss_fct(F.log_softmax(scaled_dot_product_s),
+                    F.softmax(scaled_dot_product_t))
     return loss
 
 
@@ -213,10 +210,11 @@ def to_distill(self,
         TinyBertForPretraining._forward = tinybert_forward
 
     def init_func(layer):
-        if isinstance(layer, (MultiHeadAttention, TransformerEncoderLayer,
-                              TransformerEncoder, TinyBertForPretraining,
-                              BertForSequenceClassification,
-                              PPMiniLMForSequenceClassification)):
+        if isinstance(
+                layer,
+            (MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder,
+             TinyBertForPretraining, BertForSequenceClassification,
+             PPMiniLMForSequenceClassification)):
             layer.forward = layer._forward
             if isinstance(layer, TransformerEncoder):
                 layer.return_layer_outputs = return_layer_outputs
@@ -284,11 +282,10 @@ def attention_forward(self,
     self.attention_matrix = product if self.return_attentions else None
     weights = F.softmax(product)
     if self.dropout:
-        weights = F.dropout(
-            weights,
-            self.dropout,
-            training=self.training,
-            mode="upscale_in_train")
+        weights = F.dropout(weights,
+                            self.dropout,
+                            training=self.training,
+                            mode="upscale_in_train")
 
     out = tensor.matmul(weights, v)
     if self.return_qkv:

@@ -35,18 +35,17 @@ class DialogReader(object):
         group = parser.add_argument_group("Reader")
         group.add_argument("--max_src_len", type=int, default=128)
         group.add_argument("--max_tgt_len", type=int, default=128)
-        group.add_argument(
-            "--truncate_first_turn", type=str2bool, default=False)
-        group.add_argument(
-            "--file_format",
-            type=str,
-            default="file",
-            choices=["file", "filelist"])
-        group.add_argument(
-            "--data_format",
-            type=str,
-            default="raw",
-            choices=["raw", "tokenized", "numerical"])
+        group.add_argument("--truncate_first_turn",
+                           type=str2bool,
+                           default=False)
+        group.add_argument("--file_format",
+                           type=str,
+                           default="file",
+                           choices=["file", "filelist"])
+        group.add_argument("--data_format",
+                           type=str,
+                           default="raw",
+                           choices=["raw", "tokenized", "numerical"])
         group.add_argument("--in_tokens", type=str2bool, default=False)
         group.add_argument("--batch_size", type=int, default=16)
         group.add_argument("--continuous_position", type=str2bool, default=True)
@@ -54,8 +53,9 @@ class DialogReader(object):
         group.add_argument("--sort_pool_size", type=int, default=2**16)
 
         group = parser.add_argument_group("Tokenizer")
-        group.add_argument(
-            "--tokenizer", type=str, default="SentencePieceTokenizer")
+        group.add_argument("--tokenizer",
+                           type=str,
+                           default="SentencePieceTokenizer")
         args, _ = parser.parse_known_args()
         tokenizer_cls = getattr(tokenization, args.tokenizer)
         tokenizer_cls.add_cmdline_args(parser)
@@ -96,8 +96,9 @@ class DialogReader(object):
         self.fields += ["tgt_start_idx", "data_id"]
         self.sort_key = lambda record: [len(record.token_ids)]
 
-        self.Record = namedtuple(
-            "Record", self.fields, defaults=(None, ) * len(self.fields))
+        self.Record = namedtuple("Record",
+                                 self.fields,
+                                 defaults=(None, ) * len(self.fields))
 
         self.features = {}
         return
@@ -121,8 +122,9 @@ class DialogReader(object):
             else:
                 s_tokens = self.tokenizer.tokenize(s)
 
-            s_token_ids = self.tokenizer.convert_tokens_to_ids(
-                s_tokens) + [self.eos_id]
+            s_token_ids = self.tokenizer.convert_tokens_to_ids(s_tokens) + [
+                self.eos_id
+            ]
             s_token_ids_list.append(s_token_ids)
 
         # trim src
@@ -135,8 +137,9 @@ class DialogReader(object):
                     truncated_ids = s_token_ids_list[idx][:self.max_src_len -
                                                           total_token_num]
                     if len(truncated_ids) > 1:
-                        s_token_ids_list[
-                            idx] = truncated_ids[:-1] + [self.eos_id]
+                        s_token_ids_list[idx] = truncated_ids[:-1] + [
+                            self.eos_id
+                        ]
                         idx -= 1
                 break
             idx -= 1
@@ -229,6 +232,7 @@ class DialogReader(object):
             yield record
 
     def _read_file(self, input_file, phase, is_infer):
+
         def __wrapper__():
             with open_file(input_file) as fp:
                 if self.data_format == "numerical":
@@ -289,8 +293,8 @@ class DialogReader(object):
                 self.current_example += 1
                 max_lens = update_max_lens(max_lens, record)
                 if self.in_tokens:
-                    to_append = (len(batch) + 1
-                                 ) * sum(max_lens) <= self.batch_size
+                    to_append = (len(batch) +
+                                 1) * sum(max_lens) <= self.batch_size
                 else:
                     to_append = len(batch) < self.batch_size
                 if to_append:
@@ -311,8 +315,8 @@ class DialogReader(object):
                 self.current_example += 1
                 max_lens = update_max_lens(max_lens, record)
                 if self.in_tokens:
-                    to_append = (len(batch) + 1
-                                 ) * sum(max_lens) <= self.batch_size
+                    to_append = (len(batch) +
+                                 1) * sum(max_lens) <= self.batch_size
                 else:
                     to_append = len(batch) < self.batch_size
                 if to_append:
@@ -351,6 +355,7 @@ class DialogReader(object):
                                   num_part,
                                   part_id,
                                   is_test=False):
+
         def __wrapper__():
             batches = []
             for batch in batch_reader():
@@ -396,11 +401,13 @@ class DialogReader(object):
                 is_infer,
                 sort_pool_size=self.sort_pool_size if not is_infer else 0)
             if phase == "train":
-                batch_reader = self._distributed_batch_reader(batch_reader,
-                                                              num_part, part_id)
-            elif phase.startswith("distributed"):
                 batch_reader = self._distributed_batch_reader(
-                    batch_reader, num_part, part_id, is_test=True)
+                    batch_reader, num_part, part_id)
+            elif phase.startswith("distributed"):
+                batch_reader = self._distributed_batch_reader(batch_reader,
+                                                              num_part,
+                                                              part_id,
+                                                              is_test=True)
 
             for epoch_index in range(num_epochs):
                 if phase == "train":
@@ -427,12 +434,12 @@ class DialogReader(object):
                 mask_data[:end + shift_len, :start + shift_len] = 1.0
                 # Generate the lower triangular matrix using the slice of matrix
                 b = np.tril(np.ones([end - start, end - start]), 0)
-                mask_data[start + shift_len:end + shift_len, start + shift_len:
-                          end + shift_len] = b
+                mask_data[start + shift_len:end + shift_len,
+                          start + shift_len:end + shift_len] = b
         else:
             for index, token_ids in enumerate(batch_token_ids):
-                input_mask_data[index, :len(token_ids) + shift_len, :len(
-                    token_ids) + shift_len] = 1.0
+                input_mask_data[index, :len(token_ids) +
+                                shift_len, :len(token_ids) + shift_len] = 1.0
         return input_mask_data.astype("float32")
 
     def _pad_batch_records(self, batch_records, is_infer):
@@ -453,8 +460,8 @@ class DialogReader(object):
             batch_token_ids, batch_tgt_start_idx=batch_tgt_start_idx)
 
         if is_infer:
-            tgt_ids = np.array(
-                [[[self.bos_id]]] * len(batch_token_ids), dtype="int64")
+            tgt_ids = np.array([[[self.bos_id]]] * len(batch_token_ids),
+                               dtype="int64")
             if self.continuous_position:
                 tgt_pos = np.array(batch_tgt_start_idx, dtype="int64")
             else:

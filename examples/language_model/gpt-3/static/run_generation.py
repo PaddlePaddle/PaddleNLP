@@ -36,6 +36,7 @@ from paddlenlp.utils.log import logger
 import paddlenlp.ops as ops
 
 from paddle.distributed import init_parallel_env
+from paddle.static.amp import AutoMixedPrecisionLists
 
 from modeling import GPTModel, GPTForPretraining, GPTForGeneration
 
@@ -68,8 +69,7 @@ def create_data_holder(args):
     #names = ['src_ids']  # one input
 
     inputs = [
-        paddle.static.data(
-            name=names[i], shape=shapes[i], dtype=dtypes[i])
+        paddle.static.data(name=names[i], shape=shapes[i], dtype=dtypes[i])
         for i in range(len(names))
     ]
     return inputs
@@ -83,8 +83,8 @@ def debug_program(name, program):
 def get_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -95,8 +95,8 @@ def get_data_file(args):
         return files
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
     files = [x.replace("_ids.npz", "") for x in files]
     return files
@@ -130,6 +130,25 @@ def do_generation(args):
         "tensor_parallel_degree": args.mp_degree
     }
 
+    white_list = [
+        'softmax', 'layer_norm', 'gelu', 'fused_softmax_mask_upper_triangle',
+        'elementwise_add'
+    ]
+    black_list = [
+        'reduce_sum', 'c_softmax_with_cross_entropy', 'elementwise_div'
+    ]
+
+    if args.use_amp:
+        strategy.amp = True
+        strategy.amp_configs = {
+            "custom_white_list": white_list,
+            "custom_black_list": black_list,
+            "init_loss_scaling": 32768,
+            "use_dynamic_loss_scaling": True,
+            "use_pure_fp16": args.amp_level == "O2",
+            "use_fp16_guard": False
+        }
+
     fleet.init(is_collective=True, strategy=strategy)
 
     # temp use dynamic init, use HybridParallelInferenceHelper in future?
@@ -158,13 +177,12 @@ def do_generation(args):
     worker_index = fleet.worker_index()
     local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank())
 
-    topo = Topology(
-        device_rank=worker_index,
-        world_size=worker_num,
-        dp_degree=args.dp_degree,
-        pp_degree=args.pp_degree,
-        sharding_degree=args.sharding_degree,
-        mp_degree=args.mp_degree)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=args.dp_degree,
+                    pp_degree=args.pp_degree,
+                    sharding_degree=args.sharding_degree,
+                    mp_degree=args.mp_degree)
 
     logger.info("The topo of hybrid parallelism:\n{}".format(topo))
 
@@ -177,7 +195,8 @@ def do_generation(args):
     startup_program = paddle.static.default_startup_program()
     with paddle.static.program_guard(main_program, startup_program):
         with paddle.utils.unique_name.guard():
-            with paddle.static.device_guard('gpu:0'):
+            with paddle.static.device_guard(
+                    'gpu:0' if topo.pp_info.size > 1 else None):
                 feeds = create_data_holder(args)
                 tokenizer = tokenizer_class.from_pretrained(
                     args.model_name_or_path)
@@ -204,6 +223,7 @@ def do_generation(args):
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
                     model_config["fuse"] = args.fuse
+                    model_config["fuse_mt"] = args.fuse_mt
                     model = GPTForGeneration(
                         GPTModel(**model_config),
                         max_length=args.max_dec_len,
@@ -212,17 +232,43 @@ def do_generation(args):
                         top_k=args.topk,
                         top_p=args.topp,
                         eos_id=eos_id,
-                        fuse=args.fuse)
+                        fuse=args.fuse,
+                        fuse_mt=args.fuse_mt)
                 else:
                     logger.error("No checkpoint load.")
                 model.eval()
                 ins = {v.name: v for v in feeds}
                 preds = model(ins)
 
+            if args.use_amp:
+                amp_lists = AutoMixedPrecisionLists(
+                    custom_white_list=set(white_list),
+                    custom_black_list=set(black_list))
+                # Cast model with while loop to fp16
+                from utils.fp16_util import cast_model_to_fp16_block
+                fp16_var_names = cast_model_to_fp16_block(
+                    main_program, amp_lists, False)
+
+                # Change parameters' and ops' dtype to fp16, or will cause OOM while running
+                # startup program
+                block = startup_program.block(0)
+                for var_name in fp16_var_names:
+                    var = block.var(var_name)
+                    block._remove_var(var_name, sync=False)
+                    cast_var = block.create_var(name=var_name,
+                                                dtype='float16',
+                                                shape=var.shape,
+                                                persistable=True)
+                    for op in block.ops:
+                        for out_name in op.output_arg_names:
+                            if out_name == var_name:
+                                op._set_attr("dtype", paddle.float16)
+
     # Define the Executor for running the static model
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
     main_program = main_program.clone(for_test=True)
+    #debug_program('main_program', main_program)
 
     model_urls = model.pretrained_resource_files_map['model_state']
     model_path = args.model_name_or_path
@@ -236,10 +282,7 @@ def do_generation(args):
             else:
                 logger.info("Loading parameters from %s" % dygraph_path)
                 init_static_with_params(
-                    model,
-                    paddle.load(
-                        dygraph_path, return_numpy=True),
-                    topo,
+                    model, paddle.load(dygraph_path, return_numpy=True), topo,
                     main_program)
                 flag_loaded = True
         if not flag_loaded:
@@ -254,22 +297,21 @@ def do_generation(args):
         "Question: Where is the capital of China? Answer:",
         "Question:Who is the CEO of Apple? Answer:"
     ]
-    inputs = tokenizer(
-        text,
-        padding=True,
-        return_attention_mask=True,
-        return_position_ids=True)
+    inputs = tokenizer(text,
+                       padding=True,
+                       return_attention_mask=True,
+                       return_position_ids=True)
     ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype('int64')
     position_ids = np.array(inputs["position_ids"]).reshape(len(text),
                                                             -1).astype('int64')
     attention_mask = np.array(inputs["attention_mask"]).reshape(
         len(text), -1).astype('float32')
 
-    t_ids = paddle.fluid.core.Tensor()
+    t_ids = paddle.framework.core.Tensor()
     t_ids.set(ids, place)
-    t_mask = paddle.fluid.core.Tensor()
+    t_mask = paddle.framework.core.Tensor()
     t_mask.set(attention_mask, place)
-    t_pos = paddle.fluid.core.Tensor()
+    t_pos = paddle.framework.core.Tensor()
     t_pos.set(position_ids, place)
     feed_data = {'src_ids': t_ids, 'pos_ids': t_pos, 'input_mask': t_mask}
     ret = exe.run(main_program, feed=feed_data, fetch_list=fetchs)
@@ -296,8 +338,11 @@ def do_generation(args):
         feed_names = [v.name for v in feeds]
         fetchs_names = [v.name for v in fetchs]
         print('feeds: ', feed_names, 'fetches: ', fetchs_names)
-        paddle.static.save_inference_model(
-            inference_save_path, feeds, fetchs, exe, program=main_program)
+        paddle.static.save_inference_model(inference_save_path,
+                                           feeds,
+                                           fetchs,
+                                           exe,
+                                           program=main_program)
 
 
 if __name__ == '__main__':

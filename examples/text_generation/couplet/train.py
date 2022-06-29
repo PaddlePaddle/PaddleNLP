@@ -33,8 +33,8 @@ def do_train(args):
         Seq2SeqAttnModel(vocab_size, args.hidden_size, args.hidden_size,
                          args.num_layers, pad_id))
 
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=args.learning_rate, parameters=model.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=args.learning_rate,
+                                      parameters=model.parameters())
     ppl_metric = Perplexity()
     model.prepare(optimizer, CrossEntropyCriterion(), ppl_metric)
 

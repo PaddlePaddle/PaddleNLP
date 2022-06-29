@@ -75,11 +75,6 @@ class UIETask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    encoding_model_map = {
-        "uie-base": "ernie-3.0-base-zh",
-        "uie-tiny": "ernie-3.0-medium-zh",
-        "uie-medical-base": "ernie-3.0-base-zh"
-    }
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
@@ -87,10 +82,11 @@ class UIETask(Task):
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json"
     }
+    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     resource_files_urls = {
         "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
                 "aeca0ed2ccf003f4e9c6160363327c9b"
             ],
             "model_config": [
@@ -110,6 +106,95 @@ class UIETask(Task):
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
+        "uie-medium": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
+                "15874e4e76d05bc6de64cc69717f172e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
+                "6f1ee399398d4f218450fbbf5f212b15"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-mini": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
+                "f7b493aae84be3c107a6b4ada660ce2e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
+                "9229ce0a9d599de4602c97324747682f"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-micro": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
+                "80baf49c7f853ab31ac67802104f3f15"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
+                "07ef444420c3ab474f9270a1027f6da5"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-nano": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
+                "ba934463c5cd801f46571f2588543700"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
+                "e3a9842edf8329ccdd0cf6039cf0a8f8"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
         "uie-tiny": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
@@ -120,15 +205,15 @@ class UIETask(Task):
                 "6f1ee399398d4f218450fbbf5f212b15"
             ],
             "vocab_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
                 "1c1c1f4fd93c5bed3b4eebec4de976a8"
             ],
             "special_tokens_map": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
                 "8b3fb1023167bb4ab9d70708eb05f6ec"
             ],
             "tokenizer_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
@@ -160,10 +245,6 @@ class UIETask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._schema_tree = None
         self.set_schema(schema)
-        if model not in self.encoding_model_map.keys():
-            raise ValueError(
-                "Model should be one of uie-base, uie-tiny and uie-medical-base")
-        self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
         self._check_predictor_type()
@@ -177,6 +258,10 @@ class UIETask(Task):
             'split_sentence'] if 'split_sentence' in self.kwargs else False
         self._position_prob = self.kwargs[
             'position_prob'] if 'position_prob' in self.kwargs else 0.5
+        self._lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
+        self._num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -188,14 +273,18 @@ class UIETask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='token_type_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='pos_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='att_mask'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_type_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='pos_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='att_mask'),
         ]
 
     def _construct_model(self, model):
@@ -245,18 +334,16 @@ class UIETask(Task):
 
         def read(inputs):
             for example in inputs:
-                encoded_inputs = self._tokenizer(
-                    text=[example["prompt"]],
-                    text_pair=[example["text"]],
-                    stride=len(example["prompt"]),
-                    truncation=True,
-                    max_seq_len=self._max_seq_len,
-                    pad_to_max_seq_len=True,
-                    return_attention_mask=True,
-                    return_position_ids=True,
-                    return_dict=False)
+                encoded_inputs = self._tokenizer(text=[example["prompt"]],
+                                                 text_pair=[example["text"]],
+                                                 truncation=True,
+                                                 max_seq_len=self._max_seq_len,
+                                                 pad_to_max_seq_len=True,
+                                                 return_attention_mask=True,
+                                                 return_position_ids=True,
+                                                 return_dict=False,
+                                                 return_offsets_mapping=True)
                 encoded_inputs = encoded_inputs[0]
-
                 tokenized_output = [
                     encoded_inputs["input_ids"],
                     encoded_inputs["token_type_ids"],
@@ -265,18 +352,19 @@ class UIETask(Task):
                     encoded_inputs["offset_mapping"]
                 ]
                 tokenized_output = [
-                    np.array(
-                        x, dtype="int64") for x in tokenized_output
+                    np.array(x, dtype="int64") for x in tokenized_output
                 ]
-
                 yield tuple(tokenized_output)
 
-        infer_ds = load_dataset(read, inputs=short_inputs, lazy=False)
-        batch_sampler = paddle.io.BatchSampler(
-            dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
+        infer_ds = load_dataset(read, inputs=short_inputs, lazy=self._lazy_load)
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
+                                               batch_size=self._batch_size,
+                                               shuffle=False)
 
-        infer_data_loader = paddle.io.DataLoader(
-            dataset=infer_ds, batch_sampler=batch_sampler, return_list=True)
+        infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
+                                                 batch_sampler=batch_sampler,
+                                                 num_workers=self._num_workers,
+                                                 return_list=True)
 
         sentence_ids = []
         probs = []
@@ -303,12 +391,13 @@ class UIETask(Task):
 
             start_ids_list = get_bool_ids_greater_than(
                 start_prob, limit=self._position_prob, return_prob=True)
-            end_ids_list = get_bool_ids_greater_than(
-                end_prob, limit=self._position_prob, return_prob=True)
+            end_ids_list = get_bool_ids_greater_than(end_prob,
+                                                     limit=self._position_prob,
+                                                     return_prob=True)
 
             for start_ids, end_ids, ids, offset_map in zip(
-                    start_ids_list, end_ids_list,
-                    input_ids.tolist(), offset_maps.tolist()):
+                    start_ids_list, end_ids_list, input_ids.tolist(),
+                    offset_maps.tolist()):
                 for i in reversed(range(len(ids))):
                     if ids[i] != 0:
                         ids = ids[:i]
@@ -343,8 +432,9 @@ class UIETask(Task):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0][
-                            'text']] = [1, short_results[v][0]['probability']]
+                        cls_options[short_results[v][0]['text']] = [
+                            1, short_results[v][0]['probability']
+                        ]
                     else:
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
@@ -353,8 +443,10 @@ class UIETask(Task):
                     cls_res, cls_info = max(cls_options.items(),
                                             key=lambda x: x[1])
                     concat_results.append([{
-                        'text': cls_res,
-                        'probability': cls_info[1] / cls_info[0]
+                        'text':
+                        cls_res,
+                        'probability':
+                        cls_info[1] / cls_info[0]
                     }])
                 else:
                     concat_results.append([])
@@ -471,8 +563,8 @@ class UIETask(Task):
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
-                                new_relations[i].append(relations[i][j][
-                                    "relations"][node.name][k])
+                                new_relations[i].append(
+                                    relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]

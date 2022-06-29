@@ -64,10 +64,9 @@ if __name__ == "__main__":
 
     tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -77,8 +76,8 @@ if __name__ == "__main__":
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
         "ernie-1.0")
 
-    model = SemanticIndexBase(
-        pretrained_model, output_emb_size=args.output_emb_size)
+    model = SemanticIndexBase(pretrained_model,
+                              output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
 
     # Load pretrained semantic model
@@ -96,12 +95,11 @@ if __name__ == "__main__":
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(
-        corpus_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(corpus_ds,
+                                           mode='predict',
+                                           batch_size=args.batch_size,
+                                           batchify_fn=batchify_fn,
+                                           trans_fn=trans_func)
 
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
@@ -112,12 +110,11 @@ if __name__ == "__main__":
 
     query_ds = MapDataset(text_list)
 
-    query_data_loader = create_dataloader(
-        query_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    query_data_loader = create_dataloader(query_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
 
@@ -136,6 +133,6 @@ if __name__ == "__main__":
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(text_list[text_index][
-                        "text"], id2corpus[doc_idx], 1.0 - cosine_sims[
-                            row_index][idx]))
+                    f.write("{}\t{}\t{}\n".format(
+                        text_list[text_index]["text"], id2corpus[doc_idx],
+                        1.0 - cosine_sims[row_index][idx]))

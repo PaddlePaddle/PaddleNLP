@@ -134,6 +134,11 @@ public:
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
 
+    // For models without parallel
+    if (l_parallel_param_.layers_per_group == 0) {
+        l_parallel_param_.layers_per_group = decoder_layers;
+    }
+
     if (std::is_same<DataType_, float>::value)
       args_.vocab_size_padded_ = vocab_size;
     else if (std::is_same<DataType_, half>::value)

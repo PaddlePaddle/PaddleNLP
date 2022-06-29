@@ -231,9 +231,9 @@ class CnnDailymail(datasets.GeneratorBasedBuilder):
     """CNN/DailyMail non-anonymized summarization dataset."""
 
     BUILDER_CONFIGS = [
-        CnnDailymailConfig(
-            name=str(version), description="Plain text", version=version)
-        for version in _SUPPORTED_VERSIONS
+        CnnDailymailConfig(name=str(version),
+                           description="Plain text",
+                           version=version) for version in _SUPPORTED_VERSIONS
     ]
 
     def _info(self):
@@ -247,7 +247,8 @@ class CnnDailymail(datasets.GeneratorBasedBuilder):
             }),
             supervised_keys=None,
             homepage="https://github.com/abisee/cnn-dailymail",
-            citation=_CITATION, )
+            citation=_CITATION,
+        )
 
     def _vocab_text_gen(self, paths):
         for _, ex in self._generate_examples(paths):
@@ -259,19 +260,21 @@ class CnnDailymail(datasets.GeneratorBasedBuilder):
         # Generate shared vocabulary
 
         return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN, gen_kwargs={"files": train_files}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN,
+                                    gen_kwargs={"files": train_files}),
             datasets.SplitGenerator(
                 name=datasets.Split.VALIDATION,
                 gen_kwargs={
                     "files": _subset_filenames(dl_paths,
                                                datasets.Split.VALIDATION)
-                }, ),
-            datasets.SplitGenerator(
-                name=datasets.Split.TEST,
-                gen_kwargs={
-                    "files": _subset_filenames(dl_paths, datasets.Split.TEST)
-                }),
+                },
+            ),
+            datasets.SplitGenerator(name=datasets.Split.TEST,
+                                    gen_kwargs={
+                                        "files":
+                                        _subset_filenames(
+                                            dl_paths, datasets.Split.TEST)
+                                    }),
         ]
 
     def _generate_examples(self, files):

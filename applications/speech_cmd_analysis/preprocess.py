@@ -73,8 +73,9 @@ def do_convert():
         p1 = int(len(raw_examples) * i1)
         p2 = int(len(raw_examples) * (i1 + i2))
 
-        train_examples = _create_ext_examples(
-            raw_examples[:p1], args.negative_ratio, args.is_shuffle)
+        train_examples = _create_ext_examples(raw_examples[:p1],
+                                              args.negative_ratio,
+                                              args.is_shuffle)
         dev_examples = _create_ext_examples(raw_examples[p1:p2])
         test_examples = _create_ext_examples(raw_examples[p2:])
 

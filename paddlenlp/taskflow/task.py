@@ -43,7 +43,7 @@ class Task(metaclass=abc.ABCMeta):
         self.kwargs = kwargs
         self._priority_path = priority_path
         self._usage = ""
-        # The dygraph model instantce 
+        # The dygraph model instantce
         self._model = None
         # The static model instantce
         self._input_spec = None
@@ -199,15 +199,16 @@ class Task(metaclass=abc.ABCMeta):
         fp16_model_file = os.path.join(onnx_dir, 'fp16_model.onnx')
         if not os.path.exists(fp16_model_file):
             onnx_model = onnx.load_model(float_onnx_file)
-            trans_model = float16.convert_float_to_float16(
-                onnx_model, keep_io_types=True)
+            trans_model = float16.convert_float_to_float16(onnx_model,
+                                                           keep_io_types=True)
             onnx.save_model(trans_model, fp16_model_file)
         providers = ['CUDAExecutionProvider']
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = self._num_threads
         sess_options.inter_op_num_threads = self._num_threads
-        self.predictor = ort.InferenceSession(
-            fp16_model_file, sess_options=sess_options, providers=providers)
+        self.predictor = ort.InferenceSession(fp16_model_file,
+                                              sess_options=sess_options,
+                                              providers=providers)
         assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
             "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
             "Please run the following commands to reinstall: \n " \
@@ -242,8 +243,8 @@ class Task(metaclass=abc.ABCMeta):
         assert self._model is not None, 'The dygraph model must be created before converting the dygraph model to static model.'
         assert self._input_spec is not None, 'The input spec must be created before converting the dygraph model to static model.'
         logger.info("Converting to the inference model cost a little time.")
-        static_model = paddle.jit.to_static(
-            self._model, input_spec=self._input_spec)
+        static_model = paddle.jit.to_static(self._model,
+                                            input_spec=self._input_spec)
         save_path = os.path.join(self._task_path, "static", "inference")
         paddle.jit.save(static_model, save_path)
         logger.info("The inference model save in the path:{}".format(save_path))
@@ -253,18 +254,18 @@ class Task(metaclass=abc.ABCMeta):
         if isinstance(inputs, str):
             if len(inputs) == 0:
                 raise ValueError(
-                    "Invalid inputs, input text should not be empty text, please check your input.".
-                    format(type(inputs)))
+                    "Invalid inputs, input text should not be empty text, please check your input."
+                    .format(type(inputs)))
             inputs = [inputs]
         elif isinstance(inputs, list):
             if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
                 raise TypeError(
-                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text.".
-                    format(type(inputs[0])))
+                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text."
+                    .format(type(inputs[0])))
         else:
             raise TypeError(
-                "Invalid inputs, input text should be str or list of str, but type of {} found!".
-                format(type(inputs)))
+                "Invalid inputs, input text should be str or list of str, but type of {} found!"
+                .format(type(inputs)))
         return inputs
 
     def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
