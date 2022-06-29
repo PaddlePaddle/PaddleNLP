@@ -540,9 +540,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
     _decode_use_source_tokenizer = False
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _pre_init(self, original_init, *args, **kwargs):
         """
-        It would be hooked after `__init__` to add specials tokens (arguments of
+        It would be hooked before `__init__` to add specials tokens (arguments of
         `__init__` whose name ends with `_token`) as attributes of the tokenizer
         instance.
         """
@@ -559,10 +559,24 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         self._decode_use_source_tokenizer = False
 
     def _build_special_tokens_map_extended(self, **kwargs):
-        if getattr(self, "_has_built_special_tokens", None):
-            return
-        SpecialTokensMixin.__init__(self, **kwargs)
-        self._has_built_special_tokens = True
+        for key, value in kwargs.items():
+            if value is None:
+                continue
+            if key in self.SPECIAL_TOKENS_ATTRIBUTES:
+                if key == "additional_special_tokens":
+                    assert isinstance(
+                        value,
+                        (list, tuple)), f"Value {value} is not a list or tuple"
+                    assert all(
+                        isinstance(t, (str, AddedToken)) for t in value
+                    ), "One of the tokens is not a string or an AddedToken"
+                    setattr(self, key, value)
+                elif isinstance(value, (str, AddedToken)):
+                    setattr(self, key, value)
+                else:
+                    raise TypeError(
+                        f"special token {key} has to be either str or AddedToken but got: {type(value)}"
+                    )
 
     @property
     def vocab_size(self) -> int:

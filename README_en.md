@@ -1,7 +1,7 @@
 [简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
+  <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------

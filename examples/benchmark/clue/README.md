@@ -109,7 +109,7 @@
         </tr>
         <tr>
             <td style="text-align:center">
-                <span style="font-size:18px">RoBERTa-wwm-ext-large</span>
+                <span style="font-size:18px">HFL/RoBERTa-wwm-ext-large</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">76.61</span>
@@ -185,9 +185,13 @@
             </td>
         </tr>
         <tr>
-            <td rowspan=7 align=center> 12L768H </td>
+            <td rowspan=8 align=center> 12L768H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 3.0-Base-zh</b></span>
+                <span style="font-size:18px">
+                    <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams">
+                        ERNIE 3.0-Base-zh
+                    </a>
+                </span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>76.05</b></span>
@@ -301,7 +305,7 @@
         </tr>
         <tr>
             <td style="text-align:center">
-                <span style="font-size:18px">Mengzi-BERT-Base</span>
+                <span style="font-size:18px">Langboat/Mengzi-BERT-Base</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">74.69</span>
@@ -377,7 +381,7 @@
         </tr>
         <tr>
             <td style="text-align:center">
-                <span style="font-size:18px">RoBERTa-wwm-ext</span>
+                <span style="font-size:18px">HFL/RoBERTa-wwm-ext</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">74.11</span>
@@ -450,11 +454,91 @@
             <td style="text-align:center">
                 <span style="font-size:18px">65.38</span>
             </td>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">UER/Chinese-RoBERTa-Base</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">71.78</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">72.89</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.62</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.14</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.01</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.56</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.58</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">80.80</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">63.87/84.95</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.52</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">62.76</span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=1 align=center> 8L512H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">UER/Chinese-RoBERTa-Medium</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.06</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.64</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">56.10</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">58.29</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">77.35</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">71.90</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">68.09</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">78.63</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.63/78.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.13</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">56.84</span>
+            </td>
         </tr>
         <tr>
             <td rowspan=5 align=center> 6L768H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 3.0-Medium-zh</b></span>
+                <span style="font-size:18px">
+                    <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams">
+                        ERNIE 3.0-Medium-zh
+                    </a>
+                </span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>72.49</b></span>
@@ -495,7 +579,7 @@
                 <span style="font-size:18px">HLF/RBT6, Chinese</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">70.18</span>
+                <span style="font-size:18px">70.06</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">73.45</span>
@@ -519,10 +603,10 @@
                 <span style="font-size:18px">80.67</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">64.15/85.63</span>
+                <span style="font-size:18px">62.72/84.77</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">77.91</span>
+                <span style="font-size:18px">78.17</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">59.85</span>
@@ -533,7 +617,7 @@
                 <span style="font-size:18px">TinyBERT<sub>6</sub>, Chinese</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">69.58</span>
+                <span style="font-size:18px">69.62</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">72.22</span>
@@ -557,7 +641,7 @@
                 <span style="font-size:18px">80.17</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">62.63/83.72</span>
+                <span style="font-size:18px">63.03/83.75</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">77.64</span>
@@ -605,10 +689,10 @@
         </tr>
         <tr>
             <td style="text-align:center">
-                <span style="font-size:18px">UER/Chinese-RoBERTa (L6-H768)</span>
+                <span style="font-size:18px">UER/Chinese-RoBERTa-L6-H768</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">67.17</span>
+                <span style="font-size:18px">67.09</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">70.13</span>
@@ -632,19 +716,23 @@
                 <span style="font-size:18px">77.33</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">55.70/77.98</span>
+                <span style="font-size:18px">53.74/75.52</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">76.75</span>
+                <span style="font-size:18px">76.73</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">53.25</span>
+                <span style="font-size:18px">54.40</span>
             </td>
         </tr>
         <tr>
             <td rowspan=1 align=center> 6L384H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 3.0-Mini-zh</span>
+                <span style="font-size:18px">
+                    <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams">
+                        ERNIE 3.0-Mini-zh
+                    </a>
+                </span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">66.90</span>
@@ -686,7 +774,7 @@
                 <span style="font-size:18px">HFL/RBT4, Chinese</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">67.45</span>
+                <span style="font-size:18px">67.42</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">72.41</span>
@@ -710,19 +798,62 @@
                 <span style="font-size:18px">78.23</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">59.21/81.80</span>
+                <span style="font-size:18px">59.30/81.93</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">73.61</span>
+                <span style="font-size:18px">73.18</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">56.45</span>
             </td>
         </tr>
         <tr>
+            <td rowspan=1 align=center> 4L512H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">UER/Chinese-RoBERTa-Small</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">63.25</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.21</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">55.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.552</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.64</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.80</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">66.78</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.83</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">46.75/69.69</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.59</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">50.92</span>
+            </td>
+        </tr>
+        <tr>
             <td rowspan=1 align=center> 4L384H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 3.0-Micro-zh</span>
+                <span style="font-size:18px">
+                    <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams">
+                    ERNIE 3.0-Micro-zh
+                    </a>
+                </span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">64.21</span>
@@ -761,7 +892,11 @@
         <tr>
             <td rowspan=2 align=center> 4L312H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 3.0-Nano-zh</b></span>
+                <span style="font-size:18px">
+                    <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams">
+                        ERNIE 3.0-Nano-zh
+                    </a>
+                </span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>62.97</b></span>
@@ -797,12 +932,12 @@
                 <span style="font-size:18px"><b>55.11</b></span>
             </td>
         </tr>
-        <tr>
+         <tr>
             <td style="text-align:center">
             <span style="font-size:18px">TinyBERT<sub>4</sub>, Chinese</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">60.83</span>
+                <span style="font-size:18px">60.82</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">69.07</span>
@@ -826,13 +961,52 @@
                 <span style="font-size:18px">75.07</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">45.05/68.44</span>
+                <span style="font-size:18px">46.04/69.34</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">59.61</span>
+                <span style="font-size:18px">58.53</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">52.15</span>
+                <span style="font-size:18px">52.18</span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=1 align=center> 4L256H </td>
+            <td style="text-align:center">
+            <span style="font-size:18px">UER/Chinese-RoBERTa-Mini</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">53.40</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.32</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">54.22</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">41.63</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.40</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.36</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">65.13</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.07</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">5.96/17.13</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">51.19</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">39.68</span>
             </td>
         </tr>
         <tr>
@@ -840,8 +1014,8 @@
             <td style="text-align:center">
                 <span style="font-size:18px">HFL/RBTL3, Chinese</span>
             </td>
-                <td style="text-align:center">
-                <span style="font-size:18px">66.79</span>
+            <td style="text-align:center">
+                <span style="font-size:18px">66.63</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">71.11</span>
@@ -865,14 +1039,15 @@
                 <span style="font-size:18px">76.93</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">58.59/81.35</span>
+                <span style="font-size:18px">58.50/80.90</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">72.57</span>
+                <span style="font-size:18px">71.03</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">55.56</span>
             </td>
+        </tr>
         <tr>
             <td rowspan=1 align=center> 3L768H </td>
             <td style="text-align:center">
@@ -903,20 +1078,59 @@
                 <span style="font-size:18px">76.63</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">55.14/78.09</span>
+                <span style="font-size:18px">55.73/78.63</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">70.70</span>
+                <span style="font-size:18px">70.26</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">55.08</span>
+                <span style="font-size:18px">54.93</span>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan=1 align=center> 2L128H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">UER/Chinese-RoBERTa-Tiny</span>
+            </td>
+                <td style="text-align:center">
+                <span style="font-size:18px">44.45</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">69.02</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">51.47</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">20.28</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.95</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.73</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">63.82</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">67.43</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">3.08/14.33</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">23.57</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">28.12</span>
             </td>
         </tr>
     <tbody>
 </table>
 <br />
 
-AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3</sup> 任务使用的评估指标均是 Accuracy。CMRC2018 的评估指标是 EM (Exact Match)/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
+AFQMC（语义相似度）、TNEWS（文本分类）、IFLYTEK（长文本分类）、CMNLI（自然语言推理）、OCNLI（自然语言推理）、CLUEWSC2020（代词消歧）、CSL（论文关键词识别）、CHID（成语阅读理解填空） 和 C<sup>3</sup>（中文多选阅读理解） 任务使用的评估指标均是 Accuracy。CMRC2018（阅读理解） 的评估指标是 EM (Exact Match)/F1，计算每个模型效果的平均值时，取 EM 为最终指标。
 
 其中前 7 项属于分类任务，后面 3 项属于阅读理解任务，这两种任务的训练过程在下面将会分开介绍。
 
@@ -942,29 +1156,33 @@ AFQMC、TNEWS、IFLYTEK、CMNLI、OCNLI、CLUEWSC2020、CSL 、CHID 和 C<sup>3<
 | -------------------------------- | ------- | ------- | ------- | -------- | -------- | ----------- | ------- | -------- | ------- | ------------- |
 | ERNIE 3.0-Xbase-zh               | 2e-5,16 | 3e-5,32 | 3e-5,32 | 3e-5,64  | 3e-5,64  | 2e-5,32     | 1e-5,16 | 3e-5,24  | 2e-5,24 | 3e-5,24       |
 | ERNIE 2.0-Large-zh               | 1e-5,32 | 3e-5,64 | 3e-5,32 | 2e-5,32  | 1e-5,16  | 3e-5,32     | 1e-5,64 | 2e-5,24  | 2e-5,24 | 3e-5,32       |
-| RoBERTa-wwm-ext-large            | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
+| HFL/RoBERTa-wwm-ext-large        | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
 | ERNIE 3.0-Base-zh                | 3e-5,16 | 3e-5,32 | 5e-5,32 | 3e-5,32  | 2e-5,64  | 2e-5,16     | 2e-5,32 | 2e-5,24  | 3e-5,24 | 3e-5,32       |
 | ERNIE-Gram-zh                    | 1e-5,16 | 5e-5,16 | 5e-5,16 | 2e-5,32  | 2e-5,64  | 3e-5,16     | 3e-5,64 | 3e-5,32  | 2e-5,24 | 2e-5,24       |
 | ERNIE 2.0-Base-zh                | 3e-5,64 | 3e-5,64 | 5e-5,16 | 5e-5,64  | 5e-5,32  | 5e-5,16     | 2e-5,16 | 2e-5,32  | 3e-5,24 | 3e-5,32       |
-| Mengzi-Bert-Base                 | 3e-5,32 | 5e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,16  | 3e-5,8      | 1e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,32       |
+| Langboat/Mengzi-Bert-Base        | 3e-5,32 | 5e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,16  | 3e-5,8      | 1e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,32       |
 | ERNIE 1.0-Base-zh                | 3e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
-| RoBERTa-wwm-ext                  | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
+| HFL/RoBERTa-wwm-ext              | 3e-5,32 | 3e-5,64 | 5e-5,16 | 3e-5,32  | 2e-5,32  | 3e-5,32     | 2e-5,32 | 3e-5,32  | 2e-5,32 | 3e-5,24       |
 | BERT-Base-Chinese                | 2e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,16     | 1e-5,16 | 3e-5,24  | 2e-5,32 | 3e-5,24       |
+| UER/Chinese-RoBERTa-Base         | 2e-5,16 | 5e-5,16 | 5e-5,16 | 2e-5,16  | 3e-5,16  | 3e-5,8      | 2e-5,16 | 3e-5,24  | 3e-5,32 | 3e-5,32       |
+| UER/Chinese-RoBERTa-Medium       | 3e-5,32 | 5e-5,64 | 5e-5,16 | 5e-5,32  | 3e-5,32  | 3e-5,16     | 5e-5,32 | 3e-5,24  | 3e-5,24 | 3e-5,32       |
 | ERNIE 3.0-Medium-zh              | 3e-5,32 | 3e-5,64 | 5e-5,32 | 2e-5,32  | 1e-5,64  | 3e-5,16     | 2e-5,32 | 3e-5,24  | 2e-5,24 | 1e-5,24       |
-| TinyBERT<sub>6</sub>, Chinese    | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 8,3e-5   | 3e-5,24 | 2e-5,24       |
+| TinyBERT<sub>6</sub>, Chinese    | 1e-5,16 | 3e-5,32 | 5e-5,16 | 5e-5,32  | 3e-5,64  | 3e-5,16     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 2e-5,24       |
 | RoFormerV2 Small                 | 5e-5,16 | 2e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 3e-5,8      | 3e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
-| HLF/RBT6, Chinese                | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,8      | 5e-5,64 | 3e-5,16  | 2e-5,16 | 2e-5,32       |
-| UER/Chinese-RoBERTa (L6-H768)    | 2e-5,16 | 3e-5,16 | 5e-5,16 | 5e-5,16  | 5e-5,32  | 2e-5,32     | 3e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,16       |
+| HLF/RBT6, Chinese                | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,64  | 3e-5,16  | 3e-5,8      | 5e-5,64 | 2e-5,24  | 3e-5,32 | 2e-5,32       |
+| UER/Chinese-RoBERTa-L6-H768      | 2e-5,16 | 3e-5,16 | 5e-5,16 | 5e-5,16  | 5e-5,32  | 2e-5,32     | 3e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,24       |
 | ERNIE 3.0-Mini-zh                | 5e-5,64 | 5e-5,64 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
-| HFL/RBT4, Chinese                | 5e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,32       |
+| HFL/RBT4, Chinese                | 5e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 2e-5,16  | 2e-5,8      | 2e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,32       |
+| UER/Chinese-RoBERTa-Small        | 2e-5,32 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 5e-5,16  | 2e-5,64     | 5e-5,32 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
 | ERNIE 3.0-Micro-zh               | 3e-5,16 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,32  | 5e-5,16     | 3e-5,64 | 3e-5,24  | 3e-5,32 | 3e-5,24       |
 | ERNIE 3.0-Nano-zh                | 2e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,8      | 3e-5,32 | 3e-5,24  | 3e-5,24 | 2e-5,24       |
-| TinyBERT<sub>4</sub>, Chinese    | 3e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,16     | 5e-5,16 | 3e-5,16  | 3e-5,16| 2e-5,16        |
-| HFL/RBTL3, Chinese               | 5e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5, 32 | 2e-5,16  | 5e-5,8      | 2e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,16       |
-| HFL/RBT3, Chinese                | 5e-5,64 | 5e-5,32 | 5e-5,16 | 5e-5, 16 | 2e-5,16  | 3e-5,16     | 5e-5,16 | 3e-5,16  | 3e-5,16 | 3e-5,16       |
+| TinyBERT<sub>4</sub>, Chinese    | 3e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 3e-5,16  | 1e-5,16     | 5e-5,16 | 3e-5,24  | 3e-5,24 | 2e-5,24       |
+| UER/Chinese-RoBERTa-Mini         | 3e-5,16 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 5e-5,32  | 3e-5,8      | 5e-5,32 | 3e-5,24  | 3e-5,32 | 3e-5,32       |
+| HFL/RBTL3, Chinese               | 5e-5,32 | 5e-5,16 | 5e-5,16 | 5e-5,32  | 2e-5,16  | 5e-5,8      | 2e-5,16 | 3e-5,24  | 2e-5,24 | 3e-5,24       |
+| HFL/RBT3, Chinese                | 5e-5,64 | 5e-5,32 | 5e-5,16 | 5e-5,16  | 2e-5,16  | 3e-5,16     | 5e-5,16 | 3e-5,32  | 3e-5,24 | 3e-5,32       |
+| UER/Chinese-RoBERTa-Tiny         | 5e-5,64 | 5e-5,16 | 5e-5,16 | 5e-5,16  | 5e-5,16  | 5e-5,8      | 5e-5,16 | 3e-5,24  | 3e-5,24 | 3e-5,24       |
 
-
-其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 、`HFL/RBT3, Chinese`、`HFL/RBTL3, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa (L6-H768)`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh`、`HFL/RBT3, Chinese`、`HFL/RBT4, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese` 在 IFLYTEK 处的 dropout_prob 为 0.0。
+其中，`ERNIE 3.0-Base-zh`、`ERNIE 3.0-Medium-zh`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh` 、`HFL/RBT3, Chinese`、`HFL/RBTL3, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese`、`UER/Chinese-RoBERTa-Base`、`UER/Chinese-RoBERTa-Mini`、`UER/Chinese-RoBERTa-Small` 在 CLUEWSC2020 处的 dropout_prob 为 0.0，`ERNIE 3.0-Base-zh`、`HLF/RBT6, Chinese`、`Langboat/Mengzi-BERT-Base`、`ERNIE-Gram-zh`、`ERNIE 1.0-Base-zh` 、`TinyBERT6, Chinese`、`UER/Chinese-RoBERTa-L6-H768`、`ERNIE 3.0-Mini-zh`、`ERNIE 3.0-Micro-zh`、`ERNIE 3.0-Nano-zh`、`HFL/RBT3, Chinese`、`HFL/RBT4, Chinese`、`HFL/RBT6, Chinese`、`TinyBERT<sub>4</sub>, Chinese`、`UER/Chinese-RoBERTa-Medium`、`UER/Chinese-RoBERTa-Base`、`UER/Chinese-RoBERTa-Mini`、`UER/Chinese-RoBERTa-Tiny`、`UER/Chinese-RoBERTa-Small` 在 IFLYTEK 处的 dropout_prob 为 0.0。
 
 <a name="一键复现模型效果"></a>
 
@@ -984,10 +1202,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base-zh
+export MODEL_PATH=ernie-3.0-medium-zh
 
 cd classification
-mkdir ernie-3.0-base-zh
+mkdir ernie-3.0-medium-zh
 python -u ./run_clue_classifier.py \
     --model_name_or_path ${MODEL_PATH} \
     --task_name ${TASK_NAME} \
@@ -1051,10 +1269,10 @@ export LR=3e-5
 export BS=32
 export EPOCH=6
 export MAX_SEQ_LEN=128
-export MODEL_PATH=ernie-3.0-base-zh
+export MODEL_PATH=ernie-3.0-medium-zh
 
 cd classification
-mkdir ernie-3.0-base-zh
+mkdir ernie-3.0-medium-zh
 
 python -u ./run_clue_classifier_trainer.py \
     --model_name_or_path ${MODEL_PATH} \
@@ -1096,7 +1314,7 @@ python -u ./run_clue_classifier_trainer.py \
 
 cd mrc
 
-MODEL_PATH=ernie-3.0-base-zh
+MODEL_PATH=ernie-3.0-medium-zh
 BATCH_SIZE=6
 LR=2e-5
 
@@ -1121,9 +1339,9 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_c3.py \
 
 #### 环境依赖
 
-Grid Search 需要在 GPU 环境下进行，需要依赖 pynvml 库。pynvml 库提供了 GPU 管理的 Python 接口。
+Grid Search 需要在 GPU 环境下进行，需要注意的是 C<sup>3</sup> 任务需要显存大于 16 GB，最好是在显存 32 GB的环境下启动。
 
-可启动以下命令进行安装 pynvml：
+Grid Search 中的 GPU 调度需要依赖 pynvml 库，pynvml 库提供了 GPU 管理的 Python 接口。可启动以下命令进行安装 pynvml：
 
 ```shell
 pip install pynvml
@@ -1134,6 +1352,7 @@ pip install pynvml
 #### 一键启动方法
 
 运行下面一句命令即可启动 Grid Search 任务。前期需要注意数据集是否正常下载，否则训练任务不会正式启动。
+脚本默认不保存模型，如需保存每个超参数下最好的模型，需要修改 Python 脚本中的 `--save_best_models` 参数为 True。
 
 ```shell
 cd grid_search_tools
@@ -1156,16 +1375,16 @@ AFQMC	TNEWS	IFLYTEK	CMNLI	OCNLI	CLUEWSC2020	CSL	CMRC2018	CHID	C3
 Best hyper-parameters list:
 ====================================================================
 TASK	result	(lr, batch_size, dropout_p)
-AFQMC	75.93	(3e-05, 16, 0.1)
-TNEWS	58.26	(3e-05, 32, 0.1)
-IFLYTEK	61.56	(5e-05, 32, 0.0)
-CMNLI	83.02	(3e-05, 32, 0.1)
-OCNLI	80.10	(2e-05, 64, 0.1)
-CLUEWSC2020	86.18	(2e-05, 16, 0.0)
-CSL	82.63	(2e-05, 32, 0.1)
-CMRC2018	70.71/90.41	(2e-05, 24, 0.1)
-CHID	84.26	(3e-05, 24, 0.1)
-C3	77.88	(3e-05, 32, 0.1)
+AFQMC	75.93	(3e-05,16,0.1)
+TNEWS	58.26	(3e-05,32,0.1)
+IFLYTEK	61.56	(5e-05,32,0.0)
+CMNLI	83.02	(3e-05,32,0.1)
+OCNLI	80.10	(2e-05,64,0.1)
+CLUEWSC2020	86.18	(2e-05,16,0.0)
+CSL	82.63	(2e-05,32,0.1)
+CMRC2018	70.71/90.41	(2e-05,24,0.1)
+CHID	84.26	(3e-05,24,0.1)
+C3	77.88	(3e-05,32,0.1)
 ```
 
 另外，如遇意外情况（如机器重启）导致训练中断，可以直接再次启动 `grid_search.py` 脚本，之前已完成（输出完整日志）的任务则会直接跳过。

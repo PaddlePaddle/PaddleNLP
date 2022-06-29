@@ -47,8 +47,9 @@ class InitTrackerMeta(type(Layer)):
     """
     This metaclass wraps the `__init__` method of a class to add `init_config`
     attribute for instances of that class, and `init_config` use a dict to track
-    the initial configuration. If the class has `_wrap_init` method, it would be
-    hooked after `__init__` and called as `_wrap_init(self, init_fn, init_args)`.
+    the initial configuration. If the class has `_pre_init` or `_post_init`
+    method, it would be hooked before or after `__init__` and called as
+    `_pre_init(self, init_fn, init_args)` or `_post_init(self, init_fn, init_args)`.
     Since InitTrackerMeta would be used as metaclass for pretrained model classes,
     which always are Layer and `type(Layer)` is not `type`, thus use `type(Layer)`
     rather than `type` as base class for it to avoid inheritance metaclass
@@ -57,23 +58,29 @@ class InitTrackerMeta(type(Layer)):
 
     def __init__(cls, name, bases, attrs):
         init_func = cls.__init__
-        # If attrs has `__init__`, wrap it using accessable `_wrap_init`.
+        # If attrs has `__init__`, wrap it using accessable `_pre_init, _post_init`.
         # Otherwise, no need to wrap again since the super cls has been wraped.
         # TODO: remove reduplicated tracker if using super cls `__init__`
-        help_func = getattr(cls, '_wrap_init',
-                            None) if '__init__' in attrs else None
-        cls.__init__ = InitTrackerMeta.init_and_track_conf(init_func, help_func)
+        pre_init_func = getattr(cls, '_pre_init',
+                                None) if '__init__' in attrs else None
+        post_init_func = getattr(cls, '_post_init',
+                                 None) if '__init__' in attrs else None
+        cls.__init__ = InitTrackerMeta.init_and_track_conf(
+            init_func, pre_init_func, post_init_func)
         super(InitTrackerMeta, cls).__init__(name, bases, attrs)
 
     @staticmethod
-    def init_and_track_conf(init_func, help_func=None):
+    def init_and_track_conf(init_func, pre_init_func=None, post_init_func=None):
         """
         wraps `init_func` which is `__init__` method of a class to add `init_config`
         attribute for instances of that class.
         Args:
             init_func (callable): It should be the `__init__` method of a class.
-            help_func (callable, optional): If provided, it would be hooked after
-                `init_func` and called as `_wrap_init(self, init_func, *init_args, **init_args)`.
+            pre_init_func (callable, optional): If provided, it would be hooked after
+                `init_func` and called as `pre_init_func(self, init_func, *init_args, **init_args)`.
+                Default None.
+            post_init_func (callable, optional): If provided, it would be hooked after
+                `init_func` and called as `post_init_func(self, init_func, *init_args, **init_args)`.
                 Default None.
         
         Returns:
@@ -82,11 +89,14 @@ class InitTrackerMeta(type(Layer)):
 
         @functools.wraps(init_func)
         def __impl__(self, *args, **kwargs):
+            # registed helper by `pre_init_func`
+            if pre_init_func:
+                pre_init_func(self, init_func, *args, **kwargs)
             # keep full configuration
             init_func(self, *args, **kwargs)
-            # registed helper by `_wrap_init`
-            if help_func:
-                help_func(self, init_func, *args, **kwargs)
+            # registed helper by `post_init_func`
+            if post_init_func:
+                post_init_func(self, init_func, *args, **kwargs)
             self.init_config = kwargs
             if args:
                 kwargs['init_args'] = args
