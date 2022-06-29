@@ -44,13 +44,13 @@ op:
             device_type: 1
 
             #计算硬件ID，当devices为""或不写时为CPU预测；当devices为"0", "0,1,2"时为GPU预测，表示使用的GPU卡
-            devices: "3"
+            devices: "0"
 
             #use_mkldnn
-            #use_mkldnn: True
+            use_mkldnn: True
 
             #thread_num
-            thread_num: 1
+            thread_num: 12
 
             #ir_optim
             ir_optim: True

@@ -105,7 +105,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop
 * `epochs`: 训练轮次，默认为1000。
 * `warmup`：是否使用学习率warmup策略；默认为False。
 * `warmup_steps`：学习率warmup策略的steps数，如果设为2000，则学习率会在前2000 steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为2000。
-* `logging_steps`: 日志打印的间隔steps数，默认30。
+* `logging_steps`: 日志打印的间隔steps数，默认5。
 * `seed`：随机种子，默认为3。
 
 
@@ -178,7 +178,7 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 
 data.tsv(可选，待预测数据文件)
 
-- data.tsv 文件：
+- data.tsv 文件格式：
 
 ```text
 <输入序列1>'\n'
@@ -260,7 +260,7 @@ export/
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 
 # 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir=cail2018_small_charges
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir cail2018_small_charges
 ```
 
 此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
@@ -313,7 +313,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 
 启动裁剪：
 ```shell
+# 使用内置数据集
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
+
+# 使用本地数据集
+python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir cail2018_small_charges
 ```
 
 可支持配置的参数：
