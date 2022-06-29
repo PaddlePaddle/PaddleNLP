@@ -43,12 +43,11 @@ parser.add_argument("--dataset",
                     default="cblue",
                     type=str,
                     help="Dataset for text classfication.")
-parser.add_argument(
-    "--dataset_dir",
-    default=None,
-    type=str,
-    help=
-    "Local dataset directory should include train.tsv, dev.tsv and label.tsv")
+parser.add_argument("--dataset_dir",
+                    default=None,
+                    type=str,
+                    help="Local dataset directory should include"
+                    "train.tsv, dev.tsv and label.tsv")
 parser.add_argument("--task_name",
                     default="KUAKE-QIC",
                     type=str,
@@ -99,7 +98,7 @@ parser.add_argument('--warmup_proportion',
                     help="Linear warmup proportion of learning "
                     "rate over the training process.")
 parser.add_argument("--logging_steps",
-                    default=30,
+                    default=5,
                     type=int,
                     help="The interval steps to logging.")
 parser.add_argument("--init_from_ckpt",

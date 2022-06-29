@@ -78,7 +78,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup
 * `epochs`: 训练轮次，默认为3。
 * `warmup`：是否使用学习率warmup策略；默认为False。
 * `warmup_proportion`：学习率warmup策略的比例数，如果设为0.1，则学习率会在前10%steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0.1。
-* `logging_steps`: 日志打印的间隔steps数，默认30。
+* `logging_steps`: 日志打印的间隔steps数，默认5。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
 
@@ -368,7 +368,6 @@ python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/f
 5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 200，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
 
 6. 精度评价指标：Accuracy
-
 
 |                            | Accuracy(%)   | latency(ms) |
 | -------------------------- | ------------ | ------------- |
