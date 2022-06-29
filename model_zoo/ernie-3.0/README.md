@@ -1253,10 +1253,10 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 seq_cls_model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh")
 
 # 用于序列标注任务
-token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-base-zh")
+token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh")
 
 # 用于阅读理解任务
-qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
+qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 
 ```
 
@@ -1264,7 +1264,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-base-zh")
 
 ```shell
 # 分类任务
-python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-base-zh --do_train
+python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-medium-zh --do_train
 
 # 序列标注任务
 python run_token_cls.py --task_name msra_ner  --model_name_or_path ernie-3.0-medium-zh --do_train
