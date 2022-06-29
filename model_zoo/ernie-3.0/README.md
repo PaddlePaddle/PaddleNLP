@@ -1264,7 +1264,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 
 ```shell
 # 分类任务
-python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-meidum-zh --do_train
+python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-medium-zh --do_train
 
 # 序列标注任务
 python run_token_cls.py --task_name msra_ner  --model_name_or_path ernie-3.0-medium-zh --do_train
