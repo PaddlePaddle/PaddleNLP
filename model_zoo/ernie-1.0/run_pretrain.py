@@ -249,14 +249,14 @@ def run_evaluate(data_loader,
                 v.subtract_(v)
             if dist.get_rank() == 0:
                 log_info_dict[
-                    "samples_per_second"] = iter_steps * args.micro_batch_size / (
-                        time.time() - local_time)
+                    "samples_per_second"] = iter_steps * args.micro_batch_size * dist.get_world_size(
+                    ) / (time.time() - local_time)
                 loss_info = ", ".join([
                     "{}: {:.6f}".format(k, log_info_dict[k])
                     for k in log_info_dict.keys() if k.endswith("loss")
                 ])
 
-                logger.info("%s step %d, batch: %d, %s, speed: %.0f seqs/s" %
+                logger.info("%s step %d, batch: %d, %s, ips: %.0f seqs/s" %
                             (task_name, global_step, iter_steps, loss_info,
                              log_info_dict["samples_per_second"]))
 

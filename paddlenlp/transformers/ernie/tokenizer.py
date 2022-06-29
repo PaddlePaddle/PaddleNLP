@@ -253,7 +253,7 @@ class ErnieTokenizer(PretrainedTokenizer):
                 if new_char not in vocab_set:
                     extend_list.append(new_char)
         if len(self.vocab) + len(extend_list) > 2**16:
-            warnings.warn("The vocab size if larger than uint16")
+            warnings.warn("The vocab size is larger than uint16")
         new_tokens = [str(tok) for tok in extend_list]
 
         tokens_to_add = []
