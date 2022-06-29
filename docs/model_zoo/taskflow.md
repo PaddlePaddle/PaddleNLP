@@ -631,7 +631,7 @@ from paddlenlp import Taskflow
 
 - 事件抽取
 
-  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词和事件要素，组合为相应的结构化信息。
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词(Trigger)和事件论元(Argument)，组合为相应的事件结构化信息。
 
   例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
 
