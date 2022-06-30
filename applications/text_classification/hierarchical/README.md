@@ -92,10 +92,10 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop
 
 可支持配置的参数：
 
-* `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoints文件夹下。
+* `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `dataset_dir`：本地训练数据集;默认为None。
 * `dataset`：训练数据集;默认为wos数据集。
-* `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
+* `max_seq_length`：ERNIE 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu。如使用gpu训练则参数gpus指定GPU卡号。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为12。
@@ -106,7 +106,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop
 * `epochs`: 训练轮次，默认为1000。
 * `warmup`：是否使用学习率warmup策略；默认为False。
 * `warmup_steps`：学习率warmup策略的steps数，如果设为2000，则学习率会在前2000 steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为2000。
-* `logging_steps`: 日志打印的间隔steps数，默认100。
+* `logging_steps`: 日志打印的间隔steps数，默认5。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
 * `depth`：层次结构最大深度，默认为2。
@@ -120,11 +120,10 @@ checkpoint/
 ├── model_state.pdparams
 ├── tokenizer_config.json
 └── vocab.txt
-
 ```
 
 **NOTE:**
-* 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoints/macro/model_state.pdparams` 。
+* 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练中文层次分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
 ### 以内置数据集格式读取本地数据集
@@ -135,7 +134,6 @@ checkpoint/
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/wos_data.tar.gz
-
 tar -zxvf wos_data.tar.gz
 ```
 
@@ -148,65 +146,65 @@ wos_data/
 ├── test.tsv # 可选，测试训练集文件
 ├── taxonomy.tsv # 层次分类标签文件
 └── data.tsv # 可选，待预测数据文件
-
 ```
 
-- train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中数据格式为：
-```text
+train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中 n 表示标签层次结构中最大层数，<level i 标签> 代表数据的第i层标签。输入文本序列及不同层的标签数据用`'\t'`分隔开，每一层标签中多个标签之间用`','`逗号分隔开。注意，对于第i层数据没有标签的，使用空字符`''`来表示<level i 标签>。
 
+- train.tsv/dev.tsv/test.tsv 文件格式：
+```text
 <输入序列1>'\t'<level 1 标签>'\t'<level 2 标签>'\t'...'\t'<level n 标签>'\n'
-
 <输入序列2>'\t'<level 1 标签>'\t'<level 2 标签>'\t'...'\t'<level n 标签>'\n'
-
 ...
-
 ```
-其中n表示标签层次结构中最大层数，<level i 标签> 代表数据的第i层标签。输入文本序列及不同层的标签数据用`'\t'`分隔开，每一层标签中多个标签之间用`','`逗号分隔开。注意，对于第i层数据没有标签的，使用空字符`''`来表示<level i 标签>。
+- train.tsv/dev.tsv/test.tsv 文件样例：
+```text
+unintended pregnancy continues to be a substantial public health problem. emergency contraception (ec) provides a last chance at pregnancy prevention. several safe and effective options for emergency contraception are currently available. the yuzpe method, a combined hormonal regimen, was essentially replaced by other oral medications including levonorgestrel and the antiprogestin ulipristal. the antiprogestin mifepristone has been studied for use as emergency contraception. the most effective postcoital method of contraception is the copper intrauterine device (iud). obesity and the simultaneous initiation of progestin-containing contraception may decrease the effectiveness of some emergency contraception.    Medical    Emergency Contraception
+the objective of this paper is to present an example in which matrix functions are used to solve a modern control exercise. specifically, the solution for the equation of state, which is a matrix differential equation is calculated. to resolve this, two different methods are presented, first using the properties of the matrix functions and by other side, using the classical method of laplace transform.    ECE    Control engineering
+...
+```
+taxonomy.tsv(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'--'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
 
-- taxonomy.tsv(层次分类标签文件)记录数据集中所有标签路径集合，标签格式为：
+- taxonomy.tsv 文件格式：
 
 ```text
-
-<level 1: 标签1>'\n'
-
-<level 1: 标签1>'--'<level 2: 标签1>'\n'
-
+<level 1: 标签>'\n'
+<level 1: 标签>'--'<level 2: 标签>'\n'
+<level 1: 标签>'--'<level 2: 标签>'--'<level 3: 标签>'\n'
 ...
-
-<level 1: 标签 i1>'--'...'--'<level n: 标签in>'\n'
-
+```
+- taxonomy.tsv  文件样例：
+```text
+CS
+ECE
+CS--Computer vision
+CS--Machine learning
+ECE--Electricity
+ECE--Lorentz force law
+...
 ```
 
-标签路径中，高层的标签指向底层标签，标签之间用`'--'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
-
-- data.tsv(可选，待预测数据文件)，数据格式为：
-
+data.tsv(可选，待预测数据文件)。
+- data.tsv 文件格式：
 ```text
-
 <输入序列1>'\n'
-
 <输入序列2>'\n'
-
 ...
-
-在训练过程中通过指定数据集路径参数`dataset_dir`进行训练：
-
 ```
-
+- data.tsv 文件样例：
+```text
+previous research exploring cognitive biases in bulimia nervosa suggests that attentional biases occur for both food-related and body-related cues. individuals with bulimia were compared to non-bulimic controls on an emotional-stroop task which contained both food-related and body-related cues. results indicated that bulimics (but not controls) demonstrated a cognitive bias for both food-related and body related cues. however, a discrepancy between the two cue-types was observed with body-related cognitive biases showing the most robust effects and food-related cognitive biases being the most strongly associated with the severity of the disorder. the results may have implications for clinical practice as bulimics with an increased cognitive bias for food-related cues indicated increased bulimic disorder severity. (c) 2016 elsevier ltd. all rights reserved.
+posterior reversible encephalopathy syndrome (pres) is a reversible clinical and neuroradiological syndrome which may appear at any age and characterized by headache, altered consciousness, seizures, and cortical blindness. the exact incidence is still unknown. the most commonly identified causes include hypertensive encephalopathy, eclampsia, and some cytotoxic drugs. vasogenic edema related subcortical white matter lesions, hyperintense on t2a and flair sequences, in a relatively symmetrical pattern especially in the occipital and parietal lobes can be detected on cranial mr imaging. these findings tend to resolve partially or completely with early diagnosis and appropriate treatment. here in, we present a rare case of unilateral pres developed following the treatment with pazopanib, a testicular tumor vascular endothelial growth factor (vegf) inhibitory agent.
+```
+在训练过程中通过指定数据集路径参数`dataset_dir`进行训练：
 单卡训练
 ```shell
-
-python train.py --early_stop --dataset_dir 'wos_data'
-
+python train.py --early_stop --dataset_dir wos_data
 ```
 
 指定GPU卡号/多卡训练
 ```shell
-
 unset CUDA_VISIBLE_DEVICES
-
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir 'wos_data'
-
+python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir wos_data
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -218,18 +216,17 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 
 启动预测：
 ```shell
-python predict.py --params_path ./checkpoints/model_state.pdparams
-```
+# 预测默认数据
+python predict.py --params_path ./checkpoint/model_state.pdparams
 
-也可以通过指定本地数据文件路径进行预测：
-```shell
-python predict.py --params_path ./checkpoints/model_state.pdparams --dataset_dir "wos_data"
+# 预测本地数据文件wos_data/data.tsv
+python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir wos_data
 ```
 
 可支持配置的参数：
 
 * `params_path`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-* `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
+* `max_seq_length`：ERNIE 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为12。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
 * `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
@@ -242,13 +239,13 @@ python predict.py --params_path ./checkpoints/model_state.pdparams --dataset_dir
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_state.pdparams --output_path=./export
+python export_model.py --params_path=./checkpoint/model_state.pdparams --output_path=./export --num_classes 141
 ```
 可支持配置的参数：
 
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `num_classes`：任务标签类别数;默认为wos数据集类别数141。
+* `num_classes`：必须，任务标签类别数。
 * `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
@@ -268,8 +265,10 @@ export/
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 
 # 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --data_dir "wos_data"
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir wos_data
 ```
+
+此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
 ## 模型裁剪
 ### 环境准备
@@ -281,12 +280,11 @@ pip install paddleslim
 ```
 
 ### 裁剪 API 使用
-本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE、BERT 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用 `prune()` 即可一键启动裁剪和并自动保存裁剪后的模型。
+本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用 `prune()` 即可一键启动裁剪和并自动保存裁剪后的模型。
 
 可以这样使用裁剪 API (示例代码只提供了核心调用，如需跑通完整的例子可参考[完整样例脚本](prune.py)):
 
 ```python
-
 trainer = Trainer(
         model=model,
         args=training_args,
@@ -295,15 +293,12 @@ trainer = Trainer(
         eval_dataset=dev_dataset,
         tokenizer=tokenizer,
         criterion=criterion)
-
 output_dir = os.path.join(training_args.output_dir, data_args.dataset)
-
 trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
-
 ```
 由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
 
-* `model`：ERNIE、BERT 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
+* `model`：ERNIE 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
 * `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
 * `train_dataset`：裁剪训练需要使用的训练集
 * `eval_dataset`：裁剪训练使用的评估集
@@ -325,21 +320,19 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
 
 # 使用本地数据集
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --data_dir "wos_data"
+python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir "wos_data"
 ```
 
 
 可支持配置的参数：
 * `TrainingArguments`
-  * `output_dir`：必须，保存模型输出和和中间checkpoints的输出目录;默认为 `None` 。
+  * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
   * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例默认通过`prune_config.json`对TrainingArguments 参数进行配置
-
 * `DataArguments`
   * `dataset`：训练数据集;默认为wos数据集。
   * `dataset`：本地数据集路径，路径内需要包含train.tsv, dev.tsv, taxonomy.tsv文件;默认为None。
   * `depth`：层次分类数据标签最大深度;默认为2。
   * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
-
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
   * `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
@@ -350,7 +343,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
 
 ```text
 prune/
-├── 0.25
+├── 0.6666666666666666
 │   ├── float32.pdiparams
 │   ├── float32.pdiparams.info
 │   ├── float32.pdmodel
@@ -367,15 +360,17 @@ prune/
 
 3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
-导出模型之后用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+4. 导出模型之后用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
 
 ```shell
 # 使用内置数据集
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.25/float32
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 
-#使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.25/float32 --data_dir "wos_data"
+# 使用本地数据集
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir wos_data
 ```
+
+5. 此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
 ### 裁剪效果
 本案例我们对ERNIE 2.0模型微调后的模型使用裁剪 API 进行裁剪,将模型转为ONNX模型，并基于ONNXRuntime引擎GPU部署，测试配置如下：
@@ -386,7 +381,7 @@ python deploy/predictor/infer.py --model_path_prefix ./prune/0.25/float32 --data
 
     系统: CentOS Linux release 7.7.1908 (Core)
 
-    GPU: Tesla V100-SXM2-32GB * 8
+    GPU: Tesla V100-SXM2-32GB
 
     CPU: Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz
 

@@ -26,7 +26,7 @@ class Op(Op):
 
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-2.0-base-en",
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
                                                        use_faster=True)
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
@@ -35,7 +35,7 @@ class Op(Op):
         ]
 
     def preprocess(self, input_dicts, data_id, log_id):
-        # convert input format
+        # Convert input format
         (_, input_dict), = input_dicts.items()
         data = input_dict["sentence"]
         if isinstance(data, str) and "array(" in data:
@@ -51,8 +51,6 @@ class Op(Op):
                               truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
-        # print("input_ids:", input_ids)
-        # print("token_type_ids", token_type_ids)
         return {
             "input_ids": np.array(input_ids, dtype="int64"),
             "token_type_ids": np.array(token_type_ids, dtype="int64")

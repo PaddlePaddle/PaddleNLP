@@ -41,7 +41,8 @@ python infer.py --model_path_prefix ../../export/float32
 * `device_id`: 选择GPU卡号；默认为0。
 * `perf`：选择进行模型性能和精度评估；默认为False。
 * `depth`：层次分类结构最大深度；默认为2。
-* `dataset_dir`：本地数据集地址，需包含data.tsv, taxonomy.tsv,test.tsv(可选，如果启动模型性能和精度评估)；默认为None。
+* `dataset_dir`：本地数据集地址，需包含data.tsv, taxonomy.tsv,test.tsv/dev.tsv(可选，如果启动模型性能和精度评估)；默认为None。
+* `perf_dataset`：评估数据集，选择在开发集或测试集评估模型；默认为"test"。
 
 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。可以使用如下命令开启ONNXRuntime的FP16进行推理加速：
 
@@ -75,6 +76,8 @@ python infer.py --device cpu --model_path_prefix ../../export/float32
 * `num_threads`：cpu线程数；默认为cpu的物理核心数量。
 * `device`: 选用什么设备进行训练，可选cpu、gpu。
 * `perf`：选择进行模型性能和精度评估；默认为False。
+* `dataset_dir`：本地数据集地址，需包含data.tsv, taxonomy.tsv,test.tsv/dev.tsv(可选，如果启动模型性能和精度评估)；默认为None。
+* `perf_dataset`：评估数据集，选择在开发集或测试集评估模型；默认为"test"。
 
 可以使用如下命令开启ONNXRuntime的INT8动态量化进行推理加速：
 
