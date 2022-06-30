@@ -204,7 +204,9 @@ class ErnieMConverter(SpmConverter):
             # clean text for white space and control character, like bert normalizer,
             normalizers.ReplaceNormalizer("[\\s\\p{Zs}]+", ' '),
             normalizers.ReplaceNormalizer(
-                "[\\p{Cf}\\p{Cc}\\p{Cn}\\p{Co}\\p{Cs}]+", ''),
+                # \p{Cn} is not supported in re2
+                "[\\p{Cf}\\p{Cc}\\p{Co}\\p{Cs}]+",
+                ''),
         ]
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
         list_normalizers.append(
