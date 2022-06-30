@@ -24,16 +24,16 @@ parser.add_argument("--params_path",
                     type=str,
                     default='./checkpoint/model_state.pdparams',
                     help="The path to model parameters to be loaded.")
+parser.add_argument("--num_classes",
+                    required=True,
+                    type=int,
+                    help="Number of classes for "
+                    "multi label classfication tasks.")
 parser.add_argument("--output_path",
                     type=str,
                     default='./export',
                     help="The path of model parameter in "
                     "static graph to be saved.")
-parser.add_argument("--num_classes",
-                    default=141,
-                    type=int,
-                    help="Number of classes for "
-                    "hierarchical classfication tasks.")
 parser.add_argument('--model_name',
                     default="ernie-2.0-base-en",
                     help="Select model to train, defaults "
