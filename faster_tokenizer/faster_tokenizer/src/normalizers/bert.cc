@@ -39,12 +39,11 @@ static bool IsWhiteSpace(int ch) {
   for (int i = 0; i < WHITESPACE.length(); ++i) {
     if (ch == WHITESPACE[i]) return true;
   }
-  return false;
+  return u_isspace(ch);
 }
 
 static bool IsControl(int ch) {
   if (ch == '\t' || ch == '\n' || ch == '\r') return false;
-  if (ch == 0 || ch == 0xfffd) return true;
   // It means (general category "C").
   return !u_isprint(ch);
 }
@@ -86,7 +85,6 @@ void BertNormalizer::DoHandleChineseChars(NormalizedString* input) const {
   input->UpdateNormalized(new_normalized_offset, 0);
 }
 void BertNormalizer::operator()(NormalizedString* input) const {
-  std::string result = input->GetStr();
   if (clean_text_) {
     DoCleanText(input);
   }

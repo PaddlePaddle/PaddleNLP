@@ -15,9 +15,9 @@
 
 #include "utils/sentencepiece_normalizer.h"
 #include <algorithm>
+#include "utils/unique_ptr.h"
 #include "utils/utf8.h"
 #include "utils/utils.h"
-#include "utils/unique_ptr.h"
 
 #include "glog/logging.h"
 #include "unicode/brkiter.h"
@@ -30,7 +30,7 @@ PrefixMatcher::PrefixMatcher(const std::set<const char*, Cstrless>& dic) {
   std::vector<const char*> key;
   key.reserve(dic.size());
   for (const auto& it : dic) key.push_back(it);
-  trie_= utils::make_unique<Darts::DoubleArray>();
+  trie_ = utils::make_unique<Darts::DoubleArray>();
   trie_->build(key.size(), const_cast<char**>(&key[0]), nullptr, nullptr);
 }
 
@@ -290,7 +290,7 @@ bool Normalizer::Normalize(const char* input,
             u32content);
         modified = true;
       } else {
-        for (int i = curr_grapheme_pos; i < sp.size(); ++i) {
+        for (int i = 0; i < sp.size(); ++i) {
           *normalized += sp.data()[i];
         }
         if (u32content != nullptr) {
@@ -322,12 +322,13 @@ void Normalizer::Replace(const simple_string_view& new_part,
           utils::UTF8ToUInt32(new_part.data() + utf8_len, &content_char);
       content_char = utils::UTF8ToUnicode(content_char);
       u32content->push_back(content_char);
-      utf8_len += new_part.size();
+      utf8_len += content_char_width;
     }
   }
   changes->insert(changes->end(), new_unicode_len, 0);
   if (new_unicode_len > old_unicode_len) {
-    for (auto i = old_unicode_len; i < new_unicode_len; ++i) {
+    auto diff = new_unicode_len - old_unicode_len;
+    for (auto i = changes->size() - 1; i >= changes->size() - diff; --i) {
       (*changes)[i] = 1;
     }
   } else {

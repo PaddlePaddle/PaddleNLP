@@ -48,8 +48,7 @@ void MetaSpacePreTokenizer::operator()(PreTokenizedString* pretokenized) const {
                           normalizers::NormalizedString* normalized,
                           std::vector<StringSplit>* string_splits) {
     normalized->Replace(pattern, replacement_);
-    if (add_prefix_space_ &&
-        normalized->GetStr().find_first_of(replacement_) != 0) {
+    if (add_prefix_space_ && normalized->GetStr().find(replacement_) != 0) {
       normalized->Prepend(replacement_);
     }
     normalized->Split(

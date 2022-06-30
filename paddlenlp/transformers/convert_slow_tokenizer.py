@@ -201,15 +201,11 @@ class ErnieMConverter(SpmConverter):
             normalizers.ReplaceNormalizer("”", '"'),
             normalizers.ReplaceNormalizer("’", '"'),
             normalizers.ReplaceNormalizer("—", '"'),
+            # clean text for white space and control character, like bert normalizer,
+            normalizers.ReplaceNormalizer("[\\s\\p{Zs}]+", ' '),
+            normalizers.ReplaceNormalizer(
+                "[\\p{Cf}\\p{Cc}\\p{Cn}\\p{Co}\\p{Cs}]+", ''),
         ]
-        list_normalizers.append(
-            normalizers.BertNormalizer(
-                clean_text=True,
-                handle_chinese_chars=False,
-                strip_accents=False,
-                lowercase=False,
-            ))
-
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
         list_normalizers.append(
             normalizers.PrecompiledNormalizer(precompiled_charsmap))
