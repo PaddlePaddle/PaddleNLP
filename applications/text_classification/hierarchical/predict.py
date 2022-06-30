@@ -70,7 +70,8 @@ def predict(data, label_list):
     paddle.set_device(args.device)
     model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name, num_classes=len(label_list))
-    model.set_dict(paddle.load(os.path.join(args.params_path)))
+    if args.params_path and os.path.isfile(args.params_path):
+        model.set_dict(paddle.load(os.path.join(args.params_path)))
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     examples = []
