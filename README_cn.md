@@ -78,13 +78,13 @@ gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 
 ```python
 # 6L768H
-ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 # 6L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
 # 4L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
 # 4L312H
-ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
