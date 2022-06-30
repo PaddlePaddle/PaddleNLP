@@ -28,11 +28,27 @@ multi_class/
 │   │   ├── infer.py # ONNXRuntime推理部署示例
 │   │   ├── predictor.py
 │   │   └── README.md # 使用说明
-│   └── paddle_serving # 基于Paddle Serving 部署
-│       ├──config.yml # 分类任务启动服务端的配置文件
-│       ├──rpc_client.py # 分类任务发送pipeline预测请求的脚本
-│       ├──service.py # 分类任务启动服务端的脚本
-│       └── README.md # 使用说明
+│   ├── paddle_serving # 基于Paddle Serving 部署
+│   │   ├──config.yml # 分类任务启动服务端的配置文件
+│   │   ├──rpc_client.py # 分类任务发送pipeline预测请求的脚本
+│   │   ├──service.py # 分类任务启动服务端的脚本
+│   │   └── README.md # 使用说明
+│   └── triton_serving # 基于Triton server部署
+│       ├── README.md # 使用说明
+│       ├── seqcls_grpc_client.py # 客户端测试代码
+│       └── models # 部署模型
+│           ├── seqcls
+│           │   └── config.pbtxt
+│           ├── seqcls_model
+│           │   └──config.pbtxt
+│           ├── seqcls_postprocess
+│           │   ├── 1
+│           │   │   └── model.py
+│           │   └── config.pbtxt
+│           └── tokenizer
+│               ├── 1
+│               │   └── model.py
+│               └── config.pbtxt
 ├── train.py # 训练评估脚本
 ├── predict.py # 预测脚本
 ├── export_model.py # 动态图参数导出静态图参数脚本
@@ -44,7 +60,6 @@ multi_class/
 ├── requirements.txt # 环境依赖
 └── README.md # 使用说明
 ```
-
 ## 模型微调
 
 我们以公开数据集CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为示例，在训练集上进行模型微调，并在开发集上使用准确率Accuracy评估模型表现。
@@ -382,3 +397,5 @@ python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/f
 - 服务化部署请参考：[基于Paddle Serving的服务化部署指南](deploy/paddle_serving/README.md)，Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件的服务化部署
 
 - ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](deploy/predictor/README.md)
+
+- 基于ONNXRuntime的服务化部署请参考：[基于Triton Inference Server的服务化部署指南](deploy/triton_serving/README.md)
