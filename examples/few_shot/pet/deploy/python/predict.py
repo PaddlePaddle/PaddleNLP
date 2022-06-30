@@ -29,7 +29,7 @@ sys.path.append('./')
 from data import create_dataloader, transform_fn_dict
 from data import convert_example, convert_chid_example
 
-# yapf: disable
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
                     help="The directory to static model.")
@@ -60,7 +60,6 @@ parser.add_argument("--pattern_id", default=0, type=int, help="pattern id of pet
 args = parser.parse_args()
 
 
-# yapf: enable
 
 
 class Predictor(object):
