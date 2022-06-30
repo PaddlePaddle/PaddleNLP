@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "models/unigram.h"
+#include <iomanip>
 #include <limits>
 #include <sstream>
 
@@ -108,7 +109,7 @@ void Unigram::Init(const core::VocabList& vocab,
   }
 }
 
-double Unigram::GetVocabScore(uint id) const { return vocab_.at(id).second; }
+float Unigram::GetVocabScore(uint id) const { return vocab_.at(id).second; }
 
 bool Unigram::TokenToId(const std::string& token, uint* id) const {
   if (token_to_ids_.find(token) == token_to_ids_.end()) {
@@ -146,7 +147,6 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
       }
     }
     auto len = str.length();
-    core::Offset offsets{};
     tokens.emplace_back(id, str, core::Offset{offset, offset + len});
   }
   return tokens;
@@ -274,6 +274,11 @@ void Unigram::EncodeOptimized(const std::string& normalized,
         const auto score = GetVocabScore(ret);
         const auto candidate_best_path_score =
             score + best_path_score_till_here;
+        VLOG(4) << "key_pos: " << key_pos;
+        VLOG(4) << "score: " << score;
+        VLOG(4) << "best_path_score_till_here: " << best_path_score_till_here;
+        VLOG(4) << "starts_at: " << starts_at;
+        VLOG(4) << "token: " << vocab_.at(ret).first;
         if (target_node.starts_at == -1 ||
             candidate_best_path_score > target_node.best_path_score) {
           target_node.best_path_score = candidate_best_path_score;

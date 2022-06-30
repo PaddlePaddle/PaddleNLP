@@ -140,7 +140,7 @@ inline void from_json(const nlohmann::json& j, PadMethod& pad_method) {
 using Offset = std::pair<uint, uint>;
 using Range = std::pair<uint, uint>;
 using Vocab = std::unordered_map<std::string, uint>;
-using VocabList = std::vector<std::pair<std::string, double>>;
+using VocabList = std::vector<std::pair<std::string, float>>;
 using VocabReversed = std::unordered_map<uint, std::string>;
 using SortedVocabReversed = std::map<uint, std::string>;
 using Pair = std::pair<uint, uint>;

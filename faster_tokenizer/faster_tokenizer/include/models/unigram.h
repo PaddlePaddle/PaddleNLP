@@ -41,7 +41,7 @@ struct Unigram : public Model {
       const std::string& filename_prefix) const override;
 
 private:
-  double GetVocabScore(uint id) const;
+  float GetVocabScore(uint id) const;
   void Init(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
   void PopulateNodes(utils::Lattice* lattice) const;
   void Encode(const std::string& normalized,
