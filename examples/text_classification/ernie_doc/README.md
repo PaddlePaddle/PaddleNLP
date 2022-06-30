@@ -39,7 +39,7 @@ iflytek的数据示例如下：
 该数据集共有1.7万多条关于app应用描述的长文本标注数据，包含和日常生活相关的各类应用主题，共119个类别。 使用训练脚本
 
 ```shell
-python train.py --batch_size 16 \
+python train.py --batch_size 4 \
                 --model_name_or_path ernie-doc-base-zh \
                 --epoch 5 \
                 --output_dir ./checkpoints/
