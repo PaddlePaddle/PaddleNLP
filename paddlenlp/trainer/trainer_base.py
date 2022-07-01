@@ -877,7 +877,6 @@ class Trainer:
         core = paddle.framework.core
         if core.is_compiled_with_cuda():
             for i in range(core.get_cuda_device_count()):
-                core.default_cuda_generator(i)._is_init_py = True
                 core.default_cuda_generator(i).manual_seed(
                     checkpoint_rng_state["cuda"][i])
 
