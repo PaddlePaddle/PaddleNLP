@@ -23,10 +23,11 @@ import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
+
+sys.path.append('./')
 from data import create_dataloader, transform_fn_dict
 from data import convert_example, convert_chid_example
 
-sys.path.append('./')
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
@@ -72,8 +73,7 @@ class Predictor(object):
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
-            raise ValueError(
-                "not find params file path {}".format(params_file))
+            raise ValueError("not find params file path {}".format(params_file))
         config = paddle.inference.Config(model_file, params_file)
 
         if device == "gpu":
@@ -149,8 +149,7 @@ class Predictor(object):
                     new_masked_positions.append(bs_index * max_len + pos)
             new_masked_positions = paddle.to_tensor(
                 np.array(new_masked_positions).astype('int64'))
-            self.input_handles[0].copy_from_cpu(
-                src_ids.numpy().astype('int64'))
+            self.input_handles[0].copy_from_cpu(src_ids.numpy().astype('int64'))
             self.input_handles[1].copy_from_cpu(
                 token_type_ids.numpy().astype('int64'))
             self.input_handles[2].copy_from_cpu(
