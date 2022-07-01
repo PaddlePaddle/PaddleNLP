@@ -53,15 +53,11 @@ class TextGenerationTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._static_mode = True
         self._usage = usage
-        if self._static_mode:
-            download_file(self._task_path,
-                          "static" + os.path.sep + "inference.pdiparams",
-                          URLS[self.model][0], URLS[self.model][1])
-            self._get_inference_model()
-        else:
-            self._construct_model(model)
+        download_file(self._task_path, "gpt-cpm-large-cn_params.tar",
+                      URLS[self.model][0], URLS[self.model][1])
+        # Default to static mode
+        self._get_inference_model()
         self._construct_tokenizer(model)
         self.kwargs['generation_task'] = task
 
