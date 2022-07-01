@@ -404,9 +404,8 @@ class LayoutLMv2SelfAttention(nn.Layer):
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = list(context_layer.shape[:-2]) + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = list(
+            context_layer.shape[:-2]) + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
 
         if output_attentions:
@@ -450,7 +449,9 @@ class LayoutLMv2Attention(nn.Layer):
         )
         attention_output = self.output(self_outputs[0], hidden_states)
         if output_attentions:
-            outputs = [attention_output, ] + self_outputs[1:]
+            outputs = [
+                attention_output,
+            ] + self_outputs[1:]
         else:
             outputs = [attention_output]
         return outputs
@@ -666,8 +667,11 @@ class LayoutLMv2Layer(nn.Layer):
         layer_output = self.feed_forward_chunk(attention_output)
 
         if output_attentions:
-            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
-            outputs = [layer_output, ] + list(outputs)
+            outputs = self_attention_outputs[
+                1:]  # add self attentions if we output attention weights
+            outputs = [
+                layer_output,
+            ] + list(outputs)
         else:
             outputs = [layer_output]
         return outputs
@@ -881,8 +885,10 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([expand_shape[0]*expand_shape[1], paddle.shape(bbox)[-1]])
-        visual_bbox = visual_bbox.expand([input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
+        visual_bbox = visual_bbox.expand(
+            [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:

@@ -338,7 +338,7 @@ class LayoutXLMSelfAttention(nn.Layer):
         new_x_shape = list(x.shape[:-1]) + [
             self.num_attention_heads, self.attention_head_size
         ]
-        
+
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
 
@@ -399,11 +399,10 @@ class LayoutXLMSelfAttention(nn.Layer):
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = list(context_layer.shape[:-2]) + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = list(
+            context_layer.shape[:-2]) + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
-        
+
         if output_attentions:
             outputs = [context_layer, attention_probs]
         else:
@@ -445,7 +444,9 @@ class LayoutXLMAttention(nn.Layer):
         attention_output = self.output(self_outputs[0], hidden_states)
         # add attentions if we output them
         if output_attentions:
-            outputs = [attention_output, ] + self_outputs[1:]
+            outputs = [
+                attention_output,
+            ] + self_outputs[1:]
         else:
             outputs = [attention_output]
         return outputs
@@ -459,7 +460,7 @@ class LayoutXLMEncoder(nn.Layer):
         self.layer = nn.LayerList([
             LayoutXLMLayer(config) for _ in range(config["num_hidden_layers"])
         ])
-        
+
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
         self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
 
@@ -569,7 +570,7 @@ class LayoutXLMEncoder(nn.Layer):
                 rel_pos=rel_pos,
                 rel_2d_pos=rel_2d_pos,
             )
-            
+
             hidden_states = layer_outputs[0]
 
             hidden_save["{}_data".format(i)] = hidden_states
@@ -654,10 +655,13 @@ class LayoutXLMLayer(nn.Layer):
         )
         attention_output = self_attention_outputs[0]
         layer_output = self.feed_forward_chunk(attention_output)
-        
+
         if output_attentions:
-            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
-            outputs = [layer_output, ] + list(outputs)
+            outputs = self_attention_outputs[
+                1:]  # add self attentions if we output attention weights
+            outputs = [
+                layer_output,
+            ] + list(outputs)
         else:
             outputs = [layer_output]
         return outputs
@@ -872,12 +876,13 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 visual_bbox_x[1:].expand(expand_shape),
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
-            axis=-1, 
-        ).reshape([expand_shape[0]*expand_shape[1], paddle.shape(bbox)[-1]])
+            axis=-1,
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
 
         visual_bbox = visual_bbox.expand(
             [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
-        
+
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
         if attention_mask is None:
             attention_mask = paddle.ones(input_shape)
