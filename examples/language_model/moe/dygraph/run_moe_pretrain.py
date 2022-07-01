@@ -35,7 +35,7 @@ import types
 from utils import get_timers, set_timers
 from types import MethodType
 from paddle import _C_ops
-from paddle.framework import core
+from paddle.framework import core, in_dygraph_mode
 import paddle.distributed as dist
 from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
@@ -335,6 +335,8 @@ def do_train(args):
 
     fleet.init(is_collective=True, strategy=strategy)
 
+    nranks = paddle.distributed.get_world_size()
+
     # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
     global_rank = hcg.get_global_rank()
@@ -441,7 +443,7 @@ def do_train(args):
             scaler = fleet.distributed_scaler(scaler)
             scaler._unscale = MethodType(unscale_method, scaler)
         else:
-            wrap_scale_func = GroupShardedScaler if paddle.in_dynamic_mode(
+            wrap_scale_func = GroupShardedScaler if in_dygraph_mode(
             ) else ShardingScaler
             scaler = wrap_scale_func(scaler)
 
@@ -616,9 +618,10 @@ def do_train(args):
                     else:
                         bal_loss = -1
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, bal_loss, speed,
-                           speed * default_global_tokens_num, learning_rate))
+                           speed * default_global_tokens_num, speed *
+                           default_global_tokens_num / nranks, learning_rate))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate", learning_rate,
                                           global_step)

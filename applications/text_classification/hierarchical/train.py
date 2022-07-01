@@ -94,7 +94,7 @@ parser.add_argument("--warmup_steps",
                     type=int,
                     help="Linear warmup steps over the training process.")
 parser.add_argument("--logging_steps",
-                    default=100,
+                    default=5,
                     type=int,
                     help="The interval steps to logging.")
 parser.add_argument("--init_from_ckpt",

@@ -224,7 +224,7 @@ class ErnieCrossEncoder(nn.Layer):
             inputs = tokenizer("你们好", text_pair="你好")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
-            # Get similarity probability of text pair.
+            # Get embedding of text pair.
             embedding = model.matching(**inputs)
 
     """
