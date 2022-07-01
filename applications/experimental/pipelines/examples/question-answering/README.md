@@ -109,8 +109,9 @@ python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 
 ## FAQ
 
-### 语义检索系统可以跑通，但终端输出字符是乱码怎么解决？
-通过如下命令设置操作系统默认编码为 zh_CN.UTF-8
+#### 语义检索系统可以跑通，但终端输出字符是乱码怎么解决？
+
++ 通过如下命令设置操作系统默认编码为 zh_CN.UTF-8
 ```bash
 export LANG=zh_CN.UTF-8
 ```
