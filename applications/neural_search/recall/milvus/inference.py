@@ -27,12 +27,9 @@ def search_in_milvus(text_embedding):
     status, results = client.search(collection_name=collection_name,
                                     vectors=text_embedding.tolist(),
                                     partition_tag=partition_tag)
-    # print(status)
-    # print(resultes)
     corpus_file = "milvus/milvus_data.csv"
     id2corpus = gen_id2corpus(corpus_file)
-    # print(status)
-    # print(results)
+
     for line in results:
         for item in line:
             idx = item.id
@@ -88,7 +85,7 @@ if __name__ == "__main__":
     # Need better way to get inner model of DataParallel
 
     all_embeddings = []
-
+    model.eval()
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
