@@ -43,7 +43,7 @@ def _get_ppnlp_home():
 def _get_sub_home(directory, parent_home=_get_ppnlp_home()):
     home = os.path.join(parent_home, directory)
     if not os.path.exists(home):
-        os.makedirs(home)
+        os.makedirs(home, exist_ok=True)
     return home
 
 
