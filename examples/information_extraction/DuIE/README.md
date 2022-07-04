@@ -51,8 +51,8 @@ F1 = (2 * P * R) / (P + R)，其中
 ```python
 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0-base-zh", num_classes=(len(label_map) - 2) * 2 + 2)
-tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0-base-zh")
+model = ErnieForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=(len(label_map) - 2) * 2 + 2)
+tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
 ```
 
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。

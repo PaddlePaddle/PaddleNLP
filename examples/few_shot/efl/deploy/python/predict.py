@@ -125,7 +125,7 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-1.0",
+            self.autolog = auto_log.AutoLogger(model_name="ernie-3.0-medium-zh",
                                                model_precision=precision,
                                                batch_size=self.batch_size,
                                                data_shape="dynamic",
@@ -198,7 +198,8 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-3.0-medium-zh')
     test_ds = load_dataset("fewclue", name=args.task_name, splits=["test"])
     processor = processor_dict[args.task_name]()
     test_ds = processor.get_test_datasets(test_ds,

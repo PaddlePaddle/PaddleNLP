@@ -235,8 +235,9 @@ if __name__ == "__main__":
                                           TASK_LABELS_DESC[args.task_name])
 
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=2)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+        'ernie-3.0-medium-zh', num_classes=2)
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-3.0-medium-zh')
 
     # [src_ids, token_type_ids]
     predict_batchify_fn = lambda samples, fn=Tuple(

@@ -11,6 +11,7 @@ import paddle.nn.functional as F
 import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 from base_model import SemanticIndexBaseStatic
@@ -47,7 +48,8 @@ if __name__ == "__main__":
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-3.0-medium-zh')
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
@@ -58,7 +60,7 @@ if __name__ == "__main__":
     ): [data for data in fn(samples)]
 
     pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+        "ernie-3.0-medium-zh")
 
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)

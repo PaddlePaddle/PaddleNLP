@@ -303,8 +303,8 @@ if __name__ == "__main__":
                         help="must be in [0, 1, 2, 3, 4, all]")
     parser.add_argument('--language_model',
                         type=str,
-                        default='ernie-1.0',
-                        choices=['ernie-1.0'],
+                        default='ernie-3.0-medium-zh',
+                        choices=['ernie-3.0-medium-zh'],
                         help="Language model")
     parser.add_argument(
         "--rdrop_coef",

@@ -175,7 +175,7 @@ pip install -r requirements.txt
 
 第一步：无监督训练 Domain-adaptive Pretraining
 
-训练用时 16hour55min，可参考：[ERNIE 1.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0)
+训练用时 16hour55min，可参考：[ERNIE 3.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0)
 
 第二步：无监督训练 SimCSE
 
@@ -197,7 +197,7 @@ pip install -r requirements.txt
 |  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| ERNIE 预训练，SimCSE 无监督训练|
 |  Domain-adaptive Pretraining + SimCSE + In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| ERNIE 预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
 
-从上述表格可以看出，首先利用ERNIE 1.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到 SimCSE 上进行无监督训练，最后利用 In-batch Negatives 在有监督数据上进行训练能够获得最佳的性能。[模型下载](https://paddlenlp.bj.bcebos.com/models/inbatch_model_best.zip)，模型的使用方式参考[In-batch Negatives](./recall/in_batch_negative/) 。
+从上述表格可以看出，首先利用 ERNIE 3.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到 SimCSE 上进行无监督训练，最后利用 In-batch Negatives 在有监督数据上进行训练能够获得最佳的性能。[模型下载](https://paddlenlp.bj.bcebos.com/models/inbatch_model_best.zip)，模型的使用方式参考[In-batch Negatives](./recall/in_batch_negative/) 。
 
 **召回系统搭建**
 
@@ -235,7 +235,7 @@ pip install -r requirements.txt
 
 ### 4.2 排序阶段
 
-排序阶段使用的模型是 ERNIE-Gram，用时 20h，可参考：
+排序阶段使用的模型是 ERNIE-3.0-Medium-zh，用时 20h，可参考：
 
 [ernie_matching](./ranking/ernie_matching/)
 

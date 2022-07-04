@@ -16,6 +16,8 @@ import logging
 import numpy as np
 import sys
 
+from paddlenlp.transformers import AutoTokenizer
+
 from paddle_serving_server.web_service import WebService, Op
 
 _LOGGER = logging.getLogger()
@@ -40,8 +42,7 @@ class ErnieOp(Op):
 
     def init_op(self):
         import paddlenlp as ppnlp
-        self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            'ernie-1.0')
+        self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad

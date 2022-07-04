@@ -286,7 +286,7 @@ class DataCollator:
 
 
 if __name__ == "__main__":
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
     d = DuIEDataset.from_file("./data/train_data.json", tokenizer)
     sampler = paddle.io.RandomSampler(data_source=d)
     batch_sampler = paddle.io.BatchSampler(sampler=sampler, batch_size=2)

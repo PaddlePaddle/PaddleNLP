@@ -192,7 +192,7 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-1.0",
+            self.autolog = auto_log.AutoLogger(model_name="ernie-3.0-medium-zh",
                                                model_precision=precision,
                                                batch_size=self.batch_size,
                                                data_shape="dynamic",
@@ -250,7 +250,7 @@ class Predictor(object):
 
 
 if __name__ == '__main__':
-    tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = ErnieTokenizer.from_pretrained('ernie-3.0-medium-zh')
     test_ds = load_dataset(read,
                            data_path=os.path.join(args.data_dir, 'test.txt'),
                            lazy=False)

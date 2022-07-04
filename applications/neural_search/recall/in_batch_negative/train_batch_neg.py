@@ -22,6 +22,7 @@ from functools import partial
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from base_model import SemanticIndexBase
 from batch_negative.model import SemanticIndexBatchNeg
@@ -172,10 +173,9 @@ def do_train():
                             data_path=args.train_set_file,
                             lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,

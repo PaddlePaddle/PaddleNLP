@@ -18,10 +18,10 @@ import sys
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
 from scipy import spatial
 from paddle import inference
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
@@ -156,7 +156,7 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-1.0",
+            self.autolog = auto_log.AutoLogger(model_name="ernie-3.0-medium-zh",
                                                model_precision=precision,
                                                batch_size=self.batch_size,
                                                data_shape="dynamic",
@@ -279,7 +279,7 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     output_emb_size = 256
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     res = predictor.extract_embedding(corpus_list, tokenizer)

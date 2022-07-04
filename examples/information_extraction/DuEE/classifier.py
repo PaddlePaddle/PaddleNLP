@@ -193,9 +193,9 @@ def do_train():
     id2label = {val: key for key, val in label_map.items()}
 
     model = ErnieForSequenceClassification.from_pretrained(
-        "ernie-1.0", num_classes=len(label_map))
+        "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     print("============start train==========")
     train_ds = DuEventExtraction(args.train_data, args.tag_path)
@@ -286,9 +286,9 @@ def do_predict():
     id2label = {val: key for key, val in label_map.items()}
 
     model = ErnieForSequenceClassification.from_pretrained(
-        "ernie-1.0", num_classes=len(label_map))
+        "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):

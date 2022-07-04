@@ -135,8 +135,9 @@ def do_train():
                                                              "test"))
 
     model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=2)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+        'ernie-3.0-medium-zh', num_classes=2)
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-3.0-medium-zh')
 
     processor = processor_dict[args.task_name](args.negative_num)
     train_ds = processor.get_train_datasets(train_ds,

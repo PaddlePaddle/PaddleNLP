@@ -35,7 +35,7 @@ if __name__ == "__main__":
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
 
     model = ppnlp.transformers.ErnieForTokenClassification.from_pretrained(
-        "ernie-1.0", num_classes=len(label_vocab))
+        "ernie-3.0-medium-zh", num_classes=len(label_vocab))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

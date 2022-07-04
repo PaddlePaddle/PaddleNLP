@@ -99,9 +99,10 @@ def do_train():
     dev_ds = dev_ds.map(transform_fn, lazy=False)
     public_test_ds = public_test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        'ernie-3.0-medium-zh')
 
     if args.task_name != "chid":
         # [src_ids, token_type_ids, masked_positions, masked_lm_labels]

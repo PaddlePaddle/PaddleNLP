@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser()
 # Train
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
-parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
+parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-3.0-medium-zh", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-3.0-medium-zh", help="Select the encoding model.")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
@@ -120,7 +120,7 @@ def do_train(args):
             args.encoding_model)
     elif args.encoding_model == "lstm-pe":
         tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            "ernie-1.0")
+            "ernie-3.0-medium-zh")
     else:
         tokenizer = None
 
@@ -188,8 +188,8 @@ def do_train(args):
         trans_fn=trans_fn,
     )
 
-    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
+    # Load pretrained model if encoding model is ernie-3.0-medium, ernie-tiny or ernie-gram-zh
+    if args.encoding_model in ["ernie-3.0-medium-zh", "ernie-tiny"]:
         pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
             args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
