@@ -68,13 +68,20 @@ def adapt_stale_fwd_patch(self, name, value):
         ]
 
         if new_args:
-            warnings.warn(
-                f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} is patched and the patch "
-                "might be based on an old oversion which missing some "
-                f"arguments compared with the latest, such as {new_args}. "
-                "We automatically add compatibility on the patch for "
-                "these arguemnts, and maybe the patch should be updated.")
-
+            if self.__module__.startswith("paddlenlp"):
+                warnings.warn(
+                    f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} is patched and the patch "
+                    "might be based on an old oversion which missing some "
+                    f"arguments compared with the latest, such as {new_args}. "
+                    "We automatically add compatibility on the patch for "
+                    "these arguemnts, and maybe the patch should be updated.")
+            else:
+                warnings.warn(
+                    f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} "
+                    "is patched and the patch might be conflict with patches made "
+                    f"by paddlenlp which seems have more arguments such as {new_args}. "
+                    "We automatically add compatibility on the patch for "
+                    "these arguemnts, and maybe the patch should be updated.")
             if isinstance(self, Layer) and inspect.isfunction(value):
 
                 @functools.wraps(value)

@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import paddle
 import numpy as np
 from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
 from paddle.nn.layer.transformer import _convert_attention_mask
+
+from .utils import adapt_stale_fwd_patch
 
 
 def _transformer_encoder_layer_fwd(self,
@@ -114,6 +117,22 @@ def _transformer_encoder_fwd(self,
         past_key_values=new_caches,
         hidden_states=all_hidden_states,
         attentions=all_attentions)
+
+
+# patches of paddle.nn.Transformer to get all hidden_states and attentions
+paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
+paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
+
+
+def _wrap_setattr(self, name, value):
+    value = adapt_stale_fwd_patch(self, name, value)
+    return super(self.__class__, self).__setattr__(name, value)
+
+
+paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
+    paddle.nn.TransformerEncoderLayer.__setattr__)(_wrap_setattr)
+paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
+    paddle.nn.TransformerEncoder.__setattr__)(_wrap_setattr)
 
 
 def is_tensor(x):
