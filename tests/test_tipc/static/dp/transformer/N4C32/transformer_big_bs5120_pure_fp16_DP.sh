@@ -7,6 +7,7 @@ device_num=N4C32
 max_epochs=3000
 num_workers=0
 
+
 # get data
 bash ./test_tipc/static/dp/${model}/benchmark_common/prepare.sh
 # run
