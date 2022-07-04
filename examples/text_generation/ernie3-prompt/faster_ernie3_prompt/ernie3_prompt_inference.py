@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import argparse
 import numpy as np
 from pprint import pprint
@@ -31,15 +32,18 @@ def setup_args():
         default="./infer_model/",
         type=str,
         help="Path to save inference model of Ernie3Prompt. ")
-
+    parser.add_argument(
+        "--model_name_or_path",
+        default="ernie3-prompt",
+        type=str,
+        help="The model name to specify the ernie3 to use. ")
     args = parser.parse_args()
 
     return args
 
 
 def infer(args):
-    model_name = 'ernie3-prompt'
-    tokenizer = Ernie3PromptTokenizer.from_pretrained(model_name)
+    tokenizer = Ernie3PromptTokenizer.from_pretrained(args.model_name_or_path)
 
     texts = ["嗜睡抑郁多梦入睡困难很", "三个月宝宝一天睡几个小时"]
 
@@ -49,8 +53,8 @@ def infer(args):
     load("FasterTransformer", verbose=True)
 
     config = paddle_infer.Config(
-        args.inference_model_dir + "ernie3_prompt.pdmodel",
-        args.inference_model_dir + "ernie3_prompt.pdiparams")
+        os.path.join(args.inference_model_dir, "ernie3_prompt.pdmodel"),
+        os.path.join(args.inference_model_dir, "ernie3_prompt.pdiparams"))
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
     predictor = paddle_infer.create_predictor(config)
@@ -76,7 +80,7 @@ def infer(args):
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
 
-    for idx, sample in enumerate(output[0].transpose([1, 2, 0]).tolist()):
+    for idx, sample in enumerate(output[0].tolist()):
         for beam_idx, beam in enumerate(sample):
             seq = tokenizer.convert_ids_to_string(beam)
             score = output[1][idx][beam_idx]

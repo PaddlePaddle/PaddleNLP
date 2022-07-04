@@ -20,7 +20,7 @@ import numpy as np
 
 def match_embedding_param(convert_parameter_name_dict):
     convert_parameter_name_dict[
-        "embeddings.word_embeddings.weight"] = "word_embedding_expanded"
+        "embeddings.word_embeddings.weight"] = "word_embedding"
     convert_parameter_name_dict[
         "embeddings.position_embeddings.weight"] = "pos_embedding"
     convert_parameter_name_dict[
@@ -91,17 +91,15 @@ def match_encoder_param(convert_parameter_name_dict, layer_num=6):
 
 def match_mlm_parameter(convert_parameter_name_dict):
     convert_parameter_name_dict[
-        "lm_head.lm_transform.weight"] = "server_nlg_mask_lm_trans_fc.w_0"
+        "lm_head.lm_transform.weight"] = "mask_lm_trans_fc.w_0"
     convert_parameter_name_dict[
-        "lm_head.lm_transform.bias"] = "server_nlg_mask_lm_trans_fc.b_0"
+        "lm_head.lm_transform.bias"] = "mask_lm_trans_fc.b_0"
     convert_parameter_name_dict[
-        "lm_head.layer_norm.weight"] = "server_nlg_mask_lm_trans_layer_norm_scale"
+        "lm_head.layer_norm.weight"] = "mask_lm_trans_layer_norm_scale"
     convert_parameter_name_dict[
-        "lm_head.layer_norm.bias"] = "server_nlg_mask_lm_trans_layer_norm_bias"
-    convert_parameter_name_dict[
-        "lm_head.lm_out.weight"] = "word_embedding_expanded"
-    convert_parameter_name_dict[
-        "lm_head.lm_out.bias"] = "server_nlg_mask_lm_out_fc.b_0"
+        "lm_head.layer_norm.bias"] = "mask_lm_trans_layer_norm_bias"
+    convert_parameter_name_dict["lm_head.lm_out.weight"] = "word_embedding"
+    convert_parameter_name_dict["lm_head.lm_out.bias"] = "mask_lm_out_fc.b_0"
     return convert_parameter_name_dict
 
 
@@ -161,6 +159,7 @@ if __name__ == "__main__":
 
     convert_static_to_dygraph_params(
         dygraph_params_save_path='ernie3_prompt.pdparams',
-        static_params_dir='/home/home/ernie3_prompt/paddlenlp/transformers/ernie3/step_500000',
+        static_params_dir='checkpoints_step_625001_dec',
         static_to_dygraph_param_name=convert_parameter_name_dict,
         model_name='ernie3_prompt')
+    #/home/home/ernie3_prompt/paddlenlp/transformers/ernie3/step_500000

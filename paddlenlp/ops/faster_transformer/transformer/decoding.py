@@ -2506,4 +2506,7 @@ class InferErnie3PromptDecoding(nn.Layer):
             sequence_length,
             forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
+
+        ids = ids.transpose([1, 2, 0])
+
         return ids, output_scores
