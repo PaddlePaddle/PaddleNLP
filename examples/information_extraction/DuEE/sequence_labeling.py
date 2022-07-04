@@ -26,7 +26,8 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification, LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModelTokenClassification, AutoTokenizer
 from paddlenlp.metrics import ChunkEvaluator
 from utils import read_by_lines, write_by_lines, load_dict
 
@@ -150,10 +151,10 @@ def do_train():
     no_entity_label = "O"
     ignore_label = -1
 
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained(
+    model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
 
@@ -245,10 +246,10 @@ def do_train():
 def do_predict():
     paddle.set_device(args.device)
 
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
-    model = ErnieForTokenClassification.from_pretrained(
+    model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
 
     no_entity_label = "O"

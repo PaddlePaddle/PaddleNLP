@@ -16,8 +16,6 @@ import logging
 import numpy as np
 import sys
 
-from paddlenlp.transformers import AutoTokenizer
-
 from paddle_serving_server.web_service import WebService, Op
 
 _LOGGER = logging.getLogger()
@@ -41,7 +39,7 @@ def convert_example(example,
 class ErnieOp(Op):
 
     def init_op(self):
-        import paddlenlp as ppnlp
+        from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     def preprocess(self, input_dicts, data_id, log_id):

@@ -19,7 +19,7 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModelForTokenClassification
 from data import load_dict, load_dataset, parse_decodes
 
 # yapf: disable
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
 
-    model = ppnlp.transformers.ErnieForTokenClassification.from_pretrained(
+    model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_vocab))
 
     if args.params_path and os.path.isfile(args.params_path):

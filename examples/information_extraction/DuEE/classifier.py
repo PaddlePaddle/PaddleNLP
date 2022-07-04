@@ -28,9 +28,8 @@ from collections import namedtuple
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from utils import read_by_lines, write_by_lines, load_dict
 
@@ -192,10 +191,10 @@ def do_train():
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
-    model = ErnieForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     print("============start train==========")
     train_ds = DuEventExtraction(args.train_data, args.tag_path)

@@ -18,7 +18,7 @@ import os
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 from data import load_dict, load_dataset, parse_decodes
@@ -116,7 +116,7 @@ if __name__ == '__main__':
                    os.path.join(args.data_dir, 'test.txt')))
 
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
-    tokenizer = ErnieTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_to_features,
                          tokenizer=tokenizer,
@@ -151,7 +151,7 @@ if __name__ == '__main__':
                                     batchify_fn=batchify_fn)
 
     # Define the model netword and its loss
-    model = ErnieForTokenClassification.from_pretrained(
+    model = AutoModelForTokenClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_vocab))
     if trainer_num > 1:
         model = paddle.DataParallel(model)

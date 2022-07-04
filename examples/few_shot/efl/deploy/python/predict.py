@@ -18,7 +18,7 @@ import sys
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from scipy.special import softmax
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
@@ -198,8 +198,7 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-        'ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     test_ds = load_dataset("fewclue", name=args.task_name, splits=["test"])
     processor = processor_dict[args.task_name]()
     test_ds = processor.get_test_datasets(test_ds,

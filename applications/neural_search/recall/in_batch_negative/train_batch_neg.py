@@ -17,7 +17,6 @@ import random
 import time
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from functools import partial
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad

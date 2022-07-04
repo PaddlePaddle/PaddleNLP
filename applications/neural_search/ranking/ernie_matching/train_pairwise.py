@@ -22,7 +22,6 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup, AutoModel, AutoTokenizer
@@ -118,8 +117,6 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-
-    # train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
     train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)

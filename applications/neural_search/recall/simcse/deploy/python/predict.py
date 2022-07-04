@@ -18,7 +18,7 @@ import sys
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer
 from scipy.special import softmax
 from scipy import spatial
 from paddle import inference

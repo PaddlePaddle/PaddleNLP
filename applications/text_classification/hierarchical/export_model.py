@@ -16,7 +16,6 @@ import argparse
 import os
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.transformers import AutoModelForSequenceClassification
 
 parser = argparse.ArgumentParser()

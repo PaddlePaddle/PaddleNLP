@@ -18,7 +18,6 @@ import numpy as np
 
 import paddle
 from paddle.io import Dataset
-import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
 from utils import kmeans, pad_sequence
 

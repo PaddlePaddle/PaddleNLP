@@ -18,12 +18,11 @@ import numpy as np
 from functools import partial
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
@@ -250,7 +249,7 @@ class Predictor(object):
 
 
 if __name__ == '__main__':
-    tokenizer = ErnieTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     test_ds = load_dataset(read,
                            data_path=os.path.join(args.data_dir, 'test.txt'),
                            lazy=False)

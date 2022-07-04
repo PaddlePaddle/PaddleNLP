@@ -25,7 +25,6 @@ import numpy as np
 import hnswlib
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
