@@ -117,7 +117,6 @@ checkpoint/
 ├── model_state.pdparams
 ├── tokenizer_config.json
 └── vocab.txt
-
 ```
 
 **NOTE:**
@@ -130,7 +129,6 @@ checkpoint/
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/cail2018_small_charges.tar.gz
-
 tar -zxvf cail2018_small_charges.tar.gz
 ```
 
@@ -143,14 +141,13 @@ cail2018_small_charges/
 ├── test.tsv # 可选，测试训练集文件
 ├── label.tsv # 分类标签文件
 └── data.tsv # 可选，待预测数据文件
-
 ```
 
 train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中输入文本序列与标签数据用`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
 - train.tsv/dev.tsv/test.tsv 文件格式：
 ```text
-<输入序列1>'\t'<标签1>','<标签2>'\n'
-<输入序列2>'\t'<标签1>'\n'
+<输入序列1>'\t'<标签1>','<标签2>
+<输入序列2>'\t'<标签1>
 ...
 ```
 - train.tsv/dev.tsv/test.tsv 文件样例：
@@ -163,8 +160,8 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 - label.tsv 文件格式：
 
 ```text
-<标签名1>'\n'
-<标签名2>'\n'
+<标签名1>
+<标签名2>
 ...
 ```
 - label.tsv 文件样例：
@@ -181,8 +178,8 @@ data.tsv(可选，待预测数据文件)
 - data.tsv 文件格式：
 
 ```text
-<输入序列1>'\n'
-<输入序列2>'\n'
+<输入序列1>
+<输入序列2>
 ...
 ```
 - data.tsv 文件样例：
@@ -211,12 +208,12 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 
 输入待预测数据和数据标签对照列表，模型预测数据对应的标签
 
-启动预测：
+使用默认数据进行预测：
 ```shell
-# 预测默认数据
 python predict.py --params_path ./checkpoint/model_state.pdparams
-
-# 预测本地数据文件cail2018_small_charges/data.tsv
+```
+也可以选择使用本地数据文件cail2018_small_charges/data.tsv进行预测：
+```shell
 python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir=cail2018_small_charges
 ```
 
@@ -253,13 +250,14 @@ export/
 ```
 
 
-导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件cail2018_small_charges/data.tsv进行部署：
+```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir cail2018_small_charges
 ```
 
@@ -271,7 +269,7 @@ python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_
 使用裁剪功能需要安装 paddleslim 包
 
 ```shell
-pip install paddleslim
+pip install paddleslim==2.2.2
 ```
 
 ### 裁剪 API 使用
@@ -311,12 +309,12 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 * `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
 
 
-启动裁剪：
+选择使用默认数据集启动裁剪：
 ```shell
-# 使用内置数据集
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件启动裁剪：
+```shell
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir cail2018_small_charges
 ```
 
@@ -358,13 +356,14 @@ prune/
 
 3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
-4. 本项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+4. 本项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件 cail2018_small_charges/data.tsv 进行部署：
+```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir cail2018_small_charges
 ```
 5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
