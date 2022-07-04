@@ -30,19 +30,25 @@ def str2bool(v):
 
 class ArgumentGroup(object):
     """argument group"""
+
     def __init__(self, parser, title, des):
         self._group = parser.add_argument_group(title=title, description=des)
 
-    def add_arg(self, name, type, default, help, positional_arg=False, **kwargs):
+    def add_arg(self,
+                name,
+                type,
+                default,
+                help,
+                positional_arg=False,
+                **kwargs):
         """add argument"""
         prefix = "" if positional_arg else "--"
         type = str2bool if type == bool else type
-        self._group.add_argument(
-            prefix + name,
-            default=default,
-            type=type,
-            help=help + ' Default: %(default)s.',
-            **kwargs)
+        self._group.add_argument(prefix + name,
+                                 default=default,
+                                 type=type,
+                                 help=help + ' Default: %(default)s.',
+                                 **kwargs)
 
 
 def print_arguments(args):
