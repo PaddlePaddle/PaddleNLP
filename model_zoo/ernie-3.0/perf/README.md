@@ -9,7 +9,7 @@ pip install faster_tokenizer
 export OMP_NUM_THREADS=4
 ```
 
-性能测试需要静态图模型 ${MODEL_PATH}，包含 `*.pdmodel` 和 `*.pdiparams` 文件。动态图转静态图可参考[预训练模型导出脚本](../../bert/export_model.py)，传入动态图模型的路径 ${DYGRAPH_PATH}，以及导出的静态图路径 ${MODEL_PATH}。
+性能测试需要静态图模型 ${MODEL_PATH}，包含 `*.pdmodel` 和 `*.pdiparams` 文件。动态图转静态图可使用预训练模型导出脚本 export_model.py，传入动态图模型的路径 ${DYGRAPH_PATH}，以及导出的静态图路径 ${MODEL_PATH}。
 
 ```shell
 python export_model.py \
@@ -34,7 +34,6 @@ MODEL_NAME_OR_PATH=ernie-3.0-medium-zh
 bs=32
 # Step1: collect shape info
 python clue_infer.py \
-    --perf \
     --use_trt \
     --device gpu \
     --use_inference \
@@ -56,7 +55,6 @@ python clue_infer.py \
 
 # Step2(Option2):precision FP16
 python clue_infer.py \
-    --perf \
     --device gpu  \
     --use_trt \
     --fp16  \

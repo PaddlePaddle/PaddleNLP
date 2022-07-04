@@ -20,7 +20,7 @@ from abc import ABC
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.data_feeder import convert_dtype
+from paddle.common_ops_import import convert_dtype
 from paddle.fluid.layers.utils import map_structure
 from paddlenlp.utils.log import logger
 

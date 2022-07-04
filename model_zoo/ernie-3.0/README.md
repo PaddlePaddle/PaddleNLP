@@ -1212,7 +1212,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本
 ├── config.yml                   # 压缩配置文件
-├── infer.py                     # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
+├── eval.py                      # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的精度预测脚本
 ├── deploy                       # 部署目录
 │ └── python
 │   └── ernie_predictor.py
@@ -1232,8 +1232,10 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 │   └── infer.py
 │   └── README.md
 │ └── perf                       # 性能测试目录
-│   └── clue_infer.py
-│   └── infer_backend.py
+│   └── clue_infer.py            # 性能测试脚本
+│   └── infer_backend.py        # 性能测试脚本
+│   └── export_model.py          # 动转静脚本
+│   └── README.md                # 性能测试脚本使用文档
 └── README.md                    # 文档，本文件
 
 ```
@@ -1369,11 +1371,11 @@ python compress_seq_cls.py --dataset "clue cmrc2018"  --model_name_or_path best_
 
 ```shell
 # 原模型
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/inference/infer --use_trt
+python eval.py --task_name tnews --model_path best_models/TNEWS/compress/inference/infer --use_trt
 # 裁剪后
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/float --use_trt
+python eval.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/float --use_trt
 # 量化后
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/hist16/int8 --use_trt --precision int8
+python eval.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/hist16/int8 --use_trt --precision int8
 
 ```
 其中 --model_path 参数需要传入静态图模型的路径和前缀名。

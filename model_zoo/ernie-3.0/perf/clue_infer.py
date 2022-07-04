@@ -76,14 +76,9 @@ def parse_args():
         help="Whether to use inference engin TensorRT.",
     )
     parser.add_argument(
-        "--perf",
-        action='store_true',
-        help="Whether to test performance.",
-    )
-    parser.add_argument(
         "--int8",
         action='store_true',
-        help="Whether to use int8 inference.",
+        help="Whether to use int8 for inference.",
     )
     parser.add_argument(
         "--faster_tokenizer",
@@ -98,7 +93,7 @@ def parse_args():
         "--num_threads",
         default=1,
         type=int,
-        help="Set num_threads.",
+        help="Set number of threads.",
     )
     parser.add_argument(
         "--epochs",
@@ -109,12 +104,12 @@ def parse_args():
     parser.add_argument(
         "--fp16",
         action='store_true',
-        help="Whether to use int16 inference.",
+        help="Whether to use FP16 inference.",
     )
     parser.add_argument(
         "--use_inference",
         action='store_true',
-        help="use_inference for inference.",
+        help="use paddle.inference for inference.",
     )
     parser.add_argument(
         "--collect_shape",
@@ -214,8 +209,26 @@ class Predictor(object):
             dataset[idx:idx + args.batch_size]
             for idx in range(0, len(dataset), args.batch_size)
         ]
-        if args.perf:
-            for i, batch in enumerate(batches):
+        for i, batch in enumerate(batches):
+            examples, _ = self.convert_predict_batch(args, batch, None,
+                                                     dataset.label_list)
+            encodings = tokenizer(examples,
+                                  padding=True,
+                                  max_length=args.max_seq_length,
+                                  truncation=True,
+                                  return_tensors="np")
+            input_ids = encodings['input_ids']
+            segment_ids = encodings['token_type_ids']
+            output = self.predict_batch([input_ids, segment_ids])
+            output_label = np.argmax(output, -1)
+            if i > args.perf_warmup_steps:
+                break
+
+        time1 = time.time()
+        nums = 0
+        for j in range(args.epochs):
+            for batch in batches:
+                nums = nums + len(batch)
                 examples, _ = self.convert_predict_batch(
                     args, batch, None, dataset.label_list)
                 encodings = tokenizer(examples,
@@ -227,58 +240,13 @@ class Predictor(object):
                 segment_ids = encodings['token_type_ids']
                 output = self.predict_batch([input_ids, segment_ids])
                 output_label = np.argmax(output, -1)
-                if i > args.perf_warmup_steps:
-                    break
-
-            time1 = time.time()
-            nums = 0
-            for j in range(args.epochs):
-                for batch in batches:
-                    nums = nums + len(batch)
-                    examples, _ = self.convert_predict_batch(
-                        args, batch, None, dataset.label_list)
-                    encodings = tokenizer(examples,
-                                          padding=True,
-                                          max_length=args.max_seq_length,
-                                          truncation=True,
-                                          return_tensors="np")
-                    input_ids = encodings['input_ids']
-                    segment_ids = encodings['token_type_ids']
-                    output = self.predict_batch([input_ids, segment_ids])
-                    output_label = np.argmax(output, -1)
-            times_total = time.time() - time1
-            log_info = "model name: %s, thread num: %s, nums: %s, int8: %s, fp16: %s, times_total: %s, QPS: %s seq/s, latency: %s ms" % (
-                args.model_path, args.num_threads, nums, args.int8, args.fp16,
-                times_total, nums / times_total, times_total * 1000 / nums)
-            print(log_info)
-            with open("iflytek_cpu.txt", 'a+') as f:
-                f.write(log_info + "\n")
-        else:
-            metric = Accuracy()
-            metric.reset()
-            for i, batch in enumerate(batches):
-                # Data Preprocess
-                examples, labels = self.convert_predict_batch(
-                    args, batch, None, dataset.label_list)
-                encodings = tokenizer(examples,
-                                      padding=True,
-                                      max_length=args.max_seq_length,
-                                      truncation=True,
-                                      return_tensors="np")
-                input_ids = encodings['input_ids']
-                segment_ids = encodings['token_type_ids']
-                # Predict
-                output = self.predict_batch([input_ids, segment_ids])
-                # Compute metric, for eval
-                correct = metric.compute(paddle.to_tensor(output),
-                                         paddle.to_tensor(labels))
-                metric.update(correct)
-
-            res = metric.accumulate()
-            log_info = "model name: %s, acc: %s, " % (args.model_path, res)
-            print(log_info)
-            with open("iflytek_cpu.txt", 'a+') as f:
-                f.write(log_info + "\n")
+        times_total = time.time() - time1
+        log_info = "model name: %s, thread num: %s, nums: %s, int8: %s, fp16: %s, times_total: %s, QPS: %s seq/s, latency: %s ms" % (
+            args.model_path, args.num_threads, nums, args.int8, args.fp16,
+            times_total, nums / times_total, times_total * 1000 / nums)
+        print(log_info)
+        with open("iflytek_cpu.txt", 'a+') as f:
+            f.write(log_info + "\n")
 
 
 def main():

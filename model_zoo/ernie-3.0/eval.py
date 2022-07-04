@@ -91,20 +91,12 @@ def parse_args():
                         default=50,
                         type=int,
                         help="Max answer length for question answering task.")
-    parser.add_argument("--shape_file",
-                        default="shape_info.txt",
-                        type=str,
-                        help="Shape info filename.")
     parser.add_argument("--use_trt",
                         action='store_true',
                         help="Whether to use inference engin TensorRT.")
     parser.add_argument("--perf",
                         action='store_true',
                         help="Whether to test performance.")
-    parser.add_argument("--collect_shape",
-                        action='store_true',
-                        help="Whether to collect shape info.")
-
     parser.add_argument("--precision",
                         default="fp32",
                         choices=["fp32", "fp16", "int8"],
@@ -121,20 +113,10 @@ def parse_args():
         help=
         "Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
     )
-    parser.add_argument("--use_onnxruntime",
-                        type=distutils.util.strtobool,
-                        default=False,
-                        help="Use onnxruntime to infer or not.")
     parser.add_argument(
         "--debug",
         action='store_true',
         help="With debug it will save graph and model after each pass.")
-    parser.add_argument(
-        "--provider",
-        default='CPUExecutionProvider',
-        choices=['CPUExecutionProvider', 'DnnlExecutionProvider'],
-        type=str,
-        help="Onnx ExecutionProvider with DNNL or without DNNL")
 
     args = parser.parse_args()
     return args
@@ -202,38 +184,6 @@ class Predictor(object):
 
     @classmethod
     def create_predictor(cls, args):
-        if args.use_onnxruntime:
-            assert args.device != "xpu", "Running ONNXRuntime on XPU is temporarily not supported."
-            if args.model_path.count(".onnx"):
-                onnx_model = args.model_path
-            else:
-                import paddle2onnx
-                onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                    model_file=args.model_path + ".pdmodel",
-                    params_file=args.model_path + ".pdiparams",
-                    opset_version=13,
-                    enable_onnx_checker=True)
-            dynamic_quantize_model = onnx_model
-            if args.enable_quantize:
-                from onnxruntime.quantization import QuantizationMode, quantize_dynamic
-                float_onnx_file = "model.onnx"
-                with open(float_onnx_file, "wb") as f:
-                    f.write(onnx_model)
-                dynamic_quantize_model = "dynamic_quantize_model.onnx"
-                quantize_dynamic(float_onnx_file, dynamic_quantize_model)
-            sess_options = ort.SessionOptions()
-            sess_options.intra_op_num_threads = args.num_threads
-            sess_options.inter_op_num_threads = args.num_threads
-            executionprovider = args.provider
-            print("ExecutionProvider is: ", executionprovider)
-            predictor = ort.InferenceSession(dynamic_quantize_model,
-                                             sess_options=sess_options,
-                                             providers=[executionprovider])
-            input_name1 = predictor.get_inputs()[1].name
-            input_name2 = predictor.get_inputs()[0].name
-            input_handles = [input_name1, input_name2]
-            return cls(predictor, input_handles, [])
-
         config = paddle.inference.Config(args.model_path + ".pdmodel",
                                          args.model_path + ".pdiparams")
         if args.device == "gpu":
@@ -270,14 +220,6 @@ class Predictor(object):
                 use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
-
-            if args.collect_shape:
-                config.collect_shape_range_info(args.task_name +
-                                                args.shape_file)
-            else:
-                config.enable_tuned_tensorrt_dynamic_shape(
-                    args.task_name + args.shape_file, True)
-
         config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         predictor = paddle.inference.create_predictor(config)
 
@@ -340,8 +282,7 @@ class Predictor(object):
                 args,
                 dev_example=None,
                 dev_ds_ori=None):
-        if args.collect_shape:
-            self.set_dynamic_shape(args.max_seq_length, args.batch_size)
+        self.set_dynamic_shape(args.max_seq_length, args.batch_size)
         if args.task_name == "cmrc2018":
             dataset_removed = dataset.remove_columns(
                 ["offset_mapping", "attention_mask", "example_id"])

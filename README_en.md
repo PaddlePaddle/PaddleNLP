@@ -75,13 +75,13 @@ gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 Due to the computation limitation, you can use the ERNIE-Tiny light models to accelerate the deployment of pretrained models.
 ```python
 # 6L768H
-ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 # 6L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
 # 4L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
 # 4L312H
-ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh') 
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
 ```
 Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
 

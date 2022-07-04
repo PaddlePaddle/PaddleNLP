@@ -1717,7 +1717,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         logits = self.qa_outputs(sequence_output)
 
         start_logits, end_logits = paddle.split(logits,
-                                                num_or_sections=1,
+                                                num_or_sections=2,
                                                 axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = start_logits.squeeze(axis=-1)
