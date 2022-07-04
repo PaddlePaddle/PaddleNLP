@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import collections
-from typing import Optional
+from typing import Optional, List
 
 import paddle
 import paddle.nn as nn
@@ -184,8 +184,8 @@ class MultiHeadAttention(Layer):
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
         """
-        key = key or query
-        value = value or query
+        key = query if key is None else key
+        value = query if value is None else value
 
         # compute q ,k ,v
         if use_cache is False:
@@ -237,11 +237,19 @@ class TransformerDecoder(Layer):
     def __init__(self,
                  decoder_layers: List[Layer],
                  num_layers: int,
+                 hidden_size: int,
+                 word_embed_proj_dim: int,
                  norm: Optional[Layer] = None,
-                 hidden_size: Optional[int] = None,
                  normalize_before: bool = False,
                  remove_final_layer_norm: bool = False):
         super(TransformerDecoder, self).__init__()
+
+        if word_embed_proj_dim != hidden_size:
+            self.project_out = nn.Linear(hidden_size,
+                                         word_embed_proj_dim,
+                                         bias_attr=False)
+        else:
+            self.project_out = None
 
         self.num_layers = num_layers
         self.layers = decoder_layers
@@ -296,6 +304,9 @@ class TransformerDecoder(Layer):
 
         if self.final_layer_norm:
             output = self.final_layer_norm(output)
+
+        if self.project_out:
+            output = self.project_out(output)
 
         return output if use_cache is False else (output, new_caches)
 
@@ -441,6 +452,7 @@ class OPTEmbeddings(Layer):
     def __init__(self,
                  vocab_size: int,
                  hidden_size: int = 768,
+                 word_embed_proj_dim: int = 768,
                  padding_idx: int = 1,
                  hidden_dropout_prob: float = 0.1,
                  max_position_embeddings: int = 512,
@@ -449,10 +461,17 @@ class OPTEmbeddings(Layer):
         super(OPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size,
-            hidden_size,
+            word_embed_proj_dim,
             # padding_idx=padding_idx,
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
                 mean=0.0, std=initializer_range)))
+
+        if word_embed_proj_dim != hidden_size:
+            self.project_in = nn.Linear(word_embed_proj_dim,
+                                        hidden_size,
+                                        bias_attr=False)
+        else:
+            self.project_in = None
 
         self.position_embeddings = OPTLearnedPositionEmbedding(
             num_embeddings=max_position_embeddings,
@@ -467,9 +486,14 @@ class OPTEmbeddings(Layer):
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
 
-        input_embedings = self.word_embeddings(input_ids)
+        input_embeddings = self.word_embeddings(input_ids)
+
+        if self.project_in:
+            input_embeddings = self.project_in(input_embeddings)
+
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embedings + position_embeddings
+
+        embeddings = input_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -487,64 +511,72 @@ class OPTPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {
         "opt-125m": {
             "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 0,
+            "bos_token_id": 2,
             "hidden_size": 768,
             "hidden_dropout_prob": 0.1,
             "eos_token_id": 2,
-            "hidden_act": "relu",
             "intermediate_size": 3072,
             "initializer_range": 0.02,
+            "hidden_act": "relu",
             "max_position_embeddings": 2048,
             "type_vocab_size": 1,
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
             "pad_token_id": 1,
-            "vocab_size": 50272
+            "vocab_size": 50272,
+            "normalize_before": True,
+            "word_embed_proj_dim": 768
         },
         "opt-350m": {
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 0,
-            "hidden_size": 1024,
-            "hidden_act": "relu",
-            "eos_token_id": 2,
             "intermediate_size": 4096,
-            "initializer_range": 0.02,
-            "vocab_size": 50272,
-            "pad_token_id": 1,
-            "num_hidden_layers": 24,
+            "attention_probs_dropout_prob": 0.0,
+            "hidden_dropout_prob": 0.1,
+            "normalize_before": False,
             "num_attention_heads": 16,
-            "max_position_embeddings": 2048
+            "bos_token_id": 2,
+            "hidden_size": 1024,
+            "eos_token_id": 2,
+            "hidden_act": "relu",
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_hidden_layers": 24,
+            "pad_token_id": 1,
+            "vocab_size": 50272,
+            "word_embed_proj_dim": ""
         },
         "opt-1.3b": {
-            "hidden_dropout_prob": 0.1,
+            "intermediate_size": 8192,
             "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 0,
-            "hidden_size": 1024,
-            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "normalize_before": True,
+            "word_embed_proj_dim": 2048,
+            "num_attention_heads": 32,
+            "bos_token_id": 2,
+            "hidden_size": 2048,
             "eos_token_id": 2,
-            "intermediate_size": 4096,
+            "hidden_act": "relu",
             "initializer_range": 0.02,
-            "vocab_size": 50272,
-            "pad_token_id": 1,
+            "max_position_embeddings": 2048,
             "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "max_position_embeddings": 2048
+            "pad_token_id": 1,
+            "vocab_size": 50272
         },
         "opt-2.7b": {
-            "hidden_dropout_prob": 0.1,
+            "intermediate_size": 10240,
             "attention_probs_dropout_prob": 0.0,
-            "bos_token_id": 0,
-            "hidden_size": 1024,
-            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "normalize_before": True,
+            "word_embed_proj_dim": 2560,
+            "num_attention_heads": 32,
+            "bos_token_id": 2,
+            "hidden_size": 2560,
             "eos_token_id": 2,
-            "intermediate_size": 4096,
+            "hidden_act": "relu",
             "initializer_range": 0.02,
-            "vocab_size": 50272,
+            "max_position_embeddings": 2048,
+            "num_hidden_layers": 32,
             "pad_token_id": 1,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "max_position_embeddings": 2048
+            "vocab_size": 50272
         },
         "opt-6.7b": {
             "hidden_dropout_prob": 0.1,
@@ -658,6 +690,7 @@ class OPTModel(OPTPretrainedModel):
     def __init__(self,
                  vocab_size: int,
                  hidden_size: int = 768,
+                 word_embed_proj_dim: int = 768,
                  num_hidden_layers: int = 12,
                  num_attention_heads: int = 12,
                  intermediate_size: int = 3072,
@@ -672,17 +705,18 @@ class OPTModel(OPTPretrainedModel):
                  bos_token_id: int = 0,
                  eol_token_id: int = 3,
                  normalize_before: bool = True,
-                 remove_final_layer_norm: bool = False):
+                 remove_final_layer_norm: bool = False,
+                 **kwargs):
         super(OPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
-
         self.embeddings = OPTEmbeddings(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
+            word_embed_proj_dim=word_embed_proj_dim,
             padding_idx=pad_token_id,
             hidden_dropout_prob=hidden_dropout_prob,
             max_position_embeddings=max_position_embeddings,
@@ -713,7 +747,8 @@ class OPTModel(OPTPretrainedModel):
             norm="LayerNorm",
             hidden_size=hidden_size,
             normalize_before=normalize_before,
-            remove_final_layer_norm=remove_final_layer_norm)
+            remove_final_layer_norm=remove_final_layer_norm,
+            word_embed_proj_dim=word_embed_proj_dim)
 
         self.apply(self.init_weights)
         self.checkpoints = []
@@ -800,7 +835,7 @@ class OPTModel(OPTPretrainedModel):
         else:
             attention_mask = causal_mask
         # The tensor returned by triu not in static graph.
-        attention_mask.sto_gradient = True
+        attention_mask.stop_gradient = True
 
         decoder_outputs = self.decoder(embedding_output,
                                        memory=None,
