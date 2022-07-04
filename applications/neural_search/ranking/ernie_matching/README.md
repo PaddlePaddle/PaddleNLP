@@ -351,7 +351,7 @@ time to cost :0.012039899826049805 seconds
 启动C++的Serving：
 
 ```
-python -m paddle_serving_server.serve --model serving_server --port 9392 --gpu_id 0 --thread 5 --ir_optim True
+python -m paddle_serving_server.serve --model serving_server --port 8600 --gpu_id 0 --thread 5 --ir_optim True
 ```
 也可以使用脚本：
 
