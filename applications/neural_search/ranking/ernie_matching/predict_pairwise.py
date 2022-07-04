@@ -60,9 +60,6 @@ def predict(model, data_loader):
         for batch_data in data_loader:
             input_ids, token_type_ids = batch_data
 
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
-
             batch_prob = model.predict(input_ids=input_ids,
                                        token_type_ids=token_type_ids).numpy()
 
@@ -77,10 +74,6 @@ def predict(model, data_loader):
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
 
     pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
         'ernie-gram-zh')

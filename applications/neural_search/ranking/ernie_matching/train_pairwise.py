@@ -119,17 +119,8 @@ def do_train():
 
     set_seed(args.seed)
 
-    # train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
-
     train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
-    print(train_ds[0])
-
-    # train_ds = gen_pair(train_ds)
-
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
 
     pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
         'ernie-gram-zh')

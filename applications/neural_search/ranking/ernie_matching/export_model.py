@@ -32,9 +32,6 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
 
     pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
         'ernie-gram-zh')

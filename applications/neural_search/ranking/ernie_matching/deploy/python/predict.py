@@ -103,8 +103,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
-        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
+        model_file = model_dir + "/inference.predict.pdmodel"
+        params_file = model_dir + "/inference.predict.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -225,7 +225,6 @@ if __name__ == "__main__":
     tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
         'ernie-gram-zh')
 
-    # test_ds = load_dataset("lcqmc", splits=["test"])
     input_file = 'sort/test_pairwise.csv'
 
     test_ds = load_dataset(read_text_pair, data_path=input_file, lazy=False)
