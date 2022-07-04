@@ -124,8 +124,7 @@ def parse_args():
     parser.add_argument(
         "--enable_bf16",
         action='store_true',
-        help=
-        "Whether to use the bfloat16 datatype",
+        help="Whether to use the bfloat16 datatype",
     )
     parser.add_argument("--use_onnxruntime",
                         type=distutils.util.strtobool,
@@ -200,7 +199,6 @@ def convert_example(example,
 
 
 class Predictor(object):
-
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
