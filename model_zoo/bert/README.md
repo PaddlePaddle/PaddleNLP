@@ -172,7 +172,6 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 
 ```shell
 python -u ./export_model.py \
-    --model_type bert \
     --model_path bert-base-uncased \
     --output_path ./infer_model/model
 ```

@@ -16,22 +16,13 @@ import argparse
 import os
 
 import paddle
-
-from run_glue import MODEL_CLASSES
+from paddlenlp.transformers import AutoModelForSequenceClassification
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
-    )
     parser.add_argument(
         "--model_path",
         default=None,
@@ -53,11 +44,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-
     # build model and load trained parameters
-    model = model_class.from_pretrained(args.model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_path)
     # switch to eval model
     model.eval()
     # convert to static graph with specific input description

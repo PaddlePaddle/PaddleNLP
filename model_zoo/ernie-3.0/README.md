@@ -1231,6 +1231,9 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 │   └── ernie_predictor.py
 │   └── infer.py
 │   └── README.md
+│ └── perf                       # 性能测试目录
+│   └── clue_infer.py
+│   └── infer_backend.py
 └── README.md                    # 文档，本文件
 
 ```

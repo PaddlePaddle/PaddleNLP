@@ -9,9 +9,15 @@ pip install faster_tokenizer
 export OMP_NUM_THREADS=4
 ```
 
-性能测试需要静态图模型 ${MODEL_PATH}，包含 `*.pdmodel` 和 `*.pdiparams` 文件。动态图转静态图可参考[预训练模型导出脚本](../../bert/export_model.py)
+性能测试需要静态图模型 ${MODEL_PATH}，包含 `*.pdmodel` 和 `*.pdiparams` 文件。动态图转静态图可参考[预训练模型导出脚本](../../bert/export_model.py)，传入动态图模型的路径 ${DYGRAPH_PATH}，以及导出的静态图路径 ${MODEL_PATH}。
 
-这里以 CLUE 中的 IFLYTEK 数据集为例，因为 IFLYTEK 是长文本数据集，平均长度是 289.17（测试脚本默认的最大序列长度是 128）。
+```shell
+python export_model.py \
+    --model_path ${DYGRAPH_PATH} \
+    --output_path ${MODEL_PATH} \
+```
+
+这里以 CLUE 中的 IFLYTEK 数据集为例，因为 IFLYTEK 是长文本数据集（平均长度是 289.17），能够适应性能测试（最大序列长度为 128）的配置。
 
 ## GPU
 
