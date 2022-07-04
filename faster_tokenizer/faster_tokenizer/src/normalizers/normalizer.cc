@@ -404,7 +404,6 @@ NormalizedString& NormalizedString::FilterChar(
 NormalizedString& NormalizedString::MapChar(
     std::function<char32_t(char32_t)> map_char_fn) {
   size_t utf8_len = 0;
-  size_t target_utf8_len = 0;
   std::u32string u32normalized;
   uint32_t curr_char;
   u32normalized.reserve(normalized_.length());
@@ -413,14 +412,11 @@ NormalizedString& NormalizedString::MapChar(
         utils::UTF8ToUInt32(normalized_.data() + utf8_len, &curr_char);
     curr_char = utils::UTF8ToUnicode(curr_char);
     curr_char = map_char_fn(curr_char);
-    target_utf8_len += utils::GetUTF8CharLen(curr_char);
     u32normalized.push_back(curr_char);
     utf8_len += chwidth;
   }
-  std::vector<char> target_utf8_str(target_utf8_len + 1);
-  utils::GetUTF8Str(
-      u32normalized.data(), target_utf8_str.data(), u32normalized.length());
-  normalized_ = std::string(target_utf8_str.data());
+  std::vector<int> changes(u32normalized.size(), 0);
+  UpdateNormalized({u32normalized, changes}, 0);
   return *this;
 }
 
