@@ -198,12 +198,12 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir K
 
 输入待预测数据和数据标签对照列表，模型预测数据对应的标签
 
-启动预测：
+使用默认数据进行预测：
 ```shell
-# 使用默认数据进行预测
 python predict.py --params_path ./checkpoint/model_state.pdparams
-
-# 预测本地数据文件KUAKE_QIC/data.tsv
+```
+也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行预测：
+```shell
 python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir KUAKE_QIC
 ```
 可支持配置的参数：
@@ -241,11 +241,12 @@ export/
 
 导出模型之后，可以用于部署，项目提供了[onnxruntime部署脚本](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署指南](./deploy/predictor/README.md)。运行方式：
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行部署：
+```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir KUAKE_QIC
 ```
 
@@ -257,7 +258,7 @@ python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_
 使用裁剪功能需要安装 paddleslim 包
 
 ```shell
-pip install paddleslim
+pip install paddleslim==2.2.2
 ```
 
 ### 裁剪 API 使用
@@ -297,12 +298,12 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 * `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
 
 
-启动裁剪：
+选择使用默认数据集启动裁剪：
 ```shell
-# 使用默认数据集
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件启动裁剪：
+```shell
 python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir KUAKE_QIC
 ```
 
@@ -346,11 +347,12 @@ prune/
 
 4. 导出模型之后用于部署，项目提供了[onnxruntime部署脚本](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署指南](./deploy/predictor/README.md)。运行方式：
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
-
-# 使用本地数据集
+```
+也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行部署：
+```shell
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir KUAKE_QIC
 ```
 5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。

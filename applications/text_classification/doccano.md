@@ -1,4 +1,4 @@
-# doccano
+# 文本分类任务doccano使用指南
 
  **目录**
 
@@ -15,26 +15,29 @@
 ## 1. 安装
 **以下标注示例用到的环境配置：**
 
+- Python 3.8+
 - doccano 1.6.2
-- pip (Python 3.8+)
 
-在终端(terminal)运行以下命令行：
+在终端(terminal)使用pip安装doccano：
+
 ```shell
-# 可以使用pip安装doccano
 pip install doccano==1.6.2
-# 初始化数据库
+```
+安装完成后，运行以下命令行：
+```shell
+# Initialize database.
 doccano init
-# 创建一个超级用户admin，密码为pass
+# Create a super user.
 doccano createuser --username admin --password pass
-# 开启网页服务端，端口号为8000
+# Start a web server.
 doccano webserver --port 8000
 ```
 在新的终端(terminal)运行如下命令行：
 ```shell
-# 启动任务队列来处理文件上传/下载。
+# Start the task queue to handle file upload/download.
 doccano task
 ```
-在浏览器打开http://127.0.0.1:8000/，输入用户名和密码登录，开始使用doccano进行标注。doccano支持中文版本，可以点击右上角选择ZH(中文)。
+在浏览器打开[http://127.0.0.1:8000/](http://127.0.0.1:8000/)，输入用户名和密码登录，开始使用doccano进行标注。doccano支持中文版本，可以点击右上角选择ZH(中文)。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/176856052-bde31dd7-6317-49d9-8ae6-572c821f4e3d.png height=230 hspace='15'/>
@@ -106,10 +109,10 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/175248039-ce1673f1-9b03-4804-b1cb-29e4b4193f86.png height=300 hspace='15'/>
 </div>
-对于层次分类任务的分类标签我们建议使用标签层次结构中叶结点标签路径作为标签，以上图的标签结构为例，我们建议使用`--`作为分隔符，分隔不同层之间的标签：
+对于层次分类任务的分类标签我们建议使用标签层次结构中叶结点标签路径作为标签，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/176871979-77e78bf4-7b6b-4c8b-b8bb-094e149b1226.png height=300 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/63761690/177095794-0acb9665-3862-4de9-8771-8f424fd4f7b0.png height=300 hspace='15'/>
 </div>
 <a name="任务标注"></a>
 
@@ -189,7 +192,7 @@ python doccano.py \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
     --task_type "hierarchical" \
-    --separator "--"
+    --separator "##"
 ```
 
 可配置参数说明：
@@ -200,7 +203,7 @@ python doccano.py \
 - ``task_type``: 可选，选择任务类型,有多分类，多标签，层次分类三种类型的任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
-- ``separator``: 不同层标签之间的分隔符，该参数只对层次文本分类任务有效。默认为"--"。
+- ``separator``: 不同层标签之间的分隔符，该参数只对层次文本分类任务有效。默认为"##"。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集，或全部导出为 train 数据集。

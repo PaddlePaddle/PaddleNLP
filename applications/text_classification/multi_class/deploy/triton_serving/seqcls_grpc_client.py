@@ -97,7 +97,6 @@ if __name__ == "__main__":
     model_name = "seqcls"
     model_version = "1"
     url = "localhost:8001"
-    url = "10.9.189.6:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
 
     data = [["黑苦荞茶的功效与作用及食用方法", "交界痣会凸起吗", "检查是否能怀孕挂什么科"], ["幼儿挑食的生理原因是"],

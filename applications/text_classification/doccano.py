@@ -35,34 +35,35 @@ parser.add_argument("--save_dir",
                     default="./data",
                     type=str,
                     help="The path of data that you wanna save.")
-parser.add_argument(
-    "--splits",
-    default=[0.8, 0.1, 0.1],
-    type=float,
-    nargs="*",
-    help=
-    "The ratio of samples in datasets. [0.8, 0.1, 0.1] means 80% samples used for training, 10% for evaluation and 10% for test."
-)
-parser.add_argument(
-    "--task_type",
-    choices=['multi_class', 'multi_label', 'hierarchical'],
-    default="multi_label",
-    type=str,
-    help=
-    "Select task type, multi_class for multi classification task, multi_label for multi label classification task and hierarchical for hierarchical classification, defaults to multi_label."
-)
-parser.add_argument(
-    "--is_shuffle",
-    default=True,
-    type=bool,
-    help="Whether to shuffle the labeled dataset, defaults to True.")
+parser.add_argument("--splits",
+                    default=[0.8, 0.1, 0.1],
+                    type=float,
+                    nargs="*",
+                    help="The ratio of samples in datasets. "
+                    "[0.8, 0.1, 0.1] means 80% samples "
+                    "used for training, 10% for evaluation"
+                    "and 10% for test.")
+parser.add_argument("--task_type",
+                    choices=['multi_class', 'multi_label', 'hierarchical'],
+                    default="multi_label",
+                    type=str,
+                    help="Select task type, multi_class for"
+                    "multi classification task, multi_label"
+                    "for multi label classification task and"
+                    "hierarchical for hierarchical classification,"
+                    "defaults to multi_label.")
+parser.add_argument("--is_shuffle",
+                    default=True,
+                    type=bool,
+                    help="Whether to shuffle the labeled"
+                    "dataset, defaults to True.")
 parser.add_argument("--seed",
                     type=int,
                     default=3,
                     help="Random seed for initialization")
 parser.add_argument("--separator",
                     type=str,
-                    default="--",
+                    default="##",
                     help="Separator for hierarchical classification")
 
 args = parser.parse_args()
@@ -84,14 +85,11 @@ def do_convert():
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
-    if len(args.splits) != 0 and len(args.splits) != 2 and len(
-            args.splits) != 3:
+    if len(args.splits) != 2 and len(args.splits) != 3:
         raise ValueError(
-            "Only []/ len(splits)==2 / len(splits)==3 accepted for splits.")
+            "Only len(splits)==2 / len(splits)==3 accepted for splits.")
 
     def _check_sum(splits):
-        if len(splits) == 0:
-            return True
         if len(splits) == 2:
             return Decimal(str(splits[0])) + Decimal(str(
                 splits[1])) == Decimal("1")
@@ -164,24 +162,21 @@ def do_convert():
                 count += 1
         logger.info("Save %d examples to %s." % (count, save_path))
 
-    if len(args.splits) == 0:
-        _save_examples(args.save_dir, "train.tsv", examples)
-    else:
-        if args.is_shuffle:
-            indexes = np.random.permutation(len(raw_examples))
-            raw_examples = [raw_examples[i] for i in indexes]
-        if len(args.splits) == 2:
-            i1, _ = args.splits
-            p1 = int(len(raw_examples) * i1)
-            _save_examples(args.save_dir, "train.tsv", examples[:p1])
-            _save_examples(args.save_dir, "dev.tsv", examples[p1:])
-        if len(args.splits) == 3:
-            i1, i2, _ = args.splits
-            p1 = int(len(raw_examples) * i1)
-            p2 = int(len(raw_examples) * (i1 + i2))
-            _save_examples(args.save_dir, "train.tsv", examples[:p1])
-            _save_examples(args.save_dir, "dev.tsv", examples[p1:p2])
-            _save_examples(args.save_dir, "test.tsv", examples[p2:])
+    if args.is_shuffle:
+        indexes = np.random.permutation(len(raw_examples))
+        raw_examples = [raw_examples[i] for i in indexes]
+    if len(args.splits) == 2:
+        i1, _ = args.splits
+        p1 = int(len(raw_examples) * i1)
+        _save_examples(args.save_dir, "train.tsv", examples[:p1])
+        _save_examples(args.save_dir, "dev.tsv", examples[p1:])
+    if len(args.splits) == 3:
+        i1, i2, _ = args.splits
+        p1 = int(len(raw_examples) * i1)
+        p2 = int(len(raw_examples) * (i1 + i2))
+        _save_examples(args.save_dir, "train.tsv", examples[:p1])
+        _save_examples(args.save_dir, "dev.tsv", examples[p1:p2])
+        _save_examples(args.save_dir, "test.tsv", examples[p2:])
     logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
