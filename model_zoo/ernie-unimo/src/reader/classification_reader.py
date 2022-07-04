@@ -26,6 +26,7 @@ from paddle.io import Dataset
 
 class ClassifyReader(Dataset):
     """ClassifyReader"""
+
     def __init__(self, input_file, tokenizer, args):
         self.tokenizer = tokenizer
         self.pad_id = tokenizer.pad_token_id
@@ -37,7 +38,6 @@ class ClassifyReader(Dataset):
         self.in_tokens = args.in_tokens
 
         self.examples = self._read_tsv(input_file)
-
 
     def _read_tsv(self, input_file, quotechar=None):
         """Reads a tab separated value file."""
@@ -54,7 +54,6 @@ class ClassifyReader(Dataset):
                 example = Example(*line)
                 examples.append(example)
             return examples
-
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -110,13 +109,11 @@ class ClassifyReader(Dataset):
             'Record',
             ['token_ids', 'text_type_ids', 'position_ids', 'label_id'])
 
-        record = Record(
-            token_ids=token_ids,
-            text_type_ids=text_type_ids,
-            position_ids=position_ids,
-            label_id=label_id)
+        record = Record(token_ids=token_ids,
+                        text_type_ids=text_type_ids,
+                        position_ids=position_ids,
+                        label_id=label_id)
         return record
-
 
     def __len__(self):
         """get_num_examples"""
@@ -125,9 +122,9 @@ class ClassifyReader(Dataset):
     def __getitem__(self, idx):
         example = self.examples[idx]
         record = self._convert_example_to_record(example, self.max_seq_len,
-                                                     self.tokenizer)
+                                                 self.tokenizer)
         return record
-                
+
 
 def pad_batch_records(batch_records, tokenizer):
     batch_token_ids = [record.token_ids for record in batch_records]
@@ -138,19 +135,25 @@ def pad_batch_records(batch_records, tokenizer):
 
     # padding
     padded_token_ids, input_mask = pad_batch_data(
-        batch_token_ids, pretraining_task='nlu', pad_idx=tokenizer.pad_token_id, return_input_mask=True)
-    padded_text_type_ids = pad_batch_data(
-        batch_text_type_ids, pretraining_task='nlu', pad_idx=tokenizer.pad_token_id)
-    padded_position_ids = pad_batch_data(
-        batch_position_ids, pretraining_task='nlu', pad_idx=tokenizer.pad_token_id)
+        batch_token_ids,
+        pretraining_task='nlu',
+        pad_idx=tokenizer.pad_token_id,
+        return_input_mask=True)
+    padded_text_type_ids = pad_batch_data(batch_text_type_ids,
+                                          pretraining_task='nlu',
+                                          pad_idx=tokenizer.pad_token_id)
+    padded_position_ids = pad_batch_data(batch_position_ids,
+                                         pretraining_task='nlu',
+                                         pad_idx=tokenizer.pad_token_id)
     input_mask = np.matmul(input_mask, np.transpose(input_mask, (0, 2, 1)))
 
     return_list = [
-        padded_token_ids, padded_text_type_ids, padded_position_ids,
-        input_mask, batch_labels
+        padded_token_ids, padded_text_type_ids, padded_position_ids, input_mask,
+        batch_labels
     ]
 
     return return_list
+
 
 if __name__ == '__main__':
     pass

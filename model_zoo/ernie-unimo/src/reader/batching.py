@@ -65,11 +65,13 @@ def pad_batch_data(insts,
                 # Generate the lower triangular matrix using the slice of matrix
                 b = np.tril(np.ones([end - start, end - start]), 0)
                 mask_data[start:end, start:end] = b
-            input_mask_data = np.array(input_mask_data).reshape([-1, max_len, max_len])
+            input_mask_data = np.array(input_mask_data).reshape(
+                [-1, max_len, max_len])
         else:
             # This is used to avoid attention on paddings.
             input_mask_data = np.array([[1] * len(inst) + [0] *
-                                        (max_len - len(inst)) for inst in insts])
+                                        (max_len - len(inst))
+                                        for inst in insts])
             input_mask_data = np.expand_dims(input_mask_data, axis=-1)
             # input_mask_data = np.matmul(input_mask_data, np.transpose(input_mask_data, (0, 2, 1)))
         return_list += [input_mask_data.astype("float32")]
@@ -90,12 +92,17 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
-def pad_feature_data(data, pad_value=0.0, dtype="float32", return_mask=False, batch_image_size=None):
+def pad_feature_data(data,
+                     pad_value=0.0,
+                     dtype="float32",
+                     return_mask=False,
+                     batch_image_size=None):
     """for image feature sequence padding"""
     # num box + 1 ,1 for global feature
     max_lenth = max([len(item) for item in data])
     data_width = len(data[0][0])
-    out_data = np.ones((len(data), max_lenth, data_width), dtype=dtype) * pad_value
+    out_data = np.ones(
+        (len(data), max_lenth, data_width), dtype=dtype) * pad_value
     out_mask = np.zeros((len(data), max_lenth, 1), dtype=dtype)
     for i in range(len(data)):
         out_data[i, 0:len(data[i]), :] = data[i]
@@ -120,7 +127,8 @@ def gen_seq2seq_mask(insts, sent_b_starts=None):
         # Generate the lower triangular matrix using the slice of matrix
         b = np.tril(np.ones([end - start, end - start]), 0)
         mask_data[start:end, start:end] = b
-    input_mask_data = np.array(input_mask_data, dtype='float32').reshape([-1, max_len, max_len])
+    input_mask_data = np.array(input_mask_data,
+                               dtype='float32').reshape([-1, max_len, max_len])
     return input_mask_data
 
 

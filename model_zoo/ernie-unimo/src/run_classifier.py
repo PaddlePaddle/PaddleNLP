@@ -39,7 +39,6 @@ from utils.init import init_pretraining_params, init_checkpoint
 from args.classification_args import parser
 
 
-
 def create_pretrained_dataset(
     args,
     tokenizer,
@@ -77,29 +76,26 @@ def create_pretrained_dataset(
                                            return_list=False)
         return data_loader
 
-    train_dl = loader(train_ds, current_step*args.batch_size * data_world_size)
+    train_dl = loader(train_ds,
+                      current_step * args.batch_size * data_world_size)
     dev_dl = paddle.io.DataLoader(dataset=dev_ds,
-                                batch_size=args.batch_size,
-                                num_workers=args.num_workers,
-                                worker_init_fn=None,
-                                collate_fn=_collate_data,
-                                return_list=False)
+                                  batch_size=args.batch_size,
+                                  num_workers=args.num_workers,
+                                  worker_init_fn=None,
+                                  collate_fn=_collate_data,
+                                  return_list=False)
     test_dl = paddle.io.DataLoader(dataset=test_ds,
-                                batch_size=args.batch_size,
-                                num_workers=args.num_workers,
-                                worker_init_fn=None,
-                                collate_fn=_collate_data,
-                                return_list=False)
+                                   batch_size=args.batch_size,
+                                   num_workers=args.num_workers,
+                                   worker_init_fn=None,
+                                   collate_fn=_collate_data,
+                                   return_list=False)
 
     return train_dl, dev_dl, test_dl
 
 
 @paddle.no_grad()
-def run_evaluate(data_loader,
-                 model,
-                 global_step,
-                 args,
-                 task_name="valid"):
+def run_evaluate(data_loader, model, global_step, args, task_name="valid"):
     model.eval()
     results = []
     labels = []
@@ -113,19 +109,24 @@ def run_evaluate(data_loader,
         input_ids, segment_ids, position_ids, masked_lm_positions, \
         label_ids = batch
 
-        emb_ids = {"word_embedding": input_ids, "sent_embedding": segment_ids, "pos_embedding": position_ids}
+        emb_ids = {
+            "word_embedding": input_ids,
+            "sent_embedding": segment_ids,
+            "pos_embedding": position_ids
+        }
 
         # forward
-        prediction_logits  = model(
-            emb_ids, masked_lm_positions)
-        
-        loss, probs = paddle.nn.functional.softmax_with_cross_entropy(logits=prediction_logits, label=label_ids, return_softmax=True)
+        prediction_logits = model(emb_ids, masked_lm_positions)
+
+        loss, probs = paddle.nn.functional.softmax_with_cross_entropy(
+            logits=prediction_logits, label=label_ids, return_softmax=True)
         results.append(probs)
         labels.append(label_ids)
     probs = paddle.concat(results, axis=0)
     label_ids = paddle.concat(labels, axis=0)
     result = paddle.metric.accuracy(input=probs, label=label_ids, k=1)
-    logger.info("{} step {}, accuracy: {} ".format(task_name, global_step, result))
+    logger.info("{} step {}, accuracy: {} ".format(task_name, global_step,
+                                                   result))
     model.train()
     return result
 
@@ -190,11 +191,11 @@ def do_train(args):
                                 encoder_json_file=args.encoder_json_file,
                                 vocab_bpe_file=args.vocab_bpe_file,
                                 do_lower_case=args.do_lower_case)
-    
-    train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(args, tokenizer, worker_num, worker_index)
 
-    
-    # Create model 
+    train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
+        args, tokenizer, worker_num, worker_index)
+
+    # Create model
     model_config = UNIMOConfig(args.unimo_config_path)
     model_config.print_config()
     unimo_pretrain = UNIMOModel(config=model_config)
@@ -204,24 +205,28 @@ def do_train(args):
         if os.path.exists(params_path):
             model_dict = paddle.load(params_path)
             unimo_pretrain.encoder.set_state_dict(model_dict)
-            logger.info("Load model state dict from init_pretraining_params path: {}.".format(params_path))
+            logger.info(
+                "Load model state dict from init_pretraining_params path: {}.".
+                format(params_path))
         else:
             logger.warning("No model checkpoint file found in %s." %
                            params_path)
-        
+
     model = UNIMOClassifier(unimo_pretrain, args.num_labels)
-    
 
     # Create the learning_rate sheduler and optimizer
     max_steps = len(train_data_loader) * args.epoch * worker_num
     global_step = 0
-    logger.info("Total Epochs {}, train dataloader length {},  Max steps {}.".format(args.epoch, len(train_data_loader), max_steps))
-    
+    logger.info(
+        "Total Epochs {}, train dataloader length {},  Max steps {}.".format(
+            args.epoch, len(train_data_loader), max_steps))
+
     assert args.warmup_proportion <= 1.0 and args.warmup_proportion >= 0.0, "warmup_proportion should be in [0, 1]"
     assert args.decay_proportion <= 1.0 and args.decay_proportion >= 0.0, "decay_proportion should be in [0, 1]"
     warmup_steps = args.warmup_proportion * max_steps
     decay_steps = args.decay_proportion * max_steps
-    logger.info("Warm up steps {}, Decay steps {}.".format(warmup_steps, decay_steps))
+    logger.info("Warm up steps {}, Decay steps {}.".format(
+        warmup_steps, decay_steps))
     lr_scheduler = LinearAnnealingWithWarmupDecay(args.learning_rate,
                                                   0,
                                                   warmup_step=warmup_steps,
@@ -239,7 +244,8 @@ def do_train(args):
     ]
     logger.info("Using paddle.optimizer.AdamW.")
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else args.learning_rate,
+        learning_rate=lr_scheduler
+        if lr_scheduler is not None else args.learning_rate,
         beta1=args.beta1,
         beta2=args.beta2,
         epsilon=args.epsilon,
@@ -257,22 +263,24 @@ def do_train(args):
         if os.path.exists(opt_path):
             opt_dict = paddle.load(opt_path)
             optimizer.set_state_dict(opt_dict)
-                
+
         else:
             logger.warning("No optimizer checkpoint file found in %s." %
-                            opt_path)
+                           opt_path)
         if os.path.exists(params_path):
             model_dict = paddle.load(params_path)
             model.set_state_dict(model_dict)
-            logger.info("Load model state dict from load_checkpoint path: {}.".format(params_path))
+            logger.info(
+                "Load model state dict from load_checkpoint path: {}.".format(
+                    params_path))
         else:
             logger.warning("No model checkpoint file found in %s." %
-                            params_path)
+                           params_path)
 
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-    
+
     while True:
         # If not call valid_data_loader, the enumerate will call valid_data_loader
         # many times. and start a new random dataloader.
@@ -298,14 +306,21 @@ def do_train(args):
             input_ids, segment_ids, position_ids, masked_lm_positions, \
             label_ids = batch
 
-            emb_ids = {"word_embedding": input_ids, "sent_embedding": segment_ids, "pos_embedding": position_ids}
+            emb_ids = {
+                "word_embedding": input_ids,
+                "sent_embedding": segment_ids,
+                "pos_embedding": position_ids
+            }
 
             # forward
-            prediction_logits  = model(emb_ids, masked_lm_positions)
-            loss, probs = paddle.nn.functional.softmax_with_cross_entropy(logits=prediction_logits, label=label_ids, return_softmax=True)
+            prediction_logits = model(emb_ids, masked_lm_positions)
+            loss, probs = paddle.nn.functional.softmax_with_cross_entropy(
+                logits=prediction_logits, label=label_ids, return_softmax=True)
             loss = loss.mean()
             if worker_index == 0:
-                log_writer.add_scalar(step=global_step, tag="loss", value=loss.numpy())
+                log_writer.add_scalar(step=global_step,
+                                      tag="loss",
+                                      value=loss.numpy())
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
@@ -320,12 +335,14 @@ def do_train(args):
                 # TODO, check the input data of validation
 
                 accuracy = run_evaluate(valid_data_loader(),
-                             model,
-                             global_step,
-                             args,
-                             task_name="valid")
+                                        model,
+                                        global_step,
+                                        args,
+                                        task_name="valid")
                 if worker_index == 0:
-                    log_writer.add_scalar(step=global_step, tag="accuracy", value=accuracy.numpy())
+                    log_writer.add_scalar(step=global_step,
+                                          tag="accuracy",
+                                          value=accuracy.numpy())
 
             def save_ckpt(output_dir, model, global_step):
                 logger.debug("saving models to {}".format(output_dir))
@@ -337,12 +354,11 @@ def do_train(args):
                 paddle.save(optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
 
-
             if global_step % args.save_steps == 0 or global_step >= max_steps:
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % global_step)
                 if worker_index == 0:
-                    save_ckpt(output_dir, model,  global_step)
+                    save_ckpt(output_dir, model, global_step)
 
                 if worker_num > 1:
                     paddle.distributed.barrier()
@@ -372,7 +388,7 @@ def do_train(args):
                              task_name="test")
                 del train_data_loader
                 return
-    
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

@@ -64,11 +64,9 @@ class UNIMOEncoder(nn.Layer):
         self.num_layers = num_layers
         self.nhead = nhead
         # image embedding
-        self.image_embedding = nn.Linear(
-                image_len, d_model)
+        self.image_embedding = nn.Linear(image_len, d_model)
         # image location embedding
-        self.image_loc_embedding = nn.Linear(
-                loc_len, d_model)
+        self.image_loc_embedding = nn.Linear(loc_len, d_model)
         # text embedding
         self.text_embedding = nn.Embedding(voc_size, d_model)
         # text position embedding
@@ -80,20 +78,24 @@ class UNIMOEncoder(nn.Layer):
         self.vision_pre_dropout = nn.Dropout(dropout, mode="upscale_in_train")
 
         # Encoder
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model,
-                nhead = nhead,
-                dim_feedforward = dim_feedforward,
-                dropout=dropout,
-                activation=activation,
-                attn_dropout=attn_dropout,
-                act_dropout=act_dropout,
-                normalize_before=normalize_before)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation=activation,
+            attn_dropout=attn_dropout,
+            act_dropout=act_dropout,
+            normalize_before=normalize_before)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers)
 
-    
-    
-    def forward(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None,
-    text_adv_delta=None, image_adv_delta=None):
+    def forward(self,
+                emb_ids=None,
+                input_mask=None,
+                image_input=None,
+                emb_obj_ids=None,
+                text_adv_delta=None,
+                image_adv_delta=None):
         if emb_ids is not None and image_input is not None and emb_obj_ids is not None:
             input_type = 'vol'
         elif emb_ids is not None and image_input is not None:
@@ -105,12 +107,15 @@ class UNIMOEncoder(nn.Layer):
         else:
             raise ValueError('input feature error')
 
-        
         assert input_mask is not None, "input_mask should not be none"
 
         self_attn_mask = input_mask
-        self_attn_mask = paddle.scale(self_attn_mask, scale=1e4, bias=-1.0, bias_after_scale=False)
-        n_head_self_attn_mask = paddle.stack(x=[self_attn_mask] * self.nhead, axis=1)
+        self_attn_mask = paddle.scale(self_attn_mask,
+                                      scale=1e4,
+                                      bias=-1.0,
+                                      bias_after_scale=False)
+        n_head_self_attn_mask = paddle.stack(x=[self_attn_mask] * self.nhead,
+                                             axis=1)
         n_head_self_attn_mask.stop_gradient = True
         emb_feature, _v_seq_len, _o_seq_len = None, None, None
 
@@ -122,7 +127,7 @@ class UNIMOEncoder(nn.Layer):
                     continue  # don't use sentence embedding
                 elif emb_name == "word_embedding":
                     emb = self.text_embedding(emb_id)
-                    emb_out = emb_out + emb 
+                    emb_out = emb_out + emb
                 elif emb_name == "pos_embedding":
                     emb = self.text_pos_embedding(emb_id)
                     emb_out = emb_out + emb
@@ -141,7 +146,6 @@ class UNIMOEncoder(nn.Layer):
                 emb_v_in = image_input["image_embedding"]
 
             image_embeddings = self.image_embedding(emb_v_in)
-            
 
             loc_emb_out = self.image_loc_embedding(image_input["loc_embedding"])
 
@@ -162,13 +166,14 @@ class UNIMOEncoder(nn.Layer):
                 elif emb_name == "pos_embedding":
                     emb_obj = self.text_pos_embedding(emb_id)
                     emb_obj_out = emb_obj_out + emb_obj
-                
+
             emb_obj_out = self.pre_dropout(self.pre_norm(emb_obj_out))
             _o_seq_len = emb_obj_out.shape[1]
 
         if input_type == 'vol':
             assert emb_ids is not None and image_input is not None and emb_obj_ids is not None, "the input is invalid"
-            emb_feature = paddle.concat([emb_v_out, emb_obj_out, emb_out], axis=1)
+            emb_feature = paddle.concat([emb_v_out, emb_obj_out, emb_out],
+                                        axis=1)
         elif input_type == 'vl':
             assert emb_ids is not None and image_input is not None and emb_obj_ids is None, "the input is invalid"
             emb_feature = paddle.concat([emb_v_out, emb_out], axis=1)
@@ -186,27 +191,39 @@ class UNIMOEncoder(nn.Layer):
         if input_type == 'vol':
             assert _v_seq_len is not None and _o_seq_len is not None, "the input is invalid"
             _vol_seq_len = enc_out.shape[1]
-            enc_v_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[0], ends=[_v_seq_len])
-            enc_o_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[_v_seq_len], ends=[_v_seq_len + _o_seq_len])
-            enc_l_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[_v_seq_len + _o_seq_len], ends=[_vol_seq_len])
+            enc_v_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[0],
+                                     ends=[_v_seq_len])
+            enc_o_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[_v_seq_len],
+                                     ends=[_v_seq_len + _o_seq_len])
+            enc_l_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[_v_seq_len + _o_seq_len],
+                                     ends=[_vol_seq_len])
             enc_vol_out = enc_out
             return enc_vol_out, enc_v_out, enc_l_out
         elif input_type == 'vl':
             assert _v_seq_len is not None and _o_seq_len is None, "the input is invalid"
             _vl_seq_len = enc_out.shape[1]
-            enc_v_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[0], ends=[_v_seq_len])
-            enc_l_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[_v_seq_len], ends=[_vl_seq_len])
+            enc_v_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[0],
+                                     ends=[_v_seq_len])
+            enc_l_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[_v_seq_len],
+                                     ends=[_vl_seq_len])
             enc_vl_out = enc_out
             return enc_vl_out, enc_v_out, enc_l_out
         elif input_type == 'vo':
             assert _v_seq_len is not None and _o_seq_len is not None, "the input is invalid"
-            enc_v_out = paddle.slice(
-                input=enc_out, axes=[1], starts=[0], ends=[_v_seq_len])
+            enc_v_out = paddle.slice(input=enc_out,
+                                     axes=[1],
+                                     starts=[0],
+                                     ends=[_v_seq_len])
             return enc_v_out
         elif input_type == 'l':
             assert _v_seq_len is None and _o_seq_len is None, "the input is invalid"
@@ -226,8 +243,7 @@ class UNIMOModel(object):
                  weight_sharing=True,
                  task_type="normal",
                  decoding=False,
-                 is_multimodal_task = False
-                 ):
+                 is_multimodal_task=False):
 
         self.text_adv_delta = text_adv_delta
         self.image_adv_delta = image_adv_delta
@@ -243,8 +259,10 @@ class UNIMOModel(object):
         self._weight_sharing = weight_sharing
 
         self._task_type = task_type
-        self._emb_vocab_size = {"word_embedding": self._voc_size,
-                                "pos_embedding": self._max_position_seq_len}
+        self._emb_vocab_size = {
+            "word_embedding": self._voc_size,
+            "pos_embedding": self._max_position_seq_len
+        }
 
         self._is_dialogue_task = (task_type == "dialog")
         self._is_img2txt_task = (task_type == "img2txt")
@@ -269,28 +287,61 @@ class UNIMOModel(object):
                 self._image_emb_name = "image_embedding"
                 self._loc_emb_name = "loc_embedding"
 
-        self.encoder = UNIMOEncoder(voc_size=self._voc_size, pos_seq_len=self._max_position_seq_len, image_len=2048, loc_len=5, d_model=config['hidden_size'], num_layers=config['num_hidden_layers'], 
-        nhead=config['num_attention_heads'], dim_feedforward=config['hidden_size']*4,  dropout=config['hidden_dropout_prob'],
-        activation=self._hidden_act, attn_dropout=config['attention_probs_dropout_prob'], act_dropout=0, normalize_before=False)
+        self.encoder = UNIMOEncoder(
+            voc_size=self._voc_size,
+            pos_seq_len=self._max_position_seq_len,
+            image_len=2048,
+            loc_len=5,
+            d_model=config['hidden_size'],
+            num_layers=config['num_hidden_layers'],
+            nhead=config['num_attention_heads'],
+            dim_feedforward=config['hidden_size'] * 4,
+            dropout=config['hidden_dropout_prob'],
+            activation=self._hidden_act,
+            attn_dropout=config['attention_probs_dropout_prob'],
+            act_dropout=0,
+            normalize_before=False)
 
         self._emb_dtype = "float32"
 
-    def encode(self, emb_ids=None, input_mask=None, image_input=None, emb_obj_ids=None):
-        if emb_ids is not None and image_input is not None and emb_obj_ids is not None:           
-            self.enc_vol_out, self.enc_v_out, self.enc_l_out = self.encoder(emb_ids=emb_ids, input_mask=input_mask, image_input=image_input, emb_obj_ids=emb_obj_ids,
-    text_adv_delta=self.text_adv_delta, image_adv_delta=self.image_adv_delta)
+    def encode(self,
+               emb_ids=None,
+               input_mask=None,
+               image_input=None,
+               emb_obj_ids=None):
+        if emb_ids is not None and image_input is not None and emb_obj_ids is not None:
+            self.enc_vol_out, self.enc_v_out, self.enc_l_out = self.encoder(
+                emb_ids=emb_ids,
+                input_mask=input_mask,
+                image_input=image_input,
+                emb_obj_ids=emb_obj_ids,
+                text_adv_delta=self.text_adv_delta,
+                image_adv_delta=self.image_adv_delta)
             return self.enc_vol_out, self.enc_v_out, self.enc_l_out
         elif emb_ids is not None and image_input is not None:
-            self.enc_vl_out, self.enc_v_out, self.enc_l_out = self.encoder(emb_ids=emb_ids, input_mask=input_mask, image_input=image_input, emb_obj_ids=emb_obj_ids,
-    text_adv_delta=self.text_adv_delta, image_adv_delta=self.image_adv_delta)
-            return self.enc_vl_out, self.enc_v_out, self.enc_l_out 
+            self.enc_vl_out, self.enc_v_out, self.enc_l_out = self.encoder(
+                emb_ids=emb_ids,
+                input_mask=input_mask,
+                image_input=image_input,
+                emb_obj_ids=emb_obj_ids,
+                text_adv_delta=self.text_adv_delta,
+                image_adv_delta=self.image_adv_delta)
+            return self.enc_vl_out, self.enc_v_out, self.enc_l_out
         elif emb_ids is not None:
-            self.enc_l_out = self.encoder(emb_ids=emb_ids, input_mask=input_mask, image_input=image_input, emb_obj_ids=emb_obj_ids,
-    text_adv_delta=self.text_adv_delta, image_adv_delta=self.image_adv_delta)
+            self.enc_l_out = self.encoder(emb_ids=emb_ids,
+                                          input_mask=input_mask,
+                                          image_input=image_input,
+                                          emb_obj_ids=emb_obj_ids,
+                                          text_adv_delta=self.text_adv_delta,
+                                          image_adv_delta=self.image_adv_delta)
             return self.enc_l_out
         elif image_input is not None and emb_obj_ids is not None:
-            self.enc_v_out = self.encoder(emb_ids=emb_ids, input_mask=input_mask, image_input=image_input, emb_obj_ids=emb_obj_ids,
-    text_adv_delta=self.text_adv_delta, image_adv_delta=self.image_adv_delta)
+            self.enc_v_out = self.encoder(emb_ids=emb_ids,
+                                          input_mask=input_mask,
+                                          image_input=image_input,
+                                          emb_obj_ids=emb_obj_ids,
+                                          text_adv_delta=self.text_adv_delta,
+                                          image_adv_delta=self.image_adv_delta)
             return self.enc_v_out
         else:
             raise ValueError('input feature error')

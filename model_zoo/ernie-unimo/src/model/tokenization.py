@@ -130,13 +130,14 @@ def bytes_to_unicode():
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
-    bs = list(range(33, 126 + 1)) + list(range(161, 172 + 1)) + list(range(174, 255 + 1))
+    bs = list(range(33, 126 + 1)) + list(range(161, 172 + 1)) + list(
+        range(174, 255 + 1))
     cs = bs[:]
     n = 0
-    for b in range(2 ** 8):
+    for b in range(2**8):
         if b not in bs:
             bs.append(b)
-            cs.append(2 ** 8 + n)
+            cs.append(2**8 + n)
             n += 1
     cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
@@ -156,6 +157,7 @@ def get_pairs(word):
 
 class Tokenizer(object):
     """RoBERTa Tokenizer"""
+
     def __init__(self, encoder, bpe_merges, errors='replace'):
         self.encoder = encoder
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -166,7 +168,9 @@ class Tokenizer(object):
         self.cache = {}
 
         # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
-        self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        self.pat = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
         self.int_token = re.compile(r"^[0-9]+$")
 
     def bpe(self, token):
@@ -180,7 +184,8 @@ class Tokenizer(object):
             return token
 
         while True:
-            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            bigram = min(
+                pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -195,7 +200,8 @@ class Tokenizer(object):
                     new_word.extend(word[i:])
                     break
 
-                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i +
+                                                                   1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -216,7 +222,8 @@ class Tokenizer(object):
         bpe_tokens = []
         for token in re.findall(self.pat, text):
             token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(' '))
+            bpe_tokens.extend(self.encoder[bpe_token]
+                              for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def decode(self, tokens):
@@ -228,7 +235,8 @@ class Tokenizer(object):
             else:
                 decoded_tokens.append(str(token))
         text = ''.join(decoded_tokens)
-        text = bytearray([self.byte_decoder[c] for c in text]).decode('utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
         return text
 
     def decode_token(self, token):
@@ -237,13 +245,19 @@ class Tokenizer(object):
             token = self.decoder[int(token)]
         else:
             token = str(token)
-        text = bytearray([self.byte_decoder[c] for c in token]).decode('utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c]
+                          for c in token]).decode('utf-8', errors=self.errors)
         return text
 
 
 class GptBpeTokenizer(object):
     """GptBpeTokenizer"""
-    def __init__(self, vocab_file=None, encoder_json_file=None, vocab_bpe_file=None, do_lower_case=True):
+
+    def __init__(self,
+                 vocab_file=None,
+                 encoder_json_file=None,
+                 vocab_bpe_file=None,
+                 do_lower_case=True):
         if vocab_file is None:
             vocab_file = "./model_files/dict/unimo_en.vocab.txt"
         if encoder_json_file is None:
@@ -256,8 +270,11 @@ class GptBpeTokenizer(object):
         with codecs.open(vocab_bpe_file, 'r', encoding="utf-8") as f:
             bpe_data = f.read()
 
-        bpe_merges = [tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]]
-        self.gptbpe_tokenizer = Tokenizer(encoder=encoder, bpe_merges=bpe_merges)
+        bpe_merges = [
+            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
+        ]
+        self.gptbpe_tokenizer = Tokenizer(encoder=encoder,
+                                          bpe_merges=bpe_merges)
         self.vocab = load_vocab(vocab_file)
         self.inv_vocab = {v: k for k, v in self.vocab.items()}
 
@@ -460,13 +477,13 @@ class BasicTokenizer(object):
         # space-separated words, so they are not treated specially and handled
         # like the all of the other languages.
         if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
-                (cp >= 0x3400 and cp <= 0x4DBF) or  #
-                (cp >= 0x20000 and cp <= 0x2A6DF) or  #
-                (cp >= 0x2A700 and cp <= 0x2B73F) or  #
-                (cp >= 0x2B740 and cp <= 0x2B81F) or  #
-                (cp >= 0x2B820 and cp <= 0x2CEAF) or
-                (cp >= 0xF900 and cp <= 0xFAFF) or  #
-                (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+            (cp >= 0x3400 and cp <= 0x4DBF) or  #
+            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+            (cp >= 0x2B820 and cp <= 0x2CEAF) or
+            (cp >= 0xF900 and cp <= 0xFAFF) or  #
+            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
             return True
 
         return False
@@ -578,8 +595,8 @@ def _is_punctuation(char):
     # Characters such as "^", "$", and "`" are not in the Unicode
     # Punctuation class but we treat them as punctuation anyways, for
     # consistency.
-    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
-            (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
+    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64)
+            or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
         return True
     cat = unicodedata.category(char)
     if cat.startswith("P"):

@@ -79,4 +79,3 @@ data_g.add_arg("in_tokens", bool, False,
                "If set, the batch size will be the maximum number of tokens in one batch. "
                "Otherwise, it will be the maximum number of examples in one batch.")
 data_g.add_arg("num_workers", type=int, default=2, help="Num of workers for DataLoader.")
-

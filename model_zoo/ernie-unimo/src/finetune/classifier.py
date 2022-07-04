@@ -26,22 +26,29 @@ from paddle import ParamAttr
 
 
 class UNIMOClassifier(nn.Layer):
+
     def __init__(self, unimo_model, num_labels):
         super(UNIMOClassifier, self).__init__()
         self.d_model = unimo_model._emb_size
         self.encoder = unimo_model.encoder
-        self.fc0 = nn.Linear(self.d_model, self.d_model, weight_attr=ParamAttr(initializer=nn.initializer.TruncatedNormal(std=0.02)), 
+        self.fc0 = nn.Linear(
+            self.d_model,
+            self.d_model,
+            weight_attr=ParamAttr(initializer=nn.initializer.TruncatedNormal(
+                std=0.02)),
             bias_attr=ParamAttr(initializer=nn.initializer.Constant(value=0.0)))
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.1, mode="upscale_in_train")
-        self.fc1 = nn.Linear(self.d_model, num_labels, weight_attr=ParamAttr(initializer=nn.initializer.TruncatedNormal(std=0.02)), 
+        self.fc1 = nn.Linear(
+            self.d_model,
+            num_labels,
+            weight_attr=ParamAttr(initializer=nn.initializer.TruncatedNormal(
+                std=0.02)),
             bias_attr=ParamAttr(initializer=nn.initializer.Constant(value=0.0)))
-
-            
 
     def forward(self, emb_ids, input_mask):
         features = self.encoder(emb_ids=emb_ids, input_mask=input_mask)
-        features = paddle.reshape(features[:,0,:], [-1, self.d_model])
+        features = paddle.reshape(features[:, 0, :], [-1, self.d_model])
         cls_feats = self.relu(self.fc0(features))
         cls_feats = self.dropout(cls_feats)
         logits = self.fc1(cls_feats)
