@@ -12,7 +12,7 @@
 
 ### 安装Paddle Serving
 安装client和serving app，用于向服务发送请求:
-```
+```shell
 pip install paddle_serving_app paddle_serving_client
 ```
 安装serving，用于启动服务，根据服务器设备选择安装CPU server或GPU server：
@@ -101,7 +101,7 @@ fetch_list: ["linear_113.tmp_1"]    =>   fetch_list: ["linear_147.tmp_1"]
 ### 分类任务
 #### 启动服务
 修改好配置文件后，执行下面命令启动服务:
-```
+```shell
 python service.py
 ```
 输出打印如下:
@@ -123,7 +123,7 @@ I0628 09:12:30.787542 74305 naive_executor.cc:102] ---  skip [linear_147.tmp_1],
 
 #### 启动client测试
 注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
-```
+```shell
 python rpc_client.py
 ```
 输出打印如下:
@@ -143,5 +143,4 @@ label:  其他
 data:  幼儿挑食的生理原因是
 label:  病因分析
 --------------------
-
 ```

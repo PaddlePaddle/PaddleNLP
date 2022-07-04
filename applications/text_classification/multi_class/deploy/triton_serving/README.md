@@ -172,17 +172,14 @@ pip install tritonclient==2.10.0
 
 方式二：拉取官网镜像并启动容器:
 ```
-# 拉取镜像
 docker pull nvcr.io/nvidia/tritonserver:21.10-py3-sdk
-
-#启动容器
 docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code nvcr.io/nvidia/tritonserver:21.10-py3-sdk bash
 ```
 
 ### 启动客户端测试
 注意执行客户端请求时关闭代理，并根据实际情况修改main函数中的ip地址(启动服务所在的机器)
 
-```
+```shell
 python seqcls_grpc_client.py
 ```
 
