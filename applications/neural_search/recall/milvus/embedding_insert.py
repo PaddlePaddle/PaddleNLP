@@ -36,5 +36,3 @@ for i in tqdm(range(0, data_size, batch_size)):
                                 vectors=batch_emb.tolist(),
                                 ids=embedding_ids[i:i + batch_size],
                                 partition_tag=partition_tag)
-    # print(status)
-    # print(ids)
