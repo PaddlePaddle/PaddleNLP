@@ -276,7 +276,9 @@ def train():
             tokenizer.save_pretrained(save_best_path)
 
     logger.info("Best macro f1 score: %.5f" % (best_f1_score))
-    logger.info("Save best macro f1 text classification model in %s" % (args.save_dir))
+    logger.info("Save best macro f1 text classification model in %s" %
+                (args.save_dir))
+
 
 if __name__ == "__main__":
     train()

@@ -95,4 +95,3 @@ def preprocess_function(examples, tokenizer, max_seq_length, label_list, depth):
         float(1) if i in labels else float(0) for i in range(len(label_list))
     ]
     return result
-
