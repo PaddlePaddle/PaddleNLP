@@ -63,8 +63,15 @@
 ```
 ernie_matching/
 ├── deply # 部署
+    ├── cpp
+        ├── rpc_client.py # RPC 客户端的bash脚本
+        ├── http_client.py # http 客户端的bash文件
+        └── start_server.sh # 启动C++服务的脚本
     └── python
         ├── deploy.sh # 预测部署bash脚本
+        ├── config_nlp.yml # Pipeline 的配置文件
+        ├── web_service.py # Pipeline 服务端的脚本
+        ├── rpc_client.py # Pipeline RPC客户端的脚本
         └── predict.py # python 预测部署示例
 |—— scripts
     ├── export_model.sh # 动态图参数导出静态图参数的bash文件
