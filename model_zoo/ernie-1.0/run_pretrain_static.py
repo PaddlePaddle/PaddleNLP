@@ -205,7 +205,7 @@ def dist_optimizer(args, topo):
     exec_strategy.num_iteration_per_drop_scope = 10000
 
     build_strategy = paddle.static.BuildStrategy()
-    #build_strategy.enable_sequential_execution = True # for profile
+    build_strategy.enable_sequential_execution = True  # for profile
     build_strategy.fuse_broadcast_ops = True
     build_strategy.enable_inplace = True
     build_strategy.enable_addto = args.enable_addto
