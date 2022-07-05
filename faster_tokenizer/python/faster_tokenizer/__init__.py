@@ -37,4 +37,4 @@ from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
                               PadStrategy)
 from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
 
-from .tokenizers_impl import ErnieFasterTokenizer
+from .tokenizers_impl import ErnieFasterTokenizer, SentencePieceBPEFasterTokenizer
