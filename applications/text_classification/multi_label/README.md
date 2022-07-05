@@ -125,7 +125,7 @@ checkpoint/
 
 ### 从本地文件创建数据集
 
-在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，这里我们将介绍如何加载本地固定格式数据集进行训练,本项目将以CAIL2018-SMALL数据集罪名预测任务为例进行介绍：
+在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，本项目支持使用固定格式本地数据集文件进行训练。如果需要对本地数据集进行数据标注，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。本项目将以CAIL2018-SMALL数据集罪名预测任务为例进行介绍如何加载本地固定格式数据集进行训练：
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/cail2018_small_charges.tar.gz
@@ -210,35 +210,32 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 
 使用默认数据进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams
+python predict.py --params_path ./checkpoint/
 ```
 也可以选择使用本地数据文件cail2018_small_charges/data.tsv进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir=cail2018_small_charges
+python predict.py --params_path ./checkpoint/ --dataset_dir cail2018_small_charges
 ```
 
 可支持配置的参数：
 
-* `params_path`：必须，待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
+* `params_path`：必须，待预测模型和分词器参数文件夹；默认为"./checkpoint/"。
 * `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 ## 模型静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export --num_classes 202
+python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 可支持配置的参数：
 
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
-* `num_classes`：必须，任务标签类别数。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -293,11 +290,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 ```
 由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
 
-* `model`：ERNIE等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
+* `model`：ERNIE等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.params_dir)` 来获取
 * `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
 * `train_dataset`：裁剪训练需要使用的训练集
 * `eval_dataset`：裁剪训练使用的评估集
-* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.model_name_or_path)` 来获取
+* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.params_dir)` 来获取
 * `criterion`： 定义criterion计算损失，分类中使用损失函数 paddle.nn.BCEWithLogitsLoss()
 
 然后可以直接调用 `prune` 启动裁剪，其中 `prune` 的参数释义如下：
@@ -311,11 +308,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 
 选择使用默认数据集启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
+python prune.py --output_dir ./prune --params_dir ./checkpoint/
 ```
 也可以选择使用本地数据文件启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir cail2018_small_charges
+python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir cail2018_small_charges
 ```
 
 可支持配置的参数：
@@ -330,8 +327,8 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
   * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 
 * `ModelArguments`
-  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+  * `params_dir`：待预测模型参数文件夹；默认为"./checkpoint/"。
+
 
 以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
 

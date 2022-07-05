@@ -24,7 +24,7 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path",
-                    default="./checkpoint/model_state.pdparams",
+                    default="./checkpoint/",
                     type=str,
                     help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length",
@@ -41,10 +41,6 @@ parser.add_argument('--device',
                     choices=['cpu', 'gpu', 'xpu', 'npu'],
                     default="gpu",
                     help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name',
-                    default='ernie-2.0-base-en',
-                    help="Define which model to train, "
-                    "defaults to ernie-2.0-base-en.")
 parser.add_argument("--depth",
                     type=int,
                     default=2,
@@ -53,7 +49,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including"
-                    "data.tsv and taxonomy.tsv files.")
+                    "data.tsv and label.tsv files.")
 args = parser.parse_args()
 
 
@@ -68,11 +64,8 @@ def predict(data, label_list):
  
     """
     paddle.set_device(args.device)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(label_list))
-    if args.params_path and os.path.isfile(args.params_path):
-        model.set_dict(paddle.load(os.path.join(args.params_path)))
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.params_path)
 
     examples = []
     for text in data:
@@ -128,7 +121,7 @@ if __name__ == "__main__":
 
     if args.dataset_dir is not None:
         data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        taxonomy_dir = os.path.join(args.dataset_dir, "taxonomy.tsv")
+        label_dir = os.path.join(args.dataset_dir, "label.tsv")
 
         data = []
         label_list = []
@@ -138,7 +131,7 @@ if __name__ == "__main__":
                 data.append(line.strip())
         f.close()
 
-        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+        with open(label_dir, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 label_list.append(line.strip())
         f.close()

@@ -77,7 +77,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including "
-                    "data.tsv, taxonomy.tsv, test.tsv(optional,"
+                    "data.tsv, label.tsv, test.tsv(optional,"
                     "if evaluate the performance).")
 parser.add_argument("--perf_dataset",
                     choices=['dev', 'test'],
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     if args.dataset_dir is not None:
         data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        taxonomy_dir = os.path.join(args.dataset_dir, "taxonomy.tsv")
+        label_dir = os.path.join(args.dataset_dir, "label.tsv")
 
         data = []
         label_list = []
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                 data.append(line.strip())
         f.close()
 
-        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+        with open(label_dir, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 label_list.append(line.strip())
         f.close()

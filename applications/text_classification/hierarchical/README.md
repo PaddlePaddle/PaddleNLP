@@ -127,8 +127,7 @@ checkpoint/
 * 如需训练中文层次分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
 ### 以内置数据集格式读取本地数据集
-
-在许多情况下，我们希望使用本地的数据集来训练层次分类模型。本项目将以wos数据集为例，介绍如何使用本地指定格式数据集文件以内置数据集方式读取层次分类训练数据，本项目默认不同层的标签之间存在层次关系。
+在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，本项目支持使用固定格式本地数据集文件进行训练。如果需要对本地数据集进行数据标注，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。本项目将以wos数据集为例进行介绍如何加载本地固定格式数据集进行训练：
 
 下载wos数据集到本地(如果有本地数据集，跳过此步骤)
 
@@ -144,7 +143,7 @@ wos_data/
 ├── train.tsv # 训练数据集文件
 ├── dev.tsv # 开发数据集文件
 ├── test.tsv # 可选，测试训练集文件
-├── taxonomy.tsv # 层次分类标签文件
+├── label.tsv # 层次分类标签文件
 └── data.tsv # 可选，待预测数据文件
 ```
 
@@ -162,9 +161,9 @@ unintended pregnancy continues to be a substantial public health problem. emerge
 the objective of this paper is to present an example in which matrix functions are used to solve a modern control exercise. specifically, the solution for the equation of state, which is a matrix differential equation is calculated. to resolve this, two different methods are presented, first using the properties of the matrix functions and by other side, using the classical method of laplace transform.    ECE    Control engineering
 ...
 ```
-taxonomy.tsv(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'##'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
+label.tsv(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'##'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
 
-- taxonomy.tsv 文件格式：
+- label.tsv 文件格式：
 
 ```text
 <level 1: 标签>
@@ -172,7 +171,7 @@ taxonomy.tsv(层次分类标签文件)记录数据集中所有标签路径集合
 <level 1: 标签>'##'<level 2: 标签>'##'<level 3: 标签>
 ...
 ```
-- taxonomy.tsv  文件样例：
+- label.tsv  文件样例：
 ```text
 CS
 ECE
@@ -216,20 +215,19 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 
 使用默认数据进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams
+python predict.py --params_path ./checkpoint/
 ```
 也可以选择使用本地数据文件wos_data/data.tsv进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir wos_data
+python predict.py --params_path ./checkpoint/ --dataset_dir wos_data
 ```
 
 可支持配置的参数：
 
-* `params_path`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
+* `params_path`：待预测模型参数文件；默认为"./checkpoint/"。
 * `max_seq_length`：ERNIE 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为12。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 * `depth`：层次结构最大深度，默认为2。
 * `dataset_dir`：本地训练数据集;默认为None。
 
@@ -239,14 +237,12 @@ python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path=./checkpoint/model_state.pdparams --output_path=./export --num_classes 141
+python export_model.py --params_path=./checkpoint/ --output_path=./export
 ```
 可支持配置的参数：
 
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `num_classes`：必须，任务标签类别数。
-* `model_name`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -317,11 +313,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 
 选择使用默认数据集启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
+python prune.py --output_dir ./prune --params_dir ./checkpoint/
 ```
 也可以选择使用本地数据文件启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir "wos_data"
+python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir "wos_data"
 ```
 
 
@@ -331,12 +327,11 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
   * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例默认通过`prune_config.json`对TrainingArguments 参数进行配置
 * `DataArguments`
   * `dataset`：训练数据集;默认为wos数据集。
-  * `dataset`：本地数据集路径，路径内需要包含train.tsv, dev.tsv, taxonomy.tsv文件;默认为None。
+  * `dataset`：本地数据集路径，路径内需要包含train.tsv, dev.tsv, label.tsv文件;默认为None。
   * `depth`：层次分类数据标签最大深度;默认为2。
   * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `ModelArguments`
-  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
+  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
 
 以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
 
