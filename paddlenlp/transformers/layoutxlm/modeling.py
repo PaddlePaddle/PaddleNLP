@@ -1317,6 +1317,8 @@ class REDecoder(nn.Layer):
         loss = 0
         all_pred_relations = []
         for b in range(batch_size):
+            if "head" not in relations[b]:
+                continue
             head_entities = paddle.to_tensor(relations[b]["head"])
             tail_entities = paddle.to_tensor(relations[b]["tail"])
             relation_labels = paddle.to_tensor(relations[b]["label"],
