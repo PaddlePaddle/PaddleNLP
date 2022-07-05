@@ -654,12 +654,12 @@ class LimeTextExplainer(object):
 
         epoch_num = math.ceil(len(token_ids_np) / batch)
         for idx in range(epoch_num):
-            token_ids_tensor = paddle.fluid.core_avx.VarBase(
+            token_ids_tensor = paddle.Tensor(
                 value=token_ids_np[idx * batch:(idx + 1) * batch],
-                place=paddle.fluid.core.CUDAPlace(0),
+                place=paddle.CUDAPlace(0),
                 stop_gradient=True)
             if if_lstm:
-                seq_len_tensor = paddle.fluid.core_avx.VarBase(
+                seq_len_tensor = paddle.Tensor(
                     value=seq_len_np[idx * batch:(idx + 1) * batch],
                     place=token_ids_tensor.place,
                     stop_gradient=token_ids_tensor.stop_gradient)
@@ -667,7 +667,7 @@ class LimeTextExplainer(object):
                     token_ids_tensor,
                     seq_len_tensor)[0]  # label: Tensor[num_samples, 2]
             else:
-                s_ids_tensor = paddle.fluid.core_avx.VarBase(
+                s_ids_tensor = paddle.Tensor(
                     value=s_ids_np[idx * batch:(idx + 1) * batch],
                     place=token_ids_tensor.place,
                     stop_gradient=token_ids_tensor.stop_gradient)
