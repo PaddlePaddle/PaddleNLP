@@ -617,7 +617,8 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   } else {
     pad_length = method.pad_len_;
   }
-  if (method.pad_to_multiple_of_ > 0 && pad_length % method.pad_to_multiple_of_) {
+  if (method.pad_to_multiple_of_ > 0 &&
+      pad_length % method.pad_to_multiple_of_) {
     pad_length += pad_length - pad_length % method.pad_to_multiple_of_;
   }
   for (auto& encoding : *encodings) {
