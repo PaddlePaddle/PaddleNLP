@@ -317,7 +317,7 @@ def run_evaluate(data_loader,
                 break
 
             for k in list(eval_fetch.keys()):
-                average_ret[k] = sum(all_ret[k]) / len(all_ret[k])
+                average_ret[k] = sum(all_ret[k]) / len(all_ret[k]) / worker_num
 
             speed = iter_steps / (time.time() - local_time)
             speed_tokens = speed * args.micro_batch_size * args.max_seq_len * worker_num
@@ -340,13 +340,12 @@ def run_evaluate(data_loader,
             break
 
 
-def all_gather(v):
+def all_reduce(v):
     if fleet.worker_num() <= 1:
         return v
-    ret = []
-    dist.all_gather(ret, v)
-    concat = paddle.concat(ret, axis=0)
-    return concat.mean()
+    v = v + 0
+    dist.all_reduce(v)
+    return v
 
 
 def default_logdir() -> str:
@@ -484,13 +483,13 @@ def do_train(args):
                                           masked_lm_labels,
                                           next_sentence_labels)
             loss = lm_loss + sop_loss
-            lm_loss_gather = all_gather(lm_loss)
-            sop_loss_gather = all_gather(sop_loss)
+            lm_loss_reduce = all_reduce(lm_loss)
+            sop_loss_reduce = all_reduce(sop_loss)
         else:
             loss = criterion(prediction_scores, seq_relationship_score,
                              masked_lm_labels)
 
-        loss_gather = all_gather(loss)
+        loss_reduce = all_reduce(loss)
 
         # Create the learning_rate sheduler and optimizer
         if args.decay_steps is None:
@@ -604,10 +603,10 @@ def do_train(args):
 
     fetch_loss_vars = collections.OrderedDict()
     fetch_other_vars = collections.OrderedDict()
-    fetch_loss_vars["loss"] = loss_gather
+    fetch_loss_vars["loss"] = loss_reduce
     if args.binary_head:
-        fetch_loss_vars["lm_loss"] = lm_loss_gather
-        fetch_loss_vars["sop_loss"] = sop_loss_gather
+        fetch_loss_vars["lm_loss"] = lm_loss_reduce
+        fetch_loss_vars["sop_loss"] = sop_loss_reduce
 
     fetch_other_vars["learning_rate"] = main_program.global_block(
     ).vars["learning_rate_0"]
@@ -656,7 +655,8 @@ def do_train(args):
                     res = collections.defaultdict(float)
                     for k, v in zip(fetchs_keys, ret):
                         if k in fetch_loss_vars:
-                            res[k] = sum(loss_res[k]) / len(loss_res[k])
+                            res[k] = sum(loss_res[k]) / len(
+                                loss_res[k]) / worker_num
                             loss_res[k] = []
                         else:
                             res[k] = v[0]
@@ -697,10 +697,10 @@ def do_train(args):
                 # TODO, check the input data of validation
                 eval_fetch = collections.OrderedDict()
                 # if topo.is_last:
-                eval_fetch["loss"] = loss_gather
+                eval_fetch["loss"] = loss_reduce
                 if args.binary_head:
-                    eval_fetch["lm_loss"] = lm_loss_gather
-                    eval_fetch["sop_loss"] = sop_loss_gather
+                    eval_fetch["lm_loss"] = lm_loss_reduce
+                    eval_fetch["sop_loss"] = sop_loss_reduce
 
                 run_evaluate(valid_data_loader, exe, test_program,
                              args.eval_iters, log_writer, global_step, args,
@@ -765,10 +765,10 @@ def do_train(args):
             if global_step >= args.max_steps:
                 eval_fetch = collections.OrderedDict()
                 # if topo.is_last:
-                eval_fetch["loss"] = loss_gather
+                eval_fetch["loss"] = loss_reduce
                 if args.binary_head:
-                    eval_fetch["lm_loss"] = lm_loss_gather
-                    eval_fetch["sop_loss"] = sop_loss_gather
+                    eval_fetch["lm_loss"] = lm_loss_reduce
+                    eval_fetch["sop_loss"] = sop_loss_reduce
 
                 run_evaluate(test_data_loader, exe, test_program,
                              args.test_iters, log_writer, global_step, args,
