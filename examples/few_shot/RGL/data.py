@@ -84,7 +84,7 @@ class InputFeatures(dict):
     """
     input_keys = [
         'input_ids', 'attention_mask', 'token_type_ids', 'input_embeds',
-        'cls_label', 'seq_label', 'label', 'uid', 'mask_ids'
+        'cls_label', 'seq_label', 'label', 'uid', 'mask_ids', 'soft_token_ids'
     ]
 
     def __init__(self,
@@ -96,7 +96,8 @@ class InputFeatures(dict):
                  label=None,
                  cls_label=None,
                  seq_label=None,
-                 uid=None):
+                 uid=None,
+                 soft_token_ids=None):
         self.input_ids = input_ids
         self.attention_mask = attention_mask
         self.token_type_ids = token_type_ids
@@ -106,6 +107,7 @@ class InputFeatures(dict):
         self.seq_label = seq_label
         self.mask_ids = mask_ids
         self.uid = uid
+        self.soft_token_ids = soft_token_ids
 
     @classmethod
     def add_keys(cls, *args):
@@ -157,6 +159,7 @@ class InputFeatures(dict):
                 new_batch[key] = paddle.to_tensor(values)
             except ValueError:
                 new_batch[key] = values
+
         return InputFeatures(**new_batch)
 
 
@@ -217,6 +220,32 @@ class DataProcessor(object):
         data = pd.read_csv(input_file, header=header)
         return data.values.tolist()
 
+    @classmethod
+    def read_json(cls, input_file):
+        with open(input_file, 'r') as f:
+            data = [json.loads(x) for x in f.readlines()]
+            return data
+
+
+class BoolQProcessor(DataProcessor):
+
+    def __init__(self):
+        super().__init__(['False', 'True'])
+        self.split_map = {'train': 'train', 'dev': 'dev32', 'test': 'val'}
+
+    def get_examples(self, data_dir, split):
+        split = self.split_map[split]
+        raw_data = self.read_json(os.path.join(data_dir, split + '.jsonl'))
+        examples = []
+        for i, line in enumerate(raw_data):
+            examples.append(
+                InputExample(uid='%s-%d' % (split, i),
+                             text_a=line['passage'],
+                             text_b=line['question'],
+                             cls_label=str(line['label'])))
+
+        return examples
+
 
 class MrpcProcesser(DataProcessor):
 
@@ -266,7 +295,9 @@ class MnliProcessor(DataProcessor):
 class MnliMismatchedProcessor(MnliProcessor):
 
     def _process_file(self, split):
-        if split in ['dev', 'test']:
+        if split == 'dev':
+            return split + '_matched'
+        if split == 'test':
             return split + '_mismatched'
         return split
 
@@ -468,7 +499,8 @@ processor_mapping = {
     'sst-5': TextClassificationProcessor('sst-5'),
     'subj': TextClassificationProcessor('subj'),
     'mpqa': TextClassificationProcessor('mpqa'),
-    'trec': TextClassificationProcessor('trec')
+    'trec': TextClassificationProcessor('trec'),
+    'boolq': BoolQProcessor()
 }
 
 

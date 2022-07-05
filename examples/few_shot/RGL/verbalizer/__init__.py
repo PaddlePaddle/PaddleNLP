@@ -177,8 +177,7 @@ class ManualVerbalizer(Verbalizer):
 
     def process_logits(self, logits, mask_ids=None, **kwargs):
         if mask_ids is not None:
-            index = [x.squeeze() for x in paddle.where(mask_ids == 1)]
-            logits = logits[index[0], index[1]]
+            logits = logits[mask_ids == 1]
         label_words_logits = logits.index_select(index=self.word_ids, axis=-1)
         return label_words_logits
 
@@ -189,6 +188,8 @@ class ManualVerbalizer(Verbalizer):
                 example.label = self.labels_to_ids[example.cls_label]
             except KeyError:
                 # Regression tasks.
+                logger.warning('Fail to map label {} to id.'.format(
+                    example.cls_label))
                 example.label = eval(example.cls_label)
             return example
         else:

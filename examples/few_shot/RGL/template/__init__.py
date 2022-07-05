@@ -89,6 +89,8 @@ class Template(nn.Layer):
                 inputs[i] = self.tokenizer.mask_token
             elif 'hard' in p:
                 inputs[i] = p['add_prefix_space'] + p['hard']
+            elif 'sep' in p:
+                inputs[i] = self.tokenizer.sep_token
             else:
                 raise ValueError('can not parse {}'.format(p))
 
@@ -169,8 +171,9 @@ class Template(nn.Layer):
                     setattr(self, name, v)
                 else:
                     raise ValueError("""
-                        Template's part attribute '{}' is registered but not initialized.
-                        Try using template.{} = [...] to initialize or create a get_default_{}(self)
+                        Template's part attribute '{}' is registered but not 
+                        initialized. Try using template.{} = [...] to 
+                        initialize or create a get_default_{}(self)
                         method in your template.""".format(name, name, name))
                 values.append(v)
 
@@ -208,8 +211,9 @@ class ManualTemplate(Template):
 
 class SoftTemplate(Template):
     """
-    SoftTemplate for soft prompt methods, such as prefix-tuning, p-tuning.
+    SoftTemplate on the input layer for soft prompt methods, such as p-tuning.
     """
+    registered_input_names = ['soft_token_ids', 'mask_ids', 'shortenable_ids']
 
     def __init__(self,
                  tokenizer,
@@ -218,32 +222,51 @@ class SoftTemplate(Template):
                  text_mapping={
                      'text_a': 'text_a',
                      'text_b': 'text_b'
-                 },
-                 soft_embeddings=None):
+                 }):
         super().__init__(tokenizer=tokenizer, text_mapping=text_mapping)
-        self.template = template
-        self.tokenizer = tokenizer
-        self.token_embeddings = model.embeddings
+        for module in model.children():
+            if type(module).__name__.endswith('Model'):
+                self.token_embeddings = module.embeddings.word_embeddings
+                break
         self.embedding_size = self.token_embeddings.weight.shape[-1]
-
-        if soft_embeddings is not None:
-            self.soft_embeddings = soft_embeddings
-            self.num_soft_token = soft_embeddings.shape[0]
+        self.template = template
 
     def process_template(self):
         self._template = self.parse_inputs(self._template)
         self.process_soft_tokens()
+        self.generate_parameters()
+
+    def incorporate_template_text(self, example, template=None):
+        """ Replace each item in template with real text. """
+        inputs = template.copy(
+        ) if self.template is None else self.template.copy()
+
+        for i, p in enumerate(inputs):
+            if 'text' in p:
+                inputs[i] = p['add_prefix_space'] + getattr(example, p['text'])
+            elif 'mask' in p:
+                inputs[i] = self.tokenizer.mask_token
+            elif 'hard' in p:
+                inputs[i] = p['add_prefix_space'] + p['hard']
+            elif 'soft' in p:
+                inputs[i] = p['add_prefix_space'] + p['soft']
+            elif 'sep' in p:
+                inputs[i] = self.tokenizer.sep_token
+            else:
+                raise ValueError('can not parse {}'.format(p))
+
+        return inputs
 
     def process_soft_tokens(self):
         inputs = []
-        soft_ids = []
+        soft_token_ids = []
         num_soft_token = 0
         soft2word_init = {}
         soft_id_reindex = {}
 
         for part in self.template:
             if 'soft' not in part and 'soft_id' not in part:
-                soft_ids.append(0)
+                soft_token_ids.append(0)
                 inputs.append(part)
                 continue
 
@@ -267,8 +290,11 @@ class SoftTemplate(Template):
                 num_soft_token += len(init_tokens)
                 id_list = list(range(next_num_soft, num_soft_token + 1))
 
-                soft_ids.extend(id_list)
-                inputs.extend([{'soft': token} for token in init_tokens])
+                soft_token_ids.extend(id_list)
+                inputs.extend([{
+                    'add_prefix_space': part['add_prefix_space'],
+                    'soft': token
+                } for token in init_tokens])
                 for soft_id, word_id in zip(id_list, init_token_ids):
                     soft2word_init[soft_id] = word_id
 
@@ -302,21 +328,125 @@ class SoftTemplate(Template):
             if 'soft_id' in part:
                 soft_id_reindex[part['soft_id']] = id_list
 
-            soft_ids.extend(id_list)
-            inputs.extend([{'soft': None} for _ in range(len(id_list))])
+            soft_token_ids.extend(id_list)
+            inputs.extend([{
+                'add_prefix_space': part['add_prefix_space'],
+                'soft': ''
+            } for _ in range(len(id_list))])
 
         self._template = inputs
-        self.soft_ids = soft_ids
+        self.soft_token_ids = soft_token_ids
         self.num_soft_token = num_soft_token
         self.soft2word_init = soft2word_init
 
-        if hasattr(self, 'soft_embeddings'):
-            assert self.num_soft_token == self.soft_embeddings.shape[0]
-        else:
-            self.soft_embeddings = nn.Embedding(self.num_soft_token,
-                                                self.embedding_size)
+        if self.num_soft_token == 0:
+            logger.warnings('No soft tokens in template. '\
+                'Use ManualTemplate for better performance.')
+
+    def generate_parameters(self):
+        """
+        Generate parameters for soft tokens.
+        """
+        if self.num_soft_token == 0:
+            return None
+        self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
+                                            self.embedding_size)
 
         weight = self.soft_embeddings.weight.clone().detach()
         for soft_id, word_id in self.soft2word_init.items():
-            weight[soft_id] = self.token_embeddings(word_id)
+            weight[soft_id] = self.token_embeddings(paddle.to_tensor(word_id))
         self.soft_embeddings.weight.set_value(weight)
+
+    def process_batch(self, batch):
+        word_embeds = self.token_embeddings(batch['input_ids'])
+        batch['input_ids'] = None
+        if not hasattr(self, 'soft_embeddings'):
+            batch['input_embeds'] = word_embeds
+        else:
+            soft_embeds = self.soft_embeddings(batch['soft_token_ids'])
+            input_embeds = paddle.where(
+                (batch['soft_token_ids'] > 0).unsqueeze(-1), soft_embeds,
+                word_embeds)
+            batch['input_embeds'] = input_embeds
+        return batch
+
+    def post_process_batch(self, outputs, axis=1):
+        # TODO check the correction.
+        index = paddle.nonzero(batch['soft_token_ids'] > 0).squeeze()
+        outputs = paddle.index_select(x=outputs, index=index, axis=axis)
+        return outputs
+
+
+class PTuningTemplate(SoftTemplate):
+
+    def __init__(self,
+                 tokenizer,
+                 model,
+                 template,
+                 prompt_encoder='lstm',
+                 text_mapping={
+                     'text_a': 'text_a',
+                     'text_b': 'text_b'
+                 }):
+        super().__init__(tokenizer=tokenizer,
+                         model=model,
+                         text_mapping=text_mapping)
+        self.prompt_encoder = prompt_encoder
+        self.template = template
+
+    def generate_parameters(self):
+        super().generate_parameters()
+        if self.prompt_encoder == 'lstm':
+            self.lstm_head = nn.LSTM(input_size=self.embedding_size,
+                                     hidden_size=self.embedding_size,
+                                     num_layers=2,
+                                     direction='bidirect',
+                                     time_major=False)
+            self.mlp_head = nn.Sequential(
+                nn.Linear(2 * self.embedding_size, self.embedding_size),
+                nn.ReLU(), nn.Linear(self.embedding_size, self.embedding_size))
+        elif self.prompt_encoder == 'mlp':
+            self.mlp_head = nn.Sequential(
+                nn.Linear(self.embedding_size, self.embedding_size), nn.ReLU(),
+                nn.Linear(self.embedding_size, self.embedding_size))
+        else:
+            raise ValueError('Unsupported soft token encoder: {}'.format(
+                self.prompt_encoder))
+
+    def process_batch(self, batch):
+        word_embeds = self.token_embeddings(batch['input_ids'])
+        batch['input_ids'] = None
+        if not hasattr(self, 'soft_embeddings'):
+            batch['input_embeds'] = word_embeds
+        else:
+            soft_embeds = self.soft_embeddings(batch['soft_token_ids'])
+            if self.prompt_encoder == 'lstm':
+                soft_embeds = self.lstm_head(soft_embeds)[0]
+            soft_embeds = self.mlp_head(soft_embeds)
+
+            input_embeds = paddle.where(
+                (batch['soft_token_ids'] > 0).unsqueeze(-1), soft_embeds,
+                word_embeds)
+            batch['input_embeds'] = input_embeds
+        return batch
+
+
+def DeepSoftTemplate(SoftTemplate):
+    """
+    Template on any layer in PLM for soft prompt methods, like prefix-tuning.
+    """
+
+    def __init__(self,
+                 tokenizer,
+                 model,
+                 template,
+                 prompt_positions=[0],
+                 text_mapping={
+                     'text_a': 'text_a',
+                     'text_b': 'text_b'
+                 }):
+        super().__init__(tokenizer=tokenizer,
+                         model=model,
+                         text_mapping=text_mapping)
+        self.prompt_positions = prompt_positions
+        self.template = template
