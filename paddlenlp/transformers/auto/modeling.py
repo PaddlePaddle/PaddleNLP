@@ -37,6 +37,7 @@ MAPPING_NAMES = OrderedDict([
     ("BigBird", "bigbird"),
     ("BlenderbotSmall", "blenderbot_small"),
     ("Blenderbot", "blenderbot"),
+    ("Canine", "canine"),
     ("ChineseBert", "chinesebert"),
     ("ConvBert", "convbert"),
     ("CTRL", "ctrl"),

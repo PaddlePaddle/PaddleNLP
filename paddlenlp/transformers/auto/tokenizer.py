@@ -34,7 +34,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BigBirdTokenizer", "bigbird"),
     ("BlenderbotSmallTokenizer", "blenderbot_small"),
     ("BlenderbotTokenizer", "blenderbot"),
-    ("ChineseBertTokenizer", "chinesebert"),
+    ("CanineTokenizer", "canine")("ChineseBertTokenizer", "chinesebert"),
     ("ConvBertTokenizer", "convbert"),
     ("CTRLTokenizer", "ctrl"),
     ("DistilBertTokenizer", "distilbert"),
