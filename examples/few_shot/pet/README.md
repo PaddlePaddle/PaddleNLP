@@ -63,5 +63,13 @@ python -u -m paddle.distributed.launch --gpus "0" predict.py \
         --max_seq_length 512
 ```
 
+### 模型导出
+在动态图模型训练完毕之后，可以将动态图模型导出成静态图模型用于预测部署。
+
+```python
+python export_model.py --params_path=./tnews/model_120/model_state.pdparams --output_path=./export
+```
+**注意params_path需要填写训练完毕之后真实路径**
+
 ## References
 [1] Schick, Timo, and Hinrich Schütze. “Exploiting Cloze Questions for Few Shot Text Classification and Natural Language Inference.” ArXiv:2001.07676 [Cs], January 25, 2021. http://arxiv.org/abs/2001.07676.

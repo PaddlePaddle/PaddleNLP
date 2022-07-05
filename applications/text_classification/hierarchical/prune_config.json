@@ -1,0 +1,10 @@
+{
+    "per_device_train_batch_size": 12,
+    "per_device_eval_batch_size": 12,
+    "learning_rate": 3e-5,
+    "num_train_epochs": 10,
+    "logging_steps": 5,
+    "save_steps": 500,
+    "seed": 42,
+    "device": "gpu"
+}

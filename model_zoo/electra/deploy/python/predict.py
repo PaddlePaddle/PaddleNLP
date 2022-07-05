@@ -3,10 +3,7 @@ import time
 import numpy as np
 import os
 
-import paddle.inference as paddle_infer
-from paddle.fluid.core import AnalysisConfig
-from paddle.fluid.core import create_paddle_predictor
-
+from paddle import inference
 from paddlenlp.transformers import ElectraTokenizer
 
 
@@ -143,7 +140,7 @@ def predict(args, sentences=[], paths=[]):
         predicted_data, tokenizer, args.max_seq_length, args.batch_size)
 
     # config
-    config = AnalysisConfig(args.model_file, args.params_file)
+    config = inference.Config(args.model_file, args.params_file)
     config.switch_use_feed_fetch_ops(False)
     config.enable_memory_optim()
     if args.use_gpu:
@@ -153,12 +150,12 @@ def predict(args, sentences=[], paths=[]):
             workspace_size=1 << 30,
             max_batch_size=args.batch_size,
             min_subgraph_size=5,
-            precision_mode=AnalysisConfig.Precision.Float32,
+            precision_mode=inference.PrecisionType.Float32,
             use_static=False,
             use_calib_mode=False)
 
     # predictor
-    predictor = create_paddle_predictor(config)
+    predictor = inference.create_predictor(config)
 
     start_time = time.time()
     output_data = []
