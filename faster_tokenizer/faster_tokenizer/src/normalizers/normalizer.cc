@@ -136,8 +136,6 @@ void NormalizedString::UpdateNormalizedRange(
     }
     uint replaced_char_size =
         (replaced_char == -1) ? 0 : utils::GetUTF8CharLen(replaced_char);
-    uint replaced_char_size_change =
-        new_normalized_char_len - replaced_char_size;
 
     uint total_bytes_to_remove = 0;
     if (curr_changes < 0) {
@@ -154,6 +152,8 @@ void NormalizedString::UpdateNormalizedRange(
     std::memcpy(alignments_.data() + n_range.first,
                 alignments.data(),
                 alignments.size() * sizeof(core::Range));
+    alignments_.erase(alignments_.begin() + n_range.first + alignments.size(),
+                      alignments_.begin() + n_range.second);
   } else {
     std::vector<core::Range> new_alignments;
     auto third_len = 0;

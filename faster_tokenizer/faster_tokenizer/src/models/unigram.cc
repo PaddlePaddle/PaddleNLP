@@ -148,6 +148,7 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
     }
     auto len = str.length();
     tokens.emplace_back(id, str, core::Offset{offset, offset + len});
+    offset += len;
   }
   return tokens;
 }

@@ -112,7 +112,7 @@ class SpmConverter(Converter):
 
     def __init__(self, *args):
         super().__init__(*args)
-        import sentencepiece_model_pb2 as model_pb2
+        from . import sentencepiece_model_pb2 as model_pb2
         m = model_pb2.ModelProto()
         # For ernie_m sentencepiece tokenizer
         if hasattr(self.original_tokenizer, "sentencepiece_model_file"):

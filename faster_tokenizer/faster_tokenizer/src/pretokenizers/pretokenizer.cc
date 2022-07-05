@@ -55,7 +55,7 @@ bool BytesToCharOffsetConverter::convert(const core::Offset& offset,
 }
 
 PreTokenizedString::PreTokenizedString(const std::string& original)
-    : original_(original), splits_(1) {
+    : original_(original) {
   splits_.emplace_back(std::move(StringSplit(original_)));
 }
 
