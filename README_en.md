@@ -1,7 +1,7 @@
 [简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
+  <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -72,6 +72,17 @@ electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
+Due to the computation limitation, you can use the ERNIE-Tiny light models to accelerate the deployment of pretrained models.
+```python
+# 6L768H
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+# 6L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
+# 4L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
+# 4L312H
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
+```
 Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
 
 ```python

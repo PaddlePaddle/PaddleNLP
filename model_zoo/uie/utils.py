@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import math
 import json
 import random
@@ -22,10 +23,11 @@ import paddle
 from paddlenlp.utils.log import logger
 
 MODEL_MAP = {
+    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     "uie-base": {
         "resource_file_urls": {
             "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
             "model_config.json":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
             "vocab_file":
@@ -36,6 +38,63 @@ MODEL_MAP = {
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
         }
     },
+    "uie-medium": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
+        }
+    },
+    "uie-mini": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
+        }
+    },
+    "uie-micro": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
+        }
+    },
+    "uie-nano": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
+        }
+    },
+    # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
     "uie-tiny": {
         "resource_file_urls": {
             "model_state.pdparams":
@@ -70,13 +129,13 @@ def convert_example(example, tokenizer, max_seq_len):
     """
     encoded_inputs = tokenizer(text=[example["prompt"]],
                                text_pair=[example["content"]],
-                               stride=len(example["prompt"]),
                                truncation=True,
                                max_seq_len=max_seq_len,
                                pad_to_max_seq_len=True,
                                return_attention_mask=True,
                                return_position_ids=True,
-                               return_dict=False)
+                               return_dict=False,
+                               return_offsets_mapping=True)
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -122,7 +181,7 @@ def reader(data_path, max_seq_len=512):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             json_line = json.loads(line)
-            content = json_line['content']
+            content = json_line['content'].strip()
             prompt = json_line['prompt']
             # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
             # It include three summary tokens.
@@ -195,6 +254,19 @@ def reader(data_path, max_seq_len=512):
                     yield json_line
 
 
+def unify_prompt_name(prompt):
+    # The classification labels are shuffled during finetuning, so they need
+    # to be unified during evaluation.
+    if re.search(r'\[.*?\]$', prompt):
+        prompt_prefix = prompt[:prompt.find("[", 1)]
+        cls_options = re.search(r'\[.*?\]$', prompt).group()[1:-1].split(",")
+        cls_options = sorted(list(set(cls_options)))
+        cls_options = ",".join(cls_options)
+        prompt = prompt_prefix + "[" + cls_options + "]"
+        return prompt
+    return prompt
+
+
 def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
     negative_examples = []
     positive_examples = []
@@ -264,12 +336,8 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
 
 def generate_cls_example(text, labels, prompt_prefix, options):
     random.shuffle(options)
-    prompt = ""
-    sep = ","
-    for option in options:
-        prompt += option
-        prompt += sep
-    prompt = prompt_prefix + "[" + prompt.rstrip(sep) + "]"
+    cls_options = ",".join(options)
+    prompt = prompt_prefix + "[" + cls_options + "]"
 
     result_list = []
     example = {"content": text, "result_list": result_list, "prompt": prompt}
@@ -306,14 +374,14 @@ def convert_ext_examples(raw_examples,
                          negative_ratio,
                          prompt_prefix="情感倾向",
                          options=["正向", "负向"],
-                         seperator="##",
+                         separator="##",
                          is_train=True):
     """
     Convert labeled data export from doccano for extraction and aspect-level classification task.
     """
 
-    def _sep_cls_label(label, seperator):
-        label_list = label.split(seperator)
+    def _sep_cls_label(label, separator):
+        label_list = label.split(separator)
         if len(label_list) == 1:
             return label_list[0], None
         return label_list[0], label_list[1:]
@@ -356,6 +424,7 @@ def convert_ext_examples(raw_examples,
                     relation_mode = True
                 text = items["data"]
                 entities = []
+                relations = []
                 if not relation_mode:
                     # Export file in JSONL format which doccano < 1.7.0
                     # e.g. {"data": "", "label": [ [0, 2, "ORG"], ... ]}
@@ -371,16 +440,12 @@ def convert_ext_examples(raw_examples,
                 else:
                     # Export file in JSONL format for relation labeling task which doccano < 1.7.0
                     # e.g. {"data": "", "label": {"relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}}
-                    for item in items["label"]["entities"]:
-                        entity = {
-                            "id": entity_id,
-                            "start_offset": item["start_offset"],
-                            "end_offset": item["end_offset"],
-                            "label": item["label"]
-                        }
-                        entities.append(entity)
-                        entity_id += 1
-                relations = []
+                    entities.extend(
+                        [entity for entity in items["label"]["entities"]])
+                    if "relations" in items["label"].keys():
+                        relations.extend([
+                            relation for relation in items["label"]["relations"]
+                        ])
             else:
                 # Export file in JSONL format which doccano >= 1.7.0
                 # e.g. {"text": "", "label": [ [0, 2, "ORG"], ... ]}
@@ -417,7 +482,7 @@ def convert_ext_examples(raw_examples,
                 }
 
                 entity_label, entity_cls_label = _sep_cls_label(
-                    entity["label"], seperator)
+                    entity["label"], separator)
 
                 # Define the prompt prefix for entity-level classification
                 entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
