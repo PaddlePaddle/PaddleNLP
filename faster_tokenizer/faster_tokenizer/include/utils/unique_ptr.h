@@ -16,6 +16,7 @@ limitations under the License. */
 
 #include <memory>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -57,3 +58,4 @@ typename MakeUniqueResult<T>::invalid make_unique(Args &&... /* args */) =
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

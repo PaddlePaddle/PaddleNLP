@@ -35,6 +35,7 @@ struct hash<std::pair<uint, uint>> {
 };
 }
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
@@ -355,3 +356,4 @@ struct BPEWord {
 
 }  // namespace core
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

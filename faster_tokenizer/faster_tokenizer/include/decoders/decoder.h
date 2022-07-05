@@ -17,6 +17,7 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace decoders {
 
@@ -27,3 +28,4 @@ struct Decoder {
 
 }  // namespace decoders
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

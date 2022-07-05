@@ -17,6 +17,7 @@ limitations under the License. */
 #include <string>
 #include "normalizers/normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -52,3 +53,4 @@ struct NmtNormalizer : public Normalizer {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

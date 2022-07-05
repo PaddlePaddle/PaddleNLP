@@ -20,6 +20,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizers.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tokenizers_impl {
 
@@ -147,3 +148,4 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
 
 }  // namespace tokenizers_impl
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

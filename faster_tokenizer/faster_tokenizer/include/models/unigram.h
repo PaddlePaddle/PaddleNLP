@@ -23,6 +23,7 @@ limitations under the License. */
 #include "darts.h"
 #include "nlohmann/json.hpp"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -69,3 +70,4 @@ private:
 
 }  // namespace models
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

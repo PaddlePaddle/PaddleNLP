@@ -18,6 +18,7 @@ limitations under the License. */
 
 #include "normalizers/normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -46,3 +47,4 @@ struct StripAccentsNormalizer : public Normalizer {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -19,6 +19,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizer.h"
 #include "re2/re2.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
@@ -419,3 +420,4 @@ void to_json(nlohmann::json& j, const AddedVocabulary& added_vocab) {
 
 }  // namespace core
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

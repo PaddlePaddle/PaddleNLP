@@ -25,6 +25,7 @@ limitations under the License. */
 #include "postprocessors/bert.h"
 #include "pretokenizers/bert.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tests {
 
@@ -115,4 +116,5 @@ TEST(tokenizer, bert_tokenizer) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -20,6 +20,7 @@
 #include <mutex>
 #include <system_error>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -300,3 +301,4 @@ inline void swap(shared_lock<Mutex>& x, shared_lock<Mutex>& y) {
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

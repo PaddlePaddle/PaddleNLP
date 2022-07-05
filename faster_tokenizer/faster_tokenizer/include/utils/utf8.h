@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 #include <cstring>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -221,3 +222,4 @@ inline bool IsValidDecodeUTF8(const char* begin,
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -17,6 +17,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
@@ -41,3 +42,4 @@ private:
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -20,6 +20,7 @@ limitations under the License. */
 #include "utils/unique_ptr.h"
 
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -77,3 +78,4 @@ void from_json(const nlohmann::json& j,
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -18,6 +18,7 @@ limitations under the License. */
 #include <vector>
 #include "core/base.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -34,3 +35,4 @@ struct Model {
 
 }  // namespace model
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

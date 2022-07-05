@@ -24,6 +24,7 @@ limitations under the License. */
 #include "pybind/pretokenizers.h"
 #include "pybind/tokenizers.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pybind {
 
@@ -47,3 +48,4 @@ PYBIND11_MODULE(core_tokenizers, m) {
 
 }  // namespace pybind
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -30,6 +30,7 @@ limitations under the License. */
 #include "unicode/uchar.h"
 #include "unicode/utypes.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -622,3 +623,4 @@ template void NormalizedString::Split(
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

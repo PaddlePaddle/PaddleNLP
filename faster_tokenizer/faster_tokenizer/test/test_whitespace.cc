@@ -18,6 +18,7 @@ limitations under the License. */
 #include "gtest/gtest.h"
 #include "pretokenizers/whitespace.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tests {
 
@@ -35,4 +36,5 @@ TEST(pretokenizers, whitespace) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

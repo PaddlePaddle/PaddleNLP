@@ -18,6 +18,7 @@ limitations under the License. */
 #include "unicode/uchar.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
@@ -68,3 +69,4 @@ void to_json(nlohmann::json& j, const BertPreTokenizer& bert_pre_tokenizer) {
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

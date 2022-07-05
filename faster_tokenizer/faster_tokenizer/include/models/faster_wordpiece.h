@@ -21,6 +21,7 @@
 #include "utils/failure.h"
 #include "utils/trie.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -84,3 +85,4 @@ private:
 
 }  // namespace models
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

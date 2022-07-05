@@ -21,6 +21,7 @@ limitations under the License. */
 #include "core/base.h"
 #include "nlohmann/json.hpp"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 
 namespace normalizers {
@@ -220,3 +221,4 @@ private:
 
 }  // namespace core
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

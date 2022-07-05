@@ -15,6 +15,7 @@ limitations under the License. */
 #include "decoders/wordpiece.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace decoders {
 
@@ -65,3 +66,4 @@ void from_json(const nlohmann::json& j, WordPiece& decoder) {
 
 }  // namespace decoders
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

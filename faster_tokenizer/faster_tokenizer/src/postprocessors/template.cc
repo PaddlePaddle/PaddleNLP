@@ -19,6 +19,7 @@
 #include "glog/logging.h"
 #include "postprocessors/template.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace postprocessors {
 
@@ -448,3 +449,4 @@ void from_json(const nlohmann::json& j,
 
 }  // namespace postprocessors
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

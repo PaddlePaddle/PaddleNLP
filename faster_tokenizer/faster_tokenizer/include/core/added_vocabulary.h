@@ -25,6 +25,7 @@ namespace re2 {
 class RE2;
 }  // namespace re2
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 
 namespace normalizers {
@@ -137,13 +138,14 @@ private:
 
 }  // namespace core
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp
 
 namespace std {
 template <>
-class hash<faster_tokenizer::core::AddedToken> {
+class hash<paddlenlp::faster_tokenizer::core::AddedToken> {
 public:
   size_t operator()(
-      const faster_tokenizer::core::AddedToken& added_token) const {
+      const paddlenlp::faster_tokenizer::core::AddedToken& added_token) const {
     return std::hash<std::string>()(added_token.GetContent());
   }
 };

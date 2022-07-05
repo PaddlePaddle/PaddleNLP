@@ -34,6 +34,7 @@ limitations under the License. */
 #endif
 #endif
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -237,3 +238,4 @@ inline void GetSortedVocab(const std::vector<const char*>& keys,
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

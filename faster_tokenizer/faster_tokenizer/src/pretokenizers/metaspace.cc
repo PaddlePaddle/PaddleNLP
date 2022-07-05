@@ -16,6 +16,7 @@ limitations under the License. */
 #include "re2/re2.h"
 #include "utils/utf8.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
@@ -81,3 +82,4 @@ void from_json(const nlohmann::json& j,
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

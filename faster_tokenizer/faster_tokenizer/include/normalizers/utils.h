@@ -19,6 +19,7 @@ limitations under the License. */
 #include <vector>
 #include "normalizers/normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -45,3 +46,4 @@ struct LowercaseNormalizer : public Normalizer {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

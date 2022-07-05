@@ -19,6 +19,7 @@ limitations under the License. */
 #include "gtest/gtest.h"
 #include "models/wordpiece.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tests {
 
@@ -91,4 +92,5 @@ TEST(model, wordpiece_model) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -23,6 +23,7 @@ limitations under the License. */
 #include "utils/path.h"
 #include "utils/utf8.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -345,3 +346,4 @@ void from_json(const nlohmann::json& j, BPE& model) {
 
 }  // namespace model
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

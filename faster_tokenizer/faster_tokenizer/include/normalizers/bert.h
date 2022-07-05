@@ -18,6 +18,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 struct BertNormalizer : public Normalizer {
@@ -42,3 +43,4 @@ private:
 };
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

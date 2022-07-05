@@ -29,6 +29,7 @@ limitations under the License. */
 
 namespace py = pybind11;
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pybind {
 
@@ -1367,3 +1368,4 @@ void BindTokenizers(pybind11::module* m) {
 
 }  // namespace pybind
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

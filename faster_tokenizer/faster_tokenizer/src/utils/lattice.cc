@@ -30,6 +30,7 @@
 
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -542,3 +543,4 @@ std::vector<Lattice::Node *> Lattice::Sample(float inv_theta) {
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

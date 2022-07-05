@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstring>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -49,3 +50,4 @@ struct simple_string_view {
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

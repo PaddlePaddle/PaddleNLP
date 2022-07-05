@@ -24,6 +24,7 @@ namespace re2 {
 class RE2;
 }  // namespace re2
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -206,3 +207,4 @@ struct Normalizer {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

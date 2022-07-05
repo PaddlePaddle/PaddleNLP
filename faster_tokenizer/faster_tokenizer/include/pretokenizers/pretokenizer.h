@@ -22,6 +22,7 @@ limitations under the License. */
 #include "core/encoding.h"
 #include "normalizers/normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
@@ -101,3 +102,4 @@ struct BytesToCharOffsetConverter : public OffsetConverter {
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

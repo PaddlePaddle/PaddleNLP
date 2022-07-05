@@ -19,6 +19,7 @@ limitations under the License. */
 #include "normalizers/normalizer.h"
 #include "utils/sentencepiece_normalizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 
 namespace normalizers {
@@ -39,3 +40,4 @@ private:
 };
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

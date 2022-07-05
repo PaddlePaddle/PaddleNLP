@@ -19,6 +19,7 @@
 #include <unordered_set>
 #include <vector>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -102,3 +103,4 @@ private:
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

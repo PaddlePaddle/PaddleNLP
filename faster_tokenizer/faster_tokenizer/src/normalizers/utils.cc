@@ -20,6 +20,7 @@ limitations under the License. */
 #include "normalizers/unicode.h"
 #include "unicode/unistr.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -98,3 +99,4 @@ void from_json(const nlohmann::json& j, LowercaseNormalizer& normalizer) {}
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

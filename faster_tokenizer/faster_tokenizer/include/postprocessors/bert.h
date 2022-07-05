@@ -17,6 +17,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace postprocessors {
 
@@ -38,3 +39,4 @@ struct BertPostProcessor : public PostProcessor {
 };
 }  // namespace postprocessors
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

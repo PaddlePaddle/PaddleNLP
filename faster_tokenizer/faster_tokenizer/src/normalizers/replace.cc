@@ -15,6 +15,7 @@ limitations under the License. */
 #include "normalizers/replace.h"
 #include "utils/unique_ptr.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -47,3 +48,4 @@ void from_json(const nlohmann::json& j, ReplaceNormalizer& replace_normalizer) {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

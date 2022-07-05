@@ -17,6 +17,7 @@ limitations under the License. */
 #include "unicode/unistr.h"
 #include "unicode/utypes.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 StripNormalizer::StripNormalizer(bool left /* = true*/, bool right /* = true*/)
@@ -64,3 +65,4 @@ void from_json(const nlohmann::json& j,
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

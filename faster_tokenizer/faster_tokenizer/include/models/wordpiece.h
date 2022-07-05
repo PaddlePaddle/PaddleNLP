@@ -17,6 +17,7 @@ limitations under the License. */
 #include "models/model.h"
 #include "nlohmann/json.hpp"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -81,3 +82,4 @@ struct WordPieceFactory {
 
 }  // namespace models
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

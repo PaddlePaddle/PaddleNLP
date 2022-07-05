@@ -26,6 +26,7 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -402,3 +403,4 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
 
 }  // namespace models
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

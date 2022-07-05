@@ -22,6 +22,7 @@
 #include "glog/logging.h"
 #include "unicode/brkiter.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -338,3 +339,4 @@ void Normalizer::Replace(const simple_string_view& new_part,
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

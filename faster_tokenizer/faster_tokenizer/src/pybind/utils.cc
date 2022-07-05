@@ -19,6 +19,7 @@ limitations under the License. */
 #include "pybind/utils.h"
 namespace py = pybind11;
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pybind {
 
@@ -274,3 +275,4 @@ bool PyObject_CheckLongOrConvertToLong(PyObject** obj) {
 
 }  // namespace pybind
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

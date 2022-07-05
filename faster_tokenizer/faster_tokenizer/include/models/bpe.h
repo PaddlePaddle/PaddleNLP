@@ -18,6 +18,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "utils/cache.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -77,3 +78,4 @@ private:
 
 }  // namespace models
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

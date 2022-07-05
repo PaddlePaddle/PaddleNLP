@@ -19,6 +19,7 @@
 #include <vector>
 #include "utils/string_view.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -188,3 +189,4 @@ private:
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

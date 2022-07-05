@@ -23,6 +23,7 @@ limitations under the License. */
 #include "utils/path.h"
 #include "utils/utf8.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -273,3 +274,4 @@ void WordPieceFactory::GetVocabFromFiles(const std::string& files) {
 
 }  // namespace model
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

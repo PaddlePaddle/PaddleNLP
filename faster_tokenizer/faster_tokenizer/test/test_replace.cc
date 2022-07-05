@@ -20,6 +20,7 @@ limitations under the License. */
 #include "normalizers/strip.h"
 #include "normalizers/unicode.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tests {
 
@@ -42,4 +43,5 @@ TEST(normalizers, replace) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

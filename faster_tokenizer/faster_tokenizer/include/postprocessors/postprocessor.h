@@ -16,6 +16,7 @@ limitations under the License. */
 
 #include <string>
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 
 namespace core {
@@ -36,3 +37,4 @@ struct PostProcessor {
 };
 }  // namespace postprocessors
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

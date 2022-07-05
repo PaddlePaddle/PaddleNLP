@@ -18,6 +18,7 @@ limitations under the License. */
 #include "core/encoding.h"
 #include "core/tokenizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tokenizers_impl {
 
@@ -65,3 +66,4 @@ private:
 
 }  // namespace faster_tokenizer_impl
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

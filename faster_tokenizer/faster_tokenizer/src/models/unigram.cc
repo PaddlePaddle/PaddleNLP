@@ -22,6 +22,7 @@ limitations under the License. */
 #include "utils/unique_ptr.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
@@ -379,3 +380,4 @@ void from_json(const nlohmann::json& j, Unigram& model) {
 
 }  // namespace model
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

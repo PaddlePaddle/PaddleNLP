@@ -23,6 +23,7 @@ limitations under the License. */
 #include "unicode/unistr.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 BertNormalizer::BertNormalizer(bool clean_text,
@@ -118,3 +119,4 @@ void from_json(const nlohmann::json& j, BertNormalizer& bert_normalizer) {
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

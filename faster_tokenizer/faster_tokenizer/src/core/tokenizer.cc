@@ -30,6 +30,7 @@ limitations under the License. */
 #include <omp.h>
 #endif
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
@@ -734,3 +735,4 @@ template void Tokenizer::SetPostProcessor(
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
 }  // namespace core
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

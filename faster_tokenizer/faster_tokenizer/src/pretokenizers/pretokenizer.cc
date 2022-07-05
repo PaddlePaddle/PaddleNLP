@@ -20,6 +20,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizer.h"
 #include "utils/utf8.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
@@ -211,3 +212,4 @@ void PreTokenizedString::SetOriginalStr(const std::string& original) {
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -20,6 +20,7 @@ limitations under the License. */
 #include "normalizers/normalizer.h"
 #include "re2/re2.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
@@ -40,3 +41,4 @@ private:
 
 }  // namespace normalizers
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp

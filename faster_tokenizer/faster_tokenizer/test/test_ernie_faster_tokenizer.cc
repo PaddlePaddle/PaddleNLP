@@ -26,6 +26,7 @@ limitations under the License. */
 #include "pretokenizers/bert.h"
 #include "tokenizers/ernie_faster_tokenizer.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace tests {
 
@@ -89,4 +90,5 @@ TEST(tokenizer, ernie_faster_tokenizer) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -22,6 +22,7 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
+namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
@@ -227,3 +228,4 @@ void Trie::SetContinuingSubwordPrefix(
 
 }  // namespace utils
 }  // namespace faster_tokenizer
+}  // namespace paddlenlp
