@@ -15,7 +15,7 @@
 
 def sequence_mask(seq_ids, valid_lengths):
     """
-    To boost the performance, this sequence_mask is different with paddle.fluid.layers.sequence_mask
+    To boost the performance, this sequence_mask is different with paddle.nn.functional.sequence_mask
 
     Args:
         seq_ids (Tensor):

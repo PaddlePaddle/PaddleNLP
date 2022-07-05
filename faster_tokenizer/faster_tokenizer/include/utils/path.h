@@ -23,7 +23,8 @@ limitations under the License. */
 #define PATH_SEP "/"
 #endif
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
 inline std::string PathJoin(const std::vector<std::string>& paths,
@@ -53,4 +54,5 @@ inline std::string PathJoin(const std::string& folder,
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

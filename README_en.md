@@ -30,6 +30,8 @@
 
 ## News 📢
 
+* 🍭 2022.6.29 **PaddleNLP v2.3.4** Released! Whole series of Chinese pretrained models [**ERNIE Tiny**](./model_zoo/ernie-3.0) are released to quickly improve deployment efficiency. We also provides smaller and faster models [**UIE Tiny**](./model_zoo/uie) for universal information extraction.
+
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
   * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow](./docs/model_zoo/taskflow.md).
   * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
@@ -72,6 +74,17 @@ electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
+Due to the computation limitation, you can use the ERNIE-Tiny light models to accelerate the deployment of pretrained models.
+```python
+# 6L768H
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+# 6L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
+# 4L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
+# 4L312H
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
+```
 Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
 
 ```python
