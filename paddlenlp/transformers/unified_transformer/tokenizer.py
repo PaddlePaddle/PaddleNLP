@@ -157,6 +157,11 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 pat_str += "(" + re.escape(special) + ")|"
         else:
             self.specials = {}
+            for s_token in [
+                    unk_token, pad_token, cls_token, sep_token, mask_token
+            ]:
+                if s_token is not None and s_token not in self.specials:
+                    self.specials[s_token] = self.vocab._token_to_idx[s_token]
 
         pat_str += r"([a-zA-Z0-9\S]+)"
         self.pat = re.compile(pat_str)
