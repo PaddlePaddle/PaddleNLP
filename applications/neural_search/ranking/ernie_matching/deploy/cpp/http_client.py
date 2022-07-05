@@ -30,7 +30,6 @@ def convert_example(example, tokenizer, max_seq_length=512):
     encoded_inputs = tokenizer(text=query,
                                text_pair=title,
                                max_seq_len=max_seq_length)
-
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
 
@@ -67,5 +66,6 @@ feed_dict['token_type_ids'] = np.array(token_type_ids)
 b_start = time.time()
 result = client.predict(feed=feed_dict, fetch=fetch_names, batch=True)
 b_end = time.time()
+print(result)
 print("time to cost :{} seconds".format(b_end - b_start))
 print(result.outputs[0].tensor[0].float_data)
