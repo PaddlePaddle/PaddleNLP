@@ -21,7 +21,7 @@
 #include "utils/failure.h"
 #include "utils/trie.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 struct FasterWordPiece : public WordPiece {
@@ -82,5 +82,5 @@ private:
   bool with_pretokenization_;  // The end-to-end version of FasterWordPiece
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer

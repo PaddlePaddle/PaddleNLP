@@ -19,7 +19,7 @@ limitations under the License. */
 #include "gtest/gtest.h"
 #include "models/faster_wordpiece.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace tests {
 
 TEST(model, faster_wordpiece_token_to_id) {

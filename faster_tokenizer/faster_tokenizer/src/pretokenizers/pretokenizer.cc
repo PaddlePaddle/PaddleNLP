@@ -20,7 +20,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizer.h"
 #include "utils/utf8.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 BytesToCharOffsetConverter::BytesToCharOffsetConverter(const std::string& seq)
@@ -209,5 +209,5 @@ void PreTokenizedString::SetOriginalStr(const std::string& original) {
   splits_.emplace_back(original_);
 }
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

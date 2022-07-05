@@ -17,7 +17,7 @@ limitations under the License. */
 #include "unicode/unistr.h"
 #include "unicode/utypes.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 StripNormalizer::StripNormalizer(bool left /* = true*/, bool right /* = true*/)
     : left_(left), right_(right) {}
@@ -62,5 +62,5 @@ void to_json(nlohmann::json& j,
 void from_json(const nlohmann::json& j,
                StripAccentsNormalizer& strip_normalizer) {}
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

@@ -16,7 +16,7 @@
 #include <cassert>
 #include <cstring>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 struct simple_string_view {
@@ -48,4 +48,4 @@ struct simple_string_view {
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

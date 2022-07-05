@@ -34,7 +34,7 @@ limitations under the License. */
 #endif
 #endif
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 inline void GetVocabFromFiles(const std::string& files,
@@ -236,4 +236,4 @@ inline void GetSortedVocab(const std::vector<const char*>& keys,
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

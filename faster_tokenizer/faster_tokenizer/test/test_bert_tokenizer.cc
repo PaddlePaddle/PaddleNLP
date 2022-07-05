@@ -25,7 +25,7 @@ limitations under the License. */
 #include "postprocessors/bert.h"
 #include "pretokenizers/bert.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace tests {
 
 template <typename T>

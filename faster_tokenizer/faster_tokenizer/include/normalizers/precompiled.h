@@ -19,7 +19,7 @@ limitations under the License. */
 #include "normalizers/normalizer.h"
 #include "utils/sentencepiece_normalizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 
 namespace normalizers {
 struct PrecompiledNormalizer : public Normalizer {
@@ -37,5 +37,5 @@ private:
   friend void from_json(const nlohmann::json& j,
                         PrecompiledNormalizer& precompiled_normalizer);
 };
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

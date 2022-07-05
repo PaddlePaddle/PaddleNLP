@@ -23,7 +23,7 @@ limitations under the License. */
 #include "unicode/unistr.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 BertNormalizer::BertNormalizer(bool clean_text,
                                bool handle_chinese_chars,
@@ -116,5 +116,5 @@ void from_json(const nlohmann::json& j, BertNormalizer& bert_normalizer) {
   j.at("strip_accents").get_to(bert_normalizer.strip_accents_);
 }
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

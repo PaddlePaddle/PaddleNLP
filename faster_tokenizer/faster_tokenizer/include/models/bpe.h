@@ -18,7 +18,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "utils/cache.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 struct BPE : public Model {
@@ -75,5 +75,5 @@ private:
   friend void from_json(const nlohmann::json& j, BPE& model);
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer

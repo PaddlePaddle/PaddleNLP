@@ -16,7 +16,7 @@ limitations under the License. */
 #include "re2/re2.h"
 #include "utils/utf8.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 static re2::RE2 pattern(" ");
@@ -79,5 +79,5 @@ void from_json(const nlohmann::json& j,
   meta_pretokenizer.SetReplacement(j.at("replacement").get<std::string>());
 }
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

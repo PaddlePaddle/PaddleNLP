@@ -15,7 +15,7 @@ limitations under the License. */
 #include "decoders/wordpiece.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace decoders {
 
 WordPiece::WordPiece(const std::string prefix, bool cleanup)
@@ -63,5 +63,5 @@ void from_json(const nlohmann::json& j, WordPiece& decoder) {
   j["prefix"].get_to(decoder.prefix_);
 }
 
-}  // decoders
-}  // tokenizers
+}  // namespace decoders
+}  // namespace faster_tokenizer

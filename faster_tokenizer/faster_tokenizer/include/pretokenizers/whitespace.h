@@ -16,12 +16,12 @@ limitations under the License. */
 
 #include "pretokenizers/pretokenizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 struct Whitespace : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
 };
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

@@ -23,7 +23,7 @@ limitations under the License. */
 #include "darts.h"
 #include "nlohmann/json.hpp"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 struct Unigram : public Model {
@@ -67,5 +67,5 @@ private:
   friend void from_json(const nlohmann::json& j, Unigram& model);
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer

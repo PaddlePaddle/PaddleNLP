@@ -15,7 +15,7 @@ limitations under the License. */
 #include "normalizers/replace.h"
 #include "utils/unique_ptr.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 ReplaceNormalizer::ReplaceNormalizer(const std::string& pattern,
@@ -45,5 +45,5 @@ void from_json(const nlohmann::json& j, ReplaceNormalizer& replace_normalizer) {
   j.at("content").get_to(replace_normalizer.content_);
 }
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

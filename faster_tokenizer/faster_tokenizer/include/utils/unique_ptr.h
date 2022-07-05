@@ -16,7 +16,7 @@ limitations under the License. */
 
 #include <memory>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 // Trait to select overloads and return types for MakeUnique.
@@ -56,4 +56,4 @@ typename MakeUniqueResult<T>::invalid make_unique(Args &&... /* args */) =
     delete;  // NOLINT
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

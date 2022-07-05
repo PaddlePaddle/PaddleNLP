@@ -19,7 +19,7 @@
 
 #include "utils/shared_mutex.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 static size_t DEFAULT_CACHE_CAPACITY = 10000;
@@ -97,4 +97,4 @@ private:
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

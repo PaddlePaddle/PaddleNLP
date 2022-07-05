@@ -17,7 +17,7 @@ limitations under the License. */
 #include <string>
 #include "normalizers/normalizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 struct NFCNormalizer : public Normalizer {
@@ -50,5 +50,5 @@ struct NmtNormalizer : public Normalizer {
   friend void from_json(const nlohmann::json& j, NmtNormalizer& normalizer);
 };
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

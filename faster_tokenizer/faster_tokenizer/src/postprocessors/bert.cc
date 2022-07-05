@@ -18,7 +18,7 @@
 #include "glog/logging.h"
 #include "postprocessors/bert.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace postprocessors {
 
 BertPostProcessor::BertPostProcessor()
@@ -201,5 +201,5 @@ void from_json(const nlohmann::json& j, BertPostProcessor& bert_postprocessor) {
   j["sep"].get_to(bert_postprocessor.sep_);
 }
 
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer

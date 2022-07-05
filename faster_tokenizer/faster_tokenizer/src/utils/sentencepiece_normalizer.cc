@@ -22,7 +22,7 @@
 #include "glog/logging.h"
 #include "unicode/brkiter.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 PrefixMatcher::PrefixMatcher(const std::set<const char*, Cstrless>& dic) {
@@ -337,4 +337,4 @@ void Normalizer::Replace(const simple_string_view& new_part,
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

@@ -19,7 +19,7 @@
 #include <vector>
 #include "utils/string_view.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 // Copy from https://github.com/google/sentencepiece/blob/master/src/freelist.h
@@ -187,4 +187,4 @@ private:
 
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

@@ -30,7 +30,7 @@ limitations under the License. */
 #include <omp.h>
 #endif
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace core {
 
 normalizers::Normalizer* Tokenizer::GetNormalizerPtr() const {
@@ -732,5 +732,5 @@ template void Tokenizer::SetPostProcessor(
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer

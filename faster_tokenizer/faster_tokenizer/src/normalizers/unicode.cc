@@ -23,7 +23,7 @@ limitations under the License. */
 #include "unicode/normalizer2.h"
 #include "unicode/utypes.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 void NFCNormalizer::operator()(NormalizedString* input) const { input->NFC(); }
@@ -97,5 +97,5 @@ void to_json(nlohmann::json& j, const NmtNormalizer& normalizer) {
 
 void from_json(const nlohmann::json& j, NmtNormalizer& normalizer) {}
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

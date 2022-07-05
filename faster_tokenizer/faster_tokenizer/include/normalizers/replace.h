@@ -20,7 +20,7 @@ limitations under the License. */
 #include "normalizers/normalizer.h"
 #include "re2/re2.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 struct ReplaceNormalizer : public Normalizer {
@@ -38,5 +38,5 @@ private:
   std::string content_;
 };
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

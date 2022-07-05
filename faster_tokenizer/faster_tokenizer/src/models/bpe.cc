@@ -23,7 +23,7 @@ limitations under the License. */
 #include "utils/path.h"
 #include "utils/utf8.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 const std::string WHITESPACE = " \n\r\t\f\v";
 
@@ -343,5 +343,5 @@ void from_json(const nlohmann::json& j, BPE& model) {
   model.Init(merges);
 }
 
-}  // model
-}  // tokenizers
+}  // namespace model
+}  // namespace faster_tokenizer

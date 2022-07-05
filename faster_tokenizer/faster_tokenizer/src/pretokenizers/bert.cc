@@ -18,7 +18,7 @@ limitations under the License. */
 #include "unicode/uchar.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 // Note (zhoushunjie): Init re2::RE2 objects cost too much,
@@ -66,5 +66,5 @@ void to_json(nlohmann::json& j, const BertPreTokenizer& bert_pre_tokenizer) {
 }
 
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

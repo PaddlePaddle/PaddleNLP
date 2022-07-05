@@ -16,7 +16,7 @@ limitations under the License. */
 #include "normalizers/normalizer.h"
 #include "re2/re2.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 static re2::RE2 pattern("[\\s\\p{Zs}]+");
 
@@ -32,5 +32,5 @@ void Whitespace::operator()(PreTokenizedString* pretokenized) const {
   });
 }
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

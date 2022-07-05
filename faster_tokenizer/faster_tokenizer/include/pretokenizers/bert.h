@@ -17,7 +17,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 struct BertPreTokenizer : public PreTokenizer {
@@ -28,5 +28,5 @@ struct BertPreTokenizer : public PreTokenizer {
                         BertPreTokenizer& bert_pre_tokenizer);
 };
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

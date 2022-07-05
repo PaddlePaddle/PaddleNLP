@@ -17,7 +17,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 struct MetaSpacePreTokenizer : public PreTokenizer {
@@ -39,5 +39,5 @@ private:
                         MetaSpacePreTokenizer& meta_pretokenizer);
 };
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer

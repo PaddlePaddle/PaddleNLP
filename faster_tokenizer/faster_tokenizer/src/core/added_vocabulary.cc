@@ -19,7 +19,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizer.h"
 #include "re2/re2.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace core {
 
 inline bool StartWithWord(const std::string& sequence) {
@@ -417,5 +417,5 @@ void to_json(nlohmann::json& j, const AddedVocabulary& added_vocab) {
   j = jarray;
 }
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer

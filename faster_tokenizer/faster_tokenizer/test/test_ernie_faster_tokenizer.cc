@@ -26,7 +26,7 @@ limitations under the License. */
 #include "pretokenizers/bert.h"
 #include "tokenizers/ernie_faster_tokenizer.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace tests {
 
 template <typename T>

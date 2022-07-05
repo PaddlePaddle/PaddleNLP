@@ -23,7 +23,7 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 py::list GetWordIdx(const core::Encoding& self) {
@@ -270,5 +270,5 @@ void BindCore(pybind11::module* m) {
       .def_property_readonly("single_word", &core::AddedToken::GetIsSingleWord);
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

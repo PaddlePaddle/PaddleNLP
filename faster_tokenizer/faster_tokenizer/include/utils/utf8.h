@@ -15,7 +15,7 @@ limitations under the License. */
 #pragma once
 #include <cstring>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 static constexpr uint32_t kUnicodeError = 0xFFFD;
@@ -220,4 +220,4 @@ inline bool IsValidDecodeUTF8(const char* begin,
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

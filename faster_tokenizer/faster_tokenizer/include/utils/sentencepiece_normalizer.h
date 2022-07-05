@@ -24,7 +24,7 @@
 
 #include "darts.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 struct Cstrless {
@@ -109,4 +109,4 @@ private:
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

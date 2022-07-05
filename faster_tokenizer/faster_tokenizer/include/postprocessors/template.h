@@ -23,7 +23,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace postprocessors {
 
 enum SequenceType { SEQ_A, SEQ_B };
@@ -184,5 +184,5 @@ struct TemplatePostProcessor : public PostProcessor {
   SpecialTokensMap special_tokens_map_;
 };
 
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer

@@ -17,7 +17,7 @@ limitations under the License. */
 #include "models/model.h"
 #include "nlohmann/json.hpp"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 struct WordPiece : public Model {
@@ -79,5 +79,5 @@ struct WordPieceFactory {
   void GetVocabFromFiles(const std::string& files);
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer

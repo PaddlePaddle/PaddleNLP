@@ -30,7 +30,7 @@ limitations under the License. */
 #include "unicode/uchar.h"
 #include "unicode/utypes.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 NormalizedString::NormalizedString(const std::string& original)
@@ -620,5 +620,5 @@ template void NormalizedString::Split(
     SplitMode mode,
     std::vector<NormalizedString>* normalizes) const;
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

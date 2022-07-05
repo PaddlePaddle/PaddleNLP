@@ -15,7 +15,7 @@ limitations under the License. */
 #include "postprocessors/postprocessor.h"
 #include "core/encoding.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace postprocessors {
 
 void PostProcessor::DefaultProcess(core::Encoding* encoding,
@@ -31,5 +31,5 @@ void PostProcessor::DefaultProcess(core::Encoding* encoding,
   }
 }
 
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer

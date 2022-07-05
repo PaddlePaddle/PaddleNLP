@@ -17,7 +17,7 @@ limitations under the License. */
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 PyObject* ToPyObject(int value);
@@ -96,5 +96,5 @@ std::vector<T> CastPyArg2VectorOfInt(PyObject* obj, size_t arg_pos) {
   }
   return result;
 }
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

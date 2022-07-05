@@ -18,7 +18,7 @@ limitations under the License. */
 #include <vector>
 #include "core/base.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 struct Model {
@@ -32,5 +32,5 @@ struct Model {
       const std::string& folder, const std::string& filename_prefix) const = 0;
 };
 
-}  // model
-}  // tokenizers
+}  // namespace model
+}  // namespace faster_tokenizer

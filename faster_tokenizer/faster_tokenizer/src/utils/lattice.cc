@@ -30,7 +30,7 @@
 
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 // Size of nodes pre-allocated in Lattice.
@@ -541,4 +541,4 @@ std::vector<Lattice::Node *> Lattice::Sample(float inv_theta) {
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

@@ -22,9 +22,9 @@ limitations under the License. */
 
 namespace re2 {
 class RE2;
-}  // re2
+}  // namespace re2
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 enum SplitMode {
@@ -204,5 +204,5 @@ struct Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

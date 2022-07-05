@@ -20,7 +20,7 @@
 #include <mutex>
 #include <system_error>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 // The code is from http://howardhinnant.github.io/shared_mutex.cpp
@@ -299,4 +299,4 @@ inline void swap(shared_lock<Mutex>& x, shared_lock<Mutex>& y) {
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

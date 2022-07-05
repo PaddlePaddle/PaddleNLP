@@ -19,7 +19,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 class Trie;
@@ -101,4 +101,4 @@ private:
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

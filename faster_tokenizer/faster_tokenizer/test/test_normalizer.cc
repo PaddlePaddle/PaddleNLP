@@ -21,7 +21,7 @@ limitations under the License. */
 #include "normalizers/unicode.h"
 #include "re2/re2.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace tests {
 
 TEST(normalizers, split) {

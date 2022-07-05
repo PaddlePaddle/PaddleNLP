@@ -17,7 +17,7 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace postprocessors {
 
 struct BertPostProcessor : public PostProcessor {
@@ -36,5 +36,5 @@ struct BertPostProcessor : public PostProcessor {
   friend void from_json(const nlohmann::json& j,
                         BertPostProcessor& bert_postprocessor);
 };
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer

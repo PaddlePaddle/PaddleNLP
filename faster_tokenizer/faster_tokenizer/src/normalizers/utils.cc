@@ -20,7 +20,7 @@ limitations under the License. */
 #include "normalizers/unicode.h"
 #include "unicode/unistr.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 void SequenceNormalizer::AppendNormalizer(Normalizer* normalizer) {
@@ -96,5 +96,5 @@ void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer) {
 
 void from_json(const nlohmann::json& j, LowercaseNormalizer& normalizer) {}
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

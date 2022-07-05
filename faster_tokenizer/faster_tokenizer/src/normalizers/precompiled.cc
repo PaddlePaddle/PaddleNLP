@@ -20,7 +20,7 @@ limitations under the License. */
 #include "utils/unique_ptr.h"
 
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace normalizers {
 
 PrecompiledNormalizer::PrecompiledNormalizer(
@@ -75,5 +75,5 @@ void from_json(const nlohmann::json& j,
       j.at("precompiled_charsmap").get<std::string>());
 }
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer

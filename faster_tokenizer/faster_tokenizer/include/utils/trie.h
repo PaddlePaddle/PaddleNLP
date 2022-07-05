@@ -22,7 +22,7 @@
 #include <vector>
 #include "darts.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 class Trie {
@@ -114,4 +114,4 @@ private:
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

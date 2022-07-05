@@ -17,7 +17,7 @@ limitations under the License. */
 #include <string>
 #include <vector>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace decoders {
 
 struct Decoder {
@@ -25,5 +25,5 @@ struct Decoder {
                           std::string* result) const = 0;
 };
 
-}  // decoders
-}  // tokenizers
+}  // namespace decoders
+}  // namespace faster_tokenizer

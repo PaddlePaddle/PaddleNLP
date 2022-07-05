@@ -22,7 +22,7 @@ limitations under the License. */
 #include "utils/unique_ptr.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 constexpr float kUnkPenalty = 10.0;
@@ -377,5 +377,5 @@ void from_json(const nlohmann::json& j, Unigram& model) {
              j.at("unk_id").get<std::vector<size_t>>());
 }
 
-}  // model
-}  // tokenizers
+}  // namespace model
+}  // namespace faster_tokenizer

@@ -22,7 +22,7 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace utils {
 
 void Trie::CreateTrie(const std::vector<const char*>& keys,
@@ -226,4 +226,4 @@ void Trie::SetContinuingSubwordPrefix(
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer

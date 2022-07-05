@@ -20,7 +20,7 @@ limitations under the License. */
 #include "pretokenizers/pretokenizers.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace tokenizers_impl {
 
 ErnieFasterTokenizer::ErnieFasterTokenizer(const std::string& vocab_path,
@@ -145,5 +145,5 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
   }
 }
 
-}  // tokenizers_impl
-}  // tokenizers
+}  // namespace tokenizers_impl
+}  // namespace faster_tokenizer

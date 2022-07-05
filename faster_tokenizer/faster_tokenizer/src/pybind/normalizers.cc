@@ -19,7 +19,7 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyNormalizer : public normalizers::Normalizer {
@@ -447,5 +447,5 @@ void BindNormalizers(pybind11::module* m) {
       .def("__call__", &normalizers::PrecompiledNormalizer::operator());
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

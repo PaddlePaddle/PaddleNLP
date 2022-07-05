@@ -35,7 +35,7 @@ struct hash<std::pair<uint, uint>> {
 };
 }
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace core {
 
 enum OffsetType { CHAR, BYTE };
@@ -353,5 +353,5 @@ struct BPEWord {
   std::vector<Symbol> symbols_;
 };
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer

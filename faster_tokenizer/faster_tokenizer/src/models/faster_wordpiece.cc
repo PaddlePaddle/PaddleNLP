@@ -26,7 +26,7 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -400,5 +400,5 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
   model.InitFailureAndTrie();
 }
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer

@@ -20,7 +20,7 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyModel : public models::Model {
@@ -488,5 +488,5 @@ void BindModels(pybind11::module* m) {
            py::arg("folder"),
            py::arg("prefix") = py::none());
 }
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

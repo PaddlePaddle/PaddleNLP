@@ -16,10 +16,10 @@ limitations under the License. */
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 void BindPostProcessors(pybind11::module* m);
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

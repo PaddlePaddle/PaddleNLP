@@ -29,7 +29,7 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace pybind {
 
 PyTypeObject* p_tokenizer_type;  // For Tokenizer
@@ -1365,5 +1365,5 @@ void BindTokenizers(pybind11::module* m) {
   }
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer

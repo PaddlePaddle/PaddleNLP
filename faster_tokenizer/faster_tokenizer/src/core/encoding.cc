@@ -19,7 +19,7 @@ limitations under the License. */
 #include <sstream>
 #include "glog/logging.h"
 
-namespace tokenizers {
+namespace faster_tokenizer {
 namespace core {
 
 Encoding::Encoding(const std::vector<uint>& ids,
@@ -630,5 +630,5 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   }
 }
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
