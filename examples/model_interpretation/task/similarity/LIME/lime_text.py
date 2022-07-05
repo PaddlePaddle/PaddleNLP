@@ -645,11 +645,11 @@ class LimeTextExplainer(object):
                     query_list_tensor, title_list_tensor, query_len_list_tensor,
                     title_len_list_tensor)[0]  # label: Tensor[num_samples, 2]
             else:
-                token_ids_tensor = paddle.fluid.core_avx.VarBase(
+                token_ids_tensor = paddle.Tensor(
                     value=token_ids_np[idx * batch:(idx + 1) * batch],
-                    place=paddle.fluid.core.CUDAPlace(0),
+                    place=paddle.CUDAPlace(0),
                     stop_gradient=True)
-                s_ids_tensor = paddle.fluid.core_avx.VarBase(
+                s_ids_tensor = paddle.Tensor(
                     value=s_ids_np[idx * batch:(idx + 1) * batch],
                     place=token_ids_tensor.place,
                     stop_gradient=token_ids_tensor.stop_gradient)

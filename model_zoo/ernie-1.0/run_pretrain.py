@@ -361,8 +361,7 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.fluid.clip.GradientClipByGlobalNorm(
-            clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
     decay_param = [
         p.name for n, p in model.named_parameters()
