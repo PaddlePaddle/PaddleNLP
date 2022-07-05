@@ -339,7 +339,7 @@ class LayoutLMv2SelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + [
+        new_x_shape = list(x.shape[:-1]) + [
             self.num_attention_heads, self.attention_head_size
         ]
         x = x.reshape(new_x_shape)
@@ -389,23 +389,29 @@ class LayoutLMv2SelfAttention(nn.Layer):
             attention_scores += rel_pos
         if self.has_spatial_attention_bias:
             attention_scores += rel_2d_pos
+
+        bool_attention_mask = attention_mask.astype(paddle.bool)
+        bool_attention_mask.stop_gradient = True
+        attention_scores_shape = paddle.shape(attention_scores)
         attention_scores = paddle.where(
-            attention_mask.astype(paddle.bool).expand_as(attention_scores),
-            paddle.ones_like(attention_scores) * float("-inf"),
+            bool_attention_mask.expand(attention_scores_shape),
+            paddle.ones(attention_scores_shape) * float("-1e10"),
             attention_scores)
+
         attention_probs = F.softmax(attention_scores, axis=-1)
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = context_layer.shape[:-2] + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = list(
+            context_layer.shape[:-2]) + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
 
-        outputs = (context_layer,
-                   attention_probs) if output_attentions else (context_layer, )
+        if output_attentions:
+            outputs = [context_layer, attention_probs]
+        else:
+            outputs = [context_layer]
         return outputs
 
 
@@ -442,8 +448,12 @@ class LayoutLMv2Attention(nn.Layer):
             rel_2d_pos=rel_2d_pos,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
+        if output_attentions:
+            outputs = [
+                attention_output,
+            ] + self_outputs[1:]
+        else:
+            outputs = [attention_output]
         return outputs
 
 
@@ -654,13 +664,16 @@ class LayoutLMv2Layer(nn.Layer):
         )
         attention_output = self_attention_outputs[0]
 
-        outputs = self_attention_outputs[
-            1:]  # add self attentions if we output attention weights
-
         layer_output = self.feed_forward_chunk(attention_output)
 
-        outputs = (layer_output, ) + outputs
-
+        if output_attentions:
+            outputs = self_attention_outputs[
+                1:]  # add self attentions if we output attention weights
+            outputs = [
+                layer_output,
+            ] + list(outputs)
+        else:
+            outputs = [layer_output]
         return outputs
 
 
@@ -841,15 +854,13 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 head_mask=None,
-                output_hidden_states=None,
-                output_attentions=None):
-        input_shape = input_ids.shape
+                output_hidden_states=False,
+                output_attentions=False):
+        input_shape = paddle.shape(input_ids)
 
         visual_shape = list(input_shape)
         visual_shape[1] = self.config["image_feature_pool_shape"][
             0] * self.config["image_feature_pool_shape"][1]
-        final_shape = list(input_shape)
-        final_shape[1] += visual_shape[1]
 
         visual_bbox_x = (paddle.arange(
             0,
@@ -874,8 +885,10 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([-1, bbox.shape[-1]])
-        visual_bbox = visual_bbox.expand([final_shape[0], -1, -1])
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
+        visual_bbox = visual_bbox.expand(
+            [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
@@ -894,10 +907,10 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         if position_ids is None:
             seq_length = input_shape[1]
             position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
+            position_ids = position_ids.expand(input_shape)
 
         visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], -1])
+            [input_shape[0], visual_shape[1]])
         final_position_ids = paddle.concat([position_ids, visual_position_ids],
                                            axis=1)
 
