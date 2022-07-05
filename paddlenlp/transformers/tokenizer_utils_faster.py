@@ -442,7 +442,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
             verbose: bool = True,
             **kwargs) -> BatchEncoding:
 
-        batched_input = [(text, text_pair)] if text_pair else [text]
+        batched_input = [(text, text_pair)] if text_pair is not None else [text]
         batched_output = self._batch_encode_plus(
             batched_input,
             is_split_into_words=is_split_into_words,

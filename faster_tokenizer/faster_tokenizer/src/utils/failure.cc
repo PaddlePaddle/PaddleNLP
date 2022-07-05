@@ -23,7 +23,8 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
 Failure::Failure()
@@ -420,4 +421,5 @@ void FailureArray::BuildOutgoingEdgeLabelsFromToken(
 
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

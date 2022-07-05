@@ -22,7 +22,8 @@
 #include <vector>
 #include "darts.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
 class Trie {
@@ -80,10 +81,6 @@ private:
   void InitTrieSuffixRoot();
   void InitTrie(const std::vector<const char*>& keys,
                 const std::vector<int>& values);
-  void GetSortedVocab(const std::vector<const char*>& keys,
-                      const std::vector<int>& values,
-                      std::vector<const char*>* sorted_keys,
-                      std::vector<int>* sorted_values) const;
   int EncodeTokenId(const std::string& token, uint id) const;
   void CreateTrie(const std::vector<const char*>& keys,
                   const std::vector<int>& values);
@@ -118,4 +115,5 @@ private:
 };
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
