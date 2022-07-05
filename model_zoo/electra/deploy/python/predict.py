@@ -165,18 +165,16 @@ def predict(args, sentences=[], paths=[]):
         # get input name
         input_names = predictor.get_input_names()
         # get input pointer and copy data
-        input_tensor = predictor.get_input_tensor(input_names[0])
-        input_tensor.reshape(sen.shape)
+        input_tensor = predictor.get_input_handle(input_names[0])
         input_tensor.copy_from_cpu(sen)
-        #input_tensor.copy_from_cpu(fake_input.copy())
 
         # run predictor
-        predictor.zero_copy_run()
+        predictor.run()
 
         # get output name
         output_names = predictor.get_output_names()
         # get output pointer and copy data(nd.array)
-        output_tensor = predictor.get_output_tensor(output_names[0])
+        output_tensor = predictor.get_output_handle(output_names[0])
         predict_data = output_tensor.copy_to_cpu()
         output_res = np.argmax(predict_data, axis=1).tolist()
         output_data.append(output_res)
