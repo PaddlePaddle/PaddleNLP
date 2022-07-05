@@ -124,15 +124,21 @@ paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
 
 
-def _wrap_setattr(self, name, value):
-    value = adapt_stale_fwd_patch(self, name, value)
-    return super(self.__class__, self).__setattr__(name, value)
+def _get_wrap_setattr(cls):
+
+    def _wrap_setattr(self, name, value):
+        value = adapt_stale_fwd_patch(self, name, value)
+        return super(cls, self).__setattr__(name, value)
+
+    return _wrap_setattr
 
 
 paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
-    paddle.nn.TransformerEncoderLayer.__setattr__)(_wrap_setattr)
+    paddle.nn.TransformerEncoderLayer.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerEncoderLayer))
 paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
-    paddle.nn.TransformerEncoder.__setattr__)(_wrap_setattr)
+    paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerEncoder))
 
 
 def is_tensor(x):
