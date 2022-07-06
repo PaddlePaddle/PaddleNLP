@@ -18,7 +18,8 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyDecoder : public decoders::Decoder {
@@ -68,5 +69,6 @@ void BindDecoders(pybind11::module* m) {
            py::arg("tokens"));
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

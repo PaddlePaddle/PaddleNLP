@@ -100,7 +100,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'.".format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-
+        self.vocab_file = vocab_file
+        self.sentencepiece_model_file = sentencepiece_model_file
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
@@ -117,9 +118,12 @@ class ErnieMTokenizer(PretrainedTokenizer):
                  return_attention_mask=True,
                  return_length=False,
                  return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+                 return_special_tokens_mask=False,
+                 max_length=None):
+        if max_length is None:
+            max_length = max_seq_len
         return super(ErnieMTokenizer, self).__call__(
-            text, text_pair, max_seq_len, stride, is_split_into_words,
+            text, text_pair, max_length, stride, is_split_into_words,
             pad_to_max_seq_len, truncation_strategy, return_position_ids,
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)

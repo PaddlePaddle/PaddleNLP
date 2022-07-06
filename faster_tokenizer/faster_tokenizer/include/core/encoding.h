@@ -20,7 +20,8 @@ limitations under the License. */
 #include <vector>
 #include "core/base.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace core {
 
 class Encoding {
@@ -114,5 +115,6 @@ bool TruncateEncodings(Encoding* encoding,
                        const TruncMethod& method);
 void PadEncodings(std::vector<Encoding>* encoding, const PadMethod& method);
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
