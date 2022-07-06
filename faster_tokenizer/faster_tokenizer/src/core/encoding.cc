@@ -175,7 +175,7 @@ Range Encoding::GetSequenceRange(uint32_t seq_id) const {
 }
 
 void Encoding::ProcessTokenWithOffsets(
-    std::function<void(uint, std::string*, Offset*)> process_token_fn) {
+    std::function<void(uint32_t, std::string*, Offset*)> process_token_fn) {
   auto length = GetLen();
   for (int i = 0; i < length; ++i) {
     process_token_fn(i, &tokens_[i], &offsets_[i]);

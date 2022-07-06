@@ -75,7 +75,7 @@ public:
   Range GetSequenceRange(uint32_t seq_id) const;
 
   void ProcessTokenWithOffsets(
-      std::function<void(uint, std::string*, Offset*)> process_token_fn);
+      std::function<void(uint32_t, std::string*, Offset*)> process_token_fn);
 
   // token_idx: The index of token in the sequence
   std::vector<uint32_t> TokenIdxToSequenceIds(uint32_t token_idx) const;

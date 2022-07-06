@@ -40,20 +40,15 @@ GetICUByproducts(${ICU_INSTALL_DIR} ICU_LIBRARIES ICU_INCLUDE_DIRS ICU_BASE_NAME
 INCLUDE_DIRECTORIES(${ICU_INCLUDE_DIRS})
 
 if(NOT WIN32)
-ExternalProject_Add(
-        extern_icu
-        ${EXTERNAL_PROJECT_LOG_ARGS}
-        ${SHALLOW_CLONE}
-        GIT_REPOSITORY    ${ICU_REPOSITORY}
-        GIT_TAG           ${ICU_TAG}
-        GIT_PROGRESS      1
-        PREFIX            ${ICU_PREFIX_DIR}
-        UPDATE_COMMAND    ""
-        CONFIGURE_COMMAND ${HOST_ENV_CMAKE} ../extern_icu/icu4c/source/runConfigureICU "Linux/gcc" --enable-static --disable-shared --enable-rpath
-        BUILD_COMMAND make -j4
-        INSTALL_COMMAND make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install
-)
+set(PLATFORM_CONFIGURE ${HOST_ENV_CMAKE} ../extern_icu/icu4c/source/runConfigureICU "Linux/gcc" --enable-static --disable-shared --enable-rpath)
+set(PLATFORM_BUILD make -j4)
+set(PLATFORM_INSTALL make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install)
 else()
+set(PLATFORM_CONFIGURE "")
+set(PLATFORM_BUILD msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64)
+set(PLATFORM_INSTALL xcopy ..\\extern_icu\\icu4c\\include ..\\extern_icu\\icu4c\\lib64 ${ICU_INSTALL_DIR})
+endif()
+
 ExternalProject_Add(
         extern_icu
         ${EXTERNAL_PROJECT_LOG_ARGS}
@@ -63,10 +58,11 @@ ExternalProject_Add(
         GIT_PROGRESS      1
         PREFIX            ${ICU_PREFIX_DIR}
         UPDATE_COMMAND    ""
-        BUILD_COMMAND msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64
-        INSTALL_COMMAND  xcopy ..\\extern_icu\\icu4c\\include ..\\extern_icu\\icu4c\\lib64 ${ICU_INSTALL_DIR}
+        CONFIGURE_COMMAND ${PLATFORM_CONFIGURE}
+        BUILD_COMMAND ${PLATFORM_BUILD}
+        INSTALL_COMMAND ${PLATFORM_INSTALL}
+        BUILD_BYPRODUCTS ${ICU_LIBRARIES}
 )
-endif()
 
 list(LENGTH ICU_LIBRARIES ICU_LIB_LEN)
 MATH(EXPR ICU_LIB_LEN "${ICU_LIB_LEN}-1")
