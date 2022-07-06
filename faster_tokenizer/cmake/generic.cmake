@@ -153,3 +153,56 @@ function(generate_dummy_static_lib)
   configure_file(${PROJECT_SOURCE_DIR}/cmake/dummy.c.in ${dummy_FILE_PATH} @ONLY)
   add_library(${dummy_LIB_NAME} STATIC ${dummy_FILE_PATH})
 endfunction()
+
+function(paddle_protobuf_generate_cpp SRCS HDRS)
+  if(NOT ARGN)
+    message(
+      SEND_ERROR
+        "Error: paddle_protobuf_generate_cpp() called without any proto files")
+    return()
+  endif()
+
+  set(${SRCS})
+  set(${HDRS})
+
+  foreach(FIL ${ARGN})
+    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+    get_filename_component(FIL_WE ${FIL} NAME_WE)
+    set(_protobuf_protoc_src "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.cc")
+    set(_protobuf_protoc_hdr "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.h")
+    list(APPEND ${SRCS} "${_protobuf_protoc_src}")
+    list(APPEND ${HDRS} "${_protobuf_protoc_hdr}")
+
+    add_custom_command(
+      OUTPUT "${_protobuf_protoc_src}" "${_protobuf_protoc_hdr}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}"
+      COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} -I${CMAKE_CURRENT_SOURCE_DIR}
+              --cpp_out "${CMAKE_CURRENT_BINARY_DIR}" ${ABS_FIL}
+      # Set `EXTERN_PROTOBUF_DEPEND` only if need to compile `protoc.exe`.
+      DEPENDS ${ABS_FIL} ${EXTERN_PROTOBUF_DEPEND}
+      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
+      VERBATIM)
+  endforeach()
+
+  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
+  set(${SRCS}
+      ${${SRCS}}
+      PARENT_SCOPE)
+  set(${HDRS}
+      ${${HDRS}}
+      PARENT_SCOPE)
+endfunction()
+
+function(proto_library TARGET_NAME)
+  set(oneValueArgs "")
+  set(multiValueArgs SRCS DEPS)
+  cmake_parse_arguments(proto_library "${options}" "${oneValueArgs}"
+                        "${multiValueArgs}" ${ARGN})
+  set(proto_srcs)
+  set(proto_hdrs)
+  paddle_protobuf_generate_cpp(proto_srcs proto_hdrs ${proto_library_SRCS})
+  cc_library(
+    ${TARGET_NAME}
+    SRCS ${proto_srcs}
+    DEPS ${proto_library_DEPS} protobuf)
+endfunction()
