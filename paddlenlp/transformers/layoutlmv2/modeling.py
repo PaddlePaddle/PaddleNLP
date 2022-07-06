@@ -1202,8 +1202,11 @@ class REDecoder(nn.Layer):
             ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
-            positive_relations = set(
-                list(zip(relations[b]["head"], relations[b]["tail"])))
+            if "head" in relations[b]:
+                positive_relations = set(
+                    list(zip(relations[b]["head"], relations[b]["tail"])))
+            else:
+                positive_relations = set()
             negative_relations = all_possible_relations - positive_relations
             positive_relations = set(
                 [i for i in positive_relations if i in all_possible_relations])
