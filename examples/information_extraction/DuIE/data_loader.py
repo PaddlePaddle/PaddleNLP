@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 from tqdm import tqdm
 
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
 from extract_chinese_and_punct import ChineseAndPunctuationExtractor
@@ -286,7 +286,7 @@ class DataCollator:
 
 
 if __name__ == "__main__":
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     d = DuIEDataset.from_file("./data/train_data.json", tokenizer)
     sampler = paddle.io.RandomSampler(data_source=d)
     batch_sampler = paddle.io.BatchSampler(sampler=sampler, batch_size=2)

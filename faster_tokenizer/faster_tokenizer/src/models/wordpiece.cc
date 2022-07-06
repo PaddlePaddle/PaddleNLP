@@ -23,7 +23,8 @@ limitations under the License. */
 #include "utils/path.h"
 #include "utils/utf8.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 const std::string WHITESPACE = " \n\r\t\f\v";
 
@@ -82,8 +83,8 @@ bool WordPiece::IdToToken(uint id, std::string* token) const {
   return true;
 }
 
-std::string WordPiece::Save(const std::string& folder,
-                            const std::string& filename_prefix) const {
+std::vector<std::string> WordPiece::Save(
+    const std::string& folder, const std::string& filename_prefix) const {
   std::string filepath;
   if (filename_prefix == "") {
     filepath = utils::PathJoin(folder, "vocab.txt");
@@ -103,11 +104,10 @@ std::string WordPiece::Save(const std::string& folder,
     fout << vocab_item.second << "\n";
   }
   fout.close();
-  return filepath;
+  return {filepath};
 }
 
-std::vector<core::Token> WordPiece::Tokenize(
-    const std::string& sequence) const {
+std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
   VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence";
   std::vector<core::Token> all_tokens;
   size_t unicode_len =
@@ -272,5 +272,6 @@ void WordPieceFactory::GetVocabFromFiles(const std::string& files) {
   }
 }
 
-}  // model
-}  // tokenizers
+}  // namespace model
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
