@@ -22,9 +22,10 @@ limitations under the License. */
 
 namespace re2 {
 class RE2;
-}  // re2
+}  // namespace re2
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace normalizers {
 
 enum SplitMode {
@@ -71,6 +72,7 @@ public:
   NormalizedString& Lowercase();
   NormalizedString& Replace(const re2::RE2& pattern,
                             const std::string& content);
+  NormalizedString& Prepend(const std::string& content);
   bool Slice(core::Range range,
              NormalizedString* normalized,
              bool origin_range) const;
@@ -136,11 +138,8 @@ public:
           previous_match = curr_match;
         }
         matches = std::move(new_matches);
-        int end = matches.size();
         normalizes_size = matches.size();
-        for (int i = 0; i < end / 2; ++i) {
-          std::swap(matches[i], matches[end - i - 1]);
-        }
+        std::reverse(matches.begin(), matches.end());
         break;
       }
       case CONTIGUOUS: {
@@ -206,5 +205,6 @@ struct Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

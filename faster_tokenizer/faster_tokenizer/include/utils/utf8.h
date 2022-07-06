@@ -15,8 +15,11 @@ limitations under the License. */
 #pragma once
 #include <cstring>
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
+
+static constexpr uint32_t kUnicodeError = 0xFFFD;
 
 inline bool IsUnicodeNonChar(uint32_t c) {
   return ((c) >= 0xfdd0 && ((c) <= 0xfdef || ((c)&0xfffe) == 0xfffe) &&
@@ -168,5 +171,55 @@ inline void GetUnicodeStr(const char* pSrc,
   }
 }
 
+inline bool IsTrailByte(char x) { return static_cast<signed char>(x) < -0x40; }
+
+inline bool IsValidCodepoint(char32_t c) {
+  return (static_cast<uint32_t>(c) < 0xD800) || (c >= 0xE000 && c <= 0x10FFFF);
+}
+
+// mblen sotres the number of bytes consumed after decoding.
+inline uint32_t DecodeUTF8(const char* begin, const char* end, size_t* mblen) {
+  const size_t len = end - begin;
+
+  if (static_cast<unsigned char>(begin[0]) < 0x80) {
+    *mblen = 1;
+    return static_cast<unsigned char>(begin[0]);
+  } else if (len >= 2 && (begin[0] & 0xE0) == 0xC0) {
+    const uint32_t cp = (((begin[0] & 0x1F) << 6) | ((begin[1] & 0x3F)));
+    if (IsTrailByte(begin[1]) && cp >= 0x0080 && IsValidCodepoint(cp)) {
+      *mblen = 2;
+      return cp;
+    }
+  } else if (len >= 3 && (begin[0] & 0xF0) == 0xE0) {
+    const uint32_t cp = (((begin[0] & 0x0F) << 12) | ((begin[1] & 0x3F) << 6) |
+                         ((begin[2] & 0x3F)));
+    if (IsTrailByte(begin[1]) && IsTrailByte(begin[2]) && cp >= 0x0800 &&
+        IsValidCodepoint(cp)) {
+      *mblen = 3;
+      return cp;
+    }
+  } else if (len >= 4 && (begin[0] & 0xf8) == 0xF0) {
+    const uint32_t cp = (((begin[0] & 0x07) << 18) | ((begin[1] & 0x3F) << 12) |
+                         ((begin[2] & 0x3F) << 6) | ((begin[3] & 0x3F)));
+    if (IsTrailByte(begin[1]) && IsTrailByte(begin[2]) &&
+        IsTrailByte(begin[3]) && cp >= 0x10000 && IsValidCodepoint(cp)) {
+      *mblen = 4;
+      return cp;
+    }
+  }
+
+  // Invalid UTF-8.
+  *mblen = 1;
+  return kUnicodeError;
+}
+
+inline bool IsValidDecodeUTF8(const char* begin,
+                              const char* end,
+                              size_t* mblen) {
+  const uint32_t c = DecodeUTF8(begin, end, mblen);
+  return c != kUnicodeError || *mblen == 3;
+}
+
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

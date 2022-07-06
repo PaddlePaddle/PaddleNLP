@@ -14,12 +14,14 @@ limitations under the License. */
 
 #include "normalizers/utils.h"
 #include "normalizers/bert.h"
+#include "normalizers/precompiled.h"
 #include "normalizers/replace.h"
 #include "normalizers/strip.h"
 #include "normalizers/unicode.h"
 #include "unicode/unistr.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace normalizers {
 
 void SequenceNormalizer::AppendNormalizer(Normalizer* normalizer) {
@@ -57,6 +59,9 @@ void SequenceNormalizer::AppendNormalizer(Normalizer* normalizer) {
   } else if (typeid(*normalizer) == typeid(BertNormalizer)) {
     auto cast_normalizer = dynamic_cast<BertNormalizer*>(normalizer);
     normalizer_ptr = std::make_shared<BertNormalizer>(*cast_normalizer);
+  } else if (typeid(*normalizer) == typeid(PrecompiledNormalizer)) {
+    auto cast_normalizer = dynamic_cast<PrecompiledNormalizer*>(normalizer);
+    normalizer_ptr = std::make_shared<PrecompiledNormalizer>(*cast_normalizer);
   }
   normalizer_ptrs_.push_back(std::move(normalizer_ptr));
 }
@@ -92,5 +97,6 @@ void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer) {
 
 void from_json(const nlohmann::json& j, LowercaseNormalizer& normalizer) {}
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
