@@ -38,6 +38,17 @@ set(HOST_ENV_CMAKE ${CMAKE_COMMAND} -E env
 set(ICU_STATIC TRUE)
 GetICUByproducts(${ICU_INSTALL_DIR} ICU_LIBRARIES ICU_INCLUDE_DIRS ICU_BASE_NAMES)
 INCLUDE_DIRECTORIES(${ICU_INCLUDE_DIRS})
+
+if(NOT WIN32)
+  set(PLATFORM "Linux/gcc")
+  set(PLATFORM_BUILD make -j4)
+  set(PLATFORM_INSTALL make prefix="" DESTDIR=${ICU_INSTALL_DIR} install)
+else()
+    set(PLATFORM "MSYS/MSVC")
+    set(PLATFORM_BUILD ninja)
+    set(PLATFORM_INSTALL ninja prefix="" DESTDIR=${ICU_INSTALL_DIR} install)
+endif()
+
 ExternalProject_Add(
         extern_icu
         ${EXTERNAL_PROJECT_LOG_ARGS}
@@ -47,9 +58,9 @@ ExternalProject_Add(
         GIT_PROGRESS      1
         PREFIX            ${ICU_PREFIX_DIR}
         UPDATE_COMMAND    ""
-        CONFIGURE_COMMAND ${HOST_ENV_CMAKE} ../extern_icu/icu4c/source/runConfigureICU Linux/gcc --enable-static --disable-shared --enable-rpath
-        BUILD_COMMAND make -j4
-        INSTALL_COMMAND make prefix="" DESTDIR=${ICU_INSTALL_DIR} install
+        CONFIGURE_COMMAND ${HOST_ENV_CMAKE} ../extern_icu/icu4c/source/runConfigureICU ${PLATFORM} --enable-static --disable-shared --enable-rpath
+        BUILD_COMMAND ${PLATFORM_BUILD}
+        INSTALL_COMMAND ${PLATFORM_INSTALL}
 )
 
 list(LENGTH ICU_LIBRARIES ICU_LIB_LEN)
@@ -61,5 +72,6 @@ foreach(ICU_IDX RANGE ${ICU_LIB_LEN})
   list(GET ICU_BASE_NAMES ${ICU_IDX} ICU_BASE_NAME)
   ADD_LIBRARY("icu${ICU_BASE_NAME}" STATIC IMPORTED GLOBAL)
   SET_PROPERTY(TARGET "icu${ICU_BASE_NAME}" PROPERTY IMPORTED_LOCATION ${ICU_LIB})
+  ADD_DEPENDENCIES("icu${ICU_BASE_NAME}" extern_icu)
   list(APPEND ICU_INTERFACE_LINK_LIBRARIES "icu${ICU_BASE_NAME}")
 endforeach()

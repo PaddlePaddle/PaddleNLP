@@ -45,7 +45,7 @@ struct StringSplit;
 namespace core {
 
 using MatchSet = std::pair<std::shared_ptr<re2::RE2>, Vocab>;
-using MatchResult = std::tuple<uint, bool /* UNK Flag */, core::Offset>;
+using MatchResult = std::tuple<uint32_t, bool /* UNK Flag */, core::Offset>;
 
 bool StartWithWord(const std::string& sequence);
 bool EndWithWord(const std::string& sequence);
@@ -86,7 +86,7 @@ private:
 
 struct AddedTokenWithId {
   AddedToken added_token_;
-  uint id_;
+  uint32_t id_;
   friend void to_json(nlohmann::json& j, const AddedTokenWithId& added_token);
   friend void from_json(const nlohmann::json& j, AddedTokenWithId& added_token);
 };
@@ -99,8 +99,10 @@ public:
   core::Vocab GetVocab() const;
   bool TokenToId(const std::string& token,
                  const models::Model& model,
-                 uint* id) const;
-  bool IdToToken(uint id, const models::Model& model, std::string* token) const;
+                 uint32_t* id) const;
+  bool IdToToken(uint32_t id,
+                 const models::Model& model,
+                 std::string* token) const;
   bool IsSpecialToken(const std::string& token) const;
   size_t AddSpecialTokens(const std::vector<AddedToken>& tokens,
                           const models::Model& model,
@@ -121,12 +123,12 @@ public:
       const normalizers::Normalizer* normalizers,
       const std::string& sequence,
       pretokenizers::PreTokenizedString* pretokenized) const;
-  const std::unordered_map<uint, AddedToken>& GetAddedTokenVocabReversed()
+  const std::unordered_map<uint32_t, AddedToken>& GetAddedTokenVocabReversed()
       const;
 
 private:
   core::Vocab vocab_;
-  std::unordered_map<uint, AddedToken> vocab_reversed_;
+  std::unordered_map<uint32_t, AddedToken> vocab_reversed_;
   std::vector<AddedToken> added_tokens_;
   std::vector<AddedToken> special_tokens_;
   std::unordered_set<std::string> special_tokens_set_;

@@ -38,8 +38,9 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace utils {
 
-inline void GetVocabFromFiles(const std::string& files,
-                              std::unordered_map<std::string, uint>* vocab) {
+inline void GetVocabFromFiles(
+    const std::string& files,
+    std::unordered_map<std::string, uint32_t>* vocab) {
   const static std::string WHITESPACE = " \n\r\t\f\v";
   std::ifstream fin(files);
   if (!fin.good()) {
@@ -126,7 +127,9 @@ static constexpr uint32_t kMaxSupportedVocabSize =
 static constexpr uint32_t kMaskToEncodeVocabTokenId =
     ((1 << kBitToIndicateSuffixToken) - 1) ^ kMaskToEncodeVocabTokenLength;
 
-inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
+inline int EncodeToken(uint32_t token_id,
+                       uint32_t token_length,
+                       bool is_suffix_token) {
   int encoded_value = (is_suffix_token << kBitToIndicateSuffixToken) |
                       (token_id << kBitsToEncodeVocabTokenLength) |
                       (token_length - 1);

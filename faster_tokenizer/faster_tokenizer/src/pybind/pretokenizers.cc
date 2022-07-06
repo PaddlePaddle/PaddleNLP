@@ -88,8 +88,8 @@ void BindPreTokenizers(pybind11::module* m) {
            &pretokenizers::PreTokenizedString::GetOriginStr)
       .def("to_encoding",
            [](const pretokenizers::PreTokenizedString& self,
-              const std::vector<uint>& word_idx,
-              uint type_id,
+              const std::vector<uint32_t>& word_idx,
+              uint32_t type_id,
               core::OffsetType offset_type) {
              core::Encoding encoding;
              self.TransformToEncoding(

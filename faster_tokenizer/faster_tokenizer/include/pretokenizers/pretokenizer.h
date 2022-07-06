@@ -65,13 +65,13 @@ public:
   // For wordpiece, bpe ......
   void Tokenize(std::function<std::vector<core::Token>(
                     normalizers::NormalizedString*)> tokenize_fn);
-  bool TransformToEncoding(const std::vector<uint>& word_idx,
-                           uint type_id,
+  bool TransformToEncoding(const std::vector<uint32_t>& word_idx,
+                           uint32_t type_id,
                            core::OffsetType offset_type,
                            core::Encoding* encodings) const;
   template <typename Convertor>
-  bool TransformToEncodingUseConvertor(const std::vector<uint>& word_idx,
-                                       uint type_id,
+  bool TransformToEncodingUseConvertor(const std::vector<uint32_t>& word_idx,
+                                       uint32_t type_id,
                                        core::Encoding* encodings) const;
   size_t GetSplitsSize() const;
   StringSplit GetSplit(int idx) const;

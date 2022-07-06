@@ -110,9 +110,9 @@ void Unigram::Init(const core::VocabList& vocab,
   }
 }
 
-float Unigram::GetVocabScore(uint id) const { return vocab_.at(id).second; }
+float Unigram::GetVocabScore(uint32_t id) const { return vocab_.at(id).second; }
 
-bool Unigram::TokenToId(const std::string& token, uint* id) const {
+bool Unigram::TokenToId(const std::string& token, uint32_t* id) const {
   if (token_to_ids_.find(token) == token_to_ids_.end()) {
     return false;
   }
@@ -120,7 +120,7 @@ bool Unigram::TokenToId(const std::string& token, uint* id) const {
   return true;
 }
 
-bool Unigram::IdToToken(uint id, std::string* token) const {
+bool Unigram::IdToToken(uint32_t id, std::string* token) const {
   if (id >= vocab_.size()) {
     return false;
   }
@@ -139,7 +139,7 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
   std::vector<core::Token> tokens;
   tokens.reserve(encode_result.size());
   for (auto&& str : encode_result) {
-    uint id = 0;
+    uint32_t id = 0;
     if (token_to_ids_.find(str) != token_to_ids_.end()) {
       id = token_to_ids_.at(str);
     } else {
