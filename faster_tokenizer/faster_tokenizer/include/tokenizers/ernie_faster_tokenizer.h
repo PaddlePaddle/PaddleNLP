@@ -18,7 +18,8 @@ limitations under the License. */
 #include "core/encoding.h"
 #include "core/tokenizer.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tokenizers_impl {
 
 struct ErnieFasterTokenizer : public core::Tokenizer {
@@ -63,5 +64,6 @@ private:
             uint max_sequence_len = 0);
 };
 
-}  // tokenizers_impl
-}  // tokenizers
+}  // namespace faster_tokenizer_impl
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
