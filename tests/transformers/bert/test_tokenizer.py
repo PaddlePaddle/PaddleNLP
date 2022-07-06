@@ -25,6 +25,7 @@ from paddlenlp.transformers.bert.tokenizer import (
     _is_whitespace,
 )
 
+from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
@@ -87,6 +88,13 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                              ["hello", "!", "how", "are", "you", "?"])
         self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["hello"])
 
+    def test_basic_tokenizer_lower_strip_accents_false(self):
+        tokenizer = BasicTokenizer(do_lower_case=True, strip_accents=False)
+
+        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
+                             ["hällo", "!", "how", "are", "you", "?"])
+        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["h\u00E9llo"])
+
     def test_basic_tokenizer_lower_strip_accents_true(self):
         tokenizer = BasicTokenizer(do_lower_case=True)
 
@@ -107,11 +115,24 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.tokenize(" \tHeLLo!how  \n Are yoU?  "),
                              ["HeLLo", "!", "how", "Are", "yoU", "?"])
 
+    def test_basic_tokenizer_no_lower_strip_accents_false(self):
+        tokenizer = BasicTokenizer(do_lower_case=False, strip_accents=False)
+
+        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
+                             ["HäLLo", "!", "how", "Are", "yoU", "?"])
+
     def test_basic_tokenizer_no_lower_strip_accents_true(self):
         tokenizer = BasicTokenizer(do_lower_case=False)
 
         self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
                              ["HaLLo", "!", "how", "Are", "yoU", "?"])
+
+    def test_basic_tokenizer_respects_never_split_tokens(self):
+        tokenizer = BasicTokenizer(do_lower_case=False, never_split=["[UNK]"])
+
+        self.assertListEqual(
+            tokenizer.tokenize(" \tHeLLo!how  \n Are yoU? [UNK]"),
+            ["HeLLo", "!", "how", "Are", "yoU", "?", "[UNK]"])
 
     def test_wordpiece_tokenizer(self):
         vocab_tokens = [
@@ -167,6 +188,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
             [["[UNK]"], [], ["[UNK]"]])
 
+    @slow
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("bert-base-uncased")
 
