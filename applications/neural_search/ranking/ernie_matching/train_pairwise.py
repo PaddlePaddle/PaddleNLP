@@ -120,7 +120,6 @@ def do_train():
 
     train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
-    print(train_ds[0])
 
     pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
     tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
