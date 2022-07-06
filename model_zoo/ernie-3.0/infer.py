@@ -121,6 +121,11 @@ def parse_args():
         help=
         "Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
     )
+    parser.add_argument(
+        "--enable_bf16",
+        action='store_true',
+        help="Whether to use the bfloat16 datatype",
+    )
     parser.add_argument("--use_onnxruntime",
                         type=distutils.util.strtobool,
                         default=False,
@@ -246,6 +251,8 @@ class Predictor(object):
             config.disable_gpu()
             config.switch_ir_optim(True)
             config.enable_mkldnn()
+            if args.enable_bf16:
+                config.enable_mkldnn_bfloat16()
             if args.enable_quantize:
                 config.enable_mkldnn_int8()
             if args.debug:
