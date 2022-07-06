@@ -17,7 +17,8 @@ limitations under the License. */
 #include "decoders/decoder.h"
 #include "nlohmann/json.hpp"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace decoders {
 
 struct WordPiece : public Decoder {
@@ -35,5 +36,6 @@ private:
   friend void from_json(const nlohmann::json& j, WordPiece& decoder);
 };
 
-}  // decoders
-}  // tokenizers
+}  // namespace decoders
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

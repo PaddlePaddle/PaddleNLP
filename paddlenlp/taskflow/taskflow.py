@@ -226,6 +226,26 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base"
             },
+            "uie-medium": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-medium"
+            },
+            "uie-mini": {
+                "task_class": UIETask,
+                "hidden_size": 384,
+                "task_flag": "information_extraction-uie-mini"
+            },
+            "uie-micro": {
+                "task_class": UIETask,
+                "hidden_size": 384,
+                "task_flag": "information_extraction-uie-micro"
+            },
+            "uie-nano": {
+                "task_class": UIETask,
+                "hidden_size": 312,
+                "task_flag": "information_extraction-uie-nano"
+            },
             "uie-tiny": {
                 "task_class": UIETask,
                 "hidden_size": 768,
@@ -242,6 +262,11 @@ TASKS = {
         }
     }
 }
+
+support_schema_list = [
+    "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
+    "uie-medical-base", "wordtag"
+]
 
 
 class Taskflow(object):
@@ -276,7 +301,7 @@ class Taskflow(object):
 
         if self.model is not None:
             assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name:{} is not in task:[{}]".format(tag, model, task)
+            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
@@ -347,7 +372,5 @@ class Taskflow(object):
                 print("[Bot]:%s" % robot)
 
     def set_schema(self, schema):
-        assert self.task_instance.model in [
-            "uie-base", "uie-tiny", "uie-medical-base", "wordtag"
-        ], 'This method can only used for the task with uie model.'
+        assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)

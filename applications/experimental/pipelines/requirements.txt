@@ -12,3 +12,4 @@ langdetect
 python-docx
 nltk
 pdfplumber
+faiss-cpu>=1.7.2
