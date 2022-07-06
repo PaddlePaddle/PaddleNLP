@@ -20,6 +20,8 @@
 #include <map>
 
 #include "glog/logging.h"
+#include "unicode/uchar.h"
+
 #include "models/faster_wordpiece.h"
 #include "models/wordpiece.h"
 #include "utils/path.h"
