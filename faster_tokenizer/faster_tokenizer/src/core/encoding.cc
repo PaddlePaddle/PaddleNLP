@@ -19,7 +19,8 @@ limitations under the License. */
 #include <sstream>
 #include "glog/logging.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace core {
 
 Encoding::Encoding(const std::vector<uint>& ids,
@@ -617,7 +618,8 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   } else {
     pad_length = method.pad_len_;
   }
-  if (method.pad_to_multiple_of_ > 0 && pad_length % method.pad_to_multiple_of_) {
+  if (method.pad_to_multiple_of_ > 0 &&
+      pad_length % method.pad_to_multiple_of_) {
     pad_length += pad_length - pad_length % method.pad_to_multiple_of_;
   }
   for (auto& encoding : *encodings) {
@@ -629,5 +631,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   }
 }
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

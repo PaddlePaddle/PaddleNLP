@@ -34,10 +34,12 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 void ThrowExceptionToPython(std::exception_ptr p);
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

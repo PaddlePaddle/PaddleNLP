@@ -22,7 +22,8 @@ limitations under the License. */
 #include "core/encoding.h"
 #include "normalizers/normalizer.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 struct StringSplit {
@@ -99,5 +100,6 @@ struct BytesToCharOffsetConverter : public OffsetConverter {
   virtual bool convert(const core::Offset&, core::Offset*) const;
 };
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -22,9 +22,9 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from data import create_dataloader, read_text_pair
 from data import convert_pairwise_example as convert_example
@@ -75,10 +75,8 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,

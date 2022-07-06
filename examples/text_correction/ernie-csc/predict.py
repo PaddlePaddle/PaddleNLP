@@ -19,7 +19,6 @@ import numpy as np
 from functools import partial
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.transformers import ErnieTokenizer

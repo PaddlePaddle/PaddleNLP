@@ -16,11 +16,12 @@ limitations under the License. */
 
 #include <string>
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 
 namespace core {
 class Encoding;
-}  // core
+}  // namespace core
 
 namespace postprocessors {
 
@@ -34,5 +35,6 @@ struct PostProcessor {
                              core::Encoding* pair_encoding,
                              core::Encoding* result_encoding);
 };
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

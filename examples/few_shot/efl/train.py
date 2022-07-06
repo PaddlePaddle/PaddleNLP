@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -134,9 +134,9 @@ def do_train():
                                                              "test_public",
                                                              "test"))
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=2)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=2)
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     processor = processor_dict[args.task_name](args.negative_num)
     train_ds = processor.get_train_datasets(train_ds,
@@ -210,7 +210,7 @@ def do_train():
         apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
-    rdrop_loss = ppnlp.losses.RDropLoss()
+    rdrop_loss = paddlenlp.losses.RDropLoss()
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):

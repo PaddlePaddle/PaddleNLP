@@ -13,14 +13,29 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <string>
 #include <unordered_map>
+
 #include "unicode/uchar.h"
 
-namespace tokenizers {
+#if defined(_FREEBSD)
+#include <sys/endian.h>
+#endif
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined(_FREEBSD)
+#include <endian.h>
+#if BYTE_ORDER == __BIG_ENDIAN
+#define IS_BIG_ENDIAN
+#endif
+#endif
+
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
 inline void GetVocabFromFiles(const std::string& files,
@@ -173,5 +188,54 @@ inline bool IsSuffixWord(const std::string& word,
   return word.rfind(continuing_subword_prefix) == 0;
 }
 
+template <typename T>
+inline bool DecodePOD(const char* str, size_t str_len, T* result) {
+  if (sizeof(*result) != str_len) {
+    return false;
+  }
+  memcpy(result, str, sizeof(T));
+  return true;
+}
+
+
+template <typename T>
+inline std::string EncodePOD(const T& value) {
+  std::string s;
+  s.resize(sizeof(T));
+  memcpy(const_cast<char*>(s.data()), &value, sizeof(T));
+  return s;
+}
+
+inline size_t OneCharLen(const char* src) {
+  return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
+}
+
+#ifdef IS_BIG_ENDIAN
+inline uint32 Swap32(uint32 x) { return __builtin_bswap32(x); }
+#endif
+
+inline void GetSortedVocab(const std::vector<const char*>& keys,
+                           const std::vector<int>& values,
+                           std::vector<const char*>* sorted_keys,
+                           std::vector<int>* sorted_values) {
+  // Sort the vocab
+  std::vector<int> sorted_vocab_index(keys.size());
+  std::iota(sorted_vocab_index.begin(), sorted_vocab_index.end(), 0);
+  std::sort(sorted_vocab_index.begin(),
+            sorted_vocab_index.end(),
+            [&keys](const int a, const int b) {
+              return std::strcmp(keys[a], keys[b]) < 0;
+            });
+
+  sorted_keys->resize(keys.size());
+  sorted_values->resize(keys.size());
+  for (int i = 0; i < sorted_vocab_index.size(); ++i) {
+    auto idx = sorted_vocab_index[i];
+    (*sorted_keys)[i] = keys[idx];
+    (*sorted_values)[i] = values[idx];
+  }
+}
+
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
