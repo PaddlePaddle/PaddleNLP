@@ -19,7 +19,6 @@ import random
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 

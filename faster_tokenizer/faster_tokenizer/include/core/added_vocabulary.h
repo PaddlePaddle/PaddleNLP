@@ -23,23 +23,24 @@ limitations under the License. */
 
 namespace re2 {
 class RE2;
-}  // re2
+}  // namespace re2
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 
 namespace normalizers {
 class Normalizer;
 class NormalizedString;
-}  // normalizers
+}  // namespace normalizers
 
 namespace models {
 class Model;
-}  // models
+}  // namespace models
 
 namespace pretokenizers {
 class PreTokenizedString;
 struct StringSplit;
-}  // pretokenizers
+}  // namespace pretokenizers
 
 namespace core {
 
@@ -135,14 +136,16 @@ private:
   friend void from_json(const nlohmann::json& j, AddedVocabulary& added_vocab);
 };
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
 
 namespace std {
 template <>
-class hash<tokenizers::core::AddedToken> {
+class hash<paddlenlp::faster_tokenizer::core::AddedToken> {
 public:
-  size_t operator()(const tokenizers::core::AddedToken& added_token) const {
+  size_t operator()(
+      const paddlenlp::faster_tokenizer::core::AddedToken& added_token) const {
     return std::hash<std::string>()(added_token.GetContent());
   }
 };

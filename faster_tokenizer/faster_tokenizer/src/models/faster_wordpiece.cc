@@ -26,7 +26,8 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -373,7 +374,7 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
 }
 
 std::vector<core::Token> FasterWordPiece::Tokenize(
-    const std::string& sequence) const {
+    const std::string& sequence) {
   if (!with_pretokenization_) {
     return TokenizeWithoutPreTokenize(sequence);
   }
@@ -400,5 +401,6 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
   model.InitFailureAndTrie();
 }
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

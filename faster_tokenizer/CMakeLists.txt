@@ -20,7 +20,7 @@ else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl")
 IF(WIN32)
 # Need to add flags for windows
 ELSE(WIN32)
@@ -68,7 +68,7 @@ set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer_cpp)
 add_custom_target(build_cpp_package_dir ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include)
 
-    # copy headers
+# copy headers
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
     ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include
@@ -94,8 +94,6 @@ add_custom_target(remove_pybind_headers ALL
 # copy library
 add_custom_target(copy_shared_library ALL
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizer/src/libcore_tokenizers.so ${CPP_PACKAGE_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicuuc.so.70 ${CPP_PACKAGE_DIR}/lib
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/third_party/install/icu/lib/libicudata.so.70 ${CPP_PACKAGE_DIR}/lib
     DEPENDS build_cpp_package_dir core_tokenizers)
 
 add_custom_target(create_commit_id_file ALL
