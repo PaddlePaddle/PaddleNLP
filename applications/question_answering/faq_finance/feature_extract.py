@@ -214,7 +214,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]

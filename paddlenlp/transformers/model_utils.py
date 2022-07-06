@@ -120,7 +120,7 @@ class PretrainedModel(Layer, GenerationMixin):
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _post_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the pretrained model instance.
@@ -155,6 +155,12 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        raise NotImplementedError(
+            f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
+            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
+        )
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):

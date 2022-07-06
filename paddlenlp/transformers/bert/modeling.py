@@ -537,6 +537,12 @@ class BertModel(BertPretrainedModel):
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
                 token_type_ids=None,

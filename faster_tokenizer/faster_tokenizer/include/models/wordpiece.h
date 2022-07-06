@@ -17,7 +17,8 @@ limitations under the License. */
 #include "models/model.h"
 #include "nlohmann/json.hpp"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
 struct WordPiece : public Model {
@@ -32,14 +33,15 @@ struct WordPiece : public Model {
             size_t max_input_chars_per_word,
             std::string&& continuing_subword_prefix);
   virtual std::vector<core::Token> Tokenize(
-      const std::string& sequence) const override;
+      const std::string& sequence) override;
   virtual bool TokenToId(const std::string& token, uint* id) const override;
   virtual bool IdToToken(uint id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   // Return the saved voacb full path
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const override;
+  virtual std::vector<std::string> Save(
+      const std::string& folder,
+      const std::string& filename_prefix) const override;
   static core::Vocab GetVocabFromFile(const std::string& file);
   static WordPiece GetWordPieceFromFile(
       const std::string& file,
@@ -78,5 +80,6 @@ struct WordPieceFactory {
   void GetVocabFromFiles(const std::string& files);
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -99,10 +99,8 @@ def do_train():
                             is_test=False,
                             lazy=False)
 
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
-        "bert-base-uncased")
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-uncased')
+    pretrained_model = AutoModel.from_pretrained("bert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,

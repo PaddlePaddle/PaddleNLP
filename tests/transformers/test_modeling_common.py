@@ -1,3 +1,18 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The HuggingFace Team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import random
 import copy
 
@@ -108,5 +123,71 @@ class ModelTesterMixin:
                 max_diff = np.amax(np.abs(out_1 - out_2))
                 self.assertLessEqual(max_diff, 1e-5)
 
-    def test_base_model(self):
-        pass
+    def test_resize_tokens_embeddings(self):
+        (
+            original_config,
+            inputs_dict,
+        ) = self.model_tester.prepare_config_and_inputs_for_common()
+        if not self.test_resize_embeddings:
+            return
+
+        for model_class in self.all_model_classes:
+            config = copy.deepcopy(original_config)
+            if model_class == self.base_model_class:
+                model = model_class(**config)
+            else:
+                model = model_class(self.base_model_class(**config))
+
+            if self.model_tester.is_training is False:
+                model.eval()
+
+            model_vocab_size = config["vocab_size"]
+            # Retrieve the embeddings and clone theme
+            model_embed = model.resize_token_embeddings(model_vocab_size)
+            print(model_embed)
+            cloned_embeddings = model_embed.weight.clone()
+
+            # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
+            model_embed = model.resize_token_embeddings(model_vocab_size + 10)
+            self.assertEqual(model.base_model.config["vocab_size"],
+                             model_vocab_size + 10)
+            # Check that it actually resizes the embeddings matrix
+            self.assertEqual(model_embed.weight.shape[0],
+                             cloned_embeddings.shape[0] + 10)
+            # Check that the model can still do a forward pass successfully (every parameter should be resized)
+            model(**self._prepare_for_class(inputs_dict, model_class))
+
+            # Check that resizing the token embeddings with a smaller vocab size decreases the model's vocab size
+            model_embed = model.resize_token_embeddings(model_vocab_size - 15)
+            self.assertEqual(model.base_model.config["vocab_size"],
+                             model_vocab_size - 15)
+            # Check that it actually resizes the embeddings matrix
+            self.assertEqual(model_embed.weight.shape[0],
+                             cloned_embeddings.shape[0] - 15)
+
+            # Check that the model can still do a forward pass successfully (every parameter should be resized)
+            # Input ids should be clamped to the maximum size of the vocabulary
+            inputs_dict["input_ids"] = paddle.clip(inputs_dict["input_ids"],
+                                                   max=model_vocab_size - 15 -
+                                                   1)
+
+            # make sure that decoder_input_ids are resized as well
+            if "decoder_input_ids" in inputs_dict:
+                inputs_dict["decoder_input_ids"] = paddle.clip(
+                    inputs_dict["decoder_input_ids"],
+                    max=model_vocab_size - 15 - 1)
+            model(**self._prepare_for_class(inputs_dict, model_class))
+
+            # Check that adding and removing tokens has not modified the first part of the embedding matrix.
+            models_equal = True
+            for p1, p2 in zip(cloned_embeddings, model_embed.weight):
+                if not paddle.equal_all(p1, p2).item():
+                    models_equal = False
+                    break
+
+            self.assertTrue(models_equal)
+
+    def test_model_name_list(self):
+        for model_class in self.all_model_classes:
+            model_name_list = model_class.model_name_list
+            self.assertTrue(len(model_name_list) != 0)

@@ -21,8 +21,8 @@ from pathlib import Path
 from tqdm.auto import tqdm
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer
 
 from pipelines.schema import Document
 from pipelines.document_stores import BaseDocumentStore
@@ -133,12 +133,12 @@ class DensePassageRetriever(BaseRetriever):
                 "This can be set when initializing the DocumentStore")
 
         # Init & Load Encoders
-        #self.query_encoder = ppnlp.transformers.ErnieDualEncoder.from_pretrained(query_embedding_model)
-        self.ernie_dual_encoder = ppnlp.transformers.ErnieDualEncoder(
-            query_embedding_model, passage_embedding_model)
-        self.query_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        #self.query_encoder = ErnieDualEncoder.from_pretrained(query_embedding_model)
+        self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
+                                                   passage_embedding_model)
+        self.query_tokenizer = AutoTokenizer.from_pretrained(
             query_embedding_model)
-        self.passage_tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
+        self.passage_tokenizer = AutoTokenizer.from_pretrained(
             passage_embedding_model)
 
         self.processor = TextSimilarityProcessor(
