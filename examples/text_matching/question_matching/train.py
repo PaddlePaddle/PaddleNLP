@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -116,10 +116,8 @@ def do_train():
                           is_test=False,
                           lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = Autookenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
