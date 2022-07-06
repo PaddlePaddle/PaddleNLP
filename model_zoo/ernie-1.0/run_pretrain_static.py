@@ -211,6 +211,7 @@ def dist_optimizer(args, topo):
     build_strategy.enable_addto = args.enable_addto
 
     dist_strategy = fleet.DistributedStrategy()
+    dist_strategy.without_graph_optimization = True
     dist_strategy.execution_strategy = exec_strategy
     dist_strategy.build_strategy = build_strategy
     dist_strategy.nccl_comm_num = 3
