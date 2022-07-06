@@ -14,19 +14,21 @@
 
 import argparse
 import os
+import sys
 
-import numpy as np
-import pandas as pd
-import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
 from scipy.special import expit
+import numpy as np
+import pandas as pd
+
+import paddle
 from paddle import inference
+import paddle.nn.functional as F
+
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
-import paddle.nn.functional as F
-import sys
+from paddlenlp.transformers import AutoTokenizer, AutoModel
 
 sys.path.append('.')
 
@@ -222,10 +224,8 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    # test_ds = load_dataset("lcqmc", splits=["test"])
     input_file = 'sort/test_pairwise.csv'
 
     test_ds = load_dataset(read_text_pair, data_path=input_file, lazy=False)
