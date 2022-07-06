@@ -375,14 +375,17 @@ class TransformerDecoderLayer(nn.Layer):
                  weight_attr=None,
                  bias_attr=None,
                  num_partitions=1,
-                 fuse=False,
-                 mp_ring_id=-1,
-                 mp_nranks=1):
+                 fuse=False):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
 
         super(TransformerDecoderLayer, self).__init__()
+
+        hcg = fleet.get_hybrid_communicate_group()
+        mp_nranks = hcg.get_model_parallel_rank()
+        mp_group = hcg.get_model_parallel_group()
+        ring_id = mp_group.id if mp_nranks > 1 else -1
 
         self.fuse = fuse
         attn_dropout = dropout if attn_dropout is None else attn_dropout
@@ -393,7 +396,6 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         if self.fuse:
-            ring_id = mp_ring_id if mp_nranks > 1 else -1
             self.self_attn = incubate.nn.FusedMultiHeadAttention(
                 d_model,
                 nhead,
@@ -768,9 +770,7 @@ class GPTModel(GPTPretrainedModel):
                  eol_token_id=3,
                  num_partitions=1,
                  use_recompute=False,
-                 mp_ring_id=-1,
-                 fuse=False,
-                 mp_nranks=None):
+                 fuse=False):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -779,7 +779,6 @@ class GPTModel(GPTPretrainedModel):
         self.vocab_size = vocab_size
 
         self.fuse = fuse
-        self.mp_ring_id = mp_ring_id
 
         self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
                                         hidden_dropout_prob,
@@ -802,9 +801,7 @@ class GPTModel(GPTPretrainedModel):
                             mean=0.0, std=self.initializer_range)),
                     bias_attr=None,
                     num_partitions=num_partitions,
-                    fuse=self.fuse,
-                    mp_ring_id=self.mp_ring_id,
-                    mp_nranks=mp_nranks))
+                    fuse=self.fuse))
 
         self.decoder = TransformerDecoder(decoder_layers,
                                           num_hidden_layers,
