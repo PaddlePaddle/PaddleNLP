@@ -20,11 +20,11 @@ else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl")
 IF(WIN32)
 # Need to add flags for windows
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
 ELSE(WIN32)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lpthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
 ENDIF(WIN32)
 
 # For OpenMP

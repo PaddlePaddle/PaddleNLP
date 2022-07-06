@@ -46,7 +46,9 @@ set(PLATFORM_INSTALL make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install)
 else()
 set(PLATFORM_CONFIGURE "")
 set(PLATFORM_BUILD msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64)
-set(PLATFORM_INSTALL xcopy ..\\extern_icu\\icu4c\\include ..\\extern_icu\\icu4c\\lib64 ${ICU_INSTALL_DIR})
+set(PLATFORM_INSTALL ${CMAKE_COMMAND} -E copy_directory
+        ../extern_icu/icu4c/include ${ICU_INSTALL_DIR}
+        && ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/lib64 ${ICU_INSTALL_DIR})
 endif()
 
 ExternalProject_Add(
