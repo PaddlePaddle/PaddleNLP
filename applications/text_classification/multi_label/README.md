@@ -1,4 +1,4 @@
-# 多标签分类任务
+# 文本多标签分类任务指南
 
 **目录**
    * [多标签任务介绍](#多标签任务介绍)
@@ -130,12 +130,13 @@ checkpoint/
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/cail2018_small_charges.tar.gz
 tar -zxvf cail2018_small_charges.tar.gz
+mv cail2018_small_charges data
 ```
 
 本地数据集目录结构如下：
 
 ```text
-cail2018_small_charges/
+data/
 ├── train.tsv # 训练数据集文件
 ├── dev.tsv # 开发数据集文件
 ├── test.tsv # 可选，测试训练集文件
@@ -191,13 +192,13 @@ data.tsv(可选，待预测数据文件)
 在训练过程中通过指定数据集路径参数 `dataset_dir` 进行：
 单卡训练
 ```shell
-python train.py --early_stop --dataset_dir 'cail2018_small_charges'
+python train.py --early_stop --dataset_dir data
 ```
 
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir 'cail2018_small_charges'
+python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir data
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -212,9 +213,9 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 ```shell
 python predict.py --params_path ./checkpoint/
 ```
-也可以选择使用本地数据文件cail2018_small_charges/data.tsv进行预测：
+也可以选择使用本地数据文件data/data.tsv进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/ --dataset_dir cail2018_small_charges
+python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
 
 可支持配置的参数：
@@ -253,9 +254,9 @@ export/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 ```
-也可以选择使用本地数据文件cail2018_small_charges/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.tsv进行部署：
 ```shell
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir cail2018_small_charges
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir data
 ```
 
 此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
@@ -312,7 +313,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/
 ```
 也可以选择使用本地数据文件启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir cail2018_small_charges
+python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir data
 ```
 
 可支持配置的参数：
@@ -359,9 +360,9 @@ prune/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 ```
-也可以选择使用本地数据文件 cail2018_small_charges/data.tsv 进行部署：
+也可以选择使用本地数据文件 data/data.tsv 进行部署：
 ```shell
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir cail2018_small_charges
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
 5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
