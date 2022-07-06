@@ -22,10 +22,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, AutoModel, AutoTokenizer
 
 from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
@@ -119,22 +118,12 @@ def do_train():
 
     set_seed(args.seed)
 
-    # train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
-
     train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
     print(train_ds[0])
 
-    # train_ds = gen_pair(train_ds)
-
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func_train = partial(convert_example,
                                tokenizer=tokenizer,

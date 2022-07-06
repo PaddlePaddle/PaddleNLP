@@ -4,7 +4,7 @@ bs_item=2560
 fp_item=amp_fp16
 run_mode=DP
 device_num=N1C1
-max_epochs=1000
+max_epochs=3000
 num_workers=0
 
 # get data

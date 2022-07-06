@@ -21,29 +21,30 @@ limitations under the License. */
 #include "core/base.h"
 #include "nlohmann/json.hpp"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 
 namespace normalizers {
 
 class Normalizer;
 class NormalizedString;
 
-}  // normalizers
+}  // namespace normalizers
 
 namespace pretokenizers {
 
 class PreTokenizer;
 class PreTokenizedString;
 
-}  // pretokenizers
+}  // namespace pretokenizers
 
 namespace models {
 class Model;
-}  // models
+}  // namespace models
 
 namespace postprocessors {
 class PostProcessor;
-}  // postprocessors
+}  // namespace postprocessors
 
 namespace decoders {
 class Decoder;
@@ -218,5 +219,6 @@ private:
   friend void from_json(const nlohmann::json& j, Tokenizer& tokenizer);
 };
 
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

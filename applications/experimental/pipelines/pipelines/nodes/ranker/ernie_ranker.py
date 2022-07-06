@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 import paddle
-from paddlenlp.transformers import ErnieCrossEncoder, ErnieTokenizer
+from paddlenlp.transformers import ErnieCrossEncoder, AutoTokenizer
 
 from pipelines.schema import Document
 from pipelines.nodes.ranker import BaseRanker
@@ -64,7 +64,7 @@ class ErnieRanker(BaseRanker):
                                                      multi_gpu=True)
 
         self.transformer_model = ErnieCrossEncoder(model_name_or_path)
-        self.tokenizer = ErnieTokenizer.from_pretrained(model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.transformer_model.eval()
 
         if len(self.devices) > 1:

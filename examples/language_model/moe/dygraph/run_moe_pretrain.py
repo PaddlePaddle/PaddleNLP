@@ -335,6 +335,8 @@ def do_train(args):
 
     fleet.init(is_collective=True, strategy=strategy)
 
+    nranks = paddle.distributed.get_world_size()
+
     # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
     global_rank = hcg.get_global_rank()
@@ -616,9 +618,10 @@ def do_train(args):
                     else:
                         bal_loss = -1
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, bal_loss, speed,
-                           speed * default_global_tokens_num, learning_rate))
+                           speed * default_global_tokens_num, speed *
+                           default_global_tokens_num / nranks, learning_rate))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate", learning_rate,
                                           global_step)
