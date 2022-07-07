@@ -175,7 +175,7 @@ pip install -r requirements.txt
 
 第一步：无监督训练 Domain-adaptive Pretraining
 
-训练用时 16hour55min，可参考：[ERNIE 3.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0)
+训练用时 16hour55min，可参考：[ERNIE 1.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0)
 
 第二步：无监督训练 SimCSE
 
