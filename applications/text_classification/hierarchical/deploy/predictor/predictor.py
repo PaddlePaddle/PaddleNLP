@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 import os
-import numpy as np
-import paddle
 import json
 import time
 
+import six
+import numpy as np
+import paddle
 import paddle2onnx
 import onnxruntime as ort
 from sklearn.metrics import f1_score
@@ -205,7 +205,7 @@ class Predictor(object):
             hierarchical_labels = {d: [] for d in range(self.depth)}
 
             for r in result[idx]:
-                for i, l in enumerate(self.label_list[r].split('--')):
+                for i, l in enumerate(self.label_list[r].split('##')):
                     if l not in hierarchical_labels[i]:
                         hierarchical_labels[i].append(l)
             for d in range(self.depth):
@@ -268,7 +268,7 @@ class Predictor(object):
                     if l == '':
                         l = layers[i][off]
                     else:
-                        l += '--{}'.format(layers[i][off])
+                        l += '##{}'.format(layers[i][off])
                     if l in label_list and label_list[l] not in labels:
                         labels.append(label_list[l])
                 for i in range(len(shape) - 1, -1, -1):

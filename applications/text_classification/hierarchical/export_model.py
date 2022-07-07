@@ -21,33 +21,18 @@ from paddlenlp.transformers import AutoModelForSequenceClassification
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path",
                     type=str,
-                    default='./checkpoint/model_state.pdparams',
+                    default='./checkpoint/',
                     help="The path to model parameters to be loaded.")
-parser.add_argument("--num_classes",
-                    required=True,
-                    type=int,
-                    help="Number of classes for "
-                    "multi label classfication tasks.")
 parser.add_argument("--output_path",
                     type=str,
                     default='./export',
                     help="The path of model parameter in "
                     "static graph to be saved.")
-parser.add_argument('--model_name',
-                    default="ernie-2.0-base-en",
-                    help="Select model to train, defaults "
-                    "to ernie-2.0-base-en.")
 args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=args.num_classes)
-
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
+    model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
     model.eval()
 
     # Convert to static graph with specific input description
