@@ -15,5 +15,6 @@ limitations under the License. */
 #pragma once
 
 #include "pretokenizers/bert.h"
+#include "pretokenizers/metaspace.h"
 #include "pretokenizers/pretokenizer.h"
 #include "pretokenizers/whitespace.h"
