@@ -861,7 +861,8 @@ class TextSimilarityProcessor(Processor):
             if "query" in basket.raw:
                 try:
                     query = self._normalize_question(basket.raw["query"])
-                    query_inputs = self.query_tokenizer(query)
+                    query_inputs = self.query_tokenizer(
+                        text=query, max_seq_len=self.max_seq_len_query)
                     tokenized_query = self.query_tokenizer.convert_ids_to_tokens(
                         query_inputs["input_ids"])
 
@@ -940,7 +941,8 @@ class TextSimilarityProcessor(Processor):
                         len(all_ctx))
 
                     # [text] -> tokenize -> id
-                    ctx_inputs = self.passage_tokenizer(all_ctx[0])
+                    ctx_inputs = self.passage_tokenizer(
+                        text=all_ctx[0], max_seq_len=self.max_seq_len_passage)
 
                     # get tokens in string format
                     tokenized_passage = [
