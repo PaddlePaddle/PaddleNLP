@@ -67,7 +67,7 @@ ExternalProject_Add(
         CONFIGURE_COMMAND msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64
         BUILD_COMMAND ""
         INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/include ${ICU_INSTALL_DIR}/include
-                     && ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/lib64 ${ICU_INSTALL_DIR}
+                     && ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/lib64 ${ICU_INSTALL_DIR}/lib64
         BUILD_BYPRODUCTS ${ICU_LIBRARIES}
 )
 endif()
@@ -84,3 +84,7 @@ foreach(ICU_IDX RANGE ${ICU_LIB_LEN})
   ADD_DEPENDENCIES("icu${ICU_BASE_NAME}" extern_icu)
   list(APPEND ICU_INTERFACE_LINK_LIBRARIES "icu${ICU_BASE_NAME}")
 endforeach()
+
+if(WIN32)
+ADD_LIBRARY("icudata" ALIAS "icudt")
+endif()

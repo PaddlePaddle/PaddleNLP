@@ -22,7 +22,25 @@ endif()
 
 IF(WIN32)
 # Need to add flags for windows
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
+foreach(
+    flag_var
+    CMAKE_CXX_FLAGS
+    CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_CXX_FLAGS_MINSIZEREL
+    CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    CMAKE_C_FLAGS
+    CMAKE_C_FLAGS_DEBUG
+    CMAKE_C_FLAGS_RELEASE
+    CMAKE_C_FLAGS_MINSIZEREL
+    CMAKE_C_FLAGS_RELWITHDEBINFO)
+    if(${flag_var} MATCHES "/MD")
+      string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+    else()
+        set(${flag_var} "${CMAKE_CXX_FLAGS} /MT")
+    endif()
+
+  endforeach()
 ELSE(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
 ENDIF(WIN32)

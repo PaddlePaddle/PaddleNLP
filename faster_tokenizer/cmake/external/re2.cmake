@@ -20,7 +20,7 @@ SET(RE2_REPOSITORY    ${GIT_URL}/google/re2.git)
 SET(RE2_TAG           2022-04-01)
 
 IF(WIN32)
-  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/re2_static.lib")
+  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib/re2.lib")
   add_definitions(-DRE2_STATIC)
 ELSE(WIN32)
   SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/libre2.a")
