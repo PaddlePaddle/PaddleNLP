@@ -19,7 +19,7 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 
 from model import SimCSE
@@ -35,10 +35,9 @@ if __name__ == "__main__":
     # If you want to use ernie1.0 model, plesace uncomment the following code
     output_emb_size = 256
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):

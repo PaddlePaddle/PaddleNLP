@@ -19,7 +19,8 @@
 #include "glog/logging.h"
 #include "postprocessors/template.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace postprocessors {
 
 void ParseIdFromString(const std::string& template_id_string,
@@ -446,5 +447,6 @@ void from_json(const nlohmann::json& j,
       template_postprocessor.DefaultAdded(false);
 }
 
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

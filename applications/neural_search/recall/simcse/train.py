@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -56,7 +56,7 @@ parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween p
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
 parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether use fc layer after cls embedding or not for when infer.")
-parser.add_argument("--model_name_or_path",default='ernie-1.0',type=str,help='pretrained model')
+parser.add_argument("--model_name_or_path",default='ernie-3.0-medium-zh',type=str,help='pretrained model')
 
 args = parser.parse_args()
 
@@ -79,12 +79,12 @@ def do_train():
         read_simcse_text, data_path=args.train_set_file, lazy=False)
 
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+    pretrained_model = AutoModel.from_pretrained(
        args.model_name_or_path,
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
     print("loading model from {}".format(args.model_name_or_path))
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(
         convert_example,

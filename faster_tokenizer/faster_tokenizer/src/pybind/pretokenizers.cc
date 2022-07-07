@@ -19,7 +19,8 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyPreTokenizer : public pretokenizers::PreTokenizer {
@@ -49,6 +50,16 @@ public:
       pretokenizers::PreTokenizedString* pretokenized) const override {
     PYBIND11_OVERLOAD_NAME(
         void, BertPreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
+class PyMetaSpacePreTokenizer : public pretokenizers::MetaSpacePreTokenizer {
+public:
+  using MetaSpacePreTokenizer::MetaSpacePreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, MetaSpacePreTokenizer, "__call__", operator(), pretokenized);
   }
 };
 
@@ -97,7 +108,14 @@ void BindPreTokenizers(pybind11::module* m) {
       sub_module, "BertPreTokenizer")
       .def(py::init<>())
       .def("__call__", &pretokenizers::BertPreTokenizer::operator());
+  py::class_<pretokenizers::MetaSpacePreTokenizer, PyMetaSpacePreTokenizer>(
+      sub_module, "MetaSpacePreTokenizer")
+      .def(py::init<const std::string&, bool>(),
+           py::arg("replacement") = "_",
+           py::arg("add_prefix_space") = true)
+      .def("__call__", &pretokenizers::MetaSpacePreTokenizer::operator());
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

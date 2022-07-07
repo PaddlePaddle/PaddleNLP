@@ -123,7 +123,7 @@ class LayoutXLMEmbeddings(Layer):
                                             padding_idx=0)
         self.position_embeddings = nn.Embedding(
             config["max_position_embeddings"], config["hidden_size"])
-        # gry add for layoutxlm
+
         self.x_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.y_position_embeddings = nn.Embedding(
@@ -132,7 +132,7 @@ class LayoutXLMEmbeddings(Layer):
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.w_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
-        # end of gry add for layoutxlm
+
         self.token_type_embeddings = nn.Embedding(config["type_vocab_size"],
                                                   config["hidden_size"])
         self.LayerNorm = nn.LayerNorm(config["hidden_size"],
@@ -1275,8 +1275,11 @@ class REDecoder(nn.Layer):
             ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
-            positive_relations = set(
-                list(zip(relations[b]["head"], relations[b]["tail"])))
+            if "head" in relations[b]:
+                positive_relations = set(
+                    list(zip(relations[b]["head"], relations[b]["tail"])))
+            else:
+                positive_relations = set()
             negative_relations = all_possible_relations - positive_relations
             positive_relations = set(
                 [i for i in positive_relations if i in all_possible_relations])

@@ -20,7 +20,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Pad
 from paddlenlp.datasets import load_dataset
 

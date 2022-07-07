@@ -38,7 +38,7 @@ msgid "Details of the model"
 msgstr ""
 
 #: ../model_zoo/transformers/ERNIE/contents.rst:15
-msgid "``ernie-1.0-base-zh``"
+msgid "``ernie-3.0-medium-zh``"
 msgstr ""
 
 #: ../model_zoo/transformers/ERNIE/contents.rst:15

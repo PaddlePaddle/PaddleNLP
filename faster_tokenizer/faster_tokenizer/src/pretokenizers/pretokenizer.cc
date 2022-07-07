@@ -20,7 +20,8 @@ limitations under the License. */
 #include "pretokenizers/pretokenizer.h"
 #include "utils/utf8.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
 BytesToCharOffsetConverter::BytesToCharOffsetConverter(const std::string& seq)
@@ -55,7 +56,7 @@ bool BytesToCharOffsetConverter::convert(const core::Offset& offset,
 }
 
 PreTokenizedString::PreTokenizedString(const std::string& original)
-    : original_(original), splits_(1) {
+    : original_(original) {
   splits_.emplace_back(std::move(StringSplit(original_)));
 }
 
@@ -209,5 +210,6 @@ void PreTokenizedString::SetOriginalStr(const std::string& original) {
   splits_.emplace_back(original_);
 }
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
