@@ -96,6 +96,9 @@ def parse_args(MODEL_CLASSES):
     # Argument for bert
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
+    parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")
+    parser.add_argument("--max_ngrams", type=int, default=3, help="Short sequence prob.")
+
     # yapf: enable
 
     args = parser.parse_args()

@@ -35,19 +35,22 @@ from paddlenlp.transformers import ErnieTokenizer
 
 class ErnieDataset(paddle.io.Dataset):
 
-    def __init__(self,
-                 name,
-                 tokenizer,
-                 indexed_dataset,
-                 data_prefix,
-                 num_epochs,
-                 max_num_samples,
-                 masked_lm_prob,
-                 max_seq_length,
-                 short_seq_prob,
-                 seed,
-                 binary_head,
-                 share_folder=False):
+    def __init__(
+        self,
+        name,
+        tokenizer,
+        indexed_dataset,
+        data_prefix,
+        num_epochs,
+        max_num_samples,
+        masked_lm_prob,
+        max_seq_length,
+        short_seq_prob,
+        seed,
+        binary_head,
+        share_folder=False,
+        args=None,
+    ):
 
         # Params to store.
         self.name = name
@@ -56,6 +59,7 @@ class ErnieDataset(paddle.io.Dataset):
         self.max_seq_length = max_seq_length
         self.binary_head = binary_head
         self.share_folder = share_folder
+        self.args = args
 
         # Dataset.
         self.indexed_dataset = indexed_dataset
@@ -118,13 +122,24 @@ class ErnieDataset(paddle.io.Dataset):
             self.pad_id,
             self.masked_lm_prob,
             np_rng,
-            self.binary_head)
+            self.binary_head,
+            self.args)
 
 
-def build_training_sample(sample, target_seq_length, max_seq_length,
-                          vocab_id_list, vocab_id_to_token_dict,
-                          vocab_token_to_id_dict, cls_id, sep_id, mask_id,
-                          pad_id, masked_lm_prob, np_rng, binary_head):
+def build_training_sample(sample,
+                          target_seq_length,
+                          max_seq_length,
+                          vocab_id_list,
+                          vocab_id_to_token_dict,
+                          vocab_token_to_id_dict,
+                          cls_id,
+                          sep_id,
+                          mask_id,
+                          pad_id,
+                          masked_lm_prob,
+                          np_rng,
+                          binary_head,
+                          args=None):
     """Biuld training sample.
 
     Arguments:
@@ -186,6 +201,8 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
          to_chinese_char=True,
          inplace_random_mask=False,
+         favor_longer_ngram=False if args is None else args.favor_longer_ngram,
+         max_ngrams=3 if args is None else args.max_ngrams,
      )
 
     # Padding.

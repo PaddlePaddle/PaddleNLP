@@ -710,6 +710,8 @@ def do_train(args):
                              args,
                              task_name="test")
                 del train_data_loader
+                del valid_data_loader
+                del test_data_loader
                 return
 
 

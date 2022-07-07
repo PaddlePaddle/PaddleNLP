@@ -733,6 +733,7 @@ def _build_train_valid_test_datasets(data_prefix,
                 max_seq_length=max_seq_length,
                 seed=seed,
                 share_folder=args.share_folder,
+                args=args,
             )
             if dataset_type == DSET_TYPE_T5:
                 dataset = T5Dataset(indexed_dataset=indexed_dataset,

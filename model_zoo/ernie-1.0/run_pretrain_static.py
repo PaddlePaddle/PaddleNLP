@@ -206,12 +206,14 @@ def dist_optimizer(args, topo):
 
     build_strategy = paddle.static.BuildStrategy()
     build_strategy.enable_sequential_execution = True  # for profile
+    # build_strategy.reduce_strategy = paddle.static.BuildStrategy.ReduceStrategy._NoReduce
     build_strategy.fuse_broadcast_ops = True
+    build_strategy.fix_op_run_order = True
     build_strategy.enable_inplace = True
     build_strategy.enable_addto = args.enable_addto
 
     dist_strategy = fleet.DistributedStrategy()
-    dist_strategy.without_graph_optimization = True
+    # dist_strategy.without_graph_optimization = True
     dist_strategy.execution_strategy = exec_strategy
     dist_strategy.build_strategy = build_strategy
     dist_strategy.nccl_comm_num = 3
@@ -663,6 +665,9 @@ def do_train(args):
                             res[k] = v[0]
 
                     speed = args.logging_freq / (time.time() - tic_train)
+                    res["global_step"] = global_step
+                    res["steps_per_second"] = speed
+                    res["samples_per_second"] = speed * args.global_batch_size
 
                     loss_info = ", ".join([
                         "{}: {:.6f}".format(k, res[k])
@@ -670,8 +675,8 @@ def do_train(args):
                     ])
 
                     common_loginfo = "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, loss_info, speed,
-                        speed * args.global_batch_size, res["learning_rate"])
+                        global_step, loss_info, res["steps_per_second"],
+                        res["samples_per_second"], res["learning_rate"])
                     additional_loginfo = ", ".join([
                         "{}: {}".format(k, res[k])
                         for k in additional_vars.keys()
@@ -775,6 +780,8 @@ def do_train(args):
                              args.test_iters, log_writer, global_step, args,
                              topo.is_last, eval_fetch, "test")
                 del train_data_loader
+                del valid_data_loader
+                del test_data_loader
                 return
 
 
