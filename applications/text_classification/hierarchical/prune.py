@@ -49,7 +49,7 @@ class DataArguments:
         metadata={
             "help":
             "The dataset directory should include train.tsv,"
-            "dev.tsv and taxonomy.tsv files."
+            "dev.tsv and label.tsv files."
         })
 
     depth: int = field(default=2,
@@ -71,17 +71,10 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     params_dir: str = field(
-        default='./checkpoint/model_state.pdparams',
+        default='./checkpoint/',
         metadata={
             "help":
             "The output directory where the model checkpoints are written."
-        })
-
-    model_name_or_path: str = field(
-        default='ernie-2.0-base-en',
-        metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
 
 
@@ -106,10 +99,10 @@ def main():
     if data_args.dataset_dir is not None:
         train_dir = os.path.join(data_args.dataset_dir, "train.tsv")
         dev_dir = os.path.join(data_args.dataset_dir, "dev.tsv")
-        taxonomy_dir = os.path.join(data_args.dataset_dir, "taxonomy.tsv")
+        label_dir = os.path.join(data_args.dataset_dir, "label.tsv")
         train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
         label_list = {}
-        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+        with open(label_dir, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 label_list[line.strip()] = i
     else:
@@ -121,9 +114,8 @@ def main():
         }
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=len(label_list))
-    model.set_dict(paddle.load(model_args.params_dir))
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+        model_args.params_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.params_dir)
 
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
