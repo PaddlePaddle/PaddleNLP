@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import AutoTokenizer, AutoForTokenClassification
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 from model import ErnieCrfForTokenClassification
