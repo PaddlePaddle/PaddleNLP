@@ -78,6 +78,7 @@ MAPPING_NAMES = OrderedDict([
     ("Bert", "bert"),
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
+    ("OPT", 'opt')
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -193,8 +194,8 @@ class _BaseAutoModelClass:
                                 f"module '{import_class.__name__}' only supports the following classes: "
                                 + ", ".join(m for m in all_model_classes) + "\n"
                                 "Hint: you can use interface " +
-                                "or ".join(task + ".from_pretrained"
-                                           for task in all_tasks) +
+                                " or ".join(task + ".from_pretrained"
+                                            for task in all_tasks) +
                                 f" to load '{pretrained_model_name_or_path}'\n")
                         logger.info(
                             "We are using %s to load '%s'." %
