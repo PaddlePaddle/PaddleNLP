@@ -188,6 +188,6 @@ class ModelTesterMixin:
             self.assertTrue(models_equal)
 
     def test_model_name_list(self):
-        for model_class in self.all_model_classes:
-            model_name_list = model_class.model_name_list
-            self.assertTrue(len(model_name_list) != 0)
+        config = self.model_tester.get_config()
+        model = self.base_model_class(**config)
+        self.assertTrue(len(model.model_name_list) != 0)

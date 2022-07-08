@@ -2338,121 +2338,121 @@ class TokenizerTesterMixin:
                 self.assertEqual(text,
                                  tokenizer.convert_tokens_to_string(tokens))
 
-    @slow
-    def test_torch_encode_plus_sent_to_model(self):
-        import torch
+    # @slow
+    # def test_torch_encode_plus_sent_to_model(self):
+    #     import torch
+    #
+    #     from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
+    #
+    #     MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
+    #         MODEL_MAPPING, TOKENIZER_MAPPING)
+    #
+    #     tokenizers = self.get_tokenizers(do_lower_case=False)
+    #     for tokenizer in tokenizers:
+    #         with self.subTest(f"{tokenizer.__class__.__name__}"):
+    #
+    #             if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
+    #                 return
+    #
+    #             config_class, model_class = MODEL_TOKENIZER_MAPPING[
+    #                 tokenizer.__class__]
+    #             config = config_class()
+    #
+    #             if config.is_encoder_decoder or config.pad_token_id is None:
+    #                 return
+    #
+    #             model = model_class(config)
+    #
+    #             # Make sure the model contains at least the full vocabulary size in its embedding matrix
+    #             is_using_common_embeddings = hasattr(
+    #                 model.get_input_embeddings(), "weight")
+    #             if is_using_common_embeddings:
+    #                 self.assertGreaterEqual(
+    #                     model.get_input_embeddings().weight.shape[0],
+    #                     len(tokenizer))
+    #
+    #             # Build sequence
+    #             first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
+    #             sequence = " ".join(first_ten_tokens)
+    #             encoded_sequence = tokenizer.encode_plus(sequence,
+    #                                                      return_tensors="pt")
+    #
+    #             # Ensure that the BatchEncoding.to() method works.
+    #             encoded_sequence.to(model.device)
+    #
+    #             batch_encoded_sequence = tokenizer.batch_encode_plus(
+    #                 [sequence, sequence], return_tensors="pt")
+    #             # This should not fail
+    #
+    #             with torch.no_grad():  # saves some time
+    #                 model(**encoded_sequence)
+    #                 model(**batch_encoded_sequence)
+    #
+    #     # if self.test_rust_tokenizer:
+    #     #     fast_tokenizer = self.get_rust_tokenizer()
+    #     #     encoded_sequence_fast = fast_tokenizer.encode_plus(sequence, return_tensors="pt")
+    #     #     batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus([sequence, sequence], return_tensors="pt")
+    #     #     # This should not fail
+    #     #     model(**encoded_sequence_fast)
+    #     #     model(**batch_encoded_sequence_fast)
 
-        from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
-
-        MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
-            MODEL_MAPPING, TOKENIZER_MAPPING)
-
-        tokenizers = self.get_tokenizers(do_lower_case=False)
-        for tokenizer in tokenizers:
-            with self.subTest(f"{tokenizer.__class__.__name__}"):
-
-                if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
-                    return
-
-                config_class, model_class = MODEL_TOKENIZER_MAPPING[
-                    tokenizer.__class__]
-                config = config_class()
-
-                if config.is_encoder_decoder or config.pad_token_id is None:
-                    return
-
-                model = model_class(config)
-
-                # Make sure the model contains at least the full vocabulary size in its embedding matrix
-                is_using_common_embeddings = hasattr(
-                    model.get_input_embeddings(), "weight")
-                if is_using_common_embeddings:
-                    self.assertGreaterEqual(
-                        model.get_input_embeddings().weight.shape[0],
-                        len(tokenizer))
-
-                # Build sequence
-                first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
-                sequence = " ".join(first_ten_tokens)
-                encoded_sequence = tokenizer.encode_plus(sequence,
-                                                         return_tensors="pt")
-
-                # Ensure that the BatchEncoding.to() method works.
-                encoded_sequence.to(model.device)
-
-                batch_encoded_sequence = tokenizer.batch_encode_plus(
-                    [sequence, sequence], return_tensors="pt")
-                # This should not fail
-
-                with torch.no_grad():  # saves some time
-                    model(**encoded_sequence)
-                    model(**batch_encoded_sequence)
-
-        # if self.test_rust_tokenizer:
-        #     fast_tokenizer = self.get_rust_tokenizer()
-        #     encoded_sequence_fast = fast_tokenizer.encode_plus(sequence, return_tensors="pt")
-        #     batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus([sequence, sequence], return_tensors="pt")
-        #     # This should not fail
-        #     model(**encoded_sequence_fast)
-        #     model(**batch_encoded_sequence_fast)
-
-    @slow
-    def test_np_encode_plus_sent_to_model(self):
-        from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
-
-        MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
-            MODEL_MAPPING, TOKENIZER_MAPPING)
-
-        tokenizers = self.get_tokenizers()
-        for tokenizer in tokenizers:
-            with self.subTest(f"{tokenizer.__class__.__name__}"):
-                if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
-                    return
-
-                config_class, model_class = MODEL_TOKENIZER_MAPPING[
-                    tokenizer.__class__]
-                config = config_class()
-
-                if config.is_encoder_decoder or config.pad_token_id is None:
-                    return
-
-                # Build sequence
-                first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
-                sequence = " ".join(first_ten_tokens)
-                encoded_sequence = tokenizer.encode_plus(sequence,
-                                                         return_tensors="np")
-                batch_encoded_sequence = tokenizer.batch_encode_plus(
-                    [sequence, sequence], return_tensors="np")
-
-                # TODO: add forward through JAX/Flax when PR is merged
-                # This is currently here to make flake8 happy !
-                if encoded_sequence is None:
-                    raise ValueError(
-                        "Cannot convert list to numpy tensor on  encode_plus()")
-
-                if batch_encoded_sequence is None:
-                    raise ValueError(
-                        "Cannot convert list to numpy tensor on  batch_encode_plus()"
-                    )
-
-                if self.test_rust_tokenizer:
-                    fast_tokenizer = self.get_rust_tokenizer()
-                    encoded_sequence_fast = fast_tokenizer.encode_plus(
-                        sequence, return_tensors="np")
-                    batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus(
-                        [sequence, sequence], return_tensors="np")
-
-                    # TODO: add forward through JAX/Flax when PR is merged
-                    # This is currently here to make flake8 happy !
-                    if encoded_sequence_fast is None:
-                        raise ValueError(
-                            "Cannot convert list to numpy tensor on  encode_plus() (fast)"
-                        )
-
-                    if batch_encoded_sequence_fast is None:
-                        raise ValueError(
-                            "Cannot convert list to numpy tensor on  batch_encode_plus() (fast)"
-                        )
+    # @slow
+    # def test_np_encode_plus_sent_to_model(self):
+    #     from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
+    #
+    #     MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
+    #         MODEL_MAPPING, TOKENIZER_MAPPING)
+    #
+    #     tokenizers = self.get_tokenizers()
+    #     for tokenizer in tokenizers:
+    #         with self.subTest(f"{tokenizer.__class__.__name__}"):
+    #             if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
+    #                 return
+    #
+    #             config_class, model_class = MODEL_TOKENIZER_MAPPING[
+    #                 tokenizer.__class__]
+    #             config = config_class()
+    #
+    #             if config.is_encoder_decoder or config.pad_token_id is None:
+    #                 return
+    #
+    #             # Build sequence
+    #             first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
+    #             sequence = " ".join(first_ten_tokens)
+    #             encoded_sequence = tokenizer.encode_plus(sequence,
+    #                                                      return_tensors="np")
+    #             batch_encoded_sequence = tokenizer.batch_encode_plus(
+    #                 [sequence, sequence], return_tensors="np")
+    #
+    #             # TODO: add forward through JAX/Flax when PR is merged
+    #             # This is currently here to make flake8 happy !
+    #             if encoded_sequence is None:
+    #                 raise ValueError(
+    #                     "Cannot convert list to numpy tensor on  encode_plus()")
+    #
+    #             if batch_encoded_sequence is None:
+    #                 raise ValueError(
+    #                     "Cannot convert list to numpy tensor on  batch_encode_plus()"
+    #                 )
+    #
+    #             if self.test_rust_tokenizer:
+    #                 fast_tokenizer = self.get_rust_tokenizer()
+    #                 encoded_sequence_fast = fast_tokenizer.encode_plus(
+    #                     sequence, return_tensors="np")
+    #                 batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus(
+    #                     [sequence, sequence], return_tensors="np")
+    #
+    #                 # TODO: add forward through JAX/Flax when PR is merged
+    #                 # This is currently here to make flake8 happy !
+    #                 if encoded_sequence_fast is None:
+    #                     raise ValueError(
+    #                         "Cannot convert list to numpy tensor on  encode_plus() (fast)"
+    #                     )
+    #
+    #                 if batch_encoded_sequence_fast is None:
+    #                     raise ValueError(
+    #                         "Cannot convert list to numpy tensor on  batch_encode_plus() (fast)"
+    #                     )
 
     def test_prepare_seq2seq_batch(self):
         if not self.test_seq2seq:
