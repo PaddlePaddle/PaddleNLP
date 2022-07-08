@@ -323,80 +323,44 @@ class GPTTokenizer(PretrainedTokenizer):
     gpt_merges_link = "http://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "gpt3-175B-en":
-            gpt_vocab_link,
-            "gpt3-89B-en":
-            gpt_vocab_link,
-            "gpt3-13B-en":
-            gpt_vocab_link,
-            "gpt3-1.3B-en":
-            gpt_vocab_link,
-            "gpt2-xl-en":
-            gpt_vocab_link,
-            "gpt2-large-en":
-            gpt_vocab_link,
-            "gpt2-medium-en":
-            gpt_vocab_link,
-            "gpt2-en":
-            gpt_vocab_link,
-            "gpt2-small-en":
-            gpt_vocab_link,
-            "facebook":
-            gpt_vocab_link,
-            "facebook/opt-125m":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-125m/vocab.json",
-            "facebook/opt-350m":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-350m/vocab.json",
-            "facebook/opt-1.3b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-1.3b/vocab.json",
-            "facebook/opt-2.7b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-2.7b/vocab.json",
-            "facebook/opt-6.7b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-6.7b/vocab.json",
-            "facebook/opt-13b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-13b/vocab.json",
-            "facebook/opt-30b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-30b/vocab.json",
-            "facebook/opt-66b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-66b/vocab.json",
+            "gpt3-175B-en": gpt_vocab_link,
+            "gpt3-89B-en": gpt_vocab_link,
+            "gpt3-13B-en": gpt_vocab_link,
+            "gpt3-1.3B-en": gpt_vocab_link,
+            "gpt2-xl-en": gpt_vocab_link,
+            "gpt2-large-en": gpt_vocab_link,
+            "gpt2-medium-en": gpt_vocab_link,
+            "gpt2-en": gpt_vocab_link,
+            "gpt2-small-en": gpt_vocab_link,
+            "facebook": gpt_vocab_link,
+            "facebook/opt-125m": "",
+            "facebook/opt-350m": "",
+            "facebook/opt-1.3b": "",
+            "facebook/opt-2.7b": "",
+            "facebook/opt-6.7b": "",
+            "facebook/opt-13b": "",
+            "facebook/opt-30b": "",
+            "facebook/opt-66b": ""
         },
         "merges_file": {
-            "gpt3-175B-en":
-            gpt_merges_link,
-            "gpt3-89B-en":
-            gpt_merges_link,
-            "gpt3-13B-en":
-            gpt_merges_link,
-            "gpt3-1.3B-en":
-            gpt_merges_link,
-            "gpt2-xl-en":
-            gpt_merges_link,
-            "gpt2-large-en":
-            gpt_merges_link,
-            "gpt2-medium-en":
-            gpt_merges_link,
-            "gpt2-en":
-            gpt_merges_link,
-            "gpt2-small-en":
-            gpt_merges_link,
-            "facebook":
-            gpt_merges_link,
-            "facebook/opt-125m":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-125m/merges.txt",
-            "facebook/opt-350m":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-350m/merges.txt",
-            "facebook/opt-1.3b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-1.3b/merges.txt",
-            "facebook/opt-2.7b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-2.7b/merges.txt",
-            "facebook/opt-6.7b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-6.7b/merges.txt",
-            "facebook/opt-13b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-13b/merges.txt",
-            "facebook/opt-30b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-30b/merges.txt",
-            "facebook/opt-66b":
-            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-66b/merges.txt",
+            "gpt3-175B-en": gpt_merges_link,
+            "gpt3-89B-en": gpt_merges_link,
+            "gpt3-13B-en": gpt_merges_link,
+            "gpt3-1.3B-en": gpt_merges_link,
+            "gpt2-xl-en": gpt_merges_link,
+            "gpt2-large-en": gpt_merges_link,
+            "gpt2-medium-en": gpt_merges_link,
+            "gpt2-en": gpt_merges_link,
+            "gpt2-small-en": gpt_merges_link,
+            "facebook": gpt_merges_link,
+            "facebook/opt-125m": "",
+            "facebook/opt-350m": "",
+            "facebook/opt-1.3b": "",
+            "facebook/opt-2.7b": "",
+            "facebook/opt-6.7b": "",
+            "facebook/opt-13b": "",
+            "facebook/opt-30b": "",
+            "facebook/opt-66b": ""
         }
     }
     pretrained_init_configuration = {
@@ -413,6 +377,10 @@ class GPTTokenizer(PretrainedTokenizer):
         "facebook/opt-350m": {},
         "facebook/opt-1.3b": {},
         "facebook/opt-2.7b": {},
+        "facebook/opt-6.7b": {},
+        "facebook/opt-13b": {},
+        "facebook/opt-30b": {},
+        "facebook/opt-66b": {},
     }
 
     def __init__(
