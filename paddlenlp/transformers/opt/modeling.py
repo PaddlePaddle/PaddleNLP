@@ -31,7 +31,6 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     'OPTModel',
     'OPTPretrainedModel',
-    'OPTLMHeadModel',
     'OPTForCausalLM',
 ]
 
@@ -574,7 +573,7 @@ class OPTLMHead(Layer):
         return logits
 
 
-class OPTLMHeadModel(OPTPretrainedModel):
+class OPTForCausalLM(OPTPretrainedModel):
     """
     The OPT Model with a `language modeling` head on top.
 
@@ -717,6 +716,3 @@ class OPTLMHeadModel(OPTPretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
-
-
-OPTForCausalLM = OPTLMHeadModel
