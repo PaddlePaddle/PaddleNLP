@@ -38,7 +38,7 @@ ExternalProject_Add(
   PREFIX                ${RE2_PREFIX_DIR}
   UPDATE_COMMAND        ""
   CMAKE_ARGS            -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                        -DBUILD_SHARED=ON
+                        -DBUILD_SHARED=OFF
                         -DBUILD_STATIC=ON
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_INSTALL_PREFIX:PATH=${RE2_INSTALL_DIR}
