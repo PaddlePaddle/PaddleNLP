@@ -31,8 +31,6 @@ from .. import PretrainedModel, register_base_model
 __all__ = [
     'OPTModel',
     'OPTPretrainedModel',
-    'OPTForPretraining',
-    'OPTPretrainingCriterion',
     'OPTLMHeadModel',
     'OPTForCausalLM',
 ]
@@ -555,121 +553,6 @@ class OPTModel(OPTPretrainedModel):
 
         self.checkpoints.extend(self.decoder.checkpoints)
         return decoder_outputs
-
-
-class OPTForPretraining(OPTPretrainedModel):
-    """
-    OPT Model with pretraining tasks on top.
-
-    Args:
-        opt (:class:`OPTModel`):
-            An instance of :class:`OPTModel`.
-
-    """
-
-    def __init__(self, opt: OPTModel):
-        super(OPTForPretraining, self).__init__()
-        self.opt = opt
-        self.apply(self.init_weights)
-
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                use_cache=False,
-                cache=None):
-        r"""
-
-        Args:
-            input_ids (Tensor):
-                See :class:`OPTModel`.
-            position_ids (Tensor, optional):
-                See :class:`OPTModel`.
-            attention_mask (Tensor, optional):
-                See :class:`OPTModel`.
-            use_cache (bool, optional):
-                See :class:`OPTModel`.
-            cache (Tensor, optional):
-                See :class:`OPTModel`.
-
-        Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
-            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the opt model.
-            `cache_kvs` is the cache output of opt model if `use_cache` is True.
-
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import OPTForPretraining, GPTTokenizer
-
-                tokenizer = GPTTokenizer.from_pretrained('facebook/opt-125m')
-                model = OPTForPretraining.from_pretrained('facebook/opt-125m')
-
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs, use_cache=True)
-
-                logits = output[0]
-                cached_kvs = output[1]
-        """
-
-        outputs = self.opt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-        logits = paddle.matmul(encoder_outputs,
-                               self.opt.embeddings.word_embeddings.weight,
-                               transpose_y=True)
-
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
-
-
-class OPTPretrainingCriterion(Layer):
-    """
-    Criterion for OPT. It calculates the final loss.
-    """
-
-    def __init__(self):
-        super(OPTPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-
-    def forward(self, prediction_scores, masked_lm_labels, loss_mask):
-        """
-        Args:
-            prediction_scores(Tensor):
-                The logits of masked token prediction. Its data type should be float32 and
-                its shape is [batch_size, sequence_length, vocab_size].
-            masked_lm_labels(Tensor):
-                The labels of the masked language modeling, the dimensionality of `masked_lm_labels`
-                is equal to `prediction_scores`. Its data type should be int64 and
-                its shape is [batch_size, sequence_length, 1].
-            loss_mask(Tensor):
-                Mask used for calculating the loss of the masked language modeling to avoid
-                calculating some unwanted tokens.
-                Its data type should be float32 and its shape is [batch_size, sequence_length, 1].
-
-        Returns:
-            Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
-
-        """
-        masked_lm_loss = self.loss_func(prediction_scores,
-                                        masked_lm_labels.unsqueeze(2))
-
-        loss_mask = loss_mask.reshape([-1])
-        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-        loss = masked_lm_loss / loss_mask.sum()
-        return loss
 
 
 class OPTLMHead(Layer):
