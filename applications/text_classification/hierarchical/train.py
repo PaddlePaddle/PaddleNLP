@@ -43,7 +43,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory should include train.tsv,"
-                    "dev.tsv and taxonomy.tsv files.")
+                    "dev.tsv and label.tsv files.")
 parser.add_argument("--dataset",
                     default="wos",
                     type=str,
@@ -142,10 +142,10 @@ def train():
     if args.dataset_dir is not None:
         train_dir = os.path.join(args.dataset_dir, "train.tsv")
         dev_dir = os.path.join(args.dataset_dir, "dev.tsv")
-        taxonomy_dir = os.path.join(args.dataset_dir, "taxonomy.tsv")
+        label_dir = os.path.join(args.dataset_dir, "label.tsv")
         train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
         label_list = {}
-        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+        with open(label_dir, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 label_list[line.strip()] = i
     else:
@@ -261,6 +261,10 @@ def train():
             best_f1_score = macro_f1_score
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
+
+    logger.info("Best macro f1 score: %.5f" % (best_f1_score))
+    logger.info("Save best macro f1 text classification model in %s" %
+                (args.save_dir))
 
 
 if __name__ == "__main__":

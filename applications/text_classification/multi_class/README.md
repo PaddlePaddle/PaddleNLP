@@ -66,13 +66,13 @@ multi_class/
 
 单卡训练
 ```shell
-python train.py --warmup
+python train.py --warmup --early_stop
 ```
 
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --warmup
+python -m paddle.distributed.launch --gpus "0" train.py --warmup --early_stop
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -90,7 +90,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup
 * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.01。
 * `early_stop`：选择是否使用早停法(EarlyStopping)；默认为False。
 * `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
-* `epochs`: 训练轮次，默认为3。
+* `epochs`: 训练轮次，默认为100。
 * `warmup`：是否使用学习率warmup策略；默认为False。
 * `warmup_proportion`：学习率warmup策略的比例数，如果设为0.1，则学习率会在前10%steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0.1。
 * `logging_steps`: 日志打印的间隔steps数，默认5。
@@ -113,18 +113,19 @@ checkpoint/
 * 如需训练中文文本分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
 ### 从本地文件创建数据集
+在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，本项目支持使用固定格式本地数据集文件进行训练。如果需要对本地数据集进行数据标注，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。本项目将以CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为例进行介绍如何加载本地固定格式数据集进行训练：
 
-在许多情况，我们需要使用本地数据来训练我们的文本分类模型，这里我们将介绍如何加载本地固定格式数据集进行训练,本项目将以CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务为例进行介绍：
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/KUAKE_QIC.tar.gz
 tar -zxvf KUAKE_QIC.tar.gz
+mv KUAKE_QIC data
 ```
 
 本地数据集目录结构如下：
 
 ```text
-KUAKE_QIC/
+data/
 ├── train.tsv # 训练数据集文件
 ├── dev.tsv # 开发数据集文件
 ├── label.tsv # 分类标签文件
@@ -134,8 +135,8 @@ KUAKE_QIC/
 train.tsv(训练数据集文件), dev.tsv(开发数据集文件),输入文本序列与标签类别名用`'\t'`分隔开。
 - train.tsv/dev.tsv 文件格式：
 ```text
-<输入序列1>'\t'<标签1>
-<输入序列2>'\t'<标签2>
+<输入序列1>'\t'<标签1>'\n'
+<输入序列2>'\t'<标签2>'\n'
 ...
 ```
 - train.tsv/dev.tsv 文件样例：
@@ -151,8 +152,8 @@ train.tsv(训练数据集文件), dev.tsv(开发数据集文件),输入文本序
 label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
 - label.tsv 文件格式：
 ```text
-<标签名1>
-<标签名2>
+<标签名1>'\n'
+<标签名2>'\n'
 ...
 ```
 - label.tsv 文件样例：
@@ -168,8 +169,8 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 data.tsv(可选，待预测数据文件)。
 - data.tsv 文件格式：
 ```text
-<输入序列1>
-<输入序列2>
+<输入序列1>'\n'
+<输入序列2>'\n'
 ...
 ```
 - data.tsv 文件样例：
@@ -181,13 +182,13 @@ data.tsv(可选，待预测数据文件)。
 在训练过程中通过指定数据集路径参数`dataset_dir`进行：
 单卡训练
 ```shell
-python train.py --warmup --dataset_dir KUAKE_QIC
+python train.py --warmup --dataset_dir data
 ```
 
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir KUAKE_QIC
+python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir data
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -200,34 +201,31 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir K
 
 使用默认数据进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams
+python predict.py --params_path ./checkpoint/
 ```
-也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行预测：
+也可以选择使用本地数据文件data/data.tsv进行预测：
 ```shell
-python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir KUAKE_QIC
+python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
 可支持配置的参数：
 
-* `params_path`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
+* `params_path`：待预测模型参数文件夹；默认为"./checkpoint/"。
 * `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 ## 模型静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export --num_classes 11
+python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 可支持配置的参数：
 
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
-* `num_classes`：必须，任务标签类别数。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -245,9 +243,9 @@ export/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 ```
-也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.tsv进行部署：
 ```shell
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir KUAKE_QIC
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir data
 ```
 
 此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
@@ -282,11 +280,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 ```
 由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
 
-* `model`：ERNIE 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
+* `model`：ERNIE 等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.params_dir)` 来获取
 * `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
 * `train_dataset`：裁剪训练需要使用的训练集
 * `eval_dataset`：裁剪训练使用的评估集(开发集)
-* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.model_name_or_path)` 来获取
+* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.params_dir)` 来获取
 * `criterion`： 定义criterion计算损失，分类中使用损失函数 paddle.nn.BCEWithLogitsLoss()
 
 然后可以直接调用 `prune` 启动裁剪，其中 `prune` 的参数释义如下：
@@ -300,11 +298,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 
 选择使用默认数据集启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
+python prune.py --output_dir ./prune --params_dir ./checkpoint/
 ```
 也可以选择使用本地数据文件启动裁剪：
 ```shell
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir KUAKE_QIC
+python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir data
 ```
 
 可支持配置的参数：
@@ -319,8 +317,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
   * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 
 * `ModelArguments`
-  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
 
 以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
 
@@ -351,9 +348,9 @@ prune/
 ```shell
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 ```
-也可以选择使用本地数据文件KUAKE_QIC/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.tsv进行部署：
 ```shell
-python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir KUAKE_QIC
+python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
 5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 

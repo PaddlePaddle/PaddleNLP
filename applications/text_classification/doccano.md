@@ -205,10 +205,20 @@ python doccano.py \
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 不同层标签之间的分隔符，该参数只对层次文本分类任务有效。默认为"##"。
 
+转化后的doccano标注数据目录结构如下：
+```text
+data/
+├── train.tsv # 训练数据集文件
+├── dev.tsv # 开发数据集文件
+├── test.tsv # 测试训练集文件（可选，数据划分为 train/dev/test 数据集）
+├── label.tsv # 分类标签文件
+└── data.tsv # 待预测数据文件
+```
+
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集，或全部导出为 train 数据集。
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集。
+- 如果数据划分为 train/dev/test 数据集，data.tsv则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.tsv则为dev数据集无标签数据。
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
-
 ## References
 - **[doccano](https://github.com/doccano/doccano)**
