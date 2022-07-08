@@ -49,7 +49,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             new_masked_positions = paddle.fluid.layers.create_array(
                 dtype='int32')
             # masked_positions: [bs, label_length]
-            for bs_index, mask_pos in enumerate(masked_positions.numpy()):
+            for bs_index, mask_pos in enumerate(masked_positions):
                 for pos in mask_pos:
                     new_masked_positions.append(bs_index * max_len + pos)
 
