@@ -405,8 +405,6 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
-        # Logging model download statistics
-
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
