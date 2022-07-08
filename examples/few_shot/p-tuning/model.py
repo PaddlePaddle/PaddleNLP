@@ -46,8 +46,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             sequence_output, pooled_output = outputs[:2]
 
             max_len = input_ids.shape[1]
-            new_masked_positions = paddle.fluid.layers.create_array(
-                dtype='int32')
+            new_masked_positions = paddle.tensor.create_array(dtype='int32')
             # masked_positions: [bs, label_length]
             for bs_index, mask_pos in enumerate(masked_positions):
                 for pos in mask_pos:
