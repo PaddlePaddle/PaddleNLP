@@ -383,7 +383,7 @@ class TransformerDecoderLayer(nn.Layer):
         super(TransformerDecoderLayer, self).__init__()
 
         hcg = fleet.get_hybrid_communicate_group()
-        mp_nranks = hcg.get_model_parallel_rank()
+        mp_nranks = hcg.get_model_parallel_world_size()
         mp_group = hcg.get_model_parallel_group()
         ring_id = mp_group.id if mp_nranks > 1 else -1
 
@@ -1125,9 +1125,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                  num_partitions=1,
                  topology=None,
                  use_recompute=False,
-                 fuse=False,
-                 mp_ring_id=-1,
-                 mp_nranks=1):
+                 fuse=False):
 
         # forward desc
         self.descs = []
@@ -1158,9 +1156,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                                   mean=0.0, std=initializer_range)),
                           bias_attr=None,
                           num_partitions=num_partitions,
-                          fuse=fuse,
-                          mp_ring_id=mp_ring_id,
-                          mp_nranks=mp_nranks))
+                          fuse=fuse))
 
         self.descs.append(LayerDesc(nn.LayerNorm, normalized_shape=hidden_size))
 
