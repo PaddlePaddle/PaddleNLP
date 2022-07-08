@@ -24,7 +24,7 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path",
-                    default="./checkpoint/model_state.pdparams",
+                    default="./checkpoint/",
                     type=str,
                     help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length",
@@ -41,10 +41,6 @@ parser.add_argument('--device',
                     choices=['cpu', 'gpu', 'xpu', 'npu'],
                     default="gpu",
                     help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name',
-                    default='ernie-2.0-base-en',
-                    help="Define which model to train, "
-                    "defaults to ernie-2.0-base-en.")
 parser.add_argument("--depth",
                     type=int,
                     default=2,
@@ -53,7 +49,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including"
-                    "data.tsv and taxonomy.tsv files.")
+                    "data.tsv and label.tsv files.")
 args = parser.parse_args()
 
 
@@ -68,11 +64,8 @@ def predict(data, label_list):
  
     """
     paddle.set_device(args.device)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(label_list))
-    if args.params_path and os.path.isfile(args.params_path):
-        model.set_dict(paddle.load(os.path.join(args.params_path)))
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.params_path)
 
     examples = []
     for text in data:
@@ -113,7 +106,7 @@ def predict(data, label_list):
         hierarchical_labels = {d: [] for d in range(args.depth)}
 
         for r in results[idx]:
-            for i, l in enumerate(label_list[r].split('--')):
+            for i, l in enumerate(label_list[r].split('##')):
                 if l not in hierarchical_labels[i]:
                     hierarchical_labels[i].append(l)
         print('predicted result:')
@@ -128,7 +121,7 @@ if __name__ == "__main__":
 
     if args.dataset_dir is not None:
         data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        taxonomy_dir = os.path.join(args.dataset_dir, "taxonomy.tsv")
+        label_dir = os.path.join(args.dataset_dir, "label.tsv")
 
         data = []
         label_list = []
@@ -138,7 +131,7 @@ if __name__ == "__main__":
                 data.append(line.strip())
         f.close()
 
-        with open(taxonomy_dir, 'r', encoding='utf-8') as f:
+        with open(label_dir, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
                 label_list.append(line.strip())
         f.close()
@@ -151,74 +144,74 @@ if __name__ == "__main__":
         ]
         label_list = [
             'CS', 'ECE', 'Psychology', 'MAE', 'Civil', 'Medical',
-            'biochemistry', 'CS--Computer vision', 'CS--Machine learning',
-            'CS--network security', 'CS--Cryptography', 'CS--Operating systems',
-            'CS--Computer graphics', 'CS--Image processing',
-            'CS--Parallel computing', 'CS--Relational databases',
-            'CS--Software engineering', 'CS--Distributed computing',
-            'CS--Structured Storage', 'CS--Symbolic computation',
-            'CS--Algorithm design', 'CS--Computer programming',
-            'CS--Data structures', 'CS--Bioinformatics', 'ECE--Electricity',
-            'ECE--Lorentz force law', 'ECE--Electrical circuits',
-            'ECE--Voltage law', 'ECE--Digital control',
-            'ECE--System identification', 'ECE--Electrical network',
-            'ECE--Microcontroller',
-            'ECE--Electrical generator/Analog signal processing',
-            'ECE--Electric motor', 'ECE--Satellite radio',
-            'ECE--Control engineering', 'ECE--Signal-flow graph',
-            'ECE--State space representation', 'ECE--PID controller',
-            'ECE--Operational amplifier', 'Psychology--Prejudice',
-            'Psychology--Social cognition', 'Psychology--Person perception',
-            'Psychology--Nonverbal communication',
-            'Psychology--Prosocial behavior', 'Psychology--Leadership',
-            'Psychology--Eating disorders', 'Psychology--Depression',
-            'Psychology--Borderline personality disorder',
-            'Psychology--Seasonal affective disorder', 'Medical--Schizophrenia',
-            'Psychology--Antisocial personality disorder',
-            'Psychology--Media violence', 'Psychology--Prenatal development',
-            'Psychology--Child abuse', 'Psychology--Gender roles',
-            'Psychology--False memories', 'Psychology--Attention',
-            'Psychology--Problem-solving', 'MAE--computer-aided design',
-            'MAE--Hydraulics', 'MAE--Manufacturing engineering',
-            'MAE--Machine design', 'MAE--Fluid mechanics',
-            'MAE--Internal combustion engine', 'MAE--Thermodynamics',
-            'MAE--Materials Engineering', 'MAE--Strength of materials',
-            'Civil--Ambient Intelligence', 'Civil--Geotextile',
-            'Civil--Remote Sensing', 'Civil--Rainwater Harvesting',
-            'Civil--Water Pollution', 'Civil--Suspension Bridge',
-            'Civil--Stealth Technology', 'Civil--Green Building',
-            'Civil--Solar Energy', 'Civil--Construction Management',
-            'Civil--Smart Material', 'Medical--Addiction', 'Medical--Allergies',
-            "Medical--Alzheimer's Disease", 'Medical--Ankylosing Spondylitis',
-            'Medical--Anxiety', 'Medical--Asthma', 'Medical--Atopic Dermatitis',
-            'Medical--Atrial Fibrillation', 'Medical--Autism',
-            'Medical--Skin Care', 'Medical--Bipolar Disorder',
-            'Medical--Birth Control', "Medical--Children's Health",
-            "Medical--Crohn's Disease", 'Medical--Dementia',
-            'Medical--Diabetes', 'Medical--Weight Loss',
-            'Medical--Digestive Health', 'Medical--Emergency Contraception',
-            'Medical--Mental Health', 'Medical--Fungal Infection',
-            'Medical--Headache', 'Medical--Healthy Sleep',
-            'Medical--Heart Disease', 'Medical--Hepatitis C',
-            'Medical--Hereditary Angioedema', 'Medical--HIV/AIDS',
-            'Medical--Hypothyroidism', 'Medical--Idiopathic Pulmonary Fibrosis',
-            'Medical--Irritable Bowel Syndrome', 'Medical--Kidney Health',
-            'Medical--Low Testosterone', 'Medical--Lymphoma',
-            'Medical--Medicare', 'Medical--Menopause', 'Medical--Migraine',
-            'Medical--Multiple Sclerosis', 'Medical--Myelofibrosis',
-            'Medical--Cancer', 'Medical--Osteoarthritis',
-            'Medical--Osteoporosis', 'Medical--Overactive Bladder',
-            'Medical--Parenting', "Medical--Parkinson's Disease",
-            'Medical--Polycythemia Vera', 'Medical--Psoriasis',
-            'Medical--Psoriatic Arthritis', 'Medical--Rheumatoid Arthritis',
-            'Medical--Senior Health', 'Medical--Smoking Cessation',
-            'Medical--Sports Injuries', 'Medical--Sprains and Strains',
-            'Medical--Stress Management', 'biochemistry--Molecular biology',
-            'biochemistry--Cell biology', 'biochemistry--Human Metabolism',
-            'biochemistry--Immunology', 'biochemistry--Genetics',
-            'biochemistry--Enzymology',
-            'biochemistry--Polymerase chain reaction',
-            'biochemistry--Northern blotting', 'biochemistry--Southern blotting'
+            'biochemistry', 'CS##Computer vision', 'CS##Machine learning',
+            'CS##network security', 'CS##Cryptography', 'CS##Operating systems',
+            'CS##Computer graphics', 'CS##Image processing',
+            'CS##Parallel computing', 'CS##Relational databases',
+            'CS##Software engineering', 'CS##Distributed computing',
+            'CS##Structured Storage', 'CS##Symbolic computation',
+            'CS##Algorithm design', 'CS##Computer programming',
+            'CS##Data structures', 'CS##Bioinformatics', 'ECE##Electricity',
+            'ECE##Lorentz force law', 'ECE##Electrical circuits',
+            'ECE##Voltage law', 'ECE##Digital control',
+            'ECE##System identification', 'ECE##Electrical network',
+            'ECE##Microcontroller',
+            'ECE##Electrical generator/Analog signal processing',
+            'ECE##Electric motor', 'ECE##Satellite radio',
+            'ECE##Control engineering', 'ECE##Signal-flow graph',
+            'ECE##State space representation', 'ECE##PID controller',
+            'ECE##Operational amplifier', 'Psychology##Prejudice',
+            'Psychology##Social cognition', 'Psychology##Person perception',
+            'Psychology##Nonverbal communication',
+            'Psychology##Prosocial behavior', 'Psychology##Leadership',
+            'Psychology##Eating disorders', 'Psychology##Depression',
+            'Psychology##Borderline personality disorder',
+            'Psychology##Seasonal affective disorder', 'Medical##Schizophrenia',
+            'Psychology##Antisocial personality disorder',
+            'Psychology##Media violence', 'Psychology##Prenatal development',
+            'Psychology##Child abuse', 'Psychology##Gender roles',
+            'Psychology##False memories', 'Psychology##Attention',
+            'Psychology##Problem-solving', 'MAE##computer-aided design',
+            'MAE##Hydraulics', 'MAE##Manufacturing engineering',
+            'MAE##Machine design', 'MAE##Fluid mechanics',
+            'MAE##Internal combustion engine', 'MAE##Thermodynamics',
+            'MAE##Materials Engineering', 'MAE##Strength of materials',
+            'Civil##Ambient Intelligence', 'Civil##Geotextile',
+            'Civil##Remote Sensing', 'Civil##Rainwater Harvesting',
+            'Civil##Water Pollution', 'Civil##Suspension Bridge',
+            'Civil##Stealth Technology', 'Civil##Green Building',
+            'Civil##Solar Energy', 'Civil##Construction Management',
+            'Civil##Smart Material', 'Medical##Addiction', 'Medical##Allergies',
+            "Medical##Alzheimer's Disease", 'Medical##Ankylosing Spondylitis',
+            'Medical##Anxiety', 'Medical##Asthma', 'Medical##Atopic Dermatitis',
+            'Medical##Atrial Fibrillation', 'Medical##Autism',
+            'Medical##Skin Care', 'Medical##Bipolar Disorder',
+            'Medical##Birth Control', "Medical##Children's Health",
+            "Medical##Crohn's Disease", 'Medical##Dementia',
+            'Medical##Diabetes', 'Medical##Weight Loss',
+            'Medical##Digestive Health', 'Medical##Emergency Contraception',
+            'Medical##Mental Health', 'Medical##Fungal Infection',
+            'Medical##Headache', 'Medical##Healthy Sleep',
+            'Medical##Heart Disease', 'Medical##Hepatitis C',
+            'Medical##Hereditary Angioedema', 'Medical##HIV/AIDS',
+            'Medical##Hypothyroidism', 'Medical##Idiopathic Pulmonary Fibrosis',
+            'Medical##Irritable Bowel Syndrome', 'Medical##Kidney Health',
+            'Medical##Low Testosterone', 'Medical##Lymphoma',
+            'Medical##Medicare', 'Medical##Menopause', 'Medical##Migraine',
+            'Medical##Multiple Sclerosis', 'Medical##Myelofibrosis',
+            'Medical##Cancer', 'Medical##Osteoarthritis',
+            'Medical##Osteoporosis', 'Medical##Overactive Bladder',
+            'Medical##Parenting', "Medical##Parkinson's Disease",
+            'Medical##Polycythemia Vera', 'Medical##Psoriasis',
+            'Medical##Psoriatic Arthritis', 'Medical##Rheumatoid Arthritis',
+            'Medical##Senior Health', 'Medical##Smoking Cessation',
+            'Medical##Sports Injuries', 'Medical##Sprains and Strains',
+            'Medical##Stress Management', 'biochemistry##Molecular biology',
+            'biochemistry##Cell biology', 'biochemistry##Human Metabolism',
+            'biochemistry##Immunology', 'biochemistry##Genetics',
+            'biochemistry##Enzymology',
+            'biochemistry##Polymerase chain reaction',
+            'biochemistry##Northern blotting', 'biochemistry##Southern blotting'
         ]
 
     predict(data, label_list)
