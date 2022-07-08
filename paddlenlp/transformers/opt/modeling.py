@@ -24,6 +24,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
+from paddlenlp.transformers.gpt.modeling import MultiHeadAttention
 
 from .. import PretrainedModel, register_base_model
 
@@ -35,198 +36,6 @@ __all__ = [
     'OPTLMHeadModel',
     'OPTForCausalLM',
 ]
-
-
-class MultiHeadAttention(Layer):
-    """
-    Attention mapps queries and a set of key-value pairs to outputs, and
-    Multi-Head Attention performs multiple parallel attention to jointly attending
-    to information from different representation subspaces.
-    """
-
-    Cache = collections.namedtuple("Cache", ["k", "v"])
-    StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
-
-    def __init__(self,
-                 embed_dim: int,
-                 num_heads: int,
-                 dropout: float = 0.,
-                 kdim: Optional[int] = None,
-                 vdim: Optional[int] = None,
-                 need_weights: bool = False,
-                 weight_attr=None,
-                 bias_attr=None,
-                 fuse: bool = False,
-                 **kwargs):
-        super(MultiHeadAttention, self).__init__()
-        self.embed_dim = embed_dim
-        self.kdim = kdim or embed_dim
-        self.vdim = vdim or embed_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
-        self.need_weights = need_weights
-        self.fuse = fuse
-
-        self.head_dim = embed_dim // num_heads
-
-        if self.fuse:
-            assert self.kdim == embed_dim, "if fuse, kdim must be the same as embed_dim"
-            assert self.vdim == embed_dim, "if fuse, vdim must be the same as embed_dim"
-            self.qkv_proj = nn.Linear(embed_dim,
-                                      3 * embed_dim,
-                                      weight_attr,
-                                      bias_attr=bias_attr)
-        else:
-            self.q_proj = nn.Linear(embed_dim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-            self.k_proj = nn.Linear(self.kdim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-            self.v_proj = nn.Linear(self.vdim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-        self.out_proj = nn.Linear(embed_dim,
-                                  embed_dim,
-                                  weight_attr,
-                                  bias_attr=bias_attr)
-
-    def _fuse_prepare_qkv(self, query):
-        mix_layer = self.qkv_proj(query)
-
-        # TODO(wj-Mcat): paddle.reshape_ method will change mix_layer in replace, so it should not be assigned again
-        mix_layer = paddle.reshape_(mix_layer,
-                                    [0, 0, self.num_heads, 3 * self.head_dim])
-        mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
-        q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
-        return q, k, v
-
-    def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
-        r"""Prapares linear projected queries, keys and values for usage of subsequnt
-        multiple parallel attention. If `cache` is not None, using cached results
-        to reduce redundant calculations.
-        """
-        q = self.q_proj(query)
-        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
-        q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
-
-        if isinstance(cache, self.StaticCache):
-            # for encoder-decoder attention in inference and has cached
-            k, v = cache.k, cache.v
-        else:
-            k, v = self.compute_kv(key, value)
-
-        if isinstance(cache, self.Cache):
-            # for decoder self-attention in inference
-            k = tensor.concat([cache.k, k], axis=2)
-            v = tensor.concat([cache.v, v], axis=2)
-        if use_cache is True:
-            cache = self.Cache(k, v)
-
-        return (q, k, v) if use_cache is False else (q, k, v, cache)
-
-    def compute_kv(self, key, value):
-        r"""
-        Applies linear projection on input keys and values, then splits heads
-        (reshape and transpose) to get keys and values from different representation
-        subspaces. The results are used as key-values pairs for subsequent multiple
-        parallel attention.
-
-        It is part of calculations in multi-head attention, and is provided as
-        a method to pre-compute and prefetch these results, thus we can use them
-        to construct cache for inference.
-
-        """
-        k = self.k_proj(key)
-        v = self.v_proj(value)
-        k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
-        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
-        v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
-        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
-        return k, v
-
-    def gen_cache(self, key, value=None, type=Cache):
-        """
-        Generates cache for `forward` usage in inference accroding to arguments.
-        The generated cache is an instance of `MultiHeadAttention.Cache` or an
-        instance of `MultiHeadAttention.StaticCache`.
-        """
-        if type == MultiHeadAttention.StaticCache:  # static_kv
-            k, v = self.compute_kv(key, value)
-            return self.StaticCache(k, v)
-        elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key,
-                shape=[-1, self.num_heads, 0, self.head_dim],
-                dtype=key.dtype,
-                value=0)
-            v = layers.fill_constant_batch_size_like(
-                input=key,
-                shape=[-1, self.num_heads, 0, self.head_dim],
-                dtype=key.dtype,
-                value=0)
-            return self.Cache(k, v)
-        else:
-            # incremental_state with initial value, mainly for usage like UniLM
-            return self.Cache(key, value)
-
-    def forward(self,
-                query,
-                key,
-                value,
-                attn_mask=None,
-                use_cache=False,
-                cache=None):
-        r"""
-        Applies multi-head attention to map queries and a set of key-value pairs
-        to outputs.
-        """
-        key = query if key is None else key
-        value = query if value is None else value
-
-        # compute q ,k ,v
-        if use_cache is False:
-            if self.fuse:
-                q, k, v = self._fuse_prepare_qkv(query)
-            else:
-                q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
-        else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
-                                               cache)
-        # scale dot product attention
-        product = layers.matmul(x=q,
-                                y=k,
-                                transpose_y=True,
-                                alpha=self.head_dim**-0.5)
-
-        if attn_mask is not None:
-            product = product + attn_mask
-
-        weights = F.softmax(product)
-        if self.dropout:
-            weights = F.dropout(weights,
-                                self.dropout,
-                                training=self.training,
-                                mode="upscale_in_train")
-
-        out = tensor.matmul(weights, v)
-
-        # combine heads
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-
-        # project to output
-        out = self.out_proj(out)
-
-        outs = [out]
-        if self.need_weights:
-            outs.append(weights)
-        if use_cache:
-            outs.append(cache)
-        return out if len(outs) == 1 else tuple(outs)
 
 
 class TransformerDecoder(Layer):
@@ -500,7 +309,7 @@ class OPTEmbeddings(Layer):
 
 class OPTPretrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained GPT models. It provides GPT related
+    An abstract class for pretrained OPT models. It provides OPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
     `pretrained_init_configuration`, `base_model_prefix` for downloading and
     loading pretrained models.
@@ -509,7 +318,7 @@ class OPTPretrainedModel(PretrainedModel):
 
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
-        "opt-125m": {
+        "facebook/opt-125m": {
             "attention_probs_dropout_prob": 0.0,
             "bos_token_id": 2,
             "hidden_size": 768,
@@ -527,11 +336,12 @@ class OPTPretrainedModel(PretrainedModel):
             "normalize_before": True,
             "word_embed_proj_dim": 768
         },
-        "opt-350m": {
+        "facebook/opt-350m": {
             "intermediate_size": 4096,
             "attention_probs_dropout_prob": 0.0,
             "hidden_dropout_prob": 0.1,
             "normalize_before": False,
+            "word_embed_proj_dim": 512,
             "num_attention_heads": 16,
             "bos_token_id": 2,
             "hidden_size": 1024,
@@ -541,27 +351,30 @@ class OPTPretrainedModel(PretrainedModel):
             "max_position_embeddings": 2048,
             "num_hidden_layers": 24,
             "pad_token_id": 1,
-            "vocab_size": 50272,
-            "word_embed_proj_dim": ""
-        },
-        "opt-1.3b": {
-            "intermediate_size": 8192,
-            "attention_probs_dropout_prob": 0.0,
-            "hidden_dropout_prob": 0.1,
-            "normalize_before": True,
-            "word_embed_proj_dim": 2048,
-            "num_attention_heads": 32,
-            "bos_token_id": 2,
-            "hidden_size": 2048,
-            "eos_token_id": 2,
-            "hidden_act": "relu",
-            "initializer_range": 0.02,
-            "max_position_embeddings": 2048,
-            "num_hidden_layers": 24,
-            "pad_token_id": 1,
             "vocab_size": 50272
         },
-        "opt-2.7b": {
+        "facebook/opt-1.3b": {
+            "opt": {
+                "intermediate_size": 8192,
+                "attention_probs_dropout_prob": 0.0,
+                "hidden_dropout_prob": 0.1,
+                "normalize_before": True,
+                "word_embed_proj_dim": 2048,
+                "num_attention_heads": 32,
+                "bos_token_id": 2,
+                "hidden_size": 2048,
+                "eos_token_id": 2,
+                "hidden_act": "relu",
+                "initializer_range": 0.02,
+                "max_position_embeddings": 2048,
+                "num_hidden_layers": 24,
+                "pad_token_id": 1,
+                "vocab_size": 50272,
+                "init_class": "OPTModel"
+            },
+            "init_class": "OPTLMHeadModel"
+        },
+        "facebook/opt-2.7b": {
             "intermediate_size": 10240,
             "attention_probs_dropout_prob": 0.0,
             "hidden_dropout_prob": 0.1,
@@ -578,7 +391,7 @@ class OPTPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
             "vocab_size": 50272
         },
-        "opt-6.7b": {
+        "facebook/opt-6.7b": {
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.0,
             "bos_token_id": 0,
@@ -593,7 +406,37 @@ class OPTPretrainedModel(PretrainedModel):
             "num_attention_heads": 16,
             "max_position_embeddings": 2048
         },
-        "opt-30b": {
+        "facebook/opt-13b": {
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.0,
+            "bos_token_id": 0,
+            "hidden_size": 1024,
+            "hidden_act": "relu",
+            "eos_token_id": 2,
+            "intermediate_size": 4096,
+            "initializer_range": 0.02,
+            "vocab_size": 50272,
+            "pad_token_id": 1,
+            "num_hidden_layers": 24,
+            "num_attention_heads": 16,
+            "max_position_embeddings": 2048
+        },
+        "facebook/opt-30b": {
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.0,
+            "bos_token_id": 0,
+            "hidden_size": 1024,
+            "hidden_act": "relu",
+            "eos_token_id": 2,
+            "intermediate_size": 4096,
+            "initializer_range": 0.02,
+            "vocab_size": 50272,
+            "pad_token_id": 1,
+            "num_hidden_layers": 24,
+            "num_attention_heads": 16,
+            "max_position_embeddings": 2048
+        },
+        "facebook/opt-66b": {
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.0,
             "bos_token_id": 0,
@@ -610,7 +453,26 @@ class OPTPretrainedModel(PretrainedModel):
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {"model_state": {}}
+    pretrained_resource_files_map = {
+        "model_state": {
+            "facebook/opt-125m":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-125m/model_state.pdparams",
+            "facebook/opt-350m":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-350m/model_state.pdparams",
+            "facebook/opt-1.3b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-1.3b/model_state.pdparams",
+            "facebook/opt-2.7b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-2.7b/model_state.pdparams",
+            "facebook/opt-6.7b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-6.7b/model_state.pdparams",
+            "facebook/opt-13b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-13b/model_state.pdparams",
+            "facebook/opt-30b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-30b/model_state.pdparams",
+            "facebook/opt-66b":
+            "https://paddlenlp.bj.bcebos.com/models/community/facebook/opt-66b/model_state.pdparams",
+        }
+    }
     base_model_prefix = "opt"
 
     def init_weights(self, layer):
@@ -679,11 +541,11 @@ class OPTModel(OPTPretrainedModel):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`GPTPretrainedModel._init_weights()` for how weights are initialized in `OPTModel`.
+                See :meth:`OPTPretrainedModel._init_weights()` for how weights are initialized in `OPTModel`.
 
         pad_token_id(int, optional):
             The index of padding token in the token vocabulary.
-            Defaults to `0`.
+             to `0`.
 
     """
 
@@ -800,10 +662,11 @@ class OPTModel(OPTPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import OPTModel, GPTTokenizer
 
-                tokenizer = GPTTokenizer.from_pretrained('opt-135m')
-                model = OPTModel.from_pretrained('opt-135m')
+                tokenizer = GPTTokenizer.from_pretrained('facebook/opt-125m')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                model = OPTModel.from_pretrained('facebook/opt-125m')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLimage.pngP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -895,16 +758,15 @@ class OPTForPretraining(OPTPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import OPTForPretraining, GPTTokenizer
 
-                tokenizer = GPTTokenizer.from_pretrained('opt-135m')
-                model = GPTForPretraining.from_pretrained('opt-135m')
+                tokenizer = GPTTokenizer.from_pretrained('facebook/opt-125m')
+                model = OPTForPretraining.from_pretrained('facebook/opt-125m')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs,use_cache=True)
+                output = model(**inputs, use_cache=True)
 
                 logits = output[0]
                 cached_kvs = output[1]
-
         """
 
         outputs = self.opt(input_ids,
@@ -928,7 +790,7 @@ class OPTForPretraining(OPTPretrainedModel):
 
 class OPTPretrainingCriterion(Layer):
     """
-    Criterion for GPT. It calculates the final loss.
+    Criterion for OPT. It calculates the final loss.
     """
 
     def __init__(self):
@@ -1023,9 +885,22 @@ class OPTLMHeadModel(OPTPretrainedModel):
         Returns:
             Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
             tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the gpt model.
-            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+            `logits` is the output of the opt model.
+            `cache_kvs` is the cache output of opt model if `use_cache` is True.
 
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import OPTForCausalLM, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('facebook/opt-125m')
+                model = OPTForPretraining.from_pretrained('facebook/opt-125m')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output_ids, score = model.generate(input_ids=inputs['input_ids'])
+                print(tokenizer.batch_decode(output_ids[0]))
         """
 
         outputs = self.opt(input_ids,
@@ -1047,19 +922,19 @@ class OPTLMHeadModel(OPTPretrainedModel):
             return logits
 
     def prepare_faster_entry(self, kwargs):
-        from paddlenlp.ops import FasterGPel
+        from paddlenlp.ops import FasterOPT
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
         if decode_strategy == "beam_search":
             raise AttributeError(
-                "'beam_search' is not supported yet in the faster version of GPT"
+                "'beam_search' is not supported yet in the faster version of OPT"
             )
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.opt.config["hidden_size"] // self.opt.config[
             "num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPT"
+                "'size_per_head = %d' is not supported yet in the faster version of OPT"
                 % size_per_head)
         if kwargs['forced_bos_token_id'] is not None:
             # not support for min_length yet in the faster version
@@ -1070,7 +945,7 @@ class OPTLMHeadModel(OPTPretrainedModel):
             # not support for min_length yet in the faster version
             raise AttributeError(
                 "'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterGPT(
+        self._faster_entry = FasterOPT(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
@@ -1085,13 +960,14 @@ class OPTLMHeadModel(OPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 4:
                 attention_mask = attention_mask[:, -1, -1, :]
-            # if "int" in paddle.common_ops_import.convert_dtype(
-            #         attention_mask.dtype):
-            #     attention_mask = (1.0 - attention_mask) * -1e4
+            if "int" in paddle.common_ops_import.convert_dtype(
+                    attention_mask.dtype):
+                attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
+                position_ids += 2
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,
