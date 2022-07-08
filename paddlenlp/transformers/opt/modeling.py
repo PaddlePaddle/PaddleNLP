@@ -46,8 +46,7 @@ class TransformerDecoder(Layer):
                  hidden_size: int,
                  word_embed_proj_dim: int,
                  norm: Optional[Layer] = None,
-                 normalize_before: bool = False,
-                 remove_final_layer_norm: bool = False):
+                 normalize_before: bool = False):
         super(TransformerDecoder, self).__init__()
 
         if word_embed_proj_dim != hidden_size:
@@ -60,7 +59,7 @@ class TransformerDecoder(Layer):
         self.num_layers = num_layers
         self.layers = decoder_layers
 
-        if normalize_before and not remove_final_layer_norm:
+        if normalize_before:
             self.final_layer_norm = nn.LayerNorm(hidden_size)
         else:
             self.final_layer_norm = None
@@ -411,7 +410,6 @@ class OPTModel(OPTPretrainedModel):
                  bos_token_id: int = 0,
                  eol_token_id: int = 3,
                  normalize_before: bool = True,
-                 remove_final_layer_norm: bool = False,
                  **kwargs):
         super(OPTModel, self).__init__()
 
@@ -453,7 +451,6 @@ class OPTModel(OPTPretrainedModel):
             norm="LayerNorm",
             hidden_size=hidden_size,
             normalize_before=normalize_before,
-            remove_final_layer_norm=remove_final_layer_norm,
             word_embed_proj_dim=word_embed_proj_dim)
 
         self.apply(self.init_weights)
@@ -651,9 +648,15 @@ class OPTForCausalLM(OPTPretrainedModel):
             return logits
 
     def prepare_faster_entry(self, kwargs):
+        # TODO(wj-Mcat): this error will be removed when opt can play with FasterGeneration.
+        raise AttributeError(
+            "FasterGeneration is not supported in OPT Model, please keep eyes on the latest feature of PaddleNLP"
+        )
+
         from paddlenlp.ops import FasterOPT
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
+
         if decode_strategy == "beam_search":
             raise AttributeError(
                 "'beam_search' is not supported yet in the faster version of OPT"
