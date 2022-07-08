@@ -14,8 +14,6 @@ limitations under the License. */
 
 #include <unordered_map>
 
-#include <Python.h>
-
 #include "core/tokenizer.h"
 #include "decoders/decoders.h"
 #include "glog/logging.h"
@@ -23,6 +21,9 @@ limitations under the License. */
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
+
+#include <Python.h>
+
 #include "pybind/exception.h"
 #include "pybind/tokenizers.h"
 #include "pybind/utils.h"

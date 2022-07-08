@@ -12,14 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
 #include <sstream>
 
-#include <pybind11/operators.h>
 #include "core/added_vocabulary.h"
 #include "core/base.h"
 #include "core/encoding.h"
 #include "pybind/core.h"
+
+#include <Python.h>
+#include <pybind11/operators.h>
 
 namespace py = pybind11;
 
