@@ -2,7 +2,7 @@
 
 This is the implementation of the paper [RGL: A Simple yet Effective Relation Graph Augmented Prompt-based Tuning Approach for Few-Shot Learning](https://aclanthology.org/2022.findings-naacl.81/).
 
-**************************** Updates ****************************
+**************************** Updates *****************************
 
 2022-04-08: Our paper has been accepted to Findings of NAACL 2022!
 
@@ -23,22 +23,20 @@ We evaluate on the [GLUE variant data](https://paddlenlp.bj.bcebos.com/datasets/
 
 The structure of the code:
 
+```
 rgl
 ├── template.py # The parser for prompt template.
 ├── verbalizer.py # The mapping from labels to corresponding words.
 ├── tokenizer.py # The tokenizer wrapeer to conduct text truncation.
 ├── utils.py # The tools
 └── rgl.py # The training process of RGL
-
+```
 
 ## How to define a template
 
 We inspire from [OpenPrompt](https://github.com/thunlp/OpenPrompt/tree/main) and define template as a list of dictionary. The key of raw texts in datasets is `text`, and the corresponding value is the keyword of text in loaded dataset, where we use `text_a` to denote the first sentence in every example and `text_b` to denote the other sentences by default.
 
-For example, given
-- the template ``{'text':'text_a'} It was {'mask'}.``,
-- a sample text ``nothing happens , and it happens to flat characters .``,
-the input text will be ``nothing happens , and it happens to flat characters . It was <mask>.``
+For example, given the template ``{'text':'text_a'} It was {'mask'}.`` and a sample text ``nothing happens , and it happens to flat characters .`` the input text will be ``nothing happens , and it happens to flat characters . It was <mask>.``
 
 
 ## Quick start
@@ -61,7 +59,7 @@ python rgl.py \
 --learning_rate 1e-5 \
 --template "{'text':'text_a'} It was {'mask'}." \
 --verbalizer "{'0':'terrible','1':'great'}"
-
+```
 
 The configurations consist of:
 - ``output_dir``: The directory to save model checkpoints.
