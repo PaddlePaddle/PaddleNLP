@@ -79,6 +79,7 @@ MAPPING_NAMES = OrderedDict([
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
     ("OPT", 'opt')
+    ("CodeGen", "codegen"),
 ])
 
 MAPPING_TASKS = OrderedDict([

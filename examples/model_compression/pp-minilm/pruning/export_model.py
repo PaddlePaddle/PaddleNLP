@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.fluid.core as core
+from paddle.common_ops_import import core
 
 from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger

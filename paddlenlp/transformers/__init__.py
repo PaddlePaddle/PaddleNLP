@@ -115,6 +115,8 @@ from .optimization import *
 from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+from .codegen.modeling import *
+from .codegen.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_faster_tokenizer_available

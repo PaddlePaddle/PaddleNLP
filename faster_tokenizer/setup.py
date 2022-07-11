@@ -39,17 +39,9 @@ class InstallPlatlib(install):
 
 
 if os.name != 'nt':
-    package_data = {
-        "faster_tokenizer": [
-            "core_tokenizers.so", "libicuuc.so.70", "libicudata.so.70",
-            "commit.log"
-        ]
-    }
+    package_data = {"faster_tokenizer": ["core_tokenizers.so", "commit.log"]}
 else:
-    package_data = {
-        "faster_tokenizer":
-        ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll", "commit.log"]
-    }
+    package_data = {"faster_tokenizer": ["core_tokenizers.pyd", "commit.log"]}
 
 
 def get_version():
