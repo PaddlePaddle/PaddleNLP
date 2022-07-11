@@ -30,7 +30,7 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch
 
 __all__ = [
     'PretrainedModel',
@@ -563,3 +563,7 @@ class PretrainedModel(Layer, GenerationMixin):
             new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
 
         return new_embeddings
+
+    def __setattr__(self, name, value):
+        value = adapt_stale_fwd_patch(self, name, value)
+        return super(PretrainedModel, self).__setattr__(name, value)

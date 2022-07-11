@@ -14,6 +14,7 @@
 
 import functools
 import inspect
+import warnings
 
 import paddle
 from paddle.nn import Layer
@@ -41,6 +42,68 @@ def fn_args_to_dict(func, *args, **kwargs):
     kwargs_dict.update(kwargs)
     init_dict.update(kwargs_dict)
     return init_dict
+
+
+def adapt_stale_fwd_patch(self, name, value):
+    """
+    Since there are some monkey patches for forward of PretrainedModel, such as
+    model compression, we make these patches compatible with the latest forward
+    method.
+    """
+    if name == "forward":
+        # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
+        # by an instance of `StaticFunction`. And use string compare to avoid to
+        # import fluid.
+        if type(value).__name__.endswith('StaticFunction'):
+            return value
+        if hasattr(inspect, 'getfullargspec'):
+            (patch_spec_args, patch_spec_varargs, patch_spec_varkw,
+             patch_spec_defaults, _, _, _) = inspect.getfullargspec(value)
+            (spec_args, spec_varargs, spec_varkw, spec_defaults, _, _,
+             _) = inspect.getfullargspec(self.forward)
+        else:
+            (patch_spec_args, patch_spec_varargs, patch_spec_varkw,
+             patch_spec_defaults) = inspect.getargspec(value)
+            (spec_args, spec_varargs, spec_varkw,
+             spec_defaults) = inspect.getargspec(self.forward)
+        new_args = [
+            arg for arg in ('output_hidden_states', 'output_attentions',
+                            'return_dict')
+            if arg not in patch_spec_args and arg in spec_args
+        ]
+
+        if new_args:
+            if self.__module__.startswith("paddlenlp"):
+                warnings.warn(
+                    f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} is patched and the patch "
+                    "might be based on an old oversion which missing some "
+                    f"arguments compared with the latest, such as {new_args}. "
+                    "We automatically add compatibility on the patch for "
+                    "these arguemnts, and maybe the patch should be updated.")
+            else:
+                warnings.warn(
+                    f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} "
+                    "is patched and the patch might be conflict with patches made "
+                    f"by paddlenlp which seems have more arguments such as {new_args}. "
+                    "We automatically add compatibility on the patch for "
+                    "these arguemnts, and maybe the patch should be updated.")
+            if isinstance(self, Layer) and inspect.isfunction(value):
+
+                @functools.wraps(value)
+                def wrap_fwd(*args, **kwargs):
+                    for arg in new_args:
+                        kwargs.pop(arg, None)
+                    return value(self, *args, **kwargs)
+            else:
+
+                @functools.wraps(value)
+                def wrap_fwd(*args, **kwargs):
+                    for arg in new_args:
+                        kwargs.pop(arg, None)
+                    return value(*args, **kwargs)
+
+            return wrap_fwd
+    return value
 
 
 class InitTrackerMeta(type(Layer)):
@@ -103,3 +166,7 @@ class InitTrackerMeta(type(Layer)):
             kwargs['init_class'] = self.__class__.__name__
 
         return __impl__
+
+    def __setattr__(self, name, value):
+        value = adapt_stale_fwd_patch(self, name, value)
+        return super(InitTrackerMeta, self).__setattr__(name, value)
