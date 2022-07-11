@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import random
 import numpy as np
 
 import paddle
 
-
 def set_seed(seed=0):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-
 
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)

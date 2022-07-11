@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import os
 import time
 import random
@@ -26,16 +27,18 @@ import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+from visualdl import LogWriter
 
-from model import DiffCSE, Extractor
+from model import DiffCSE, Encoder
 from utils import set_seed
 from eval_metrics import eval_metrics
 from data import read_text_single, read_text_pair, convert_example, create_dataloader, word_repetition
 
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["train", "eval", "infer"], default="infer", help="Select which mode to run model, defaults to infer.")
-parser.add_argument("--extractor_name", type=str, help="The extractor model name or path that you wanna train based on.")
+parser.add_argument("--encoder_name", type=str, help="The sentence_encoder name or path that you wanna train based on.")
 parser.add_argument("--generator_name", type=str, help="The generator model name or path that you wanna train based on.")
 parser.add_argument("--discriminator_name", type=str, help="The discriminator model name or path that you wanna train based on.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
@@ -43,8 +46,9 @@ parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embed
 parser.add_argument("--train_set_file", type=str, help="The full path of train_set_file.")
 parser.add_argument("--eval_set_file", type=str, help="The full path of eval_set_file.")
 parser.add_argument("--infer_set_file", type=str, help="The full path of infer_set_file.")
-parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded.")
-parser.add_argument("--save_dir", default="./checkpoints", type=str, help="The save directory where the model checkpoints will be written.")
+parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded when doing evalution/inference.")
+parser.add_argument("--save_dir", default="./checkpoints", type=str, help="The directory where the model checkpoints will be written.")
+parser.add_argument("--log_dir", default=None, type=str, help="The directory where log will be written.")
 parser.add_argument("--save_infer_path", default="./infer_result.txt", type=str, help="The save directory where the inference result will be written.")
 parser.add_argument("--save_steps", type=int, default=10000, help="Step interval for saving checkpoint.")
 parser.add_argument("--eval_steps", type=int, default=10000, help="Step interval for evaluation.")
@@ -54,10 +58,7 @@ parser.add_argument("--epochs", default=1, type=int, help="Total number of train
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
-parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
-parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
-parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
-parser.add_argument("--dup_rate", default=0.32, type=float, help="duplicate rate for word reptition.")
+parser.add_argument("--temp", default=0.05, type=float, help="Temperature for softmax.")
 parser.add_argument("--mlm_probability", default=0.15, type=float, help="The ratio for masked language model.")
 parser.add_argument("--lambda_weight", default=0.15, type=float, help="The weight for RTD loss.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
@@ -67,9 +68,7 @@ args = parser.parse_args()
 
 
 def do_infer(model, tokenizer, data_loader):
-    assert isinstance(
-        model,
-        Extractor), "please make sure that model is instance of Extractor."
+    assert isinstance(model, Encoder), "please make sure that model is instance of Encoder."
     sims = []
     model.eval()
     with paddle.no_grad():
@@ -82,7 +81,7 @@ def do_infer(model, tokenizer, data_loader):
                 key_token_type_ids=key_token_type_ids,
                 query_attention_mask=query_attention_mask,
                 key_attention_mask=key_attention_mask,
-            )
+                )
             sims.append(cosine_sim.numpy())
         sims = np.concatenate(sims, axis=0)
     model.train()
@@ -90,13 +89,9 @@ def do_infer(model, tokenizer, data_loader):
 
 
 def do_eval(model, tokenizer, data_loader):
-    assert isinstance(
-        model,
-        Extractor), "please make sure that model is instance of Extractor."
+    assert isinstance(model, Encoder), "please make sure that model is instance of Encoder."
     total_num = 0
-    spearman_corr = 0.0
-    sims = []
-    labels = []
+    sims, labels = [], []
     model.eval()
     with paddle.no_grad():
         for batch in data_loader:
@@ -109,38 +104,40 @@ def do_eval(model, tokenizer, data_loader):
                 key_token_type_ids=key_token_type_ids,
                 query_attention_mask=query_attention_mask,
                 key_attention_mask=key_attention_mask,
-            )
+                )
             sims.append(cosine_sim.numpy())
             labels.append(label.numpy())
-
+    
     sims = np.concatenate(sims, axis=0)
-    labels = np.concatenate(labels, axis=0)
+    labels = np.concatenate(labels, axis=0)    
     eval_res = eval_metrics(labels, sims)
     model.train()
     return eval_res, total_num
 
 
-def do_train(model, tokenizer, train_data_loader, dev_data_loader):
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.epochs
+def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(
+        args.learning_rate,
+        num_training_steps,
+        args.warmup_proportion
+    )
 
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params
+    )
 
     global_step = 0
     best_spearman = 0.0
     best_pre_rec = 0.0
-    best_rec95 = 0.0
+    best_pre = 0.0
+    best_rec = 0.0
+    best_rec95 = 0.0 
     tic_train = time.time()
     model = paddle.DataParallel(model)
     model.train()
@@ -148,111 +145,120 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask = batch
 
-            if (args.dup_rate > 0):
-                query_input_ids, query_token_type_ids = word_repetition(
-                    query_input_ids, query_token_type_ids, args.dup_rate)
-                key_input_ids, key_token_type_ids = word_repetition(
-                    key_input_ids, key_token_type_ids, args.dup_rate)
-
-            loss = model(query_input_ids,
-                         key_input_ids,
-                         query_token_type_ids=query_token_type_ids,
-                         key_token_type_ids=key_token_type_ids,
-                         query_attention_mask=query_attention_mask,
-                         key_attention_mask=key_attention_mask,
-                         cls_token=tokenizer.cls_token_id)
+            loss, rtd_loss = model(
+                query_input_ids,
+                key_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                key_token_type_ids=key_token_type_ids,
+                query_attention_mask=query_attention_mask,
+                key_attention_mask=key_attention_mask
+            )
 
             global_step += 1
             if global_step % (args.eval_steps // 10) == 0 and rank == 0:
-                print(
-                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, speed: {:.2f} step/s"
-                    .format(global_step, epoch, step, loss.item(),
-                            (args.eval_steps // 10) /
-                            (time.time() - tic_train)))
+                print("global step {}, epoch: {}, batch: {}, loss: {:.5f}, rtd_loss: {:.5f}, rtd_acc: {:.5f}, rtd_rep_acc: {:.5f}, rtd_fix_acc: {:.5f}, speed: {:.2f} step/s".format(global_step, epoch, step, loss.item(), rtd_loss.item(), model._layers.rtd_acc, model._layers.rtd_rep_acc, model._layers.rtd_fix_acc, (args.eval_steps // 10) / (time.time() - tic_train)))
+                writer.add_scalar(tag="train/loss", step=global_step, value=loss.item())
+                writer.add_scalar(tag="train/rtd_loss", step=global_step, value=rtd_loss.item())
+                writer.add_scalar(tag="train/rtd_acc", step=global_step, value=model._layers.rtd_acc)
+                writer.add_scalar(tag="train/rtd_rep_acc", step=global_step, value=model._layers.rtd_rep_acc)
+                writer.add_scalar(tag="train/rtd_fix_acc", step=global_step, value=model._layers.rtd_fix_acc)
+
                 tic_train = time.time()
 
             if global_step % args.eval_steps == 0 and rank == 0:
-                eval_res, total_num = do_eval(model._layers.extractor,
-                                              tokenizer, dev_data_loader)
+                eval_res, total_num = do_eval(model._layers.encoder, tokenizer, dev_data_loader)
                 spearman = eval_res["spearman_corr"]
+
                 if best_spearman < spearman:
-                    print(
-                        "best checkpoint has been updated: from last best_spearman {} --> new spearman {}."
-                        .format(best_spearman, spearman))
+                    print("best checkpoint has been updated: from last best_spearman {} --> new spearman {}.".format(best_spearman, spearman))
                     best_spearman = spearman
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_spearman")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(),
-                                save_param_path)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(batch))
-
+                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
+                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(step))
+                
+                writer.add_scalar(tag="eval/spearman", step=global_step, value=spearman)
+                
                 pre_rec = eval_res["best_pre_rec_thr"][0]
                 if best_pre_rec < pre_rec:
-                    print(
-                        "best checkpoint has been updated: from last best_pre_rec {} --> new pre_rec {}."
-                        .format(best_pre_rec, pre_rec))
+                    print("best checkpoint has been updated: from last best_pre_rec {} --> new pre_rec {}.".format(best_pre_rec, pre_rec))
                     best_pre_rec = pre_rec
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_pre_rec")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(),
-                                save_param_path)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(batch))
+                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
+                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(step))
+                
+                writer.add_scalar(tag="eval/pre_rec", step=global_step, value=pre_rec)
+                
+                pre = eval_res["best_pre_rec_thr"][1]
+                if best_pre < pre:
+                    print("best checkpoint has been updated: from last best_pre {} --> new pre {}.".format(best_pre, pre))
+                    best_pre = pre
+                    # save best model
+                    save_dir = os.path.join(args.save_dir, "best_pre")
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
+                    tokenizer.save_pretrained(save_dir)
+                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
+                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(step))
+
+                writer.add_scalar(tag="eval/pre", step=global_step, value=pre)
+
+                rec = eval_res["best_pre_rec_thr"][2]
+                if best_rec < rec:
+                    print("best checkpoint has been updated: from last best_rec {} --> new rec {}.".format(best_rec, rec))
+                    best_rec = rec
+                    # save best model
+                    save_dir = os.path.join(args.save_dir, "best_rec")
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
+                    tokenizer.save_pretrained(save_dir)
+                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
+                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(step))
+
+                writer.add_scalar(tag="eval/rec", step=global_step, value=rec)
 
                 rec95 = eval_res["best_pre_rec_thr_at_K"][1]
                 if best_rec95 < rec95:
-                    print(
-                        "best checkpoint has been updated: from last best_rec95 {} --> new rec95 {}."
-                        .format(best_rec95, rec95))
+                    print("best checkpoint has been updated: from last best_rec95 {} --> new rec95 {}.".format(best_rec95, rec95))
                     best_rec95 = rec95
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best_rec95")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.extractor.state_dict(),
-                                save_param_path)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(batch))
+                    with open(os.path.join(save_dir, "best_step.txt"), "w", encoding="utf-8") as f:
+                        f.write(str(global_step)+" "+str(epoch)+ " "+ str(step))
+                
+                writer.add_scalar(tag="eval/rec95", step=global_step, value=rec95)
                 model.train()
-
+                
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir,
-                                        "checkpoint_{}".format(global_step))
+                save_dir = os.path.join(args.save_dir, "checkpoint_{}".format(global_step))
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
-                paddle.save(model._layers.extractor.state_dict(),
-                            save_param_path)
+                paddle.save(model._layers.encoder.state_dict(), save_param_path)
                 tokenizer.save_pretrained(save_dir)
 
             if args.max_steps > 0 and global_step >= args.max_steps:
@@ -271,24 +277,26 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
-    # define token for processing data
-    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(
-        args.extractor_name)
-
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    # define tokenizer for processing data
+    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.encoder_name)
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length
+    )
 
     if args.mode == "train":
         start_time = time.time()
+
+        # load data
+        train_ds = load_dataset(read_text_single, data_path=args.train_set_file, lazy=False)
+        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
+        gen_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.generator_name)
+        dis_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.discriminator_name)
+
         # intializing DiffCSE model
-        model = DiffCSE(args, tokenizer)
-        train_ds = load_dataset(read_text_single,
-                                data_path=args.train_set_file,
-                                lazy=False)
-        dev_ds = load_dataset(read_text_pair,
-                              data_path=args.eval_set_file,
-                              lazy=False)
+        model = DiffCSE(encoder_name=args.encoder_name, generator_name=args.generator_name, discriminator_name=args.discriminator_name, gen_tokenizer=gen_tokenizer, dis_tokenizer=dis_tokenizer, 
+                        temp=args.temp, output_emb_size=args.output_emb_size, mlm_probability=args.mlm_probability, lambda_weight=args.lambda_weight)
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -308,42 +316,41 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        train_data_loader = create_dataloader(train_ds,
-                                              mode="train",
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
-        dev_data_loader = create_dataloader(dev_ds,
-                                            mode="eval",
-                                            batch_size=args.batch_size,
-                                            batchify_fn=dev_batchify_fn,
-                                            trans_fn=trans_func)
+        train_data_loader = create_dataloader(
+            train_ds,
+            mode="train",
+            batch_size=args.batch_size,
+            batchify_fn=batchify_fn,
+            trans_fn=trans_func
+        )
+        dev_data_loader = create_dataloader(
+            dev_ds,
+            mode="eval",
+            batch_size=args.batch_size,
+            batchify_fn=dev_batchify_fn,
+            trans_fn=trans_func
+        )
 
-        do_train(model, tokenizer, train_data_loader, dev_data_loader)
+        with LogWriter(logdir=os.path.join(args.log_dir, "scalar")) as writer:
+            do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=writer)
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
 
+
     if args.mode == "eval":
         start_time = time.time()
-        # initalizing Extractor model for eval
-        model = Extractor(args.extractor_name,
-                          margin=args.margin,
-                          scale=args.scale,
-                          output_emb_size=args.output_emb_size)
+        # initalizing encoder model for eval
+        model = Encoder(args.encoder_name, temp=args.temp, output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
-                print(
-                    "*************************initializing model from {}*****************************"
-                    .format(init_from_ckpt))
+                print("*************************initializing model from {}*****************************".format(init_from_ckpt))
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        dev_ds = load_dataset(read_text_pair,
-                              data_path=args.eval_set_file,
-                              lazy=False)
+        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
 
         dev_batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -355,39 +362,33 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        dev_data_loader = create_dataloader(dev_ds,
-                                            mode="eval",
-                                            batch_size=args.batch_size,
-                                            batchify_fn=dev_batchify_fn,
-                                            trans_fn=trans_func)
+        dev_data_loader = create_dataloader(
+            dev_ds,
+            mode="eval",
+            batch_size=args.batch_size,
+            batchify_fn=dev_batchify_fn,
+            trans_fn=trans_func
+        )
 
         eval_res, total_num = do_eval(model, tokenizer, dev_data_loader)
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
 
-    if args.mode == "infer":
+    if args.mode == "infer": 
         start_time = time.time()
-        # initalizing Extractor model for eval
-        model = Extractor(args.extractor_name,
-                          margin=args.margin,
-                          scale=args.scale,
-                          output_emb_size=args.output_emb_size)
+        # initalizing encoder model for eval
+        model = Encoder(args.encoder_name, temp=args.temp, output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
-                print(
-                    "*************************initializing model from {}*****************************"
-                    .format(init_from_ckpt))
+                print("*************************initializing model from {}*****************************".format(init_from_ckpt))
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        infer_ds = load_dataset(read_text_pair,
-                                data_path=args.infer_set_file,
-                                lazy=False,
-                                is_infer=True)
-
+        infer_ds = load_dataset(read_text_pair, data_path=args.infer_set_file, lazy=False, is_infer=True)
+        
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
@@ -397,11 +398,13 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
 
-        infer_data_loader = create_dataloader(infer_ds,
-                                              mode="predict",
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
+        infer_data_loader = create_dataloader(
+            infer_ds,
+            mode="infer",
+            batch_size=args.batch_size,
+            batchify_fn=batchify_fn,
+            trans_fn=trans_func
+        )
 
         cosin_sim = do_infer(model, tokenizer, infer_data_loader)
 
@@ -409,6 +412,10 @@ if __name__ == "__main__":
             for idx, cos in enumerate(cosin_sim):
                 msg = "{} --> {}\n".format(idx, cos)
                 f.write(msg)
+            print("Inference result has been saved to : {}".format(args.save_infer_path))
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
+
+        
+

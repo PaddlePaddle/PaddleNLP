@@ -24,48 +24,49 @@ DiffCSE/
 可以运行如下命令，开始模型训练并且进行模型测试。
 
 ```shell
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+gpu_ids=0
+export CUDA_VISIBLE_DEVICES=${gpu_ids}
+log_dir="log_diffcse_ErG3D3"
 
-python -u -m paddle.distributed.launch --gpus ${gpu_ids} \
-    run_diffcse.py \
-    --mode "train" \
-    --extractor_name "rocketqa-zh-dureader-query-encoder" \
-    --generator_name "ernie-1.0" \
-    --discriminator_name "ernie-1.0" \
-    --max_seq_length "128" \
-    --output_emb_size "32" \
-    --train_set_file ./data/train.txt \
-    --eval_set_file ./data/test_v1.txt \
-    --save_dir ./checkpoints \
-    --save_steps "10000" \
-    --eval_steps "1000" \
-    --batch_size "32" \
-    --epochs "3" \
-    --learning_rate "3e-5" \
-    --weight_decay "0.01" \
-    --warmup_proportion "0.01" \
-    --dropout "0.1" \
-    --margin "0.0" \
-    --scale "20" \
-    --seed "0" \
-    --device "gpu"
+python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
+	run_diffcse.py \
+	--mode "train" \
+	--encoder_name "rocketqa-zh-dureader-query-encoder" \
+	--generator_name "ernie-3.0-base-zh" \
+	--discriminator_name "ernie-3.0-base-zh" \
+	--max_seq_length "128" \
+	--output_emb_size "32" \
+	--train_set_file "../dataset/100w/train_webdata.txt" \
+	--eval_set_file "../dataset/100w/test_v1.txt" \
+	--save_dir "./checkpoints_diffcse_ErG3D3" \
+	--log_dir ${log_dir} \
+	--save_steps "50000" \
+	--eval_steps "1000" \
+	--batch_size "32" \
+	--epochs "3" \
+	--mlm_probability "0.15" \
+	--lambda_weight "0.15" \
+	--learning_rate "3e-5" \
+	--weight_decay "0.01" \
+	--warmup_proportion "0.01" \
+	--seed "0" \
+	--device "gpu"
 ```
 
 可支持配置的参数：
 * `mode`：可选，用于指明本次运行是模型训练、模型评估还是模型预测，仅支持[train, eval, infer]三种模式；默认为 infer。
-* `extractor_name`：可选，DiffCSE模型中用于向量抽取的模型名称；默认为 ernie-1.0。
+* `encoder_name`：可选，DiffCSE模型中用于向量抽取的模型名称；默认为 ernie-3.0-base-zh。
 * `generator_name`: 可选，DiffCSE模型中生成器的模型名称；默认为 ernie-3.0-base-zh。
 * `discriminator_name`: 可选，DiffCSE模型中判别器的模型名称；默认为 rocketqa-zh-dureader-query-encoder。
 * `epochs`: 模型训练轮次，默认为3。
 * `batch_size`：可选，批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：可选，Fine-tune 的最大学习率；默认为5e-5。
 * `weight_decay`：可选，控制正则项力度的参数，用于防止过拟合，默认为0.01。
-* `warmup_proption`：可选，学习率 warmup 策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到 learning_rate, 而后再缓慢衰减，默认为0.01。
+* `warmup_proportion`：可选，学习率 warmup 策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到 learning_rate, 而后再缓慢衰减，默认为0.01。
+* `mlm_probability`：可选，利用生成器预测时，控制单词掩码的比例，默认为0.15。
+* `lambda_weight`：可选，控制RTD任务loss的占比，默认为0.15。
 * `max_seq_length`：可选，ERNIE-Gram 模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `output_emb_size`：可选，向量抽取模型输出向量的维度；默认为32。
-* `dropout`：可选，DiffCSE 网络前向使用的 dropout 取值；默认 0.1。
-* `margin`：可选，用于计算损失时，保持正例相对于负例的 margin 值；默认 0.0.
-* `scale`：可选，在计算 cross_entropy loss 之前对 cosine 相似度进行缩放的因子；默认为 20。
 * `train_set_file`：可选，用于指定训练集的路径。
 * `eval_set_file`：可选，用于指定验证集的路径。
 * `save_dir`：可选，保存训练模型的目录；
@@ -78,7 +79,7 @@ python -u -m paddle.distributed.launch --gpus ${gpu_ids} \
 如：
 ```text
 checkpoints/
-├── model_10000
+├── model_best_spearman
 │   ├── model_state.pdparams
 │   ├── tokenizer_config.json
 │   ├── special_tokens_map.json
@@ -90,24 +91,22 @@ checkpoints/
 可以运行如下命令，进行模型评估。
 
 ```shell
-export CUDA_VISIBLE_DEVICES=0
+gpu_ids=0
+export CUDA_VISIBLE_DEVICES=${gpu_ids}
 
-python run_diffcse.py \
-    --mode "eval" \
-    --extractor_name "rocketqa-zh-dureader-query-encoder" \
-    --generator_name "ernie-1.0" \
-    --discriminator_name "ernie-1.0" \
-    --max_seq_length "128" \
-    --output_emb_size "32" \
-    --eval_set_file ./data/test_v1.txt \
-    --ckpt_dir ./checkpoints/checkpoint_10000 \
-    --batch_size "8" \
-    --dropout "0.1" \
-    --margin "0.0" \
-    --scale "20" \
-    --dup_rate "0.0" \
-    --seed "0" \
-    --device "gpu"
+log_dir="log_eval"
+python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
+    run_diffcse.py \
+	--mode "eval" \
+	--encoder_name "rocketqa-zh-dureader-query-encoder" \
+	--max_seq_length "128" \
+	--output_emb_size "32" \
+	--eval_set_file "../diffcse/data/test_v1.txt" \
+	--ckpt_dir "./checkpoints_diffcse_ErG3D3/best_spearman" \
+	--batch_size "8" \
+	--seed "0" \
+	--device "gpu"
+
 ```
 可支持配置的参数：
 * `ckpt_dir`: 用于指定进行模型评估的checkpoint路径。
@@ -118,25 +117,23 @@ python run_diffcse.py \
 
 可以运行如下命令，进行模型预测：
 ```shell
-export CUDA_VISIBLE_DEVICES=0
+gpu_ids=0
+export CUDA_VISIBLE_DEVICES=${gpu_ids}
 
-python run_diffcse.py \
-    --mode "eval" \
-    --extractor_name "rocketqa-zh-dureader-query-encoder" \
-    --generator_name "ernie-1.0" \
-    --discriminator_name "ernie-3.0-base-zh" \
-    --max_seq_length "128" \
-    --output_emb_size "32" \
-    --infer_set_file "./data/test.txt" \
-    --ckpt_dir "./checkpoints/best_spearman" \
+log_dir="log_infer"
+python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
+    run_diffcse.py \
+	--mode "infer" \
+	--encoder_name "rocketqa-zh-dureader-query-encoder" \
+	--max_seq_length "128" \
+	--output_emb_size "32" \
+	--infer_set_file "../diffcse/data/test.txt" \
+	--ckpt_dir "./checkpoints_diffcse_ErG3D3/best_spearman" \
     --save_infer_path "./infer_result.txt" \
-    --batch_size "8" \
-    --dropout "0.1" \
-    --margin "0.0" \
-    --scale "20" \
-    --dup_rate "0.0" \
-    --seed "0" \
-    --device "gpu"
+	--batch_size "8" \
+	--seed "0" \
+	--device "gpu"
+
 
 ```
 
