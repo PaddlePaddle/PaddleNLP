@@ -107,7 +107,8 @@ do
                 --seed $seed \
                 --learning_rate $lr \
                 --template "$temp" \
-                --verbalizer "$verb"
+                --verbalizer "$verb" \
+                --overwrite_output 
             done
         done
     done

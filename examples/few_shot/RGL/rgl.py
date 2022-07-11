@@ -17,6 +17,7 @@ import argparse
 from tqdm import tqdm
 from functools import partial
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddlenlp.utils.log import logger
@@ -110,10 +111,9 @@ def contrastive_loss(sentence_embeddings, labels, task_type='classification'):
             score = score.unsqueeze(0)
             logits = paddle.concat([(1 - score) * 50, (1 + score) * 50],
                                    axis=-1)
-            labels = paddle.to_tensor(
-                equal_int(sentence_embeddings[i], sentence_embeddings[j]))
+            label = paddle.to_tensor(equal_int(labels[i], labels[j]))
             loss += bce_metric(logits.reshape([-1, logits.shape[-1]]),
-                               labels.unsqueeze(0))
+                               label.unsqueeze(0))
     loss = loss / (batch_size * (batch_size - 1))
     loss = loss / 100
     return loss
