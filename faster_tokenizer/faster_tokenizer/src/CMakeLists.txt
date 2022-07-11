@@ -18,6 +18,10 @@ cc_library(core_tokenizers SHARED
                 pybind_core normalizers pretokenizers core models
                 tokenizer added_vocabulary postprocessors json)
 set_target_properties(core_tokenizers PROPERTIES PREFIX "")
+if (WIN32)
+set_target_properties(core_tokenizers PROPERTIES SUFFIX ".pyd")
+endif()
+
 else(WITH_PYTHON)
 # add_subdirectory(tokenizers)
 cc_library(core_tokenizers SHARED
