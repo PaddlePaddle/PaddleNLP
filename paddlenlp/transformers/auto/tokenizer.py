@@ -284,9 +284,10 @@ class AutoTokenizer():
                 with io.open(resolved_vocab_file, encoding="utf-8") as f:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class",
-                                             None) or init_kwargs.pop(
-                                                 "tokenizer_class", None)
+                init_class = init_kwargs.pop("init_class", None)
+                if not init_class:
+                    init_class = init_kwargs.pop("tokenizer_class", None)
+
                 if init_class:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
