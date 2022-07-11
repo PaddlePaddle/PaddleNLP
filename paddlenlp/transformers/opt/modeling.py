@@ -25,8 +25,7 @@ import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddlenlp.transformers.gpt.modeling import MultiHeadAttention
-
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 __all__ = [
     'OPTModel',
@@ -581,7 +580,7 @@ class OPTForCausalLM(OPTPretrainedModel):
     """
 
     def __init__(self, opt: OPTModel):
-        super(OPTLMHeadModel, self).__init__()
+        super(OPTForCausalLM, self).__init__()
         self.opt = opt
         self.lm_head = OPTLMHead(
             hidden_size=self.opt.config["hidden_size"],
@@ -621,7 +620,7 @@ class OPTForCausalLM(OPTPretrainedModel):
                 from paddlenlp.transformers import OPTForCausalLM, GPTTokenizer
 
                 tokenizer = GPTTokenizer.from_pretrained('facebook/opt-125m')
-                model = OPTForPretraining.from_pretrained('facebook/opt-125m')
+                model = OPTForCausalLM.from_pretrained('facebook/opt-125m')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}

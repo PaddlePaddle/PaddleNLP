@@ -332,15 +332,6 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_vocab_link,
             "gpt2-en": gpt_vocab_link,
             "gpt2-small-en": gpt_vocab_link,
-            "facebook": gpt_vocab_link,
-            "facebook/opt-125m": "",
-            "facebook/opt-350m": "",
-            "facebook/opt-1.3b": "",
-            "facebook/opt-2.7b": "",
-            "facebook/opt-6.7b": "",
-            "facebook/opt-13b": "",
-            "facebook/opt-30b": "",
-            "facebook/opt-66b": ""
         },
         "merges_file": {
             "gpt3-175B-en": gpt_merges_link,
@@ -352,15 +343,6 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-medium-en": gpt_merges_link,
             "gpt2-en": gpt_merges_link,
             "gpt2-small-en": gpt_merges_link,
-            "facebook": gpt_merges_link,
-            "facebook/opt-125m": "",
-            "facebook/opt-350m": "",
-            "facebook/opt-1.3b": "",
-            "facebook/opt-2.7b": "",
-            "facebook/opt-6.7b": "",
-            "facebook/opt-13b": "",
-            "facebook/opt-30b": "",
-            "facebook/opt-66b": ""
         }
     }
     pretrained_init_configuration = {
@@ -373,14 +355,6 @@ class GPTTokenizer(PretrainedTokenizer):
         "gpt2-medium-en": {},
         "gpt2-en": {},
         "gpt2-small-en": {},
-        "facebook/opt-125m": {},
-        "facebook/opt-350m": {},
-        "facebook/opt-1.3b": {},
-        "facebook/opt-2.7b": {},
-        "facebook/opt-6.7b": {},
-        "facebook/opt-13b": {},
-        "facebook/opt-30b": {},
-        "facebook/opt-66b": {},
     }
 
     def __init__(
@@ -555,3 +529,12 @@ class GPTTokenizer(PretrainedTokenizer):
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
                 shutil.copyfile(source_path, save_path)
+
+    def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (string) in a single string.
+        """
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
+        return text
