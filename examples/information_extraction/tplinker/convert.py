@@ -89,7 +89,6 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
                                               use_faster=True)
-
     tokenize = tokenizer.tokenize
     get_tok2char_span_map = lambda text: tokenizer(text,
                                                    return_token_type_ids=None,

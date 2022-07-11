@@ -15,13 +15,14 @@
 import argparse
 import json
 import time
+import os
 from functools import partial
 
 import paddle
 from paddlenlp.datasets import MapDataset
 from paddlenlp.transformers import AutoTokenizer, AutoModel
 
-from utils import Preprocessor, set_seed, convert_example
+from utils import Preprocessor, set_seed, DataMaker
 from model import TPLinkerPlus, HandshakingTaggingScheme
 from metric import MetricsCalculator
 
@@ -68,34 +69,23 @@ def do_train():
     handshaking_tagger = HandshakingTaggingScheme(rel2id, max_seq_len, ent2id)
     tag_size = handshaking_tagger.get_tag_size()
 
-    train_ds = MapDataset(train_data)
-    dev_ds = MapDataset(valid_data)
+    data_maker = DataMaker(tokenizer, handshaking_tagger)
 
-    train_ds = train_ds.map(
-        partial(convert_example,
-                tokenizer=tokenizer,
-                shaking_tagger=handshaking_tagger,
-                max_seq_len=args.max_seq_len))
+    train_data = data_maker.get_indexed_data(train_data, max_seq_len)
+    valid_data = data_maker.get_indexed_data(valid_data, max_seq_len)
 
-    dev_ds = dev_ds.map(
-        partial(convert_example,
-                tokenizer=tokenizer,
-                shaking_tagger=handshaking_tagger,
-                max_seq_len=args.max_seq_len))
+    train_data_loader = paddle.io.DataLoader(
+        MapDataset(train_data),
+        batch_size=args.batch_size,
+        num_workers=0,
+        shuffle=True,
+        collate_fn=data_maker.generate_batch)
 
-    train_batch_sampler = paddle.io.BatchSampler(dataset=train_ds,
-                                                 batch_size=args.batch_size,
-                                                 shuffle=True)
-    train_data_loader = paddle.io.DataLoader(dataset=train_ds,
-                                             batch_sampler=train_batch_sampler,
-                                             return_list=True)
-
-    dev_batch_sampler = paddle.io.BatchSampler(dataset=dev_ds,
-                                               batch_size=args.batch_size,
-                                               shuffle=False)
-    dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
-                                           batch_sampler=dev_batch_sampler,
-                                           return_list=True)
+    dev_data_loader = paddle.io.DataLoader(MapDataset(valid_data),
+                                           batch_size=args.batch_size,
+                                           num_workers=0,
+                                           shuffle=False,
+                                           collate_fn=data_maker.generate_batch)
 
     model = TPLinkerPlus(encoder, tag_size)
 
@@ -121,7 +111,7 @@ def do_train():
 
     for epoch in range(1, args.num_epochs + 1):
         for batch in train_data_loader:
-            input_ids, token_type_ids, att_mask, shaking_tags = batch
+            sample_list, input_ids, att_mask, token_type_ids, _, shaking_tags = batch
             pred_small_shaking_outputs, sampled_tok_pair_indices = model(
                 input_ids, att_mask, token_type_ids)
 
@@ -130,14 +120,14 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--batch_size", default=4, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
-    parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
+    parser.add_argument("--train_path", default="./data/train_data.json", type=str, help="The path of train set.")
+    parser.add_argument("--dev_path", default="./data/valid_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--rel2id_path", default="./data/rel2id.json", type=str, help="The file path of the mappings of relations.")
     parser.add_argument("--ent2id_path", default="./data/ent2id.json", type=str, help="The file path of the mappings of entities.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
+    parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum input sequence length. "
         "Sequences longer than this will be split automatically.")
     parser.add_argument("--sliding_len", default=50, type=int, help="")
     parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")

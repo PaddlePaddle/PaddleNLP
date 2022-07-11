@@ -29,31 +29,77 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def convert_example(example,
-                    tokenizer,
-                    shaking_tagger,
-                    max_seq_len,
-                    data_type="train"):
-    encoded_inputs = tokenizer(text=example['text'],
-                               max_seg_len=max_seq_len,
-                               truncation=True,
-                               pad_to_max_seq_len=True,
-                               add_special_tokens=False,
-                               return_token_type_ids=None,
-                               return_attention_mask=True,
-                               return_offsets_mapping=True)
+class DataMaker():
 
-    matrix_spots = None
-    if data_type != "test":
-        matrix_spots = shaking_tagger.get_spots(example)
+    def __init__(self, tokenizer, shaking_tagger):
+        self.tokenizer = tokenizer
+        self.shaking_tagger = shaking_tagger
 
-    tokenized_output = [
-        encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
-        encoded_inputs["attention_mask"], encoded_inputs["offset_mapping"],
-        matrix_spots
-    ]
-    tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
-    return tokenized_output
+    def get_indexed_data(self, data, max_seq_len, data_type="train"):
+        indexed_samples = []
+        for ind, sample in tqdm(enumerate(data),
+                                desc="Generate indexed train or valid data"):
+            text = sample["text"]
+            encoded_inputs = self.tokenizer(text=text,
+                                            max_seq_len=max_seq_len,
+                                            truncation=True,
+                                            pad_to_max_seq_len=True,
+                                            add_special_tokens=False,
+                                            return_token_type_ids=None,
+                                            return_attention_mask=True,
+                                            return_offsets_mapping=True)
+
+            # tagging
+            matrix_spots = None
+            if data_type != "test":
+                matrix_spots = self.shaking_tagger.get_spots(sample)
+
+            # get codes
+            input_ids = encoded_inputs["input_ids"]
+            attention_mask = encoded_inputs["attention_mask"]
+            token_type_ids = encoded_inputs["token_type_ids"]
+            tok2char_span = encoded_inputs["offset_mapping"]
+
+            sample_tp = (
+                sample,
+                input_ids,
+                attention_mask,
+                token_type_ids,
+                tok2char_span,
+                matrix_spots,
+            )
+            indexed_samples.append(sample_tp)
+        return indexed_samples
+
+    def generate_batch(self, batch_data, data_type="train"):
+        sample_list = []
+        input_ids_list = []
+        attention_mask_list = []
+        token_type_ids_list = []
+        tok2char_span_list = []
+        matrix_spots_list = []
+
+        for tp in batch_data:
+            sample_list.append(tp[0])
+            input_ids_list.append(tp[1])
+            attention_mask_list.append(tp[2])
+            token_type_ids_list.append(tp[3])
+            tok2char_span_list.append(tp[4])
+            if data_type != "test":
+                matrix_spots_list.append(tp[5])
+
+        batch_input_ids = np.stack(input_ids_list)
+        batch_attention_mask = np.stack(attention_mask_list)
+        batch_token_type_ids = np.stack(token_type_ids_list)
+
+        batch_shaking_tag = None
+        if data_type != "test":
+            batch_shaking_tag = self.shaking_tagger.spots2shaking_tag4batch(
+                matrix_spots_list)
+
+        return sample_list, \
+              batch_input_ids, batch_attention_mask, batch_token_type_ids, tok2char_span_list, \
+                batch_shaking_tag
 
 
 class Preprocessor:
