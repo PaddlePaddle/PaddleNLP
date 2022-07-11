@@ -19,7 +19,6 @@ import random
 import time
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
@@ -108,7 +107,7 @@ if __name__ == "__main__":
         Stack(dtype="int64"),  # title_seq_lens
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    tokenizer = ppnlp.data.JiebaTokenizer(vocab)
+    tokenizer = JiebaTokenizer(vocab)
     trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False)
     train_loader = create_dataloader(train_ds,
                                      trans_fn=trans_fn,
