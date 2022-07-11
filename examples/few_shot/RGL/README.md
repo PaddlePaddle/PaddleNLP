@@ -8,7 +8,9 @@ This is the implementation of the paper [RGL: A Simple yet Effective Relation Gr
 
 # Overview
 
-![Overview_of_RGL](https://user-images.githubusercontent.com/25607475/178176845-c559b07f-5278-432d-a4d8-ed9bd74d393c.png)
+<h2 align="center">
+<img align="center"  src="https://user-images.githubusercontent.com/25607475/178176845-c559b07f-5278-432d-a4d8-ed9bd74d393c.png" alt="overview" width = "600" height = "400">
+</h2>
 
 We propose a simple yet effective Relation Graph augmented Learning RGL method that can obtain better performance in few-shot natural language understanding tasks.
 
@@ -24,12 +26,14 @@ We evaluate on the [GLUE variant data](https://paddlenlp.bj.bcebos.com/datasets/
 The structure of the code:
 
 ```
-rgl
-├── template.py # The parser for prompt template.
-├── verbalizer.py # The mapping from labels to corresponding words.
-├── tokenizer.py # The tokenizer wrapeer to conduct text truncation.
-├── utils.py # The tools
-└── rgl.py # The training process of RGL
+├── scripts/
+│   ├── run_pet.sh  # Script for PET
+│   └── run_rgl.sh  # Script for RGL
+├── template.py     # The parser for prompt template
+├── verbalizer.py   # The mapping from labels to corresponding words
+├── tokenizer.py    # The tokenizer wrapeer to conduct text truncation
+├── utils.py        # The tools
+└── rgl.py          # The training process of RGL
 ```
 
 ## How to define a template
