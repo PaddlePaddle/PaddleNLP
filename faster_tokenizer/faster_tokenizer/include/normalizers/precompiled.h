@@ -15,12 +15,29 @@ limitations under the License. */
 #pragma once
 
 #include <string>
+#include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
+#include "utils/sentencepiece_normalizer.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
+
 namespace normalizers {
 struct PrecompiledNormalizer : public Normalizer {
+  PrecompiledNormalizer() = default;
+  explicit PrecompiledNormalizer(const std::string& precompiled_charsmap);
+  PrecompiledNormalizer(const PrecompiledNormalizer& precompiled_normalizer);
+
   virtual void operator()(NormalizedString* mut_str) const override;
+  void SetPrecompiledCharsMap(const std::string& precompiled_charsmap);
+
+private:
+  std::unique_ptr<utils::Normalizer> sentencepiece_normalizer_;
+  friend void to_json(nlohmann::json& j,
+                      const PrecompiledNormalizer& precompiled_normalizer);
+  friend void from_json(const nlohmann::json& j,
+                        PrecompiledNormalizer& precompiled_normalizer);
 };
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

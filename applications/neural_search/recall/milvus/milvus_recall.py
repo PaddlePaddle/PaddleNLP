@@ -29,7 +29,6 @@ class RecallByMilvus():
                 top_k=top_k,
                 params=search_param,
                 partition_tag=partition_tag)
-            # print(status)
             return status, results
         except Exception as e:
             print('Milvus recall error: ', e)

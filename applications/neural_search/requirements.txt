@@ -1,4 +1,4 @@
-pymilvus>=1.1.2
+pymilvus==1.1.2
 pandas==0.25.1 
 paddlenlp>=2.1.1    
 paddlepaddle-gpu>=2.1.3

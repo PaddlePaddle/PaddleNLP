@@ -30,7 +30,8 @@ limitations under the License. */
 #include <omp.h>
 #endif
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace core {
 
 normalizers::Normalizer* Tokenizer::GetNormalizerPtr() const {
@@ -488,6 +489,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::SequenceNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::SequenceNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::PrecompiledNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::PrecompiledNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -496,6 +501,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
     if (typeid(*tokenizer.pretokenizer_.get()) ==
         typeid(pretokenizers::BertPreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::BertPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::MetaSpacePreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::MetaSpacePreTokenizer*>(
           tokenizer.pretokenizer_.get());
     }
   }
@@ -508,6 +517,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(models::FasterWordPiece)) {
       j["model"] =
           *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::BPE)) {
+      j["model"] = *dynamic_cast<models::BPE*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::Unigram)) {
+      j["model"] = *dynamic_cast<models::Unigram*>(tokenizer.model_.get());
     }
   }
 
@@ -583,6 +596,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::SequenceNormalizer unicode_normalizer;
         normalizer.get_to(unicode_normalizer);
         tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "PrecompiledNormalizer") {
+        normalizers::PrecompiledNormalizer precompiled_normalizer;
+        normalizer.get_to(precompiled_normalizer);
+        tokenizer.SetNormalizer(precompiled_normalizer);
       }
     }
 
@@ -592,6 +609,9 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
       if (pretokenizer.at("type") == "BertPreTokenizer") {
         pretokenizers::BertPreTokenizer bert_pretokenizer;
         tokenizer.SetPreTokenizer(bert_pretokenizer);
+      } else if (pretokenizer.at("type") == "MetaSpacePreTokenizer") {
+        pretokenizers::MetaSpacePreTokenizer meta_pretokenizer;
+        tokenizer.SetPreTokenizer(meta_pretokenizer);
       }
     }
 
@@ -606,6 +626,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         models::FasterWordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);
+      } else if (model.at("type") == "BPE") {
+        models::BPE bpe;
+        model.get_to(bpe);
+        tokenizer.SetModel(bpe);
+      } else if (model.at("type") == "Unigram") {
+        models::Unigram unigram;
+        model.get_to(unigram);
+        tokenizer.SetModel(unigram);
       }
     }
 
@@ -672,9 +700,8 @@ template void Tokenizer::SetNormalizer(const normalizers::NFKCNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFKDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NmtNormalizer&);
-// TODO(zhoushunjie): Need to implement PrecompiledNormalizer later
-// template void Tokenizer::SetNormalizer(const
-// normalizers::PrecompiledNormalizer&);
+template void Tokenizer::SetNormalizer(
+    const normalizers::PrecompiledNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::ReplaceNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::SequenceNormalizer&);
 template void Tokenizer::SetNormalizer(
@@ -685,12 +712,18 @@ template void Tokenizer::SetNormalizer(const normalizers::StripNormalizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
 template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::MetaSpacePreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
 template void Tokenizer::SetModel(const models::WordPiece&);
 template Tokenizer::Tokenizer(const models::FasterWordPiece&);
 template void Tokenizer::SetModel(const models::FasterWordPiece&);
+template Tokenizer::Tokenizer(const models::BPE&);
+template void Tokenizer::SetModel(const models::BPE&);
+template Tokenizer::Tokenizer(const models::Unigram&);
+template void Tokenizer::SetModel(const models::Unigram&);
 
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(
@@ -700,5 +733,6 @@ template void Tokenizer::SetPostProcessor(
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

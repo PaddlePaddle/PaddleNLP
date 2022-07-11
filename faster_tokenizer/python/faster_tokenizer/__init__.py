@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 from typing import Tuple, Union, Tuple, List
 
@@ -37,4 +37,4 @@ from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
                               PadStrategy)
 from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
 
-from .tokenizers_impl import ErnieFasterTokenizer
+from .tokenizers_impl import ErnieFasterTokenizer, SentencePieceBPEFasterTokenizer

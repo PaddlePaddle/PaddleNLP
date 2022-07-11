@@ -16,11 +16,10 @@ from __future__ import print_function
 import sys
 import paddle
 from paddle.optimizer import Optimizer
-from paddle.fluid.clip import ClipGradByGlobalNorm
-from paddle.fluid.dygraph import base as imperative_base
-from paddle.fluid import framework
-from paddle.fluid.framework import Variable
-from paddle.fluid import core
+from paddle.nn import ClipGradByGlobalNorm
+from paddle import framework
+from paddle.static import Variable
+from paddle.framework import core
 from paddle.fluid import layers
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
@@ -46,7 +45,7 @@ class HybridParallelClipGrad:
         self._clip = clip
         self._hcg = hcg
 
-    @imperative_base.no_grad
+    @paddle.no_grad
     def _dygraph_clip(self, params_grads):
         params_and_grads = []
         sum_square_list_dist = []
@@ -141,7 +140,7 @@ class MOEOptimizer:
             self._inner_opt._grad_clip = HybridParallelClipGrad(
                 self._inner_opt._grad_clip, hcg)
 
-    @imperative_base.no_grad
+    @paddle.no_grad
     @framework.dygraph_only
     def step(self):
         parameters_list = _obtain_optimizer_parameters_list(self._inner_opt)

@@ -170,10 +170,12 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
                          attn_dropout=attn_dropout,
                          act_dropout=act_dropout,
                          normalize_before=normalize_before)
-        self.self_attn = MultiHeadAttentionWithRotary(d_model,
-                                                      nhead,
-                                                      dropout=attn_dropout,
-                                                      rotary_value=rotary_value)
+        self.self_attn = MultiHeadAttentionWithRotary(
+            d_model,
+            nhead,
+            dropout=attn_dropout,
+            rotary_value=rotary_value,
+            max_position_embeddings=max_position_embeddings)
         self._config.update({
             "rotary_value": rotary_value,
             "max_position_embeddings": max_position_embeddings
