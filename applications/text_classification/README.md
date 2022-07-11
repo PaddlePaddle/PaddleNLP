@@ -43,7 +43,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 接下来，我们将按数据准备、训练、性能优化部署等三个阶段对文本分类应用的全流程进行介绍。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/177523359-5976b906-f3eb-4fda-8660-a166ba73fc91.jpg />
+    <img width="1238" alt="image" src="https://user-images.githubusercontent.com/16698950/178186513-565e29ec-95d4-4368-8382-cab59b27d94c.png">
 </div>
 
 1. 数据准备阶段
