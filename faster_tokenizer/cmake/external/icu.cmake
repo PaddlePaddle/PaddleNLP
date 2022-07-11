@@ -64,7 +64,7 @@ ExternalProject_Add(
         GIT_PROGRESS      1
         PREFIX            ${ICU_PREFIX_DIR}
         UPDATE_COMMAND    ""
-        CONFIGURE_COMMAND msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64
+        CONFIGURE_COMMAND msbuild ..\\extern_icu\\icu4c\\source\\allinone\\allinone.sln /p:Configuration=Release /p:Platform=x64 /p:RuntimeLibrary=MT_StaticRelease
         BUILD_COMMAND ""
         INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/include ${ICU_INSTALL_DIR}/include
                      && ${CMAKE_COMMAND} -E copy_directory ../extern_icu/icu4c/lib64 ${ICU_INSTALL_DIR}/lib64

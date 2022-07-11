@@ -37,10 +37,32 @@ foreach(
     if(${flag_var} MATCHES "/MD")
       string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
     else()
-        set(${flag_var} "${CMAKE_CXX_FLAGS} /MT")
+        set(${flag_var} "${flag_var} /MT")
     endif()
+endforeach()
 
-  endforeach()
+set(CMAKE_SUPPRESS_REGENERATION ON)
+set(CMAKE_STATIC_LIBRARY_PREFIX lib)
+
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /bigobj")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /bigobj")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /bigobj")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /bigobj")
+
+if("${CMAKE_GENERATOR}" STREQUAL "Ninja")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Zc:inline")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zc:inline")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zc:inline")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zc:inline")
+endif()
+
+foreach(flag_var CMAKE_SHARED_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS
+                CMAKE_EXE_LINKER_FLAGS CMAKE_LINKER_FLAGS)
+set(${flag_var}
+    "${${flag_var}} /ignore:4049 /ignore:4217 /ignore:4006 /ignore:4221")
+set(${flag_var} "${${flag_var}} /NODEFAULTLIB:MSVCRT.LIB")
+endforeach()
+
 ELSE(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
 ENDIF(WIN32)
