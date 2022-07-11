@@ -154,8 +154,7 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             raise NotImplementedError(
                 f'model of {type(base_model)} has not implemented the `get_input_embedding`'
-                ' or `set_input_embedding` method'
-            )
+                ' or `set_input_embedding` method')
 
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
@@ -498,7 +497,9 @@ class PretrainedModel(Layer, GenerationMixin):
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
 
-    def resize_token_embeddings(self, new_num_tokens: Optional[int]=None) -> nn.Embedding:
+    def resize_token_embeddings(self,
+                                new_num_tokens: Optional[int] = None
+                                ) -> nn.Embedding:
         """
         Resizes input token embeddings matrix of the model according to new_num_tokens.
 
@@ -512,8 +513,8 @@ class PretrainedModel(Layer, GenerationMixin):
             paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
         old_embeddings: nn.Embedding = self.get_input_embeddings()
-
-        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[0]:
+        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[
+                0]:
             return old_embeddings
 
         new_embeddings = self._get_resized_embeddings(old_embeddings,
@@ -528,7 +529,10 @@ class PretrainedModel(Layer, GenerationMixin):
 
         return new_embeddings
 
-    def _get_resized_embeddings(self, old_embeddings: nn.Embedding, new_num_tokens: Optional[int]=None) -> nn.Embedding:
+    def _get_resized_embeddings(
+            self,
+            old_embeddings: nn.Embedding,
+            new_num_tokens: Optional[int] = None) -> nn.Embedding:
         """
         Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
         initialized vectors at the end. Reducing the size will remove vectors from the end
