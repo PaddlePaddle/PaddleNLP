@@ -9,7 +9,7 @@ This is the implementation of the paper [RGL: A Simple yet Effective Relation Gr
 # Overview
 
 <h2 align="center">
-<img align="center"  src="https://user-images.githubusercontent.com/25607475/178176845-c559b07f-5278-432d-a4d8-ed9bd74d393c.png" alt="overview" width = "350" height = "500">
+<img align="center"  src="https://user-images.githubusercontent.com/25607475/178176845-c559b07f-5278-432d-a4d8-ed9bd74d393c.png" alt="overview" width = "410" height = "400">
 </h2>
 
 We propose a simple yet effective Relation Graph augmented Learning RGL method that can obtain better performance in few-shot natural language understanding tasks.
@@ -18,7 +18,7 @@ RGL constructs a relation graph based on the label consistency between samples i
 
 # Prepare the data
 
-We evaluate on the GLUE variant for few-shot learning in the paper, including SST-2, SST-5, MR, CR, MPQA, Subj, TREC, CoLA, MNLI, MNLI-mm, SNLI, QNLI, RTE, MRPC, QQP and STS-B. Please download [it](https://paddlenlp.bj.bcebos.com/datasets/k-shot-glue/rgl-k-shot.zip) and extract the data files to the path ``./data/k-shot``.
+We evaluate on the GLUE variant for few-shot learning in the paper, including SST-2, SST-5, MR, CR, MPQA, Subj, TREC, CoLA, MNLI, MNLI-mm, SNLI, QNLI, RTE, MRPC, QQP and STS-B. Please download the [datasets](https://paddlenlp.bj.bcebos.com/datasets/k-shot-glue/rgl-k-shot.zip) and extract the data files to the path ``./data/k-shot``.
 
 
 # Experiments
@@ -81,7 +81,7 @@ The configurations consist of:
 - ``verbalizer``: The verbalizer to map labels to words in vocabulary.
 
 
-## Multiple runs for best results
+## Multiple runs for the best results
 
 To reproduce our experiments, you can use the scripts to get the results under different settings. We have defined the templates and the verbalizers in both ``./script/run_pet.sh`` and ``./script/run_rgl.sh``. You can refer to these scripts for more details.
 
