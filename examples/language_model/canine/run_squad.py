@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This code almost copied from paddlenlp.examples.machine_reading_comprehension.SQuAD.run_squad.py
+
 import os
 import random
 import time
@@ -26,9 +28,7 @@ from paddle.amp import GradScaler, auto_cast
 from paddle.io import DataLoader
 from args import parse_args
 
-import paddlenlp as ppnlp
-
-from paddlenlp.data import default_data_collator, DataCollatorWithPadding
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import CanineForQuestionAnswering, CanineTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
@@ -44,9 +44,6 @@ def prepare_train_features(examples, tokenizer, args):
 
     contexts = examples['context']
     questions = [x.strip() for x in examples['question']]
-    if max([len(x) for x in questions]) > args.max_seq_length:
-        import pdb
-        pdb.set_trace()
 
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
@@ -67,8 +64,6 @@ def prepare_train_features(examples, tokenizer, args):
     # Let's label those examples!
     tokenized_examples["start_positions"] = []
     tokenized_examples["end_positions"] = []
-    # print("num samples: ",len(tokenized_examples['input_ids']))
-    # print("length of input: ",len(tokenized_examples['input_ids'][0]))
 
     for i, offsets in enumerate(offset_mapping):
         # We will label impossible answers with the index of the CLS token.
@@ -263,7 +258,7 @@ def run(args):
 
     if args.do_train:
         if args.fp16:
-            scaler = GradScaler(init_loss_scaling=4096)
+            scaler = GradScaler(init_loss_scaling=args.init_loss_scaling)
         train_ds = train_examples.map(partial(prepare_train_features,
                                               tokenizer=tokenizer,
                                               args=args),

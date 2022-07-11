@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright Google AI and The HuggingFace Inc. team. All rights reserved.
 #
@@ -16,7 +15,6 @@
 
 from typing import Dict, List, Optional
 from .. import PretrainedTokenizer
-import unicodedata
 
 __all__ = ['CanineTokenizer']
 
@@ -242,7 +240,7 @@ class CanineTokenizer(PretrainedTokenizer):
             return len(cls + token_ids_0 + sep) * [0]
         return [0] * len(cls + token_ids_0 + sep) + [1] * len(token_ids_1 + sep)
 
-    # Copied from ..bert.tokenizer.BertTokenizer.num_special_tokens_to_add
+    # Copied from paddlenlp.transformers.bert.tokenizer.BertTokenizer.num_special_tokens_to_add
     def num_special_tokens_to_add(self, pair=False):
         """
         Returns the number of added tokens when encoding a sequence with special tokens.
@@ -261,7 +259,7 @@ class CanineTokenizer(PretrainedTokenizer):
             self.build_inputs_with_special_tokens(
                 token_ids_0, token_ids_1 if pair else None))
 
-    # Copied from ..bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens
+    # Copied from paddlenlp.transformers.bert.tokenizer.BertTokenizer.build_offset_mapping_with_special_tokens
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
@@ -289,7 +287,7 @@ class CanineTokenizer(PretrainedTokenizer):
                                               ] + offset_mapping_1 + [(0, 0)]
 
     @staticmethod
-    def save_vocabulary(filepath, vocab):
+    def save_vocabulary(*args, **kwargs):
         """
         CanineTokenizer has no vocab file.
         """
@@ -325,15 +323,3 @@ class CanineTokenizer(PretrainedTokenizer):
 
         token_mapping = [(idx, idx + 1) for idx in range(len(text))]
         return token_mapping
-
-
-def _is_control(char):
-    """Checks whether `chars` is a control character."""
-    # These are technically control characters but we count them as whitespace
-    # characters.
-    if char == "\t" or char == "\n" or char == "\r":
-        return False
-    cat = unicodedata.category(char)
-    if cat.startswith("C"):
-        return True
-    return False
