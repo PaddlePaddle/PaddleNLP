@@ -152,7 +152,10 @@ class PretrainedModel(Layer, GenerationMixin):
         if base_model is not self:
             return base_model.get_input_embeddings()
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f'model of {type(base_model)} has not implemented the `get_input_embedding`'
+                ' or `set_input_embedding` method'
+            )
 
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
@@ -508,16 +511,9 @@ class PretrainedModel(Layer, GenerationMixin):
         Returns:
             paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
-        # 1. resize the embedding
-        try:
-            old_embeddings = self.get_input_embeddings()
-        except NotImplementedError:
-            raise NotImplementedError(
-                f'model of {type(self)} has not implemented the `get_input_embedding` or `set_input_embedding` '
-                'method, please use the another model to call `resize_token_embeddings` method'
-            )
+        old_embeddings: nn.Embedding = self.get_input_embeddings()
 
-        if not new_num_tokens or new_num_tokens == len(old_embeddings):
+        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[0]:
             return old_embeddings
 
         new_embeddings = self._get_resized_embeddings(old_embeddings,
@@ -532,7 +528,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         return new_embeddings
 
-    def _get_resized_embeddings(self, old_embeddings: nn.Embedding, new_num_token: Optional[int]=None) -> nn.Embedding:
+    def _get_resized_embeddings(self, old_embeddings: nn.Embedding, new_num_tokens: Optional[int]=None) -> nn.Embedding:
         """
         Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
         initialized vectors at the end. Reducing the size will remove vectors from the end
