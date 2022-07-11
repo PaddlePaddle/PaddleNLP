@@ -14,12 +14,13 @@
 
 import argparse
 import os
-
-import numpy as np
-import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
+import numpy as np
+
+import paddle
 from paddle import inference
+
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
@@ -249,8 +250,7 @@ if __name__ == "__main__":
                           args.cpu_threads, args.enable_mkldnn)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     test_ds = load_dataset("chnsenticorp", splits=["test"])
     data = [d["text"] for d in test_ds]
     batches = [

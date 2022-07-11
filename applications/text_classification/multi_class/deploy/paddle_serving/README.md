@@ -96,6 +96,9 @@ device_type: 1    =>   device_type: 0
 
 #Fetch结果列表，以serving_client/serving_client_conf.prototxt中fetch_var的alias_name为准
 fetch_list: ["linear_113.tmp_1"]    =>   fetch_list: ["linear_147.tmp_1"]
+
+#开启MKLDNN加速
+#use_mkldnn: True    =>   use_mkldnn: True
 ```
 
 ### 分类任务
@@ -143,4 +146,5 @@ label:  其他
 data:  幼儿挑食的生理原因是
 label:  病因分析
 --------------------
+
 ```

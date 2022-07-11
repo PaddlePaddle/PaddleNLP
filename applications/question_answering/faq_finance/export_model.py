@@ -34,12 +34,11 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
     output_emb_size = 256
 
-    pretrained_model = AutoModel.from_pretrained("ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):

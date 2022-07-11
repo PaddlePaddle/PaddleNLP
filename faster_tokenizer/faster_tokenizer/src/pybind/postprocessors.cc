@@ -21,7 +21,8 @@ limitations under the License. */
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyPostProcessor : public postprocessors::PostProcessor {
@@ -310,5 +311,6 @@ void BindPostProcessors(pybind11::module* m) {
            py::arg("add_special_tokens"));
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

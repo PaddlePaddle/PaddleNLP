@@ -22,7 +22,8 @@
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
 void Trie::CreateTrie(const std::vector<const char*>& keys,
@@ -45,27 +46,6 @@ int Trie::EncodeTokenId(const std::string& token, uint id) const {
   return EncodeToken(id, token_length, is_suffix_token);
 }
 
-void Trie::GetSortedVocab(const std::vector<const char*>& keys,
-                          const std::vector<int>& values,
-                          std::vector<const char*>* sorted_keys,
-                          std::vector<int>* sorted_values) const {
-  // Sort the vocab
-  std::vector<int> sorted_vocab_index(keys.size());
-  std::iota(sorted_vocab_index.begin(), sorted_vocab_index.end(), 0);
-  std::sort(sorted_vocab_index.begin(),
-            sorted_vocab_index.end(),
-            [&keys](const int a, const int b) {
-              return std::strcmp(keys[a], keys[b]) < 0;
-            });
-
-  sorted_keys->resize(keys.size());
-  sorted_values->resize(keys.size());
-  for (int i = 0; i < sorted_vocab_index.size(); ++i) {
-    auto idx = sorted_vocab_index[i];
-    (*sorted_keys)[i] = keys[idx];
-    (*sorted_values)[i] = values[idx];
-  }
-}
 void Trie::InitTrieSuffixRoot() {
   auto node = CreateRootTraversalCursor();
   if (!TryTraverseSeveralSteps(&node, continuing_subword_prefix_)) {
@@ -247,4 +227,5 @@ void Trie::SetContinuingSubwordPrefix(
 }
 
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

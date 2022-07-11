@@ -213,7 +213,7 @@ class PretrainedModel(Layer, GenerationMixin):
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
-
+        track_download = True
         # From built-in pretrained models
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
@@ -225,6 +225,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
+            track_download = False
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
@@ -404,8 +405,6 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
-        # Logging model download statistics
-        download_check(pretrained_model_name_or_path, "from_pretrained")
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
@@ -413,7 +412,11 @@ class PretrainedModel(Layer, GenerationMixin):
             model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
+            if track_download:
+                download_check(pretrained_model_name_or_path, "from_pretrained")
             return model
+        if track_download:
+            download_check(pretrained_model_name_or_path, "from_pretrained")
         return model, state_to_load
 
     def get_model_config(self):

@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 import os
-import numpy as np
-import paddle
 import json
 import time
 
+import six
+import numpy as np
+import paddle
 import paddle2onnx
 import onnxruntime as ort
 from sklearn.metrics import f1_score

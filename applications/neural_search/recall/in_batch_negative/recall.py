@@ -25,10 +25,10 @@ import numpy as np
 import hnswlib
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from base_model import SemanticIndexBase
 from data import convert_example, create_dataloader
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -87,8 +87,7 @@ if __name__ == "__main__":
             ),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)
