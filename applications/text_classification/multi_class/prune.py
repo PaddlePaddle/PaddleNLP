@@ -71,17 +71,10 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     params_dir: str = field(
-        default='./checkpoint/model_state.pdparams',
+        default='./checkpoint/',
         metadata={
             "help":
             "The output directory where the model checkpoints are written."
-        })
-
-    model_name_or_path: str = field(
-        default='ernie-3.0-base-zh',
-        metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
 
 
@@ -126,9 +119,8 @@ def main():
         label_list = train_ds.label_list
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=len(label_list))
-    model.set_dict(paddle.load(model_args.params_dir))
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+        model_args.params_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.params_dir)
 
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
@@ -152,7 +144,7 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=1 / 12))
+    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2 / 3))
 
 
 if __name__ == "__main__":

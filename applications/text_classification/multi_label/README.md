@@ -1,4 +1,4 @@
-# 多标签分类任务
+# 文本多标签分类任务指南
 
 **目录**
    * [多标签任务介绍](#多标签任务介绍)
@@ -117,7 +117,6 @@ checkpoint/
 ├── model_state.pdparams
 ├── tokenizer_config.json
 └── vocab.txt
-
 ```
 
 **NOTE:**
@@ -126,31 +125,30 @@ checkpoint/
 
 ### 从本地文件创建数据集
 
-在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，这里我们将介绍如何加载本地固定格式数据集进行训练,本项目将以CAIL2018-SMALL数据集罪名预测任务为例进行介绍：
+在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，本项目支持使用固定格式本地数据集文件进行训练。如果需要对本地数据集进行数据标注，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。本项目将以CAIL2018-SMALL数据集罪名预测任务为例进行介绍如何加载本地固定格式数据集进行训练：
 
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/cail2018_small_charges.tar.gz
-
 tar -zxvf cail2018_small_charges.tar.gz
+mv cail2018_small_charges data
 ```
 
 本地数据集目录结构如下：
 
 ```text
-cail2018_small_charges/
+data/
 ├── train.tsv # 训练数据集文件
 ├── dev.tsv # 开发数据集文件
 ├── test.tsv # 可选，测试训练集文件
 ├── label.tsv # 分类标签文件
 └── data.tsv # 可选，待预测数据文件
-
 ```
 
 train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中输入文本序列与标签数据用`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
 - train.tsv/dev.tsv/test.tsv 文件格式：
 ```text
-<输入序列1>'\t'<标签1>','<标签2>'\n'
-<输入序列2>'\t'<标签1>'\n'
+<输入序列1>'\t'<标签1>','<标签2>
+<输入序列2>'\t'<标签1>
 ...
 ```
 - train.tsv/dev.tsv/test.tsv 文件样例：
@@ -163,8 +161,8 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 - label.tsv 文件格式：
 
 ```text
-<标签名1>'\n'
-<标签名2>'\n'
+<标签名1>
+<标签名2>
 ...
 ```
 - label.tsv 文件样例：
@@ -181,8 +179,8 @@ data.tsv(可选，待预测数据文件)
 - data.tsv 文件格式：
 
 ```text
-<输入序列1>'\n'
-<输入序列2>'\n'
+<输入序列1>
+<输入序列2>
 ...
 ```
 - data.tsv 文件样例：
@@ -194,13 +192,13 @@ data.tsv(可选，待预测数据文件)
 在训练过程中通过指定数据集路径参数 `dataset_dir` 进行：
 单卡训练
 ```shell
-python train.py --early_stop --dataset_dir 'cail2018_small_charges'
+python train.py --early_stop --dataset_dir data
 ```
 
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir 'cail2018_small_charges'
+python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir data
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
@@ -211,37 +209,34 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 
 输入待预测数据和数据标签对照列表，模型预测数据对应的标签
 
-启动预测：
+使用默认数据进行预测：
 ```shell
-# 预测默认数据
-python predict.py --params_path ./checkpoint/model_state.pdparams
-
-# 预测本地数据文件cail2018_small_charges/data.tsv
-python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir=cail2018_small_charges
+python predict.py --params_path ./checkpoint/
+```
+也可以选择使用本地数据文件data/data.tsv进行预测：
+```shell
+python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
 
 可支持配置的参数：
 
-* `params_path`：必须，待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
+* `params_path`：必须，待预测模型和分词器参数文件夹；默认为"./checkpoint/"。
 * `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 ## 模型静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export --num_classes 202
+python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 可支持配置的参数：
 
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
-* `num_classes`：必须，任务标签类别数。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -253,14 +248,15 @@ export/
 ```
 
 
-导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
-
-# 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir cail2018_small_charges
+```
+也可以选择使用本地数据文件data/data.tsv进行部署：
+```shell
+python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir data
 ```
 
 此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
@@ -271,7 +267,7 @@ python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_
 使用裁剪功能需要安装 paddleslim 包
 
 ```shell
-pip install paddleslim
+pip install paddleslim==2.2.2
 ```
 
 ### 裁剪 API 使用
@@ -295,11 +291,11 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 ```
 由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
 
-* `model`：ERNIE等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
+* `model`：ERNIE等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.params_dir)` 来获取
 * `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
 * `train_dataset`：裁剪训练需要使用的训练集
 * `eval_dataset`：裁剪训练使用的评估集
-* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.model_name_or_path)` 来获取
+* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.params_dir)` 来获取
 * `criterion`： 定义criterion计算损失，分类中使用损失函数 paddle.nn.BCEWithLogitsLoss()
 
 然后可以直接调用 `prune` 启动裁剪，其中 `prune` 的参数释义如下：
@@ -311,13 +307,13 @@ trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
 * `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
 
 
-启动裁剪：
+选择使用默认数据集启动裁剪：
 ```shell
-# 使用内置数据集
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
-
-# 使用本地数据集
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir cail2018_small_charges
+python prune.py --output_dir ./prune --params_dir ./checkpoint/
+```
+也可以选择使用本地数据文件启动裁剪：
+```shell
+python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir data
 ```
 
 可支持配置的参数：
@@ -332,8 +328,8 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdpar
   * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 
 * `ModelArguments`
-  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+  * `params_dir`：待预测模型参数文件夹；默认为"./checkpoint/"。
+
 
 以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
 
@@ -358,14 +354,15 @@ prune/
 
 3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
 
-4. 本项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+4. 本项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。
 
+使用内置数据集进行部署：
 ```shell
-# 使用内置数据集
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
-
-# 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir cail2018_small_charges
+```
+也可以选择使用本地数据文件 data/data.tsv 进行部署：
+```shell
+python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
 5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
 
