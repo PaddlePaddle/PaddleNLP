@@ -15,6 +15,7 @@
 import time
 import os
 import copy
+import math
 
 import numpy as np
 import paddle
@@ -40,132 +41,106 @@ from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
 
 def try_import_paddleslim():
+    '''
+    Import paddleslim when dynabert is used.
+    '''
     try:
         import paddleslim
     except ImportError:
         raise ImportError(
-            'Cannot import paddleslim, please install paddleslim.')
+            'Cannot import paddleslim, please pip install paddleslim.')
 
 
-class DynabertConfig:
+class AutoCompressConfig:
+    predefined_configuration = {
+        "dynabert": {
+            "width_mult_list": [3 / 4],
+            "output_filename_prefix": "float32"
+        },
+        "ptq": {
+            "algo_list": ["hist"],
+            "batch_num_list": [1],
+            "batch_size_list": [4],
+            "round_type": "round",
+            "bias_correction": False,
+            "input_dir": None,
+            "input_filename_prefix": "float32",
+            "output_filename_prefix": "int8",
+        }
+    }
 
-    def __init__(self,
-                 width_mult_list=[3 / 4],
-                 output_filename_prefix="float32"):
-        """
-        Pruning class config of DynaBERT stratedy.
-        Args:
-            width_mult_list (list of float):
-                Width mult list for DynaBERT.
-                Defaults to `[3/4]`.
-            output_filename_prefix (str):
-                Prefix of pruned model's filename. 
-                Defaults to `float32`.
-        """
-        self.compress_type = "dynabert"
-        self.width_mult_list = width_mult_list
-        self.output_filename_prefix = output_filename_prefix
+    def __init__(self, stratedy=("dynabert+ptq")):
+        stratedy = stratedy.lower()
+        assert stratedy in ("dynabert+ptq", "ptq", "dynabert"), \
+            "Only dynabert and ptq are supported."
+        if "dynabert" in stratedy:
+            logger.info("Compression Suggestions: For stratedy `dynabert`, parameter `width_mult_list`" \
+                        "could be passed in. Defauts to [`3/4`].")
+        elif "ptq" in stratedy:
+            logger.info("Suggestions: For stratedy `ptq`, parameter `input_dir` must be passed in, and " \
+                        "`algo_list`, `batch_size_list`, `batch_num_list`, `bias_correction, "
+                        "and `round_type` could be passed in. " \
+                        "For `algo_list`, 'hist', 'KL', 'mse', 'avg', 'abs_max' and 'emd' could be chosen. " \
+                        "`batch_num_list` defauts to `[1]`. `batch_size_list` defaults to `[4]`. " \
+                        "round_type` could be 'round' or 'adaround', and defaults to 'round'. " \
+                        "`bias_correction` could be True or False. " \
+                        )
+        else:
+            pass
 
+        self.stratedy = stratedy
+        self.config_dict = {}
+        for each_stratedy in stratedy.split("+"):
+            self.config_dict[each_stratedy] = self.predefined_configuration[
+                each_stratedy]
 
-class PTQConfig:
+    def set_config(self, **custom_config_dict):
+        for custom_config_key in custom_config_dict:
+            for strategy in self.config_dict:
+                if custom_config_key in self.config_dict[strategy]:
+                    self.config_dict[strategy][
+                        custom_config_key] = custom_config_dict[
+                            custom_config_key]
 
-    def __init__(self,
-                 algo_list=["hist"],
-                 batch_size_list=[4],
-                 input_dir=None,
-                 input_filename_prefix="float32",
-                 output_filename_prefix="int8"):
-        """
-        Quantization class config of Post-Training method.
-        Args:
-            algo_list (list of str):
-                Algorithm name list of `PostTrainingQuantization`. Each
-                algorithm would be performed to input model. Supported
-                algorithms are `KL`, `abs_max`, `min_max`, `avg`, `hist`
-                and `mse`.
-                Defaults to `["hist"]`.
-            batch_size_list (list of int):
-                Number of calibration samples.
-                Defaults to `[4]`.
-            input_dir (str):
-                Directory name of model to be quantized.
-                Defaults to `None`.
-            input_filename_prefix (str):
-                Prefix of model filename after quantization.
-                Defaults to `"float32"`.
-            output_filename_prefix (str):
-                Prefix of model filename after quantization.
-                Defaults to `"int8"`.
-        """
-        self.compress_type = "ptq"
-        self.algo_list = algo_list
-        self.batch_size_list = batch_size_list
-        self.input_dir = input_dir
-        self.input_filename_prefix = input_filename_prefix
-        self.output_filename_prefix = output_filename_prefix
+    def print_config(self):
+        logger.info("=" * 60)
+        logger.info('{:^40}'.format("Compression Configuration Arguments"))
+        logger.info('{:30}:{}'.format("paddle commit id",
+                                      paddle.version.commit))
+        for strategy in self.config_dict:
+            logger.info('{}:'.format(strategy))
+            for a in self.config_dict[strategy]:
+                v = self.config_dict[strategy][a]
+                logger.info('\t\t{:30}:{}'.format(a, v))
 
-
-class CompressConfig:
-
-    def __init__(self,
-                 prune_config=DynabertConfig(),
-                 quantization_config=PTQConfig()):
-        """
-        Model compression Config class. It accepts Hyperparameters of
-        pruning and quantization.
-        Args:
-            prune_config (`DynabertConfig`):
-                Accepts Hyperparameters of pruning. More prune strategies would
-                be supported in the future.
-                Defaults to `DynabertConfig()`.
-            quantization_config (`PTQConfig`):
-                Accepts Hyperparameters of pruning. More quantization methods
-                would be supported in the future.
-                Defaults to `PTQConfig()`.
-
-        """
-        assert isinstance(prune_config, (DynabertConfig)), \
-           "`prune_config` should be an instance of `DynabertConfig`."
-        assert isinstance(quantization_config, (PTQConfig)), \
-           "`quantization_config` shoule be an instance of `PTQConfig`."
-        self.prune_config = prune_config
-        self.quantization_config = quantization_config
+        logger.info("")
 
 
-def compress(self,
-             output_dir,
-             pruning=True,
-             quantization=True,
-             compress_config=CompressConfig()):
+def compress(self, output_dir, configs=AutoCompressConfig()):
     """
     Supports pruning and quantization. If both are needed, pruning would be
     performed before quantizaton.
     Args:
         output_dir (str):
             Directory name of Pruning or quantized models.
-        pruning (bool):
-            Whether to prune.
-            Defaults to `True`.
-        quantization (bool):
-            Whether to quantize.
-            Defaults to `True`.
-        compress_config (`CompressConfig`):
-            Compress config instance to pass parameters for pruning or
-            quantization.
-            Defaults to `CompressConfig()`.
+        config ( An instance of `AutoCompressConfig`):
+            Compression argument config instance to pass parameters for pruning
+            or quantization.
+            Defaults to `AutoCompressConfig()`.
     """
-    if pruning:
+    config_dict = configs.config_dict
+    if "dynabert" in configs.stratedy:
         try_import_paddleslim()
-        self.prune(output_dir, compress_config.prune_config)
-        if quantization:
-            for width_mult in compress_config.prune_config.width_mult_list:
+        _dynabert(self, self.model, output_dir, config_dict["dynabert"])
+        if "ptq" in configs.stratedy:
+            for width_mult in config_dict["dynabert"]["width_mult_list"]:
                 output_dir_width = os.path.join(output_dir, str(width_mult))
-                self.quant(output_dir_width, output_dir_width,
-                           compress_config.quantization_config)
-    elif quantization:
-        input_dir = compress_config.quantization_config.input_dir
+                self.quant(output_dir_width, output_dir_width, "ptq",
+                           config_dict["ptq"])
+    elif configs.stratedy == "ptq":
+        input_dir = configs["ptq"]["input_dir"]
         if input_dir is None:
-            compress_config.quantization_config.input_filename_prefix = "model"
+            config_dict["ptq"]["input_filename_prefix"] = "model"
             input_spec = [
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64"),  # input_ids
@@ -176,34 +151,24 @@ def compress(self,
             export_model(model=self.model,
                          input_spec=input_spec,
                          path=original_inference_model_dir)
-        self.quant(original_inference_model_dir, output_dir,
-                   compress_config.quantization_config)
+        self.quant(original_inference_model_dir, output_dir, "ptq",
+                   config_dict["ptq"])
 
 
-def prune(self, output_dir, prune_config=DynabertConfig()):
-    """
-    Supports DynaBERT strategy now.
-    """
-    assert isinstance(prune_config, (DynabertConfig)), \
-        "`prune_config` should be an instance of `DynabertConfig`."
-    if prune_config.compress_type == "dynabert":
-        _dynabert(self, self.model, output_dir, prune_config)
-
-
-def quant(self, input_dir, output_dir, quantization_config=PTQConfig()):
+def quant(self, input_dir, output_dir, stratedy, configs):
     """
     Supports Post-Training Quantization now.
     """
-    assert isinstance(quantization_config, (PTQConfig)), \
-        "`quantization_config` shoule be an instance of `PTQConfig`."
-    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-    nn.MultiHeadAttention._prepare_qkv = nn.MultiHeadAttention._ori_prepare_qkv
-    _post_training_quantization_grid_search(eval_dataloader, self.eval_dataset,
-                                            input_dir, output_dir,
-                                            quantization_config)
+    if stratedy == "ptq":
+        eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
+        nn.MultiHeadAttention._prepare_qkv = nn.MultiHeadAttention._ori_prepare_qkv
+        _post_training_quantization_grid_search(eval_dataloader,
+                                                self.eval_dataset,
+                                                self.args.device, input_dir,
+                                                output_dir, configs)
 
 
-def _dynabert(self, model, output_dir, dynabert_config):
+def _dynabert(self, model, output_dir, configs):
     model.base_model_class._ori_forward = model.base_model_class.forward
     model.base_model_class.forward = auto_model_forward
 
@@ -214,13 +179,14 @@ def _dynabert(self, model, output_dir, dynabert_config):
     if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
-        ofa_model, teacher_model = _dynabert_init(
-            model, eval_dataloader_with_label, self.criterion,
-            dynabert_config.width_mult_list)
+        ofa_model, teacher_model = _dynabert_init(model,
+                                                  eval_dataloader_with_label,
+                                                  self.criterion,
+                                                  configs["width_mult_list"])
     else:
-        ofa_model, teacher_model = _dynabert_init(
-            model, eval_dataloader, self.criterion,
-            dynabert_config.width_mult_list)
+        ofa_model, teacher_model = _dynabert_init(model, eval_dataloader,
+                                                  self.criterion,
+                                                  configs["width_mult_list"])
     args = self.args
 
     # TODO: args.gradient_accumulation_steps
@@ -230,20 +196,20 @@ def _dynabert(self, model, output_dir, dynabert_config):
                                           len(train_dataloader))
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
+        args.num_train_epochs = math.ceil(args.num_train_epochs)
     self.create_optimizer_and_scheduler(
         num_training_steps=args.num_training_steps)
 
     ofa_model = _dynabert_training(self, ofa_model, model, teacher_model,
                                    train_dataloader, eval_dataloader,
-                                   dynabert_config.width_mult_list,
-                                   self.criterion, args.num_train_epochs,
-                                   output_dir)
+                                   configs["width_mult_list"], self.criterion,
+                                   args.num_train_epochs, output_dir)
 
     # Each width_mult best model would be exported.
-    _dynabert_export(ofa_model, dynabert_config, output_dir)
+    _dynabert_export(ofa_model, configs, output_dir)
 
     model.base_model_class.forward = model.base_model_class._ori_forward
-    logger.info("DynaBERT training finished.")
+    logger.info("Pruning is finished using DynaBERT stratedy.")
 
 
 def _recover_transormer_func():
@@ -413,7 +379,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
     global_step = 0
     lambda_logit = 1.0
     tic_train = time.time()
-    best_acc = 0.0
+    best_acc = [0.0] * len(width_mult_list)
     acc = 0.0
     logger.info("DynaBERT training starts. This period will cost some time.")
     for epoch in range(num_train_epochs):
@@ -474,8 +440,8 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     tic_eval = time.time()
                     acc = evaluate(ofa_model, criterion, eval_dataloader,
                                    width_mult)
-                    if acc > best_acc:
-                        best_acc = acc
+                    if acc > best_acc[idx]:
+                        best_acc[idx] = acc
                         if paddle.distributed.get_rank() == 0:
                             output_dir_width = os.path.join(
                                 output_dir, str(width_mult))
@@ -488,7 +454,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     logger.info("eval done total : %s s" %
                                 (time.time() - tic_eval))
             if global_step > self.args.num_training_steps:
-                if best_acc == 0.0:
+                if best_acc[idx] == 0.0:
                     output_dir_width = os.path.join(output_dir, str(width_mult))
                     if not os.path.exists(output_dir_width):
                         os.makedirs(output_dir_width)
@@ -496,7 +462,8 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir_width)
-                logger.info("Best acc: %.4f" % (best_acc))
+                logger.info("Best acc of width_mult %s: %.4f" %
+                            (width_mult, best_acc[idx]))
                 return ofa_model
 
         if "QuestionAnswering" in model.__class__.__name__:
@@ -509,8 +476,8 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 tic_eval = time.time()
                 acc = evaluate(ofa_model, criterion, eval_dataloader,
                                width_mult)
-                if acc > best_acc:
-                    best_acc = acc
+                if acc > best_acc[idx]:
+                    best_acc[idx] = acc
                     if paddle.distributed.get_rank() == 0:
                         output_dir_width = os.path.join(output_dir,
                                                         str(width_mult))
@@ -522,17 +489,21 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                         model_to_save.save_pretrained(output_dir_width)
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
 
-    logger.info("Best acc: %.4f" % (best_acc))
+    for idx, width_mult in enumerate(width_mult_list):
+        logger.info("Best acc of width_mult %s: %.4f" %
+                    (width_mult, best_acc[idx]))
     return ofa_model
 
 
-def _dynabert_export(ofa_model, dynabert_config, output_dir):
+def _dynabert_export(ofa_model, configs, output_dir):
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     ofa_model.model.base_model_class.forward = auto_model_forward
     ofa_model._add_teacher = False
     _recover_transormer_func()
 
-    for width_mult in dynabert_config.width_mult_list:
+    ori_num_heads = ofa_model.model.base_model.encoder.layers[
+        0].self_attn.num_heads
+    for width_mult in configs["width_mult_list"]:
         model_dir = os.path.join(output_dir, str(width_mult))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
@@ -551,29 +522,30 @@ def _dynabert_export(ofa_model, dynabert_config, output_dir):
                                             input_shapes=[[1, 1], [1, 1]],
                                             input_dtypes=['int64', 'int64'],
                                             origin_model=origin_model)
-
         for name, sublayer in origin_model_new.named_sublayers():
             if isinstance(sublayer, paddle.nn.MultiHeadAttention):
                 sublayer.num_heads = int(width_mult * sublayer.num_heads)
-
         input_shape = [
             paddle.static.InputSpec(shape=[None, None], dtype='int64'),
             paddle.static.InputSpec(shape=[None, None], dtype='int64')
         ]
-        pruned_infer_model_dir = os.path.join(
-            model_dir, dynabert_config.output_filename_prefix)
+        pruned_infer_model_dir = os.path.join(model_dir,
+                                              configs["output_filename_prefix"])
+
         net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
         paddle.jit.save(net, pruned_infer_model_dir)
+        for layer in ofa_model.model.base_model.encoder.layers:
+            layer.self_attn.num_heads = ori_num_heads
 
 
 def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
-                                            input_dir, output_dir,
-                                            quantization_config):
+                                            device, input_dir, output_dir,
+                                            configs):
     paddle.enable_static()
-    place = paddle.set_device("gpu")
+    place = paddle.set_device(device)
     exe = paddle.static.Executor(place)
 
-    def _post_training_quantization(algo, batch_size):
+    def _post_training_quantization(algo, batch_size, batch_nums):
 
         def _batch_generator_func():
             batch_data = [[], []]
@@ -590,16 +562,15 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
             executor=exe,
             batch_generator=_batch_generator_func,
             model_dir=input_dir,
-            model_filename=quantization_config.input_filename_prefix +
-            ".pdmodel",
-            params_filename=quantization_config.input_filename_prefix +
-            ".pdiparams",
+            model_filename=configs["input_filename_prefix"] + ".pdmodel",
+            params_filename=configs["input_filename_prefix"] + ".pdiparams",
             batch_size=batch_size,
-            batch_nums=1,
+            batch_nums=batch_nums,
             scope=None,
             algo=algo,
             hist_percent=0.9999,
-            bias_correction=False,
+            round_type=configs["round_type"],
+            bias_correction=configs["bias_correction"],
             quantizable_op_type=['matmul', 'matmul_v2'],
             is_full_quantize=False,
             weight_bits=8,
@@ -611,15 +582,14 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
             save_model_path=os.path.join(output_dir, algo + str(batch_size)),
-            model_filename=quantization_config.output_filename_prefix +
-            ".pdmodel",
-            params_filename=quantization_config.output_filename_prefix +
-            ".pdiparams")
+            model_filename=configs["output_filename_prefix"] + ".pdmodel",
+            params_filename=configs["output_filename_prefix"] + ".pdiparams")
 
     logger.info("Post training quantization starts.")
-    for algo in quantization_config.algo_list:
-        for batch_size in quantization_config.batch_size_list:
-            _post_training_quantization(algo, batch_size)
+    for algo in configs["algo_list"]:
+        for batch_size in configs["batch_size_list"]:
+            for batch_nums in configs["batch_num_list"]:
+                _post_training_quantization(algo, batch_size, batch_nums)
 
     paddle.disable_static()
     logger.info("Post training quantization ends.")
@@ -763,5 +733,4 @@ def soft_cross_entropy(inp, target):
 
 
 Trainer.compress = compress
-Trainer.prune = prune
 Trainer.quant = quant

@@ -24,35 +24,18 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddlenlp
-from paddlenlp.data import DataCollatorWithPadding
 
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
 from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForQuestionAnswering,
-)
-from compress_trainer import CompressConfig, PTQConfig
+from paddlenlp.transformers import AutoTokenizer, AutoModelForQuestionAnswering
 from paddlenlp.utils.log import logger
 from datasets import load_metric, load_dataset
 
 sys.path.append("../ernie-1.0/finetune")
-from question_answering import (
-    QuestionAnsweringTrainer,
-    CrossEntropyLossForSQuAD,
-    prepare_train_features,
-    prepare_validation_features,
-)
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from question_answering import QuestionAnsweringTrainer, CrossEntropyLossForSQuAD, prepare_train_features, prepare_validation_features
+from utils import ALL_DATASETS, DataArguments, ModelArguments
+from compress_trainer import AutoCompressConfig
 
 
 def main():
@@ -163,13 +146,11 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    prune = True
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
-    trainer.compress(output_dir,
-                     pruning=prune,
-                     quantization=True,
-                     compress_config=compress_config)
+    configs = AutoCompressConfig()
+    configs.set_config(batch_size_list=[4, 8, 16])
+
+    configs.print_config()
+    trainer.compress(output_dir, configs=configs)
 
 
 if __name__ == "__main__":

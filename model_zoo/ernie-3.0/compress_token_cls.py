@@ -27,29 +27,15 @@ import paddle.nn.functional as F
 
 from datasets import load_dataset
 
-import paddlenlp
 from paddlenlp.data import DataCollatorForTokenClassification
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
-
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForTokenClassification,
-)
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification,
 from paddlenlp.utils.log import logger
-
-from compress_trainer import CompressConfig, PTQConfig
 
 sys.path.append("../ernie-1.0/finetune")
 from token_classification import ner_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from utils import ALL_DATASETS, DataArguments, ModelArguments
+from compress_trainer import AutoCompressConfig
 
 
 def main():
@@ -138,13 +124,11 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
+    configs = AutoCompressConfig()
+    configs.set_config(batch_size_list=[4, 8])
 
-    trainer.compress(output_dir,
-                     pruning=True,
-                     quantization=True,
-                     compress_config=compress_config)
+    configs.print_config()
+    trainer.compress(output_dir, configs=configs)
 
 
 if __name__ == "__main__":

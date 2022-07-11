@@ -21,28 +21,14 @@ import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
-
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-)
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
+from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.utils.log import logger
 
-from compress_trainer import CompressConfig, PTQConfig
-
 sys.path.append("../ernie-1.0/finetune")
-
 from sequence_classification import seq_trans_fn, clue_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from utils import ALL_DATASETS, DataArguments, ModelArguments
+from compress_trainer import AutoCompressConfig
 
 
 def main():
@@ -55,7 +41,7 @@ def main():
     data_args.dataset = data_args.dataset.strip()
 
     if data_args.dataset in ALL_DATASETS:
-        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
+        # If you custom you hyper-parameters in yaml config, it will overwrite all args.
         config = ALL_DATASETS[data_args.dataset]
         logger.info("Over-writing training config by yaml config!")
         for args in (model_args, data_args, training_args):
@@ -81,42 +67,55 @@ def main():
         raw_datasets['train'].label_list)
 
     criterion = paddle.nn.CrossEntropyLoss()
-    # Define tokenizer, model, loss function.
+    # Defines tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
 
-    # Define dataset pre-process function
+    # Defines dataset pre-process function
     if "clue" in data_args.dataset:
         trans_fn = partial(clue_trans_fn, tokenizer=tokenizer, args=data_args)
     else:
         trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
 
-    # Define data collector
+    # Defines data collector
     data_collator = DataCollatorWithPadding(tokenizer)
 
     train_dataset = raw_datasets["train"].map(trans_fn)
     eval_dataset = raw_datasets["dev"].map(trans_fn)
 
-    trainer = Trainer(model=model,
-                      args=training_args,
-                      data_collator=data_collator,
-                      train_dataset=train_dataset,
-                      eval_dataset=eval_dataset,
-                      tokenizer=tokenizer,
-                      criterion=criterion)
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        criterion=criterion)  # Stratedy`dynabert` needs arguments `criterion`
 
     output_dir = os.path.join(model_args.model_name_or_path, "compress")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
+    # Supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
+    # Example 1: dynabert+ptq
+    configs = AutoCompressConfig()
+    configs.set_config(width_mult_list=[0.75, 2 / 3], batch_size_list=[4, 8])
 
-    trainer.compress(output_dir,
-                     pruning=True,
-                     quantization=True,
-                     compress_config=compress_config)
+    # Example 2: ptq
+    # configs = AutoCompressConfig("ptq")
+    # configs.set_config(width_mult_list=[0.75, 2 / 3],
+    #                     batch_size_list=[4, 8],
+    #                     input_dir=os.path.join(model_args.model_name_or_path,
+    #                             "compress",
+    #                             str(2/3)
+    #                             )
+    #                     )
+
+    # Example 3: dynabert
+    # configs = AutoCompressConfig("dynabert")
+
+    configs.print_config()
+    trainer.compress(output_dir, configs=configs)
 
 
 if __name__ == "__main__":
