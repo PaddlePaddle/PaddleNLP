@@ -26,8 +26,6 @@ import paddle
 from paddle.io import DataLoader
 from args import parse_args
 
-import paddlenlp as ppnlp
-
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import BertForQuestionAnswering, BertTokenizer
 from paddlenlp.transformers import ErnieForQuestionAnswering, ErnieTokenizer

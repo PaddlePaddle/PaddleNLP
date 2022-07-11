@@ -86,7 +86,7 @@ parser.add_argument('--early_stop_nums',
                     default=4,
                     help='Number of epoch before early stop.')
 parser.add_argument("--epochs",
-                    default=3,
+                    default=100,
                     type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument('--warmup',
@@ -273,6 +273,10 @@ def train():
             best_acc = acc
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
+
+    logger.info("Best accuracy: %.5f" % (best_acc))
+    logger.info("Save best accuracy text classification model in %s" %
+                (args.save_dir))
 
 
 if __name__ == "__main__":

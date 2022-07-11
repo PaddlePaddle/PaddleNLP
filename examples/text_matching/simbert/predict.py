@@ -22,7 +22,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
@@ -84,10 +84,8 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    model = ppnlp.transformers.BertModel.from_pretrained('simbert-base-chinese',
-                                                         pool_act='linear')
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'simbert-base-chinese')
+    model = AutoModel.from_pretrained('simbert-base-chinese', pool_act='linear')
+    tokenizer = AutoTokenizer.from_pretrained('simbert-base-chinese')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
