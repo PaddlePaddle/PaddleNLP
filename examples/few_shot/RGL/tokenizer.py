@@ -252,7 +252,7 @@ class MLMTokenizerWrapper(TokenizerWrapper):
                         "This tokenizer doesn't specify {} token.".format(
                             piece['prompt']))
 
-            if part['soft_token_ids'] == 1:
+            if 'soft_token_ids' in part and part['soft_token_ids'] == 1:
                 text = [self.soft_token_id]
             else:
                 text = self.tokenizer.encode(

@@ -217,7 +217,7 @@ class SoftTemplate(Template):
 
     def __init__(self,
                  tokenizer,
-                 model=None,
+                 model,
                  template=None,
                  text_mapping={
                      'text_a': 'text_a',
@@ -228,6 +228,7 @@ class SoftTemplate(Template):
             if type(module).__name__.endswith('Model'):
                 self.token_embeddings = module.embeddings.word_embeddings
                 break
+        self.token_embeddings.weight.stop_gradient = True
         self.embedding_size = self.token_embeddings.weight.shape[-1]
         self.template = template
 
@@ -370,12 +371,6 @@ class SoftTemplate(Template):
             batch['input_embeds'] = input_embeds
         return batch
 
-    def post_process_batch(self, outputs, axis=1):
-        # TODO check the correction.
-        index = paddle.nonzero(batch['soft_token_ids'] > 0).squeeze()
-        outputs = paddle.index_select(x=outputs, index=index, axis=axis)
-        return outputs
-
 
 class PTuningTemplate(SoftTemplate):
 
@@ -429,24 +424,3 @@ class PTuningTemplate(SoftTemplate):
                 word_embeds)
             batch['input_embeds'] = input_embeds
         return batch
-
-
-def DeepSoftTemplate(SoftTemplate):
-    """
-    Template on any layer in PLM for soft prompt methods, like prefix-tuning.
-    """
-
-    def __init__(self,
-                 tokenizer,
-                 model,
-                 template,
-                 prompt_positions=[0],
-                 text_mapping={
-                     'text_a': 'text_a',
-                     'text_b': 'text_b'
-                 }):
-        super().__init__(tokenizer=tokenizer,
-                         model=model,
-                         text_mapping=text_mapping)
-        self.prompt_positions = prompt_positions
-        self.template = template

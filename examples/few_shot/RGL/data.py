@@ -19,12 +19,16 @@ import json
 import pandas as pd
 from typing import Optional, Union, List
 from dataclasses import dataclass, field
+from collections import defaultdict
 
 import paddle
+from paddle.metric import Accuracy
+
 import paddlenlp
 from paddle.fluid.reader import default_collate_fn
 from paddlenlp.utils.log import logger
 from paddlenlp.datasets import MapDataset
+from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
 
 @dataclass
@@ -481,8 +485,8 @@ class TextClassificationProcessor(DataProcessor):
         return examples
 
 
-# The processor mapping for daasets in RGL Paper.
-processor_mapping = {
+# The processor mapping for datasets in RGL paper.
+PROCESSOR_MAPPING = {
     'mrpc': MrpcProcesser(),
     'mnli': MnliProcessor(),
     'mnli-mm': MnliMismatchedProcessor(),
@@ -503,6 +507,23 @@ processor_mapping = {
     'boolq': BoolQProcessor()
 }
 
+# The task mapping for datasets.
+TASK_MAPPING = defaultdict(lambda: 'classification')
+TASK_MAPPING['sts-b'] = 'regression'
+
+# The metric mapping for datasets.
+METRIC_MAPPING = defaultdict(Accuracy)
+METRIC_MAPPING.update({
+    'mrpc':
+    AccuracyAndF1(name=['acc', 'precision', 'recall', 'f1', 'acc_and_f1']),
+    'qqp':
+    AccuracyAndF1(name=['acc', 'precision', 'recall', 'f1', 'acc_and_f1']),
+    'cola':
+    Mcc(),
+    'sts-b':
+    PearsonAndSpearman(name=['pearson', 'spearman', 'corr'])
+})
+
 
 def load_dataset(dataset, data_path=None, splits=[]):
     """
@@ -518,7 +539,7 @@ def load_dataset(dataset, data_path=None, splits=[]):
 
     """
     assert len(splits) > 0, 'No splits, can not load dataset {}'.format(dataset)
-    processor = processor_mapping[dataset]
+    processor = PROCESSOR_MAPPING[dataset]
     data = []
     if 'train' in splits:
         train_examples = processor.get_train_examples(data_path)

@@ -188,8 +188,6 @@ class ManualVerbalizer(Verbalizer):
                 example.label = self.labels_to_ids[example.cls_label]
             except KeyError:
                 # Regression tasks.
-                logger.warning('Fail to map label {} to id.'.format(
-                    example.cls_label))
                 example.label = eval(example.cls_label)
             return example
         else:
