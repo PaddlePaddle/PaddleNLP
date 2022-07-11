@@ -21,14 +21,13 @@ import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer, AutoCompressConfig
 from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.utils.log import logger
 
 sys.path.append("../ernie-1.0/finetune")
 from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import ALL_DATASETS, DataArguments, ModelArguments
-from compress_trainer import AutoCompressConfig
 
 
 def main():
@@ -90,29 +89,25 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        criterion=criterion)  # Stratedy`dynabert` needs arguments `criterion`
+        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
 
     output_dir = os.path.join(model_args.model_name_or_path, "compress")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     # Supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
-    # Example 1: dynabert+ptq
+    # Example 1: Defaults to `dynabert+ptq`
     configs = AutoCompressConfig()
-    configs.set_config(width_mult_list=[0.75, 2 / 3], batch_size_list=[4, 8])
+    # Calling `set_config` is not necessary
+    # configs.set_config(batch_size_list=[4, 8])
 
     # Example 2: ptq
     # configs = AutoCompressConfig("ptq")
-    # configs.set_config(width_mult_list=[0.75, 2 / 3],
-    #                     batch_size_list=[4, 8],
-    #                     input_dir=os.path.join(model_args.model_name_or_path,
-    #                             "compress",
-    #                             str(2/3)
-    #                             )
-    #                     )
+    # configs.set_config(algo_list=["emd", "hist"], batch_size_list=[4, 8])
 
     # Example 3: dynabert
     # configs = AutoCompressConfig("dynabert")
+    # Calling `set_config` is not necessary
 
     configs.print_config()
     trainer.compress(output_dir, configs=configs)

@@ -26,7 +26,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer, AutoCompressConfig
 from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
 from paddlenlp.transformers import AutoTokenizer, AutoModelForQuestionAnswering
 from paddlenlp.utils.log import logger
@@ -35,7 +35,6 @@ from datasets import load_metric, load_dataset
 sys.path.append("../ernie-1.0/finetune")
 from question_answering import QuestionAnsweringTrainer, CrossEntropyLossForSQuAD, prepare_train_features, prepare_validation_features
 from utils import ALL_DATASETS, DataArguments, ModelArguments
-from compress_trainer import AutoCompressConfig
 
 
 def main():
@@ -146,8 +145,19 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
+    # Example 1: Defaults to `dynabert+ptq`
     configs = AutoCompressConfig()
-    configs.set_config(batch_size_list=[4, 8, 16])
+    # Calling `set_config` is not necessary
+    # configs.set_config(batch_size_list=[4, 8])
+
+    # Example 2: ptq
+    # configs = AutoCompressConfig("ptq")
+    # configs.set_config(algo_list=["emd", "hist"], batch_size_list=[4, 8])
+
+    # Example 3: dynabert
+    # configs = AutoCompressConfig("dynabert")
+    # Calling `set_config` is not necessary
 
     configs.print_config()
     trainer.compress(output_dir, configs=configs)
