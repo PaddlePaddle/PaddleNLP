@@ -382,11 +382,6 @@ class TransformerDecoderLayer(nn.Layer):
 
         super(TransformerDecoderLayer, self).__init__()
 
-        hcg = fleet.get_hybrid_communicate_group()
-        mp_nranks = hcg.get_model_parallel_world_size()
-        mp_group = hcg.get_model_parallel_group()
-        ring_id = mp_group.id if mp_nranks > 1 else -1
-
         self.fuse = fuse
         attn_dropout = dropout if attn_dropout is None else attn_dropout
         act_dropout = dropout if act_dropout is None else act_dropout
@@ -396,6 +391,10 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         if self.fuse:
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_nranks = hcg.get_model_parallel_world_size()
+            mp_group = hcg.get_model_parallel_group()
+            ring_id = mp_group.id if mp_nranks > 1 else -1
             self.self_attn = incubate.nn.FusedMultiHeadAttention(
                 d_model,
                 nhead,
