@@ -40,14 +40,14 @@ class InstallPlatlib(install):
 
 if os.name != 'nt':
     package_data = {"faster_tokenizer": ["core_tokenizers.so", "commit.log"]}
-    package_data['paddle.libs'] = []
+    package_data['faster_tokenizer.libs'] = []
 else:
     package_data = {
         "faster_tokenizer":
         ["core_tokenizers.pyd", "core_tokenizers.lib", "commit.log"]
     }
     # Add icu dll
-    package_data['paddle.libs'] = ["icuuc70.dll", "icudt70.dll"]
+    package_data['faster_tokenizer.libs'] = ["icuuc70.dll", "icudt70.dll"]
 
 
 def get_version():

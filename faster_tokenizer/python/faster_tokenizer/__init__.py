@@ -23,7 +23,7 @@ current_path = os.path.abspath(os.path.dirname(__file__))
 
 try:
     if os.name == 'nt':
-        third_lib_path = current_path + os.sep + '..' + os.sep + 'libs'
+        third_lib_path = current_path + os.sep + 'libs'
         # Will load shared library from 'path' on windows
         os.environ[
             'path'] = current_path + ';' + third_lib_path + ';' + os.environ[
