@@ -52,6 +52,7 @@ class CodeGenerationTask(Task):
         self._length_penalty = kwargs.get("length_penalty", 1.0)
         self._repetition_penalty = kwargs.get("repetition_penalty", 1.1)
         self._output_scores = kwargs.get("output_scores", False)
+        self._use_faster = kwargs.get("use_faster", False)
         self._construct_tokenizer(model)
         self._construct_model(model)
 
@@ -135,7 +136,8 @@ class CodeGenerationTask(Task):
                 top_p=self._top_p,
                 num_beams=self._num_beams,
                 length_penalty=self._length_penalty,
-                repetition_penalty=self._repetition_penalty)
+                repetition_penalty=self._repetition_penalty,
+                use_faster=self._use_faster)
             all_ids.extend(ids.numpy().tolist())
             all_scores.extend(scores.numpy().tolist())
         inputs['ids'] = all_ids
