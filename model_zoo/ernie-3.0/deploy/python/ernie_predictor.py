@@ -22,17 +22,28 @@ from paddlenlp.transformers import AutoTokenizer
 
 class InferBackend(object):
 
-    def __init__(
-            self,
-            model_path,
-            batch_size=32,
-            device='cpu',  # deploy device cpu, gpu or xpu
-            cpu_backend="mkldnn",  # mkldnn or ort
-            use_fp16=False,  # use fp16 or not
-            use_quantize=False,  # use ort quantize dynamic or not
-            set_dynamic_shape=False,  # set_dynamic_shape for Inference-TRT or not
-            shape_info_file="shape_info.txt",
-            num_threads=10):
+    def __init__(self,
+                 model_path,
+                 batch_size=32,
+                 device='cpu',
+                 cpu_backend="mkldnn",
+                 use_fp16=False,
+                 use_quantize=False,
+                 set_dynamic_shape=False,
+                 shape_info_file="shape_info.txt",
+                 num_threads=10):
+        """
+        Args:
+            model_path (str): The model path for deployment.
+            batch_size (int): Batch size of input, the default is 32.
+            device (str): The deployed device can be set to cpu, gpu or xpu, the default is cpu.
+            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or ort, the default is mkldnn.
+            use_fp16 (bool): Whether to use fp16 to inference, the default is False.
+            use_quantize (bool): Whether to use ort dynamic quantize , the default is False.
+            set_dynamic_shape (bool): Whether to set_dynamic_shape for Inference-TRT, the default is False.
+            shape_info_file (str): When set_dynamic_shape is enabled, the file name of shape_info is stored, the default is shape_info.txt.
+            num_threads (int): Number of cpu threads during inference, the default is 10.
+        """
         model_path = self.model_path_correction(model_path)
         is_int8_model = self.paddle_quantize_model(
             model_path)  # Determine whether a Paddle model is a quantized model
