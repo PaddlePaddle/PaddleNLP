@@ -13,7 +13,7 @@
 文本分类任务可以根据标签类型分为多分类（multi class）、多标签（multi label）、层次分类（hierarchical）等三类任务，接下来我们将以下图的新闻文本分类为例介绍三种分类任务的区别。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/177503276-2095a4f3-0e86-4a72-85a7-c72165bf94e1.jpg />
+    <img src=https://user-images.githubusercontent.com/63761690/178486882-bcf797a8-5a07-420c-acbb-837bef5c80b5.jpg />
 </div>
 
 - **多分类**（Multi class）是最常见的文本分类类型，多分类数据集的标签集含有两个或两个以上的类别，所有输入句子/文本有且只有一个标签。在文本多分类任务中，我们需要预测输入句子/文本最可能来自 `n` 个标签类别中的哪一个类别。以上图多分类中新闻文本为例，该新闻分类具有一个标签为 `娱乐`。
