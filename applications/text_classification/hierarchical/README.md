@@ -204,7 +204,7 @@ python train.py --early_stop --dataset_dir data
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir data
+python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir data --epochs 100
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
