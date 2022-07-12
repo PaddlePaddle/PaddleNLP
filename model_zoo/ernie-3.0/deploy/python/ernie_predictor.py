@@ -129,6 +129,7 @@ class InferBackend(object):
 
             if use_fp16:
                 from onnxconverter_common import float16
+                import onnx
                 deploy_onnx_model = "fp16_model.onnx"
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
