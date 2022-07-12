@@ -141,30 +141,30 @@ mv wos_data data
 
 ```text
 data/
-├── train.tsv # 训练数据集文件
-├── dev.tsv # 开发数据集文件
-├── test.tsv # 可选，测试训练集文件
-├── label.tsv # 层次分类标签文件
-└── data.tsv # 可选，待预测数据文件
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── test.txt # 可选，测试训练集文件
+├── label.txt # 层次分类标签文件
+└── data.txt # 可选，待预测数据文件
 ```
 
-train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中 n 表示标签层次结构中最大层数，<level i 标签> 代表数据的第i层标签。输入文本序列及不同层的标签数据用`'\t'`分隔开，每一层标签中多个标签之间用`','`逗号分隔开。注意，对于第i层数据没有标签的，使用空字符`''`来表示<level i 标签>。
+train.txt(训练数据集文件), dev.txt(开发数据集文件), test.txt(可选，测试训练集文件)中 n 表示标签层次结构中最大层数，<level i 标签> 代表数据的第i层标签。输入文本序列及不同层的标签数据用`'\t'`分隔开，每一层标签中多个标签之间用`','`逗号分隔开。注意，对于第i层数据没有标签的，使用空字符`''`来表示<level i 标签>。
 
-- train.tsv/dev.tsv/test.tsv 文件格式：
+- train.txt/dev.txt/test.txt 文件格式：
 ```text
 <输入序列1>'\t'<level 1 标签1>','<level 1 标签2>'\t'<level 2 标签1>','<level 2 标签2>'\t'...'\t'<level n 标签1>','<level n 标签2>
 <输入序列2>'\t'<level 1 标签>'\t'<level 2 标签>'\t'...'\t'<level n 标签>
 ...
 ```
-- train.tsv/dev.tsv/test.tsv 文件样例：
+- train.txt/dev.txt/test.txt 文件样例：
 ```text
 unintended pregnancy continues to be a substantial public health problem. emergency contraception (ec) provides a last chance at pregnancy prevention. several safe and effective options for emergency contraception are currently available. the yuzpe method, a combined hormonal regimen, was essentially replaced by other oral medications including levonorgestrel and the antiprogestin ulipristal. the antiprogestin mifepristone has been studied for use as emergency contraception. the most effective postcoital method of contraception is the copper intrauterine device (iud). obesity and the simultaneous initiation of progestin-containing contraception may decrease the effectiveness of some emergency contraception.    Medical    Emergency Contraception
 the objective of this paper is to present an example in which matrix functions are used to solve a modern control exercise. specifically, the solution for the equation of state, which is a matrix differential equation is calculated. to resolve this, two different methods are presented, first using the properties of the matrix functions and by other side, using the classical method of laplace transform.    ECE    Control engineering
 ...
 ```
-label.tsv(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'##'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
+label.txt(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'##'`连接，本项目选择为标签层次结构中的每一个节点生成对应的标签路径。
 
-- label.tsv 文件格式：
+- label.txt 文件格式：
 
 ```text
 <level 1: 标签>
@@ -172,7 +172,7 @@ label.tsv(层次分类标签文件)记录数据集中所有标签路径集合，
 <level 1: 标签>'##'<level 2: 标签>'##'<level 3: 标签>
 ...
 ```
-- label.tsv  文件样例：
+- label.txt  文件样例：
 ```text
 CS
 ECE
@@ -183,14 +183,14 @@ ECE##Lorentz force law
 ...
 ```
 
-data.tsv(可选，待预测数据文件)。
-- data.tsv 文件格式：
+data.txt(可选，待预测数据文件)。
+- data.txt 文件格式：
 ```text
 <输入序列1>
 <输入序列2>
 ...
 ```
-- data.tsv 文件样例：
+- data.txt 文件样例：
 ```text
 previous research exploring cognitive biases in bulimia nervosa suggests that attentional biases occur for both food-related and body-related cues. individuals with bulimia were compared to non-bulimic controls on an emotional-stroop task which contained both food-related and body-related cues. results indicated that bulimics (but not controls) demonstrated a cognitive bias for both food-related and body related cues. however, a discrepancy between the two cue-types was observed with body-related cognitive biases showing the most robust effects and food-related cognitive biases being the most strongly associated with the severity of the disorder. the results may have implications for clinical practice as bulimics with an increased cognitive bias for food-related cues indicated increased bulimic disorder severity. (c) 2016 elsevier ltd. all rights reserved.
 posterior reversible encephalopathy syndrome (pres) is a reversible clinical and neuroradiological syndrome which may appear at any age and characterized by headache, altered consciousness, seizures, and cortical blindness. the exact incidence is still unknown. the most commonly identified causes include hypertensive encephalopathy, eclampsia, and some cytotoxic drugs. vasogenic edema related subcortical white matter lesions, hyperintense on t2a and flair sequences, in a relatively symmetrical pattern especially in the occipital and parietal lobes can be detected on cranial mr imaging. these findings tend to resolve partially or completely with early diagnosis and appropriate treatment. here in, we present a rare case of unilateral pres developed following the treatment with pazopanib, a testicular tumor vascular endothelial growth factor (vegf) inhibitory agent.
@@ -218,7 +218,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 ```shell
 python predict.py --params_path ./checkpoint/
 ```
-也可以选择使用本地数据文件data/data.tsv进行预测：
+也可以选择使用本地数据文件data/data.txt进行预测：
 ```shell
 python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
@@ -328,7 +328,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir da
   * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例默认通过`prune_config.json`对TrainingArguments 参数进行配置
 * `DataArguments`
   * `dataset`：训练数据集;默认为wos数据集。
-  * `dataset`：本地数据集路径，路径内需要包含train.tsv, dev.tsv, label.tsv文件;默认为None。
+  * `dataset`：本地数据集路径，路径内需要包含train.txt, dev.txt, label.txt文件;默认为None。
   * `depth`：层次分类数据标签最大深度;默认为2。
   * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `ModelArguments`
@@ -363,7 +363,7 @@ prune/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 ```
-也可以选择使用本地数据文件data/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.txt进行部署：
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
