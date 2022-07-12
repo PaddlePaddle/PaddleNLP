@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,25 +47,19 @@ class InferBackend(object):
                 )
                 use_fp16 = False
 
+            precision_type = inference.PrecisionType.Half
             if use_fp16:
                 assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
                 print(">>> [InferBackend] FP16 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Half,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
             else:
                 print(">>> [InferBackend] INT8 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Int8,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
+                precision_type = inference.PrecisionType.Int8
+            config.enable_tensorrt_engine(workspace_size=1 << 30,
+                                          precision_mode=precision_type,
+                                          max_batch_size=batch_size,
+                                          min_subgraph_size=5,
+                                          use_static=False,
+                                          use_calib_mode=False)
             if set_dynamic_shape:
                 config.collect_shape_range_info(shape_info_file)
             else:
@@ -325,7 +319,7 @@ class ErniePredictor(object):
     def set_dynamic_shape(self, max_seq_length, batch_size):
         # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
-        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
+        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, max_seq_length
         batches = [
             {
                 "input_ids":
