@@ -39,7 +39,7 @@ struct StringSplit {
   StringSplit() = default;
   StringSplit(const StringSplit& other) = default;
   StringSplit(StringSplit&& other)
-      : tokens_(std::move(tokens_)),
+      : tokens_(std::move(other.tokens_)),
         normalized_(std::move(other.normalized_)) {}
 
   StringSplit& operator=(const StringSplit& other) = default;
