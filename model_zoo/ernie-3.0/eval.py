@@ -97,6 +97,11 @@ def parse_args():
     parser.add_argument("--perf",
                         action='store_true',
                         help="Whether to test performance.")
+    parser.add_argument(
+        "--cpu_backend",
+        default="mkldnn",
+        choices=["mkldnn", "ort", "original"],
+        help="Which inference backend is used for CPU inference.")
     parser.add_argument("--precision",
                         default="fp32",
                         choices=["fp32", "fp16", "int8"],
@@ -106,12 +111,6 @@ def parse_args():
         default=cpu_count(),
         type=int,
         help="num_threads for cpu.",
-    )
-    parser.add_argument(
-        "--enable_quantize",
-        action='store_true',
-        help=
-        "Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
     )
     parser.add_argument(
         "--debug",
@@ -195,9 +194,15 @@ class Predictor(object):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
             config.switch_ir_optim(True)
-            config.enable_mkldnn()
-            if args.enable_quantize:
-                config.enable_mkldnn_int8()
+            if args.cpu_backend == "mkldnn":
+                config.enable_mkldnn()
+                if args.precision == "fp16":
+                    config.enable_mkldnn_bfloat16()
+                if args.precision == "int8":
+                    config.enable_mkldnn_int8()
+            elif args.cpu_backend == "ort":
+                config.enable_onnxruntime()
+                config.enable_ort_optimization()
             if args.debug:
                 config.switch_ir_debug(True)
             config.set_cpu_math_library_num_threads(args.num_threads)
@@ -237,7 +242,7 @@ class Predictor(object):
     def set_dynamic_shape(self, max_seq_length, batch_size):
         # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
-        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
+        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, max_seq_length
         batches = [
             [
                 np.zeros([min_batch_size, min_seq_len], dtype="int64"),
@@ -260,13 +265,6 @@ class Predictor(object):
         exit(0)
 
     def predict_batch(self, data):
-        if len(self.output_handles) == 0:
-            input_dict = {}
-            for input_field, input_handle in zip(data, self.input_handles):
-                input_dict[input_handle] = input_field
-            result = self.predictor.run(None, input_dict)
-            return result
-
         for input_field, input_handle in zip(data, self.input_handles):
             input_handle.copy_from_cpu(input_field)
         self.predictor.run()

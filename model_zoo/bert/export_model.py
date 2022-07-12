@@ -16,7 +16,7 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import AutoModelForSequenceClassification
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 
 def parse_args():
@@ -60,7 +60,7 @@ def main():
     # save converted static graph model
     paddle.jit.save(model, args.output_path)
     # also save tokenizer for inference usage
-    tokenizer = tokenizer_class.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 

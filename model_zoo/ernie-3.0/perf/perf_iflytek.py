@@ -25,7 +25,11 @@ from paddle.metric import Accuracy
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 
-from infer_backend import InferBackend
+from pathlib import Path
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from deploy.python.ernie_predictor import InferBackend
 
 
 def parse_args():
@@ -71,24 +75,10 @@ def parse_args():
         help="Warmup steps for performance test.",
     )
     parser.add_argument(
-        "--use_trt",
-        action='store_true',
-        help="Whether to use inference engin TensorRT.",
-    )
-    parser.add_argument(
-        "--int8",
-        action='store_true',
-        help="Whether to use int8 for inference.",
-    )
-    parser.add_argument(
         "--faster_tokenizer",
         action='store_true',
         help="Whether to use FasterTokenizer.",
     )
-    parser.add_argument("--use_onnxruntime",
-                        type=distutils.util.strtobool,
-                        default=False,
-                        help="Use onnxruntime to infer or not.")
     parser.add_argument(
         "--num_threads",
         default=1,
@@ -102,14 +92,10 @@ def parse_args():
         help="Set epochs.",
     )
     parser.add_argument(
-        "--fp16",
-        action='store_true',
-        help="Whether to use FP16 inference.",
-    )
-    parser.add_argument(
-        "--use_inference",
-        action='store_true',
-        help="use paddle.inference for inference.",
+        "--precision_mode",
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help="Precision mode.",
     )
     parser.add_argument(
         "--collect_shape",
@@ -150,38 +136,14 @@ def convert_example(example,
 class Predictor(object):
 
     def __init__(self, args):
-        self.inference_backend = InferBackend(args.model_path,
-                                              batch_size=args.batch_size,
-                                              device=args.device,
-                                              use_int8=args.int8,
-                                              use_fp16=args.fp16,
-                                              collect_shape=args.collect_shape,
-                                              num_threads=args.num_threads,
-                                              use_inference=args.use_inference,
-                                              use_trt=args.use_trt)
-        if args.collect_shape:
-            min_batch_size, max_batch_size, opt_batch_size = 1, args.batch_size, args.batch_size
-            min_seq_len, max_seq_len, opt_seq_len = 2, 128, 32
-            batches = [
-                [
-                    np.zeros([min_batch_size, min_seq_len], dtype="int64"),
-                    np.zeros([min_batch_size, min_seq_len], dtype="int64")
-                ],
-                [
-                    np.zeros([max_batch_size, max_seq_len], dtype="int64"),
-                    np.zeros([max_batch_size, max_seq_len], dtype="int64")
-                ],
-                [
-                    np.zeros([opt_batch_size, opt_seq_len], dtype="int64"),
-                    np.zeros([opt_batch_size, opt_seq_len], dtype="int64")
-                ],
-            ]
-            for batch in batches:
-                self.inference_backend.infer(batch)
-            print(
-                "collect_shape finished, please close collect_shape and restart."
-            )
-            exit(0)
+        self.inference_backend = InferBackend(
+            args.model_path,
+            batch_size=args.batch_size,
+            device=args.device,
+            use_quantize=args.precision_mode == "int8",
+            use_fp16=args.precision_mode == "fp16",
+            set_dynamic_shape=args.collect_shape,
+            num_threads=args.num_threads)
 
     def predict_batch(self, data):
         return self.inference_backend.infer(data)
@@ -241,8 +203,8 @@ class Predictor(object):
                 output = self.predict_batch([input_ids, segment_ids])
                 output_label = np.argmax(output, -1)
         times_total = time.time() - time1
-        log_info = "model name: %s, thread num: %s, nums: %s, int8: %s, fp16: %s, times_total: %s, QPS: %s seq/s, latency: %s ms" % (
-            args.model_path, args.num_threads, nums, args.int8, args.fp16,
+        log_info = "model name: %s, thread num: %s, nums: %s, precision: %s, times_total: %s, QPS: %s seq/s, latency: %s ms" % (
+            args.model_path, args.num_threads, nums, args.precision_mode,
             times_total, nums / times_total, times_total * 1000 / nums)
         print(log_info)
         with open("iflytek_cpu.txt", 'a+') as f:

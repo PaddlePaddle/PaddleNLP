@@ -1232,8 +1232,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 │   └── infer.py
 │   └── README.md
 │ └── perf                       # 性能测试目录
-│   └── clue_infer.py            # 性能测试脚本
-│   └── infer_backend.py        # 性能测试脚本
+│   └── perf_iflytek.py          # 性能测试脚本
 │   └── export_model.py          # 动转静脚本
 │   └── README.md                # 性能测试脚本使用文档
 └── README.md                    # 文档，本文件
