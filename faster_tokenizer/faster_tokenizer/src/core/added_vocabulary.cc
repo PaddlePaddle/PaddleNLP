@@ -338,7 +338,8 @@ bool AddedVocabulary::SplitWithIndices(
     if (is_not_unk) {
       tokens.emplace_back(core::Token{id, slice.GetStr(), {0, slice.GetLen()}});
     }
-    split_results->push_back({slice, tokens});
+    // use push_back({slice, tokens}) will raise error in windows platform.
+    split_results->emplace_back(slice, tokens);
   }
   return status;
 }

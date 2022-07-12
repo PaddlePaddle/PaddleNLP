@@ -100,11 +100,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
 ENDIF(WIN32)
 
 # For OpenMP
-find_package(OpenMP)
-if (OPENMP_FOUND)
-    add_definitions(-DWITH_OMP)
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+# openmp not support well for now on windows
+if (NOT WIN32)
+    find_package(OpenMP)
+    if (OPENMP_FOUND)
+        add_definitions(-DWITH_OMP)
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    endif()
 endif()
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
