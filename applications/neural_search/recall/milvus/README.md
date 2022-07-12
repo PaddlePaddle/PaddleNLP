@@ -206,6 +206,6 @@ python3 inference.py
 ```
 ## FAQ
 
-### 句子抽取向量后，利用milvus进行检索到了相同的句子，得到的距离不是0
+#### 句子抽取向量后，利用milvus进行检索到了相同的句子，得到的距离不是0
 
 使用的是近似索引，详情请参考Milvus官方文档，[索引创建机制](https://milvus.io/cn/docs/v2.0.x/index.md)
