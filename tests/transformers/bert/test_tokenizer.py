@@ -123,7 +123,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                              ["HäLLo", "!", "how", "Are", "yoU", "?"])
 
     def test_basic_tokenizer_no_lower_strip_accents_true(self):
-        tokenizer = BasicTokenizer(do_lower_case=False)
+        tokenizer = BasicTokenizer(do_lower_case=False, strip_accents=True)
 
         self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
                              ["HaLLo", "!", "how", "Are", "yoU", "?"])

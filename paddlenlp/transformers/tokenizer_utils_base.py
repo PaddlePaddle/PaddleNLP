@@ -22,6 +22,7 @@ import io
 import re
 import warnings
 from collections import OrderedDict, UserDict
+from contextlib import contextmanager
 from shutil import copyfile
 from dataclasses import dataclass, field
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
@@ -2268,22 +2269,22 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     def encode(self,
                text,
                text_pair=None,
-               max_length=None,
-               stride: int = 0,
-               is_split_into_words: bool = False,
+               add_special_tokens=True,
                padding: Union[bool, str, PaddingStrategy] = False,
                truncation: Union[bool, str, TruncationStrategy] = False,
-               return_position_ids=False,
-               return_token_type_ids=True,
-               return_attention_mask=False,
-               return_length=False,
-               return_overflowing_tokens=False,
-               return_special_tokens_mask=False,
-               return_offsets_mapping=False,
-               add_special_tokens=True,
+               max_length: Optional[int] = None,
+               stride: int = 0,
+               is_split_into_words: bool = False,
                pad_to_multiple_of: Optional[int] = None,
                return_tensors: Optional[Union[str, TensorType]] = None,
+               return_token_type_ids: Optional[bool] = None,
+               return_attention_mask: Optional[bool] = None,
+               return_overflowing_tokens: bool = False,
+               return_special_tokens_mask: bool = False,
+               return_offsets_mapping: bool = False,
+               return_length: bool = False,
                verbose: bool = True,
+               return_position_ids=False,
                **kwargs) -> BatchEncoding:
         """
         Tokenize and prepare for the model a sequence or a pair of sequences.
@@ -3220,7 +3221,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if not self.deprecation_warnings.get(
                     "sequence-length-is-longer-than-the-specified-maximum",
                     False):
-                warnings.warn(
+                logger.warning(
                     "Token indices sequence length is longer than the specified maximum sequence length "
                     f"for this model ({len(ids)} > {self.model_max_length}). Running this sequence through the model "
                     "will result in indexing errors")

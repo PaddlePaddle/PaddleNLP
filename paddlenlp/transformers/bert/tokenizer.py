@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import os
+import collections
 import unicodedata
 
-from .. import PretrainedTokenizer, AddedToken
+from ..tokenizer_utils import PretrainedTokenizer
 from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
 
 __all__ = [
@@ -33,22 +33,38 @@ class BasicTokenizer(object):
 
     Args:
         do_lower_case (bool):
-            Whether or not to lowercase the input when tokenizing.
+            Whether to lowercase the input when tokenizing.
             Defaults to `True`.
-
+        never_split (Iterable):
+            Collection of tokens which will never be split during tokenization. Only has an effect when
+            `do_basic_tokenize=True`
+        tokenize_chinese_chars (bool):
+            Whether to tokenize Chinese characters.
+        strip_accents: (bool):
+            Whether to strip all accents. If this option is not specified, then it will be determined by the
+            value for `lowercase` (as in the original BERT).
     """
 
-    def __init__(self, do_lower_case=True):
+    def __init__(self,
+                 do_lower_case=True,
+                 never_split=None,
+                 tokenize_chinese_chars=True,
+                 strip_accents=None):
         """Constructs a BasicTokenizer."""
-
+        if never_split is None:
+            never_split = []
         self.do_lower_case = do_lower_case
+        self.never_split = set(never_split)
+        self.tokenize_chinese_chars = tokenize_chinese_chars
+        self.strip_accents = strip_accents
 
-    def tokenize(self, text):
+    def tokenize(self, text, never_split=None):
         """
         Tokenizes a piece of text using basic tokenizer.
 
         Args:
             text (str): A piece of text.
+            never_split (List[str]): List of token not to split.
 
         Returns: 
             list(str): A list of tokens.
@@ -62,22 +78,25 @@ class BasicTokenizer(object):
                 '''
                 ['he', 'was', 'a', 'puppeteer']
                 '''
-
         """
-
         text = convert_to_unicode(text)
+        never_split = self.never_split.union(
+            set(never_split)) if never_split else self.never_split
         text = self._clean_text(text)
-        text = self._tokenize_chinese_chars(text)
 
+        if self.tokenize_chinese_chars:
+            text = self._tokenize_chinese_chars(text)
         orig_tokens = whitespace_tokenize(text)
         split_tokens = []
         for token in orig_tokens:
-            if self.do_lower_case:
-                token = token.lower()
-                token = self._run_strip_accents(token)
-            else:
-                token = self._run_strip_accents(token)
-            split_tokens.extend(self._run_split_on_punc(token))
+            if token not in never_split:
+                if self.do_lower_case:
+                    token = token.lower()
+                    if self.strip_accents is not False:
+                        token = self._run_strip_accents(token)
+                elif self.strip_accents:
+                    token = self._run_strip_accents(token)
+            split_tokens.extend(self._run_split_on_punc(token, never_split))
 
         output_tokens = whitespace_tokenize(" ".join(split_tokens))
         return output_tokens
@@ -95,10 +114,12 @@ class BasicTokenizer(object):
             output.append(char)
         return "".join(output)
 
-    def _run_split_on_punc(self, text):
+    def _run_split_on_punc(self, text, never_split=None):
         """
         Splits punctuation on a piece of text.
         """
+        if never_split is not None and text in never_split:
+            return [text]
         chars = list(text)
         i = 0
         start_new_word = True
@@ -136,7 +157,6 @@ class BasicTokenizer(object):
         """
         Checks whether CP is the codepoint of a CJK character.
         """
-
         # This defines a "chinese character" as anything in the CJK Unicode block:
         #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
         #
@@ -144,7 +164,7 @@ class BasicTokenizer(object):
         # despite its name. The modern Korean Hangul alphabet is a different block,
         # as is Japanese Hiragana and Katakana. Those alphabets are used to write
         # space-separated words, so they are not treated specially and handled
-        # like the all of the other languages.
+        # like the all the other languages.
         if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
             (cp >= 0x3400 and cp <= 0x4DBF) or  #
             (cp >= 0x20000 and cp <= 0x2A6DF) or  #
@@ -221,7 +241,6 @@ class WordpieceTokenizer(object):
                 '''
                 ["un", "##aff", "##able"]
                 '''
-
         """
 
         output_tokens = []
@@ -301,7 +320,6 @@ class BertTokenizer(PretrainedTokenizer):
             '''
             {'input_ids': [101, 2002, 2001, 1037, 13997, 11510, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0]}
             '''
-
     """
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
@@ -400,16 +418,40 @@ class BertTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "bert-base-uncased": 512,
+        "bert-large-uncased": 512,
+        "bert-base-cased": 512,
+        "bert-large-cased": 512,
+        "bert-base-multilingual-uncased": 512,
+        "bert-base-multilingual-cased": 512,
+        "bert-base-chinese": 512,
+        "bert-wwm-chinese": 512,
+        "bert-wwm-ext-chinese": 512,
+        "macbert-large-chinese": 512,
+        "macbert-base-chinese": 512,
+        "simbert-base-chinese": 512,
+        "uer/chinese-roberta-base": 512,
+        "uer/chinese-roberta-medium": 512,
+        "uer/chinese-roberta-6l-768h": 512,
+        "uer/chinese-roberta-small": 512,
+        "uer/chinese-roberta-mini": 512,
+        "uer/chinese-roberta-tiny": 512,
+    }
     padding_side = 'right'
 
     def __init__(self,
                  vocab_file,
                  do_lower_case=True,
+                 do_basic_tokenize=True,
+                 never_split=None,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
+                 tokenize_chinese_chars=True,
+                 strip_accents=None,
                  **kwargs):
 
         if not os.path.isfile(vocab_file):
@@ -420,7 +462,14 @@ class BertTokenizer(PretrainedTokenizer):
                 .format(vocab_file))
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+        self.do_basic_tokenize = do_basic_tokenize
+        if do_basic_tokenize:
+            self.basic_tokenizer = BasicTokenizer(
+                do_lower_case=do_lower_case,
+                never_split=never_split,
+                tokenize_chinese_chars=tokenize_chinese_chars,
+                strip_accents=strip_accents,
+            )
         self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
                                                       unk_token=unk_token)
 
@@ -446,9 +495,16 @@ class BertTokenizer(PretrainedTokenizer):
             list: A list of string representing converted tokens.
         """
         split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token)
+        if self.do_basic_tokenize:
+            for token in self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens):
+                # If the token is part of the never_split set
+                if token in self.basic_tokenizer.never_split:
+                    split_tokens.append(token)
+                else:
+                    split_tokens += self.wordpiece_tokenizer.tokenize(token)
+        else:
+            split_tokens = self.wordpiece_tokenizer.tokenize(text)
         return split_tokens
 
     def convert_tokens_to_string(self, tokens):
