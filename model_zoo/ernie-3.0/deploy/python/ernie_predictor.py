@@ -22,49 +22,71 @@ from paddlenlp.transformers import AutoTokenizer
 
 class InferBackend(object):
 
-    def __init__(self,
-                 model_path,
-                 batch_size=32,
-                 device='cpu',
-                 use_fp16=False,
-                 use_quantize=False,
-                 set_dynamic_shape=False,
-                 shape_info_file="shape_info.txt",
-                 num_threads=10):
+    def __init__(
+            self,
+            model_path,
+            batch_size=32,
+            device='cpu',  # deploy device cpu, gpu or xpu
+            cpu_backend="mkldnn",  # mkldnn or ort
+            use_fp16=False,  # use fp16 or not
+            use_quantize=False,  # use ort quantize dynamic or not
+            set_dynamic_shape=False,  # set_dynamic_shape for Inference-TRT or not
+            shape_info_file="shape_info.txt",
+            num_threads=10):
         model_path = self.model_path_correction(model_path)
-        is_int8_model = self.paddle_quantize_model(model_path)
+        is_int8_model = self.paddle_quantize_model(
+            model_path)  # Determine whether a Paddle model is a quantized model
         print(">>> [InferBackend] Creating Engine ...")
-        if device == 'gpu' and is_int8_model or use_fp16:
+        # quantized model, deploy on xpu, deploy on cpu and use_quantize is disabled
+        if is_int8_model or device == "xpu" or device == "cpu" and not use_quantize:
             from paddle import inference
             self.predictor_type = "inference"
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
-            config.enable_use_gpu(100, 0)
-            paddle.set_device("gpu")
-            if is_int8_model and use_fp16:
-                print(
-                    ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
-                )
-                use_fp16 = False
+            if device == 'gpu':  # quantized model on GPU
+                config.enable_use_gpu(100, 0)
+                paddle.set_device("gpu")
 
-            precision_type = inference.PrecisionType.Half
-            if use_fp16:
-                assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
-                print(">>> [InferBackend] FP16 inference ...")
-            else:
-                print(">>> [InferBackend] INT8 inference ...")
-                precision_type = inference.PrecisionType.Int8
-            config.enable_tensorrt_engine(workspace_size=1 << 30,
-                                          precision_mode=precision_type,
-                                          max_batch_size=batch_size,
-                                          min_subgraph_size=5,
-                                          use_static=False,
-                                          use_calib_mode=False)
-            if set_dynamic_shape:
-                config.collect_shape_range_info(shape_info_file)
-            else:
-                config.enable_tuned_tensorrt_dynamic_shape(
-                    shape_info_file, True)
+                precision_type = inference.PrecisionType.Float32
+                if is_int8_model:
+                    print(">>> [InferBackend] INT8 inference on GPU ...")
+                    precision_type = inference.PrecisionType.Int8
+
+                config.enable_tensorrt_engine(workspace_size=1 << 30,
+                                              precision_mode=precision_type,
+                                              max_batch_size=batch_size,
+                                              min_subgraph_size=5,
+                                              use_static=False,
+                                              use_calib_mode=False)
+                if set_dynamic_shape:
+                    config.collect_shape_range_info(shape_info_file)
+                else:
+                    config.enable_tuned_tensorrt_dynamic_shape(
+                        shape_info_file, True)
+            elif device == 'cpu':
+                config.disable_gpu()
+                config.switch_ir_optim(True)
+                if cpu_backend == "mkldnn":
+                    config.enable_mkldnn()
+                    if use_fp16:
+                        print(">>> [InferBackend] FP16 inference on CPU ...")
+                        config.enable_mkldnn_bfloat16()
+                    if is_int8_model:
+                        print(">>> [InferBackend] INT8 inference on CPU ...")
+                        config.enable_mkldnn_int8()
+                elif cpu_backend == "ort":
+                    if use_fp16:
+                        print(
+                            ">>> [InferBackend] FP16 is not supported in ORT backend ..."
+                        )
+                    config.enable_onnxruntime()
+                    config.enable_ort_optimization()
+            elif device == 'xpu':
+                print(">>> [InferBackend] Inference on XPU ...")
+                config.enable_xpu(100)
+
+            config.enable_memory_optim()
+            config.set_cpu_math_library_num_threads(num_threads)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -78,7 +100,7 @@ class InferBackend(object):
                 self.predictor.get_output_handle(name)
                 for name in self.predictor.get_output_names()
             ]
-        else:
+        else:  # Deploy on gpu, use ort dynamic quantize on float model on cpu, fp16 on gpu
             import paddle2onnx
             import onnxruntime as ort
             import copy
@@ -88,20 +110,47 @@ class InferBackend(object):
                 params_file=model_path + ".pdiparams",
                 opset_version=13,
                 enable_onnx_checker=True)
-            dynamic_quantize_model = onnx_model
+
+            deploy_onnx_model = onnx_model
             providers = ['CUDAExecutionProvider']
-            if device == 'cpu':
-                providers = ['CPUExecutionProvider']
-            if use_quantize:
+
+            # Can not use ORT dynamic quantize when deploy on GPU
+            if device == "gpu" and use_quantize:
+                print(
+                    ">>> [InferBackend] The model is a FP32 model here, use FP32 to inference here ..."
+                )
+                use_quantize = False
+
+            if use_fp16 and use_quantize:
+                print(
+                    ">>> [InferBackend] Both FP16 and Int8 are enabled, use FP16 to inference here ..."
+                )
+                use_quantize = False
+
+            if use_fp16:
+                from onnxconverter_common import float16
+                deploy_onnx_model = "fp16_model.onnx"
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
-                dynamic_quantize_model = "dynamic_quantize_model.onnx"
-                self.dynamic_quantize(float_onnx_file, dynamic_quantize_model)
+                onnx_model = onnx.load_model(float_onnx_file)
+                trans_model = float16.convert_float_to_float16(
+                    onnx_model, keep_io_types=True)
+                onnx.save_model(trans_model, deploy_onnx_model)
+                print(">>> [InferBackend] FP16 inference on GPU ...")
+
+            if use_quantize:
+                deploy_onnx_model = "dynamic_quantize_model.onnx"
+                float_onnx_file = "model.onnx"
+                with open(float_onnx_file, "wb") as f:
+                    f.write(onnx_model)
+                self.dynamic_quantize(float_onnx_file, deploy_onnx_model)
                 providers = ['CPUExecutionProvider']
+                print(">>> [InferBackend] INT8 inference on CPU ...")
+
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            self.predictor = ort.InferenceSession(dynamic_quantize_model,
+            self.predictor = ort.InferenceSession(deploy_onnx_model,
                                                   sess_options=sess_options,
                                                   providers=providers)
             input_name1 = self.predictor.get_inputs()[0].name
@@ -185,7 +234,7 @@ class ErniePredictor(object):
                 type(device))
             exit(0)
         args.device = args.device.lower()
-        if args.device not in ['cpu', 'gpu']:
+        if args.device not in ['cpu', 'gpu', 'xpu']:
             print(
                 ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
                 type(args.device))
@@ -215,13 +264,10 @@ class ErniePredictor(object):
         self.max_seq_length = args.max_seq_length
 
         if args.device == 'cpu':
-            args.use_fp16 = False
             args.set_dynamic_shape = False
-            args.batch_size = 32
             args.shape_info_file = None
         if args.device == 'gpu':
             args.num_threads = cpu_count(logical=False)
-            args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
