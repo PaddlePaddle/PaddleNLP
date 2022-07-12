@@ -102,7 +102,7 @@ std::vector<std::string> WordPiece::Save(
               return left.second < right.second;
             });
   for (const auto& vocab_item : vocab) {
-    fout << vocab_item.second << "\n";
+    fout << vocab_item.first << "\n";
   }
   fout.close();
   return {filepath};
