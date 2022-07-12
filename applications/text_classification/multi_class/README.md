@@ -66,7 +66,7 @@ multi_class/
 
 单卡训练
 ```shell
-python train.py --warmup --early_stop
+python train.py --warmup --early_stop --epochs 100
 ```
 
 指定GPU卡号/多卡训练
