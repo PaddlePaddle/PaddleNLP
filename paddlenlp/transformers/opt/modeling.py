@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddlenlp.transformers.gpt.modeling import MultiHeadAttention
+from paddlenlp.transformers.gpt.modeling import MultiHeadAttention, TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 __all__ = [
@@ -126,95 +126,6 @@ class TransformerDecoder(Layer):
         if do_zip:
             cache = list(zip(*cache))
         return cache
-
-
-class TransformerDecoderLayer(Layer):
-    """
-    The transformer decoder layer.
-
-    It contains multiheadattention and some linear layers.
-    """
-
-    def __init__(self,
-                 d_model: int,
-                 nhead: int,
-                 dim_feedforward: int,
-                 dropout: float = 0.1,
-                 activation: str = "gelu",
-                 attn_dropout: Optional[float] = None,
-                 act_dropout: Optional[float] = None,
-                 normalize_before: bool = True,
-                 weight_attr=None,
-                 bias_attr=None):
-        self._config = locals()
-        self._config.pop("self")
-        self._config.pop("__class__", None)  # py3
-
-        super(TransformerDecoderLayer, self).__init__()
-        attn_dropout = dropout if attn_dropout is None else attn_dropout
-        act_dropout = dropout if act_dropout is None else act_dropout
-        self.normalize_before = normalize_before
-
-        weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
-        bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
-
-        self.self_attn = MultiHeadAttention(d_model,
-                                            nhead,
-                                            dropout=attn_dropout,
-                                            weight_attr=weight_attrs[0],
-                                            bias_attr=bias_attrs[0])
-        self.linear1 = nn.Linear(d_model,
-                                 dim_feedforward,
-                                 weight_attrs[2],
-                                 bias_attr=bias_attrs[2])
-        self.linear2 = nn.Linear(dim_feedforward,
-                                 d_model,
-                                 weight_attrs[2],
-                                 bias_attr=bias_attrs[2])
-
-        self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
-        self.activation = getattr(F, activation)
-
-    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
-        residual = tgt
-
-        # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
-        if self.normalize_before:
-            tgt = self.norm1(tgt)
-
-        if use_cache is False:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
-        else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    use_cache, cache)
-        tgt = residual + self.dropout1(tgt)
-
-        # 350m applies layer norm AFTER attention
-        if not self.normalize_before:
-            tgt = self.norm1(tgt)
-
-        residual = tgt
-
-        # 125m, 1.7B, ..., 175B applies layer norm BEFORE attention
-        if self.normalize_before:
-            tgt = self.norm2(tgt)
-
-        tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
-        tgt = residual + tgt
-
-        # 350m applies layer norm AFTER attention
-        if not self.normalize_before:
-            tgt = self.norm2(tgt)
-
-        return tgt if use_cache is False else (tgt, incremental_cache)
-
-    def gen_cache(self, memory):
-        incremental_cache = self.self_attn.gen_cache(memory,
-                                                     type=self.self_attn.Cache)
-        return incremental_cache
 
 
 class OPTLearnedPositionEmbedding(nn.Embedding):
