@@ -152,11 +152,12 @@ class InferBackend(object):
                 print(">>> [InferBackend] FP16 inference on GPU ...")
 
             if use_quantize:
+                from onnxruntime.quantization import quantize_dynamic
                 deploy_onnx_model = "dynamic_quantize_model.onnx"
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
-                self.dynamic_quantize(float_onnx_file, deploy_onnx_model)
+                quantize_dynamic(float_onnx_file, deploy_onnx_model)
                 providers = ['CPUExecutionProvider']
                 print(">>> [InferBackend] INT8 inference on CPU ...")
 
@@ -170,10 +171,6 @@ class InferBackend(object):
             self.input_handles = [input_name1, input_name2]
             self.output_handles = []
         print(">>> [InferBackend] Engine Created ...")
-
-    def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
-        from onnxruntime.quantization import QuantizationMode, quantize_dynamic
-        quantize_dynamic(input_float_model, dynamic_quantized_model)
 
     def model_path_correction(self, model_path):
         if os.path.isfile(model_path + ".pdmodel"):
