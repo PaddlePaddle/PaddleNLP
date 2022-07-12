@@ -4,7 +4,9 @@ This is the implementation of the paper [RGL: A Simple yet Effective Relation Gr
 
 **************************** Updates *****************************
 
-2022-04-08: Our paper has been accepted to Findings of NAACL 2022!
+2022-07-11: Our training code has been released.
+
+2022-04-08: Our paper has been accepted to Findings of [NAACL 2022](https://aclanthology.org/2022.findings-naacl.81/)!
 
 # Overview
 
