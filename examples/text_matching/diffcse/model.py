@@ -203,6 +203,7 @@ class DiffCSE(nn.Layer):
                  encoder_name,
                  generator_name,
                  discriminator_name,
+                 enc_tokenizer,
                  gen_tokenizer,
                  dis_tokenizer,
                  temp=0.05,
@@ -213,6 +214,7 @@ class DiffCSE(nn.Layer):
         self.encoder_name = encoder_name
         self.generator_name = generator_name
         self.discriminator_name = discriminator_name
+        self.enc_tokenizer = enc_tokenizer
         self.gen_tokenizer = gen_tokenizer
         self.dis_tokenizer = dis_tokenizer
         self.temp = temp
@@ -250,10 +252,11 @@ class DiffCSE(nn.Layer):
         with paddle.no_grad():
             # mask tokens for query and key input_ids and then predict mask token with generator
             input_ids = paddle.concat([query_input_ids, key_input_ids], axis=0)
+            if self.encoder_name != self.generator_name:
+                input_ids = self.encode_by_generator(input_ids)
             attention_mask = paddle.concat(
                 [query_attention_mask, key_attention_mask], axis=0)
-            mlm_input_ids, _ = mask_tokens(paddle.concat(
-                [query_input_ids, key_input_ids], axis=0),
+            mlm_input_ids, _ = mask_tokens(input_ids,
                                            self.gen_tokenizer,
                                            mlm_probability=self.mlm_probability)
             # predict tokens using generator
@@ -283,6 +286,16 @@ class DiffCSE(nn.Layer):
                              attention_mask.sum())
 
         return loss, rtd_loss
+
+    def encode_by_generator(self, batch_tokens):
+        new_tokens = []
+        for one_tokens in batch_tokens:
+            one_gen_tokens = self.enc_tokenizer.convert_ids_to_tokens(
+                one_tokens.tolist())
+            new_tokens.append(
+                self.gen_tokenizer.convert_tokens_to_ids(one_gen_tokens))
+
+        return paddle.to_tensor(new_tokens)
 
     def encode_by_discriminator(self, batch_tokens):
         new_tokens = []

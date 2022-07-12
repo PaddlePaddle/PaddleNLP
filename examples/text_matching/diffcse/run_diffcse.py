@@ -365,6 +365,7 @@ if __name__ == "__main__":
         model = DiffCSE(encoder_name=args.encoder_name,
                         generator_name=args.generator_name,
                         discriminator_name=args.discriminator_name,
+                        enc_tokenizer=tokenizer,
                         gen_tokenizer=gen_tokenizer,
                         dis_tokenizer=dis_tokenizer,
                         temp=args.temp,
