@@ -43,7 +43,7 @@ def evaluate(model, criterion, metric, data_loader):
         metric.update(probs, labels)
 
     micro_f1_score, macro_f1_score = metric.accumulate()
-    logger.info("loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f" %
+    logger.info("eval loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f" %
                 (np.mean(losses), micro_f1_score, macro_f1_score))
     model.train()
     metric.reset()

@@ -43,7 +43,7 @@ def evaluate(model, criterion, metric, data_loader):
         metric.update(correct)
 
     acc = metric.accumulate()
-    logger.info("loss: %.5f, acc: %.5f" % (np.mean(losses), acc))
+    logger.info("eval loss: %.5f, acc: %.5f" % (np.mean(losses), acc))
     model.train()
     metric.reset()
 
