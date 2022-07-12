@@ -49,14 +49,16 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 </div>
 
 1. **数据准备**
-
-- 首先我们需要根据数据类型选择对应的文本分类类型（[多分类](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class)、[多标签](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label)、[层次分类](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical)）。
 - 如果没有已标注的数据集，我们推荐doccano数据标注工具，如何使用doccano进行数据标注并转化成指定格式本地数据集详见[文本分类任务doccano使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)。如果已有标注好的本地数据集，我们需要根据不同任务要求将数据集整理为文档要求的格式：[多分类数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#%E4%BB%8E%E6%9C%AC%E5%9C%B0%E6%96%87%E4%BB%B6%E5%88%9B%E5%BB%BA%E6%95%B0%E6%8D%AE%E9%9B%86)、[多标签数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#%E4%BB%8E%E6%9C%AC%E5%9C%B0%E6%96%87%E4%BB%B6%E5%88%9B%E5%BB%BA%E6%95%B0%E6%8D%AE%E9%9B%86)、[层次分类数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#%E4%BB%A5%E5%86%85%E7%BD%AE%E6%95%B0%E6%8D%AE%E9%9B%86%E6%A0%BC%E5%BC%8F%E8%AF%BB%E5%8F%96%E6%9C%AC%E5%9C%B0%E6%95%B0%E6%8D%AE%E9%9B%86)。
 - 准备好数据集后，我们可以根据现有的数据集规模或训练后模型表现选择是否使用数据增强策略进行数据集扩充。（目前数据增强工具正在开发中，敬请期待）
 
 2. **模型训练**
 
 - 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"ernie-3.0-base-zh"模型，英文任务默认使用"ernie-2.0-base-en"模型，ERNIE 3.0还支持多个轻量级中文模型，详见[ERNIE模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/ERNIE/contents.html)，可以根据任务和设备需求进行选择。
+- 首先我们需要根据任务场景选择不同的   
+ [多分类任务点击这里](./multi_class)    
+ [多标签任务点击这里](./multi_label)    
+ [层次分类任务点击这里](./hierarchical)     
 
 - 训练结束后，我们可以加载保存的最佳模型进行模型测试，打印模型预测结果。
 
