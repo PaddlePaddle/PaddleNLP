@@ -128,7 +128,7 @@ class InferBackend(object):
             # Can not use ORT dynamic quantize when deploy on GPU
             if device == "gpu" and use_quantize:
                 print(
-                    ">>> [InferBackend] The model is a FP32 model here, use FP32 to inference here ..."
+                    ">>> [InferBackend] It is a FP32 model, and dynamic quantization is not supported on gpu, use FP32 to inference here ..."
                 )
                 use_quantize = False
 
