@@ -77,7 +77,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including "
-                    "data.tsv, label.tsv, test.tsv(optional,"
+                    "data.txt, label.txt, test.txt(optional,"
                     "if evaluate the performance).")
 parser.add_argument("--perf_dataset",
                     choices=['dev', 'test'],
@@ -104,7 +104,7 @@ def predict(data, label_list):
 
         if args.dataset_dir is not None:
             eval_dir = os.path.join(args.dataset_dir,
-                                    "{}.tsv".format(args.perf_dataset))
+                                    "{}.txt".format(args.perf_dataset))
             eval_ds = load_dataset("wos", data_files=(eval_dir))
         else:
             eval_ds = load_dataset(args.dataset, splits=[args.perf_dataset])
@@ -123,8 +123,8 @@ def predict(data, label_list):
 if __name__ == "__main__":
 
     if args.dataset_dir is not None:
-        data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        label_dir = os.path.join(args.dataset_dir, "label.tsv")
+        data_dir = os.path.join(args.dataset_dir, "data.txt")
+        label_dir = os.path.join(args.dataset_dir, "label.txt")
 
         data = []
         label_list = []

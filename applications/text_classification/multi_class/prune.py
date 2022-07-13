@@ -52,7 +52,7 @@ class DataArguments:
         default=None,
         metadata={
             "help":
-            "Local dataset directory should include train.tsv, dev.tsv and label.tsv."
+            "Local dataset directory should include train.txt, dev.txt and label.txt."
         })
 
     max_seq_length: int = field(
@@ -96,7 +96,7 @@ def main():
     training_args.print_config(data_args, "Data")
     if data_args.dataset_dir is not None:
         label_list = {}
-        with open(os.path.join(data_args.dataset_dir, 'label.tsv'),
+        with open(os.path.join(data_args.dataset_dir, 'label.txt'),
                   'r',
                   encoding='utf-8') as f:
             for i, line in enumerate(f):
@@ -104,12 +104,12 @@ def main():
                 label_list[l] = i
         train_ds = load_dataset(read_local_dataset,
                                 path=os.path.join(data_args.dataset_dir,
-                                                  'train.tsv'),
+                                                  'train.txt'),
                                 label_list=label_list,
                                 lazy=False)
         dev_ds = load_dataset(read_local_dataset,
                               path=os.path.join(data_args.dataset_dir,
-                                                'dev.tsv'),
+                                                'dev.txt'),
                               label_list=label_list,
                               lazy=False)
     else:
