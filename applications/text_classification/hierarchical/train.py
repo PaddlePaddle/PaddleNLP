@@ -42,8 +42,8 @@ parser.add_argument("--save_dir",
 parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
-                    help="The dataset directory should include train.tsv,"
-                    "dev.tsv and label.tsv files.")
+                    help="The dataset directory should include train.txt,"
+                    "dev.txt and label.txt files.")
 parser.add_argument("--dataset",
                     default="wos",
                     type=str,
@@ -140,9 +140,9 @@ def train():
 
     # load and preprocess dataset
     if args.dataset_dir is not None:
-        train_dir = os.path.join(args.dataset_dir, "train.tsv")
-        dev_dir = os.path.join(args.dataset_dir, "dev.tsv")
-        label_dir = os.path.join(args.dataset_dir, "label.tsv")
+        train_dir = os.path.join(args.dataset_dir, "train.txt")
+        dev_dir = os.path.join(args.dataset_dir, "dev.txt")
+        label_dir = os.path.join(args.dataset_dir, "label.txt")
         train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
         label_list = {}
         with open(label_dir, 'r', encoding='utf-8') as f:
