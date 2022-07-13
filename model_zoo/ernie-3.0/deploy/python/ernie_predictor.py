@@ -280,10 +280,8 @@ class ErniePredictor(object):
             args.set_dynamic_shape = False
             args.shape_info_file = None
             args.batch_size = 32
-            # args.use_fp16 = False
         if args.device == 'gpu':
             args.num_threads = cpu_count(logical=False)
-            # args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
