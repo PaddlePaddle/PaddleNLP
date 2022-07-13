@@ -80,7 +80,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup --early_stop
 
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `dataset`：训练数据集;默认为"cblue"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含train.tsv，dev.tsv和label.tsv文件;默认为None。
+* `dataset_dir`：本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `task_name`：训练数据集;默认为"KUAKE-QIC"。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
@@ -126,20 +126,20 @@ mv KUAKE_QIC data
 
 ```text
 data/
-├── train.tsv # 训练数据集文件
-├── dev.tsv # 开发数据集文件
-├── label.tsv # 分类标签文件
-└── data.tsv # 可选，待预测数据文件
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── label.txt # 分类标签文件
+└── data.txt # 可选，待预测数据文件
 ```
 
-train.tsv(训练数据集文件), dev.tsv(开发数据集文件),输入文本序列与标签类别名用`'\t'`分隔开。
-- train.tsv/dev.tsv 文件格式：
+train.txt(训练数据集文件), dev.txt(开发数据集文件),输入文本序列与标签类别名用`'\t'`分隔开。
+- train.txt/dev.txt 文件格式：
 ```text
 <输入序列1>'\t'<标签1>'\n'
 <输入序列2>'\t'<标签2>'\n'
 ...
 ```
-- train.tsv/dev.tsv 文件样例：
+- train.txt/dev.txt 文件样例：
 ```text
 25岁已经感觉脸部松弛了怎么办	治疗方案
 小孩的眉毛剪了会长吗？	其他
@@ -149,14 +149,14 @@ train.tsv(训练数据集文件), dev.tsv(开发数据集文件),输入文本序
 ```
 
 
-label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
-- label.tsv 文件格式：
+label.txt(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
+- label.txt 文件格式：
 ```text
 <标签名1>'\n'
 <标签名2>'\n'
 ...
 ```
-- label.tsv 文件样例：
+- label.txt 文件样例：
 ```text
 病情诊断
 治疗方案
@@ -166,14 +166,14 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 ...
 ```
 
-data.tsv(可选，待预测数据文件)。
-- data.tsv 文件格式：
+data.txt(可选，待预测数据文件)。
+- data.txt 文件格式：
 ```text
 <输入序列1>'\n'
 <输入序列2>'\n'
 ...
 ```
-- data.tsv 文件样例：
+- data.txt 文件样例：
 ```text
 黑苦荞茶的功效与作用及食用方法
 交界痣会凸起吗
@@ -203,14 +203,14 @@ python -m paddle.distributed.launch --gpus "0" train.py --warmup --dataset_dir d
 ```shell
 python predict.py --params_path ./checkpoint/
 ```
-也可以选择使用本地数据文件data/data.tsv进行预测：
+也可以选择使用本地数据文件data/data.txt进行预测：
 ```shell
 python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
 可支持配置的参数：
 
 * `params_path`：待预测模型参数文件夹；默认为"./checkpoint/"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
+* `dataset_dir`：本地数据集路径，数据集路径中应包含data.txt和label.txt文件;默认为None。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
@@ -243,7 +243,7 @@ export/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 ```
-也可以选择使用本地数据文件data/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.txt进行部署：
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir data
 ```
@@ -313,7 +313,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir da
 * `DataArguments`
   * `dataset`：训练数据集;默认为 cblue 数据集。
   * `task_name`：训练数据集任务名;默认为"KUAKE-QIC"。
-  * `dataset_dir`：本地数据集路径，需包含train.tsv,dev.tsv,label.tsv;默认为None。
+  * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
   * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 
 * `ModelArguments`
@@ -348,7 +348,7 @@ prune/
 ```shell
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 ```
-也可以选择使用本地数据文件data/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.txt进行部署：
 ```shell
 python deploy/preditor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
