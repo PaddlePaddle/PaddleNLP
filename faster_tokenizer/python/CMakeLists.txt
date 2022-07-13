@@ -11,12 +11,18 @@ add_custom_target(copy_setup ALL
 # 3. Copy the core_tokenizers.so to python tokenizers directory
 set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_DST_DIR ${CMAKE_BINARY_DIR}/python/faster_tokenizer)
+set(TOKENIZER_SRC_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer/src)
+set(TOKENIZER_THIRD_PARTY_DIR ${CMAKE_BINARY_DIR}/third_party)
 
 IF(WIN32)
-# TODO(zhoushunjie): Need to upgrade windows
+set(ICU_DLL_DIR ${TOKENIZER_THIRD_PARTY_DIR}/icu/src/extern_icu/icu4c/bin64)
+add_custom_target(copy_shared_library ALL
+    COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_SRC_DIR}/${TOKENIZER_CORE_NAME}.pyd ${TOKENIZER_SRC_DIR}/${TOKENIZER_CORE_NAME}.lib ${TOKENIZER_DST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${TOKENIZER_DST_DIR}/libs
+    DEPENDS copy_python_tokenizers)
 ELSE(WIN32)
 add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/faster_tokenizer/src/${TOKENIZER_CORE_NAME}.so ${TOKENIZER_DST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_SRC_DIR}/${TOKENIZER_CORE_NAME}.so ${TOKENIZER_DST_DIR}
     DEPENDS copy_python_tokenizers)
 ENDIF()
 
