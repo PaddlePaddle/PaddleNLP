@@ -52,9 +52,7 @@ if __name__ == "__main__":
                 max_predict_len=128,
                 repetition_penalty=1.2)
     input_text_list = [
-        "Diet English : I lost 10 kgs! ; German : ", "Reviews Rating: 5.0",
-        "Questions Q: What is the capital of India?",
-        "Books Weary with toil, I haste me to my bed,"
+        "Hello, I am conscious and",
     ]
     for text in input_text_list:
         demo.generate(text)
