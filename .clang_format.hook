@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-readonly VERSION="3.8"
+readonly VERSION="13.0.0"
 
 version=$(clang-format -version)
 
