@@ -257,12 +257,13 @@ def train():
 
         # save models
         if macro_f1_score > best_f1_score:
+            logger.info("Current best macro f1 score: %.5f" % (macro_f1_score))
             early_stop_count = 0
             best_f1_score = macro_f1_score
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
 
-    logger.info("Best macro f1 score: %.5f" % (best_f1_score))
+    logger.info("Final best macro f1 score: %.5f" % (best_f1_score))
     logger.info("Save best macro f1 text classification model in %s" %
                 (args.save_dir))
 

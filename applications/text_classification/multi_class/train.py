@@ -269,12 +269,13 @@ def train():
 
         # save models
         if acc > best_acc:
+            logger.info("Current best accuracy: %.5f" % (acc))
             early_stop_count = 0
             best_acc = acc
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
 
-    logger.info("Best accuracy: %.5f" % (best_acc))
+    logger.info("Final best accuracy: %.5f" % (best_acc))
     logger.info("Save best accuracy text classification model in %s" %
                 (args.save_dir))
 
