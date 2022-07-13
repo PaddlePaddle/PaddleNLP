@@ -1336,8 +1336,13 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         for i, ch in enumerate(text):
             if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
-            ch = unicodedata.normalize('NFD', ch)
-            ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
+                if self.basic_tokenizer.strip_accents is not False:
+                    ch = unicodedata.normalize('NFD', ch)
+                    ch = ''.join(
+                        [c for c in ch if unicodedata.category(c) != 'Mn'])
+            elif self.basic_tokenizer.strip_accents:
+                ch = unicodedata.normalize('NFD', ch)
+                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
 
             ch = ''.join([
                 c for c in ch
@@ -1352,7 +1357,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
             if token[:2] == '##':
                 token = token[2:]
-
+            if token in self.all_special_tokens:
+                token = token.lower() if hasattr(
+                    self, "do_lower_case") and self.do_lower_case else token
             start = text[offset:].index(token) + offset
 
             end = start + len(token)
