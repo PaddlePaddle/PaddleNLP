@@ -92,7 +92,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --epochs 100 --early_sto
 
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `dataset`：训练数据集;默认为"cail2018_small"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含train.tsv，dev.tsv和label.tsv文件;默认为None。
+* `dataset_dir`：本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `task_name`：训练数据集;默认为"charges"。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
@@ -137,35 +137,35 @@ mv cail2018_small_charges data
 
 ```text
 data/
-├── train.tsv # 训练数据集文件
-├── dev.tsv # 开发数据集文件
-├── test.tsv # 可选，测试训练集文件
-├── label.tsv # 分类标签文件
-└── data.tsv # 可选，待预测数据文件
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── test.txt # 可选，测试训练集文件
+├── label.txt # 分类标签文件
+└── data.txt # 可选，待预测数据文件
 ```
 
-train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中输入文本序列与标签数据用`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
-- train.tsv/dev.tsv/test.tsv 文件格式：
+train.txt(训练数据集文件), dev.txt(开发数据集文件), test.txt(可选，测试训练集文件)中输入文本序列与标签数据用`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
+- train.txt/dev.txt/test.txt 文件格式：
 ```text
 <输入序列1>'\t'<标签1>','<标签2>
 <输入序列2>'\t'<标签1>
 ...
 ```
-- train.tsv/dev.tsv/test.tsv 文件样例：
+- train.txt/dev.txt/test.txt 文件样例：
 ```text
 灵璧县人民检察院指控：××事实2014年11月29日1时许，被告人彭某甲驾驶辽A×××××小型轿车行驶至辽宁省沈阳市于洪区太湖街红色根据地酒店门口路段时，与前方被害人闻某驾驶的辽A×××××号轿车发生追尾的交通事故。事故发生后，被告人彭某甲与乘坐人韩某下车与闻某发生口角争执，并在一起互相厮打。在厮打过程中，彭某甲与韩某用拳头将闻某面部打伤。经鉴定，闻某的损伤程度为轻伤二级。××事实2015年6月至2015年9月，被告人彭某甲通过其建立的“比特战斗”微信群，将47部淫秽视频文件上传至该微信群供群成员观看。公诉机关针对指控提供了相关书证，证人证言，被害人陈述，被告人供述，鉴定意见，现场勘验检查笔录等证据，公诉机关认为，被告人彭某甲伙同他人故意非法损害公民身体健康，致人轻伤；利用移动通讯终端传播淫秽电子信息，情节严重，其行为已触犯《中华人民共和国刑法》××××、××××、××××之规定，构成××罪、××罪，提请法院依法判处。    故意伤害,[制造、贩卖、传播]淫秽物品,传播淫秽物品
 酉阳县人民检察院指控，2014年1月17日1时许，被告人周某某在酉阳县桃花源美食街万州烤鱼店外与田某甲发生口角，随后周某某持刀将在店内的被害人田某某砍伤。经重庆市酉阳县公安局物证鉴定室鉴定，田某某所受伤为轻伤二级。指控的证据有被告人立案决定书，户籍信息，鉴定意见，辨认笔录，被害人田某某的陈述，证人冉某、陈某某等人的证言，周某某的供述与辩解等。公诉机关认为，被告人周某某××他人身体，致人轻伤，其行为触犯了《中华人民共和国刑法》第二百三十四××的规定，犯罪事实清楚，证据确实、充分，应当以××罪追究其刑事责任。周某某在××考验期内发现有其他罪没有判决的，适用《中华人民共和国刑法》××、六十九条。提请依法判决。    故意伤害,[组织、强迫、引诱、容留、介绍]卖淫,[引诱、容留、介绍]卖淫
 ...
 ```
-label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
-- label.tsv 文件格式：
+label.txt(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
+- label.txt 文件格式：
 
 ```text
 <标签名1>
 <标签名2>
 ...
 ```
-- label.tsv 文件样例：
+- label.txt 文件样例：
 ```text
 故意伤害
 盗窃
@@ -174,16 +174,16 @@ label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为
 ...
 ```
 
-data.tsv(可选，待预测数据文件)
+data.txt(可选，待预测数据文件)
 
-- data.tsv 文件格式：
+- data.txt 文件格式：
 
 ```text
 <输入序列1>
 <输入序列2>
 ...
 ```
-- data.tsv 文件样例：
+- data.txt 文件样例：
 ```text
 经审理查明，2012年4月5日19时许，被告人王某在杭州市下城区朝晖路农贸市场门口贩卖盗版光碟、淫秽光碟时被民警当场抓获，并当场查获其贩卖的各类光碟5515张，其中5280张某属非法出版物、235张某属淫秽物品。上述事实，被告人王某在庭审中亦无异议，且有经庭审举证、质证的扣押物品清单、赃物照片、公安行政处罚决定书、抓获经过及户籍证明等书证；证人胡某、徐某的证言；出版物鉴定书、淫秽物品审查鉴定书及检查笔录等证据证实，足以认定。
 榆林市榆阳区人民检察院指控：2015年11月22日2时许，被告人王某某在自己经营的榆阳区长城福源招待所内，介绍并容留杨某向刘某某、白某向乔某某提供性服务各一次
@@ -213,7 +213,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_d
 ```shell
 python predict.py --params_path ./checkpoint/
 ```
-也可以选择使用本地数据文件data/data.tsv进行预测：
+也可以选择使用本地数据文件data/data.txt进行预测：
 ```shell
 python predict.py --params_path ./checkpoint/ --dataset_dir data
 ```
@@ -221,7 +221,7 @@ python predict.py --params_path ./checkpoint/ --dataset_dir data
 可支持配置的参数：
 
 * `params_path`：必须，待预测模型和分词器参数文件夹；默认为"./checkpoint/"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
+* `dataset_dir`：本地数据集路径，数据集路径中应包含data.txt和label.txt文件;默认为None。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
@@ -254,7 +254,7 @@ export/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32
 ```
-也可以选择使用本地数据文件data/data.tsv进行部署：
+也可以选择使用本地数据文件data/data.txt进行部署：
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir data
 ```
@@ -324,7 +324,7 @@ python prune.py --output_dir ./prune --params_dir ./checkpoint/ --dataset_dir da
 * `DataArguments`
   * `dataset`：训练数据集;默认为cail2018_small数据集。
   * `task_name`：训练数据集任务名;默认为罪名预测任务"charges"。
-  * `dataset_dir`：本地数据集路径，需包含train.tsv,dev.tsv,label.tsv;默认为None。
+  * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
   * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 
 * `ModelArguments`
@@ -360,7 +360,7 @@ prune/
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
 ```
-也可以选择使用本地数据文件 data/data.tsv 进行部署：
+也可以选择使用本地数据文件 data/data.txt 进行部署：
 ```shell
 python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir data
 ```
