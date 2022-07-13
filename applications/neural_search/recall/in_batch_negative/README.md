@@ -590,7 +590,7 @@ outputs {
 
 ## FAQ
 
-#### 怎样加载SimCSE训练的模型？
+#### 如何基于无监督SimCSE训练出的模型参数作为参数初始化继续做有监督 In-Batch Negative 训练？
 
 + 使用 `--init_from_ckpt` 参数加载即可，下面是使用示例：
 
