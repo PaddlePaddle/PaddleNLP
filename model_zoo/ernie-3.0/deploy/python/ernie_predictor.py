@@ -37,26 +37,30 @@ class InferBackend(object):
             model_path (str): The model path for deployment.
             batch_size (int): Batch size of input, the default is 32.
             device (str): The deployed device can be set to cpu, gpu or xpu, the default is cpu.
-            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or ort, the default is mkldnn.
+            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or onnxruntime, the default is mkldnn.
             use_fp16 (bool): Whether to use fp16 to inference, the default is False.
-            use_quantize (bool): Whether to use ort dynamic quantize , the default is False.
+            use_quantize (bool): Whether to use ONNXRuntime dynamic quantize, only available while inference on CPU with ONNXRuntime as inference backend, the default is False.
             set_dynamic_shape (bool): Whether to set_dynamic_shape for Inference-TRT, the default is False.
             shape_info_file (str): When set_dynamic_shape is enabled, the file name of shape_info is stored, the default is shape_info.txt.
             num_threads (int): Number of cpu threads during inference, the default is 10.
         """
         model_path = self.model_path_correction(model_path)
-        is_int8_model = self.paddle_quantize_model(
-            model_path)  # Determine whether a Paddle model is a quantized model
+        # Check if the model is a quantized model
+        is_int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
-        # quantized model, deploy on xpu, deploy on cpu and use_quantize is disabled
+
+        self.predictor_type = "ONNXRuntime"
         if is_int8_model or device == "xpu" or device == "cpu" and not use_quantize:
+            self.predictor_type = "Inference"
+
+        if self.predictor_type == "Inference":
             from paddle import inference
-            self.predictor_type = "inference"
+
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
-            if device == 'gpu':  # quantized model on GPU
+            # quantized model on GPU
+            if device == 'gpu':
                 config.enable_use_gpu(100, 0)
-                paddle.set_device("gpu")
 
                 precision_type = inference.PrecisionType.Float32
                 if is_int8_model:
@@ -85,7 +89,7 @@ class InferBackend(object):
                     if is_int8_model:
                         print(">>> [InferBackend] INT8 inference on CPU ...")
                         config.enable_mkldnn_int8()
-                elif cpu_backend == "ort":
+                elif cpu_backend == "onnxruntime":
                     if use_fp16:
                         print(
                             ">>> [InferBackend] FP16 is not supported in ORT backend ..."
@@ -111,11 +115,10 @@ class InferBackend(object):
                 self.predictor.get_output_handle(name)
                 for name in self.predictor.get_output_names()
             ]
-        else:  # Deploy on gpu, use ort dynamic quantize on float model on cpu, fp16 on gpu
+        else:
             import paddle2onnx
             import onnxruntime as ort
             import copy
-            self.predictor_type = "onnxruntime"
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=model_path + ".pdmodel",
                 params_file=model_path + ".pdiparams",
@@ -125,7 +128,7 @@ class InferBackend(object):
             deploy_onnx_model = onnx_model
             providers = ['CUDAExecutionProvider']
 
-            # Can not use ORT dynamic quantize when deploy on GPU
+            # Can not use ONNXRuntime dynamic quantize when deploy on GPU
             if device == "gpu" and use_quantize:
                 print(
                     ">>> [InferBackend] It is a FP32 model, and dynamic quantization is not supported on gpu, use FP32 to inference here ..."
@@ -142,12 +145,10 @@ class InferBackend(object):
                 from onnxconverter_common import float16
                 import onnx
                 deploy_onnx_model = "fp16_model.onnx"
-                float_onnx_file = "model.onnx"
-                with open(float_onnx_file, "wb") as f:
-                    f.write(onnx_model)
-                onnx_model = onnx.load_model(float_onnx_file)
+                onnx_model_proto = onnx.ModelProto()
+                onnx_model_proto.ParseFromString(onnx_model)
                 trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                    onnx_model_proto, keep_io_types=True)
                 onnx.save_model(trans_model, deploy_onnx_model)
                 print(">>> [InferBackend] FP16 inference on GPU ...")
 
@@ -193,7 +194,7 @@ class InferBackend(object):
         return False
 
     def infer(self, input_dict: dict):
-        if self.predictor_type == "inference":
+        if self.predictor_type == "Inference":
             for idx, input_name in enumerate(self.input_names):
                 self.input_handles[idx].copy_from_cpu(input_dict[input_name])
             self.predictor.run()
