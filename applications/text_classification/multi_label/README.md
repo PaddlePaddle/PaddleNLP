@@ -84,7 +84,7 @@ python train.py --early_stop
 指定GPU卡号/多卡训练
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop
+python -m paddle.distributed.launch --gpus "0" train.py --epochs 100 --early_stop
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
 
