@@ -113,7 +113,7 @@ void NormalizedString::UpdateNormalizedRange(
   std::vector<core::Range> alignments;
   alignments.reserve(n_range.second - n_range.first);
 
-  int replaced_normalized_idx = 0;
+  int replaced_normalized_idx = initial_removed;
   // Calculate the new alignments
   for (int i = 0; i < new_normalized.u32normalized.length(); ++i) {
     auto idx = offset;

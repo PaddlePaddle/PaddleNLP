@@ -153,12 +153,15 @@ def do_convert():
         for l in label_list:
             f.write(l + '\n')
 
-    def _save_examples(save_dir, file_name, examples):
+    def _save_examples(save_dir, file_name, examples, is_data=False):
         count = 0
         save_path = os.path.join(save_dir, file_name)
         with open(save_path, "w", encoding="utf-8") as f:
             for example in examples:
-                f.write(example)
+                if is_data:
+                    f.write(example.split('\t')[0] + '\n')
+                else:
+                    f.write(example)
                 count += 1
         logger.info("Save %d examples to %s." % (count, save_path))
 
@@ -170,6 +173,7 @@ def do_convert():
         p1 = int(len(raw_examples) * i1)
         _save_examples(args.save_dir, "train.tsv", examples[:p1])
         _save_examples(args.save_dir, "dev.tsv", examples[p1:])
+        _save_examples(args.save_dir, "data.tsv", examples[p1:], True)
     if len(args.splits) == 3:
         i1, i2, _ = args.splits
         p1 = int(len(raw_examples) * i1)
@@ -177,6 +181,7 @@ def do_convert():
         _save_examples(args.save_dir, "train.tsv", examples[:p1])
         _save_examples(args.save_dir, "dev.tsv", examples[p1:p2])
         _save_examples(args.save_dir, "test.tsv", examples[p2:])
+        _save_examples(args.save_dir, "data.tsv", examples[p2:], True)
     logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 
