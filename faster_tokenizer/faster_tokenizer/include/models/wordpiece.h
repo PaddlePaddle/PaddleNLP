@@ -34,8 +34,8 @@ struct WordPiece : public Model {
             std::string&& continuing_subword_prefix);
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) override;
-  virtual bool TokenToId(const std::string& token, uint* id) const override;
-  virtual bool IdToToken(uint id, std::string* token) const override;
+  virtual bool TokenToId(const std::string& token, uint32_t* id) const override;
+  virtual bool IdToToken(uint32_t id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   // Return the saved voacb full path
@@ -53,7 +53,7 @@ protected:
   core::Vocab vocab_;
   core::VocabReversed vocab_reversed_;
   std::string unk_token_;
-  uint unk_token_id_;
+  uint32_t unk_token_id_;
   size_t max_input_chars_per_word_;
   std::string continuing_subword_prefix_;
   friend void to_json(nlohmann::json& j, const WordPiece& model);

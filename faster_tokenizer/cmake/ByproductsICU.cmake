@@ -24,9 +24,10 @@ function(GetICUByproducts ICU_PATH ICU_LIB_VAR ICU_INCLUDE_VAR ICU_BASE_NAMES_VA
         set(ICU_LIB_BASE_NAMES dt in io tu uc)
         
         set(ICU_SHARED_PREFIX "lib")
-        set(ICU_STATIC_PREFIX "libs")
+        set(ICU_STATIC_PREFIX "")
         set(ICU_SHARED_SUFFIX ".dll.a")
-        set(ICU_STATIC_SUFFIX ".a")
+        set(ICU_STATIC_SUFFIX ".lib")
+        set(ICU_INSTALL_LIB "lib64")
     else()
         # unix basenames and pre/suffixes
         set(ICU_LIB_BASE_NAMES i18n data uc io tu)
@@ -34,11 +35,12 @@ function(GetICUByproducts ICU_PATH ICU_LIB_VAR ICU_INCLUDE_VAR ICU_BASE_NAMES_VA
         set(ICU_STATIC_PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX})
         set(ICU_SHARED_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
         set(ICU_STATIC_SUFFIX ${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(ICU_INSTALL_LIB "lib")
     endif()
     # add static and shared libs to the libraries variable
     foreach(ICU_BASE_NAME ${ICU_LIB_BASE_NAMES})
-        set(ICU_SHARED_LIB "${ICU_PATH}/lib/${ICU_SHARED_PREFIX}icu${ICU_BASE_NAME}${ICU_SHARED_SUFFIX}")
-        set(ICU_STATIC_LIB "${ICU_PATH}/lib/${ICU_STATIC_PREFIX}icu${ICU_BASE_NAME}${ICU_STATIC_SUFFIX}")
+        set(ICU_SHARED_LIB "${ICU_PATH}/${ICU_INSTALL_LIB}/${ICU_SHARED_PREFIX}icu${ICU_BASE_NAME}${ICU_SHARED_SUFFIX}")
+        set(ICU_STATIC_LIB "${ICU_PATH}/${ICU_INSTALL_LIB}/${ICU_STATIC_PREFIX}icu${ICU_BASE_NAME}${ICU_STATIC_SUFFIX}")
         
         if (ICU_STATIC)
             list(APPEND ${ICU_LIB_VAR} ${ICU_STATIC_LIB})

@@ -24,8 +24,9 @@ namespace postprocessors {
 
 BertPostProcessor::BertPostProcessor()
     : sep_({"[SEP]", 102}), cls_({"[CLS]", 101}) {}
-BertPostProcessor::BertPostProcessor(const std::pair<std::string, uint>& sep,
-                                     const std::pair<std::string, uint>& cls)
+BertPostProcessor::BertPostProcessor(
+    const std::pair<std::string, uint32_t>& sep,
+    const std::pair<std::string, uint32_t>& cls)
     : sep_(sep), cls_(cls) {}
 size_t BertPostProcessor::AddedTokensNum(bool is_pair) const {
   if (is_pair) {
@@ -66,12 +67,12 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
   CREATE_PROCESSED_ENCODING_SEQ(
       encoding, Offsets, offsets, empty_offsets, empty_offsets);
   // special_tokens_mask
-  std::vector<uint> special_tokens_mask(ids.size(), 0);
+  std::vector<uint32_t> special_tokens_mask(ids.size(), 0);
   special_tokens_mask.front() = special_tokens_mask.back() = 1;
   // attention_mask
-  std::vector<uint> attention_mask(ids.size(), 1);
+  std::vector<uint32_t> attention_mask(ids.size(), 1);
   // sequence_ranges
-  std::unordered_map<uint, core::Range> sequence_ranges;
+  std::unordered_map<uint32_t, core::Range> sequence_ranges;
   sequence_ranges[0] = {1, ids.size() - 1};
   // overflowing
   auto& overflowings = encoding->GetMutableOverflowing();
@@ -87,12 +88,12 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
     CREATE_PROCESSED_ENCODING_SEQ(
         (&overflow_encoding), Offsets, offsets, empty_offsets, empty_offsets);
 
-    std::vector<uint> special_tokens_mask(ids.size(), 0);
+    std::vector<uint32_t> special_tokens_mask(ids.size(), 0);
     special_tokens_mask.front() = special_tokens_mask.back() = 1;
 
-    std::vector<uint> attention_mask(ids.size(), 1);
+    std::vector<uint32_t> attention_mask(ids.size(), 1);
 
-    std::unordered_map<uint, core::Range> sequence_ranges;
+    std::unordered_map<uint32_t, core::Range> sequence_ranges;
     sequence_ranges[0] = {1, ids.size() - 1};
 
     overflow_encoding = std::move(
@@ -133,11 +134,11 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
     CREATE_PROCESSED_PARI_ENCODING_SEQ(
         pair_encoding, Offsets, offsets, empty_offsets);
 
-    std::vector<uint> special_tokens_mask(ids.size(), 0);
+    std::vector<uint32_t> special_tokens_mask(ids.size(), 0);
     special_tokens_mask.back() = 1;
 
-    std::vector<uint> attention_mask(ids.size(), 1);
-    std::unordered_map<uint, core::Range> sequence_ranges;
+    std::vector<uint32_t> attention_mask(ids.size(), 1);
+    std::unordered_map<uint32_t, core::Range> sequence_ranges;
     sequence_ranges[1] = {0, ids.size() - 1};
     // overflowing
     auto& overflowings = pair_encoding->GetMutableOverflowing();
@@ -154,11 +155,11 @@ void BertPostProcessor::operator()(core::Encoding* encoding,
       CREATE_PROCESSED_PARI_ENCODING_SEQ(
           (&overflow_pair_encoding), Offsets, offsets, empty_offsets);
 
-      std::vector<uint> special_tokens_mask(ids.size(), 0);
+      std::vector<uint32_t> special_tokens_mask(ids.size(), 0);
       special_tokens_mask.back() = 1;
 
-      std::vector<uint> attention_mask(ids.size(), 1);
-      std::unordered_map<uint, core::Range> sequence_ranges;
+      std::vector<uint32_t> attention_mask(ids.size(), 1);
+      std::unordered_map<uint32_t, core::Range> sequence_ranges;
       sequence_ranges[0] = {1, ids.size() - 1};
 
       overflow_pair_encoding = std::move(
