@@ -12,14 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
 #include <sstream>
 
-#include <pybind11/operators.h>
 #include "core/added_vocabulary.h"
 #include "core/base.h"
 #include "core/encoding.h"
 #include "pybind/core.h"
+
+#include <Python.h>
+#include <pybind11/operators.h>
 
 namespace py = pybind11;
 
@@ -30,7 +31,7 @@ namespace pybind {
 py::list GetWordIdx(const core::Encoding& self) {
   py::list list;
   for (const auto& idx : self.GetWordsIdx()) {
-    if (idx == static_cast<uint>(-1)) {
+    if (idx == static_cast<uint32_t>(-1)) {
       list.append(py::none());
     } else {
       list.append(py::cast(idx));
@@ -88,15 +89,15 @@ void BindCore(pybind11::module* m) {
       .export_values();
 
   py::class_<core::Encoding>(*m, "Encoding")
-      .def(py::init<const std::vector<uint>&,
-                    const std::vector<uint>&,
+      .def(py::init<const std::vector<uint32_t>&,
+                    const std::vector<uint32_t>&,
                     const std::vector<std::string>&,
-                    const std::vector<uint>&,
+                    const std::vector<uint32_t>&,
                     const std::vector<core::Offset>&,
-                    const std::vector<uint>&,
-                    const std::vector<uint>&,
+                    const std::vector<uint32_t>&,
+                    const std::vector<uint32_t>&,
                     const std::vector<core::Encoding>&,
-                    const std::unordered_map<uint, core::Range>&>(),
+                    const std::unordered_map<uint32_t, core::Range>&>(),
            py::arg("ids"),
            py::arg("type_ids"),
            py::arg("tokens"),
@@ -106,8 +107,8 @@ void BindCore(pybind11::module* m) {
            py::arg("attention_mask"),
            py::arg("overflowing"),
            py::arg("sequence_ranges"))
-      .def(py::init<uint>(), py::arg("size"))
-      .def(py::init<const std::vector<core::Token>&, uint>(),
+      .def(py::init<uint32_t>(), py::arg("size"))
+      .def(py::init<const std::vector<core::Token>&, uint32_t>(),
            py::arg("tokens"),
            py::arg("type_id"))
       .def("__str__", &core::Encoding::DebugString)
@@ -130,8 +131,8 @@ void BindCore(pybind11::module* m) {
            py::arg("sequence_id"))
       .def("char_to_token",
            [](const core::Encoding& self,
-              uint char_pos,
-              uint seq_id) -> py::object {
+              uint32_t char_pos,
+              uint32_t seq_id) -> py::object {
              auto token_idxs = self.CharOffsetsToTokenIdx(char_pos, seq_id);
              if (token_idxs.size() == 0) {
                return py::none();
@@ -142,8 +143,8 @@ void BindCore(pybind11::module* m) {
            py::arg("sequence_index") = 0)
       .def("char_to_word",
            [](const core::Encoding& self,
-              uint char_pos,
-              uint seq_id) -> py::object {
+              uint32_t char_pos,
+              uint32_t seq_id) -> py::object {
              auto word_idxs = self.CharOffsetsToWordIdx(char_pos, seq_id);
              if (word_idxs.size() == 0) {
                return py::none();
@@ -158,10 +159,10 @@ void BindCore(pybind11::module* m) {
                   py::arg("growing_offsets") = true)
       .def("pad",
            [](core::Encoding& self,
-              uint length,
+              uint32_t length,
               const std::string& direction,
-              uint pad_id,
-              uint pad_type_id,
+              uint32_t pad_id,
+              uint32_t pad_type_id,
               const std::string& pad_token) {
              core::Direction direct;
              if (direction == "right") {
@@ -177,7 +178,7 @@ void BindCore(pybind11::module* m) {
            py::arg("pad_type_id") = 0,
            py::arg("pad_token") = "[PAD]")
       .def("token_to_chars",
-           [](const core::Encoding& self, uint token_index) -> py::object {
+           [](const core::Encoding& self, uint32_t token_index) -> py::object {
              auto offsets = self.TokenIdxToCharOffsets(token_index);
              if (offsets.size() == 0) {
                return py::none();
@@ -186,7 +187,7 @@ void BindCore(pybind11::module* m) {
            },
            py::arg("token_index"))
       .def("token_to_sequence",
-           [](const core::Encoding& self, uint token_index) -> py::object {
+           [](const core::Encoding& self, uint32_t token_index) -> py::object {
              auto seq_ids = self.TokenIdxToSequenceIds(token_index);
              if (seq_ids.size() == 0) {
                return py::none();
@@ -195,7 +196,7 @@ void BindCore(pybind11::module* m) {
            },
            py::arg("token_index"))
       .def("token_to_word",
-           [](const core::Encoding& self, uint token_index) -> py::object {
+           [](const core::Encoding& self, uint32_t token_index) -> py::object {
              auto word_idx = self.TokenIdxToWordIdx(token_index);
              if (word_idx.size() == 0) {
                return py::none();
@@ -205,8 +206,8 @@ void BindCore(pybind11::module* m) {
            py::arg("token_index"))
       .def("word_to_chars",
            [](const core::Encoding& self,
-              uint word_index,
-              uint sequence_index) -> py::object {
+              uint32_t word_index,
+              uint32_t sequence_index) -> py::object {
              auto ranges =
                  self.WordIdxToCharOffsets(word_index, sequence_index);
              if (ranges.size() == 0) {
@@ -218,8 +219,8 @@ void BindCore(pybind11::module* m) {
            py::arg("sequence_index") = 0)
       .def("word_to_tokens",
            [](const core::Encoding& self,
-              uint word_index,
-              uint sequence_index) -> py::object {
+              uint32_t word_index,
+              uint32_t sequence_index) -> py::object {
              auto ranges = self.WordIdxToTokensIdx(word_index, sequence_index);
              if (ranges.size() == 0) {
                return py::none();

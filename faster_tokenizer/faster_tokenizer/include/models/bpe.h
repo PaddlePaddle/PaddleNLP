@@ -34,8 +34,8 @@ struct BPE : public Model {
       bool fuse_unk = false);
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) override;
-  virtual bool TokenToId(const std::string& token, uint* id) const override;
-  virtual bool IdToToken(uint id, std::string* token) const override;
+  virtual bool TokenToId(const std::string& token, uint32_t* id) const override;
+  virtual bool IdToToken(uint32_t id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   // Return the saved voacb path
@@ -68,7 +68,7 @@ private:
   utils::Cache<std::string, core::BPEWord> cache_;
   std::vector<float> dropout_;
   std::vector<std::string> unk_token_;
-  std::vector<uint> unk_token_id_;
+  std::vector<uint32_t> unk_token_id_;
   std::vector<std::string> continuing_subword_prefix_;
   std::vector<std::string> end_of_word_suffix_;
   bool fuse_unk_;
