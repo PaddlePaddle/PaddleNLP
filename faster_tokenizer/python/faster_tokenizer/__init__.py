@@ -15,6 +15,41 @@
 __version__ = "0.1.3"
 
 from typing import Tuple, Union, Tuple, List
+import sys
+import os
+import platform
+
+current_path = os.path.abspath(os.path.dirname(__file__))
+
+try:
+    if os.name == 'nt':
+        third_lib_path = current_path + os.sep + 'libs'
+        # Will load shared library from 'path' on windows
+        os.environ[
+            'path'] = current_path + ';' + third_lib_path + ';' + os.environ[
+                'path']
+        sys.path.insert(0, third_lib_path)
+        # Note: from python3.8, PATH will not take effect
+        # https://github.com/python/cpython/pull/12302
+        # Use add_dll_directory to specify dll resolution path
+        if sys.version_info[:2] >= (3, 8):
+            os.add_dll_directory(third_lib_path)
+except ImportError as e:
+    if os.name == 'nt':
+        executable_path = os.path.abspath(os.path.dirname(sys.executable))
+        raise ImportError("""NOTE: You may need to run \"set PATH=%s;%%PATH%%\"
+        if you encounters \"DLL load failed\" errors. If you have python
+        installed in other directory, replace \"%s\" with your own
+        directory. The original error is: \n %s""" %
+                          (executable_path, executable_path, str(e)))
+    else:
+        raise ImportError(
+            """NOTE: You may need to run \"export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH\"
+        if you encounters \"libmkldnn.so not found\" errors. If you have python
+        installed in other directory, replace \"/usr/local/lib\" with your own
+        directory. The original error is: \n""" + str(e))
+except Exception as e:
+    raise e
 
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]

@@ -14,8 +14,6 @@ limitations under the License. */
 
 #include <unordered_map>
 
-#include <Python.h>
-
 #include "core/tokenizer.h"
 #include "decoders/decoders.h"
 #include "glog/logging.h"
@@ -23,6 +21,9 @@ limitations under the License. */
 #include "normalizers/normalizers.h"
 #include "postprocessors/postprocessors.h"
 #include "pretokenizers/pretokenizers.h"
+
+#include <Python.h>
+
 #include "pybind/exception.h"
 #include "pybind/tokenizers.h"
 #include "pybind/utils.h"
@@ -519,13 +520,13 @@ static PyObject* EnablePadding(TokenizerObject* self,
                                            &kw_pad_to_multiple_of);
   Py_ssize_t args_num = PyTuple_Size(args);
   std::string direction = "right";
-  uint pad_id = 0;
-  uint pad_type_id = 0;
+  uint32_t pad_id = 0;
+  uint32_t pad_type_id = 0;
   std::string pad_token = "[PAD]";
-  uint* length_ptr = nullptr;
-  uint* pad_to_multiple_of_ptr = nullptr;
-  uint length = 0;
-  uint pad_to_multiple_of = 0;
+  uint32_t* length_ptr = nullptr;
+  uint32_t* pad_to_multiple_of_ptr = nullptr;
+  uint32_t length = 0;
+  uint32_t pad_to_multiple_of = 0;
   VLOG(6) << "args_num: " << args_num << ", flag_kwargs: " << flag_kwargs;
   VLOG(6) << "kw_direction: " << kw_direction;
   VLOG(6) << "kw_pad_id: " << kw_pad_id;
@@ -628,8 +629,8 @@ static PyObject* EnableTruncation(TokenizerObject* self,
                                            &kw_strategy,
                                            &kw_direction);
   Py_ssize_t args_num = PyTuple_Size(args);
-  uint max_length = 0;
-  uint stride = 0;
+  uint32_t max_length = 0;
+  uint32_t stride = 0;
   std::string strategy = "longest_first";
   std::string direction = "right";
 
@@ -974,7 +975,7 @@ static PyObject* IdToToken(TokenizerObject* self,
   Py_ssize_t args_num = PyTuple_Size(args);
   if (args_num == (Py_ssize_t)1) {
     if (PyLong_Check(kw_id)) {
-      uint id = PyLong_AsLong(kw_id);
+      uint32_t id = PyLong_AsLong(kw_id);
       std::string token;
       if (self->tokenizer.IdToToken(id, &token)) {
         return ToPyObject(token);
@@ -1004,7 +1005,7 @@ static PyObject* TokenToId(TokenizerObject* self,
   std::string token = "";
   if (args_num == (Py_ssize_t)1) {
     token = CastPyArg2AttrString(kw_token, 0);
-    uint id;
+    uint32_t id;
     if (self->tokenizer.TokenToId(token, &id)) {
       return ToPyObject(id);
     }
@@ -1172,7 +1173,7 @@ static PyObject* Decode(TokenizerObject* self,
     if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
       skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
     }
-    auto ids = CastPyArg2VectorOfInt<uint>(kw_ids, 0);
+    auto ids = CastPyArg2VectorOfInt<uint32_t>(kw_ids, 0);
     std::string result;
     self->tokenizer.Decode(ids, &result, skip_special_tokens);
     return ToPyObject(result);
@@ -1207,19 +1208,19 @@ static PyObject* DecodeBatch(TokenizerObject* self,
     if (args_num == (Py_ssize_t)2 || (flag_kwargs && kw_skip_special_tokens)) {
       skip_special_tokens = CastPyArg2AttrBoolean(kw_skip_special_tokens, 1);
     }
-    std::vector<std::vector<uint>> batch_ids;
+    std::vector<std::vector<uint32_t>> batch_ids;
     PyObject* item = nullptr;
     if (PyTuple_Check(kw_sequences)) {
       Py_ssize_t len = PyTuple_Size(kw_sequences);
       for (Py_ssize_t i = 0; i < len; i++) {
         item = PyTuple_GetItem(kw_sequences, i);
-        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint>(item, 0));
+        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint32_t>(item, 0));
       }
     } else if (PyList_Check(kw_sequences)) {
       Py_ssize_t len = PyList_Size(kw_sequences);
       for (Py_ssize_t i = 0; i < len; i++) {
         item = PyList_GetItem(kw_sequences, i);
-        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint>(item, 0));
+        batch_ids.emplace_back(CastPyArg2VectorOfInt<uint32_t>(item, 0));
       }
     } else {
       std::ostringstream oss;

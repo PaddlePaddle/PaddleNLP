@@ -115,8 +115,8 @@ void PreTokenizedString::Tokenize(
 }
 
 bool PreTokenizedString::TransformToEncoding(
-    const std::vector<uint>& input_word_idx,
-    uint type_id,
+    const std::vector<uint32_t>& input_word_idx,
+    uint32_t type_id,
     core::OffsetType offset_type,
     core::Encoding* encoding) const {
   if (splits_.empty()) {
@@ -142,19 +142,19 @@ bool PreTokenizedString::TransformToEncoding(
 
 template <typename Convertor>
 bool PreTokenizedString::TransformToEncodingUseConvertor(
-    const std::vector<uint>& input_word_idx,
-    uint type_id,
+    const std::vector<uint32_t>& input_word_idx,
+    uint32_t type_id,
     core::Encoding* encoding) const {
   Convertor converter(original_);
-  uint tokens_size = 0;
+  uint32_t tokens_size = 0;
   for (int i = 0; i < splits_.size(); ++i) {
     tokens_size += splits_[i].tokens_.size();
   }
 
-  std::vector<uint> token_ids(tokens_size);
+  std::vector<uint32_t> token_ids(tokens_size);
   std::vector<std::string> tokens(tokens_size);
   std::vector<core::Offset> offsets(tokens_size);
-  uint curr_idx = 0;
+  uint32_t curr_idx = 0;
   for (int i = 0; i < splits_.size(); ++i) {
     const auto& split = splits_[i];
     const auto& normalized = split.normalized_;
@@ -180,10 +180,10 @@ bool PreTokenizedString::TransformToEncodingUseConvertor(
     }
   }
   // Setting words_idx
-  std::vector<uint> words_idx(tokens_size);
+  std::vector<uint32_t> words_idx(tokens_size);
   if (input_word_idx.size() == 0) {
-    uint word_offset = 0;
-    for (uint i = 0; i < splits_.size(); ++i) {
+    uint32_t word_offset = 0;
+    for (uint32_t i = 0; i < splits_.size(); ++i) {
       std::fill_n(
           words_idx.begin() + word_offset, splits_[i].tokens_.size(), i);
       word_offset += splits_[i].tokens_.size();
@@ -193,14 +193,14 @@ bool PreTokenizedString::TransformToEncodingUseConvertor(
   }
   *encoding = std::move(core::Encoding(
       std::move(token_ids),
-      std::vector<uint>(tokens_size, type_id),  // type_ids
+      std::vector<uint32_t>(tokens_size, type_id),  // type_ids
       std::move(tokens),
       std::move(words_idx),
       std::move(offsets),
-      std::vector<uint>(tokens_size, 0), /* special_tokens_mask */
-      std::vector<uint>(tokens_size, 1), /* attention_mask */
-      std::vector<core::Encoding>(),     /* overflowing */
-      std::unordered_map<uint, core::Range>() /* sequence_ranges */));
+      std::vector<uint32_t>(tokens_size, 0), /* special_tokens_mask */
+      std::vector<uint32_t>(tokens_size, 1), /* attention_mask */
+      std::vector<core::Encoding>(),         /* overflowing */
+      std::unordered_map<uint32_t, core::Range>() /* sequence_ranges */));
   return true;
 }
 
