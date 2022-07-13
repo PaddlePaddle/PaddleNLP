@@ -1213,7 +1213,7 @@ from paddlenlp import Taskflow
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_length`：生成代码的最大长度，默认为128。
 * `min_length`：生成代码的最小长度，默认为0。
-* `decode_strategy`：解码策略，默认为sampling。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
 * `temperature`：解码参数temperature，默认为0.6。
 * `top_k`：解码参数top_k，默认为5。
 * `top_p`：解码参数top_p，默认为1.0。
