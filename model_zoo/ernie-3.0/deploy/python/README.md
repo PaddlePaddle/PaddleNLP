@@ -72,13 +72,13 @@ infer_cpu.py脚本中的参数说明：
 |--model_name_or_path | 模型的路径或者名字，默认为ernie-3.0-medium-zh|
 |--model_path | 用于推理的Paddle模型的路径|
 |--max_seq_length |最大序列长度，默认为128|
-|--use_quantize | 是否使用动态量化进行加速，默认关闭 |
+|--precision_mode | 推理精度，可选fp32，fp16或者int8，当输入非量化模型并设置int8时使用动态量化进行加速，默认fp32 |
 |--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
 
-**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启use_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。
+**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可设置precision_mode为int8对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。
 CPU端，开启动态量化的命令如下：
 ```
-python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_quantize
+python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --precision_mode int8
 ```
 INT8的输出打印和FP32的输出打印一致。
 
@@ -103,12 +103,9 @@ entity: 詹姆斯   label: PER   pos: [6, 8]
 entity: 姚明   label: PER   pos: [10, 11]
 -----------------------------
 ```
-如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
+如果需要FP16进行加速，可以设置precision_mode为fp16，具体命令为
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --use_fp16 --shape_info_file dynamic_shape_info.txt
+python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --precision_mode fp16
 ```
 如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的INT8模型进行部署，请执行如下命令获取模型：
 ```
@@ -133,8 +130,8 @@ infer_gpu.py脚本中的参数说明：
 |--batch_size |最大可测的batch size，默认为32|
 |--max_seq_length |最大序列长度，默认为128|
 |--shape_info_file | 指定dynamic shape info的存储文件名，默认为shape_info.txt |
-|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16或者进行INT8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
-|--use_fp16 | 是否使用FP16进行加速，默认关闭 |
+|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，在GPU上INT8量化推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
+|--precision_mode | 推理精度，可选fp32，fp16或者int8，默认fp32 |
 
 ## 3. 分类模型推理
 ### 3.1 模型获取
@@ -160,9 +157,9 @@ seq cls result:
 label: news_entertainment   confidence: 0.9495906829833984
 -----------------------------
 ```
-和序列标注模型推理类似，开启动态量化的命令如下：
+和序列标注模型推理类似，使用动态量化进行加速的命令如下：
 ```
-python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_quantize
+python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --precision_mode int8
 ```
 输出打印如下:
 ```
@@ -191,12 +188,9 @@ seq cls result:
 label: news_entertainment   confidence: 0.9495906829833984
 -----------------------------
 ```
-如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
+如果需要FP16进行加速，可以设置precision_mode为fp16，具体命令为
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --use_fp16 --shape_info_file dynamic_shape_info.txt
+python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --precision_mode fp16
 ```
 输出打印如下:
 ```

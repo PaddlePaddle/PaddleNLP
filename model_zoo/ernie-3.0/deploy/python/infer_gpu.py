@@ -65,9 +65,11 @@ def parse_args():
         help="The collected dynamic shape info file.",
     )
     parser.add_argument(
-        "--use_fp16",
-        action='store_true',
-        help="Whether to use fp16 inference.",
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help="Inference precision.",
     )
     args = parser.parse_args()
     return args

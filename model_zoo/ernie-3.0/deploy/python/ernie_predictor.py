@@ -27,8 +27,7 @@ class InferBackend(object):
                  batch_size=32,
                  device='cpu',
                  cpu_backend="mkldnn",
-                 use_fp16=False,
-                 use_quantize=False,
+                 precision_mode="fp32",
                  set_dynamic_shape=False,
                  shape_info_file="shape_info.txt",
                  num_threads=10):
@@ -37,13 +36,17 @@ class InferBackend(object):
             model_path (str): The model path for deployment.
             batch_size (int): Batch size of input, the default is 32.
             device (str): The deployed device can be set to cpu, gpu or xpu, the default is cpu.
-            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or onnxruntime, the default is mkldnn.
-            use_fp16 (bool): Whether to use fp16 to inference, the default is False.
-            use_quantize (bool): Whether to use ONNXRuntime dynamic quantize, only available while inference on CPU with ONNXRuntime as inference backend, the default is False.
+            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or onnxruntime, 
+                                the default is mkldnn.
+            precision_mode (str): Inference precision, which can be fp32, fp16 or int8, the default is fp32.
             set_dynamic_shape (bool): Whether to set_dynamic_shape for Inference-TRT, the default is False.
-            shape_info_file (str): When set_dynamic_shape is enabled, the file name of shape_info is stored, the default is shape_info.txt.
+            shape_info_file (str): When set_dynamic_shape is enabled, the file name of shape_info is stored, 
+                                    the default is shape_info.txt.
             num_threads (int): Number of cpu threads during inference, the default is 10.
         """
+        precision_mode = precision_mode.lower()
+        use_fp16 = precision_mode == "fp16"
+        use_quantize = precision_mode == "int8"
         model_path = self.model_path_correction(model_path)
         # Check if the model is a quantized model
         is_int8_model = self.paddle_quantize_model(model_path)
@@ -131,8 +134,8 @@ class InferBackend(object):
             # Can not use ONNXRuntime dynamic quantize when deploy on GPU
             if device == "gpu" and use_quantize:
                 print(
-                    ">>> [InferBackend] It is a FP32 model, and dynamic quantization is not supported on gpu, use FP32 to inference here ..."
-                )
+                    ">>> [InferBackend] It is a FP32 model, and dynamic quantization "
+                    "is not supported on gpu, use FP32 to inference here ...")
                 use_quantize = False
 
             if use_fp16 and use_quantize:
@@ -277,21 +280,21 @@ class ErniePredictor(object):
             args.set_dynamic_shape = False
             args.shape_info_file = None
             args.batch_size = 32
-            args.use_fp16 = False
+            # args.use_fp16 = False
         if args.device == 'gpu':
             args.num_threads = cpu_count(logical=False)
-            args.use_quantize = False
+            # args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
-            use_fp16=args.use_fp16,
-            use_quantize=args.use_quantize,
+            precision_mode=args.precision_mode,
             set_dynamic_shape=args.set_dynamic_shape,
             shape_info_file=args.shape_info_file,
             num_threads=args.num_threads)
         if args.set_dynamic_shape:
-            # If set_dynamic_shape is turned on, all required dynamic shapes will be automatically set according to the batch_size and max_seq_length.
+            # If set_dynamic_shape is turned on, all required dynamic shapes will be
+            # automatically set according to the batch_size and max_seq_length.
             self.set_dynamic_shape(args.max_seq_length, args.batch_size)
             exit(0)
 
@@ -376,7 +379,8 @@ class ErniePredictor(object):
         return out_dict
 
     def set_dynamic_shape(self, max_seq_length, batch_size):
-        # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
+        # The dynamic shape info required by TRT is automatically generated
+        # according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
         min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, max_seq_length
         batches = [

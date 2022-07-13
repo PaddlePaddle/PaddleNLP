@@ -49,9 +49,12 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
-        "--use_quantize",
-        action='store_true',
-        help="Whether to use quantization for acceleration.",
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help=
+        "Inference precision, set int8 to use dynamic quantization for acceleration.",
     )
     parser.add_argument(
         "--num_threads",
