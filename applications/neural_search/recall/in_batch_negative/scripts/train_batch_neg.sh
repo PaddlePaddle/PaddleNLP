@@ -42,7 +42,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 #     --save_steps 10 \
 #     --max_seq_length 64 \
 #     --margin 0.2 \
-#     --train_set_file data/${root_path}/train.csv  \
+#     --evaluate \
+#     --train_set_file recall/train.csv  \
 #     --init_from_ckpt simcse/model_20000/model_state.pdparams
 
 # 加载post training的模型，模型放在simcse/post_model_10000
@@ -57,5 +58,5 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 #     --save_steps 10 \
 #     --max_seq_length 64 \
 #     --margin 0.2 \
-#     --train_set_file data/${root_path}/train.csv  \
+#     --train_set_file recall/train.csv  \
 #     --init_from_ckpt simcse/post_model_10000/model_state.pdparams

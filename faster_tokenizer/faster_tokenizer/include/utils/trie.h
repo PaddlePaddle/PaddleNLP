@@ -33,7 +33,7 @@ public:
   Trie(const std::string& continuing_subword_prefix = "##",
        const std::string& unk_token = "[UNK]",
        bool with_pretokenization = false);
-  Trie(const std::unordered_map<std::string, uint>& vocab,
+  Trie(const std::unordered_map<std::string, uint32_t>& vocab,
        const std::string& continuing_subword_prefix = "##",
        const std::string& unk_token = "[UNK]",
        bool with_pretokenization = false);
@@ -55,13 +55,13 @@ public:
   bool TryTraverseSeveralSteps(TraversalCursor* cursor,
                                const std::string& path) const;
   bool TryGetData(const TraversalCursor& cursor, int* out_data) const;
-  void SetVocab(const std::unordered_map<std::string, uint>& vocab);
+  void SetVocab(const std::unordered_map<std::string, uint32_t>& vocab);
   void SetVocabList(const std::vector<std::string>& vocab);
   void SetWithPretokenization(bool with_pretokenization_);
   void SetUNKToken(const std::string& unk_token);
   void SetContinuingSubwordPrefix(const std::string& continuing_subword_prefix);
 
-  uint Size() const {
+  uint32_t Size() const {
     if (trie_.get() != nullptr) {
       return trie_->size();
     }
@@ -70,18 +70,19 @@ public:
   std::string GetContinuingSubwordPrefix() const {
     return continuing_subword_prefix_;
   }
-  uint GetSuffixRoot() const { return suffix_root_; }
-  uint GetPuncFailureNode() const { return punct_failure_link_node_; }
+  uint32_t GetSuffixRoot() const { return suffix_root_; }
+  uint32_t GetPuncFailureNode() const { return punct_failure_link_node_; }
   void DeleteValueOfNode(uint32_t node_id);
   void DeleteLinkFromParent(uint32_t child_node_id);
 
 private:
-  void AddPuncVocab(std::vector<std::string>* punc_vocab,
-                    const std::unordered_map<std::string, uint>& vocab) const;
+  void AddPuncVocab(
+      std::vector<std::string>* punc_vocab,
+      const std::unordered_map<std::string, uint32_t>& vocab) const;
   void InitTrieSuffixRoot();
   void InitTrie(const std::vector<const char*>& keys,
                 const std::vector<int>& values);
-  int EncodeTokenId(const std::string& token, uint id) const;
+  int EncodeTokenId(const std::string& token, uint32_t id) const;
   void CreateTrie(const std::vector<const char*>& keys,
                   const std::vector<int>& values);
 
@@ -106,11 +107,11 @@ private:
   }
 
   std::shared_ptr<Darts::DoubleArray> trie_;
-  std::vector<uint> trie_array_;
+  std::vector<uint32_t> trie_array_;
   std::string continuing_subword_prefix_;
   std::string unk_token_;
-  uint suffix_root_;
-  uint punct_failure_link_node_;
+  uint32_t suffix_root_;
+  uint32_t punct_failure_link_node_;
   bool with_pretokenization_;
 };
 

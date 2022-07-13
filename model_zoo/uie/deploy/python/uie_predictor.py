@@ -80,7 +80,7 @@ class UIEPredictor(object):
         if not isinstance(args.device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                type(args.device))
             exit(0)
         if args.device not in ['cpu', 'gpu']:
             print(
@@ -172,10 +172,14 @@ class UIEPredictor(object):
         for idx in range(0, len(texts), self._batch_size):
             l, r = idx, idx + self._batch_size
             input_dict = {
-                "input_ids": encoded_inputs['input_ids'][l:r],
-                "token_type_ids": encoded_inputs['token_type_ids'][l:r],
-                "pos_ids": encoded_inputs['position_ids'][l:r],
-                "att_mask": encoded_inputs["attention_mask"][l:r]
+                "input_ids":
+                encoded_inputs['input_ids'][l:r].astype('int64'),
+                "token_type_ids":
+                encoded_inputs['token_type_ids'][l:r].astype('int64'),
+                "pos_ids":
+                encoded_inputs['position_ids'][l:r].astype('int64'),
+                "att_mask":
+                encoded_inputs["attention_mask"][l:r].astype('int64')
             }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()

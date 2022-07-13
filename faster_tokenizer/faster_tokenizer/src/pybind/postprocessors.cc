@@ -126,8 +126,8 @@ void BindPostProcessors(pybind11::module* m) {
   py::class_<postprocessors::BertPostProcessor, PyBertPostProcessor>(
       submodule, "BertPostProcessor")
       .def(py::init<>())
-      .def(py::init<const std::pair<std::string, uint>&,
-                    const std::pair<std::string, uint>&>(),
+      .def(py::init<const std::pair<std::string, uint32_t>&,
+                    const std::pair<std::string, uint32_t>&>(),
            py::arg("sep"),
            py::arg("cls"))
       .def("num_special_tokens_to_add",
@@ -151,12 +151,12 @@ void BindPostProcessors(pybind11::module* m) {
   py::class_<postprocessors::SpecialToken>(submodule, "SpecialToken")
       .def(py::init<>())
       .def(py::init<const std::string&,
-                    const std::vector<uint>&,
+                    const std::vector<uint32_t>&,
                     const std::vector<std::string>&>(),
            py::arg("id"),
            py::arg("ids"),
            py::arg("tokens"))
-      .def(py::init<const std::string&, uint>(),
+      .def(py::init<const std::string&, uint32_t>(),
            py::arg("token"),
            py::arg("id"));
 
@@ -203,17 +203,17 @@ void BindPostProcessors(pybind11::module* m) {
               for (auto& str : special_tokens_obj.cast<py::list>()) {
                 if (py::isinstance<py::tuple>(str)) {
                   auto token_tuple = str.cast<py::tuple>();
-                  uint id;
+                  uint32_t id;
                   std::string token;
                   if (token_tuple.size() == 2) {
                     if (py::isinstance<py::str>(token_tuple[0]) &&
                         py::isinstance<py::int_>(token_tuple[1])) {
                       token = token_tuple[0].cast<std::string>();
-                      id = token_tuple[1].cast<uint>();
+                      id = token_tuple[1].cast<uint32_t>();
                     } else if (py::isinstance<py::str>(token_tuple[1]) &&
                                py::isinstance<py::int_>(token_tuple[0])) {
                       token = token_tuple[1].cast<std::string>();
-                      id = token_tuple[0].cast<uint>();
+                      id = token_tuple[0].cast<uint32_t>();
                     } else {
                       throw py::value_error(
                           "`Tuple` with both a token and its associated ID, in "
@@ -228,7 +228,7 @@ void BindPostProcessors(pybind11::module* m) {
                 } else if (py::isinstance<py::dict>(str)) {
                   auto token_dict = str.cast<py::dict>();
                   std::string id;
-                  std::vector<uint> ids;
+                  std::vector<uint32_t> ids;
                   std::vector<std::string> tokens;
                   if (token_dict.contains("id") &&
                       py::isinstance<py::str>(token_dict["id"])) {
@@ -242,7 +242,7 @@ void BindPostProcessors(pybind11::module* m) {
                       py::isinstance<py::list>(token_dict["ids"])) {
                     for (auto py_id : token_dict["ids"].cast<py::list>()) {
                       if (py::isinstance<py::int_>(py_id)) {
-                        ids.push_back(py_id.cast<uint>());
+                        ids.push_back(py_id.cast<uint32_t>());
                       } else {
                         throw py::value_error(
                             "Type of args special_tokens dict need to have key "
