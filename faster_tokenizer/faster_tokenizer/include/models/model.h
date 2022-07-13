@@ -24,8 +24,8 @@ namespace models {
 
 struct Model {
   virtual std::vector<core::Token> Tokenize(const std::string& tokens) = 0;
-  virtual bool TokenToId(const std::string& token, uint* id) const = 0;
-  virtual bool IdToToken(uint id, std::string* token) const = 0;
+  virtual bool TokenToId(const std::string& token, uint32_t* id) const = 0;
+  virtual bool IdToToken(uint32_t id, std::string* token) const = 0;
   virtual core::Vocab GetVocab() const = 0;
   virtual size_t GetVocabSize() const = 0;
   // Return the saved voacb path
