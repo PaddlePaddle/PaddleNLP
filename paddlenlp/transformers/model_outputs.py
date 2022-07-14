@@ -19,7 +19,7 @@ import numpy as np
 from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
-from paddle.nn.layer.transformer import _convert_attention_mask
+from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttention
 
 from .utils import adapt_stale_fwd_patch
 
@@ -75,10 +75,13 @@ def _transformer_encoder_fwd(self,
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        layer_outputs = mod(output,
-                            src_mask=src_mask,
-                            cache=None if cache is None else cache[i],
-                            output_attentions=output_attentions)
+        layer_outputs = mod(
+            output,
+            src_mask=src_mask,
+            cache=None if cache is None else
+            cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+            MultiHeadAttention.Cache(*cache[i]),
+            output_attentions=output_attentions)
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
             outputs = layer_outputs[1:]
@@ -91,7 +94,8 @@ def _transformer_encoder_fwd(self,
         if output_attentions:
             all_attentions.append(outputs[-1])
         if cache is not None:
-            new_caches.append(outputs[1])
+            new_caches.append(outputs[0] if isinstance(
+                cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 
     if self.norm is not None:
         output = self.norm(output)
