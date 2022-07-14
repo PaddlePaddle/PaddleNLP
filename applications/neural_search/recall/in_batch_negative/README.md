@@ -198,7 +198,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --max_seq_length 64 \
     --margin 0.2 \
     --train_set_file recall/train.csv \
-    --evaluate True \
+    --evaluate \
     --recall_result_dir "recall_result_dir" \
     --recall_result_file "recall_result.txt" \
     --hnsw_m 100 \
@@ -587,6 +587,30 @@ outputs {
 ......
 ```
 可以看到服务端返回了向量
+
+## FAQ
+
+#### 如何基于无监督SimCSE训练出的模型参数作为参数初始化继续做有监督 In-Batch Negative 训练？
+
++ 使用 `--init_from_ckpt` 参数加载即可，下面是使用示例：
+
+```
+python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+    train_batch_neg.py \
+    --device gpu \
+    --save_dir ./checkpoints/simcse_inbatch_negative \
+    --batch_size 64 \
+    --learning_rate 5E-5 \
+    --epochs 3 \
+    --output_emb_size 256 \
+    --save_steps 10 \
+    --max_seq_length 64 \
+    --margin 0.2 \
+    --train_set_file recall/train.csv  \
+    --init_from_ckpt simcse/model_20000/model_state.pdparams
+```
+
+
 
 ## Reference
 
