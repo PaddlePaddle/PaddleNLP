@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,51 +26,85 @@ class InferBackend(object):
                  model_path,
                  batch_size=32,
                  device='cpu',
-                 use_fp16=False,
-                 use_quantize=False,
+                 cpu_backend="mkldnn",
+                 precision_mode="fp32",
                  set_dynamic_shape=False,
                  shape_info_file="shape_info.txt",
                  num_threads=10):
+        """
+        Args:
+            model_path (str): The model path for deployment.
+            batch_size (int): Batch size of input, the default is 32.
+            device (str): The deployed device can be set to cpu, gpu or xpu, the default is cpu.
+            cpu_backend (str): Inference backend when deploy on cpu, which can be mkldnn or onnxruntime, 
+                                the default is mkldnn.
+            precision_mode (str): Inference precision, which can be fp32, fp16 or int8, the default is fp32.
+            set_dynamic_shape (bool): Whether to set_dynamic_shape for Inference-TRT, the default is False.
+            shape_info_file (str): When set_dynamic_shape is enabled, the file name of shape_info is stored, 
+                                    the default is shape_info.txt.
+            num_threads (int): Number of cpu threads during inference, the default is 10.
+        """
+        precision_mode = precision_mode.lower()
+        use_fp16 = precision_mode == "fp16"
+        use_quantize = precision_mode == "int8"
         model_path = self.model_path_correction(model_path)
+        # Check if the model is a quantized model
         is_int8_model = self.paddle_quantize_model(model_path)
         print(">>> [InferBackend] Creating Engine ...")
-        if device == 'gpu' and is_int8_model or use_fp16:
+
+        self.predictor_type = "ONNXRuntime"
+        if is_int8_model or device == "xpu" or device == "cpu" and not use_quantize:
+            self.predictor_type = "Inference"
+
+        if self.predictor_type == "Inference":
             from paddle import inference
-            self.predictor_type = "inference"
+
             config = paddle.inference.Config(model_path + ".pdmodel",
                                              model_path + ".pdiparams")
-            config.enable_use_gpu(100, 0)
-            paddle.set_device("gpu")
-            if is_int8_model and use_fp16:
-                print(
-                    ">>> [InferBackend] load a paddle quantize model, use_fp16 has been closed..."
-                )
-                use_fp16 = False
+            # quantized model on GPU
+            if device == 'gpu':
+                config.enable_use_gpu(100, 0)
 
-            if use_fp16:
-                assert device == 'gpu', "When use_fp16, please set device to gpu and install requirements_gpu.txt."
-                print(">>> [InferBackend] FP16 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Half,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
-            else:
-                print(">>> [InferBackend] INT8 inference ...")
-                config.enable_tensorrt_engine(
-                    workspace_size=1 << 30,
-                    precision_mode=inference.PrecisionType.Int8,
-                    max_batch_size=batch_size,
-                    min_subgraph_size=5,
-                    use_static=False,
-                    use_calib_mode=False)
-            if set_dynamic_shape:
-                config.collect_shape_range_info(shape_info_file)
-            else:
-                config.enable_tuned_tensorrt_dynamic_shape(
-                    shape_info_file, True)
+                precision_type = inference.PrecisionType.Float32
+                if is_int8_model:
+                    print(">>> [InferBackend] INT8 inference on GPU ...")
+                    precision_type = inference.PrecisionType.Int8
+
+                config.enable_tensorrt_engine(workspace_size=1 << 30,
+                                              precision_mode=precision_type,
+                                              max_batch_size=batch_size,
+                                              min_subgraph_size=5,
+                                              use_static=False,
+                                              use_calib_mode=False)
+                if set_dynamic_shape:
+                    config.collect_shape_range_info(shape_info_file)
+                else:
+                    config.enable_tuned_tensorrt_dynamic_shape(
+                        shape_info_file, True)
+            elif device == 'cpu':
+                config.disable_gpu()
+                config.switch_ir_optim(True)
+                if cpu_backend == "mkldnn":
+                    config.enable_mkldnn()
+                    if use_fp16:
+                        print(">>> [InferBackend] FP16 inference on CPU ...")
+                        config.enable_mkldnn_bfloat16()
+                    if is_int8_model:
+                        print(">>> [InferBackend] INT8 inference on CPU ...")
+                        config.enable_mkldnn_int8()
+                elif cpu_backend == "onnxruntime":
+                    if use_fp16:
+                        print(
+                            ">>> [InferBackend] FP16 is not supported in ORT backend ..."
+                        )
+                    config.enable_onnxruntime()
+                    config.enable_ort_optimization()
+            elif device == 'xpu':
+                print(">>> [InferBackend] Inference on XPU ...")
+                config.enable_xpu(100)
+
+            config.enable_memory_optim()
+            config.set_cpu_math_library_num_threads(num_threads)
             config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self.predictor = paddle.inference.create_predictor(config)
             self.input_names = [
@@ -88,26 +122,52 @@ class InferBackend(object):
             import paddle2onnx
             import onnxruntime as ort
             import copy
-            self.predictor_type = "onnxruntime"
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=model_path + ".pdmodel",
                 params_file=model_path + ".pdiparams",
                 opset_version=13,
                 enable_onnx_checker=True)
-            dynamic_quantize_model = onnx_model
+
+            deploy_onnx_model = onnx_model
             providers = ['CUDAExecutionProvider']
-            if device == 'cpu':
-                providers = ['CPUExecutionProvider']
+
+            # Can not use ONNXRuntime dynamic quantize when deploy on GPU
+            if device == "gpu" and use_quantize:
+                print(
+                    ">>> [InferBackend] It is a FP32 model, and dynamic quantization "
+                    "is not supported on gpu, use FP32 to inference here ...")
+                use_quantize = False
+
+            if use_fp16 and use_quantize:
+                print(
+                    ">>> [InferBackend] Both FP16 and Int8 are enabled, use FP16 to inference here ..."
+                )
+                use_quantize = False
+
+            if use_fp16:
+                from onnxconverter_common import float16
+                import onnx
+                deploy_onnx_model = "fp16_model.onnx"
+                onnx_model_proto = onnx.ModelProto()
+                onnx_model_proto.ParseFromString(onnx_model)
+                trans_model = float16.convert_float_to_float16(
+                    onnx_model_proto, keep_io_types=True)
+                onnx.save_model(trans_model, deploy_onnx_model)
+                print(">>> [InferBackend] FP16 inference on GPU ...")
+
             if use_quantize:
+                from onnxruntime.quantization import quantize_dynamic
+                deploy_onnx_model = "dynamic_quantize_model.onnx"
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
                     f.write(onnx_model)
-                dynamic_quantize_model = "dynamic_quantize_model.onnx"
-                self.dynamic_quantize(float_onnx_file, dynamic_quantize_model)
+                quantize_dynamic(float_onnx_file, deploy_onnx_model)
                 providers = ['CPUExecutionProvider']
+                print(">>> [InferBackend] INT8 inference on CPU ...")
+
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
-            self.predictor = ort.InferenceSession(dynamic_quantize_model,
+            self.predictor = ort.InferenceSession(deploy_onnx_model,
                                                   sess_options=sess_options,
                                                   providers=providers)
             input_name1 = self.predictor.get_inputs()[0].name
@@ -115,10 +175,6 @@ class InferBackend(object):
             self.input_handles = [input_name1, input_name2]
             self.output_handles = []
         print(">>> [InferBackend] Engine Created ...")
-
-    def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
-        from onnxruntime.quantization import QuantizationMode, quantize_dynamic
-        quantize_dynamic(input_float_model, dynamic_quantized_model)
 
     def model_path_correction(self, model_path):
         if os.path.isfile(model_path + ".pdmodel"):
@@ -141,7 +197,7 @@ class InferBackend(object):
         return False
 
     def infer(self, input_dict: dict):
-        if self.predictor_type == "inference":
+        if self.predictor_type == "Inference":
             for idx, input_name in enumerate(self.input_names):
                 self.input_handles[idx].copy_from_cpu(input_dict[input_name])
             self.predictor.run()
@@ -191,7 +247,7 @@ class ErniePredictor(object):
                 type(device))
             exit(0)
         args.device = args.device.lower()
-        if args.device not in ['cpu', 'gpu']:
+        if args.device not in ['cpu', 'gpu', 'xpu']:
             print(
                 ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
                 type(args.device))
@@ -221,24 +277,22 @@ class ErniePredictor(object):
         self.max_seq_length = args.max_seq_length
 
         if args.device == 'cpu':
-            args.use_fp16 = False
             args.set_dynamic_shape = False
-            args.batch_size = 32
             args.shape_info_file = None
+            args.batch_size = 32
         if args.device == 'gpu':
             args.num_threads = cpu_count(logical=False)
-            args.use_quantize = False
         self.inference_backend = InferBackend(
             args.model_path,
             batch_size=args.batch_size,
             device=args.device,
-            use_fp16=args.use_fp16,
-            use_quantize=args.use_quantize,
+            precision_mode=args.precision_mode,
             set_dynamic_shape=args.set_dynamic_shape,
             shape_info_file=args.shape_info_file,
             num_threads=args.num_threads)
         if args.set_dynamic_shape:
-            # If set_dynamic_shape is turned on, all required dynamic shapes will be automatically set according to the batch_size and max_seq_length.
+            # If set_dynamic_shape is turned on, all required dynamic shapes will be
+            # automatically set according to the batch_size and max_seq_length.
             self.set_dynamic_shape(args.max_seq_length, args.batch_size)
             exit(0)
 
@@ -323,9 +377,10 @@ class ErniePredictor(object):
         return out_dict
 
     def set_dynamic_shape(self, max_seq_length, batch_size):
-        # The dynamic shape info required by TRT is automatically generated according to max_seq_length and batch_size and stored in shape_info.txt
+        # The dynamic shape info required by TRT is automatically generated
+        # according to max_seq_length and batch_size and stored in shape_info.txt
         min_batch_size, max_batch_size, opt_batch_size = 1, batch_size, batch_size
-        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, 32
+        min_seq_len, max_seq_len, opt_seq_len = 2, max_seq_length, max_seq_length
         batches = [
             {
                 "input_ids":

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,9 +65,11 @@ def parse_args():
         help="The collected dynamic shape info file.",
     )
     parser.add_argument(
-        "--use_fp16",
-        action='store_true',
-        help="Whether to use fp16 inference.",
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help="Inference precision.",
     )
     args = parser.parse_args()
     return args
