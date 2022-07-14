@@ -711,7 +711,7 @@ class GPTJForQuestionAnswering(GPTJPreTrainedModel):
     def __init__(self, transformer):
         super().__init__()
         self.transformer = transformer
-        self.classifier = nn.Linear(self.transformer.config['d_model'], 2)
+        self.classifier = nn.Linear(self.transformer.config['n_embd'], 2)
         self.apply(self.init_weights)
 
     def forward(
