@@ -41,8 +41,8 @@ NormalizedString::NormalizedString(const std::string& original)
   std::u32string u32normalized = conv.from_bytes(normalized_);
   for (int i = 0; i < u32normalized.length(); ++i) {
     auto new_normalized_char_len = utils::GetUTF8CharLen(u32normalized[i]);
-    uint start = 0;
-    uint end = 0;
+    uint32_t start = 0;
+    uint32_t end = 0;
     if (i != 0) {
       start = alignments_.back().second;
     }
@@ -71,9 +71,9 @@ const std::string& NormalizedString::GetStr() const { return normalized_; }
 
 const std::string& NormalizedString::GetOrignalStr() const { return original_; }
 
-uint NormalizedString::GetLen() const { return normalized_.length(); }
+uint32_t NormalizedString::GetLen() const { return normalized_.length(); }
 
-uint NormalizedString::GetOriginalLen() const { return original_.length(); }
+uint32_t NormalizedString::GetOriginalLen() const { return original_.length(); }
 
 core::Offset NormalizedString::GetOrginalOffset() const {
   return {original_shift_, GetOriginalLen() + original_shift_};
@@ -84,13 +84,13 @@ bool NormalizedString::IsEmpty() const { return normalized_.empty(); }
 bool NormalizedString::IsOriginalEmpty() const { return original_.empty(); }
 
 void NormalizedString::UpdateNormalized(const OffsetMapping& new_normalized,
-                                        uint initial_offset) {
+                                        uint32_t initial_offset) {
   UpdateNormalizedRange(new_normalized, initial_offset, {0, GetLen()}, true);
 }
 
 void NormalizedString::UpdateNormalizedRange(
     const OffsetMapping& new_normalized,
-    uint initial_offset,
+    uint32_t initial_offset,
     const core::Range& range,
     bool origin_range) {
   auto n_range = range;
@@ -102,14 +102,14 @@ void NormalizedString::UpdateNormalizedRange(
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
   std::u32string u32replaced_normalized = conv.from_bytes(
       normalized_.substr(n_range.first, n_range.second - n_range.first));
-  uint initial_removed = 0;
+  uint32_t initial_removed = 0;
   // calculate initial_removed
   for (int i = 0; i < initial_offset; ++i) {
     size_t chwidth = utils::GetUTF8CharLen(u32replaced_normalized[i]);
     initial_removed += chwidth;
   }
 
-  uint offset = initial_removed + n_range.first;
+  uint32_t offset = initial_removed + n_range.first;
   std::vector<core::Range> alignments;
   alignments.reserve(n_range.second - n_range.first);
 
@@ -135,10 +135,10 @@ void NormalizedString::UpdateNormalizedRange(
     if (curr_changes <= 0) {
       replaced_char = u32replaced_normalized[replaced_normalized_idx++];
     }
-    uint replaced_char_size =
+    uint32_t replaced_char_size =
         (replaced_char == -1) ? 0 : utils::GetUTF8CharLen(replaced_char);
 
-    uint total_bytes_to_remove = 0;
+    uint32_t total_bytes_to_remove = 0;
     if (curr_changes < 0) {
       for (int j = 0; j < -curr_changes; ++j) {
         replaced_char = u32replaced_normalized[replaced_normalized_idx++];
@@ -365,8 +365,8 @@ NormalizedString& NormalizedString::FilterChar(
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
   std::u32string u32new_normalized;
   u32new_normalized.reserve(normalized_.length());
-  uint removed_start = 0;
-  uint removed = 0;
+  uint32_t removed_start = 0;
+  uint32_t removed = 0;
   std::vector<int> changes;
   changes.reserve(normalized_.length());
   bool has_init_ch = false;
@@ -492,7 +492,7 @@ NormalizedString& NormalizedString::Prepend(const std::string& content) {
   u32content.reserve(content.length());
   std::vector<int> changes;
   changes.reserve(content.length());
-  uint utf8_len = 0;
+  uint32_t utf8_len = 0;
   while (utf8_len < content.length()) {
     uint32_t content_char;
     auto content_char_width =
@@ -533,7 +533,7 @@ bool NormalizedString::Slice(core::Range range,
     } else {
       ConvertOffsets(&original_range, false);
     }
-    uint n_shift = original_range.first;
+    uint32_t n_shift = original_range.first;
     normalized->original_ = this->original_.substr(
         original_range.first, original_range.second - original_range.first);
     normalized->normalized_ = this->normalized_.substr(
@@ -541,7 +541,8 @@ bool NormalizedString::Slice(core::Range range,
         normalized_range.second - normalized_range.first);
     normalized->alignments_.reserve(normalized_range.second -
                                     normalized_range.first);
-    for (uint i = normalized_range.first; i < normalized_range.second; ++i) {
+    for (uint32_t i = normalized_range.first; i < normalized_range.second;
+         ++i) {
       normalized->alignments_.emplace_back(
           this->alignments_[i].first - n_shift,
           this->alignments_[i].second - n_shift);

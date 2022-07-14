@@ -36,6 +36,7 @@ from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
 from .information_extraction import UIETask
+from .code_generation import CodeGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -259,6 +260,58 @@ TASKS = {
         },
         "default": {
             "model": "uie-base"
+        }
+    },
+    "code_generation": {
+        "models": {
+            "Salesforce/codegen-350M-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-mono',
+                "task_priority_path": "Salesforce/codegen-350M-mono",
+            },
+            "Salesforce/codegen-2B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-mono',
+                "task_priority_path": "Salesforce/codegen-2B-mono",
+            },
+            "Salesforce/codegen-6B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-mono',
+                "task_priority_path": "Salesforce/codegen-6B-mono",
+            },
+            "Salesforce/codegen-350M-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-nl',
+                "task_priority_path": "Salesforce/codegen-350M-nl",
+            },
+            "Salesforce/codegen-2B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-nl',
+                "task_priority_path": "Salesforce/codegen-2B-nl",
+            },
+            "Salesforce/codegen-6B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-nl',
+                "task_priority_path": "Salesforce/codegen-6B-nl",
+            },
+            "Salesforce/codegen-350M-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-multi',
+                "task_priority_path": "Salesforce/codegen-350M-multi",
+            },
+            "Salesforce/codegen-2B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-multi',
+                "task_priority_path": "Salesforce/codegen-2B-multi",
+            },
+            "Salesforce/codegen-6B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-multi',
+                "task_priority_path": "Salesforce/codegen-6B-multi",
+            },
+        },
+        "default": {
+            "model": "Salesforce/codegen-350M-mono",
         }
     }
 }

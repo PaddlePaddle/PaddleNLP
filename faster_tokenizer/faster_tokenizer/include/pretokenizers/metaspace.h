@@ -22,7 +22,8 @@ namespace faster_tokenizer {
 namespace pretokenizers {
 
 struct MetaSpacePreTokenizer : public PreTokenizer {
-  MetaSpacePreTokenizer(const std::string& replacement = "▁",
+  // Replaces white space with U+2581 (LOWER ONE EIGHT BLOCK)
+  MetaSpacePreTokenizer(const std::string& replacement = "\xe2\x96\x81",
                         bool add_prefix_space = true);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   std::string GetReplacement() const;
