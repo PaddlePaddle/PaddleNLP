@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import argparse
-
-import numpy as np
-import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
+import numpy as np
+
+import paddle
 from paddle import inference
+
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -132,8 +133,7 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        args.model_name)
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     # These data samples is in Chinese.
     # If you use the english model, you should change the test data in English.

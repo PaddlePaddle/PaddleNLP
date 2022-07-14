@@ -52,7 +52,7 @@ class DataArguments:
         default=None,
         metadata={
             "help":
-            "Local dataset directory should include train.tsv, dev.tsv and label.tsv."
+            "Local dataset directory should include train.txt, dev.txt and label.txt."
         })
 
     max_seq_length: int = field(
@@ -71,17 +71,10 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     params_dir: str = field(
-        default='./checkpoint/model_state.pdparams',
+        default='./checkpoint/',
         metadata={
             "help":
             "The output directory where the model checkpoints are written."
-        })
-
-    model_name_or_path: str = field(
-        default='ernie-3.0-base-zh',
-        metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
 
 
@@ -103,7 +96,7 @@ def main():
     training_args.print_config(data_args, "Data")
     if data_args.dataset_dir is not None:
         label_list = {}
-        with open(os.path.join(data_args.dataset_dir, 'label.tsv'),
+        with open(os.path.join(data_args.dataset_dir, 'label.txt'),
                   'r',
                   encoding='utf-8') as f:
             for i, line in enumerate(f):
@@ -111,12 +104,12 @@ def main():
                 label_list[l] = i
         train_ds = load_dataset(read_local_dataset,
                                 path=os.path.join(data_args.dataset_dir,
-                                                  'train.tsv'),
+                                                  'train.txt'),
                                 label_list=label_list,
                                 lazy=False)
         dev_ds = load_dataset(read_local_dataset,
                               path=os.path.join(data_args.dataset_dir,
-                                                'dev.tsv'),
+                                                'dev.txt'),
                               label_list=label_list,
                               lazy=False)
     else:
@@ -126,9 +119,8 @@ def main():
         label_list = train_ds.label_list
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=len(label_list))
-    model.set_dict(paddle.load(model_args.params_dir))
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+        model_args.params_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.params_dir)
 
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
@@ -153,7 +145,7 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=1 / 4))
+    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2 / 3))
 
 
 if __name__ == "__main__":

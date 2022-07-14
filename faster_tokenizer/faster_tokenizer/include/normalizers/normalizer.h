@@ -22,9 +22,10 @@ limitations under the License. */
 
 namespace re2 {
 class RE2;
-}  // re2
+}  // namespace re2
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace normalizers {
 
 enum SplitMode {
@@ -49,8 +50,8 @@ public:
   NormalizedString& operator=(NormalizedString&& other);
   const std::string& GetStr() const;
   const std::string& GetOrignalStr() const;
-  uint GetLen() const;
-  uint GetOriginalLen() const;
+  uint32_t GetLen() const;
+  uint32_t GetOriginalLen() const;
   core::Offset GetOrginalOffset() const;
   bool IsEmpty() const;
   bool IsOriginalEmpty() const;
@@ -71,12 +72,13 @@ public:
   NormalizedString& Lowercase();
   NormalizedString& Replace(const re2::RE2& pattern,
                             const std::string& content);
+  NormalizedString& Prepend(const std::string& content);
   bool Slice(core::Range range,
              NormalizedString* normalized,
              bool origin_range) const;
 
   void UpdateNormalized(const OffsetMapping& new_normalized,
-                        uint initial_offset);
+                        uint32_t initial_offset);
   template <typename PatternType>
   void Split(const PatternType&
                  pattern, /* re2::RE2 or std::function<bool(char32_t)> */
@@ -136,11 +138,8 @@ public:
           previous_match = curr_match;
         }
         matches = std::move(new_matches);
-        int end = matches.size();
         normalizes_size = matches.size();
-        for (int i = 0; i < end / 2; ++i) {
-          std::swap(matches[i], matches[end - i - 1]);
-        }
+        std::reverse(matches.begin(), matches.end());
         break;
       }
       case CONTIGUOUS: {
@@ -184,10 +183,10 @@ private:
   // In order to keep track of the offset mapping from
   // original_ to normalized_
   std::vector<core::Range> alignments_;
-  uint original_shift_;
+  uint32_t original_shift_;
 
   void UpdateNormalizedRange(const OffsetMapping& new_normalized,
-                             uint initial_offset,
+                             uint32_t initial_offset,
                              const core::Range& range,
                              bool origin_range = true);
   void RunNormalization(const std::string& mode);
@@ -206,5 +205,6 @@ struct Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

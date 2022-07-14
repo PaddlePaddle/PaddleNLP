@@ -39,9 +39,8 @@ def convert_example(example,
 class ErnieOp(Op):
 
     def init_op(self):
-        import paddlenlp as ppnlp
-        self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            'ernie-1.0')
+        from paddlenlp.transformers import AutoTokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad

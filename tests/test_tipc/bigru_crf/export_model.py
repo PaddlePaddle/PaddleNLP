@@ -18,7 +18,6 @@ import os
 
 import paddle
 from paddle.static import InputSpec
-import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
 
 from data import load_vocab

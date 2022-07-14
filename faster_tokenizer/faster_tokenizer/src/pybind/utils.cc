@@ -12,14 +12,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
 #include <sstream>
 #include <unordered_map>
 
 #include "pybind/utils.h"
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 PyObject* ToPyObject(bool value) {
@@ -272,5 +272,6 @@ bool PyObject_CheckLongOrConvertToLong(PyObject** obj) {
   return false;
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

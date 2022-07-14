@@ -112,6 +112,9 @@ def parse_args():
         type=int,
         help="num_threads for cpu.",
     )
+    parser.add_argument("--collect_shape",
+                        action='store_true',
+                        help="Whether to collect shape info.")
     parser.add_argument(
         "--debug",
         action='store_true',
@@ -225,6 +228,13 @@ class Predictor(object):
                 use_calib_mode=False)
             print("Enable TensorRT is: {}".format(
                 config.tensorrt_engine_enabled()))
+            if args.collect_shape:
+                config.collect_shape_range_info(args.task_name +
+                                                args.shape_file)
+            else:
+                config.enable_tuned_tensorrt_dynamic_shape(
+                    args.task_name + args.shape_file, True)
+
         config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         predictor = paddle.inference.create_predictor(config)
 
@@ -280,7 +290,8 @@ class Predictor(object):
                 args,
                 dev_example=None,
                 dev_ds_ori=None):
-        self.set_dynamic_shape(args.max_seq_length, args.batch_size)
+        if args.collect_shape:
+            self.set_dynamic_shape(args.max_seq_length, args.batch_size)
         if args.task_name == "cmrc2018":
             dataset_removed = dataset.remove_columns(
                 ["offset_mapping", "attention_mask", "example_id"])
