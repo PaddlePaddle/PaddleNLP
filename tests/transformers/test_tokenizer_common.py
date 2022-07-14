@@ -2386,13 +2386,6 @@ class TokenizerTesterMixin:
     #                 model(**encoded_sequence)
     #                 model(**batch_encoded_sequence)
     #
-    #     # if self.test_rust_tokenizer:
-    #     #     fast_tokenizer = self.get_rust_tokenizer()
-    #     #     encoded_sequence_fast = fast_tokenizer.encode_plus(sequence, return_tensors="pt")
-    #     #     batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus([sequence, sequence], return_tensors="pt")
-    #     #     # This should not fail
-    #     #     model(**encoded_sequence_fast)
-    #     #     model(**batch_encoded_sequence_fast)
 
     # @slow
     # def test_np_encode_plus_sent_to_model(self):

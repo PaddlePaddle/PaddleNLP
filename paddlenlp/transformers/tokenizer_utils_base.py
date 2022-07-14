@@ -22,7 +22,6 @@ import io
 import re
 import warnings
 from collections import OrderedDict, UserDict
-from contextlib import contextmanager
 from shutil import copyfile
 from dataclasses import dataclass, field
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
