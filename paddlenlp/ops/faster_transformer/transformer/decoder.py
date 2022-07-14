@@ -24,6 +24,8 @@ from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops import transfer_param
 
+from paddle.fluid.core import VarBase, CustomOpKernelContext
+
 
 def infer_transformer_decoder(from_tensor,
                               memory_tensor,
