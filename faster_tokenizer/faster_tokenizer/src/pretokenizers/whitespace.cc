@@ -22,9 +22,9 @@ namespace pretokenizers {
 static re2::RE2 pattern("[\\s\\p{Zs}]+");
 
 void Whitespace::operator()(PreTokenizedString* pretokenized) const {
-  pretokenized->Split([&pattern](int idx,
-                                 normalizers::NormalizedString* normalized,
-                                 std::vector<StringSplit>* string_splits) {
+  pretokenized->Split([&](int idx,
+                          normalizers::NormalizedString* normalized,
+                          std::vector<StringSplit>* string_splits) {
     std::vector<normalizers::NormalizedString> normalized_splits;
     normalized->Split(pattern, normalizers::REMOVED, &normalized_splits);
     for (auto& normalize : normalized_splits) {

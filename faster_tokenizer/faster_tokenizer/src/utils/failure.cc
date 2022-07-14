@@ -84,7 +84,7 @@ int FailureVocabToken::TokenLengthWithoutContinuingSubwordPrefix() const {
 }
 
 void FailureArray::BuildFailureVocab(
-    const std::unordered_map<std::string, uint>& vocab,
+    const std::unordered_map<std::string, uint32_t>& vocab,
     const std::string& unk_token,
     const std::string& continuing_subword_prefix) {
   if (vocab.size() > utils::kMaxSupportedVocabSize) {
@@ -169,21 +169,21 @@ void FailureArray::BuildFailureVocab(
 
 void FailureArray::CreateVocabFromFailureVocab(
     const std::vector<FailureVocabToken>& failure_vocab_tokens,
-    std::unordered_map<std::string, uint>* vocab) const {
+    std::unordered_map<std::string, uint32_t>* vocab) const {
   for (auto&& failure_vocab : failure_vocab_tokens) {
     (*vocab)[failure_vocab.Token()] = failure_vocab.TokenId();
   }
 }
 
 void FailureArray::InitFromVocabAndTrie(
-    const std::unordered_map<std::string, uint>& vocab,
+    const std::unordered_map<std::string, uint32_t>& vocab,
     Trie* trie,
     const std::string& unk_token,
     const std::string& continuing_subword_prefix) {
   BuildFailureVocab(vocab, unk_token, continuing_subword_prefix);
 
   // Create Trie
-  std::unordered_map<std::string, uint> new_vocab;
+  std::unordered_map<std::string, uint32_t> new_vocab;
   CreateVocabFromFailureVocab(failure_vocab_tokens_, &new_vocab);
   trie->SetVocab(new_vocab);
 
@@ -245,7 +245,7 @@ void FailureArray::BuildFailureArray(
   BuildOutgoingEdgeLabelsForTrie(
       failure_vocab_tokens, trie, &node_outgoing_edge_labels);
   failure_array_.resize(trie->Size());
-  std::queue<uint> trie_node_queue({trie->kRootNodeId});
+  std::queue<uint32_t> trie_node_queue({trie->kRootNodeId});
   if (trie->GetSuffixRoot() != trie->kRootNodeId) {
     trie_node_queue.push(trie->GetSuffixRoot());
   }

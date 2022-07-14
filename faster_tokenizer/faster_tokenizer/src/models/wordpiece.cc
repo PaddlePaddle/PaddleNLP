@@ -67,7 +67,7 @@ core::Vocab WordPiece::GetVocab() const { return vocab_; }
 
 size_t WordPiece::GetVocabSize() const { return vocab_.size(); }
 
-bool WordPiece::TokenToId(const std::string& token, uint* id) const {
+bool WordPiece::TokenToId(const std::string& token, uint32_t* id) const {
   if (vocab_.find(token) == vocab_.end()) {
     return false;
   }
@@ -75,7 +75,7 @@ bool WordPiece::TokenToId(const std::string& token, uint* id) const {
   return true;
 }
 
-bool WordPiece::IdToToken(uint id, std::string* token) const {
+bool WordPiece::IdToToken(uint32_t id, std::string* token) const {
   if (vocab_reversed_.find(id) == vocab_reversed_.end()) {
     return false;
   }
@@ -93,15 +93,16 @@ std::vector<std::string> WordPiece::Save(
   }
   VLOG(6) << "Full path" << filepath;
   std::ofstream fout(filepath);
-  std::vector<std::pair<std::string, uint>> vocab(vocab_.begin(), vocab_.end());
+  std::vector<std::pair<std::string, uint32_t>> vocab(vocab_.begin(),
+                                                      vocab_.end());
   std::sort(vocab.begin(),
             vocab.end(),
-            [](const std::pair<std::string, uint>& left,
-               const std::pair<std::string, uint>& right) -> bool {
+            [](const std::pair<std::string, uint32_t>& left,
+               const std::pair<std::string, uint32_t>& right) -> bool {
               return left.second < right.second;
             });
   for (const auto& vocab_item : vocab) {
-    fout << vocab_item.second << "\n";
+    fout << vocab_item.first << "\n";
   }
   fout.close();
   return {filepath};
@@ -117,9 +118,9 @@ std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
         vocab_.at(unk_token_), unk_token_, core::Offset{0, sequence.length()});
   } else {
     bool found_token = true;
-    uint start = 0;
+    uint32_t start = 0;
     while (start < sequence.length()) {
-      uint end = sequence.length();
+      uint32_t end = sequence.length();
       core::Token cur_token;
       bool match_cur_token = false;
       while (start < end) {

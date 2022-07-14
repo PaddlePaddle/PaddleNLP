@@ -137,7 +137,7 @@ void Normalizer::DecodePrecompiledCharsMap(const char* blob,
   offset += sizeof(trie_blob_size);
 #ifdef IS_BIG_ENDIAN
   buffer->assign(blob + offset, trie_blob_size);
-  uint32* data = reinterpret_cast<uint32*>(const_cast<char*>(buffer->data()));
+  uint32* data = reinterpret_cast<uint32_t*>(const_cast<char*>(buffer->data()));
   for (int i = 0; i < trie_blob_size / 4; ++i) data[i] = util::Swap32(data[i]);
   *trie_blob = std::string(buffer->data(), trie_blob_size);
 #else
@@ -156,7 +156,7 @@ std::string Normalizer::EncodePrecompiledCharsMap(
   blob.append(normalized.data(), normalized.size());
 
 #ifdef IS_BIG_ENDIAN
-  uint32* data = reinterpret_cast<uint32*>(const_cast<char*>(blob.data()));
+  uint32* data = reinterpret_cast<uint32_t*>(const_cast<char*>(blob.data()));
   for (int i = 0; i <= trie_blob.size() / 4; ++i) {
     data[i] = util::Swap32(data[i]);
   }

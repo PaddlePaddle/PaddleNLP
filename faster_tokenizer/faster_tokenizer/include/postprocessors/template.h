@@ -33,8 +33,8 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
                                  {SEQ_A, "A"}, {SEQ_B, "B"},
                              });
 // The template indicate `${Id} : ${TypeId}`
-using TemplateSequence = std::pair<SequenceType, uint>;
-using TemplateSpecialToken = std::pair<std::string, uint>;
+using TemplateSequence = std::pair<SequenceType, uint32_t>;
+using TemplateSpecialToken = std::pair<std::string, uint32_t>;
 
 using TemplatePiece = boost::variant<TemplateSequence, TemplateSpecialToken>;
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
@@ -42,20 +42,20 @@ void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
 
 void ParseIdFromString(const std::string& template_id_string,
                        TemplatePiece* template_piece);
-void SetTypeId(uint type_id, TemplatePiece* template_piece);
+void SetTypeId(uint32_t type_id, TemplatePiece* template_piece);
 void GetTemplatePieceFromString(const std::string& template_string,
                                 TemplatePiece* template_piece);
 
 struct SpecialToken {
   std::string id_;
-  std::vector<uint> ids_;
+  std::vector<uint32_t> ids_;
   std::vector<std::string> tokens_;
   SpecialToken() = default;
   SpecialToken(const std::string& id,
-               const std::vector<uint>& ids,
+               const std::vector<uint32_t>& ids,
                const std::vector<std::string>& tokens)
       : id_(id), ids_(ids), tokens_(tokens) {}
-  SpecialToken(const std::string& token, uint id) {
+  SpecialToken(const std::string& token, uint32_t id) {
     id_ = token;
     ids_.push_back(id);
     tokens_.push_back(token);
