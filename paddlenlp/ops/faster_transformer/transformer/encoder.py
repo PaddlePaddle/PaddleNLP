@@ -23,6 +23,9 @@ from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
 
+if paddle.__version__ == "0.0.0":
+    from paddle.fluid.core import VarBase, CustomOpKernelContext
+
 
 def infer_transformer_encoder(
         input,
@@ -61,51 +64,158 @@ def infer_transformer_encoder(
     accepts the weight and bias of TransformerEncoder and some other parameters
     for inference.
     """
-    helper = LayerHelper('fusion_encoder', **locals())
-    inputs = {
-        'Input': input,
-        'SelfAttnMask': attn_mask,
-        'SelfQueryWeight@VECTOR': q_weight,
-        'SelfQueryBias@VECTOR': q_bias,
-        'SelfKeyWeight@VECTOR': k_weight,
-        'SelfKeyBias@VECTOR': k_bias,
-        'SelfValueWeight@VECTOR': v_weight,
-        'SelfValueBias@VECTOR': v_bias,
-        'SelfAttnOutputWeight@VECTOR': attn_out_weight,
-        'SelfAttnOutputBias@VECTOR': attn_out_bias,
-        'SelfAttnOutputLayernormWeight@VECTOR': norm1_weight,
-        'SelfAttnOutputLayernormBias@VECTOR': norm1_bias,
-        'OutputLayernormWeight@VECTOR': norm2_weight,
-        'OutputLayernormBias@VECTOR': norm2_bias,
-        'FFNInterWeight@VECTOR': ffn_inter_weight,
-        'FFNInterBias@VECTOR': ffn_inter_bias,
-        'FFNOutputWeight@VECTOR': ffn_out_weight,
-        'FFNOutputBias@VECTOR': ffn_out_bias,
-        # 'SequenceIdOffset': sequence_id_offset,
-        # "TRTSeqLenOffset": trt_seqlen_offset,
-        # 'AmaxList': amax_list
-    }
-    attrs = {
-        'head_num': n_head,
-        'size_per_head': size_per_head,
-        'use_gelu': use_gelu,
-        "remove_padding": remove_padding,
-        'int8_mode': int8_mode,
-        'num_layer': n_layer,
-        'layer_idx': layer_idx,
-        'allow_gemm_test': allow_gemm_test,
-        'use_trt_kernel': use_trt_kernel,
-        'normalize_before': normalize_before
-    }
+    if paddle.__version__ == "0.0.0":
+        if in_dygraph_mode():
+            ctx = core.CustomOpKernelContext()
 
-    encoder_out = helper.create_variable(dtype=input[0].dtype)
+            inputs = [
+                input,
+                attn_mask,
+                q_weight,
+                q_bias,
+                k_weight,
+                k_bias,
+                v_weight,
+                v_bias,
+                attn_out_weight,
+                attn_out_bias,
+                norm1_weight,
+                norm1_bias,
+                norm2_weight,
+                norm2_bias,
+                ffn_inter_weight,
+                ffn_inter_bias,
+                ffn_out_weight,
+                ffn_out_bias,
+                # 'SequenceIdOffset': sequence_id_offset,
+                # "TRTSeqLenOffset": trt_seqlen_offset,
+                # 'AmaxList': amax_list
+            ]
 
-    outputs = {"EncoderOut": encoder_out}
+            attrs = [
+                n_head, size_per_head, use_gelu, remove_padding, int8_mode,
+                n_layer, layer_idx, allow_gemm_test, use_trt_kernel,
+                normalize_before
+            ]
 
-    helper.append_op(type='fusion_encoder',
-                     inputs=inputs,
-                     outputs=outputs,
-                     attrs=attrs)
+            for ins in inputs:
+                ctx.add_inputs(ins)
+            for ats in attrs:
+                ctx.add_attr(ats)
+
+            encoder_out = core.eager.Tensor()
+
+            ctx.add_outputs(encoder_out)
+
+            core.eager._run_custom_op(ctx, "fusion_encoder", True)
+
+        else:
+            inputs = {
+                'Input': input,
+                'SelfAttnMask': attn_mask,
+                'SelfQueryWeight@VECTOR': q_weight,
+                'SelfQueryBias@VECTOR': q_bias,
+                'SelfKeyWeight@VECTOR': k_weight,
+                'SelfKeyBias@VECTOR': k_bias,
+                'SelfValueWeight@VECTOR': v_weight,
+                'SelfValueBias@VECTOR': v_bias,
+                'SelfAttnOutputWeight@VECTOR': attn_out_weight,
+                'SelfAttnOutputBias@VECTOR': attn_out_bias,
+                'SelfAttnOutputLayernormWeight@VECTOR': norm1_weight,
+                'SelfAttnOutputLayernormBias@VECTOR': norm1_bias,
+                'OutputLayernormWeight@VECTOR': norm2_weight,
+                'OutputLayernormBias@VECTOR': norm2_bias,
+                'FFNInterWeight@VECTOR': ffn_inter_weight,
+                'FFNInterBias@VECTOR': ffn_inter_bias,
+                'FFNOutputWeight@VECTOR': ffn_out_weight,
+                'FFNOutputBias@VECTOR': ffn_out_bias,
+                # 'SequenceIdOffset': sequence_id_offset,
+                # "TRTSeqLenOffset": trt_seqlen_offset,
+                # 'AmaxList': amax_list
+            }
+
+            attrs = {
+                'head_num': n_head,
+                'size_per_head': size_per_head,
+                'use_gelu': use_gelu,
+                "remove_padding": remove_padding,
+                'int8_mode': int8_mode,
+                'num_layer': n_layer,
+                'layer_idx': layer_idx,
+                'allow_gemm_test': allow_gemm_test,
+                'use_trt_kernel': use_trt_kernel,
+                'normalize_before': normalize_before
+            }
+
+            if _in_legacy_dygraph():
+                encoder_out = core.VarBase()
+
+                outputs = {"EncoderOut": encoder_out}
+
+                _dygraph_tracer().trace_op(type="fusion_encoder",
+                                           inputs=inputs,
+                                           outputs=outputs,
+                                           attrs=attrs)
+
+            else:
+                helper = LayerHelper('fusion_encoder', **locals())
+
+                encoder_out = helper.create_variable(dtype=input[0].dtype)
+
+                outputs = {"EncoderOut": encoder_out}
+
+                helper.append_op(type='fusion_encoder',
+                                 inputs=inputs,
+                                 outputs=outputs,
+                                 attrs=attrs)
+
+    else:
+        helper = LayerHelper('fusion_encoder', **locals())
+        inputs = {
+            'Input': input,
+            'SelfAttnMask': attn_mask,
+            'SelfQueryWeight@VECTOR': q_weight,
+            'SelfQueryBias@VECTOR': q_bias,
+            'SelfKeyWeight@VECTOR': k_weight,
+            'SelfKeyBias@VECTOR': k_bias,
+            'SelfValueWeight@VECTOR': v_weight,
+            'SelfValueBias@VECTOR': v_bias,
+            'SelfAttnOutputWeight@VECTOR': attn_out_weight,
+            'SelfAttnOutputBias@VECTOR': attn_out_bias,
+            'SelfAttnOutputLayernormWeight@VECTOR': norm1_weight,
+            'SelfAttnOutputLayernormBias@VECTOR': norm1_bias,
+            'OutputLayernormWeight@VECTOR': norm2_weight,
+            'OutputLayernormBias@VECTOR': norm2_bias,
+            'FFNInterWeight@VECTOR': ffn_inter_weight,
+            'FFNInterBias@VECTOR': ffn_inter_bias,
+            'FFNOutputWeight@VECTOR': ffn_out_weight,
+            'FFNOutputBias@VECTOR': ffn_out_bias,
+            # 'SequenceIdOffset': sequence_id_offset,
+            # "TRTSeqLenOffset": trt_seqlen_offset,
+            # 'AmaxList': amax_list
+        }
+        attrs = {
+            'head_num': n_head,
+            'size_per_head': size_per_head,
+            'use_gelu': use_gelu,
+            "remove_padding": remove_padding,
+            'int8_mode': int8_mode,
+            'num_layer': n_layer,
+            'layer_idx': layer_idx,
+            'allow_gemm_test': allow_gemm_test,
+            'use_trt_kernel': use_trt_kernel,
+            'normalize_before': normalize_before
+        }
+
+        encoder_out = helper.create_variable(dtype=input[0].dtype)
+
+        outputs = {"EncoderOut": encoder_out}
+
+        helper.append_op(type='fusion_encoder',
+                         inputs=inputs,
+                         outputs=outputs,
+                         attrs=attrs)
+
     return encoder_out
 
 
