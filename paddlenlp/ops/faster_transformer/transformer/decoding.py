@@ -296,12 +296,8 @@ def infer_gpt_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
             ctx.add_attr(ats)
 
         output_ids = core.eager.Tensor()
-        parent_ids = core.eager.Tensor()
-        sequence_length = core.eager.Tensor()
 
         ctx.add_outputs(output_ids)
-        ctx.add_outputs(parent_ids)
-        ctx.add_outputs(sequence_length)
 
         core.eager._run_custom_op(ctx, "fusion_gpt", True)
 
@@ -387,96 +383,158 @@ def infer_unified_decoding(
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _unk_id,
         _mask_id, _temperature, _len_penalty, _normalize_before, _pos_bias,
         _hidden_act, _rel_len, _early_stopping, _min_length):
-    helper = LayerHelper('fusion_unified_decoding', **locals())
-
-    inputs = {
-        "InputIds": input_ids,
-        "AttnMask": attn_mask,
-        "MemSeqLen": memory_seq_lens,
-        "TypeIds": type_id,
-        "DecTypeIds": decoder_type_id,
-        "LogitsMask": logits_mask,
-        "WordEmbedding": word_emb,
-        "SelfLayernormWeight@VECTOR": slf_ln_weight,
-        "SelfLayernormBias@VECTOR": slf_ln_bias,
-        "SelfQueryWeight@VECTOR": slf_q_weight,
-        "SelfQueryBias@VECTOR": slf_q_bias,
-        "SelfKeyWeight@VECTOR": slf_k_weight,
-        "SelfKeyBias@VECTOR": slf_k_bias,
-        "SelfValueWeight@VECTOR": slf_v_weight,
-        "SelfValueBias@VECTOR": slf_v_bias,
-        "SelfOutWeight@VECTOR": slf_out_weight,
-        "SelfOutBias@VECTOR": slf_out_bias,
-        "FFNLayernormWeight@VECTOR": ffn_ln_weight,
-        "FFNLayernormBias@VECTOR": ffn_ln_bias,
-        "FFNInterWeight@VECTOR": ffn_inter_weight,
-        "FFNInterBias@VECTOR": ffn_inter_bias,
-        "FFNOutWeight@VECTOR": ffn_out_weight,
-        "FFNOutBias@VECTOR": ffn_out_bias,
-        "DecoderLayernormWeight": decoder_ln_weight,
-        "DecoderLayernormBias": decoder_ln_bias,
-        "TransWeight": trans_weight,
-        "TransBias": trans_bias,
-        "LMLayernormWeight": lm_ln_weight,
-        "LMLayernormBias": lm_ln_bias,
-        "EmbWeight": linear_weight,
-        "EmbBias": linear_bias,
-        "PositionEncEmb": pos_emb,
-        "TypeEmb": type_emb,
-        "RoleIds": role_id,
-        "DecRoleIds": decoder_role_id,
-        "RoleEmbedding": role_emb,
-        "PositionIds": position_id,
-        "DecPositionIds": decoder_position_id
-    }
 
     tensor_para_size = get_ft_para_conf().tensor_para_size
     layer_para_size = get_ft_para_conf().layer_para_size
     layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
 
-    attrs = {
-        "decoding_strategy": _decoding_strategy,
-        "beam_size": _beam_size,
-        "topk": _topk,
-        "topp": _topp,
-        "n_head": _n_head,
-        "size_per_head": _size_per_head,
-        "num_layer": _n_layer,
-        "bos_id": _bos_id,
-        "eos_id": _eos_id,
-        "max_len": _max_out_len,
-        "beam_search_diversity_rate": _diversity_rate,
-        "unk_id": _unk_id,
-        "mask_id": _mask_id,
-        "temperature": _temperature,
-        "len_penalty": _len_penalty,
-        "normalize_before": _normalize_before,
-        "pos_bias": _pos_bias,
-        "hidden_act": _hidden_act,
-        "rel_len": _rel_len,
-        "early_stopping": _early_stopping,
-        "min_length": _min_length,
-        "tensor_para_size": tensor_para_size,
-        "layer_para_size": layer_para_size,
-        "layer_para_batch_size": layer_para_batch_size
-    }
+    if in_dygraph_mode():
+        ctx = core.CustomOpKernelContext()
 
-    output_ids = helper.create_variable(dtype="int32")
-    parent_ids = helper.create_variable(dtype="int32")
-    sequence_length = helper.create_variable(dtype="int32")
-    output_scores = helper.create_variable(dtype="float32")
+        inputs = [
+            input_ids, attn_mask, memory_seq_lens, type_id, decoder_type_id,
+            logits_mask, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
+            slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias,
+            slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+            ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
+            decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
+            lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb,
+            type_emb, role_id, decoder_role_id, role_emb, position_id,
+            decoder_position_id
+        ]
 
-    outputs = {
-        'OutputIds': output_ids,
-        'ParentIds': parent_ids,
-        'SequenceLength': sequence_length,
-        "OutputScores": output_scores
-    }
+        attrs = [
+            _decoding_strategy, _beam_size, _topk, _topp, _n_head,
+            _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
+            _diversity_rate, _unk_id, _mask_id, _temperature, _len_penalty,
+            _normalize_before, _pos_bias, _hidden_act, _rel_len,
+            _early_stopping, _min_length, tensor_para_size, layer_para_size,
+            layer_para_batch_size
+        ]
 
-    helper.append_op(type='fusion_unified_decoding',
-                     inputs=inputs,
-                     outputs=outputs,
-                     attrs=attrs)
+        for ins in inputs:
+            ctx.add_inputs(ins)
+        for ats in attrs:
+            ctx.add_attr(ats)
+
+        output_ids = core.eager.Tensor()
+        parent_ids = core.eager.Tensor()
+        sequence_length = core.eager.Tensor()
+        output_scores = core.eager.Tensor()
+
+        ctx.add_outputs(output_ids)
+        ctx.add_outputs(parent_ids)
+        ctx.add_outputs(sequence_length)
+        ctx.add_outputs(output_scores)
+
+        core.eager._run_custom_op(ctx, "fusion_unified_decoding", True)
+
+    else:
+        inputs = {
+            "InputIds": input_ids,
+            "AttnMask": attn_mask,
+            "MemSeqLen": memory_seq_lens,
+            "TypeIds": type_id,
+            "DecTypeIds": decoder_type_id,
+            "LogitsMask": logits_mask,
+            "WordEmbedding": word_emb,
+            "SelfLayernormWeight@VECTOR": slf_ln_weight,
+            "SelfLayernormBias@VECTOR": slf_ln_bias,
+            "SelfQueryWeight@VECTOR": slf_q_weight,
+            "SelfQueryBias@VECTOR": slf_q_bias,
+            "SelfKeyWeight@VECTOR": slf_k_weight,
+            "SelfKeyBias@VECTOR": slf_k_bias,
+            "SelfValueWeight@VECTOR": slf_v_weight,
+            "SelfValueBias@VECTOR": slf_v_bias,
+            "SelfOutWeight@VECTOR": slf_out_weight,
+            "SelfOutBias@VECTOR": slf_out_bias,
+            "FFNLayernormWeight@VECTOR": ffn_ln_weight,
+            "FFNLayernormBias@VECTOR": ffn_ln_bias,
+            "FFNInterWeight@VECTOR": ffn_inter_weight,
+            "FFNInterBias@VECTOR": ffn_inter_bias,
+            "FFNOutWeight@VECTOR": ffn_out_weight,
+            "FFNOutBias@VECTOR": ffn_out_bias,
+            "DecoderLayernormWeight": decoder_ln_weight,
+            "DecoderLayernormBias": decoder_ln_bias,
+            "TransWeight": trans_weight,
+            "TransBias": trans_bias,
+            "LMLayernormWeight": lm_ln_weight,
+            "LMLayernormBias": lm_ln_bias,
+            "EmbWeight": linear_weight,
+            "EmbBias": linear_bias,
+            "PositionEncEmb": pos_emb,
+            "TypeEmb": type_emb,
+            "RoleIds": role_id,
+            "DecRoleIds": decoder_role_id,
+            "RoleEmbedding": role_emb,
+            "PositionIds": position_id,
+            "DecPositionIds": decoder_position_id
+        }
+
+        attrs = {
+            "decoding_strategy": _decoding_strategy,
+            "beam_size": _beam_size,
+            "topk": _topk,
+            "topp": _topp,
+            "n_head": _n_head,
+            "size_per_head": _size_per_head,
+            "num_layer": _n_layer,
+            "bos_id": _bos_id,
+            "eos_id": _eos_id,
+            "max_len": _max_out_len,
+            "beam_search_diversity_rate": _diversity_rate,
+            "unk_id": _unk_id,
+            "mask_id": _mask_id,
+            "temperature": _temperature,
+            "len_penalty": _len_penalty,
+            "normalize_before": _normalize_before,
+            "pos_bias": _pos_bias,
+            "hidden_act": _hidden_act,
+            "rel_len": _rel_len,
+            "early_stopping": _early_stopping,
+            "min_length": _min_length,
+            "tensor_para_size": tensor_para_size,
+            "layer_para_size": layer_para_size,
+            "layer_para_batch_size": layer_para_batch_size
+        }
+
+        if _in_legacy_dygraph():
+            output_ids = core.VarBase()
+            parent_ids = core.VarBase()
+            sequence_length = core.VarBase()
+            output_scores = core.VarBase()
+
+            outputs = {
+                'OutputIds': output_ids,
+                'ParentIds': parent_ids,
+                'SequenceLength': sequence_length,
+                "OutputScores": output_scores
+            }
+
+            _dygraph_tracer().trace_op(type="fusion_unified_decoding",
+                                       inputs=inputs,
+                                       outputs=outputs,
+                                       attrs=attrs)
+
+        else:
+            helper = LayerHelper('fusion_unified_decoding', **locals())
+
+            output_ids = helper.create_variable(dtype="int32")
+            parent_ids = helper.create_variable(dtype="int32")
+            sequence_length = helper.create_variable(dtype="int32")
+            output_scores = helper.create_variable(dtype="float32")
+
+            outputs = {
+                'OutputIds': output_ids,
+                'ParentIds': parent_ids,
+                'SequenceLength': sequence_length,
+                "OutputScores": output_scores
+            }
+
+            helper.append_op(type='fusion_unified_decoding',
+                             inputs=inputs,
+                             outputs=outputs,
+                             attrs=attrs)
 
     return output_ids, parent_ids, sequence_length, output_scores
 
