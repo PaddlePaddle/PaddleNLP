@@ -14,6 +14,7 @@
 
 from .argparser import *
 from .training_args import *
+from .compression_args import *
 from .trainer_base import *
 from .trainer_callback import *
 from .trainer_utils import *

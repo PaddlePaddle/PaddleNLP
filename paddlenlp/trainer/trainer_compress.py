@@ -16,8 +16,8 @@ import time
 import os
 import copy
 import math
-
 import numpy as np
+
 import paddle
 from paddle.utils import try_import
 import paddle.nn as nn
@@ -25,121 +25,60 @@ import paddle.nn.functional as F
 from paddle.metric import Accuracy
 from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
 
-from paddlenlp.utils.log import logger
-from paddlenlp.data import Pad
-from paddlenlp.transformers import AutoModelForSequenceClassification
-from paddlenlp.transformers import AutoModelForQuestionAnswering
-from paddlenlp.transformers import AutoModelForTokenClassification
-from paddlenlp.transformers import export_model
-from paddlenlp.transformers.ofa_utils import *
-from paddlenlp.transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
-from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+from ..utils.log import logger
+from ..data import Pad
+from ..transformers import AutoModelForSequenceClassification
+from ..transformers import AutoModelForQuestionAnswering
+from ..transformers import AutoModelForTokenClassification
+from ..transformers import export_model
+from ..transformers.ofa_utils import *
+from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from ..metrics import ChunkEvaluator
+from ..metrics.squad import squad_evaluate, compute_prediction
 
 from .trainer_base import Trainer
 
 
-class AutoCompressConfig:
-    predefined_configuration = {
-        "dynabert": {
-            "width_mult_list": [3 / 4],
-            "output_filename_prefix": "float32"
-        },
-        "ptq": {
-            "algo_list": ["hist"],
-            "batch_num_list": [1],
-            "batch_size_list": [4],
-            "round_type": "round",
-            "bias_correction": False,
-            "input_filename_prefix": "float32",
-            "output_filename_prefix": "int8",
-        }
-    }
-
-    def __init__(self, strategy="dynabert+ptq"):
-        strategy = strategy.lower()
-        assert strategy in ("dynabert+ptq", "ptq", "dynabert"), \
-            "Only 'dynabert', 'ptq' and 'dynabert+ptq' are supported."
-        if "dynabert" in strategy:
-            logger.info("Compression Suggestions: For strategy `dynabert`, " \
-                        "parameter `width_mult_list` could be passed in and " \
-                        "defauts to [`3/4`].")
-        elif "ptq" in strategy:
-            logger.info("Suggestions: For strategy `ptq`, parameter `algo_list`, " \
-                        "`batch_size_list`, `batch_num_list`, `bias_correction, "
-                        "and `round_type` could be passed in. " \
-                        "For `algo_list`, 'hist', 'KL', 'mse', 'avg', 'abs_max' and 'emd' could be chosen. " \
-                        "`batch_num_list` defauts to `[1]`. `batch_size_list` defaults to `[4]`. " \
-                        "round_type` could be 'round' or 'adaround', and defaults to 'round'. " \
-                        "`bias_correction` could be True or False. " \
-                        )
-        else:
-            pass
-
-        self.strategy = strategy
-        self.config_dict = {}
-        for each_strategy in strategy.split("+"):
-            self.config_dict[each_strategy] = self.predefined_configuration[
-                each_strategy]
-
-    def set_config(self, **custom_config_dict):
-        for custom_config_key in custom_config_dict:
-            for strategy in self.config_dict:
-                if custom_config_key in self.config_dict[strategy]:
-                    self.config_dict[strategy][
-                        custom_config_key] = custom_config_dict[
-                            custom_config_key]
-
-    def print_config(self):
-        logger.info("=" * 60)
-        logger.info('{:^40}'.format("Compression Configuration Arguments"))
-        logger.info('{:30}:{}'.format("paddle commit id",
-                                      paddle.version.commit))
-        for strategy in self.config_dict:
-            logger.info('{}:'.format(strategy))
-            for para_name in self.config_dict[strategy]:
-                v = self.config_dict[strategy][para_name]
-                logger.info('\t\t{:30}:{}'.format(para_name, v))
-
-        logger.info("")
-
-
-def compress(self, output_dir, configs=AutoCompressConfig()):
+def compress(self):
     """
-    Supports pruning and quantization. If both are needed, pruning would be
-    performed before quantizaton.
-    Args:
-        output_dir (str):
-            Directory name of Pruning or quantized models.
-        config ( An instance of `AutoCompressConfig`):
-            Compression argument config instance to pass parameters for pruning
-            or quantization.
-            Defaults to `AutoCompressConfig()`.
+    Supports pruning DynaBERT and post-training quantization. If both are
+    needed, pruning DynaBERT would be performed before quantizaton.
     """
-    config_dict = configs.config_dict
-    if "dynabert" in configs.strategy:
+    args = self.args
+    if "dynabert" in args.strategy:
         try_import('paddleslim')
-        _dynabert(self, self.model, output_dir, config_dict["dynabert"])
-        if "ptq" in configs.strategy:
-            for width_mult in config_dict["dynabert"]["width_mult_list"]:
-                output_dir_width = os.path.join(output_dir,
+        _dynabert(self, self.model, args.output_dir)
+        if "ptq" in args.strategy:
+            self.args.input_filename_prefix = "pruned_model"
+            for width_mult in args.width_mult_list:
+                output_dir_width = os.path.join(args.output_dir,
                                                 "width_mult_" + str(width_mult))
-                self.quant(output_dir_width, output_dir_width, "ptq",
-                           config_dict["ptq"])
-    elif configs.strategy == "ptq":
-        config_dict["ptq"]["input_filename_prefix"] = "model"
-        input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ]
-        input_dir = os.path.join(output_dir, "float32")
-        export_model(model=self.model, input_spec=input_spec, path=input_dir)
-        self.quant(input_dir, output_dir, "ptq", config_dict["ptq"])
+                self.quant(output_dir_width, "ptq")
+    elif args.strategy == "ptq":
+        # Input model is an inference model
+        if args.infer_model_path is not None:
+            model_dir = os.path.dirname(args.infer_model_path)
+            self.args.input_filename_prefix = os.path.basename(
+                args.infer_model_path)
+            self.quant(model_dir, args.strategy)
+        # Input model is load from Trainer API in dygraph.
+        else:
+            # Prefix of `export_model` is 'model'
+            self.args.input_filename_prefix = "model"
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64"),  # input_ids
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64")  # token_type_ids
+            ]
+            input_dir = args.output_dir
+            export_model(model=self.model,
+                         input_spec=input_spec,
+                         path=input_dir)
+            self.quant(input_dir, args.strategy)
 
 
-def quant(self, input_dir, output_dir, strategy, configs):
+def quant(self, input_dir, strategy):
     """
     Supports Post-Training Quantization now.
     """
@@ -148,10 +87,11 @@ def quant(self, input_dir, output_dir, strategy, configs):
         _post_training_quantization_grid_search(eval_dataloader,
                                                 self.eval_dataset,
                                                 self.args.device, input_dir,
-                                                output_dir, configs)
+                                                self.args)
 
 
-def _dynabert(self, model, output_dir, configs):
+def _dynabert(self, model, output_dir):
+    args = self.args
     model = _replace_auto_model_forward(model)
 
     # Each batch is a dict.
@@ -164,12 +104,11 @@ def _dynabert(self, model, output_dir, configs):
         ofa_model, teacher_model = _dynabert_init(model,
                                                   eval_dataloader_with_label,
                                                   self.criterion,
-                                                  configs["width_mult_list"])
+                                                  args.width_mult_list)
     else:
         ofa_model, teacher_model = _dynabert_init(model, eval_dataloader,
                                                   self.criterion,
-                                                  configs["width_mult_list"])
-    args = self.args
+                                                  args.width_mult_list)
 
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
@@ -184,11 +123,11 @@ def _dynabert(self, model, output_dir, configs):
 
     ofa_model = _dynabert_training(self, ofa_model, model, teacher_model,
                                    train_dataloader, eval_dataloader,
-                                   configs["width_mult_list"], self.criterion,
-                                   args.num_train_epochs, output_dir)
+                                   args.width_mult_list, self.criterion,
+                                   args.num_train_epochs, args.output_dir)
 
     # Each width_mult best model would be exported.
-    _dynabert_export(ofa_model, configs, output_dir)
+    _dynabert_export(ofa_model, args.width_mult_list, args.output_dir)
 
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model, True), _recover_transformer_func(ofa_model.model, True)
@@ -355,10 +294,10 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     all_end_logits.append(end_logits_tensor.numpy()[idx])
 
             else:
-                input_ids, segment_ids, labels = batch['input_ids'], batch[
+                input_ids, token_type_ids, labels = batch['input_ids'], batch[
                     'token_type_ids'], batch['labels']
                 logits = model(input_ids,
-                               segment_ids,
+                               token_type_ids,
                                attention_mask=[None, None])
                 if isinstance(logits, tuple):
                     logits = logits[0]
@@ -535,7 +474,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
     return ofa_model
 
 
-def _dynabert_export(ofa_model, configs, output_dir):
+def _dynabert_export(ofa_model, width_mult_list, output_dir):
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(
@@ -543,7 +482,7 @@ def _dynabert_export(ofa_model, configs, output_dir):
 
     ori_num_heads = ofa_model.model.base_model.encoder.layers[
         0].self_attn.num_heads
-    for width_mult in configs["width_mult_list"]:
+    for width_mult in width_mult_list:
         model_dir = os.path.join(output_dir, "width_mult_" + str(width_mult))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
@@ -569,8 +508,7 @@ def _dynabert_export(ofa_model, configs, output_dir):
             paddle.static.InputSpec(shape=[None, None], dtype='int64'),
             paddle.static.InputSpec(shape=[None, None], dtype='int64')
         ]
-        pruned_infer_model_dir = os.path.join(model_dir,
-                                              configs["output_filename_prefix"])
+        pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
 
         net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
         paddle.jit.save(net, pruned_infer_model_dir)
@@ -580,11 +518,12 @@ def _dynabert_export(ofa_model, configs, output_dir):
 
 
 def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
-                                            device, input_dir, output_dir,
-                                            configs):
+                                            device, model_dir, args):
     paddle.enable_static()
     place = paddle.set_device(device)
     exe = paddle.static.Executor(place)
+
+    args.output_filename_prefix = "int8"
 
     def _post_training_quantization(algo, batch_size, batch_nums):
 
@@ -595,41 +534,41 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
                 batch_data[1].append(data['token_type_ids'])
                 if len(batch_data[0]) == batch_size:
                     input_ids = Pad(axis=0, pad_val=0)(batch_data[0])
-                    segment_ids = Pad(axis=0, pad_val=0)(batch_data[1])
-                    yield [input_ids, segment_ids]
+                    token_type_ids = Pad(axis=0, pad_val=0)(batch_data[1])
+                    yield [input_ids, token_type_ids]
                     batch_data = [[], []]
 
         post_training_quantization = PostTrainingQuantization(
             executor=exe,
             batch_generator=_batch_generator_func,
-            model_dir=input_dir,
-            model_filename=configs["input_filename_prefix"] + ".pdmodel",
-            params_filename=configs["input_filename_prefix"] + ".pdiparams",
+            model_dir=model_dir,
+            model_filename=args.input_filename_prefix + ".pdmodel",
+            params_filename=args.input_filename_prefix + ".pdiparams",
             batch_size=batch_size,
             batch_nums=batch_nums,
             scope=None,
             algo=algo,
             hist_percent=0.9999,
-            round_type=configs["round_type"],
-            bias_correction=configs["bias_correction"],
+            round_type=args.round_type,
+            bias_correction=args.bias_correction,
             quantizable_op_type=['matmul', 'matmul_v2'],
             is_full_quantize=False,
             weight_bits=8,
             activation_bits=8,
             activation_quantize_type='range_abs_max',
-            weight_quantize_type='channel_wise_abs_max',
-            onnx_format=True,
+            weight_quantize_type=args.weight_quantize_type,
+            onnx_format=False,
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
-            save_model_path=os.path.join(output_dir, algo + str(batch_size)),
-            model_filename=configs["output_filename_prefix"] + ".pdmodel",
-            params_filename=configs["output_filename_prefix"] + ".pdiparams")
+            save_model_path=os.path.join(model_dir, algo + str(batch_size)),
+            model_filename=args.output_filename_prefix + ".pdmodel",
+            params_filename=args.output_filename_prefix + ".pdiparams")
 
     logger.info("Post training quantization starts.")
-    for algo in configs["algo_list"]:
-        for batch_size in configs["batch_size_list"]:
-            for batch_nums in configs["batch_num_list"]:
+    for algo in args.algo_list:
+        for batch_size in args.batch_size_list:
+            for batch_nums in args.batch_num_list:
                 _post_training_quantization(algo, batch_size, batch_nums)
 
     paddle.disable_static()
@@ -649,34 +588,23 @@ def auto_model_forward(self,
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
-            (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
-    if attention_mask[0] is None:
+            (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
+    elif isinstance(attention_mask, paddle.Tensor) and attention_mask.ndim == 2:
+        attention_mask = paddle.unsqueeze(attention_mask,
+                                          axis=[1, 2]).astype(wtype)
+        attention_mask = (1.0 - attention_mask) * -1e4
+    elif attention_mask[0] is None:
         attention_mask[0] = paddle.unsqueeze(
-            (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
-    # embedding_output = self.embeddings(input_ids=input_ids,
-    #                                    position_ids=position_ids,
-    #                                    token_type_ids=token_type_ids)
-    # encoder_outputs = self.encoder(embedding_output, attention_mask)
-    # sequence_output = encoder_outputs
-    # pooled_output = self.pooler(sequence_output)
-    # return sequence_output, pooled_output
-
-    # if attention_mask is None:
-    #     attention_mask = paddle.unsqueeze(
-    #         (input_ids == self.pad_token_id).astype(
-    #             self.pooler.dense.weight.dtype) * -1e4,
-    #         axis=[1, 2])
-    # # For 2D attention_mask from tokenizer
-    # elif attention_mask.ndim == 2:
-    #     attention_mask = paddle.unsqueeze(
-    #         attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
-    #     attention_mask = (1.0 - attention_mask) * -1e4
-    # attention_mask.stop_gradient = True
-
-    embedding_output = self.embeddings(input_ids=input_ids,
-                                       position_ids=position_ids,
-                                       token_type_ids=token_type_ids,
-                                       task_type_ids=task_type_ids)
+            (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
+    if "use_task_id" in self.config:
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids,
+                                           task_type_ids=task_type_ids)
+    else:
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
     encoder_outputs = self.encoder(embedding_output,
                                    src_mask=attention_mask,
                                    output_attentions=output_attentions,

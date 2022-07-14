@@ -14,14 +14,13 @@
 
 import os
 import sys
-import yaml
 from functools import partial
 
 import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer, AutoCompressConfig
+from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
 from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.utils.log import logger
 
@@ -32,28 +31,29 @@ from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
+    )
 
-    paddle.set_device(training_args.device)
+    paddle.set_device(compression_args.device)
 
     data_args.dataset = data_args.dataset.strip()
 
     if data_args.dataset in ALL_DATASETS:
         # If you custom you hyper-parameters in yaml config, it will overwrite all args.
         config = ALL_DATASETS[data_args.dataset]
-        logger.info("Over-writing training config by yaml config!")
-        for args in (model_args, data_args, training_args):
+        logger.info("Over-writing compression config by yaml config!")
+        for args in (model_args, data_args, compression_args):
             for arg in vars(args):
                 if arg in config.keys():
                     setattr(args, arg, config[arg])
 
-        training_args.per_device_train_batch_size = config["batch_size"]
-        training_args.per_device_eval_batch_size = config["batch_size"]
+        compression_args.per_device_train_batch_size = config["batch_size"]
+        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
+    compression_args.print_config(model_args, "Model")
+    compression_args.print_config(data_args, "Data")
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -85,32 +85,18 @@ def main():
 
     trainer = Trainer(
         model=model,
-        args=training_args,
+        args=compression_args,
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
 
-    output_dir = os.path.join(model_args.model_name_or_path, "compress")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    compression_args.print_config()
 
-    # Supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
-    # Example 1: Defaults to `dynabert+ptq`
-    configs = AutoCompressConfig()
-    # Calling `set_config` is not necessary
-    # configs.set_config(batch_size_list=[4, 8])
+    if not os.path.exists(compression_args.output_dir):
+        os.makedirs(compression_args.output_dir)
 
-    # Example 2: ptq
-    # configs = AutoCompressConfig("ptq")
-    # configs.set_config(algo_list=["emd", "hist"], batch_size_list=[4, 8])
-
-    # Example 3: dynabert
-    # configs = AutoCompressConfig("dynabert")
-    # Calling `set_config` is not necessary
-
-    configs.print_config()
-    trainer.compress(output_dir, configs=configs)
+    trainer.compress()
 
 
 if __name__ == "__main__":

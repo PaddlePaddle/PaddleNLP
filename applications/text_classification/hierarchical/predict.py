@@ -49,7 +49,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="The dataset directory including"
-                    "data.tsv and label.tsv files.")
+                    "data.txt and label.txt files.")
 args = parser.parse_args()
 
 
@@ -120,8 +120,8 @@ def predict(data, label_list):
 if __name__ == "__main__":
 
     if args.dataset_dir is not None:
-        data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        label_dir = os.path.join(args.dataset_dir, "label.tsv")
+        data_dir = os.path.join(args.dataset_dir, "data.txt")
+        label_dir = os.path.join(args.dataset_dir, "label.txt")
 
         data = []
         label_list = []

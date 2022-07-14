@@ -48,8 +48,8 @@ class DataArguments:
         default=None,
         metadata={
             "help":
-            "The dataset directory should include train.tsv,"
-            "dev.tsv and label.tsv files."
+            "The dataset directory should include train.txt,"
+            "dev.txt and label.txt files."
         })
 
     depth: int = field(default=2,
@@ -97,9 +97,9 @@ def main():
 
     # load and preprocess dataset
     if data_args.dataset_dir is not None:
-        train_dir = os.path.join(data_args.dataset_dir, "train.tsv")
-        dev_dir = os.path.join(data_args.dataset_dir, "dev.tsv")
-        label_dir = os.path.join(data_args.dataset_dir, "label.tsv")
+        train_dir = os.path.join(data_args.dataset_dir, "train.txt")
+        dev_dir = os.path.join(data_args.dataset_dir, "dev.txt")
+        label_dir = os.path.join(data_args.dataset_dir, "label.txt")
         train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
         label_list = {}
         with open(label_dir, 'r', encoding='utf-8') as f:

@@ -31,7 +31,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="Local dataset directory should"
-                    "include data.tsv and label.tsv")
+                    "include data.txt and label.txt")
 parser.add_argument("--max_seq_length",
                     default=128,
                     type=int,
@@ -102,8 +102,8 @@ def predict(data, label_list):
 
 if __name__ == "__main__":
     if args.dataset_dir is not None:
-        data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        label_dir = os.path.join(args.dataset_dir, "label.tsv")
+        data_dir = os.path.join(args.dataset_dir, "data.txt")
+        label_dir = os.path.join(args.dataset_dir, "label.txt")
         label_list = []
         data = []
         with open(label_dir, 'r', encoding='utf-8') as f:
