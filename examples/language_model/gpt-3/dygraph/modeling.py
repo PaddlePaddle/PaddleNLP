@@ -22,7 +22,6 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
@@ -552,6 +551,36 @@ class GPTPretrainedModel(PretrainedModel):
             "num_partitions": 1,
             "use_recompute": False,
         },
+        "gpt3-89B-en": { # 89B
+            "vocab_size": 51200,
+            "hidden_size": 12288,
+            "num_hidden_layers": 48,
+            "num_attention_heads": 96,
+            "intermediate_size": 49152,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
+        "gpt3-175B-en": { # 175B
+            "vocab_size": 51200,
+            "hidden_size": 12288,
+            "num_hidden_layers": 96,
+            "num_attention_heads": 96,
+            "intermediate_size": 49152,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 1024,
+            "type_vocab_size": 1,  # no use
+            "initializer_range": 0.02,
+            "eos_token_id": 50256,
+            "eol_token_id": 198,
+        },
         "gpt3-13B-en": { # 13B
             "vocab_size": 50304,
             "hidden_size": 5120,
@@ -858,7 +887,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     def __init__(self, gpt, max_predict_len):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
-        self.max_predict_len = max_predict_len
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype='int32')
         self.apply(self.init_weights)
 
     def model(self,

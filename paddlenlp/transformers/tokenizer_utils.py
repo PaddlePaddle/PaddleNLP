@@ -44,8 +44,8 @@ from .utils import InitTrackerMeta, fn_args_to_dict
 from .tokenizer_utils_base import (AddedToken, BatchEncoding, EncodedInput,
                                    EncodedInputPair, PreTokenizedInput,
                                    PreTokenizedInputPair,
-                                   PretrainedTokenizerBase, TextInput,
-                                   TextInputPair, TruncationStrategy,
+                                   PretrainedTokenizerBase, SpecialTokensMixin,
+                                   TextInput, TextInputPair, TruncationStrategy,
                                    PaddingStrategy, TensorType)
 
 __all__ = [
@@ -540,9 +540,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
     _decode_use_source_tokenizer = False
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _pre_init(self, original_init, *args, **kwargs):
         """
-        It would be hooked after `__init__` to add specials tokens (arguments of
+        It would be hooked before `__init__` to add specials tokens (arguments of
         `__init__` whose name ends with `_token`) as attributes of the tokenizer
         instance.
         """
@@ -1331,8 +1331,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         for i, ch in enumerate(text):
             if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
-                ch = unicodedata.normalize('NFD', ch)
-                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
+            ch = unicodedata.normalize('NFD', ch)
+            ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
 
             ch = ''.join([
                 c for c in ch

@@ -43,7 +43,7 @@ status = os.system(
 assert status == 0, "Please make sure clue dataset CHID has been preprocessed successfully."
 logger.info("Data process for CMRC2018 tasks. If cache exists, this will skip.")
 status = os.system(
-    f"python ../mrc/run_cmrc.py --do_train --max_steps 0 --model_name_or_path {model_name_or_path} --batch_size 1 --gradient_accumulation_steps 1"
+    f"python ../mrc/run_cmrc2018.py --do_train --max_steps 0 --model_name_or_path {model_name_or_path} --batch_size 1 --gradient_accumulation_steps 1"
 )
 assert status == 0, "Please make sure clue dataset CMRC2018 has been preprocessed successfully."
 logger.info("Data process for C3 tasks. If cache exists, this will skip.")

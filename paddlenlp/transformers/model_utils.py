@@ -22,6 +22,7 @@ import inspect
 
 import paddle
 import numpy as np
+import paddle.nn as nn
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url, download_check, COMMUNITY_MODEL_PREFIX
@@ -29,7 +30,7 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch
 
 __all__ = [
     'PretrainedModel',
@@ -119,7 +120,7 @@ class PretrainedModel(Layer, GenerationMixin):
     pretrained_resource_files_map = {}
     base_model_prefix = ""
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _post_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the pretrained model instance.
@@ -154,6 +155,12 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        raise NotImplementedError(
+            f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
+            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
+        )
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -203,21 +210,22 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
-
+        track_download = True
         # From built-in pretrained models
-        if pretrained_model_name_or_path in pretrained_models:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[pretrained_model_name_or_path]
             )
+
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
+            track_download = False
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path,
                                               file_name)
@@ -270,6 +278,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
@@ -333,6 +342,14 @@ class PretrainedModel(Layer, GenerationMixin):
                     derived_kwargs[k] = v
             model = cls(*derived_args, **derived_kwargs)
 
+        # save the model config file into cache dir
+        model_config_file_path = os.path.join(default_root,
+                                              cls.model_config_file)
+        # check if there is model config file in cache directory
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration and init_kwargs is not None and not os.path.exists(
+                model_config_file_path):
+            model.save_model_config(default_root)
+
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
         assert weight_path.endswith(
@@ -388,8 +405,6 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
-        # Logging model download statistics
-        download_check(pretrained_model_name_or_path, "from_pretrained")
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
@@ -397,7 +412,11 @@ class PretrainedModel(Layer, GenerationMixin):
             model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
+            if track_download:
+                download_check(pretrained_model_name_or_path, "from_pretrained")
             return model
+        if track_download:
+            download_check(pretrained_model_name_or_path, "from_pretrained")
         return model, state_to_load
 
     def get_model_config(self):
@@ -477,3 +496,74 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
+
+    def resize_token_embeddings(self, new_num_tokens=None):
+        """
+        Resizes input token embeddings matrix of the model according to new_num_tokens.
+
+        Args:
+            new_num_tokens (int): The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
+                vectors at the end. Reducing the size will remove vectors from the end. If not provided or None, just
+                returns a pointer to the input tokens embedding module of the model without doing anything.
+
+        Returns:
+            paddle.nn.Embedding: The input tokens Embeddings Module of the model.
+        """
+        old_embeddings = self.get_input_embeddings()
+        new_embeddings = self._get_resized_embeddings(old_embeddings,
+                                                      new_num_tokens)
+        model_embeds = self.set_input_embeddings(new_embeddings)
+        if new_num_tokens is None:
+            return model_embeds
+
+        # Update vocab_size
+        self.vocab_size = new_num_tokens
+
+        # TODO(westfish@126.com): add tie_weight.
+        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+
+        return model_embeds
+
+    def _get_resized_embeddings(self, old_embeddings, new_num_tokens=None):
+        """
+        Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
+        initialized vectors at the end. Reducing the size will remove vectors from the end
+        
+        Args:
+            old_embeddings:
+                Old embeddings to be resized.
+            new_num_tokens:
+                New number of tokens in the embedding matrix.
+                Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
+                vectors from the end. 
+
+        Returns:
+            paddle.nn.Embedding: The resized Embedding Module or the old Embedding Module if new_num_tokens is None.
+        """
+        if new_num_tokens is None:
+            return old_embeddings
+
+        old_num_tokens, old_embedding_dim = old_embeddings.weight.shape
+
+        if old_num_tokens == new_num_tokens:
+            return old_embeddings
+
+        if not isinstance(old_embeddings, nn.Embedding):
+            raise TypeError(
+                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
+                " should either use a different resize function or make sure that old_embeddings are an instance of"
+                f" {nn.Embedding}.")
+
+        # Build new embeddings
+        new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
+
+        # numbers of tokens to copy
+        n = min(old_num_tokens, new_num_tokens)
+        with paddle.no_grad():
+            new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
+
+        return new_embeddings
+
+    def __setattr__(self, name, value):
+        value = adapt_stale_fwd_patch(self, name, value)
+        return super(PretrainedModel, self).__setattr__(name, value)

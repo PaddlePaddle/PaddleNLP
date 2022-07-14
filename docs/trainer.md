@@ -52,8 +52,8 @@ parser = PdArgumentParser(TrainingArguments, DataArguments)
     - 这里的，`labels`如果模型没有使用到，我们还需要额外定义`criterion`，计算最后的loss损失。
 ```python
 train_dataset = load_dataset("chnsenticorp", splits=["train"])
-model = AutoModelForSequenceClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(train_dataset.label_list))
-tokenizer = AutoTokenizer.from_pretrained("ernie-1.0-base-zh")
+model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(train_dataset.label_list))
+tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
 def convert_example(example, tokenizer):
     encoded_inputs = tokenizer(text=example["text"], max_seq_len=128, pad_to_max_seq_len=True)
@@ -285,7 +285,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --lr_scheduler_type
                         要使用的学习率调度策略。 (`str`, 可选, 默认为 `"linear"`)
 
-                        The scheduler type to use. (default: linear)
+                        The scheduler type to use. (default: linear) 支持，linear, cosine, constant, constant_with_warmup.
 
   --warmup_ratio
                         用于从 0 到 `learning_rate` 的线性warmup的总训练步骤的比例。（`float`，可选，默认为 0.0）

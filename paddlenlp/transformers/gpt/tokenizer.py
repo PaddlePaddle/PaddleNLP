@@ -323,6 +323,8 @@ class GPTTokenizer(PretrainedTokenizer):
     gpt_merges_link = "http://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-en-merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
+            "gpt3-175B-en": gpt_vocab_link,
+            "gpt3-89B-en": gpt_vocab_link,
             "gpt3-13B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
             "gpt2-xl-en": gpt_vocab_link,
@@ -332,6 +334,8 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt2-small-en": gpt_vocab_link,
         },
         "merges_file": {
+            "gpt3-175B-en": gpt_merges_link,
+            "gpt3-89B-en": gpt_merges_link,
             "gpt3-13B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
             "gpt2-xl-en": gpt_merges_link,
@@ -342,6 +346,8 @@ class GPTTokenizer(PretrainedTokenizer):
         }
     }
     pretrained_init_configuration = {
+        "gpt3-175B-en": {},
+        "gpt3-89B-en": {},
         "gpt3-13B-en": {},
         "gpt3-1.3B-en": {},
         "gpt2-xl-en": {},
@@ -383,7 +389,9 @@ class GPTTokenizer(PretrainedTokenizer):
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 
-        self.encoder = json.load(open(vocab_file))
+        with open(vocab_file, 'r', encoding='utf-8') as f:
+            self.encoder = json.load(f)
+
         self.decoder = {v: k for k, v in self.encoder.items()}
 
         self.num_tokens = len(self.encoder)
@@ -391,7 +399,10 @@ class GPTTokenizer(PretrainedTokenizer):
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-        bpe_data = open(merges_file, encoding='utf-8').read().split('\n')[1:-1]
+
+        with open(merges_file, encoding='utf-8') as f:
+            bpe_data = f.read().split('\n')[1:-1]
+
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
@@ -513,5 +524,17 @@ class GPTTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name)
+
             save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(getattr(self, "_%s" % name), save_path)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)
+
+    def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (string) in a single string.
+        """
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
+        return text

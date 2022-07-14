@@ -22,7 +22,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
@@ -64,11 +64,6 @@ def predict(model, data_loader):
         for batch_data in data_loader:
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
 
-            query_input_ids = paddle.to_tensor(query_input_ids)
-            query_token_type_ids = paddle.to_tensor(query_token_type_ids)
-            title_input_ids = paddle.to_tensor(title_input_ids)
-            title_token_type_ids = paddle.to_tensor(title_token_type_ids)
-
             batch_cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
@@ -85,7 +80,7 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -109,8 +104,7 @@ if __name__ == "__main__":
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
     model = SimCSE(pretrained_model,
                    margin=args.margin,

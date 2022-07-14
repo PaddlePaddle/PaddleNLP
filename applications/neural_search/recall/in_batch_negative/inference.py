@@ -8,12 +8,12 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.utils.log import logger
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
+from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from ann_util import build_index
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
@@ -38,8 +38,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)
@@ -68,10 +67,9 @@ if __name__ == "__main__":
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
 
-            text_embeddings = model(input_ids, token_type_ids)
+            text_embeddings = model.get_pooled_embedding(
+                input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
 
     text_embedding = all_embeddings[0]

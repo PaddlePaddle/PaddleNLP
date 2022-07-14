@@ -66,6 +66,7 @@ from .trainer_utils import (
     OptimizerNames,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
+    get_scheduler,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -178,7 +179,7 @@ class Trainer:
                           paddle.optimizer.lr.LRScheduler] = (None, None),
     ):
         if paddle.distributed.get_world_size() > 1:
-            if not paddle.fluid.dygraph.parallel_helper._is_parallel_ctx_initialized(
+            if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
             ):
                 paddle.distributed.init_parallel_env()
 
@@ -873,10 +874,9 @@ class Trainer:
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
 
-        core = paddle.fluid.core
+        core = paddle.framework.core
         if core.is_compiled_with_cuda():
             for i in range(core.get_cuda_device_count()):
-                core.default_cuda_generator(i)._is_init_py = True
                 core.default_cuda_generator(i).manual_seed(
                     checkpoint_rng_state["cuda"][i])
 
@@ -919,14 +919,8 @@ class Trainer:
         Args:
             num_training_steps (int): The number of training steps to do.
         """
-
-        def get_scheduler(lr_scheduler_type, learning_rate, num_warmup_steps,
-                          num_training_steps):
-            # TODO  @ZHUI support others
-            return LinearDecayWithWarmup(learning_rate, num_training_steps,
-                                         num_warmup_steps)
-
-        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else self.args.warmup_ratio
+        warmup = self.args.warmup_steps if self.args.warmup_steps > 0 else int(
+            self.args.warmup_ratio * num_training_steps)
 
         if self.lr_scheduler is None:
             self.lr_scheduler = get_scheduler(
@@ -1130,8 +1124,8 @@ class Trainer:
             np.random.get_state(),
             "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
             "cpu":
-            paddle.fluid.core.default_cpu_generator().get_state().current_seed(
-            ),
+            paddle.framework.core.default_cpu_generator().get_state().
+            current_seed(),
         }
 
         # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may

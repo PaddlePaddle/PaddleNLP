@@ -130,7 +130,9 @@ def do_train():
                 model_to_save = model._layers if isinstance(
                     model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(save_dir)
+                logger.disable()
                 tokenizer.save_pretrained(save_dir)
+                logger.enable()
 
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
                 logger.info(
@@ -145,7 +147,9 @@ def do_train():
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(save_dir)
+                    logger.disable()
                     tokenizer.save_pretrained(save_dir)
+                    logger.enable()
                 tic_train = time.time()
 
 
@@ -165,7 +169,7 @@ if __name__ == "__main__":
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 
     args = parser.parse_args()

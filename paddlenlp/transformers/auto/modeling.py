@@ -72,11 +72,13 @@ MAPPING_NAMES = OrderedDict([
     ("UnifiedTransformer", "unified_transformer"),
     ("UNIMO", "unimo"),
     ("XLNet", "xlnet"),
+    ("XLM", "xlm"),
     ("GPT", "gpt"),
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
+    ("CodeGen", "codegen"),
 ])
 
 MAPPING_TASKS = OrderedDict([

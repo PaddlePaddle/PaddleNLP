@@ -803,8 +803,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
 
 class MBartForConditionalGeneration(MBartPretrainedModel):
     r"""
-    MBart Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+    MBart Model with a `language modeling` head on top.
 
     Args:
         mbart (:class:`MBartModel`):

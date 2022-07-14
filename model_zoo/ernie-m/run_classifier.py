@@ -29,7 +29,8 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddle.metric import Accuracy
-from paddlenlp.ops.optimizer import AdamWDL
+from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddle.optimizer import AdamW
 
 all_languages = [
     "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
@@ -294,16 +295,18 @@ def do_train(args):
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
-    optimizer = AdamWDL(learning_rate=lr_scheduler,
-                        beta1=0.9,
-                        beta2=0.999,
-                        epsilon=args.adam_epsilon,
-                        parameters=model.parameters(),
-                        weight_decay=args.weight_decay,
-                        n_layers=n_layers,
-                        layerwise_decay=args.layerwise_decay,
-                        apply_decay_param_fun=lambda x: x in decay_params,
-                        name_dict=name_dict)
+
+    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay,
+                                name_dict, n_layers)
+
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      beta1=0.9,
+                      beta2=0.999,
+                      epsilon=args.adam_epsilon,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      lr_ratio=simple_lr_setting)
 
     loss_fct = nn.CrossEntropyLoss()
     if args.use_amp:

@@ -14,7 +14,7 @@
 import os
 
 import paddle
-import paddle.fluid.core as core
+from paddle.common_ops_import import core
 import paddle.nn as nn
 import paddle.nn.functional as F
 

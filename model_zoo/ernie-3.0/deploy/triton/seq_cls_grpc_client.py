@@ -1,12 +1,7 @@
-import argparse
-import struct
 import logging
 import numpy as np
 import time
-import random
 from typing import Optional
-
-from paddlenlp.datasets import load_dataset
 
 from tritonclient import utils as client_utils
 from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput, service_pb2_grpc, service_pb2
