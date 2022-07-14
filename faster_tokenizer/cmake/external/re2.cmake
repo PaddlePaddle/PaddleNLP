@@ -20,7 +20,7 @@ SET(RE2_REPOSITORY    ${GIT_URL}/google/re2.git)
 SET(RE2_TAG           2022-04-01)
 
 IF(WIN32)
-  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/re2_static.lib")
+  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib/re2.lib")
   add_definitions(-DRE2_STATIC)
 ELSE(WIN32)
   SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/libre2.a")
@@ -38,8 +38,6 @@ ExternalProject_Add(
   PREFIX                ${RE2_PREFIX_DIR}
   UPDATE_COMMAND        ""
   CMAKE_ARGS            -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                        -DBUILD_SHARED=ON
-                        -DBUILD_STATIC=ON
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_INSTALL_PREFIX:PATH=${RE2_INSTALL_DIR}
                         -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

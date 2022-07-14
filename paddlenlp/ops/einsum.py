@@ -110,6 +110,9 @@ def einsum(equation, *operands):
             #     [0.30368265, 0.25778348, 0.21630400],
             #     [0.39587265, 0.58031243, 0.51824755]]])
     """
+    # paddle.einsum can be used in paddle 2.3.0+
+    if hasattr(paddle, "einsum"):
+        return paddle.einsum(equation, *operands)
 
     def _mul_sum(left, right, sum_dims):
         assert left.rank() == right.rank(), "number of rank should be equal."

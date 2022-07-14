@@ -34,7 +34,7 @@ struct ErnieFasterTokenizer : public core::Tokenizer {
                        bool strip_accents = true,
                        bool lowercase = true,
                        const std::string& wordpieces_prefix = "##",
-                       uint max_sequence_len = 0);
+                       uint32_t max_sequence_len = 0);
 
   ErnieFasterTokenizer(const core::Vocab& vocab,
                        const std::string& unk_token = "[UNK]",
@@ -47,7 +47,7 @@ struct ErnieFasterTokenizer : public core::Tokenizer {
                        bool strip_accents = true,
                        bool lowercase = true,
                        const std::string& wordpieces_prefix = "##",
-                       uint max_sequence_len = 0);
+                       uint32_t max_sequence_len = 0);
 
 private:
   void Init(const core::Vocab& vocab,
@@ -61,7 +61,7 @@ private:
             bool strip_accents = true,
             bool lowercase = true,
             const std::string& wordpieces_prefix = "##",
-            uint max_sequence_len = 0);
+            uint32_t max_sequence_len = 0);
 };
 
 }  // namespace faster_tokenizer_impl
