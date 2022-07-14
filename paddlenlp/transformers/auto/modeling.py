@@ -73,13 +73,13 @@ MAPPING_NAMES = OrderedDict([
     ("UNIMO", "unimo"),
     ("XLNet", "xlnet"),
     ("XLM", "xlm"),
+    ("GPTJ", "gptj"),
     ("GPT", "gpt"),
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
     ("CodeGen", "codegen"),
-    ("GPTJ", "gptj"),
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -256,7 +256,6 @@ class _BaseAutoModelClass:
             community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
                                                  pretrained_model_name_or_path,
                                                  cls.model_config_file)
-
             default_root = os.path.join(MODEL_HOME,
                                         pretrained_model_name_or_path)
 
