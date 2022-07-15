@@ -32,7 +32,7 @@ from paddlenlp.transformers import (AlbertTokenizer, AutoTokenizer,
                                     BertTokenizer, PretrainedTokenizer)
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
-from ..testing_utils import get_tests_dir, slow
+from tests.testing_utils import get_tests_dir, slow
 
 sys.path.append(str(Path(__file__).parent.parent / "utils"))
 
