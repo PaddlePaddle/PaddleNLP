@@ -206,6 +206,6 @@ python3 inference.py
 ```
 ## FAQ
 
-### 句子抽取向量后，利用milvus进行检索到了相同的句子，得到的距离不是0
+#### 抽取文本语义向量后，利用 Milvus 进行 ANN 检索查询到了完全相同的文本，但是计算出的距离为什么不是 0？
 
 使用的是近似索引，详情请参考Milvus官方文档，[索引创建机制](https://milvus.io/cn/docs/v2.0.x/index.md)
