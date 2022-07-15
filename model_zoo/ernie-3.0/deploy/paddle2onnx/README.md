@@ -12,6 +12,7 @@
     - [3.3 ONNXRuntime 推理样例](#33-ONNXRuntime推理样例)
 ## 1. 环境准备
 ERNIE 3.0 模型转换与 ONNXRuntime 预测部署依赖 Paddle2ONNX 和 ONNXRuntime，Paddle2ONNX 支持将 Paddle 模型转化为 ONNX 模型格式，算子目前稳定支持导出 ONNX Opset 7~16，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)
+
 如果基于 CPU 部署，请使用如下命令安装所需依赖:
 ```
 python -m pip install onnxruntime
