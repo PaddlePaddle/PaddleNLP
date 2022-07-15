@@ -13,3 +13,4 @@
 # limitations under the License.
 
 from .word_substitute import *
+from .word_delete import *
