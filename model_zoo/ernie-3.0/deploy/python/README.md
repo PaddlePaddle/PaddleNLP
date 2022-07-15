@@ -26,13 +26,21 @@ pip install -r requirements_gpu.txt
 ```
 如需使用半精度（FP16）或量化（INT8）部署，请确保GPU设备的 CUDA 计算能力 (CUDA Compute Capability) 大于 7.0，典型的设备包括 V100、T4、A10、A100、GTX 20 系列和 30 系列显卡等。同时 INT8 推理需要安装 TensorRT 以及包含 TensorRT 预测库的 PaddlePaddle。
 更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
+
 1. TensorRT 安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux 端简要步骤如下：
+
     (1)下载 TensorRT8.2 版本，文件名 TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)
+
     (2)解压得到 TensorRT-XXX 文件夹
+
     (3)通过 export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH 将 lib 路径加入到 LD_LIBRARY_PATH 中
+
     (4)使用 pip install 安装 TensorRT-XXX/python 中对应的 TensorRT 安装包
+
 2. PaddlePaddle 预测库的安装请参考 [PaddlePaddle 预测库安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux 端简要步骤如下：
+
     (1)根据 CUDA 环境和 Python 版本下载对应的 PaddlePaddle 预测库，注意须下载支持 TensorRT 的预测包，如 linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[PaddlePaddle 预测库下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)
+
     (2)使用 pip install 安装下载好的 PaddlePaddle 预测库
 
 
@@ -121,6 +129,7 @@ python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_mo
 python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt
 ```
 FP16 和 INT8 推理的运行结果和FP32的运行结果一致。
+
 infer_gpu.py 脚本中的参数说明：
 | 参数 |参数说明 |
 |----------|--------------|
