@@ -24,7 +24,8 @@ from paddlenlp.ops.ext_utils import load
 from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
 
 if paddle.__version__ == "0.0.0":
-    from paddle.fluid.core import VarBase, CustomOpKernelContext
+    from paddle.framework import (core, in_dygraph_mode, _non_static_mode,
+                                  _dygraph_tracer, _in_legacy_dygraph)
 
 
 def infer_transformer_encoder(
