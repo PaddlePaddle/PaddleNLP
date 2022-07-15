@@ -14,3 +14,5 @@
 
 from .word_substitute import *
 from .word_delete import *
+from .word_swap import *
+from .word_insert import *
