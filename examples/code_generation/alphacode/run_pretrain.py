@@ -191,16 +191,6 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
 
-    if args.model_name_or_path not in pretrained_models_list:
-        logger.info("Try to load checkpoint from %s " % args.model_name_or_path)
-        opt_path = os.path.join(args.model_name_or_path, "model_state.pdopt")
-        if os.path.exists(opt_path):
-            opt_dict = paddle.load(opt_path)
-            optimizer.set_state_dict(opt_dict)
-        else:
-            logger.warning("No optimizer checkpoint file found in %s." %
-                           opt_path)
-
     global_step = 0
     tic_train = time.time()
     while True:
@@ -216,6 +206,18 @@ def do_train(args):
 
             lr_scheduler, optimizer = get_optimizer(args, model,
                                                     train_data_loader)
+
+            if args.model_name_or_path not in pretrained_models_list:
+                logger.info("Try to load checkpoint from %s " %
+                            args.model_name_or_path)
+                opt_path = os.path.join(args.model_name_or_path,
+                                        "model_state.pdopt")
+                if os.path.exists(opt_path):
+                    opt_dict = paddle.load(opt_path)
+                    optimizer.set_state_dict(opt_dict)
+                else:
+                    logger.warning("No optimizer checkpoint file found in %s." %
+                                   opt_path)
 
             # time count
             train_reader_cost = 0.0
@@ -306,6 +308,7 @@ def do_train(args):
                                 model, paddle.DataParallel) else model
                             logger.info("Save model to %s" % output_dir)
                             model_to_save.save_pretrained(output_dir)
+                            tokenizer.save_pretrained(output_dir)
                             # tokenizer.save_pretrained(output_dir)
                             paddle.save(
                                 optimizer.state_dict(),

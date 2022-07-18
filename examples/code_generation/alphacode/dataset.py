@@ -176,6 +176,7 @@ class Seq2SeqDataset(paddle.io.Dataset):
         # maybe choose another mask token
         self.mask_id = tokenizer.mask_token_id
         self.pad_id = tokenizer.pad_token_id
+        self.decoder_start_token_id = tokenizer.eos_token_id
         self.cumsum_lens = [0] + np.cumsum(sample_lens).tolist()
 
     def _construct_sample(self, tokens, idx):
@@ -185,13 +186,13 @@ class Seq2SeqDataset(paddle.io.Dataset):
         pivot = np.random.choice(range(len(origin_tokens)))
         encoder_tokens = origin_tokens[:pivot][:self.encoder_max_seq_len]
         decoder_tokens = origin_tokens[pivot:][:self.decoder_max_seq_len]
-        while len(encoder_tokens) < least_len:
+        while len(encoder_tokens) < least_len or len(decoder_tokens) < 1:
             pivot = np.random.choice(range(len(origin_tokens)))
             encoder_tokens = origin_tokens[:pivot][:self.encoder_max_seq_len]
             decoder_tokens = origin_tokens[pivot:][:self.decoder_max_seq_len]
 
-        labels = decoder_tokens[1:]
-        tokens = decoder_tokens[:-1]
+        labels = decoder_tokens
+        tokens = [self.decoder_start_token_id] + decoder_tokens[:-1]
 
         pad_length = self.decoder_max_seq_len - len(tokens)
         pad_tokens = [self.pad_id] * pad_length
