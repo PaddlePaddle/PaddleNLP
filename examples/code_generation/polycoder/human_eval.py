@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 import random
 import argparse
 from functools import partial
@@ -28,69 +29,6 @@ from paddlenlp.datasets import MapDataset
 from paddle.io import DataLoader, BatchSampler
 
 MODEL_CLASSES = {"gpt2": (GPTLMHeadModel, GPTTokenizer)}
-
-
-def tokenize_input(tokenizer, texts):
-    input_ids = []
-    max_len = 0
-    for text in texts:
-        ids = tokenizer(text)['input_ids']
-        max_len = max(max_len, len(ids))
-        input_ids.append(ids)
-    for i in range(len(input_ids)):
-        if len(input_ids[i]) < max_len:
-            input_ids[i] += [tokenizer.pad_token_id
-                             ] * (max_len - len(input_ids[i]))
-    input_ids = paddle.to_tensor(input_ids, dtype="int32")
-    return input_ids
-
-
-def convert_example(example, tokenizer):
-    """Convert all examples into necessary features."""
-    tokenized = tokenizer(example, return_position_ids=True)
-    input_ids = tokenized['input_ids']
-    tokenized['attention_mask'] = np.triu(
-        np.ones((len(input_ids), len(input_ids)), dtype='float32') * -1e4, 1)
-    return tokenized
-
-
-def batchify_fn(examples, pad_val):
-
-    def pad_mask(batch_attention_mask):
-        batch_size = len(batch_attention_mask)
-        max_len = max(map(len, batch_attention_mask))
-        attention_mask = np.ones(
-            (batch_size, max_len, max_len), dtype='float32') * -1e9
-        for i, mask_data in enumerate(attention_mask):
-            seq_len = len(batch_attention_mask[i])
-            mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i],
-                                                       dtype='float32')
-        # In order to ensure the correct broadcasting mechanism, expand one
-        # dimension to the second dimension (n_head of Transformer).
-        attention_mask = np.expand_dims(attention_mask, axis=1)
-        return attention_mask
-
-    pad_func = Pad(pad_val=pad_val, pad_right=False, dtype='int64')
-    input_ids = pad_func([example['input_ids'] for example in examples])
-    position_ids = pad_func([example['position_ids'] for example in examples])
-    attention_mask = pad_mask(
-        [example['attention_mask'] for example in examples])
-
-    return input_ids, position_ids, attention_mask
-
-
-def create_data_loader(dataset, tokenizer, args):
-    trans_func = partial(convert_example, tokenizer=tokenizer)
-    dataset = dataset.map(trans_func, lazy=True)
-    batch_sampler = BatchSampler(dataset,
-                                 batch_size=args.batch_size,
-                                 shuffle=False)
-    collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id)
-    data_loader = DataLoader(dataset,
-                             batch_sampler=batch_sampler,
-                             collate_fn=collate_fn,
-                             return_list=True)
-    return data_loader
 
 
 def parse_args():
@@ -208,7 +146,7 @@ def adjust_length_to_model(length, max_sequence_length):
     return length
 
 
-def postprocess_response(seq, eos_idx):
+def postprocess(seq, eos_idx):
     """Post-process the decoded sequence."""
     eos_pos = len(seq) - 1
     for i, idx in enumerate(seq):
@@ -217,6 +155,38 @@ def postprocess_response(seq, eos_idx):
             break
     seq = [idx for idx in seq[:eos_pos + 1] if idx != eos_idx]
     return seq
+
+
+def first_block(string):
+    """Split off first block of code by scanning for class, def etc. on newlines."""
+    return re.split("\nclass|\ndef|\n#|\n@|\nprint|\nif", string)[0].rstrip()
+
+
+def convert_example(example, tokenizer):
+    """Convert all examples into necessary features."""
+    tokenized = tokenizer(example, return_position_ids=True)
+    return tokenized
+
+
+def batchify_fn(examples, pad_val):
+    pad_func = Pad(pad_val=pad_val, pad_right=False, dtype='int64')
+    input_ids = pad_func([example['input_ids'] for example in examples])
+    position_ids = pad_func([example['position_ids'] for example in examples])
+    return input_ids, position_ids
+
+
+def create_data_loader(dataset, tokenizer, args):
+    trans_func = partial(convert_example, tokenizer=tokenizer)
+    dataset = dataset.map(trans_func, lazy=True)
+    batch_sampler = BatchSampler(dataset,
+                                 batch_size=args.batch_size,
+                                 shuffle=False)
+    collate_fn = partial(batchify_fn, pad_val=tokenizer.pad_token_id)
+    data_loader = DataLoader(dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=collate_fn,
+                             return_list=True)
+    return data_loader
 
 
 def main(args):
@@ -253,7 +223,10 @@ def main(args):
     data_loader = create_data_loader(ds, tokenizer, args)
     generated_sequences = []
     for batch in data_loader:
-        input_ids, position_ids, attention_mask = batch
+        input_ids, position_ids = batch
+        attention_mask = paddle.cast(
+            input_ids == tokenizer.pad_token_id,
+            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         ids, scores = model.generate(input_ids=input_ids,
                                      position_ids=position_ids,
                                      attention_mask=attention_mask,
@@ -270,11 +243,10 @@ def main(args):
                                      eos_token_id=tokenizer.eos_token_id)
         for i, generated_ids in enumerate(ids):
             generated_ids = generated_ids.numpy().tolist()
-            generated_ids = postprocess_response(generated_ids,
-                                                 model.pad_token_id)
+            generated_ids = postprocess(generated_ids, model.pad_token_id)
             # Decode text
             text = tokenizer.convert_ids_to_string(generated_ids)
-            generated_sequences.append(text)
+            generated_sequences.append(first_block(text))
 
     generations, references = [], []
     for task in tqdm(range(n_tasks)):
