@@ -93,6 +93,7 @@ function _train(){
                --logging_freq 1 \
                --eval_freq 1000 \
                --device "gpu" \
+               --fuse_transformer True \
                ${use_fp16_cmd}"
 
     # 以下为通用执行命令，无特殊可不用修改

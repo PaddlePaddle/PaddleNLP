@@ -40,14 +40,15 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
+| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 
 
 ## QuickStart
 
 **环境依赖**
   - python >= 3.6
-  - paddlepaddle >= 2.2.0
-  - paddlenlp >= 2.2.5
+  - paddlepaddle >= 2.3.0
+  - paddlenlp >= 2.3.4
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -1192,6 +1193,35 @@ from paddlenlp import Taskflow
 * `max_turn`：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。
   </div></details>
 
+### 代码生成
+<details><summary>&emsp; 通过CodeGen模型来生成代码 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+>>> codegen = Taskflow("code_generation")
+# 单条输入
+>>> codegen("def hello_world():")
+['\n    print("Hello World")']
+# 多条输入
+>>> codegen(["Get the length of array", "def hello_world():"])
+['\n    n = len(a)\n\n    #', '\n    print("Hello World!")']
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `repetition_penalty`：解码重复惩罚值，默认为1.1。
+* `output_scores`：是否要输出解码得分，请默认为False。
+</div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
 

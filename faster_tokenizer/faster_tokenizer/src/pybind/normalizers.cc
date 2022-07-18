@@ -12,9 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
-
 #include "normalizers/normalizers.h"
+#include <Python.h>
 #include "pybind/normalizers.h"
 
 namespace py = pybind11;

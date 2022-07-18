@@ -70,11 +70,11 @@ void Tokenizer::SetPadMethod(const PadMethod& pad_method) {
 }
 
 void Tokenizer::EnablePadMethod(Direction direction,
-                                uint pad_id,
-                                uint pad_type_id,
+                                uint32_t pad_id,
+                                uint32_t pad_type_id,
                                 const std::string& pad_token,
-                                uint* length,
-                                uint* pad_to_multiple_of) {
+                                uint32_t* length,
+                                uint32_t* pad_to_multiple_of) {
   use_padding_ = true;
   pad_method_.direction_ = direction;
   pad_method_.pad_id_ = pad_id;
@@ -135,17 +135,17 @@ size_t Tokenizer::AddSpecialTokens(const std::vector<AddedToken>& tokens) {
   return added_vocabulary_.AddSpecialTokens(tokens, *model_, normalizer_.get());
 }
 
-bool Tokenizer::TokenToId(const std::string& token, uint* id) const {
+bool Tokenizer::TokenToId(const std::string& token, uint32_t* id) const {
   return added_vocabulary_.TokenToId(token, *model_, id);
 }
 
-bool Tokenizer::IdToToken(uint id, std::string* token) const {
+bool Tokenizer::IdToToken(uint32_t id, std::string* token) const {
   return added_vocabulary_.IdToToken(id, *model_, token);
 }
 
 bool Tokenizer::DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
-                           uint type_id,
-                           const std::vector<uint>& word_idx,
+                           uint32_t type_id,
+                           const std::vector<uint32_t>& word_idx,
                            OffsetType offset_type,
                            Encoding* encoding) const {
   pretokenized->Tokenize([&](normalizers::NormalizedString* normalized) {
@@ -165,7 +165,7 @@ bool Tokenizer::DoPreTokenize(
 
 struct InputStringVisitor : public boost::static_visitor<> {
   InputStringVisitor(const Tokenizer* tokenizer,
-                     uint type_id,
+                     uint32_t type_id,
                      OffsetType offset_type,
                      Encoding* encodings)
       : tokenizer_(tokenizer),
@@ -181,13 +181,13 @@ struct InputStringVisitor : public boost::static_visitor<> {
     tokenizer_->EncodeSingleText(raw_text, type_id_, offset_type_, encodings_);
   }
   const Tokenizer* tokenizer_;
-  uint type_id_;
+  uint32_t type_id_;
   OffsetType offset_type_;
   Encoding* encodings_;
 };
 
 void Tokenizer::EncodeSingleString(const InputString& input_string,
-                                   uint type_id,
+                                   uint32_t type_id,
                                    OffsetType offset_type,
                                    Encoding* encodings) const {
   boost::apply_visitor(
@@ -317,11 +317,11 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
 
 void Tokenizer::EncodeSingleText(
     const std::vector<std::string>& pretokenized_texts,
-    uint type_id,
+    uint32_t type_id,
     OffsetType offset_type,
     Encoding* encoding) const {
   std::vector<Encoding> encodings;
-  for (uint i = 0; i < pretokenized_texts.size(); ++i) {
+  for (uint32_t i = 0; i < pretokenized_texts.size(); ++i) {
     encodings.emplace_back(
         EncodeTextToEncoding({i}, type_id, offset_type, pretokenized_texts[i]));
   }
@@ -329,14 +329,14 @@ void Tokenizer::EncodeSingleText(
 }
 
 void Tokenizer::EncodeSingleText(const std::string& raw_text,
-                                 uint type_id,
+                                 uint32_t type_id,
                                  OffsetType offset_type,
                                  Encoding* encodings) const {
   *encodings = EncodeTextToEncoding({}, type_id, offset_type, raw_text);
 }
 
-Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint>& word_idx,
-                                         uint type_id,
+Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
+                                         uint32_t type_id,
                                          OffsetType offset_type,
                                          const std::string& text) const {
   pretokenizers::PreTokenizedString pretokenized;
@@ -382,7 +382,7 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
   return tokenizer;
 }
 
-void Tokenizer::Decode(const std::vector<uint>& token_ids,
+void Tokenizer::Decode(const std::vector<uint32_t>& token_ids,
                        std::string* result,
                        bool skip_special_tokens) const {
   // Get tokens
@@ -407,7 +407,7 @@ void Tokenizer::Decode(const std::vector<uint>& token_ids,
 }
 
 void Tokenizer::DecodeBatch(
-    const std::vector<std::vector<uint>>& batch_token_ids,
+    const std::vector<std::vector<uint32_t>>& batch_token_ids,
     std::vector<std::string>* results,
     bool skip_special_tokens) const {
   results->resize(batch_token_ids.size());
