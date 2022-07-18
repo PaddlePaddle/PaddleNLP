@@ -1172,8 +1172,13 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
 
 class FasterBART(BartPretrainedModel):
+    enable_faster_encoder_func = enable_faster_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 enable_faster_encoder=True):
         super(FasterBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1186,10 +1191,14 @@ class FasterBART(BartPretrainedModel):
         self.encoder = model.bart.get_encoder()
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config['pad_token_id']
+        self.enable_faster_encoder = enable_faster_encoder
 
         self.decoding = InferBartDecoding(model=self._model,
                                           decoding_lib=decoding_lib,
                                           use_fp16_decoding=use_fp16_decoding)
+        if self.enable_faster_encoder:
+            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+            self.encoder = FasterBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
         return self.encoder
@@ -1218,11 +1227,9 @@ class FasterBART(BartPretrainedModel):
                 **model_kwargs):
 
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-            self.encoder = disable_faster_encoder(self.encoder)
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,

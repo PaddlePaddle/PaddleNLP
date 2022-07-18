@@ -1,4 +1,4 @@
-# C#opyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,6 +120,11 @@ def parse_args():
         action='store_true',
         help=
         "Whether to enable quantization for acceleration. Valid for both onnx and dnnl",
+    )
+    parser.add_argument(
+        "--enable_bf16",
+        action='store_true',
+        help="Whether to use the bfloat16 datatype",
     )
     parser.add_argument("--use_onnxruntime",
                         type=distutils.util.strtobool,
@@ -246,6 +251,8 @@ class Predictor(object):
             config.disable_gpu()
             config.switch_ir_optim(True)
             config.enable_mkldnn()
+            if args.enable_bf16:
+                config.enable_mkldnn_bfloat16()
             if args.enable_quantize:
                 config.enable_mkldnn_int8()
             if args.debug:

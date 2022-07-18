@@ -14,21 +14,22 @@ class SyncGRPCTritonRunner:
     DEFAULT_MAX_RESP_WAIT_S = 120
 
     def __init__(
-            self,
-            server_url: str,
-            model_name: str,
-            model_version: str,
-            *,
-            verbose=False,
-            resp_wait_s: Optional[float]=None, ):
+        self,
+        server_url: str,
+        model_name: str,
+        model_version: str,
+        *,
+        verbose=False,
+        resp_wait_s: Optional[float] = None,
+    ):
         self._server_url = server_url
         self._model_name = model_name
         self._model_version = model_version
         self._verbose = verbose
         self._response_wait_t = self.DEFAULT_MAX_RESP_WAIT_S if resp_wait_s is None else resp_wait_s
 
-        self._client = InferenceServerClient(
-            self._server_url, verbose=self._verbose)
+        self._client = InferenceServerClient(self._server_url,
+                                             verbose=self._verbose)
         error = self._verify_triton_state(self._client)
         if error:
             raise RuntimeError(
@@ -40,8 +41,8 @@ class SyncGRPCTritonRunner:
 
         model_config = self._client.get_model_config(self._model_name,
                                                      self._model_version)
-        model_metadata = self._client.get_model_metadata(self._model_name,
-                                                         self._model_version)
+        model_metadata = self._client.get_model_metadata(
+            self._model_name, self._model_version)
         LOGGER.info(f"Model config {model_config}")
         LOGGER.info(f"Model metadata {model_metadata}")
 
@@ -62,8 +63,8 @@ class SyncGRPCTritonRunner:
         """
         infer_inputs = []
         for idx, data in enumerate(inputs):
-            data = np.array(
-                [[x.encode('utf-8')] for x in data], dtype=np.object_)
+            data = np.array([[x.encode('utf-8')] for x in data],
+                            dtype=np.object_)
             infer_input = InferInput(self._input_names[idx], [len(data), 1],
                                      "BYTES")
             infer_input.set_data_from_numpy(data)
@@ -74,7 +75,8 @@ class SyncGRPCTritonRunner:
             model_version=self._model_version,
             inputs=infer_inputs,
             outputs=self._outputs_req,
-            client_timeout=self._response_wait_t, )
+            client_timeout=self._response_wait_t,
+        )
         results = {name: results.as_numpy(name) for name in self._output_names}
         return results
 
@@ -94,10 +96,12 @@ if __name__ == "__main__":
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    dataset = [[
-        "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",
-        "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
-    ], ]
+    dataset = [
+        [
+            "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",
+            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
+        ],
+    ]
 
     for batch_input in dataset:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)

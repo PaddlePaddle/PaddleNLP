@@ -51,7 +51,7 @@ def from_built_in_model():
     # QA test
     model = AutoModelForQuestionAnswering.from_pretrained('nezha-base-chinese')
     print(type(model))
-    #model = AutoModelForQuestionAnswering.from_pretrained('ernie-1.0')
+    #model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
     #model = AutoModelForQuestionAnswering.from_pretrained('ernie-gram-zh')
 
     # token_classification test

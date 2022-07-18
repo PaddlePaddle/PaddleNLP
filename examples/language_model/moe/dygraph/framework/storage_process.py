@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.fluid import core
+from paddle.framework import core
 import numpy as np
 from collections import OrderedDict
 
-from paddle.fluid.framework import in_dygraph_mode, _in_legacy_dygraph
+from paddle.framework import in_dygraph_mode, _in_legacy_dygraph
 
 if in_dygraph_mode():
     from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_storage import ParamStorage, GradStorage

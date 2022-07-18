@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
@@ -234,9 +234,9 @@ if __name__ == "__main__":
     test_ds = processor.get_test_datasets(test_ds,
                                           TASK_LABELS_DESC[args.task_name])
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=2)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=2)
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     # [src_ids, token_type_ids]
     predict_batchify_fn = lambda samples, fn=Tuple(

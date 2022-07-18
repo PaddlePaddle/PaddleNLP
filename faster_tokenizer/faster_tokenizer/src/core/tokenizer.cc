@@ -30,7 +30,8 @@ limitations under the License. */
 #include <omp.h>
 #endif
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace core {
 
 normalizers::Normalizer* Tokenizer::GetNormalizerPtr() const {
@@ -69,11 +70,11 @@ void Tokenizer::SetPadMethod(const PadMethod& pad_method) {
 }
 
 void Tokenizer::EnablePadMethod(Direction direction,
-                                uint pad_id,
-                                uint pad_type_id,
+                                uint32_t pad_id,
+                                uint32_t pad_type_id,
                                 const std::string& pad_token,
-                                uint* length,
-                                uint* pad_to_multiple_of) {
+                                uint32_t* length,
+                                uint32_t* pad_to_multiple_of) {
   use_padding_ = true;
   pad_method_.direction_ = direction;
   pad_method_.pad_id_ = pad_id;
@@ -134,17 +135,17 @@ size_t Tokenizer::AddSpecialTokens(const std::vector<AddedToken>& tokens) {
   return added_vocabulary_.AddSpecialTokens(tokens, *model_, normalizer_.get());
 }
 
-bool Tokenizer::TokenToId(const std::string& token, uint* id) const {
+bool Tokenizer::TokenToId(const std::string& token, uint32_t* id) const {
   return added_vocabulary_.TokenToId(token, *model_, id);
 }
 
-bool Tokenizer::IdToToken(uint id, std::string* token) const {
+bool Tokenizer::IdToToken(uint32_t id, std::string* token) const {
   return added_vocabulary_.IdToToken(id, *model_, token);
 }
 
 bool Tokenizer::DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
-                           uint type_id,
-                           const std::vector<uint>& word_idx,
+                           uint32_t type_id,
+                           const std::vector<uint32_t>& word_idx,
                            OffsetType offset_type,
                            Encoding* encoding) const {
   pretokenized->Tokenize([&](normalizers::NormalizedString* normalized) {
@@ -164,7 +165,7 @@ bool Tokenizer::DoPreTokenize(
 
 struct InputStringVisitor : public boost::static_visitor<> {
   InputStringVisitor(const Tokenizer* tokenizer,
-                     uint type_id,
+                     uint32_t type_id,
                      OffsetType offset_type,
                      Encoding* encodings)
       : tokenizer_(tokenizer),
@@ -180,13 +181,13 @@ struct InputStringVisitor : public boost::static_visitor<> {
     tokenizer_->EncodeSingleText(raw_text, type_id_, offset_type_, encodings_);
   }
   const Tokenizer* tokenizer_;
-  uint type_id_;
+  uint32_t type_id_;
   OffsetType offset_type_;
   Encoding* encodings_;
 };
 
 void Tokenizer::EncodeSingleString(const InputString& input_string,
-                                   uint type_id,
+                                   uint32_t type_id,
                                    OffsetType offset_type,
                                    Encoding* encodings) const {
   boost::apply_visitor(
@@ -316,11 +317,11 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
 
 void Tokenizer::EncodeSingleText(
     const std::vector<std::string>& pretokenized_texts,
-    uint type_id,
+    uint32_t type_id,
     OffsetType offset_type,
     Encoding* encoding) const {
   std::vector<Encoding> encodings;
-  for (uint i = 0; i < pretokenized_texts.size(); ++i) {
+  for (uint32_t i = 0; i < pretokenized_texts.size(); ++i) {
     encodings.emplace_back(
         EncodeTextToEncoding({i}, type_id, offset_type, pretokenized_texts[i]));
   }
@@ -328,14 +329,14 @@ void Tokenizer::EncodeSingleText(
 }
 
 void Tokenizer::EncodeSingleText(const std::string& raw_text,
-                                 uint type_id,
+                                 uint32_t type_id,
                                  OffsetType offset_type,
                                  Encoding* encodings) const {
   *encodings = EncodeTextToEncoding({}, type_id, offset_type, raw_text);
 }
 
-Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint>& word_idx,
-                                         uint type_id,
+Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
+                                         uint32_t type_id,
                                          OffsetType offset_type,
                                          const std::string& text) const {
   pretokenizers::PreTokenizedString pretokenized;
@@ -381,7 +382,7 @@ Tokenizer Tokenizer::LoadFromStr(const std::string& json_str) {
   return tokenizer;
 }
 
-void Tokenizer::Decode(const std::vector<uint>& token_ids,
+void Tokenizer::Decode(const std::vector<uint32_t>& token_ids,
                        std::string* result,
                        bool skip_special_tokens) const {
   // Get tokens
@@ -406,7 +407,7 @@ void Tokenizer::Decode(const std::vector<uint>& token_ids,
 }
 
 void Tokenizer::DecodeBatch(
-    const std::vector<std::vector<uint>>& batch_token_ids,
+    const std::vector<std::vector<uint32_t>>& batch_token_ids,
     std::vector<std::string>* results,
     bool skip_special_tokens) const {
   results->resize(batch_token_ids.size());
@@ -488,6 +489,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(normalizers::SequenceNormalizer)) {
       j["normalizer"] = *dynamic_cast<normalizers::SequenceNormalizer*>(
           tokenizer.normalizer_.get());
+    } else if (typeid(*tokenizer.normalizer_.get()) ==
+               typeid(normalizers::PrecompiledNormalizer)) {
+      j["normalizer"] = *dynamic_cast<normalizers::PrecompiledNormalizer*>(
+          tokenizer.normalizer_.get());
     }
   }
 
@@ -496,6 +501,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
     if (typeid(*tokenizer.pretokenizer_.get()) ==
         typeid(pretokenizers::BertPreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::BertPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::MetaSpacePreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::MetaSpacePreTokenizer*>(
           tokenizer.pretokenizer_.get());
     }
   }
@@ -508,6 +517,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(models::FasterWordPiece)) {
       j["model"] =
           *dynamic_cast<models::FasterWordPiece*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::BPE)) {
+      j["model"] = *dynamic_cast<models::BPE*>(tokenizer.model_.get());
+    } else if (typeid(*tokenizer.model_.get()) == typeid(models::Unigram)) {
+      j["model"] = *dynamic_cast<models::Unigram*>(tokenizer.model_.get());
     }
   }
 
@@ -583,6 +596,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         normalizers::SequenceNormalizer unicode_normalizer;
         normalizer.get_to(unicode_normalizer);
         tokenizer.SetNormalizer(unicode_normalizer);
+      } else if (normalizer.at("type") == "PrecompiledNormalizer") {
+        normalizers::PrecompiledNormalizer precompiled_normalizer;
+        normalizer.get_to(precompiled_normalizer);
+        tokenizer.SetNormalizer(precompiled_normalizer);
       }
     }
 
@@ -592,6 +609,9 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
       if (pretokenizer.at("type") == "BertPreTokenizer") {
         pretokenizers::BertPreTokenizer bert_pretokenizer;
         tokenizer.SetPreTokenizer(bert_pretokenizer);
+      } else if (pretokenizer.at("type") == "MetaSpacePreTokenizer") {
+        pretokenizers::MetaSpacePreTokenizer meta_pretokenizer;
+        tokenizer.SetPreTokenizer(meta_pretokenizer);
       }
     }
 
@@ -606,6 +626,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         models::FasterWordPiece wordpiece;
         model.get_to(wordpiece);
         tokenizer.SetModel(wordpiece);
+      } else if (model.at("type") == "BPE") {
+        models::BPE bpe;
+        model.get_to(bpe);
+        tokenizer.SetModel(bpe);
+      } else if (model.at("type") == "Unigram") {
+        models::Unigram unigram;
+        model.get_to(unigram);
+        tokenizer.SetModel(unigram);
       }
     }
 
@@ -672,9 +700,8 @@ template void Tokenizer::SetNormalizer(const normalizers::NFKCNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NFKDNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::NmtNormalizer&);
-// TODO(zhoushunjie): Need to implement PrecompiledNormalizer later
-// template void Tokenizer::SetNormalizer(const
-// normalizers::PrecompiledNormalizer&);
+template void Tokenizer::SetNormalizer(
+    const normalizers::PrecompiledNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::ReplaceNormalizer&);
 template void Tokenizer::SetNormalizer(const normalizers::SequenceNormalizer&);
 template void Tokenizer::SetNormalizer(
@@ -685,12 +712,18 @@ template void Tokenizer::SetNormalizer(const normalizers::StripNormalizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
 template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::MetaSpacePreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
 template void Tokenizer::SetModel(const models::WordPiece&);
 template Tokenizer::Tokenizer(const models::FasterWordPiece&);
 template void Tokenizer::SetModel(const models::FasterWordPiece&);
+template Tokenizer::Tokenizer(const models::BPE&);
+template void Tokenizer::SetModel(const models::BPE&);
+template Tokenizer::Tokenizer(const models::Unigram&);
+template void Tokenizer::SetModel(const models::Unigram&);
 
 // Instantiate processors
 template void Tokenizer::SetPostProcessor(
@@ -700,5 +733,6 @@ template void Tokenizer::SetPostProcessor(
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);
-}  // core
-}  // tokenizers
+}  // namespace core
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
