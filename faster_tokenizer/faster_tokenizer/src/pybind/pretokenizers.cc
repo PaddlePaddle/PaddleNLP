@@ -12,9 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
 
 #include "pretokenizers/pretokenizers.h"
+#include <Python.h>
 #include "pybind/pretokenizers.h"
 
 namespace py = pybind11;
@@ -88,8 +88,8 @@ void BindPreTokenizers(pybind11::module* m) {
            &pretokenizers::PreTokenizedString::GetOriginStr)
       .def("to_encoding",
            [](const pretokenizers::PreTokenizedString& self,
-              const std::vector<uint>& word_idx,
-              uint type_id,
+              const std::vector<uint32_t>& word_idx,
+              uint32_t type_id,
               core::OffsetType offset_type) {
              core::Encoding encoding;
              self.TransformToEncoding(

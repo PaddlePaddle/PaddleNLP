@@ -148,7 +148,7 @@ def do_convert():
                 example += '\n'
             examples.append(example)
 
-    save_path = os.path.join(args.save_dir, 'label.tsv')
+    save_path = os.path.join(args.save_dir, 'label.txt')
     with open(save_path, "w", encoding="utf-8") as f:
         for l in label_list:
             f.write(l + '\n')
@@ -171,17 +171,17 @@ def do_convert():
     if len(args.splits) == 2:
         i1, _ = args.splits
         p1 = int(len(raw_examples) * i1)
-        _save_examples(args.save_dir, "train.tsv", examples[:p1])
-        _save_examples(args.save_dir, "dev.tsv", examples[p1:])
-        _save_examples(args.save_dir, "data.tsv", examples[p1:], True)
+        _save_examples(args.save_dir, "train.txt", examples[:p1])
+        _save_examples(args.save_dir, "dev.txt", examples[p1:])
+        _save_examples(args.save_dir, "data.txt", examples[p1:], True)
     if len(args.splits) == 3:
         i1, i2, _ = args.splits
         p1 = int(len(raw_examples) * i1)
         p2 = int(len(raw_examples) * (i1 + i2))
-        _save_examples(args.save_dir, "train.tsv", examples[:p1])
-        _save_examples(args.save_dir, "dev.tsv", examples[p1:p2])
-        _save_examples(args.save_dir, "test.tsv", examples[p2:])
-        _save_examples(args.save_dir, "data.tsv", examples[p2:], True)
+        _save_examples(args.save_dir, "train.txt", examples[:p1])
+        _save_examples(args.save_dir, "dev.txt", examples[p1:p2])
+        _save_examples(args.save_dir, "test.txt", examples[p2:])
+        _save_examples(args.save_dir, "data.txt", examples[p2:], True)
     logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
 

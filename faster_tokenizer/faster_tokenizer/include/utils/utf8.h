@@ -53,7 +53,7 @@ inline uint32_t GetUnicodeLenFromUTF8(const char* pSrc, size_t length) {
 }
 
 inline uint32_t UTF8ToUInt32(const char* pSrc, uint32_t* chr) {
-  uint32_t chwidth = BytesInUTF8Char(static_cast<uint8_t>(*pSrc));
+  uint32_t chwidth = BytesInUTF8Char(static_cast<uint32_t>(*pSrc));
   *chr = static_cast<uint32_t>(*pSrc++) & 0xFF;
   if (chwidth > 1) {
     *chr = (*chr) << 8;
