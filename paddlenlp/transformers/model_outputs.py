@@ -70,7 +70,10 @@ def _transformer_encoder_fwd(self,
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
-    new_caches = [] if cache is not None else None
+    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
+    # to True when cache is not None.
+    new_caches = [] if cache is not None and getattr(self, "_use_cache",
+                                                     True) else None
     all_attentions = [] if output_attentions else None
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
@@ -93,7 +96,7 @@ def _transformer_encoder_fwd(self,
             all_hidden_states.append(output)
         if output_attentions:
             all_attentions.append(outputs[-1])
-        if cache is not None:
+        if new_caches is not None:
             new_caches.append(outputs[0] if isinstance(
                 cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 

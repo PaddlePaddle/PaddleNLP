@@ -560,6 +560,7 @@ class BertModel(BertPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 past_key_values=None,
+                use_cache=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -602,6 +603,9 @@ class BertModel(BertPretrainedModel):
                 If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
                 don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
                 `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the output of each hidden layers.
                 Defaults to `False`.
@@ -681,6 +685,7 @@ class BertModel(BertPretrainedModel):
                         all_hidden_states) if output_hidden_states else (
                             hidden_states, pooled_output)
         else:
+            self.encoder._use_cache = use_cache  # To be consistent with HF
             encoder_outputs = self.encoder(
                 embedding_output,
                 src_mask=attention_mask,
