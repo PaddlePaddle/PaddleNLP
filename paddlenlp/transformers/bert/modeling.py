@@ -607,7 +607,7 @@ class BertModel(BertPretrainedModel):
                 If set to `True`, `past_key_values` key value states are returned.
                 Defaults to `None`.
             output_hidden_states (bool, optional):
-                Whether to return the output of each hidden layers.
+                Whether to return the hidden states of all layers.
                 Defaults to `False`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
