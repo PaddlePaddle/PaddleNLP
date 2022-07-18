@@ -100,7 +100,6 @@ function _train(){
                 --use_recompute ${use_recompute}\
                 --sharding_stage ${sharding_stage}\
                 --sharding_offload ${sharding_offload}"
-
     # 以下为通用执行命令，无特殊可不用修改
     if [ "N1C2" = ${device_num} ]; then
         # sharding case
