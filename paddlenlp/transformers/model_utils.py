@@ -19,6 +19,7 @@ import os
 import six
 import logging
 import inspect
+from typing import Optional
 
 import paddle
 import numpy as np
@@ -151,7 +152,9 @@ class PretrainedModel(Layer, GenerationMixin):
         if base_model is not self:
             return base_model.get_input_embeddings()
         else:
-            raise NotImplementedError
+            raise NotImplementedError(
+                f'model of {type(base_model)} has not implemented the `get_input_embedding`'
+                ' or `set_input_embedding` method')
 
     def get_output_embeddings(self):
         return None  # Overwrite for models with output embeddings
@@ -497,42 +500,51 @@ class PretrainedModel(Layer, GenerationMixin):
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
 
-    def resize_token_embeddings(self, new_num_tokens=None):
+    def resize_token_embeddings(self,
+                                new_num_tokens: Optional[int] = None
+                                ) -> nn.Embedding:
         """
         Resizes input token embeddings matrix of the model according to new_num_tokens.
 
         Args:
-            new_num_tokens (int): The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
+            new_num_tokens (Optional[int]):
+                The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
                 vectors at the end. Reducing the size will remove vectors from the end. If not provided or None, just
                 returns a pointer to the input tokens embedding module of the model without doing anything.
 
         Returns:
             paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
-        old_embeddings = self.get_input_embeddings()
+        old_embeddings: nn.Embedding = self.get_input_embeddings()
+        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[
+                0]:
+            return old_embeddings
+
         new_embeddings = self._get_resized_embeddings(old_embeddings,
                                                       new_num_tokens)
-        model_embeds = self.set_input_embeddings(new_embeddings)
-        if new_num_tokens is None:
-            return model_embeds
+        self.set_input_embeddings(new_embeddings)
 
-        # Update vocab_size
+        # 2. Update vocab_size
+        self.base_model.config['vocab_size'] = new_num_tokens
         self.vocab_size = new_num_tokens
 
         # TODO(westfish@126.com): add tie_weight.
         # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
 
-        return model_embeds
+        return new_embeddings
 
-    def _get_resized_embeddings(self, old_embeddings, new_num_tokens=None):
+    def _get_resized_embeddings(
+            self,
+            old_embeddings: nn.Embedding,
+            new_num_tokens: Optional[int] = None) -> nn.Embedding:
         """
         Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
         initialized vectors at the end. Reducing the size will remove vectors from the end
         
         Args:
-            old_embeddings:
+            old_embeddings (nn.Embedding):
                 Old embeddings to be resized.
-            new_num_tokens:
+            new_num_tokens (Optional[int]):
                 New number of tokens in the embedding matrix.
                 Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
                 vectors from the end. 
@@ -544,7 +556,6 @@ class PretrainedModel(Layer, GenerationMixin):
             return old_embeddings
 
         old_num_tokens, old_embedding_dim = old_embeddings.weight.shape
-
         if old_num_tokens == new_num_tokens:
             return old_embeddings
 
