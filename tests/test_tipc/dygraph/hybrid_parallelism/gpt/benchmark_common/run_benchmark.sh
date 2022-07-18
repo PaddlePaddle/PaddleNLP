@@ -94,7 +94,8 @@ function _train(){
                 --use_pure_fp16 ${use_pure_fp16}\
                 --use_recompute False\
                 --sharding_stage 1\
-                --sharding_offload False"
+                --sharding_offload False \
+                --fuse_transformer True"
 
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
