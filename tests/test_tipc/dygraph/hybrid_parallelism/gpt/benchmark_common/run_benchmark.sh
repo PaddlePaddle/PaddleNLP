@@ -21,6 +21,11 @@ function _set_params(){
     use_sharding=${11:-"false"}               # （可选) 是否使用Sharding
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
+    use_recompute=${12:-"False"}    # (可选)是否打开recompute
+    sharding_stage=${13:-"1"}       # (可选)sharding case
+    sharding_offload=${14:-"False"} # (可选)
+    eval_freq=${15:-"1000"}         # (可选)
+    sharding_degree=${16:-"1"}      # (可选)
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -82,7 +87,7 @@ function _train(){
                 --save_steps 100000\
                 --decay_steps 320000\
                 --device gpu\
-                --eval_freq 1000\
+                --eval_freq ${eval_freq}\
                 --warmup_rate 0.01\
                 --scale_loss 32768\
                 --global_batch_size ${global_batch_size}\
@@ -90,31 +95,48 @@ function _train(){
                 --dp_degree ${dp_degree}\
                 --mp_degree ${mp_degree}\
                 --pp_degree ${pp_degree}\
-                --sharding_degree 1\
+                --sharding_degree ${sharding_degree}\
                 --use_pure_fp16 ${use_pure_fp16}\
-                --use_recompute False\
-                --sharding_stage 1\
-                --sharding_offload False \
-                --fuse_transformer True"
+                --use_recompute ${use_recompute}\
+                --sharding_stage ${sharding_stage}\
+                --sharding_offload ${sharding_offload}"
 
     # 以下为通用执行命令，无特殊可不用修改
-    case ${run_mode} in
-    DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
-              run_pretrain.py ${train_cmd}"
+    if [ "N1C2" = ${device_num} ]; then
+        # sharding case
+        echo "run run_mode: DP1-MP1-PP1 device_num: N1C2"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1 \
+              run_pretrain.py ${train_cmd}" 
         workerlog_id=0
-        ;;
-    DP2-MP2-PP2|DP2-MP8-PP2|DP4-MP8-PP1|DP1-MP8-PP4) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
-              run_pretrain.py ${train_cmd}"
-        workerlog_id=0
-        ;;
-    *) echo "choose run_mode "; exit 1;
-    esac
+    else
+        # hybrid_parallelism case
+        case ${run_mode} in
+        DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+                run_pretrain.py ${train_cmd}"
+            workerlog_id=0
+            ;;
+        DP1-MP1-PP4|DP1-MP4-PP1) echo "run run_mode: ${run_mode}"
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3 \
+                run_pretrain.py ${train_cmd}"
+            workerlog_id=0
+            ;;
+        DP1-MP2-PP4|DP1-MP4-PP2|DP2-MP2-PP2|DP2-MP8-PP2|DP4-MP8-PP1|DP1-MP8-PP4) echo "run run_mode: ${run_mode}"
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+                run_pretrain.py ${train_cmd}"
+            workerlog_id=0
+            ;;
+        *) echo "choose run_mode "; exit 1;
+        esac
+    fi
     cd ../examples/language_model/gpt-3/dygraph/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
-    timeout 15m ${train_cmd} > ${log_file} 2>&1
+    if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
+        ${train_cmd} > ${log_file} 2>&1
+    else
+        timeout 15m ${train_cmd} > ${log_file} 2>&1
+    fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else
