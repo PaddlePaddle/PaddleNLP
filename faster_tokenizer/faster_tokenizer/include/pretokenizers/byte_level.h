@@ -27,9 +27,9 @@ struct ByteLevelPreTokenizer : public PreTokenizer {
                         bool trim_offsets = true);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   friend void to_json(nlohmann::json& j,
-                      const ByteLevelPreTokenizer& bert_pre_tokenizer);
+                      const ByteLevelPreTokenizer& byte_pre_tokenizer);
   friend void from_json(const nlohmann::json& j,
-                        ByteLevelPreTokenizer& bert_pre_tokenizer);
+                        ByteLevelPreTokenizer& byte_pre_tokenizer);
 
 private:
   bool add_prefix_space_;
