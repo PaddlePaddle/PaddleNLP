@@ -213,9 +213,9 @@ sh run_static.sh
 解压文件
 ```shell
 unzip comment2019zh_corpus.zip -d  clue_corpus_small_14g/comment2019zh_corpus
-unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus  
+unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus
 unzip webText2019zh_corpus.zip -d  clue_corpus_small_14g/webText2019zh_corpus
-unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus  
+unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```

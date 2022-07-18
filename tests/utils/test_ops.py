@@ -35,6 +35,7 @@ EINSUM_TEST_SAMPLE = {
 
 
 class TestEinsum(CommonTest):
+
     def setUp(self):
         self.sample = {"paradigm": "i->", "data": ["x"]}
 
@@ -54,126 +55,151 @@ class TestEinsum(CommonTest):
 
 
 class TestEinsumVectorDot(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "i,i->", "data": ["x", "x"]}
 
 
 class TestEinsumVectorMul(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "i,i->i", "data": ["x", "x"]}
 
 
 class TestEinsumVectorOuter(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "i,j->ij", "data": ["x", "y"]}
 
 
 class TestEinsumMatrixTranspose(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij->ji", "data": ["A"]}
 
 
 class TestEinsumMatrixRowSum(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij->j", "data": ["A"]}
 
 
 class TestEinsumMatrixColSum(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij->i", "data": ["A"]}
 
 
 class TestEinsumMatrixEleMul(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij,ij->ij", "data": ["A", "A"]}
 
 
 class TestEinsumMatrixVecMul(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij,j->i", "data": ["A", "x"]}
 
 
 class TestEinsumMatrixMul(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij,kj->ik", "data": ["A", "B"]}
 
 
 class TestEinsumMatrixOuter(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij,kl->ijkl", "data": ["A", "C"]}
 
 
 class TestEinsumTensorBMM(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "bij,bjk->bik", "data": ["D", "E"]}
 
 
 class TestEinsumTensorContract1(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijk,jk->i", "data": ["D", "A"]}
 
 
 class TestEinsumTensorContract2(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijk,lk->ijl", "data": ["D", "B"]}
 
 
 class TestEinsumTensorContract3(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "abcd,dfg->abcfg", "data": ["F", "D"]}
 
 
 class TestEinsumTensorContract4(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijk,jk->ik", "data": ["D", "A"]}
 
 
 class TestEinsumTensorContract5(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijk,jk->ij", "data": ["D", "A"]}
 
 
 class TestEinsumTensorContract6(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ik, ijk->j", "data": ["A", "G"]}
 
 
 class TestEinsumTensorContract7(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijk, ik->jk", "data": ["G", "A"]}
 
 
 class TestEinsumEllipsis1(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "i...->...", "data": ["G"]}
 
 
 class TestEinsumEllipsis2(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ij,...i->j...", "data": ["A", "H"]}
 
 
 class TestEinsumEllipsis3(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "k...,jk", "data": ["F", "I"]}
 
 
 class TestEinsumTestEinsumBilinear(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "bn,anm,bm->ba", "data": ["B", "E", "I"]}
 
 
 class TestEinsumTestEinsumOthers(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijkl, lmn->kmn", "data": ["F", "H"]}
 
 
 class TestEinsumTestEinsumOthers(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "ijkl, lmn->ijn", "data": ["F", "H"]}
 
 
 class TestEinsumBatch1(TestEinsum):
+
     def setUp(self):
         self.sample = {"paradigm": "blq,bhlk->bhlqk", "data": ["J", "K"]}
 

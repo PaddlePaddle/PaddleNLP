@@ -1,4 +1,4 @@
-#   Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.fluid import core
+from paddle.framework import core
 import numpy as np
 from collections import OrderedDict
 
-from paddle.distributed.fleet.utils.internal_storage import ParamStorage, GradStorage
+from paddle.framework import in_dygraph_mode, _in_legacy_dygraph
+
+if in_dygraph_mode():
+    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_storage import ParamStorage, GradStorage
+elif _in_legacy_dygraph():
+    from paddle.distributed.fleet.utils.internal_storage import ParamStorage, GradStorage
 
 from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import Type
 
-alignment = {"gpu": 256, }
+alignment = {
+    "gpu": 256,
+}
 align = {
     Type.fp16.value: 2,
     Type.fp32.value: 4,
@@ -29,8 +36,15 @@ align = {
 
 def assign_group_by_size(parameters, group_size=256 * 1024 * 1024):
     is_sparse_gradient = [False] * len(parameters)
-    group_indices = core.assign_group_by_size(parameters, is_sparse_gradient,
-                                              [group_size, group_size])
+
+    if in_dygraph_mode():
+        group_indices = core.eager_assign_group_by_size(
+            parameters, is_sparse_gradient, [group_size, group_size])
+    elif _in_legacy_dygraph():
+        group_indices = core.assign_group_by_size(parameters,
+                                                  is_sparse_gradient,
+                                                  [group_size, group_size])
+
     var_groups = OrderedDict()
     for group_idx, indices in enumerate(group_indices):
         for index in indices:
@@ -56,13 +70,12 @@ def flatten_dense_tensors(parameters):
 
     param_storage.add_rank_params(parameters, _param2align)
 
-    # process gradient 
-    grad_storage = GradStorage(
-        size=_buffer_size,
-        dtype=dtype,
-        device="gpu",
-        destination="0",
-        parm2align=_param2align)
+    # process gradient
+    grad_storage = GradStorage(size=_buffer_size,
+                               dtype=dtype,
+                               device="gpu",
+                               destination="0",
+                               parm2align=_param2align)
 
     for param in parameters:
         grad_storage.add_grad(param, _param2align[param.name])

@@ -50,18 +50,24 @@ class MemN2N(nn.Layer):
         self.C = nn.Embedding(self.nwords, self.edim, weight_attr=normal_attr)
 
         # Temporal Encoding
-        self.T_A = nn.Embedding(
-            self.mem_size, self.edim, weight_attr=normal_attr)
-        self.T_C = nn.Embedding(
-            self.mem_size, self.edim, weight_attr=normal_attr)
+        self.T_A = nn.Embedding(self.mem_size,
+                                self.edim,
+                                weight_attr=normal_attr)
+        self.T_C = nn.Embedding(self.mem_size,
+                                self.edim,
+                                weight_attr=normal_attr)
 
         # Linear mapping for q
-        self.H = nn.Linear(
-            self.edim, self.edim, weight_attr=normal_attr, bias_attr=False)
+        self.H = nn.Linear(self.edim,
+                           self.edim,
+                           weight_attr=normal_attr,
+                           bias_attr=False)
 
         # output mapping
-        self.W = nn.Linear(
-            self.edim, self.nwords, weight_attr=normal_attr, bias_attr=False)
+        self.W = nn.Linear(self.edim,
+                           self.nwords,
+                           weight_attr=normal_attr,
+                           bias_attr=False)
 
     def forward(self, data):
         """
@@ -82,8 +88,8 @@ class MemN2N(nn.Layer):
             A_in = paddle.add(A_in_c, A_in_t)  # [batch_size, mem_size, edim]
 
             q_in = q.reshape([-1, 1, self.edim])  # [batch, 1, edim]
-            A_out3d = paddle.matmul(
-                q_in, A_in, transpose_y=True)  # [batch, 1, mem_size]
+            A_out3d = paddle.matmul(q_in, A_in,
+                                    transpose_y=True)  # [batch, 1, mem_size]
             A_out2d = A_out3d.reshape([-1, self.mem_size])
             p = nn.functional.softmax(A_out2d)  # [batch, mem_size]
 

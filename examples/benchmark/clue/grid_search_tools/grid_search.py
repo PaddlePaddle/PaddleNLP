@@ -53,7 +53,7 @@ def get_availble(est=15, is_mrc=False):
 
 def get_mrc_tasks(model_name_or_path):
     learning_rate_list = [1e-5, 2e-5, 3e-5]
-    batch_size_list = [32, 16]
+    batch_size_list = [32, 24]
     cls_base_grd_acc = 4
     tasks = []
     for lr in learning_rate_list:
@@ -79,11 +79,11 @@ def get_cls_tasks(model_name_or_path):
     hyper_params = {
         "afqmc": [[3, 128, cls_base_grd_acc, 0.1]],
         "tnews": [[3, 128, cls_base_grd_acc, 0.1]],
-        "iflytek":
-        [[3, 128, cls_base_grd_acc, 0.1], [3, 128, cls_base_grd_acc, 0.0]],
+        "iflytek": [[3, 128, cls_base_grd_acc, 0.1],
+                    [3, 128, cls_base_grd_acc, 0.0]],
         "ocnli": [[5, 128, cls_base_grd_acc, 0.1]],
-        "cluewsc2020":
-        [[50, 128, cls_base_grd_acc, 0.1], [50, 128, cls_base_grd_acc, 0.0]],
+        "cluewsc2020": [[50, 128, cls_base_grd_acc, 0.1],
+                        [50, 128, cls_base_grd_acc, 0.0]],
         "csl": [[5, 256, cls_base_grd_acc * 2, 0.1]],
         "cmnli": [[2, 128, cls_base_grd_acc, 0.1]]
     }
@@ -126,8 +126,10 @@ def do_task(task):
         return None
     task_ps = f"set -x \nexport CUDA_VISIBLE_DEVICES={device_id}\n" + task
     print(f"> Send task \n{task_ps}\n")
-    ps = subprocess.Popen(
-        task_ps, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    ps = subprocess.Popen(task_ps,
+                          shell=True,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT)
     if is_mrc and device_id is not None:
         mrc_device[task] = device_id
         print("mrc_device", mrc_device)

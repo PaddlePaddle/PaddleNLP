@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,28 +24,34 @@ def parse_args():
         "--task_name",
         default='seq_cls',
         type=str,
-        help="The name of the task to perform predict, selected in: seq_cls and token_cls"
+        help=
+        "The name of the task to perform predict, selected in: seq_cls and token_cls"
     )
     parser.add_argument(
         "--model_name_or_path",
         default="ernie-3.0-medium-zh",
         type=str,
-        help="The directory or name of model.", )
+        help="The directory or name of model.",
+    )
     parser.add_argument(
         "--model_path",
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--use_fp16",
         action='store_true',
-        help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
+        help=
+        "Whether to use fp16 inference, only takes effect when deploying on gpu.",
     )
     args = parser.parse_args()
     return args

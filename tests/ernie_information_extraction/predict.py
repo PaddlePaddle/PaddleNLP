@@ -18,7 +18,6 @@ import numpy as np
 from functools import partial
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
@@ -115,8 +114,9 @@ def parse_decodes(sentences, predictions, lengths, label_vocab):
 
 def convert_to_features(example, tokenizer):
     tokens = example[0]
-    tokenized_input = tokenizer(
-        tokens, return_length=True, is_split_into_words=True)
+    tokenized_input = tokenizer(tokens,
+                                return_length=True,
+                                is_split_into_words=True)
     # Token '[CLS]' and '[SEP]' will get label 'O'
     return tokenized_input['input_ids'], tokenized_input[
         'token_type_ids'], tokenized_input['seq_len']
@@ -133,6 +133,7 @@ def read(data_path):
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -162,10 +163,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -191,21 +191,22 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(
-                model_name="ernie-1.0",
-                model_precision=precision,
-                batch_size=self.batch_size,
-                data_shape="dynamic",
-                save_path=save_log_path,
-                inference_config=config,
-                pids=pid,
-                process_name=None,
-                gpu_ids=0,
-                time_keys=[
-                    'preprocess_time', 'inference_time', 'postprocess_time'
-                ],
-                warmup=0,
-                logger=logger)
+            self.autolog = auto_log.AutoLogger(model_name="ernie-1.0",
+                                               model_precision=precision,
+                                               batch_size=self.batch_size,
+                                               data_shape="dynamic",
+                                               save_path=save_log_path,
+                                               inference_config=config,
+                                               pids=pid,
+                                               process_name=None,
+                                               gpu_ids=0,
+                                               time_keys=[
+                                                   'preprocess_time',
+                                                   'inference_time',
+                                                   'postprocess_time'
+                                               ],
+                                               warmup=0,
+                                               logger=logger)
 
     def predict(self, dataset, batchify_fn, tokenizer, label_vocab):
         if args.benchmark:
@@ -249,13 +250,15 @@ class Predictor(object):
 
 if __name__ == '__main__':
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
-    test_ds = load_dataset(
-        read, data_path=os.path.join(args.data_dir, 'test.txt'), lazy=False)
+    test_ds = load_dataset(read,
+                           data_path=os.path.join(args.data_dir, 'test.txt'),
+                           lazy=False)
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # token_type_ids
         Stack(dtype='int64'),  # seq_len
     ): fn(samples)
 

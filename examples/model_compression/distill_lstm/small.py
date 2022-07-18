@@ -35,6 +35,7 @@ METRIC_CLASSES = {
 
 
 class BiLSTM(nn.Layer):
+
     def __init__(self,
                  embed_dim,
                  hidden_size,
@@ -48,52 +49,51 @@ class BiLSTM(nn.Layer):
                  embedding_name=None):
         super(BiLSTM, self).__init__()
         if embedding_name is not None:
-            self.embedder = TokenEmbedding(
-                embedding_name,
-                extended_vocab_path=vocab_path,
-                keep_extended_vocab_only=True)
+            self.embedder = TokenEmbedding(embedding_name,
+                                           extended_vocab_path=vocab_path,
+                                           keep_extended_vocab_only=True)
             embed_dim = self.embedder.embedding_dim
         else:
             self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
 
-        self.lstm = nn.LSTM(
-            embed_dim,
-            hidden_size,
-            num_layers,
-            'bidirectional',
-            dropout=dropout_prob)
+        self.lstm = nn.LSTM(embed_dim,
+                            hidden_size,
+                            num_layers,
+                            'bidirectional',
+                            dropout=dropout_prob)
 
         self.fc = nn.Linear(
             hidden_size * 2,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.fc_1 = nn.Linear(
             hidden_size * 8,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.output_layer = nn.Linear(
             hidden_size,
             output_dim,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
     def forward(self, x_1, seq_len_1, x_2=None, seq_len_2=None):
         x_embed_1 = self.embedder(x_1)
-        lstm_out_1, (hidden_1, _) = self.lstm(
-            x_embed_1, sequence_length=seq_len_1)
+        lstm_out_1, (hidden_1, _) = self.lstm(x_embed_1,
+                                              sequence_length=seq_len_1)
         out_1 = paddle.concat((hidden_1[-2, :, :], hidden_1[-1, :, :]), axis=1)
         if x_2 is not None:
             x_embed_2 = self.embedder(x_2)
-            lstm_out_2, (hidden_2, _) = self.lstm(
-                x_embed_2, sequence_length=seq_len_2)
-            out_2 = paddle.concat(
-                (hidden_2[-2, :, :], hidden_2[-1, :, :]), axis=1)
+            lstm_out_2, (hidden_2, _) = self.lstm(x_embed_2,
+                                                  sequence_length=seq_len_2)
+            out_2 = paddle.concat((hidden_2[-2, :, :], hidden_2[-1, :, :]),
+                                  axis=1)
             out = paddle.concat(
-                x=[out_1, out_2, out_1 + out_2, paddle.abs(out_1 - out_2)],
+                x=[out_1, out_2, out_1 + out_2,
+                   paddle.abs(out_1 - out_2)],
                 axis=1)
             out = paddle.tanh(self.fc_1(out))
         else:
@@ -126,7 +126,8 @@ def evaluate(task_name, model, loss_fct, metric, data_loader):
                 res[1],
                 res[2],
                 res[3],
-                res[4], ),
+                res[4],
+            ),
             end='')
     else:
         print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end='')
@@ -159,11 +160,12 @@ def do_train(args):
     loss_fct = nn.CrossEntropyLoss()
 
     if args.optimizer == 'adadelta':
-        optimizer = paddle.optimizer.Adadelta(
-            learning_rate=args.lr, rho=0.95, parameters=model.parameters())
+        optimizer = paddle.optimizer.Adadelta(learning_rate=args.lr,
+                                              rho=0.95,
+                                              parameters=model.parameters())
     else:
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=args.lr, parameters=model.parameters())
+        optimizer = paddle.optimizer.Adam(learning_rate=args.lr,
+                                          parameters=model.parameters())
 
     if args.init_from_ckpt:
         model.set_state_dict(paddle.load(args.init_from_ckpt + ".pdparams"))
@@ -192,8 +194,8 @@ def do_train(args):
                 with paddle.no_grad():
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.4f step/s"
-                        % (global_step, epoch, i, loss,
-                           args.log_freq / (time.time() - tic_train)))
+                        % (global_step, epoch, i, loss, args.log_freq /
+                           (time.time() - tic_train)))
                     tic_eval = time.time()
 
                     acc = evaluate(args.task_name, model, loss_fct, metric,
@@ -206,9 +208,10 @@ def do_train(args):
                     model.state_dict(),
                     os.path.join(args.output_dir,
                                  "step_" + str(global_step) + ".pdparams"))
-                paddle.save(optimizer.state_dict(),
-                            os.path.join(args.output_dir,
-                                         "step_" + str(global_step) + ".pdopt"))
+                paddle.save(
+                    optimizer.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "step_" + str(global_step) + ".pdopt"))
 
 
 if __name__ == '__main__':

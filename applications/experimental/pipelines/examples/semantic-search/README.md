@@ -6,7 +6,7 @@
 
 所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户 Query 字面本身，而是能精准捕捉到用户 Query 后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语义索引模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
 
-例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。  
+例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。
 
 ```
 车头如何放置车牌    前牌照怎么装
@@ -36,7 +36,7 @@
 
 a. 软件环境：
 - python >= 3.6
-- paddlenlp >= 2.2.1  
+- paddlenlp >= 2.2.1
 - paddlepaddle-gpu >=2.2
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
@@ -66,10 +66,10 @@ python ./ui/setup.py install
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py --gpu
+python examples/semantic-search/semantic_search_example.py --device gpu
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/question-answering/dense_qa_example.py --device cpu
+python examples/semantic-search/semantic_search_example.py --device cpu
 ```
 
 ### 3.4 构建 Web 可视化语义检索系统

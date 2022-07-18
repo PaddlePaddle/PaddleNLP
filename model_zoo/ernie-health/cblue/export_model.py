@@ -60,17 +60,16 @@ if __name__ == "__main__":
 
     # Convert to static graph with specific input description
     input_spec = [
-        paddle.static.InputSpec(
-            shape=[None, None], dtype='int64'),  # input_ids
-        paddle.static.InputSpec(
-            shape=[None, None], dtype='int64'),  # token_type_ids
-        paddle.static.InputSpec(
-            shape=[None, None], dtype='int64')  # position_ids
+        paddle.static.InputSpec(shape=[None, None], dtype='int64'),  # input_ids
+        paddle.static.InputSpec(shape=[None, None],
+                                dtype='int64'),  # token_type_ids
+        paddle.static.InputSpec(shape=[None, None],
+                                dtype='int64')  # position_ids
     ]
     if args.train_dataset in ['CMeEE', 'CMeIE']:
         input_spec.append(
-            paddle.static.InputSpec(
-                shape=[None, None], dtype='float32'))  # masks
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype='float32'))  # masks
 
     model = paddle.jit.to_static(model, input_spec=input_spec)
     # Save in static graph model.

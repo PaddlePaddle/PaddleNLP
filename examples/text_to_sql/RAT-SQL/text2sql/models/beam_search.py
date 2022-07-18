@@ -29,8 +29,8 @@ class Hypothesis:
 
 
 def beam_search(model, orig_item, preproc_item, beam_size, max_steps):
-    inference_state, next_choices = model.begin_inference(orig_item,
-                                                          preproc_item)
+    inference_state, next_choices = model.begin_inference(
+        orig_item, preproc_item)
     beam = [Hypothesis(inference_state, next_choices)]
     finished = []
 
@@ -60,13 +60,13 @@ def beam_search(model, orig_item, preproc_item, beam_size, max_steps):
             if next_choices is None:
                 finished.append(
                     Hypothesis(inference_state, None, cum_score,
-                               hyp.choice_history + [choice], hyp.score_history
-                               + [choice_score]))
+                               hyp.choice_history + [choice],
+                               hyp.score_history + [choice_score]))
             else:
                 beam.append(
                     Hypothesis(inference_state, next_choices, cum_score,
-                               hyp.choice_history + [choice], hyp.score_history
-                               + [choice_score]))
+                               hyp.choice_history + [choice],
+                               hyp.score_history + [choice_score]))
 
     finished.sort(key=operator.attrgetter('score'), reverse=True)
     return finished

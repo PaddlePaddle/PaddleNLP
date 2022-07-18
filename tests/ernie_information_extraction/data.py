@@ -27,6 +27,7 @@ def load_dict(dict_path):
 
 
 def load_dataset(datafiles):
+
     def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
             next(fp)  # Skip header

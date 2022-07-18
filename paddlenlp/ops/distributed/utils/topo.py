@@ -19,6 +19,7 @@ GroupInfo = namedtuple('GroupInfo', ['size', 'rank', 'world'])
 
 
 class Topology:
+
     def __init__(self,
                  device_rank,
                  world_size,
@@ -36,27 +37,29 @@ class Topology:
         sharding_rank = sharding_rank[0]
         mp_rank = mp_rank[0]
 
-        self.world = GroupInfo(
-            size=world_size, rank=device_rank,
-            world=list(range(0, world_size)))
+        self.world = GroupInfo(size=world_size,
+                               rank=device_rank,
+                               world=list(range(0, world_size)))
 
         mp_world = arr[dp_rank, pp_rank, sharding_rank, :]
-        self.mp_info = GroupInfo(
-            size=len(mp_world), rank=mp_rank, world=mp_world.tolist())
+        self.mp_info = GroupInfo(size=len(mp_world),
+                                 rank=mp_rank,
+                                 world=mp_world.tolist())
 
         sharding_world = arr[dp_rank, pp_rank, :, mp_rank]
-        self.sharding_info = GroupInfo(
-            size=len(sharding_world),
-            rank=sharding_rank,
-            world=sharding_world.tolist())
+        self.sharding_info = GroupInfo(size=len(sharding_world),
+                                       rank=sharding_rank,
+                                       world=sharding_world.tolist())
 
         pp_world = arr[dp_rank, :, sharding_rank, mp_rank]
-        self.pp_info = GroupInfo(
-            size=len(pp_world), rank=pp_rank, world=pp_world.tolist())
+        self.pp_info = GroupInfo(size=len(pp_world),
+                                 rank=pp_rank,
+                                 world=pp_world.tolist())
 
         dp_world = arr[:, pp_rank, sharding_rank, mp_rank]
-        self.dp_info = GroupInfo(
-            size=len(dp_world), rank=dp_rank, world=dp_world.tolist())
+        self.dp_info = GroupInfo(size=len(dp_world),
+                                 rank=dp_rank,
+                                 world=dp_world.tolist())
 
         self.is_last = self.pp_info.rank == self.pp_info.size - 1
 

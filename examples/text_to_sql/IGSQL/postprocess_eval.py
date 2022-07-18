@@ -36,8 +36,8 @@ def find_shortest_path(start, end, graph):
 def gen_from(candidate_tables, schema):
     if len(candidate_tables) <= 1:
         if len(candidate_tables) == 1:
-            ret = "from {}".format(schema["table_names_original"][list(
-                candidate_tables)[0]])
+            ret = "from {}".format(
+                schema["table_names_original"][list(candidate_tables)[0]])
         else:
             ret = "from {}".format(schema["table_names_original"][0])
         return {}, ret
@@ -70,7 +70,8 @@ def gen_from(candidate_tables, schema):
                 ret = "{} join {} as T{}".format(
                     ret,
                     schema["table_names_original"][end],
-                    table_alias_dict[end], )
+                    table_alias_dict[end],
+                )
                 continue
             for node, (acol, bcol) in path:
                 if node in table_alias_dict:
@@ -94,8 +95,9 @@ def gen_from(candidate_tables, schema):
 
 def normalize_space(format_sql):
     format_sql_1 = [
-        ' '.join(sub_sql.strip().replace(',', ' , ').replace('(', ' ( ')
-                 .replace(')', ' ) ').split())
+        ' '.join(sub_sql.strip().replace(',',
+                                         ' , ').replace('(', ' ( ').replace(
+                                             ')', ' ) ').split())
         for sub_sql in format_sql.split('\n')
     ]
     format_sql_1 = '\n'.join(format_sql_1)
@@ -224,8 +226,8 @@ def add_from_clase(sub_sql, from_clause):
         if len(left_sub_sql) > 0:
             sub_sqls.append(' '.join(left_sub_sql))
         if len(select_sub_sql) > 0:
-            new_select_statement = remove_missing_tables_from_select(' '.join(
-                select_sub_sql))
+            new_select_statement = remove_missing_tables_from_select(
+                ' '.join(select_sub_sql))
             sub_sqls.append(new_select_statement)
 
         sub_sqls.append(from_clause)
@@ -375,8 +377,9 @@ def postprocess_nested(format_sql_2, schema):
 def postprocess_one(pred_sql, schema):
     pred_sql = pred_sql.replace('group_by', 'group by').replace(
         'order_by', 'order by').replace('limit_value', 'limit 1').replace(
-            '_EOS', '').replace(' value ', ' 1 ').replace('distinct',
-                                                          '').strip(',').strip()
+            '_EOS', '').replace(' value ',
+                                ' 1 ').replace('distinct',
+                                               '').strip(',').strip()
     if pred_sql.endswith('value'):
         pred_sql = pred_sql[:-len('value')] + '1'
 
@@ -492,8 +495,9 @@ def write_and_evaluate(postprocess_sqls, db_path, table_schema_path, gold_path,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--dataset', choices=('spider', 'sparc', 'cosql'), default='sparc')
+    parser.add_argument('--dataset',
+                        choices=('spider', 'sparc', 'cosql'),
+                        default='sparc')
     parser.add_argument('--split', type=str, default='dev')
     parser.add_argument('--pred_file', type=str, default='')
     parser.add_argument('--remove_from', action='store_true', default=False)
@@ -523,8 +527,9 @@ if __name__ == '__main__':
     command = write_and_evaluate(postprocess_sqls, db_path, table_schema_path,
                                  gold_path, args.dataset)
 
-    eval_output = subprocess.check_output(
-        command, stderr=subprocess.STDOUT, shell=True)
+    eval_output = subprocess.check_output(command,
+                                          stderr=subprocess.STDOUT,
+                                          shell=True)
     with open(pred_file + '.eval', 'w') as f:
         f.write(eval_output.decode("utf-8"))
     print('Eval result in', pred_file + '.eval')

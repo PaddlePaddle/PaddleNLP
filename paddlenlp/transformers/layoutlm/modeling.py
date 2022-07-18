@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
+from paddlenlp.utils.log import logger
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
 
 
 class LayoutLMPooler(Layer):
+
     def __init__(self, hidden_size, pool_act='tanh'):
         super(LayoutLMPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -66,8 +68,9 @@ class LayoutLMEmbeddings(Layer):
                  pad_token_id=0,
                  type_vocab_size=16):
         super(LayoutLMEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         # gry add for layoutlm
@@ -85,9 +88,9 @@ class LayoutLMEmbeddings(Layer):
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-        self.register_buffer("position_ids",
-                             paddle.arange(max_position_embeddings).expand(
-                                 (1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(max_position_embeddings).expand((1, -1)))
 
     def forward(self,
                 input_ids,
@@ -129,11 +132,11 @@ class LayoutLMEmbeddings(Layer):
 
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = (
-            word_embeddings + position_embeddings + left_position_embeddings +
-            upper_position_embeddings + right_position_embeddings +
-            lower_position_embeddings + h_position_embeddings +
-            w_position_embeddings + token_type_embeddings)
+        embeddings = (word_embeddings + position_embeddings +
+                      left_position_embeddings + upper_position_embeddings +
+                      right_position_embeddings + lower_position_embeddings +
+                      h_position_embeddings + w_position_embeddings +
+                      token_type_embeddings)
 
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -196,9 +199,10 @@ class LayoutLMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.pretrained_init_configuration[
-                            "initializer_range"] if "initializer_range" in
-                        self.pretrained_init_configuration else 0.02,
+                        std=self.
+                        pretrained_init_configuration["initializer_range"]
+                        if "initializer_range"
+                        in self.pretrained_init_configuration else 0.02,
                         shape=layer.weight.shape))
 
         elif isinstance(layer, nn.LayerNorm):
@@ -257,31 +261,34 @@ class LayoutLMModel(LayoutLMPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act="gelu",
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            layer_norm_eps=1e-12,
-            max_position_embeddings=512,
-            max_2d_position_embeddings=1024,
-            type_vocab_size=16,
-            initializer_range=0.02,
-            pad_token_id=0,
-            pool_act="tanh", ):
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        layer_norm_eps=1e-12,
+        max_position_embeddings=512,
+        max_2d_position_embeddings=1024,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        pad_token_id=0,
+        pool_act="tanh",
+    ):
         super(LayoutLMModel, self).__init__()
         #self.config = kwargs
         self.num_hidden_layers = num_hidden_layers
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = LayoutLMEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, max_2d_position_embeddings, layer_norm_eps,
-            pad_token_id, type_vocab_size)
+        self.embeddings = LayoutLMEmbeddings(vocab_size, hidden_size,
+                                             hidden_dropout_prob,
+                                             max_position_embeddings,
+                                             max_2d_position_embeddings,
+                                             layer_norm_eps, pad_token_id,
+                                             type_vocab_size)
 
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
@@ -295,14 +302,50 @@ class LayoutLMModel(LayoutLMPretrainedModel):
         self.pooler = LayoutLMPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        num_position_embeds_diff = new_num_position_embeddings - self.config[
+            "max_position_embeddings"]
+
+        # no resizing needs to be done if the length stays the same
+        if num_position_embeds_diff == 0:
+            return
+
+        logger.info(
+            f"Setting `config.max_position_embeddings={new_num_position_embeddings}`..."
+        )
+        self.config["max_position_embeddings"] = new_num_position_embeddings
+
+        old_position_embeddings_weight = self.embeddings.position_embeddings.weight
+
+        self.embeddings.position_embeddings = nn.Embedding(
+            self.config["max_position_embeddings"], self.config["hidden_size"])
+
+        with paddle.no_grad():
+            if num_position_embeds_diff > 0:
+                self.embeddings.position_embeddings.weight[:
+                                                           -num_position_embeds_diff] = old_position_embeddings_weight
+            else:
+                self.embeddings.position_embeddings.weight = old_position_embeddings_weight[:
+                                                                                            num_position_embeds_diff]
+
     def forward(
-            self,
-            input_ids=None,
-            bbox=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None,
-            output_hidden_states=False, ):
+        self,
+        input_ids=None,
+        bbox=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        output_hidden_states=False,
+    ):
         r'''
         The LayoutLMModel forward method, overrides the `__call__()` special method.
 
@@ -357,8 +400,8 @@ class LayoutLMModel(LayoutLMPretrainedModel):
         input_shape = input_ids.shape
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
@@ -371,7 +414,8 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             input_ids=input_ids,
             bbox=bbox,
             position_ids=position_ids,
-            token_type_ids=token_type_ids, )
+            token_type_ids=token_type_ids,
+        )
 
         if output_hidden_states:
             output = embedding_output
@@ -411,14 +455,26 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         super(LayoutLMForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.layoutlm = layoutlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.layoutlm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  layoutlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.layoutlm.config["hidden_size"],
                                     num_classes)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutlm.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(self,
                 input_ids,
@@ -470,13 +526,12 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
         if attention_mask is not None:
             attention_mask = attention_mask.unsqueeze(
                 axis=[1, 2]).astype("int64")
-        outputs = self.layoutlm(
-            input_ids=input_ids,
-            bbox=bbox,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            output_hidden_states=False)
+        outputs = self.layoutlm(input_ids=input_ids,
+                                bbox=bbox,
+                                attention_mask=attention_mask,
+                                token_type_ids=token_type_ids,
+                                position_ids=position_ids,
+                                output_hidden_states=False)
         sequence_output = outputs[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -507,14 +562,27 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
 
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutlm.resize_position_embeddings(new_num_position_embeddings)
+
     def forward(
-            self,
-            input_ids,
-            bbox=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            output_hidden_states=False, ):
+        self,
+        input_ids,
+        bbox=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        output_hidden_states=False,
+    ):
         r"""
         The LayoutLMForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -554,13 +622,12 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
                 # [1, 2]
 
         """
-        outputs = self.layoutlm(
-            input_ids=input_ids,
-            bbox=bbox,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            output_hidden_states=output_hidden_states)
+        outputs = self.layoutlm(input_ids=input_ids,
+                                bbox=bbox,
+                                attention_mask=attention_mask,
+                                token_type_ids=token_type_ids,
+                                position_ids=position_ids,
+                                output_hidden_states=output_hidden_states)
         pooled_outputs = outputs[1]
         pooled_outputs = self.dropout(pooled_outputs)
         logits = self.classifier(pooled_outputs)
@@ -605,6 +672,7 @@ class LayoutLMLMPredictionHead(Layer):
 
 
 class LayoutLMOnlyMLMHead(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
         super().__init__()
         self.predictions = LayoutLMLMPredictionHead(
@@ -637,6 +705,18 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
             self.layoutlm.config["hidden_act"],
             embedding_weights=self.layoutlm.embeddings.word_embeddings.weight)
         self.apply(self.init_weights)
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        """
+        Resizes position embeddings of the model if `new_num_position_embeddings != config["max_position_embeddings"]`.
+
+        Arguments:
+            new_num_position_embeddings (`int`):
+                The number of new position embedding matrix. If position embeddings are learned, increasing the size
+                will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
+                end.
+        """
+        self.layoutlm.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(self,
                 input_ids,
@@ -678,12 +758,11 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
 
         """
 
-        outputs = self.layoutlm(
-            input_ids,
-            bbox=bbox,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.layoutlm(input_ids,
+                                bbox=bbox,
+                                token_type_ids=token_type_ids,
+                                position_ids=position_ids,
+                                attention_mask=attention_mask)
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
         return prediction_scores

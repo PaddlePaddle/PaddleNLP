@@ -15,7 +15,7 @@
 
 import paddle
 import paddle.nn as nn
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel
 
 
 class BiAffineParser(nn.Layer):
@@ -37,13 +37,8 @@ class BiAffineParser(nn.Layer):
 
         if encoding_model == "lstm-pe":
             self.embed = LSTMByWPEncoder(n_words, pad_index)
-        elif encoding_model == "ernie-1.0":
-            pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-                encoding_model)
-            self.embed = ErnieEncoder(pad_index, pretrained_model)
-        else:
-            pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-                encoding_model)
+        else:  # encoding_model is "ernie-3.0-medium-zh", "ernie-1.0" or other models:
+            pretrained_model = AutoModel.from_pretrained(encoding_model)
             self.embed = ErnieEncoder(pad_index, pretrained_model)
 
         # MLP layer
@@ -54,8 +49,10 @@ class BiAffineParser(nn.Layer):
 
         # Biaffine layer
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
-        self.rel_attn = BiAffine(
-            n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
+        self.rel_attn = BiAffine(n_in=n_mlp_rel,
+                                 n_out=n_rels,
+                                 bias_x=True,
+                                 bias_y=True)
 
     def forward(self, words, wp):
 
@@ -75,17 +72,18 @@ class BiAffineParser(nn.Layer):
         s_rel = paddle.transpose(self.rel_attn(rel_d, rel_h), perm=[0, 2, 3, 1])
         # Set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
-        s_arc = s_arc * s_arc_mask + paddle.scale(
-            paddle.cast(s_arc_mask, 'int32'),
-            scale=1e5,
-            bias=-1,
-            bias_after_scale=False)
+        s_arc = s_arc * s_arc_mask + paddle.scale(paddle.cast(
+            s_arc_mask, 'int32'),
+                                                  scale=1e5,
+                                                  bias=-1,
+                                                  bias_after_scale=False)
 
         mask = paddle.cast(
             paddle.logical_and(
                 paddle.logical_and(words != self.pad_index,
                                    words != self.bos_index),
-                words != self.eos_index, ), 'int32')
+                words != self.eos_index,
+            ), 'int32')
         arc_preds = paddle.argmax(s_arc, axis=-1)
         rel_preds = paddle.argmax(s_rel, axis=-1)
         return arc_preds, rel_preds, s_arc, mask
@@ -100,7 +98,8 @@ class MLP(nn.Layer):
         self.linear = nn.Linear(
             n_in,
             n_out,
-            weight_attr=nn.initializer.XavierNormal(), )
+            weight_attr=nn.initializer.XavierNormal(),
+        )
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
 
     def forward(self, x):
@@ -132,26 +131,20 @@ class BiAffine(nn.Layer):
         b = x.shape[0]
         o = self.weight.shape[0]
         # Shape x: (batch_size, output_size, num_tokens, input_size + bias_x)
-        x = paddle.expand(
-            paddle.unsqueeze(
-                x, axis=1),
-            shape=(x.shape[0], o, x.shape[1], x.shape[2]))
+        x = paddle.expand(paddle.unsqueeze(x, axis=1),
+                          shape=(x.shape[0], o, x.shape[1], x.shape[2]))
         # Shape y: (batch_size, output_size, num_tokens, input_size + bias_y)
-        y = paddle.expand(
-            paddle.unsqueeze(
-                y, axis=1),
-            shape=(y.shape[0], o, y.shape[1], y.shape[2]))
+        y = paddle.expand(paddle.unsqueeze(y, axis=1),
+                          shape=(y.shape[0], o, y.shape[1], y.shape[2]))
         # Shape weight: (batch_size, output_size, input_size + bias_x, input_size + bias_y)
-        weight = paddle.expand(
-            paddle.unsqueeze(
-                self.weight, axis=0),
-            shape=(b, self.weight.shape[0], self.weight.shape[1],
-                   self.weight.shape[2]))
+        weight = paddle.expand(paddle.unsqueeze(self.weight, axis=0),
+                               shape=(b, self.weight.shape[0],
+                                      self.weight.shape[1],
+                                      self.weight.shape[2]))
 
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
-        s = paddle.matmul(
-            paddle.matmul(x, weight), paddle.transpose(
-                y, perm=[0, 1, 3, 2]))
+        s = paddle.matmul(paddle.matmul(x, weight),
+                          paddle.transpose(y, perm=[0, 1, 3, 2]))
         # Remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)
@@ -159,6 +152,7 @@ class BiAffine(nn.Layer):
 
 
 class ErnieEncoder(nn.Layer):
+
     def __init__(self, pad_index, pretrained_model):
         super(ErnieEncoder, self).__init__()
         self.pad_index = pad_index
@@ -169,12 +163,14 @@ class ErnieEncoder(nn.Layer):
         x, _ = self.ptm(words)
         x = paddle.reshape(
             index_sample(x, wp),
-            shape=[wp.shape[0], wp.shape[1], x.shape[2]], )
+            shape=[wp.shape[0], wp.shape[1], x.shape[2]],
+        )
         words = index_sample(words, wp)
         return words, x
 
 
 class LSTMByWPEncoder(nn.Layer):
+
     def __init__(self,
                  n_words,
                  pad_index,
@@ -186,11 +182,10 @@ class LSTMByWPEncoder(nn.Layer):
         self.pad_index = pad_index
         self.word_embed = nn.Embedding(n_words, lstm_by_wp_embed_size)
 
-        self.lstm = nn.LSTM(
-            input_size=lstm_by_wp_embed_size,
-            hidden_size=n_lstm_hidden,
-            num_layers=n_lstm_layers,
-            direction="bidirectional")
+        self.lstm = nn.LSTM(input_size=lstm_by_wp_embed_size,
+                            hidden_size=n_lstm_hidden,
+                            num_layers=n_lstm_layers,
+                            direction="bidirectional")
 
         self.mlp_input_size = n_lstm_hidden * 2
 
@@ -203,7 +198,8 @@ class LSTMByWPEncoder(nn.Layer):
         x, _ = self.lstm(word_embed, sequence_length=seq_lens)
         x = paddle.reshape(
             index_sample(x, wp),
-            shape=[wp.shape[0], wp.shape[1], x.shape[2]], )
+            shape=[wp.shape[0], wp.shape[1], x.shape[2]],
+        )
         words = paddle.index_sample(words, wp)
         return words, x
 

@@ -35,28 +35,27 @@ except ImportError:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--model_name', type=str, required=True, help='What model to use.')
-    parser.add_argument(
-        '--tokenizer_name',
-        type=str,
-        required=True,
-        choices=[
-            'ErnieTokenizer', 'BertTokenizer', 'GPTTokenizer',
-            'GPTChineseTokenizer', 'ElectraTokenizer'
-        ],
-        help='What type of tokenizer to use.')
+    parser.add_argument('--model_name',
+                        type=str,
+                        required=True,
+                        help='What model to use.')
+    parser.add_argument('--tokenizer_name',
+                        type=str,
+                        required=True,
+                        choices=[
+                            'ErnieTokenizer', 'BertTokenizer', 'GPTTokenizer',
+                            'GPTChineseTokenizer', 'ElectraTokenizer'
+                        ],
+                        help='What type of tokenizer to use.')
     group = parser.add_argument_group(title='data input/output')
-    group.add_argument(
-        '--input_path',
-        type=str,
-        required=True,
-        help='Path to input JSON files.')
-    group.add_argument(
-        '--output_prefix',
-        type=str,
-        required=True,
-        help='Output prefix to store output file.')
+    group.add_argument('--input_path',
+                       type=str,
+                       required=True,
+                       help='Path to input JSON files.')
+    group.add_argument('--output_prefix',
+                       type=str,
+                       required=True,
+                       help='Output prefix to store output file.')
     group.add_argument(
         '--data_format',
         type=str,
@@ -67,12 +66,11 @@ def get_args():
         '--json_key',
         type=str,
         default='text',
-        help='For JSON format. Space separate listed of keys to extract from json'
-    )
-    group.add_argument(
-        '--split_sentences',
-        action='store_true',
-        help='Split documents into sentences.')
+        help=
+        'For JSON format. Space separate listed of keys to extract from json')
+    group.add_argument('--split_sentences',
+                       action='store_true',
+                       help='Split documents into sentences.')
 
     group = parser.add_argument_group(title='chinese words')
     group.add_argument(
@@ -83,37 +81,31 @@ def get_args():
         '--cn_whole_word_segment',
         action='store_true',
         help="Is corpus need words segmentation step for chinese words WWM.")
-    group.add_argument(
-        '--cn_seg_func',
-        type=str,
-        default='jieba',
-        choices=['lac', 'seg', 'jieba'],
-        help='Words segment function for chinese words.')
-    group.add_argument(
-        '--cn_splited',
-        action='store_true',
-        help="Is chinese corpus is splited in to words.")
-    group.add_argument(
-        '--cn_split_dimer',
-        type=str,
-        default=' ',
-        help="Split dimer between chinese words.")
+    group.add_argument('--cn_seg_func',
+                       type=str,
+                       default='jieba',
+                       choices=['lac', 'seg', 'jieba'],
+                       help='Words segment function for chinese words.')
+    group.add_argument('--cn_splited',
+                       action='store_true',
+                       help="Is chinese corpus is splited in to words.")
+    group.add_argument('--cn_split_dimer',
+                       type=str,
+                       default=' ',
+                       help="Split dimer between chinese words.")
 
     group = parser.add_argument_group(title='common config')
-    group.add_argument(
-        '--append_eos',
-        action='store_true',
-        help='Append an <eos> token to the end of a document.')
-    group.add_argument(
-        '--log_interval',
-        type=int,
-        default=100,
-        help='Interval between progress updates')
-    group.add_argument(
-        '--workers',
-        type=int,
-        default=1,
-        help='Number of worker processes to launch')
+    group.add_argument('--append_eos',
+                       action='store_true',
+                       help='Append an <eos> token to the end of a document.')
+    group.add_argument('--log_interval',
+                       type=int,
+                       default=100,
+                       help='Interval between progress updates')
+    group.add_argument('--workers',
+                       type=int,
+                       default=1,
+                       help='Number of worker processes to launch')
 
     args = parser.parse_args()
     return args
@@ -197,14 +189,14 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
     words_set = set(words)
     i = 0
     while i < len(tokens):
-        # non-chinese character, then do word piece 
+        # non-chinese character, then do word piece
         if len(re.findall('[\u4E00-\u9FA5]', tokens[i])) == 0:
             new_tokens.append(tokens[i])
             i += 1
             continue
 
         # add "##" mark on the middel tokens of Chinese words
-        # such as ["通过", "利用"] -> ["通", "##过"， "利", "##用"] 
+        # such as ["通过", "利用"] -> ["通", "##过"， "利", "##用"]
         has_add = False
         for length in range(max_word_length, 0, -1):
             if i + length > len(tokens):
@@ -224,16 +216,19 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
 
 
 class IdentitySplitter(object):
+
     def tokenize(self, *text):
         return text
 
 
 class NewlineSplitter():
+
     def tokenize(self, text):
         return text.split("\n")
 
 
 class Converter(object):
+
     def __init__(self, args):
         self.args = args
 
@@ -254,10 +249,11 @@ class Converter(object):
         else:
             Converter.splitter = IdentitySplitter()
 
-        # Split sentence whole words mask for chinese 
+        # Split sentence whole words mask for chinese
         if self.args.cn_whole_word_segment:
             if self.args.cn_splited:
-                Converter.segment_func = lambda text: text.split(self.args.cn_split_dimer)
+                Converter.segment_func = lambda text: text.split(self.args.
+                                                                 cn_split_dimer)
             else:
                 Converter.segment_func = CHINESE_SEG_FUNC[self.args.cn_seg_func]
             Converter.whole_word_mask = get_whole_word_mask_tokens
@@ -301,8 +297,8 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = getattr(
-        tfs, args.tokenizer_name).from_pretrained(args.model_name)
+    sample_tokenizer = getattr(tfs, args.tokenizer_name).from_pretrained(
+        args.model_name)
     if sample_tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16
     else:
@@ -353,29 +349,25 @@ def main():
                 if sentence_len == 0:
                     continue
                 sentlens_stream.write(
-                    sentence_len.to_bytes(
-                        4, byteorder='little', signed=True))
+                    sentence_len.to_bytes(4, byteorder='little', signed=True))
                 # token_count += sentence_len
                 # sent_cumsum_stream.write(
                 #     token_count.to_bytes(
                 #         8, byteorder='little', signed=True))
                 sent_count += 1
                 token_ids_stream.write(
-                    np.array(
-                        sentence, dtype=save_dtype).tobytes(order='C'))
+                    np.array(sentence, dtype=save_dtype).tobytes(order='C'))
 
             doc_cumsum_stream.write(
-                sent_count.to_bytes(
-                    8, byteorder='little', signed=True))
+                sent_count.to_bytes(8, byteorder='little', signed=True))
 
             if step % args.log_interval == 0:
                 current = time.time()
                 elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
-                print(
-                    f"Processed {step} documents",
-                    f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
-                    file=sys.stderr)
+                print(f"Processed {step} documents",
+                      f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
+                      file=sys.stderr)
 
     pool.close()
     print("Saving tokens to files...")

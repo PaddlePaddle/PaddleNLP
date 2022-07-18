@@ -8,7 +8,7 @@ python3 -m pip install -r ../requirements.txt #-i https://pypi.tuna.tsinghua.edu
 python3 -m pip install pybind11 regex sentencepiece tqdm visualdl #-i https://mirror.baidu.com/pypi/simple
 python3 -m pip install --upgrade paddlenlp
 # get data
-cd ../examples/language_model/gpt-moe/dygraph/
+cd ../examples/language_model/moe/dygraph/
 rm -rf data
 mkdir data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz

@@ -22,7 +22,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
@@ -63,8 +63,8 @@ def predict(model, data_loader):
             input_ids = paddle.to_tensor(input_ids)
             token_type_ids = paddle.to_tensor(token_type_ids)
 
-            batch_logit, _ = model(
-                input_ids=input_ids, token_type_ids=token_type_ids)
+            batch_logit, _ = model(input_ids=input_ids,
+                                   token_type_ids=token_type_ids)
 
             batch_logits.append(batch_logit.numpy())
 
@@ -76,31 +76,29 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        is_test=True)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         is_test=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
     ): [data for data in fn(samples)]
 
-    test_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, is_test=True, lazy=False)
+    test_ds = load_dataset(read_text_pair,
+                           data_path=args.input_file,
+                           is_test=True,
+                           lazy=False)
 
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    test_data_loader = create_dataloader(test_ds,
+                                         mode='predict',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     model = QuestionMatching(pretrained_model)
 

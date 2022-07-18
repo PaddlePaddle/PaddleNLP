@@ -18,14 +18,16 @@ def paddle2D_scatter_add(x_tensor, index_tensor, update_tensor, dim=0):
             x=[index_tensor, (paddle.arange(dim1 * dim0) % dim0).unsqueeze(1)],
             axis=1)
     elif dim == 1:
-        index_tensor = paddle.concat(
-            x=[(paddle.arange(dim1 * dim0) // dim1).unsqueeze(1), index_tensor],
-            axis=1)
+        index_tensor = paddle.concat(x=[
+            (paddle.arange(dim1 * dim0) // dim1).unsqueeze(1), index_tensor
+        ],
+                                     axis=1)
     output_tensor = paddle.scatter_nd_add(x_tensor, index_tensor, update_tensor)
     return output_tensor
 
 
 class Encoder(paddle.nn.Layer):
+
     def __init__(self):
         super(Encoder, self).__init__()
 
@@ -42,23 +44,24 @@ class Encoder(paddle.nn.Layer):
             config.hidden_dim,
             num_layers=1,
             direction='bidirect',
-            weight_ih_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-config.rand_unif_init_mag,
-                high=config.rand_unif_init_mag)),
+            weight_ih_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-config.rand_unif_init_mag,
+                                      high=config.rand_unif_init_mag)),
             bias_ih_attr=paddle.ParamAttr(initializer=I.Constant(value=0.0)))
 
         # Initialized linear weights
-        self.W_h = nn.Linear(
-            config.hidden_dim * 2, config.hidden_dim * 2, bias_attr=False)
+        self.W_h = nn.Linear(config.hidden_dim * 2,
+                             config.hidden_dim * 2,
+                             bias_attr=False)
 
     # The variable seq_lens should be in descending order
     def forward(self, input, seq_lens):
         embedded = self.embedding(input)
         self.embedded = embedded
 
-        output, hidden = self.lstm(
-            embedded, sequence_length=paddle.to_tensor(
-                seq_lens, dtype='int32'))
+        output, hidden = self.lstm(embedded,
+                                   sequence_length=paddle.to_tensor(
+                                       seq_lens, dtype='int32'))
 
         encoder_feature = paddle.reshape(
             output, [-1, 2 * config.hidden_dim])  # B * t_k x 2*hidden_dim
@@ -68,6 +71,7 @@ class Encoder(paddle.nn.Layer):
 
 
 class ReduceState(paddle.nn.Layer):
+
     def __init__(self):
         super(ReduceState, self).__init__()
 
@@ -84,18 +88,19 @@ class ReduceState(paddle.nn.Layer):
 
     def forward(self, hidden):
         h, c = hidden  # h, c dim = 2 x b x hidden_dim
-        h_in = paddle.reshape(
-            h.transpose([1, 0, 2]), [-1, config.hidden_dim * 2])
+        h_in = paddle.reshape(h.transpose([1, 0, 2]),
+                              [-1, config.hidden_dim * 2])
         hidden_reduced_h = F.relu(self.reduce_h(h_in))
-        c_in = paddle.reshape(
-            c.transpose([1, 0, 2]), [-1, config.hidden_dim * 2])
+        c_in = paddle.reshape(c.transpose([1, 0, 2]),
+                              [-1, config.hidden_dim * 2])
         hidden_reduced_c = F.relu(self.reduce_c(c_in))
 
-        return (hidden_reduced_h.unsqueeze(0),
-                hidden_reduced_c.unsqueeze(0))  # h, c dim = 1 x b x hidden_dim
+        return (hidden_reduced_h.unsqueeze(0), hidden_reduced_c.unsqueeze(0)
+                )  # h, c dim = 1 x b x hidden_dim
 
 
 class Attention(paddle.nn.Layer):
+
     def __init__(self):
         super(Attention, self).__init__()
         # Attention
@@ -150,6 +155,7 @@ class Attention(paddle.nn.Layer):
 
 
 class Decoder(paddle.nn.Layer):
+
     def __init__(self):
         super(Decoder, self).__init__()
         self.attention_network = Attention()
@@ -168,9 +174,9 @@ class Decoder(paddle.nn.Layer):
             config.hidden_dim,
             num_layers=1,
             direction='forward',
-            weight_ih_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-config.rand_unif_init_mag,
-                high=config.rand_unif_init_mag)),
+            weight_ih_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-config.rand_unif_init_mag,
+                                      high=config.rand_unif_init_mag)),
             bias_ih_attr=paddle.ParamAttr(initializer=I.Constant(value=0.0)))
 
         if config.pointer_gen:
@@ -178,11 +184,10 @@ class Decoder(paddle.nn.Layer):
                 config.hidden_dim * 4 + config.emb_dim, 1)
 
         self.out1 = nn.Linear(config.hidden_dim * 3, config.hidden_dim)
-        self.out2 = nn.Linear(
-            config.hidden_dim,
-            config.vocab_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Normal(
-                std=config.trunc_norm_init_std)))
+        self.out2 = nn.Linear(config.hidden_dim,
+                              config.vocab_size,
+                              weight_attr=paddle.ParamAttr(initializer=I.Normal(
+                                  std=config.trunc_norm_init_std)))
 
     def forward(self, y_t_1, s_t_1, encoder_outputs, encoder_feature,
                 enc_padding_mask, c_t_1, extra_zeros, enc_batch_extend_vocab,
@@ -234,8 +239,9 @@ class Decoder(paddle.nn.Layer):
 
             if extra_zeros is not None:
                 vocab_dist_ = paddle.concat([vocab_dist_, extra_zeros], 1)
-            final_dist = paddle2D_scatter_add(
-                vocab_dist_, enc_batch_extend_vocab, attn_dist_, 1)
+            final_dist = paddle2D_scatter_add(vocab_dist_,
+                                              enc_batch_extend_vocab,
+                                              attn_dist_, 1)
         else:
             final_dist = vocab_dist
 
@@ -243,6 +249,7 @@ class Decoder(paddle.nn.Layer):
 
 
 class Model(object):
+
     def __init__(self, model_file_path=None, is_eval=False):
         super(Model, self).__init__()
         encoder = Encoder()
@@ -267,5 +274,5 @@ class Model(object):
             self.encoder.set_state_dict(
                 paddle.load(os.path.join(model_file_path, 'encoder.params')))
             self.reduce_state.set_state_dict(
-                paddle.load(
-                    os.path.join(model_file_path, 'reduce_state.params')))
+                paddle.load(os.path.join(model_file_path,
+                                         'reduce_state.params')))

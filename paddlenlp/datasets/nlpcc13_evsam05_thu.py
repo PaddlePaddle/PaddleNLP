@@ -46,15 +46,15 @@ class NLPCC13EVSAM05THU(DatasetBuilder):
     MD5 = '297ad22217ba4668d49580009810446e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('nlpcc13_evsam05_thu', 'train.conll'),
-            'c7779f981203b4ecbe5b04c65aaaffce'),
-        'dev': META_INFO(
-            os.path.join('nlpcc13_evsam05_thu', 'dev.conll'),
-            '59c2de72c7be39977f766e8290336dac'),
-        'test': META_INFO(
-            os.path.join('nlpcc13_evsam05_thu', 'test.conll'),
-            '873223b42060ce16a7e24545e43a933f'),
+        'train':
+        META_INFO(os.path.join('nlpcc13_evsam05_thu', 'train.conll'),
+                  'c7779f981203b4ecbe5b04c65aaaffce'),
+        'dev':
+        META_INFO(os.path.join('nlpcc13_evsam05_thu', 'dev.conll'),
+                  '59c2de72c7be39977f766e8290336dac'),
+        'test':
+        META_INFO(os.path.join('nlpcc13_evsam05_thu', 'test.conll'),
+                  '873223b42060ce16a7e24545e43a933f'),
     }
 
     def _get_data(self, mode, **kwargs):

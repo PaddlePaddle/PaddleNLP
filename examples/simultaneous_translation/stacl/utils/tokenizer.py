@@ -23,6 +23,7 @@ _locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
 
 
 class STACLTokenizer:
+
     def __init__(self, bpe_dict, is_chinese):
         bpe_parser = subword_nmt.create_apply_bpe_parser()
         bpe_args = bpe_parser.parse_args(args=['-c', bpe_dict])
@@ -45,6 +46,6 @@ class STACLTokenizer:
 
 
 if __name__ == '__main__':
-    tokenizer_zh = STACLTokenizer(
-        'data/nist2m/2M.zh2en.dict4bpe.zh', is_chinese=True)
+    tokenizer_zh = STACLTokenizer('data/nist2m/2M.zh2en.dict4bpe.zh',
+                                  is_chinese=True)
     print(tokenizer_zh.tokenize('玻利维亚举行总统与国会选举'))

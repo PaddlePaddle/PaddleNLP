@@ -20,7 +20,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Pad
 from paddlenlp.datasets import load_dataset
 
@@ -84,6 +83,7 @@ def decode(s_arc, s_rel, mask, tree=True):
 
 
 class Predictor(object):
+
     def __init__(self, model_dir, device):
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
@@ -130,7 +130,8 @@ class Predictor(object):
             example = convert_example(
                 example,
                 vocabs=vocabs,
-                mode="test", )
+                mode="test",
+            )
             examples.append(example)
 
         batches = [
@@ -152,7 +153,8 @@ class Predictor(object):
             mask = np.logical_and(
                 np.logical_and(words != word_pad_index,
                                words != word_bos_index),
-                words != word_eos_index, )
+                words != word_eos_index,
+            )
 
             arc_preds, rel_preds = decode(s_arc, s_rel, mask, args.tree)
 

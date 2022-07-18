@@ -21,7 +21,7 @@ from scipy.special import softmax
 
 import paddle
 from paddle import inference
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
@@ -84,10 +84,9 @@ def convert_example(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -95,6 +94,7 @@ def convert_example(example,
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -127,10 +127,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -167,8 +166,9 @@ class Predictor(object):
         """
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+                ),  # segment
         ): fn(samples)
 
         all_embeddings = []
@@ -180,7 +180,7 @@ class Predictor(object):
                 max_seq_length=self.max_seq_length,
                 pad_to_max_seq_len=True)
             examples.append((input_ids, segment_ids))
-            if (len(examples) >= 100):
+            if (len(examples) >= self.batch_size):
                 input_ids, segment_ids = batchify_fn(examples)
                 self.input_handles[0].copy_from_cpu(input_ids)
                 self.input_handles[1].copy_from_cpu(segment_ids)
@@ -214,7 +214,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
