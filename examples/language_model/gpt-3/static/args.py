@@ -292,7 +292,7 @@ def parse_args(MODEL_CLASSES):
                         default=False,
                         help="save_inference_model_then_exist")
     parser.add_argument(
-        "--fuse",
+        "--fuse_transformer",
         type=str2bool,
         default=False,
         help="Whether to enable fused_attention and fused_feedforward.")

@@ -11,10 +11,10 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-#include <Python.h>
 
-#include "glog/logging.h"
 #include "models/models.h"
+#include <Python.h>
+#include "glog/logging.h"
 #include "pybind/models.h"
 #include "pybind/utils.h"
 
@@ -33,12 +33,13 @@ public:
         std::vector<core::Token>, Model, "tokenize", Tokenize, tokens);
   }
 
-  virtual bool TokenToId(const std::string& token, uint* id) const override {
+  virtual bool TokenToId(const std::string& token,
+                         uint32_t* id) const override {
     PYBIND11_OVERLOAD_PURE_NAME(
         bool, Model, "token_to_id", TokenToId, token, id);
   }
 
-  virtual bool IdToToken(uint id, std::string* token) const override {
+  virtual bool IdToToken(uint32_t id, std::string* token) const override {
     PYBIND11_OVERLOAD_PURE_NAME(
         bool, Model, "id_to_token", IdToToken, id, token);
   }
@@ -67,12 +68,13 @@ class PyWordPiece : public models::WordPiece {
         std::vector<core::Token>, WordPiece, "tokenize", Tokenize, tokens);
   }
 
-  virtual bool TokenToId(const std::string& token, uint* id) const override {
+  virtual bool TokenToId(const std::string& token,
+                         uint32_t* id) const override {
     PYBIND11_OVERLOAD_NAME(
         bool, WordPiece, "token_to_id", TokenToId, token, id);
   }
 
-  virtual bool IdToToken(uint id, std::string* token) const override {
+  virtual bool IdToToken(uint32_t id, std::string* token) const override {
     PYBIND11_OVERLOAD_NAME(
         bool, WordPiece, "id_to_token", IdToToken, id, token);
   }
@@ -108,12 +110,13 @@ class PyFasterWordPiece : public models::FasterWordPiece {
                            tokens);
   }
 
-  virtual bool TokenToId(const std::string& token, uint* id) const override {
+  virtual bool TokenToId(const std::string& token,
+                         uint32_t* id) const override {
     PYBIND11_OVERLOAD_NAME(
         bool, FasterWordPiece, "token_to_id", TokenToId, token, id);
   }
 
-  virtual bool IdToToken(uint id, std::string* token) const override {
+  virtual bool IdToToken(uint32_t id, std::string* token) const override {
     PYBIND11_OVERLOAD_NAME(
         bool, FasterWordPiece, "id_to_token", IdToToken, id, token);
   }
@@ -147,11 +150,12 @@ class PyBPE : public models::BPE {
         std::vector<core::Token>, BPE, "tokenize", Tokenize, tokens);
   }
 
-  virtual bool TokenToId(const std::string& token, uint* id) const override {
+  virtual bool TokenToId(const std::string& token,
+                         uint32_t* id) const override {
     PYBIND11_OVERLOAD_NAME(bool, BPE, "token_to_id", TokenToId, token, id);
   }
 
-  virtual bool IdToToken(uint id, std::string* token) const override {
+  virtual bool IdToToken(uint32_t id, std::string* token) const override {
     PYBIND11_OVERLOAD_NAME(bool, BPE, "id_to_token", IdToToken, id, token);
   }
 
@@ -179,11 +183,12 @@ class PyUnigram : public models::Unigram {
         std::vector<core::Token>, Unigram, "tokenize", Tokenize, tokens);
   }
 
-  virtual bool TokenToId(const std::string& token, uint* id) const override {
+  virtual bool TokenToId(const std::string& token,
+                         uint32_t* id) const override {
     PYBIND11_OVERLOAD_NAME(bool, Unigram, "token_to_id", TokenToId, token, id);
   }
 
-  virtual bool IdToToken(uint id, std::string* token) const override {
+  virtual bool IdToToken(uint32_t id, std::string* token) const override {
     PYBIND11_OVERLOAD_NAME(bool, Unigram, "id_to_token", IdToToken, id, token);
   }
 

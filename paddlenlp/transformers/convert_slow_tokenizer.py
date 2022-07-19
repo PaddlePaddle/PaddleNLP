@@ -85,7 +85,8 @@ class BertConverter(Converter):
             strip_accents=strip_accents,
             lowercase=do_lower_case,
         )
-        tokenizer.pretokenizer = pretokenizers.BertPreTokenizer()
+        # No need to init pretokenizer because FasterWordPiece can pretokenize
+        # tokenizer.pretokenizer = pretokenizers.BertPreTokenizer()
 
         cls_token = str(self.original_tokenizer.cls_token)
         sep_token = str(self.original_tokenizer.sep_token)

@@ -237,7 +237,7 @@ std::vector<core::Token> BPE::Tokenize(const std::string& sequence) {
   return tokens;
 }
 
-bool BPE::TokenToId(const std::string& token, uint* id) const {
+bool BPE::TokenToId(const std::string& token, uint32_t* id) const {
   if (vocab_.find(token) == vocab_.end()) {
     return false;
   }
@@ -245,7 +245,7 @@ bool BPE::TokenToId(const std::string& token, uint* id) const {
   return true;
 }
 
-bool BPE::IdToToken(uint id, std::string* token) const {
+bool BPE::IdToToken(uint32_t id, std::string* token) const {
   if (vocab_reversed_.find(id) == vocab_reversed_.end()) {
     return false;
   }

@@ -23,15 +23,15 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
-Encoding::Encoding(const std::vector<uint>& ids,
-                   const std::vector<uint>& type_ids,
+Encoding::Encoding(const std::vector<uint32_t>& ids,
+                   const std::vector<uint32_t>& type_ids,
                    const std::vector<std::string>& tokens,
-                   const std::vector<uint>& words_idx,
+                   const std::vector<uint32_t>& words_idx,
                    const std::vector<Offset>& offsets,
-                   const std::vector<uint>& special_tokens_mask,
-                   const std::vector<uint>& attention_mask,
+                   const std::vector<uint32_t>& special_tokens_mask,
+                   const std::vector<uint32_t>& attention_mask,
                    const std::vector<Encoding>& overflowing,
-                   const std::unordered_map<uint, Range>& sequence_ranges)
+                   const std::unordered_map<uint32_t, Range>& sequence_ranges)
     : ids_(ids),
       type_ids_(type_ids),
       tokens_(tokens),
@@ -42,15 +42,15 @@ Encoding::Encoding(const std::vector<uint>& ids,
       overflowing_(overflowing),
       sequence_ranges_(sequence_ranges) {}
 // Move version
-Encoding::Encoding(std::vector<uint>&& ids,
-                   std::vector<uint>&& type_ids,
+Encoding::Encoding(std::vector<uint32_t>&& ids,
+                   std::vector<uint32_t>&& type_ids,
                    std::vector<std::string>&& tokens,
-                   std::vector<uint>&& words_idx,
+                   std::vector<uint32_t>&& words_idx,
                    std::vector<Offset>&& offsets,
-                   std::vector<uint>&& special_tokens_mask,
-                   std::vector<uint>&& attention_mask,
+                   std::vector<uint32_t>&& special_tokens_mask,
+                   std::vector<uint32_t>&& attention_mask,
                    std::vector<Encoding>&& overflowing,
-                   std::unordered_map<uint, Range>&& sequence_ranges)
+                   std::unordered_map<uint32_t, Range>&& sequence_ranges)
     : ids_(std::move(ids)),
       type_ids_(std::move(type_ids)),
       tokens_(std::move(tokens)),
@@ -61,7 +61,7 @@ Encoding::Encoding(std::vector<uint>&& ids,
       overflowing_(std::move(overflowing)),
       sequence_ranges_(std::move(sequence_ranges)) {}
 
-Encoding::Encoding(uint capacity) {
+Encoding::Encoding(uint32_t capacity) {
   ids_.reserve(capacity);
   type_ids_.reserve(capacity);
   tokens_.reserve(capacity);
@@ -71,7 +71,7 @@ Encoding::Encoding(uint capacity) {
   attention_mask_.reserve(capacity);
 }
 
-Encoding::Encoding(const std::vector<Token>& tokens, uint type_id)
+Encoding::Encoding(const std::vector<Token>& tokens, uint32_t type_id)
     : type_ids_(tokens.size(), type_id),
       words_idx_(tokens.size()),
       attention_mask_(tokens.size(), 1),
@@ -122,19 +122,21 @@ int Encoding::GetNumSequence() const {
   return sequence_ranges_.size();
 }
 
-void Encoding::SetSequenceIds(uint seq_ids) {
+void Encoding::SetSequenceIds(uint32_t seq_ids) {
   sequence_ranges_[seq_ids] = {0, GetLen()};
 }
 
 const std::vector<std::string>& Encoding::GetTokens() const { return tokens_; }
 
-const std::vector<uint>& Encoding::GetWordsIdx() const { return words_idx_; }
+const std::vector<uint32_t>& Encoding::GetWordsIdx() const {
+  return words_idx_;
+}
 
-std::vector<uint>& Encoding::GetMutableWordsIdx() { return words_idx_; }
+std::vector<uint32_t>& Encoding::GetMutableWordsIdx() { return words_idx_; }
 
-std::vector<uint> Encoding::GetSequenceIds() const {
-  std::vector<uint> sequences(GetLen());
-  for (uint seq_id = 0; seq_id < GetNumSequence(); ++seq_id) {
+std::vector<uint32_t> Encoding::GetSequenceIds() const {
+  std::vector<uint32_t> sequences(GetLen());
+  for (uint32_t seq_id = 0; seq_id < GetNumSequence(); ++seq_id) {
     Range range = sequence_ranges_.at(seq_id);
     auto seq_len = range.second - range.first;
     for (int i = range.first; i < range.second; ++i) {
@@ -144,19 +146,19 @@ std::vector<uint> Encoding::GetSequenceIds() const {
   return sequences;
 }
 
-const std::vector<uint>& Encoding::GetIds() const { return ids_; }
+const std::vector<uint32_t>& Encoding::GetIds() const { return ids_; }
 
-const std::vector<uint>& Encoding::GetTypeIds() const { return type_ids_; }
+const std::vector<uint32_t>& Encoding::GetTypeIds() const { return type_ids_; }
 
 const std::vector<Offset>& Encoding::GetOffsets() const { return offsets_; }
 
 std::vector<Offset>& Encoding::GetMutableOffsets() { return offsets_; }
 
-const std::vector<uint>& Encoding::GetSpecialTokensMask() const {
+const std::vector<uint32_t>& Encoding::GetSpecialTokensMask() const {
   return special_tokens_mask_;
 }
 
-const std::vector<uint>& Encoding::GetAttentionMask() const {
+const std::vector<uint32_t>& Encoding::GetAttentionMask() const {
   return attention_mask_;
 }
 
@@ -168,20 +170,21 @@ std::vector<Encoding>& Encoding::GetMutableOverflowing() {
   return overflowing_;
 }
 
-Range Encoding::GetSequenceRange(uint seq_id) const {
+Range Encoding::GetSequenceRange(uint32_t seq_id) const {
   return sequence_ranges_.at(seq_id);
 }
 
 void Encoding::ProcessTokenWithOffsets(
-    std::function<void(uint, std::string*, Offset*)> process_token_fn) {
+    std::function<void(uint32_t, std::string*, Offset*)> process_token_fn) {
   auto length = GetLen();
   for (int i = 0; i < length; ++i) {
     process_token_fn(i, &tokens_[i], &offsets_[i]);
   }
 }
 
-std::vector<uint> Encoding::TokenIdxToSequenceIds(uint token_idx) const {
-  std::vector<uint> seq_ids;
+std::vector<uint32_t> Encoding::TokenIdxToSequenceIds(
+    uint32_t token_idx) const {
+  std::vector<uint32_t> seq_ids;
   if (token_idx < GetLen()) {
     if (sequence_ranges_.empty()) {
       seq_ids.push_back(0);
@@ -199,15 +202,16 @@ std::vector<uint> Encoding::TokenIdxToSequenceIds(uint token_idx) const {
   return seq_ids;
 }
 
-std::vector<Range> Encoding::WordIdxToTokensIdx(uint word_idx,
-                                                uint seq_id) const {
+std::vector<Range> Encoding::WordIdxToTokensIdx(uint32_t word_idx,
+                                                uint32_t seq_id) const {
   auto seq_range = sequence_ranges_.at(seq_id);
   std::vector<Range> ranges;
   int start = -1;
   int end = -1;
-  for (uint i = seq_range.first; i < seq_range.second; ++i) {
+  for (uint32_t i = seq_range.first; i < seq_range.second; ++i) {
     // -1 is the word index of special token
-    if (words_idx_[i] > word_idx && words_idx_[i] != static_cast<uint>(-1)) {
+    if (words_idx_[i] > word_idx &&
+        words_idx_[i] != static_cast<uint32_t>(-1)) {
       break;
     }
     if (words_idx_[i] == word_idx) {
@@ -227,8 +231,8 @@ std::vector<Range> Encoding::WordIdxToTokensIdx(uint word_idx,
   return ranges;
 }
 
-std::vector<Offset> Encoding::WordIdxToCharOffsets(uint word_idx,
-                                                   uint seq_id) const {
+std::vector<Offset> Encoding::WordIdxToCharOffsets(uint32_t word_idx,
+                                                   uint32_t seq_id) const {
   std::vector<Offset> offsets;
   std::vector<Range> ranges = WordIdxToTokensIdx(word_idx, seq_id);
   if (ranges.size() > 0) {
@@ -241,9 +245,9 @@ std::vector<Offset> Encoding::WordIdxToCharOffsets(uint word_idx,
   return offsets;
 }
 
-std::vector<std::pair<uint, Offset>> Encoding::TokenIdxToCharOffsets(
-    uint token_idx) const {
-  std::vector<std::pair<uint, Offset>> results;
+std::vector<std::pair<uint32_t, Offset>> Encoding::TokenIdxToCharOffsets(
+    uint32_t token_idx) const {
+  std::vector<std::pair<uint32_t, Offset>> results;
   auto seq_ids = TokenIdxToSequenceIds(token_idx);
   if (seq_ids.size() > 0) {
     results.push_back({seq_ids[0], offsets_[token_idx]});
@@ -251,9 +255,9 @@ std::vector<std::pair<uint, Offset>> Encoding::TokenIdxToCharOffsets(
   return results;
 }
 
-std::vector<std::pair<uint, uint>> Encoding::TokenIdxToWordIdx(
-    uint token_idx) const {
-  std::vector<std::pair<uint, uint>> results;
+std::vector<std::pair<uint32_t, uint32_t>> Encoding::TokenIdxToWordIdx(
+    uint32_t token_idx) const {
+  std::vector<std::pair<uint32_t, uint32_t>> results;
   auto seq_ids = TokenIdxToSequenceIds(token_idx);
   if (seq_ids.size() > 0) {
     results.push_back({seq_ids[0], words_idx_[token_idx]});
@@ -261,9 +265,9 @@ std::vector<std::pair<uint, uint>> Encoding::TokenIdxToWordIdx(
   return results;
 }
 
-std::vector<uint> Encoding::CharOffsetsToTokenIdx(uint char_pos,
-                                                  uint seq_id) const {
-  std::vector<uint> token_idx;
+std::vector<uint32_t> Encoding::CharOffsetsToTokenIdx(uint32_t char_pos,
+                                                      uint32_t seq_id) const {
+  std::vector<uint32_t> token_idx;
   auto seq_range = sequence_ranges_.at(seq_id);
   for (int i = seq_range.first; i < seq_range.second; ++i) {
     if (char_pos >= offsets_[i].first && char_pos < offsets_[i].second) {
@@ -274,10 +278,10 @@ std::vector<uint> Encoding::CharOffsetsToTokenIdx(uint char_pos,
   return token_idx;
 }
 
-std::vector<uint> Encoding::CharOffsetsToWordIdx(uint char_pos,
-                                                 uint seq_id) const {
-  std::vector<uint> token_idx = CharOffsetsToTokenIdx(char_pos, seq_id);
-  std::vector<uint> word_idx;
+std::vector<uint32_t> Encoding::CharOffsetsToWordIdx(uint32_t char_pos,
+                                                     uint32_t seq_id) const {
+  std::vector<uint32_t> token_idx = CharOffsetsToTokenIdx(char_pos, seq_id);
+  std::vector<uint32_t> word_idx;
   if (token_idx.size() > 0) {
     auto words_idx = TokenIdxToWordIdx(token_idx[0]);
     if (words_idx.size() > 0) {
@@ -324,39 +328,40 @@ void Encoding::Truncate(size_t max_len, size_t stride, Direction direction) {
     // Create new encoding
     auto new_encoding_len = part_ranges[0].second - part_ranges[0].first;
     Encoding new_encoding(
-        std::vector<uint>(ids_.begin(), ids_.begin() + new_encoding_len),
-        std::vector<uint>(type_ids_.begin(),
-                          type_ids_.begin() + new_encoding_len),
+        std::vector<uint32_t>(ids_.begin(), ids_.begin() + new_encoding_len),
+        std::vector<uint32_t>(type_ids_.begin(),
+                              type_ids_.begin() + new_encoding_len),
         std::vector<std::string>(tokens_.begin(),
                                  tokens_.begin() + new_encoding_len),
-        std::vector<uint>(words_idx_.begin(),
-                          words_idx_.begin() + new_encoding_len),
+        std::vector<uint32_t>(words_idx_.begin(),
+                              words_idx_.begin() + new_encoding_len),
         std::vector<Offset>(offsets_.begin(),
                             offsets_.begin() + new_encoding_len),
-        std::vector<uint>(special_tokens_mask_.begin(),
-                          special_tokens_mask_.begin() + new_encoding_len),
-        std::vector<uint>(attention_mask_.begin(),
-                          attention_mask_.begin() + new_encoding_len),
+        std::vector<uint32_t>(special_tokens_mask_.begin(),
+                              special_tokens_mask_.begin() + new_encoding_len),
+        std::vector<uint32_t>(attention_mask_.begin(),
+                              attention_mask_.begin() + new_encoding_len),
         std::vector<Encoding>(),
-        std::unordered_map<uint, Range>());
+        std::unordered_map<uint32_t, Range>());
     // Set overflowing
     for (size_t i = 1; i < part_ranges.size() - 1; ++i) {
       auto start = part_ranges[i].first;
       auto end = part_ranges[i].second;
       new_encoding.overflowing_.emplace_back(Encoding(
-          std::vector<uint>(ids_.begin() + start, ids_.begin() + end),
-          std::vector<uint>(type_ids_.begin() + start, type_ids_.begin() + end),
+          std::vector<uint32_t>(ids_.begin() + start, ids_.begin() + end),
+          std::vector<uint32_t>(type_ids_.begin() + start,
+                                type_ids_.begin() + end),
           std::vector<std::string>(tokens_.begin() + start,
                                    tokens_.begin() + end),
-          std::vector<uint>(words_idx_.begin() + start,
-                            words_idx_.begin() + end),
+          std::vector<uint32_t>(words_idx_.begin() + start,
+                                words_idx_.begin() + end),
           std::vector<Offset>(offsets_.begin() + start, offsets_.begin() + end),
-          std::vector<uint>(special_tokens_mask_.begin() + start,
-                            special_tokens_mask_.begin() + end),
-          std::vector<uint>(attention_mask_.begin() + start,
-                            attention_mask_.begin() + end),
+          std::vector<uint32_t>(special_tokens_mask_.begin() + start,
+                                special_tokens_mask_.begin() + end),
+          std::vector<uint32_t>(attention_mask_.begin() + start,
+                                attention_mask_.begin() + end),
           std::vector<Encoding>(),
-          std::unordered_map<uint, Range>()));
+          std::unordered_map<uint32_t, Range>()));
     }
     *this = std::move(new_encoding);
   }
@@ -398,7 +403,7 @@ void Encoding::MergeWith(const Encoding& pair, bool growing_offsets) {
   EXTEND_VECTOR(attention_mask_);
 #undef EXTEND_VECTOR
   // Setting offet
-  uint starting_offset = 0;
+  uint32_t starting_offset = 0;
   if (growing_offsets && offsets_.size() > 0) {
     starting_offset = offsets_.back().second;
   }
@@ -410,9 +415,9 @@ void Encoding::MergeWith(const Encoding& pair, bool growing_offsets) {
   overflowing_ = std::move(overflowings);
 }
 
-void Encoding::Pad(uint target_length,
-                   uint pad_id,
-                   uint pad_type_id,
+void Encoding::Pad(uint32_t target_length,
+                   uint32_t pad_id,
+                   uint32_t pad_type_id,
                    const std::string& pad_token,
                    Direction direction) {
   for (auto& overflowing : overflowing_) {
@@ -483,7 +488,7 @@ std::string Encoding::DebugString() const {
 
   oss << "words_idx: ";
   for (int i = 0; i < words_idx_.size(); ++i) {
-    if (words_idx_[i] == static_cast<uint>(-1)) {
+    if (words_idx_[i] == static_cast<uint32_t>(-1)) {
       // The [CLS], [SEP] word id
       oss << "-";
     } else {
