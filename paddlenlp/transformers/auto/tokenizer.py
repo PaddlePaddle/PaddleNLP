@@ -77,12 +77,14 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BertTokenizer", "bert"),
     ("BartTokenizer", "bart"),
     ("GAUAlphaTokenizer", "gau_alpha"),
+    ("CodeGenTokenizer", "codegen"),
 ])
 
-FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFasterTokenizer", "bert"),
-                                              ("ErnieFasterTokenizer", "ernie"),
-                                              ("TinyBertFasterTokenizer",
-                                               "tinybert")])
+FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
+    ("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie"),
+    ("TinyBertFasterTokenizer", "tinybert"),
+    ("ErnieMFasterTokenizer", "ernie_m")
+])
 # For FasterTokenizer
 if is_faster_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
@@ -208,8 +210,8 @@ class AutoTokenizer():
                                 logger.warning(
                                     "Can't find the faster_tokenizer package, "
                                     "please ensure install faster_tokenizer correctly. "
-                                    "You can install faster_tokenizer by `pip install faster_tokenizer`"
-                                    "(Currently only work for linux platform).")
+                                    "You can install faster_tokenizer by `pip install faster_tokenizer`."
+                                )
 
                         logger.info("We are using %s to load '%s'." %
                                     (actual_tokenizer_class,

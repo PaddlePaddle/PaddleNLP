@@ -967,7 +967,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
-        self.max_predict_len = max_predict_len
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype='int32')
         self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
@@ -1166,7 +1166,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 4:
                 attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.fluid.data_feeder.convert_dtype(
+            if "int" in paddle.common_ops_import.convert_dtype(
                     attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:

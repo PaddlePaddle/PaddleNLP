@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -149,20 +149,10 @@ def do_train():
 
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    # model = ppnlp.transformers.BertForSequenceClassification.from_pretrained('bert-base-chinese', num_class=2)
-    # model = ppnlp.transformers.RobertaForSequenceClassification.from_pretrained('roberta-wwm-ext', num_class=2)
-    # model = ppnlp.transformers.ElectraForSequenceClassification.from_pretrained('chinese-electra-small', num_classes=2)
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-tiny', num_classes=len(train_ds.label_list))
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=len(train_ds.label_list))
 
-    # If you wanna use bert/roberta/electra pretrained model,
-    # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-    # tokenizer = ppnlp.transformers.ElectraTokenizer.from_pretrained('chinese-electra-small', num_classes=2)
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,

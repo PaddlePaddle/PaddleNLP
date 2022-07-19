@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from model import ErnieForPretraining
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -362,8 +362,8 @@ if __name__ == "__main__":
     # iterate multi-times for train_ds
     test_ds = test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):

@@ -13,88 +13,48 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+#include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <string>
 #include <unordered_map>
-#include "unicode/uchar.h"
+#include <vector>
 
-namespace tokenizers {
+#if defined(_FREEBSD)
+#include <sys/endian.h>
+#endif
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined(_FREEBSD)
+#include <endian.h>
+#if BYTE_ORDER == __BIG_ENDIAN
+#define IS_BIG_ENDIAN
+#endif
+#endif
+
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace utils {
 
-inline void GetVocabFromFiles(const std::string& files,
-                              std::unordered_map<std::string, uint>* vocab) {
-  const static std::string WHITESPACE = " \n\r\t\f\v";
-  std::ifstream fin(files);
-  if (!fin.good()) {
-    std::cerr << "The vocab file " << files
-              << " seems to be unable to access"
-                 " or non-exists, please check again. "
-              << std::endl;
-    return;
-  }
-  vocab->clear();
-  int i = 0;
-  constexpr int MAX_BUFFER_SIZE = 256;
-  char word[MAX_BUFFER_SIZE];
-  while (fin.getline(word, MAX_BUFFER_SIZE)) {
-    std::string word_str = word;
-    auto leading_spaces = word_str.find_first_not_of(WHITESPACE);
-    if (leading_spaces != std::string::npos) {
-      word_str = word_str.substr(leading_spaces);
-    }
-    auto trailing_spaces = word_str.find_last_not_of(WHITESPACE);
-    if (trailing_spaces != std::string::npos) {
-      word_str = word_str.substr(0, trailing_spaces + 1);
-    }
-    if (word_str != "") {
-      (*vocab)[word_str] = i++;
-    }
-  }
-}
+void GetVocabFromFiles(const std::string& files,
+                       std::unordered_map<std::string, uint32_t>* vocab);
 
-inline bool IsChineseChar(int ch) {
-  return (
-      (ch >= 0x4E00 && ch <= 0x9FFF) || (ch >= 0x3400 && ch <= 0x4DBF) ||
-      (ch >= 0x20000 && ch <= 0x2A6DF) || (ch >= 0x2A700 && ch <= 0x2B73F) ||
-      (ch >= 0x2B740 && ch <= 0x2B81F) || (ch >= 0x2B820 && ch <= 0x2CEAF) ||
-      (ch >= 0xF900 && ch <= 0xFAFF) || (ch >= 0x2F800 && ch <= 0x2FA1F));
-}
+bool IsChineseChar(int ch);
 
-inline bool IsPunctuation(int ch) {
-  return (ch >= 33 && ch <= 47) || (ch >= 58 && ch <= 64) ||
-         (ch >= 91 && ch <= 96) || (ch >= 123 && ch <= 126) || u_ispunct(ch);
-}
+bool IsPunctuation(int ch);
 
-inline bool IsPunctuationOrChineseChar(int ch) {
-  return IsChineseChar(ch) || IsPunctuation(ch);
-}
+bool IsPunctuationOrChineseChar(int ch);
 
-inline bool StringReplace(std::string* str,
-                          const std::string& from,
-                          const std::string& to) {
-  size_t start_pos = str->find(from);
-  if (start_pos == std::string::npos) return false;
-  str->replace(start_pos, from.length(), to);
-  return true;
-}
+bool StringReplace(std::string* str,
+                   const std::string& from,
+                   const std::string& to);
 
-inline void StringReplaceAll(std::string* str,
-                             const std::string& from,
-                             const std::string& to) {
-  if (from.empty()) return;
-  size_t start_pos = 0;
-  while ((start_pos = str->find(from, start_pos)) != std::string::npos) {
-    str->replace(start_pos, from.length(), to);
-    start_pos += to.length();  // In case 'to' contains 'from', like replacing
-                               // 'x' with 'yx'
-  }
-}
-
+void StringReplaceAll(std::string* str,
+                      const std::string& from,
+                      const std::string& to);
 
 // Used in faster wordpiece model
-
 static constexpr uint32_t kBitToIndicateSuffixToken = 30;
 
 static constexpr uint32_t kBitsToEncodeVocabTokenLength = 8;
@@ -111,7 +71,9 @@ static constexpr uint32_t kMaxSupportedVocabSize =
 static constexpr uint32_t kMaskToEncodeVocabTokenId =
     ((1 << kBitToIndicateSuffixToken) - 1) ^ kMaskToEncodeVocabTokenLength;
 
-inline int EncodeToken(uint token_id, uint token_length, bool is_suffix_token) {
+inline int EncodeToken(uint32_t token_id,
+                       uint32_t token_length,
+                       bool is_suffix_token) {
   int encoded_value = (is_suffix_token << kBitToIndicateSuffixToken) |
                       (token_id << kBitsToEncodeVocabTokenLength) |
                       (token_length - 1);
@@ -173,5 +135,37 @@ inline bool IsSuffixWord(const std::string& word,
   return word.rfind(continuing_subword_prefix) == 0;
 }
 
+template <typename T>
+inline bool DecodePOD(const char* str, size_t str_len, T* result) {
+  if (sizeof(*result) != str_len) {
+    return false;
+  }
+  memcpy(result, str, sizeof(T));
+  return true;
+}
+
+
+template <typename T>
+inline std::string EncodePOD(const T& value) {
+  std::string s;
+  s.resize(sizeof(T));
+  memcpy(const_cast<char*>(s.data()), &value, sizeof(T));
+  return s;
+}
+
+inline size_t OneCharLen(const char* src) {
+  return "\1\1\1\1\1\1\1\1\1\1\1\1\2\2\3\4"[(*src & 0xFF) >> 4];
+}
+
+#ifdef IS_BIG_ENDIAN
+inline uint32 Swap32(uint32 x) { return __builtin_bswap32(x); }
+#endif
+
+void GetSortedVocab(const std::vector<const char*>& keys,
+                    const std::vector<int>& values,
+                    std::vector<const char*>* sorted_keys,
+                    std::vector<int>* sorted_values);
+
 }  // namespace utils
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

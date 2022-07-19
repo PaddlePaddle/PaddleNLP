@@ -55,8 +55,10 @@ function _train(){
     IFS=$OLD_IFS
 
     if [ ${fp_item} == "fp16" ]; then
+        fuse_transformer="True"
         use_amp="True"
     elif [ ${fp_item} == "fp32" ]; then
+        fuse_transformer="False"
         use_amp="False"
     else
         echo " The fp_item should be fp32 or fp16"
@@ -97,7 +99,7 @@ function _train(){
             --batch_size ${batch_size} \
             --use_amp ${use_amp} \
             --gradient_merge_steps $gradient_merge_steps \
-            --fuse_transformer true "
+            --fuse_transformer ${fuse_transformer} "
     else
         echo "Model type must be base or large. "
     fi

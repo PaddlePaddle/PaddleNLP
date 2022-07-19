@@ -20,7 +20,8 @@ limitations under the License. */
 #include "pretokenizers/pretokenizers.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tokenizers_impl {
 
 ErnieFasterTokenizer::ErnieFasterTokenizer(const std::string& vocab_path,
@@ -34,7 +35,7 @@ ErnieFasterTokenizer::ErnieFasterTokenizer(const std::string& vocab_path,
                                            bool strip_accents,
                                            bool lowercase,
                                            const std::string& wordpieces_prefix,
-                                           uint max_sequence_len) {
+                                           uint32_t max_sequence_len) {
   core::Vocab vocab;
   utils::GetVocabFromFiles(vocab_path, &vocab);
   VLOG(6) << "The vocab size of ErnieFasterTokenizer is " << vocab.size();
@@ -64,7 +65,7 @@ ErnieFasterTokenizer::ErnieFasterTokenizer(const core::Vocab& vocab,
                                            bool strip_accents,
                                            bool lowercase,
                                            const std::string& wordpieces_prefix,
-                                           uint max_sequence_len) {
+                                           uint32_t max_sequence_len) {
   Init(vocab,
        unk_token,
        sep_token,
@@ -91,13 +92,13 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
                                 bool strip_accents,
                                 bool lowercase,
                                 const std::string& wordpieces_prefix,
-                                uint max_sequence_len) {
+                                uint32_t max_sequence_len) {
   models::WordPiece wordpiece(
       vocab, unk_token, 100 /* max_input_chars_per_word */, wordpieces_prefix);
   this->SetModel(wordpiece);
 
   std::vector<core::AddedToken> added_tokens;
-  uint id;
+  uint32_t id;
   if (!this->TokenToId(unk_token, &id)) {
     added_tokens.emplace_back(unk_token, true);
   }
@@ -124,7 +125,7 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
   this->SetPreTokenizer(bert_pretokenizer);
 
   if (vocab.size() > 0) {
-    uint sep_id, cls_id;
+    uint32_t sep_id, cls_id;
     if (!this->TokenToId(sep_token, &sep_id)) {
       throw std::invalid_argument("sep_token not found in the vocabulary");
     }
@@ -145,5 +146,6 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
   }
 }
 
-}  // tokenizers_impl
-}  // tokenizers
+}  // namespace tokenizers_impl
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -15,7 +15,7 @@
 
 import paddle
 import paddle.nn as nn
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel
 
 
 class BiAffineParser(nn.Layer):
@@ -37,13 +37,8 @@ class BiAffineParser(nn.Layer):
 
         if encoding_model == "lstm-pe":
             self.embed = LSTMByWPEncoder(n_words, pad_index)
-        elif encoding_model == "ernie-1.0":
-            pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-                encoding_model)
-            self.embed = ErnieEncoder(pad_index, pretrained_model)
-        else:
-            pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-                encoding_model)
+        else:  # encoding_model is "ernie-3.0-medium-zh", "ernie-1.0" or other models:
+            pretrained_model = AutoModel.from_pretrained(encoding_model)
             self.embed = ErnieEncoder(pad_index, pretrained_model)
 
         # MLP layer
