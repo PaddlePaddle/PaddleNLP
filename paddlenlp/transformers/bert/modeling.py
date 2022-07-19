@@ -445,9 +445,10 @@ class BertModel(BertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
+        vocab_size (int, optional):
             Vocabulary size of `inputs_ids` in `BertModel`. Also is the vocab size of token embedding matrix.
             Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BertModel`.
+            Defaults to `30522`.
         hidden_size (int, optional):
             Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
         num_hidden_layers (int, optional):
@@ -476,7 +477,6 @@ class BertModel(BertPretrainedModel):
         type_vocab_size (int, optional):
             The vocabulary size of `token_type_ids`.
             Defaults to `16`.
-
         initializer_range (float, optional):
             The standard deviation of the normal initializer.
             Defaults to 0.02.

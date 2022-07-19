@@ -23,45 +23,21 @@ import paddle
 global_rng = random.Random()
 
 
-def ids_tensor(shape, vocab_size, rng=None):
+def ids_tensor(shape, vocab_size):
     #  Creates a random int32 tensor of the shape within the vocab size
-    if rng is None:
-        rng = global_rng
-
-    total_dims = 1
-    for dim in shape:
-        total_dims *= dim
-
-    values = []
-    for _ in range(total_dims):
-        values.append(rng.randint(0, vocab_size - 1))
-
-    return paddle.reshape(paddle.to_tensor(data=values, dtype=paddle.int32),
-                          shape=shape)
+    return paddle.randint(low=0, high=vocab_size, dtype="int32", shape=shape)
 
 
-def random_attention_mask(shape, rng=None):
-    attn_mask = ids_tensor(shape, vocab_size=2, rng=rng)
+def random_attention_mask(shape):
+    attn_mask = ids_tensor(shape, vocab_size=2)
     # make sure that at least one token is attended to for each batch
     attn_mask[:, -1] = 1
     return attn_mask
 
 
-def floats_tensor(shape, scale=1.0, rng=None):
+def floats_tensor(shape, scale=1.0):
     """Creates a random float32 tensor"""
-    if rng is None:
-        rng = global_rng
-
-    total_dims = 1
-    for dim in shape:
-        total_dims *= dim
-
-    values = []
-    for _ in range(total_dims):
-        values.append(rng.random() * scale)
-
-    return paddle.reshape(paddle.to_tensor(data=values, dtype=paddle.float32),
-                          shape=shape)
+    return scale * paddle.randn(shape, dtype="float32")
 
 
 class ModelTesterMixin:

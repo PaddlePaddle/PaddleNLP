@@ -287,26 +287,39 @@ class BertTokenizer(PretrainedTokenizer):
         vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
-        do_lower_case (bool):
-            Whether or not to lowercase the input when tokenizing.
-            Defaults to`True`.
-        unk_token (str):
+        do_lower_case (bool, optional):
+            Whether to lowercase the input when tokenizing.
+            Defaults to `True`.
+        do_basic_tokenize (bool, optional):
+            Whether to use a basic tokenizer before a WordPiece tokenizer.
+            Defaults to `True`.
+        never_split (Iterable, optional):
+            Collection of tokens which will never be split during tokenization. Only has an effect when
+            `do_basic_tokenize=True`. Defaults to `None`.
+        unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str):
+        sep_token (str, optional):
             A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str):
+        pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str):
+        cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str):
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
+        tokenize_chinese_chars (bool, optional):
+            Whether to tokenize Chinese characters.
+            Defaults to `True`.
+        strip_accents: (bool, optional):
+            Whether to strip all accents. If this option is not specified, then it will be determined by the
+            value for `lowercase` (as in the original BERT).
+            Defaults to `None`.
 
     Examples:
         .. code-block::
