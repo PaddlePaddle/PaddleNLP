@@ -269,7 +269,7 @@ class Vocab(object):
                     self.unk_token]
         else:
             return [
-                self._token_to_idx[token] if tokens in self._token_to_idx else
+                self._token_to_idx[token] if token in self._token_to_idx else
                 self._token_to_idx[self.unk_token] for token in tokens
             ]
 
