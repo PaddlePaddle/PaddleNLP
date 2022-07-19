@@ -17,6 +17,7 @@ import os
 import json
 
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.log import logger
 
 from utils import Preprocessor
 
@@ -43,14 +44,14 @@ def do_convert(input_file, target_file, label_map, preprocessor):
                 predicate_text = clean_text(spo['predicate'])
                 subject_type = spo['subject_type']
                 entity = {'text': subject_text, 'type': subject_type}
-                output['entity_list'] = [entity]
+                output.setdefault('entity_list', []).append(entity)
                 for spo_object in spo['object'].keys():
                     object_text = clean_text(spo['object'][spo_object])
                     if len(object_text) == 0:
                         continue
                     object_type = spo['object_type'][spo_object]
                     entity = {'text': object_text, 'type': object_type}
-                    output['entity_list'].append(entity)
+                    output.setdefault('entity_list', []).append(entity)
                     if predicate_text in label_map.keys():
                         # simple relation
                         relation = {
@@ -69,20 +70,22 @@ def do_convert(input_file, target_file, label_map, preprocessor):
             outputs.append(output)
             id += 1
 
-    # Add char span
-    outputs, _ = preprocessor.add_char_span(outputs, False)
+    # # Add char span
+    # outputs, _ = preprocessor.add_char_span(outputs, False)
 
-    # Add token span
-    outputs = preprocessor.add_tok_span(outputs)
+    # # Add token span
+    # outputs = preprocessor.add_tok_span(outputs)
 
     with open(target_file, 'w', encoding='utf-8') as f:
-        f.write(json.dumps(outputs, ensure_ascii=False) + "\n")
+        for output in outputs:
+            f.write(json.dumps(output, ensure_ascii=False) + "\n")
+    logger.info("Save %d examples to %s." % (id, target_file))
 
 
 if __name__ == "__main__":
     data_home = "./data"
     input_file_list = ["duie_train.json", "duie_dev.json"]
-    target_file_list = ["train_data.json", "valid_data.json"]
+    target_file_list = ["train_data.json", "dev_data.json"]
     rel2id_path = os.path.join(data_home, 'rel2id.json')
     with open(rel2id_path, 'r', encoding='utf8') as fp:
         label_map = json.load(fp)

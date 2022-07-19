@@ -81,10 +81,6 @@ class HandshakingTaggingScheme(object):
                 matrix_spots.append(spot)
                 spot_memory_set.add(memory)
 
-
-#         # if entity_list exist, need to distinguish entity types
-#         if self.ent2id is not None and "entity_list" in sample:
-
         for ent in sample["entity_list"]:
             add_spot((ent["tok_span"][0], ent["tok_span"][1] - 1,
                       self.tag2id[self.separator.join([ent["type"], "EH2ET"])]))
@@ -93,9 +89,6 @@ class HandshakingTaggingScheme(object):
             subj_tok_span = rel["subj_tok_span"]
             obj_tok_span = rel["obj_tok_span"]
             rel = rel["predicate"]
-            #             if self.ent2id is None: # set all entities to default type
-            #                 add_spot((subj_tok_span[0], subj_tok_span[1] - 1, self.tag2id[self.separator.join(["DEFAULT", "EH2ET"])]))
-            #                 add_spot((obj_tok_span[0], obj_tok_span[1] - 1, self.tag2id[self.separator.join(["DEFAULT", "EH2ET"])]))
             if subj_tok_span[0] <= obj_tok_span[0]:
                 add_spot((subj_tok_span[0], obj_tok_span[0],
                           self.tag2id[self.separator.join([rel, "SH2OH"])]))
@@ -259,7 +252,6 @@ class HandshakingTaggingScheme(object):
                     ent["tok_span"][0] + tok_offset,
                     ent["tok_span"][1] + tok_offset
                 ]
-
         return rel_list, ent_list
 
     def trans2ee(self, rel_list, ent_list):
@@ -321,7 +313,6 @@ class HandshakingTaggingScheme(object):
                                                 trigger_offset[1])
             if tirigger_offset2event[
                     trigger_offset_str] != event_type:  # filter false relations
-                #                 set_trace()
                 continue
 
             # append arguments
@@ -357,58 +348,34 @@ class HandshakingTaggingScheme(object):
 
 
 class TPLinkerPlus(nn.Layer):
+    "Network for TPLinkerPlus"
 
     def __init__(self,
                  encoder,
-                 tag_size,
-                 inner_enc_type="lstm",
+                 rel2id,
+                 shaking_type="cln",
                  tok_pair_sample_rate=1):
         super().__init__()
         self.encoder = encoder
-        self.tok_pair_sample_rate = tok_pair_sample_rate
+        self.shaking_type = shaking_type
 
         shaking_hidden_size = encoder.config["hidden_size"]
 
-        self.fc = nn.Linear(shaking_hidden_size, tag_size)
-
         # handshaking kernel
         self.handshaking_kernel = HandshakingKernel(shaking_hidden_size,
-                                                    inner_enc_type)
+                                                    shaking_type)
+        self.out_proj = nn.Linear(shaking_hidden_size, len(rel2id) * 4 + 1)
 
-    def forward(self, input_ids, attention_mask, token_type_ids):
+    def forward(self, input_ids, attention_mask):
         # input_ids, attention_mask, token_type_ids: (batch_size, seq_len)
-        context_outputs = self.encoder(input_ids, attention_mask,
-                                       token_type_ids)
+        context_outputs = self.encoder(input_ids, attention_mask=attention_mask)
         # last_hidden_state: (batch_size, seq_len, hidden_size)
         last_hidden_state = context_outputs[0]
 
         # shaking_hiddens: (batch_size, shaking_seq_len, hidden_size)
         shaking_hiddens = self.handshaking_kernel(last_hidden_state)
 
-        sampled_tok_pair_indices = None
-        if self.training:
-            # randomly sample segments of token pairs
-            shaking_seq_len = shaking_hiddens.shape[1]
-            segment_len = int(shaking_seq_len * self.tok_pair_sample_rate)
-            seg_num = math.ceil(shaking_seq_len // segment_len)
-            start_ind = paddle.randint(seg_num) * segment_len
-            end_ind = min(start_ind + segment_len, shaking_seq_len)
-            # sampled_tok_pair_indices: (batch_size, ~segment_len) ~end_ind - start_ind <= segment_len
+        # shaking_logits: (batch_size, shaking_seq_len, tag_size)
+        shaking_logits = self.out_proj(shaking_hiddens)
 
-            sampled_tok_pair_indices = paddle.tile(
-                paddle.arange(start_ind, end_ind)[None, :],
-                repeat_times=[shaking_hiddens.shape[0], 1])
-
-            # sampled_tok_pair_indices will tell model what token pairs should be fed into fcs
-            # shaking_hiddens: (batch_size, ~segment_len, hidden_size)
-            sampled_tok_pair_indices = paddle.tile(
-                sampled_tok_pair_indices[:, :, None],
-                repeat_times=[1, 1, shaking_hiddens.shape[-1]])
-            shaking_hiddens = paddle.take_along_axis(shaking_hiddens,
-                                                     sampled_tok_pair_indices,
-                                                     1)
-
-        # outputs: (batch_size, segment_len, tag_size) or (batch_size, shaking_seq_len, tag_size)
-        outputs = self.fc(shaking_hiddens)
-
-        return outputs, sampled_tok_pair_indices
+        return shaking_logits
