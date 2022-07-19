@@ -21,8 +21,9 @@ import numpy as np
 import paddle
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from paddlenlp.data import Vocab, JiebaTokenizer
+
+from ..utils.env import DATA_HOME
+from ..data import Vocab, JiebaTokenizer
 
 
 class BaseAugment(object):
@@ -45,11 +46,10 @@ class BaseAugment(object):
     def __init__(self,
                  create_n,
                  aug_n=None,
-                 aug_percent=None,
+                 aug_percent=0.02,
                  aug_min=1,
                  aug_max=10):
-        paddle.set_device("cpu")
-        self.DATA = {
+        self._DATA = {
             'stop_words':
             ("stopwords.txt", "a4a76df756194777ca18cd788231b474",
              "https://bj.bcebos.com/paddlenlp/data/stopwords.txt"),
@@ -87,7 +87,7 @@ class BaseAugment(object):
     def _load_file(self, mode):
         '''Check and download data'''
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, data_hash, url = self.DATA[mode]
+        filename, data_hash, url = self._DATA[mode]
         fullname = os.path.join(default_root, filename)
         if not os.path.exists(fullname) or (data_hash and
                                             not md5file(fullname) == data_hash):
@@ -99,23 +99,26 @@ class BaseAugment(object):
         '''Read data as list '''
         fullname = self._load_file(mode)
         data = []
-        with open(fullname, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            for line in lines:
-                data.append(line.strip())
-        f.close()
+        if os.path.exists(fullname):
+            with open(fullname, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                for line in lines:
+                    data.append(line.strip())
+            f.close()
+
         return data
 
-    def _get_aug_n(self, size):
+    def _get_aug_n(self, size, size_a=None):
         '''Calculate number of words for data augmentation'''
         if size == 0:
             return 0
-        aug_percent = self.aug_percent or 0.02
-        aug_n = self.aug_n or int(math.ceil(aug_percent * size))
+        aug_n = self.aug_n or int(math.ceil(self.aug_percent * size))
         if self.aug_min and aug_n < self.aug_min:
-            return self.aug_min
-        if self.aug_max and aug_n > self.aug_max:
-            return self.aug_max
+            aug_n = self.aug_min
+        elif self.aug_max and aug_n > self.aug_max:
+            aug_n = self.aug_max
+        if size_a is not None:
+            aug_n = min(aug_n, int(math.floor(size_a * 0.3)))
         return aug_n
 
     def _skip_stop_word_tokens(self, seq_tokens):
@@ -126,18 +129,16 @@ class BaseAugment(object):
                 indexes.append(i)
         return indexes
 
-    def _generate_random_index(self, seq_tokens, skip=True):
-        '''Random sample words for insertion/deletion/swap'''
-        # skip stopping words
-        if skip:
-            indexes = self._skip_stop_word_tokens(seq_tokens)
-        else:
-            indexes = [i for i in range(len(seq_tokens))]
-        aug_n = self._get_aug_n(len(seq_tokens))
-        aug_n = min(aug_n, len(indexes))
-        return random.sample(indexes, aug_n)
-
     def augment(self, sequences, num_thread=1):
+        '''
+        Apply augmentation strategy on input sequences.
+
+            Args:
+            sequences (str or list(str)):
+                Input sequence or list of input sequences.
+            num_thread (int):
+                Number of threads
+        '''
         sequences = self.clean(sequences)
         # Single Thread
         if num_thread == 1:
@@ -148,7 +149,8 @@ class BaseAugment(object):
                 for sequence in sequences:
                     output.append(self._augment(sequence))
                 return output
-        # TO BE DONE: Multi Thread
+        else:
+            raise NotImplementedError
 
     def _augment(self, sequence):
         raise NotImplementedError

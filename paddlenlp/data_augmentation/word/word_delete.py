@@ -13,7 +13,7 @@
 # limitations under the License.
 import random
 
-from paddlenlp.data_augmentation import BaseAugment
+from ..base_augment import BaseAugment
 
 
 class WordDelete(BaseAugment):
@@ -36,7 +36,7 @@ class WordDelete(BaseAugment):
     def __init__(self,
                  create_n=1,
                  aug_n=None,
-                 aug_percent=None,
+                 aug_percent=0.02,
                  aug_min=1,
                  aug_max=10):
         super().__init__(create_n=create_n,
@@ -48,11 +48,13 @@ class WordDelete(BaseAugment):
     def _augment(self, sequence):
 
         seq_tokens = self.tokenizer.cut(sequence)
-        aug_n = self._get_aug_n(len(seq_tokens))
-        aug_indexes = self.skip_words(seq_tokens)
-        aug_n = min(aug_n, len(aug_indexes))
+        aug_indexes = self._skip_words(seq_tokens)
+        aug_n = self._get_aug_n(len(seq_tokens), len(aug_indexes))
+
         t = 0
         sentences = []
+        if aug_n == 0:
+            return sentences
         while t < self.create_n * self.loop and len(sentences) < self.create_n:
             t += 1
             idxes = random.sample(aug_indexes, aug_n)
@@ -64,7 +66,7 @@ class WordDelete(BaseAugment):
                 sentences.append(sentence)
         return sentences
 
-    def skip_words(self, seq_tokens):
+    def _skip_words(self, seq_tokens):
         '''Skip words. We can rewrite function to skip specify words.'''
         indexes = []
         for i, seq_token in enumerate(seq_tokens):
@@ -72,13 +74,3 @@ class WordDelete(BaseAugment):
             ) and not seq_token.encode('UTF-8').isalpha():
                 indexes.append(i)
         return indexes
-
-
-if __name__ == '__main__':
-    aug = WordDelete(create_n=10, aug_n=1)
-    s1 = '2021年，我再看深度学习领域，无论是自然语言处理、音频信号处理、图像处理、推荐系统，似乎都看到attention混得风生水起，只不过更多时候看到的是它的另一个代号：Transformer。'
-
-    augmented = aug.augment(s1)
-    print(s1)
-    for a in augmented:
-        print(a)

@@ -14,9 +14,11 @@
 import random
 import sys
 import json
+import os
+
 from typing import Iterable
 
-from paddlenlp.data_augmentation import BaseAugment
+from ..base_augment import BaseAugment
 
 
 class WordInsert(BaseAugment):
@@ -48,7 +50,7 @@ class WordInsert(BaseAugment):
                  delete_file_path=None,
                  create_n=1,
                  aug_n=None,
-                 aug_percent=None,
+                 aug_percent=0.02,
                  aug_min=1,
                  aug_max=10):
         super().__init__(create_n=create_n,
@@ -88,23 +90,25 @@ class WordInsert(BaseAugment):
             fullname = self.custom_file_path
         elif source_type in ['delete']:
             fullname = self.delete_file_path
-        with open(fullname, 'r', encoding='utf-8') as f:
-            insert_dict = json.load(f)
-        f.close()
+        if os.path.exists(fullname):
+            with open(fullname, 'r', encoding='utf-8') as f:
+                insert_dict = json.load(f)
+            f.close()
         return insert_dict
 
     def _augment(self, sequence):
         seq_tokens = self.tokenizer.cut(sequence)
-        aug_n = self._get_aug_n(len(seq_tokens))
-        if aug_n == 1:
-            return self._augment_single(seq_tokens)
-        else:
-            return self._augment_multi(seq_tokens, aug_n)
-
-    def _augment_multi(self, seq_tokens, aug_n):
-        sentences = []
         aug_indexes = self._skip_stop_word_tokens(seq_tokens)
-        aug_n = min(aug_n, len(aug_indexes))
+        aug_n = self._get_aug_n(len(seq_tokens), len(aug_indexes))
+        if aug_n == 0:
+            return []
+        elif aug_n == 1:
+            return self._augment_single(seq_tokens, aug_indexes)
+        else:
+            return self._augment_multi(seq_tokens, aug_n, aug_indexes)
+
+    def _augment_multi(self, seq_tokens, aug_n, aug_indexes):
+        sentences = []
         if self.type in ['synonym', 'homonym', 'combination', 'custom']:
             candidate_tokens = []
             for aug_index in aug_indexes:
@@ -126,8 +130,8 @@ class WordInsert(BaseAugment):
                             [aug_index,
                              random.sample(aug_dict, 1)[0]])
 
-                    sentence = self._reverse_sequence(seq_tokens.copy(),
-                                                      aug_tokens)
+                    sentence = self._generate_sequence(seq_tokens.copy(),
+                                                       aug_tokens)
                     if sentence not in sentences:
                         sentences.append(sentence)
         elif self.type in ['random']:
@@ -142,13 +146,14 @@ class WordInsert(BaseAugment):
                         random.randint(0,
                                        len(self.vocab) - 2))
                     aug_tokens.append([aug_index, token])
-                sentence = self._reverse_sequence(seq_tokens.copy(), aug_tokens)
+                sentence = self._generate_sequence(seq_tokens.copy(),
+                                                   aug_tokens)
                 if sentence not in sentences:
                     sentences.append(sentence)
         return sentences
 
-    def _augment_single(self, seq_tokens):
-        aug_indexes = self._skip_stop_word_tokens(seq_tokens)
+    def _augment_single(self, seq_tokens, aug_indexes):
+
         sentences = []
         aug_tokens = []
         if self.type in ['synonym', 'homonym', 'combination', 'custom']:
@@ -172,10 +177,10 @@ class WordInsert(BaseAugment):
                     aug_tokens.append([aug_index, token])
         for aug_token in aug_tokens:
             sentences.append(
-                self._reverse_sequence(seq_tokens.copy(), [aug_token]))
+                self._generate_sequence(seq_tokens.copy(), [aug_token]))
         return sentences
 
-    def _reverse_sequence(self, output_seq_tokens, aug_tokens):
+    def _generate_sequence(self, output_seq_tokens, aug_tokens):
         '''Genearte the sequences according to the mapping list'''
         for aug_token in aug_tokens:
             idx, token = aug_token
@@ -184,13 +189,3 @@ class WordInsert(BaseAugment):
             else:
                 output_seq_tokens[idx] += token
         return ''.join(output_seq_tokens)
-
-
-if __name__ == '__main__':
-    aug = WordInsert(aug_type='synonym', create_n=2, aug_n=1)
-    s1 = '2021年，我再看深度学习领域，无论是自然语言处理、音频信号处理、图像处理、推荐系统，似乎都看到attention混得风生水起，只不过更多时候看到的是它的另一个代号：Transformer。'
-
-    augmented = aug.augment(s1)
-    print(s1)
-    for a in augmented:
-        print(a)
