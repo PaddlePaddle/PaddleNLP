@@ -19,10 +19,12 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer
 import faster_tokenizer
 from faster_tokenizer import ErnieFasterTokenizer, models
+
 logger.logger.setLevel('ERROR')
 
 
 class TestTokenizerJson(unittest.TestCase):
+
     def setUp(self):
         wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
         ernie_vocab = wordpiece_tokenizer.vocab.token_to_idx
@@ -30,6 +32,7 @@ class TestTokenizerJson(unittest.TestCase):
 
 
 class TestNormalizerJson(TestTokenizerJson):
+
     def check_normalizer_json(self, normalizer):
         self.faster_tokenizer.normalizer = normalizer
         json_file = str(normalizer.__class__) + ".json"
@@ -45,8 +48,8 @@ class TestNormalizerJson(TestTokenizerJson):
         self.check_normalizer_json(replace_normalizer)
 
     def test_strip(self):
-        strip_normalizer = faster_tokenizer.normalizers.StripNormalizer(True,
-                                                                        True)
+        strip_normalizer = faster_tokenizer.normalizers.StripNormalizer(
+            True, True)
         self.check_normalizer_json(strip_normalizer)
 
     def test_strip_accent(self):
@@ -77,6 +80,13 @@ class TestNormalizerJson(TestTokenizerJson):
         lowercase_normalizer = faster_tokenizer.normalizers.LowercaseNormalizer(
         )
         self.check_normalizer_json(lowercase_normalizer)
+
+    def test_sequence(self):
+        lowercase_normalizer = faster_tokenizer.normalizers.LowercaseNormalizer(
+        )
+        sequence_normalizer = faster_tokenizer.normalizers.SequenceNormalizer(
+            normalizers=[lowercase_normalizer])
+        self.check_normalizer_json(sequence_normalizer)
 
 
 if __name__ == "__main__":

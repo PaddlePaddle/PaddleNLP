@@ -30,18 +30,19 @@ def create_input_data(config, seed=None):
     if seed is not None:
         np.random.seed(seed)
 
-    input_ids = np.random.randint(
-        low=0,
-        high=config['vocab_size'],
-        size=(config["batch_size"], config["seq_len"]))
+    input_ids = np.random.randint(low=0,
+                                  high=config['vocab_size'],
+                                  size=(config["batch_size"],
+                                        config["seq_len"]))
 
     return input_ids
 
 
 class TestGPTForSequenceClassification(CommonTest):
+
     def set_input(self):
-        self.config = copy.deepcopy(GPTModel.pretrained_init_configuration[
-            'gpt2-medium-en'])
+        self.config = copy.deepcopy(
+            GPTModel.pretrained_init_configuration['gpt2-medium-en'])
         self.config['num_hidden_layers'] = 2
         self.config['vocab_size'] = 512
         self.config['eos_token_id'] = 511
@@ -84,6 +85,7 @@ class TestGPTForSequenceClassification(CommonTest):
 
 
 class TestGPTForTokenClassification(TestElectraForSequenceClassification):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = GPTForTokenClassification
 

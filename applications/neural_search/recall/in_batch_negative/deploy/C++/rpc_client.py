@@ -19,7 +19,7 @@ import time
 import numpy as np
 
 from paddle_serving_client import Client
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 
 
 def convert_example(example,
@@ -29,10 +29,9 @@ def convert_example(example,
     list_input_ids = []
     list_token_type_ids = []
     for text in example:
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         list_input_ids.append(input_ids)
@@ -51,7 +50,7 @@ print(feed_names)
 print(fetch_names)
 
 # 创建tokenizer
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 max_seq_len = 64
 
 # 数据预处理

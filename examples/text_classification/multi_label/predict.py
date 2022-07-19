@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
@@ -68,11 +68,10 @@ if __name__ == "__main__":
 
     # Load train dataset.
     file_name = 'test.csv'
-    test_ds = load_dataset(
-        read_custom_data,
-        filename=os.path.join(args.data_path, file_name),
-        is_test=True,
-        lazy=False)
+    test_ds = load_dataset(read_custom_data,
+                           filename=os.path.join(args.data_path, file_name),
+                           is_test=True,
+                           lazy=False)
 
     # The dataset labels
     label_info = [
@@ -80,30 +79,26 @@ if __name__ == "__main__":
     ]
 
     # Load pretrained model
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
-        "bert-base-uncased")
+    pretrained_model = AutoModel.from_pretrained("bert-base-uncased")
 
     # Load bert tokenizer
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-uncased')
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
     model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        is_test=True)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
     ): [data for data in fn(samples)]
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='test',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    test_data_loader = create_dataloader(test_ds,
+                                         mode='test',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

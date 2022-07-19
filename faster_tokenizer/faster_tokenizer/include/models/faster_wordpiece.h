@@ -21,7 +21,8 @@
 #include "utils/failure.h"
 #include "utils/trie.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
 struct FasterWordPiece : public WordPiece {
@@ -33,7 +34,7 @@ struct FasterWordPiece : public WordPiece {
                   bool with_pretokenization = false);
 
   virtual std::vector<core::Token> Tokenize(
-      const std::string& sequence) const override;
+      const std::string& sequence) override;
 
 private:
   void InitFailureAndTrie();
@@ -82,5 +83,6 @@ private:
   bool with_pretokenization_;  // The end-to-end version of FasterWordPiece
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

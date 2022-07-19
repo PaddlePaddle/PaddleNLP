@@ -20,14 +20,14 @@ sys.stdout.flush()
 
 
 class Trainer(object):
+
     def __init__(self):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
-        self.batcher = Batcher(
-            config.train_data_path,
-            self.vocab,
-            mode='train',
-            batch_size=config.batch_size,
-            single_pass=False)
+        self.batcher = Batcher(config.train_data_path,
+                               self.vocab,
+                               mode='train',
+                               batch_size=config.batch_size,
+                               single_pass=False)
 
         train_dir = os.path.join(config.log_root,
                                  'train_%d' % (int(time.time())))
@@ -49,8 +49,8 @@ class Trainer(object):
             'reduce_state': self.model.reduce_state.state_dict(),
             'optimizer': self.optimizer.state_dict()
         }
-        model_save_dir = os.path.join(self.model_dir, 'model_%06d_%.8f' %
-                                      (iter, running_avg_loss))
+        model_save_dir = os.path.join(
+            self.model_dir, 'model_%06d_%.8f' % (iter, running_avg_loss))
         for k in state:
             model_save_path = os.path.join(model_save_dir, '%s.params' % k)
             paddle.save(state[k], model_save_path)
@@ -142,8 +142,8 @@ class Trainer(object):
             iter += 1
             print(
                 'global step %d/%d, step loss: %.8f, running avg loss: %.8f, speed: %.2f step/s'
-                % (iter, n_iters, loss, running_avg_loss,
-                   1.0 / (time.time() - start)))
+                % (iter, n_iters, loss, running_avg_loss, 1.0 /
+                   (time.time() - start)))
             start = time.time()
             if iter % 5000 == 0 or iter == 1000:
                 model_save_dir = self.save_model(running_avg_loss, iter)
@@ -154,17 +154,17 @@ class Trainer(object):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train script")
-    parser.add_argument(
-        "-m",
-        dest="model_file_path",
-        required=False,
-        default=None,
-        help="Model file for retraining (default: None).")
+    parser.add_argument("-m",
+                        dest="model_file_path",
+                        required=False,
+                        default=None,
+                        help="Model file for retraining (default: None).")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override config.max_iterations.",
+        help=
+        "If > 0: set total number of training steps to perform. Override config.max_iterations.",
     )
     args = parser.parse_args()
 

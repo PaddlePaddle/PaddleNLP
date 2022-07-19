@@ -15,6 +15,6 @@
 import importlib.util
 
 
-def is_faster_tokenizers_available():
+def is_faster_tokenizer_available():
     package_spec = importlib.util.find_spec("faster_tokenizer")
     return package_spec is not None and package_spec.has_location

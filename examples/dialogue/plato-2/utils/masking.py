@@ -56,7 +56,8 @@ def mask(batch_tokens,
             mask_label.extend(sent[sent_b_index + 1:])
             mask_pos.extend([
                 sent_index * max_len + i + shift_len
-                for i in range(sent_b_index, len(sent) - 1)
+                for i in range(sent_b_index,
+                               len(sent) - 1)
             ])
         mask_label = np.array(mask_label).astype("int64").reshape([-1, 1])
         mask_pos = np.array(mask_pos).astype("int64").reshape([-1, 1])
@@ -90,8 +91,9 @@ def mask(batch_tokens,
         total_token_num = sum(map(len, batch_tokens))
         prob_mask = np.random.rand(total_token_num)
         # TODO: fix replace_ids, include [UNK]
-        replace_ids = np.random.randint(
-            3, high=vocab_size, size=total_token_num)
+        replace_ids = np.random.randint(3,
+                                        high=vocab_size,
+                                        size=total_token_num)
         prob_index = 0
         for sent_index, sent in enumerate(batch_tokens):
             # add pair label position

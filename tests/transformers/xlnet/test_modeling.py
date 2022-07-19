@@ -32,18 +32,19 @@ def create_input_data(config, seed=None):
     if seed is not None:
         np.random.seed(seed)
 
-    input_ids = np.random.randint(
-        low=0,
-        high=config['vocab_size'],
-        size=(config["batch_size"], config["seq_len"]))
+    input_ids = np.random.randint(low=0,
+                                  high=config['vocab_size'],
+                                  size=(config["batch_size"],
+                                        config["seq_len"]))
 
     return input_ids
 
 
 class TestXLNetLMHeadModel(CommonTest):
+
     def set_input(self):
-        self.config = copy.deepcopy(XLNetModel.pretrained_init_configuration[
-            'xlnet-base-cased'])
+        self.config = copy.deepcopy(
+            XLNetModel.pretrained_init_configuration['xlnet-base-cased'])
         self.config['n_layer'] = 2
         self.config['vocab_size'] = 512
         self.config['classifier_dropout'] = 0.0
@@ -81,6 +82,7 @@ class TestXLNetLMHeadModel(CommonTest):
 
 
 class TestXLNetForMultipleChoice(TestXLNetLMHeadModel):
+
     def set_input(self):
         super(TestXLNetForMultipleChoice, self).set_input()
         self.config['num_choices'] = 2
@@ -111,6 +113,7 @@ class TestXLNetForMultipleChoice(TestXLNetLMHeadModel):
 
 
 class TestXLNetForQuestionAnswering(TestXLNetLMHeadModel):
+
     def set_model_class(self):
         self.TEST_MODEL_CLASS = XLNetForQuestionAnswering
 

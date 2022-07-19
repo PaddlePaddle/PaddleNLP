@@ -1,7 +1,7 @@
 [简体中文🀄](./README_cn.md) |  **English**🌎
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
+  <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -30,6 +30,8 @@
 
 ## News 📢
 
+* 🍭 2022.6.29 **PaddleNLP v2.3.4** Released! Whole series of Chinese pretrained models [**ERNIE Tiny**](./model_zoo/ernie-3.0) are released to quickly improve deployment efficiency. We also provides smaller and faster models [**UIE Tiny**](./model_zoo/uie) for universal information extraction.
+
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
   * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow](./docs/model_zoo/taskflow.md).
   * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
@@ -57,7 +59,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
 ### Awesome Chinese Model Zoo
 
-#### 🀄 Comprehensive Chinese Transformer Models  
+#### 🀄 Comprehensive Chinese Transformer Models
 
 We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
@@ -72,6 +74,17 @@ electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
 ```
 
+Due to the computation limitation, you can use the ERNIE-Tiny light models to accelerate the deployment of pretrained models.
+```python
+# 6L768H
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+# 6L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
+# 4L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
+# 4L312H
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
+```
 Unified API experience for NLP task like semantic representation, text classification, sentence matching, sequence labeling, question answering, etc.
 
 ```python
@@ -199,7 +212,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FasterTokenizers: High Performance Text Preprocessing Library
+#### ⚡ FasterTokenizer: High Performance Text Preprocessing Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -209,7 +222,7 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizers](./faster_tokenizers).
+Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizer](./faster_tokenizer).
 
 #### ⚡ FasterGeneration: High Perforance Generation Library
 

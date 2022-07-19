@@ -64,18 +64,18 @@ batches = [
 ]
 
 for batch_data in batches:
-    input_ids, token_type_ids = pp_tokenizer(
-        text=batch_data, max_seq_len=max_seq_length)
+    input_ids, token_type_ids = pp_tokenizer(text=batch_data,
+                                             max_seq_len=max_seq_length)
 
 start = time.time()
 for _ in range(epochs):
     for batch_data in batches:
-        input_ids, token_type_ids = pp_tokenizer(
-            batch_data, max_seq_len=max_seq_length)
+        input_ids, token_type_ids = pp_tokenizer(batch_data,
+                                                 max_seq_len=max_seq_length)
 end = time.time()
 
-print("The throughput of paddle FasterTokenizer: {:,.2f} tokens/s".format((
-    total_tokens / (end - start))))
+print("The throughput of paddle FasterTokenizer: {:,.2f} tokens/s".format(
+    (total_tokens / (end - start))))
 
 hf_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese", use_fast=True)
 
@@ -93,8 +93,8 @@ for _ in range(epochs):
         encoded_inputs = hf_tokenizer(
             batch_data)  #, padding=True, truncation=True)
 end = time.time()
-print("The throughput of huggingface FasterTokenizer: {:,.2f} tokens/s".format((
-    total_tokens / (end - start))))
+print("The throughput of huggingface FasterTokenizer: {:,.2f} tokens/s".format(
+    (total_tokens / (end - start))))
 
 # BERT Tokenizer using PaddleNLP BertTokenizer
 py_tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
@@ -106,12 +106,12 @@ for _ in range(epochs):
     for batch_data in batches:
         encoded_inputs = py_tokenizer(batch_data)
 end = time.time()
-print("The throughput of paddle BertTokenizer: {:,.2f} tokens/s".format((
-    total_tokens / (end - start))))
+print("The throughput of paddle BertTokenizer: {:,.2f} tokens/s".format(
+    (total_tokens / (end - start))))
 
 # BERT Tokenizer using HuggingFace AutoTokenizer
-hf_tokenizer = AutoTokenizer.from_pretrained(
-    "bert-base-chinese", use_fast=False)
+hf_tokenizer = AutoTokenizer.from_pretrained("bert-base-chinese",
+                                             use_fast=False)
 
 for batch_data in batches:
     encoded_inputs = hf_tokenizer(batch_data)
@@ -128,13 +128,12 @@ print("The throughput of huggingface python tokenizer: {:,.2f} tokens/s".format(
 # BERT Tokenizer using TensorFlow Text
 vocab_list = list(py_tokenizer.vocab.token_to_idx.keys())
 lookup_table = tf.lookup.StaticVocabularyTable(
-    tf.lookup.KeyValueTensorInitializer(
-        keys=vocab_list,
-        key_dtype=tf.string,
-        values=tf.range(
-            tf.size(
-                vocab_list, out_type=tf.int64), dtype=tf.int64),
-        value_dtype=tf.int64),
+    tf.lookup.KeyValueTensorInitializer(keys=vocab_list,
+                                        key_dtype=tf.string,
+                                        values=tf.range(tf.size(
+                                            vocab_list, out_type=tf.int64),
+                                                        dtype=tf.int64),
+                                        value_dtype=tf.int64),
     num_oov_buckets=1)
 
 tf_tokenizer = tf_text.BertTokenizer(lookup_table)
@@ -147,5 +146,6 @@ for _ in range(epochs):
     for batch_data in batches:
         input_ids = tf_tokenizer.tokenize(batch_data)
 end = time.time()
-print("The throughput of TensorFlow Text BertTokenizer: {:,.2f} tokens/s".
-      format((total_tokens / (end - start))))
+print(
+    "The throughput of TensorFlow Text BertTokenizer: {:,.2f} tokens/s".format(
+        (total_tokens / (end - start))))

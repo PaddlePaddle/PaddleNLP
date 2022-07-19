@@ -12,8 +12,8 @@ def get_input_from_batch(batch):
     enc_batch_extend_vocab = None
 
     if config.pointer_gen:
-        enc_batch_extend_vocab = paddle.to_tensor(
-            batch.enc_batch_extend_vocab, dtype='int64')
+        enc_batch_extend_vocab = paddle.to_tensor(batch.enc_batch_extend_vocab,
+                                                  dtype='int64')
         # The variable max_art_oovs is the max over all the article oov list in the batch
         if batch.max_art_oovs > 0:
             extra_zeros = paddle.zeros((batch_size, batch.max_art_oovs))

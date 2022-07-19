@@ -16,7 +16,19 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+    MultipleChoiceModelOutput,
+    MaskedLMOutput,
+    ModelOutput,
+)
 
 __all__ = [
     'ErnieModel', 'ErniePretrainedModel', 'ErnieForSequenceClassification',
@@ -44,20 +56,22 @@ class ErnieEmbeddings(nn.Layer):
                  use_task_id=False):
         super(ErnieEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(
-            vocab_size,
-            hidden_size,
-            padding_idx=pad_token_id,
-            weight_attr=weight_attr)
-        self.position_embeddings = nn.Embedding(
-            max_position_embeddings, hidden_size, weight_attr=weight_attr)
-        self.token_type_embeddings = nn.Embedding(
-            type_vocab_size, hidden_size, weight_attr=weight_attr)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id,
+                                            weight_attr=weight_attr)
+        self.position_embeddings = nn.Embedding(max_position_embeddings,
+                                                hidden_size,
+                                                weight_attr=weight_attr)
+        self.token_type_embeddings = nn.Embedding(type_vocab_size,
+                                                  hidden_size,
+                                                  weight_attr=weight_attr)
         self.use_task_id = use_task_id
         self.task_id = task_id
         if self.use_task_id:
-            self.task_type_embeddings = nn.Embedding(
-                task_type_vocab_size, hidden_size, weight_attr=weight_attr)
+            self.task_type_embeddings = nn.Embedding(task_type_vocab_size,
+                                                     hidden_size,
+                                                     weight_attr=weight_attr)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -82,8 +96,8 @@ class ErnieEmbeddings(nn.Layer):
         embeddings = input_embedings + position_embeddings + token_type_embeddings
         if self.use_task_id:
             if task_type_ids is None:
-                task_type_ids = paddle.ones_like(
-                    input_ids, dtype="int64") * self.task_id
+                task_type_ids = paddle.ones_like(input_ids,
+                                                 dtype="int64") * self.task_id
             task_type_embeddings = self.task_type_embeddings(task_type_ids)
             embeddings = embeddings + task_type_embeddings
         embeddings = self.layer_norm(embeddings)
@@ -92,10 +106,12 @@ class ErnieEmbeddings(nn.Layer):
 
 
 class ErniePooler(nn.Layer):
+
     def __init__(self, hidden_size, weight_attr=None):
         super(ErniePooler, self).__init__()
-        self.dense = nn.Linear(
-            hidden_size, hidden_size, weight_attr=weight_attr)
+        self.dense = nn.Linear(hidden_size,
+                               hidden_size,
+                               weight_attr=weight_attr)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -464,12 +480,11 @@ class ErniePretrainedModel(PretrainedModel):
             # and configurable later
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.ernie.config["initializer_range"],
-                        shape=layer.weight.shape))
+                    paddle.tensor.normal(mean=0.0,
+                                         std=self.initializer_range if hasattr(
+                                             self, "initializer_range") else
+                                         self.ernie.config["initializer_range"],
+                                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -554,10 +569,12 @@ class ErnieModel(ErniePretrainedModel):
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(
                 mean=0.0, std=self.initializer_range))
-        self.embeddings = ErnieEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr,
-            task_type_vocab_size, task_id, use_task_id)
+        self.embeddings = ErnieEmbeddings(vocab_size, hidden_size,
+                                          hidden_dropout_prob,
+                                          max_position_embeddings,
+                                          type_vocab_size, pad_token_id,
+                                          weight_attr, task_type_vocab_size,
+                                          task_id, use_task_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -577,7 +594,10 @@ class ErnieModel(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                task_type_ids=None):
+                task_type_ids=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -643,8 +663,8 @@ class ErnieModel(ErniePretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
@@ -653,16 +673,32 @@ class ErnieModel(ErniePretrainedModel):
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
-            task_type_ids=task_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids,
+                                           task_type_ids=task_type_ids)
 
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        encoder_outputs = self.encoder(
+            embedding_output,
+            src_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+        if isinstance(encoder_outputs, type(embedding_output)):
+            sequence_output = encoder_outputs
+            pooled_output = self.pooler(sequence_output)
+            return (sequence_output, pooled_output)
+        else:
+            sequence_output = encoder_outputs[0]
+            pooled_output = self.pooler(sequence_output)
+            if not return_dict:
+                return (sequence_output, pooled_output) + encoder_outputs[1:]
+            return BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                past_key_values=encoder_outputs.past_key_values,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions)
 
 
 class ErnieForSequenceClassification(ErniePretrainedModel):
@@ -685,8 +721,8 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         super(ErnieForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie = ernie  # allow ernie to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -695,7 +731,10 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -725,15 +764,29 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie(input_ids,
+                             token_type_ids=token_type_ids,
+                             position_ids=position_ids,
+                             attention_mask=attention_mask,
+                             output_attentions=output_attentions,
+                             output_hidden_states=output_hidden_states,
+                             return_dict=return_dict)
+        pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        return logits
+
+        loss = None
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):
@@ -757,7 +810,10 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -797,17 +853,32 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie(input_ids,
+                             token_type_ids=token_type_ids,
+                             position_ids=position_ids,
+                             attention_mask=attention_mask,
+                             output_attentions=output_attentions,
+                             output_hidden_states=output_hidden_states,
+                             return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieForTokenClassification(ErniePretrainedModel):
@@ -830,8 +901,8 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         super(ErnieForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie = ernie  # allow ernie to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -840,7 +911,10 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -869,15 +943,30 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        sequence_output, _ = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie(input_ids,
+                             token_type_ids=token_type_ids,
+                             position_ids=position_ids,
+                             attention_mask=attention_mask,
+                             output_attentions=output_attentions,
+                             output_hidden_states=output_hidden_states,
+                             return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        return logits
+
+        loss = None
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return TokenClassifierOutput(
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieLMPredictionHead(nn.Layer):
@@ -886,16 +975,18 @@ class ErnieLMPredictionHead(nn.Layer):
     """
 
     def __init__(
-            self,
-            hidden_size,
-            vocab_size,
-            activation,
-            embedding_weights=None,
-            weight_attr=None, ):
+        self,
+        hidden_size,
+        vocab_size,
+        activation,
+        embedding_weights=None,
+        weight_attr=None,
+    ):
         super(ErnieLMPredictionHead, self).__init__()
 
-        self.transform = nn.Linear(
-            hidden_size, hidden_size, weight_attr=weight_attr)
+        self.transform = nn.Linear(hidden_size,
+                                   hidden_size,
+                                   weight_attr=weight_attr)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.decoder_weight = self.create_parameter(
@@ -923,23 +1014,58 @@ class ErnieLMPredictionHead(nn.Layer):
 
 
 class ErniePretrainingHeads(nn.Layer):
+
     def __init__(
-            self,
-            hidden_size,
-            vocab_size,
-            activation,
-            embedding_weights=None,
-            weight_attr=None, ):
+        self,
+        hidden_size,
+        vocab_size,
+        activation,
+        embedding_weights=None,
+        weight_attr=None,
+    ):
         super(ErniePretrainingHeads, self).__init__()
-        self.predictions = ErnieLMPredictionHead(
-            hidden_size, vocab_size, activation, embedding_weights, weight_attr)
-        self.seq_relationship = nn.Linear(
-            hidden_size, 2, weight_attr=weight_attr)
+        self.predictions = ErnieLMPredictionHead(hidden_size, vocab_size,
+                                                 activation, embedding_weights,
+                                                 weight_attr)
+        self.seq_relationship = nn.Linear(hidden_size,
+                                          2,
+                                          weight_attr=weight_attr)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
         seq_relationship_score = self.seq_relationship(pooled_output)
         return prediction_scores, seq_relationship_score
+
+
+@dataclass
+class ErnieForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`ErnieForPreTraining`].
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+            (classification) loss.
+        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
+            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    prediction_logits: paddle.Tensor = None
+    seq_relationship_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
 class ErnieForPretraining(ErniePretrainedModel):
@@ -960,7 +1086,8 @@ class ErnieForPretraining(ErniePretrainedModel):
             self.ernie.config["vocab_size"],
             self.ernie.config["hidden_act"],
             embedding_weights=self.ernie.embeddings.word_embeddings.weight,
-            weight_attr=weight_attr, )
+            weight_attr=weight_attr,
+        )
 
         self.apply(self.init_weights)
 
@@ -969,7 +1096,10 @@ class ErnieForPretraining(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                masked_positions=None):
+                masked_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -997,15 +1127,30 @@ class ErnieForPretraining(ErniePretrainedModel):
 
         """
         with paddle.static.amp.fp16_guard():
-            outputs = self.ernie(
-                input_ids,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                attention_mask=attention_mask)
+            outputs = self.ernie(input_ids,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids,
+                                 attention_mask=attention_mask,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states,
+                                 return_dict=return_dict)
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, masked_positions)
-            return prediction_scores, seq_relationship_score
+
+            total_loss = None
+            if not return_dict:
+                output = (prediction_scores,
+                          seq_relationship_score) + outputs[2:]
+                return ((total_loss, ) +
+                        output) if total_loss is not None else output
+
+            return ErnieForPreTrainingOutput(
+                prediction_logits=prediction_scores,
+                seq_relationship_logits=seq_relationship_score,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+            )
 
 
 class ErniePretrainingCriterion(paddle.nn.Layer):
@@ -1050,21 +1195,22 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
         """
 
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(
-                prediction_scores,
-                masked_lm_labels,
-                ignore_index=-1,
-                reduction='none')
+            masked_lm_loss = F.cross_entropy(prediction_scores,
+                                             masked_lm_labels,
+                                             ignore_index=-1,
+                                             reduction='none')
 
             if not self.with_nsp_loss:
                 return paddle.mean(masked_lm_loss)
 
-            next_sentence_loss = F.cross_entropy(
-                seq_relationship_score, next_sentence_labels, reduction='none')
+            next_sentence_loss = F.cross_entropy(seq_relationship_score,
+                                                 next_sentence_labels,
+                                                 reduction='none')
             return paddle.mean(masked_lm_loss), paddle.mean(next_sentence_loss)
 
 
 class ErnieOnlyMLMHead(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
         super().__init__()
         self.predictions = ErnieLMPredictionHead(
@@ -1103,7 +1249,10 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -1138,14 +1287,28 @@ class ErnieForMaskedLM(ErniePretrainedModel):
 
         """
 
-        outputs = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie(input_ids,
+                             token_type_ids=token_type_ids,
+                             position_ids=position_ids,
+                             attention_mask=attention_mask,
+                             output_attentions=output_attentions,
+                             output_hidden_states=output_hidden_states,
+                             return_dict=return_dict)
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
-        return prediction_scores
+
+        masked_lm_loss = None
+        if not return_dict:
+            output = (prediction_scores, ) + outputs[2:]
+            return ((masked_lm_loss, ) +
+                    output) if masked_lm_loss is not None else (
+                        output[0] if len(output) == 1 else output)
+
+        return MaskedLMOutput(
+            logits=prediction_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieForMultipleChoice(ErniePretrainedModel):
@@ -1168,8 +1331,8 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
         super(ErnieForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.ernie = ernie
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
@@ -1177,7 +1340,10 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The ErnieForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1204,22 +1370,35 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             position_ids = position_ids.reshape(shape=(-1,
                                                        position_ids.shape[-1]))
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(shape=(
-                -1, token_type_ids.shape[-1]))
+            token_type_ids = token_type_ids.reshape(
+                shape=(-1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        _, pooled_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.ernie(input_ids,
+                             token_type_ids=token_type_ids,
+                             position_ids=position_ids,
+                             attention_mask=attention_mask,
+                             output_attentions=output_attentions,
+                             output_hidden_states=output_hidden_states,
+                             return_dict=return_dict)
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape(
             shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
-        return reshaped_logits
+        loss = None
+        if not return_dict:
+            output = (reshaped_logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            logits=reshaped_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

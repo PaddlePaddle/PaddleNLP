@@ -19,38 +19,43 @@ class WMT14ende(DatasetBuilder):
     uses newstest2014 as test dataset.
     '''
     URL = "https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz"
-    META_INFO = collections.namedtuple('META_INFO', ('src_file', 'tgt_file',
-                                                     'src_md5', 'tgt_md5'))
+    META_INFO = collections.namedtuple(
+        'META_INFO', ('src_file', 'tgt_file', 'src_md5', 'tgt_md5'))
     SPLITS = {
-        'train': META_INFO(
+        'train':
+        META_INFO(
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "train.tok.clean.bpe.33708.en"),
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "train.tok.clean.bpe.33708.de"),
             "c7c0b77e672fc69f20be182ae37ff62c",
             "1865ece46948fda1209d3b7794770a0a"),
-        'dev': META_INFO(
+        'dev':
+        META_INFO(
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "newstest2013.tok.bpe.33708.en"),
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "newstest2013.tok.bpe.33708.de"),
             "aa4228a4bedb6c45d67525fbfbcee75e",
             "9b1eeaff43a6d5e78a381a9b03170501"),
-        'test': META_INFO(
+        'test':
+        META_INFO(
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "newstest2014.tok.bpe.33708.en"),
             os.path.join("WMT14.en-de", "wmt14_ende_data_bpe",
                          "newstest2014.tok.bpe.33708.de"),
             "c9403eacf623c6e2d9e5a1155bdff0b5",
             "0058855b55e37c4acfcb8cffecba1050"),
-        'dev-eval': META_INFO(
+        'dev-eval':
+        META_INFO(
             os.path.join("WMT14.en-de", "wmt14_ende_data",
                          "newstest2013.tok.en"),
             os.path.join("WMT14.en-de", "wmt14_ende_data",
                          "newstest2013.tok.de"),
             "d74712eb35578aec022265c439831b0e",
             "6ff76ced35b70e63a61ecec77a1c418f"),
-        'test-eval': META_INFO(
+        'test-eval':
+        META_INFO(
             os.path.join("WMT14.en-de", "wmt14_ende_data",
                          "newstest2014.tok.en"),
             os.path.join("WMT14.en-de", "wmt14_ende_data",
@@ -85,14 +90,13 @@ class WMT14ende(DatasetBuilder):
         if (not os.path.exists(src_fullname) or
             (src_data_hash and not md5file(src_fullname) == src_data_hash)) or (
                 not os.path.exists(tgt_fullname) or
-                (tgt_data_hash and
-                 not md5file(tgt_fullname) == tgt_data_hash)) or (
-                     not os.path.exists(bpe_vocab_fullname) or
-                     (bpe_vocab_hash and
-                      not md5file(bpe_vocab_fullname) == bpe_vocab_hash)) or (
-                          not os.path.exists(sub_vocab_fullname) or
-                          (sub_vocab_hash and
-                           not md5file(sub_vocab_fullname) == sub_vocab_hash)):
+                (tgt_data_hash and not md5file(tgt_fullname) == tgt_data_hash)
+            ) or (not os.path.exists(bpe_vocab_fullname) or
+                  (bpe_vocab_hash
+                   and not md5file(bpe_vocab_fullname) == bpe_vocab_hash)) or (
+                       not os.path.exists(sub_vocab_fullname) or
+                       (sub_vocab_hash
+                        and not md5file(sub_vocab_fullname) == sub_vocab_hash)):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return src_fullname, tgt_fullname

@@ -64,6 +64,7 @@ ACT2FN = {
 
 
 class TransformerEncoderLayerPro(TransformerEncoderLayer):
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -75,9 +76,10 @@ class TransformerEncoderLayerPro(TransformerEncoderLayer):
                  normalize_before=False,
                  weight_attr=None,
                  bias_attr=None):
-        super(TransformerEncoderLayerPro, self).__init__(
-            d_model, nhead, dim_feedforward, dropout, activation, attn_dropout,
-            act_dropout, normalize_before, weight_attr, bias_attr)
+        super(TransformerEncoderLayerPro,
+              self).__init__(d_model, nhead, dim_feedforward, dropout,
+                             activation, attn_dropout, act_dropout,
+                             normalize_before, weight_attr, bias_attr)
 
     def forward(self, src, src_mask=None, cache=None, output_attentions=False):
         self.self_attn.need_weights = output_attentions
@@ -115,6 +117,7 @@ class TransformerEncoderLayerPro(TransformerEncoderLayer):
 
 
 class TransformerEncoderPro(TransformerEncoder):
+
     def __init__(self, encoder_layer, num_layers, norm=None):
         super(TransformerEncoderPro, self).__init__(encoder_layer, num_layers,
                                                     norm)
@@ -382,12 +385,11 @@ class ElectraPretrainedModel(PretrainedModel):
         """ Initialize the weights """
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
-                    self.electra.config["initializer_range"],
-                    shape=layer.weight.shape))
+                paddle.tensor.normal(mean=0.0,
+                                     std=self.initializer_range if hasattr(
+                                         self, "initializer_range") else
+                                     self.electra.config["initializer_range"],
+                                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
@@ -406,17 +408,18 @@ class ElectraPretrainedModel(PretrainedModel):
             raise ValueError(
                 "when tie input/output embeddings, the shape of output embeddings: {}"
                 "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".
-                format(output_embeddings.weight.shape, input_embeddings.weight.
-                       shape, input_embeddings.weight.t().shape))
+                "or should be equal to the shape of transpose input embeddings: {}"
+                .format(output_embeddings.weight.shape,
+                        input_embeddings.weight.shape,
+                        input_embeddings.weight.t().shape))
         if getattr(output_embeddings, "bias", None) is not None:
             if output_embeddings.weight.shape[
                     -1] != output_embeddings.bias.shape[0]:
                 raise ValueError(
                     "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
                     "please check output_embeddings configuration".format(
-                        output_embeddings.weight.shape[
-                            -1], output_embeddings.bias.shape[0]))
+                        output_embeddings.weight.shape[-1],
+                        output_embeddings.bias.shape[0]))
 
 
 @register_base_model
@@ -491,9 +494,10 @@ class ElectraModel(ElectraPretrainedModel):
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
-        self.embeddings = ElectraEmbeddings(
-            vocab_size, embedding_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, layer_norm_eps)
+        self.embeddings = ElectraEmbeddings(vocab_size, embedding_size,
+                                            hidden_dropout_prob,
+                                            max_position_embeddings,
+                                            type_vocab_size, layer_norm_eps)
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -577,17 +581,16 @@ class ElectraModel(ElectraPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(paddle.get_default_dtype()) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
@@ -656,8 +659,9 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        discriminator_sequence_output = self.electra(
-            input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(input_ids, token_type_ids,
+                                                     position_ids,
+                                                     attention_mask)
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
 
@@ -740,11 +744,10 @@ class ElectraGenerator(ElectraPretrainedModel):
         if not self.tie_word_embeddings:
             prediction_scores = self.generator_lm_head(prediction_scores)
         else:
-            prediction_scores = paddle.add(paddle.matmul(
-                prediction_scores,
-                self.get_input_embeddings().weight,
-                transpose_y=True),
-                                           self.generator_lm_head_bias)
+            prediction_scores = paddle.add(
+                paddle.matmul(prediction_scores,
+                              self.get_input_embeddings().weight,
+                              transpose_y=True), self.generator_lm_head_bias)
 
         return prediction_scores
 
@@ -861,16 +864,18 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         """
 
-        discriminator_sequence_output = self.electra(
-            input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(input_ids, token_type_ids,
+                                                     position_ids,
+                                                     attention_mask)
 
         logits_rtd = self.discriminator_rtd(discriminator_sequence_output)
 
         cands_embs = self.electra.embeddings.word_embeddings(candidate_ids)
         hidden_mts = self.discriminator_mts(discriminator_sequence_output)
         hidden_mts = self.activation_mts(hidden_mts)
-        hidden_mts = paddle.matmul(
-            hidden_mts.unsqueeze(2), cands_embs, transpose_y=True).squeeze(2)
+        hidden_mts = paddle.matmul(hidden_mts.unsqueeze(2),
+                                   cands_embs,
+                                   transpose_y=True).squeeze(2)
         logits_mts = paddle.add(hidden_mts,
                                 self.bias_mts(candidate_ids).squeeze(3))
 
@@ -978,8 +983,8 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
         super(ElectraForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"],
                                     self.num_classes)
         self.init_weights()
@@ -1157,8 +1162,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def get_discriminator_inputs(self, inputs, raw_inputs, generator_logits,
                                  generator_labels, use_softmax_sample):
         # get generator token result
-        sampled_tokens = (self.sample_from_softmax(generator_logits,
-                                                   use_softmax_sample)).detach()
+        sampled_tokens = (self.sample_from_softmax(
+            generator_logits, use_softmax_sample)).detach()
         sampled_tokids = paddle.argmax(sampled_tokens, axis=-1)
         # update token only at mask position
         # generator_labels : [B, L], L contains -100(unmasked) or token value(masked)
@@ -1177,14 +1182,14 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def sample_from_softmax(self, logits, use_softmax_sample=True):
         if use_softmax_sample:
             #uniform_noise = paddle.uniform(logits.shape, dtype="float32", min=0, max=1)
-            uniform_noise = paddle.rand(
-                logits.shape, dtype=paddle.get_default_dtype())
+            uniform_noise = paddle.rand(logits.shape,
+                                        dtype=paddle.get_default_dtype())
             gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) + 1e-9)
         else:
             gumbel_noise = paddle.zeros_like(logits)
         # softmax_sample equal to sampled_tokids.unsqueeze(-1)
-        softmax_sample = paddle.argmax(
-            F.softmax(logits + gumbel_noise), axis=-1)
+        softmax_sample = paddle.argmax(F.softmax(logits + gumbel_noise),
+                                       axis=-1)
         # one hot
         return F.one_hot(softmax_sample, logits.shape[-1])
 
@@ -1267,8 +1272,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                                          position_ids, attention_mask)
 
         if attention_mask is None:
-            attention_mask = (
-                input_ids != self.discriminator.electra.config["pad_token_id"])
+            attention_mask = (input_ids !=
+                              self.discriminator.electra.config["pad_token_id"])
         else:
             attention_mask = attention_mask.astype("bool")
 
@@ -1276,6 +1281,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPooler(nn.Layer):
+
     def __init__(self, hidden_size, pool_act="gelu"):
         super(ElectraPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -1336,9 +1342,10 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         }
     }
 
-    def get_discriminator_inputs_ernie_health(
-            self, inputs, raw_inputs, generator_logits, generator_labels,
-            use_softmax_sample):
+    def get_discriminator_inputs_ernie_health(self, inputs, raw_inputs,
+                                              generator_logits,
+                                              generator_labels,
+                                              use_softmax_sample):
         updated_inputs, labels, sampled_tokids = self.get_discriminator_inputs(
             inputs, raw_inputs, generator_logits, generator_labels,
             use_softmax_sample)
@@ -1374,14 +1381,15 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
             if neg_sample_one_hot is not None:
                 excluded_ids = excluded_ids + neg_sample_one_hot * -10000
             if use_softmax_sample:
-                uniform_noise = paddle.rand(
-                    logits.shape, dtype=paddle.get_default_dtype())
+                uniform_noise = paddle.rand(logits.shape,
+                                            dtype=paddle.get_default_dtype())
                 gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) +
                                            1e-9)
             else:
                 gumbel_noise = paddle.zeros_like(logits)
-            sampled_ids = paddle.argmax(
-                F.softmax(logits + gumbel_noise + excluded_ids), axis=-1)
+            sampled_ids = paddle.argmax(F.softmax(logits + gumbel_noise +
+                                                  excluded_ids),
+                                        axis=-1)
             # One-hot encoding of sample_ids.
             neg_sample_one_hot = F.one_hot(sampled_ids, logits.shape[-1])
             if neg_samples_ids is None:
@@ -1445,8 +1453,8 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         self.electra = electra
         self.sequence_summary = ElectraPooler(
             self.electra.config["hidden_size"], pool_act="gelu")
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"], 1)
         self.init_weights()
 
@@ -1718,7 +1726,7 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
                 paddle.get_default_dtype())
             umask_positions = paddle.where(attention_mask, umask_positions,
                                            mask_positions)
-            # Mask has different meanings here. It denotes [mask] token in 
+            # Mask has different meanings here. It denotes [mask] token in
             # generator and denotes [pad] token in discriminator.
             disc_rtd_loss = paddle.where(attention_mask, disc_rtd_loss,
                                          mask_positions)
@@ -1730,9 +1738,8 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
 
         # MTS discriminator loss
         replaced_positions = discriminator_labels.astype("bool")
-        mts_labels = paddle.zeros(
-            [logits_mts.shape[0] * logits_mts.shape[1]],
-            dtype=generator_labels.dtype).detach()
+        mts_labels = paddle.zeros([logits_mts.shape[0] * logits_mts.shape[1]],
+                                  dtype=generator_labels.dtype).detach()
         disc_mts_loss = self.disc_mts_loss_fct(
             paddle.reshape(logits_mts, [-1, logits_mts.shape[-1]]), mts_labels)
         disc_mts_loss = paddle.reshape(disc_mts_loss, [-1, seq_length])
@@ -1748,8 +1755,9 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
         # CSP discriminator loss
         logits_csp = F.normalize(logits_csp, axis=-1)
         # Gather from all devices (split first)
-        logit_csp_0, logit_csp_1 = paddle.split(
-            logits_csp, num_or_sections=2, axis=0)
+        logit_csp_0, logit_csp_1 = paddle.split(logits_csp,
+                                                num_or_sections=2,
+                                                axis=0)
         if paddle.distributed.get_world_size() > 1:
             csp_list_0, csp_list_1 = [], []
             paddle.distributed.all_gather(csp_list_0, logit_csp_0)
@@ -1766,12 +1774,11 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
         mask = -1e4 * paddle.eye(logits_csp.shape[0])
         logits_csp = logits_csp + mask
         # Create labels for bundle
-        csp_labels = paddle.concat(
-            [
-                paddle.arange(batch_size, 2 * batch_size),
-                paddle.arange(batch_size)
-            ],
-            axis=0)
+        csp_labels = paddle.concat([
+            paddle.arange(batch_size, 2 * batch_size),
+            paddle.arange(batch_size)
+        ],
+                                   axis=0)
         # Calculate SimCLR loss
         disc_csp_loss = self.disc_csp_loss_fct(logits_csp, csp_labels)
         disc_csp_loss = disc_csp_loss.sum() / (batch_size * 2)
@@ -1846,11 +1853,10 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
                 end_logits  = outputs[1]
 
         """
-        sequence_output = self.electra(
-            input_ids,
-            token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.electra(input_ids,
+                                       token_type_ids,
+                                       position_ids=position_ids,
+                                       attention_mask=attention_mask)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)

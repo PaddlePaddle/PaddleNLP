@@ -33,3 +33,4 @@ PDFToTextOCRConverter = safe_import("pipelines.nodes.file_converter.pdf",
 from pipelines.nodes.file_converter.docx import DocxToTextConverter
 from pipelines.nodes.file_converter.txt import TextConverter
 from pipelines.nodes.file_converter.pdf import PDFToTextConverter
+from pipelines.nodes.file_converter.image import ImageToTextConverter

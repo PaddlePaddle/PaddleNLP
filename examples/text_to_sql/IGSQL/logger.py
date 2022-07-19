@@ -15,6 +15,7 @@
 
 
 class Logger():
+
     def __init__(self, filename, option):
         self.fileptr = open(filename, option)
         if option == "r":

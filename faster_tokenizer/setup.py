@@ -31,6 +31,7 @@ class BinaryDistribution(Distribution):
 
 
 class InstallPlatlib(install):
+
     def finalize_options(self):
         install.finalize_options(self)
         if self.distribution.has_ext_modules():
@@ -38,17 +39,15 @@ class InstallPlatlib(install):
 
 
 if os.name != 'nt':
-    package_data = {
-        "faster_tokenizer": [
-            "core_tokenizers.so", "libicuuc.so.70", "libicudata.so.70",
-            "commit.log"
-        ]
-    }
+    package_data = {"faster_tokenizer": ["core_tokenizers.so", "commit.log"]}
+    package_data['faster_tokenizer.libs'] = []
 else:
     package_data = {
         "faster_tokenizer":
-        ["core_tokenizers.pyd", "icuuc.dll", "icuucdata.dll", "commit.log"]
+        ["core_tokenizers.pyd", "core_tokenizers.lib", "commit.log"]
     }
+    # Add icu dll
+    package_data['faster_tokenizer.libs'] = ["icuuc70.dll", "icudt70.dll"]
 
 
 def get_version():
@@ -77,7 +76,8 @@ setup(
     packages=[
         "faster_tokenizer", "faster_tokenizer.tokenizers_impl",
         "faster_tokenizer.normalizers", "faster_tokenizer.pretokenizers",
-        "faster_tokenizer.models", "faster_tokenizer.postprocessors"
+        "faster_tokenizer.models", "faster_tokenizer.postprocessors",
+        "faster_tokenizer.libs"
     ],
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},
@@ -97,4 +97,5 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
-    ], )
+    ],
+)

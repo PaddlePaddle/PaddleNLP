@@ -21,14 +21,12 @@ from scipy.special import softmax
 
 import paddle
 from paddle import inference
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
 sys.path.append('.')
-
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
 
 from data import convert_example
 
@@ -63,6 +61,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -75,8 +74,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.pdmodel"
-        params_file = model_dir + "/inference.pdiparams"
+        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
+        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -95,10 +94,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -148,7 +146,7 @@ class Predictor(object):
                 max_seq_length=self.max_seq_length,
                 pad_to_max_seq_len=True)
             examples.append((input_ids, segment_ids))
-            if (len(examples) > 100):
+            if (len(examples) > self.batch_size):
                 input_ids, segment_ids = batchify_fn(examples)
                 self.input_handles[0].copy_from_cpu(input_ids)
                 self.input_handles[1].copy_from_cpu(segment_ids)
@@ -180,7 +178,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]

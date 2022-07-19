@@ -12,14 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
 
 #include "pretokenizers/pretokenizers.h"
+#include <Python.h>
 #include "pybind/pretokenizers.h"
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyPreTokenizer : public pretokenizers::PreTokenizer {
@@ -52,6 +53,16 @@ public:
   }
 };
 
+class PyMetaSpacePreTokenizer : public pretokenizers::MetaSpacePreTokenizer {
+public:
+  using MetaSpacePreTokenizer::MetaSpacePreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, MetaSpacePreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
 void BindPreTokenizers(pybind11::module* m) {
   auto sub_module =
       m->def_submodule("pretokenizers", "The pretokenizers module");
@@ -77,8 +88,8 @@ void BindPreTokenizers(pybind11::module* m) {
            &pretokenizers::PreTokenizedString::GetOriginStr)
       .def("to_encoding",
            [](const pretokenizers::PreTokenizedString& self,
-              const std::vector<uint>& word_idx,
-              uint type_id,
+              const std::vector<uint32_t>& word_idx,
+              uint32_t type_id,
               core::OffsetType offset_type) {
              core::Encoding encoding;
              self.TransformToEncoding(
@@ -97,7 +108,14 @@ void BindPreTokenizers(pybind11::module* m) {
       sub_module, "BertPreTokenizer")
       .def(py::init<>())
       .def("__call__", &pretokenizers::BertPreTokenizer::operator());
+  py::class_<pretokenizers::MetaSpacePreTokenizer, PyMetaSpacePreTokenizer>(
+      sub_module, "MetaSpacePreTokenizer")
+      .def(py::init<const std::string&, bool>(),
+           py::arg("replacement") = "_",
+           py::arg("add_prefix_space") = true)
+      .def("__call__", &pretokenizers::MetaSpacePreTokenizer::operator());
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

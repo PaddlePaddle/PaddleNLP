@@ -28,7 +28,7 @@ class FileTypeClassifier(BaseComponent):
 
     outgoing_edges = 10
 
-    def __init__(self, supported_types: List[str]=DEFAULT_TYPES):
+    def __init__(self, supported_types: List[str] = DEFAULT_TYPES):
         """
         Node that sends out files on a different output edge depending on their extension.
 
@@ -65,9 +65,8 @@ class FileTypeClassifier(BaseComponent):
 
         return extension.lstrip(".")
 
-    def run(self,
-            file_paths: Union[Path, List[Path], str, List[str], List[Union[
-                Path, str]]]):  # type: ignore
+    def run(self, file_paths: Union[Path, List[Path], str, List[str],
+                                    List[Union[Path, str]]]):  # type: ignore
         """
         Sends out files on a different output edge depending on their extension.
 

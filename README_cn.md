@@ -1,7 +1,7 @@
 **简体中文**🀄 | [English🌎](./README_en.md)
 
 <p align="center">
-  <img src="./docs/imgs/paddlenlp.png" align="middle"  width="500" />
+  <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" />
 </p>
 
 ------------------------------------------------------------------------------------------
@@ -30,7 +30,7 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-
+* 🍭 2022.6.29 **PaddleNLP v2.3.4**发布！[**ERNIE Tiny**](./model_zoo/ernie-3.0) 全系列中文预训练小模型发布，快速提升预训练模型部署效率，通用信息抽取技术[**UIE Tiny**](./model_zoo/uie) 系列模型全新升级，支持速度更快效果更好的UIE小模型。
 * 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
   * 💎 发布通用信息抽取技术[**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**一键抽取**与全流程**小样本**高效定制开发。
   * 😊 发布文心大模型[**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在[CLUE](https://www.cluebenchmarks.com/)上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案。
@@ -73,6 +73,19 @@ albert = AutoModel.from_pretrained('albert-chinese-tiny')
 roberta = AutoModel.from_pretrained('roberta-wwm-ext')
 electra = AutoModel.from_pretrained('chinese-electra-small')
 gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
+```
+
+针对预训练模型计算瓶颈，可以使用API一键使用文心ERNIE-Tiny全系列轻量化模型，降低预训练模型部署难度。
+
+```python
+# 6L768H
+ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+# 6L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
+# 4L384H
+ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
+# 4L312H
+ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
 ```
 
 对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
@@ -198,7 +211,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 ### 高性能分布式训练与推理
 
-#### ⚡ FasterTokenizers：高性能文本处理库
+#### ⚡ FasterTokenizer：高性能文本处理库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -208,7 +221,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FasterTokenizers文档](./faster_tokenizers)。
+为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FasterTokenizer文档](./faster_tokenizer)。
 
 #### ⚡️ FasterGeneration：高性能生成加速库
 
@@ -294,7 +307,7 @@ PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练
 PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的效率：
 
 - 支持[千言](https://www.luge.ai)等丰富中文数据集加载的[Dataset API](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_list.html)。
-- 提供🤗Hugging Face Style的API，支持 **500+** 优质预训练模型加载的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。  
+- 提供🤗Hugging Face Style的API，支持 **500+** 优质预训练模型加载的[Transformers API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html)。
 - 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。

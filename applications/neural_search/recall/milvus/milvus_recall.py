@@ -17,6 +17,7 @@ from config import MILVUS_HOST, MILVUS_PORT, top_k, search_param
 
 
 class RecallByMilvus():
+
     def __init__(self):
         self.client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
 
@@ -28,7 +29,6 @@ class RecallByMilvus():
                 top_k=top_k,
                 params=search_param,
                 partition_tag=partition_tag)
-            # print(status)
             return status, results
         except Exception as e:
             print('Milvus recall error: ', e)
@@ -40,9 +40,8 @@ if __name__ == '__main__':
     collection_name = 'literature_search'
     partition_tag = 'partition_3'
     embeddings = [[random.random() for _ in range(128)] for _ in range(2)]
-    status, resultes = client.search(
-        collection_name=collection_name,
-        vectors=embeddings,
-        partition_tag=partition_tag)
+    status, resultes = client.search(collection_name=collection_name,
+                                     vectors=embeddings,
+                                     partition_tag=partition_tag)
     print(status)
     print(resultes)

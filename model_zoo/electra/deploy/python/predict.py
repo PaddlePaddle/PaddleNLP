@@ -3,39 +3,40 @@ import time
 import numpy as np
 import os
 
-import paddle.inference as paddle_infer
-from paddle.fluid.core import AnalysisConfig
-from paddle.fluid.core import create_paddle_predictor
-
+from paddle import inference
 from paddlenlp.transformers import ElectraTokenizer
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_file", type=str, required=True, help="model filename")
-    parser.add_argument(
-        "--params_file", type=str, required=True, help="parameter filename")
-    parser.add_argument(
-        "--predict_sentences",
-        type=str,
-        nargs="*",
-        help="one or more sentence to predict")
+    parser.add_argument("--model_file",
+                        type=str,
+                        required=True,
+                        help="model filename")
+    parser.add_argument("--params_file",
+                        type=str,
+                        required=True,
+                        help="parameter filename")
+    parser.add_argument("--predict_sentences",
+                        type=str,
+                        nargs="*",
+                        help="one or more sentence to predict")
     parser.add_argument(
         "--predict_file",
         type=str,
         nargs="*",
         help="one or more file which contain sentence to predict")
     parser.add_argument("--batch_size", type=int, default=1, help="batch size")
-    parser.add_argument(
-        "--use_gpu", action="store_true", help="whether to use gpu")
-    parser.add_argument(
-        "--use_trt", action="store_true", help="whether to use TensorRT")
-    parser.add_argument(
-        "--max_seq_length",
-        type=int,
-        default=128,
-        help="max length of each sequence")
+    parser.add_argument("--use_gpu",
+                        action="store_true",
+                        help="whether to use gpu")
+    parser.add_argument("--use_trt",
+                        action="store_true",
+                        help="whether to use TensorRT")
+    parser.add_argument("--max_seq_length",
+                        type=int,
+                        default=128,
+                        help="max length of each sequence")
     parser.add_argument(
         "--model_name",
         type=str,
@@ -125,8 +126,8 @@ def predict(args, sentences=[], paths=[]):
     """
 
     # initialize data
-    if sentences != [] and isinstance(sentences, list) and (paths == [] or
-                                                            paths is None):
+    if sentences != [] and isinstance(sentences, list) and (paths == []
+                                                            or paths is None):
         predicted_data = sentences
     elif (sentences == [] or sentences is None) and isinstance(
             paths, list) and paths != []:
@@ -139,7 +140,7 @@ def predict(args, sentences=[], paths=[]):
         predicted_data, tokenizer, args.max_seq_length, args.batch_size)
 
     # config
-    config = AnalysisConfig(args.model_file, args.params_file)
+    config = inference.Config(args.model_file, args.params_file)
     config.switch_use_feed_fetch_ops(False)
     config.enable_memory_optim()
     if args.use_gpu:
@@ -149,12 +150,12 @@ def predict(args, sentences=[], paths=[]):
             workspace_size=1 << 30,
             max_batch_size=args.batch_size,
             min_subgraph_size=5,
-            precision_mode=AnalysisConfig.Precision.Float32,
+            precision_mode=inference.PrecisionType.Float32,
             use_static=False,
             use_calib_mode=False)
 
     # predictor
-    predictor = create_paddle_predictor(config)
+    predictor = inference.create_predictor(config)
 
     start_time = time.time()
     output_data = []
@@ -164,18 +165,16 @@ def predict(args, sentences=[], paths=[]):
         # get input name
         input_names = predictor.get_input_names()
         # get input pointer and copy data
-        input_tensor = predictor.get_input_tensor(input_names[0])
-        input_tensor.reshape(sen.shape)
+        input_tensor = predictor.get_input_handle(input_names[0])
         input_tensor.copy_from_cpu(sen)
-        #input_tensor.copy_from_cpu(fake_input.copy())
 
         # run predictor
-        predictor.zero_copy_run()
+        predictor.run()
 
         # get output name
         output_names = predictor.get_output_names()
         # get output pointer and copy data(nd.array)
-        output_tensor = predictor.get_output_tensor(output_names[0])
+        output_tensor = predictor.get_output_handle(output_names[0])
         predict_data = output_tensor.copy_to_cpu()
         output_res = np.argmax(predict_data, axis=1).tolist()
         output_data.append(output_res)

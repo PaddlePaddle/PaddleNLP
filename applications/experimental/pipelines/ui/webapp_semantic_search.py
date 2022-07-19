@@ -22,6 +22,7 @@ from pathlib import Path
 import streamlit as st
 from annotated_text import annotation
 from markdown import markdown
+
 sys.path.append('ui')
 from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
 
@@ -31,8 +32,8 @@ DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
 
 # Sliders
-DEFAULT_DOCS_FROM_RETRIEVER = int(
-    os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "30"))
+DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
+                                            "30"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "3"))
 
 # Whether the file upload should be enabled or not
@@ -48,8 +49,8 @@ def main():
 
     st.set_page_config(
         page_title="pipelines 语义检索",
-        page_icon="https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png"
-    )
+        page_icon=
+        "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
     # Persistent state
     set_state_if_absent("question", DEFAULT_QUESTION_AT_STARTUP)
@@ -69,7 +70,7 @@ def main():
     #st.markdown(
     #    """
     #    基于开源最强 **ERNIE 3.0** 预训练模型和 DuReader 数据集搭建的语义检索系统
-    # 
+    #
     #    您可以输入 query 进行语义检索，例如:
     #    1. 燃气热水器哪些品牌比较好？
     #    2. 亚马逊河流的介绍
@@ -85,14 +86,16 @@ def main():
         max_value=30,
         value=DEFAULT_NUMBER_OF_ANSWERS,
         step=1,
-        on_change=reset_results, )
+        on_change=reset_results,
+    )
     top_k_retriever = st.sidebar.slider(
         "最大检索数量",
         min_value=1,
         max_value=100,
         value=DEFAULT_DOCS_FROM_RETRIEVER,
         step=1,
-        on_change=reset_results, )
+        on_change=reset_results,
+    )
 
     if not DISABLE_FILE_UPLOAD:
         st.sidebar.write("## 文件上传:")
@@ -113,16 +116,15 @@ def main():
         pass
 
     # Search bar
-    question = st.text_input(
-        "",
-        value=st.session_state.question,
-        max_chars=100,
-        on_change=reset_results)
+    question = st.text_input("",
+                             value=st.session_state.question,
+                             max_chars=100,
+                             on_change=reset_results)
     col1, col2 = st.columns(2)
-    col1.markdown(
-        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
-    col2.markdown(
-        "<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    col1.markdown("<style>.stButton button {width:100%;}</style>",
+                  unsafe_allow_html=True)
+    col2.markdown("<style>.stButton button {width:100%;}</style>",
+                  unsafe_allow_html=True)
 
     # Run button
     run_pressed = col1.button("运行")
@@ -193,7 +195,8 @@ def main():
             st.write(
                 #markdown(context[:start_idx] + str(annotation(answer, "ANSWER", "#8ef")) + context[end_idx:]),
                 markdown(context),
-                unsafe_allow_html=True, )
+                unsafe_allow_html=True,
+            )
             st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")

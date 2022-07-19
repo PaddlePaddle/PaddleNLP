@@ -72,9 +72,8 @@ class Vocabulary(object):
         word_ids = [self.bos] + word_ids + [self.eos]
         word_ids_reverse = deepcopy(word_ids)
         word_ids_reverse.reverse()
-        return np.array(
-            word_ids, dtype=np.int64), np.array(
-                word_ids_reverse, dtype=np.int64)
+        return np.array(word_ids, dtype=np.int64), np.array(word_ids_reverse,
+                                                            dtype=np.int64)
 
 
 class UnicodeCharsVocabulary(Vocabulary):
@@ -163,7 +162,8 @@ class UnicodeCharsVocabulary(Vocabulary):
         """
         if split:
             chars_ids = [
-                self.word_to_char_ids(cur_word) for cur_word in sentence.split()
+                self.word_to_char_ids(cur_word)
+                for cur_word in sentence.split()
             ]
         else:
             chars_ids = [
@@ -181,6 +181,7 @@ class UnicodeCharsVocabulary(Vocabulary):
 
 
 class CharsVocabulary(object):
+
     def __init__(self, max_word_length):
         self._max_word_length = max_word_length
 
@@ -390,17 +391,17 @@ class OneBillionWordDataset(IterableDataset):
                     next_pos = cur_pos + how_many
 
                     inputs[i, cur_pos:next_pos] = cur_stream[i][0][:how_many]
-                    inputs_reverse[i, cur_pos:next_pos] = cur_stream[i][
-                        2][:how_many]
+                    inputs_reverse[
+                        i, cur_pos:next_pos] = cur_stream[i][2][:how_many]
                     if self._max_word_length is not None:
-                        char_inputs[i, cur_pos:next_pos] = cur_stream[i][
-                            1][:how_many]
-                        char_inputs_reverse[i, cur_pos:next_pos] = cur_stream[
-                            i][3][:how_many]
-                    targets[i, cur_pos:next_pos] = cur_stream[i][0][1:how_many +
-                                                                    1]
-                    targets_reverse[i, cur_pos:next_pos] = cur_stream[i][2][
-                        1:how_many + 1]
+                        char_inputs[
+                            i, cur_pos:next_pos] = cur_stream[i][1][:how_many]
+                        char_inputs_reverse[
+                            i, cur_pos:next_pos] = cur_stream[i][3][:how_many]
+                    targets[i,
+                            cur_pos:next_pos] = cur_stream[i][0][1:how_many + 1]
+                    targets_reverse[
+                        i, cur_pos:next_pos] = cur_stream[i][2][1:how_many + 1]
 
                     cur_pos = next_pos
 
@@ -434,11 +435,11 @@ class OneBillionWordDataset(IterableDataset):
 
 
 def create_one_batch(sentences, vocab, max_seq_len):
-    # Add <S>, </S> for every sentence 
+    # Add <S>, </S> for every sentence
     max_len = max([len(sentence) for sentence in sentences]) + 2
     max_len = min(max_len, max_seq_len)
-    batch_ids = np.zeros(
-        [len(sentences), max_len, vocab.max_word_length], dtype=np.int64)
+    batch_ids = np.zeros([len(sentences), max_len, vocab.max_word_length],
+                         dtype=np.int64)
     batch_ids_reverse = np.zeros(
         [len(sentences), max_len, vocab.max_word_length], dtype=np.int64)
     batch_lens = []

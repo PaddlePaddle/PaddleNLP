@@ -59,8 +59,8 @@ def train_single_epoch(model: MemN2N, lr, data, config):
             bar.next()
 
         optimizer.clear_grad()
-        context = np.ndarray(
-            [config.batch_size, config.mem_size], dtype=np.int64)
+        context = np.ndarray([config.batch_size, config.mem_size],
+                             dtype=np.int64)
         target = np.ndarray([config.batch_size], dtype=np.int64)
         for i in range(config.batch_size):
             m = random.randrange(config.mem_size, len(data))

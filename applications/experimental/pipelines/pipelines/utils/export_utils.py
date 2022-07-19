@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 def print_answers(results: dict,
-                  details: str="all",
-                  max_text_len: Optional[int]=None):
+                  details: str = "all",
+                  max_text_len: Optional[int] = None):
     """
     Utility function to print results of pipelines pipelines
     :param results: Results from a pipeline
@@ -71,9 +71,9 @@ def print_answers(results: dict,
 
 
 def print_documents(results: dict,
-                    max_text_len: Optional[int]=None,
-                    print_name: bool=True,
-                    print_meta: bool=False):
+                    max_text_len: Optional[int] = None,
+                    print_name: bool = True,
+                    print_meta: bool = False):
     """
     Utility that prints a compressed representation of the documents returned by a pipeline.
     :param max_text_lenght: shorten the document's content to a maximum number of chars. if None, does not cut.
@@ -94,8 +94,8 @@ def print_documents(results: dict,
     for doc in results["documents"]:
         content = doc.content
         if max_text_len:
-            content = doc.content[:max_text_len] + ("..." if len(doc.content) >
-                                                    max_text_len else "")
+            content = doc.content[:max_text_len] + (
+                "..." if len(doc.content) > max_text_len else "")
         results = {"content": content}
         if print_name:
             results["name"] = doc.meta.get("name", None)
@@ -191,19 +191,23 @@ def convert_labels_to_squad(labels_file: str):
         for label in labels:
             doc = DocumentORM.query.get(label["document_id"])
 
-            assert doc.content[label["start_offset"]:label[
-                "end_offset"]] == label["selected_text"]
+            assert doc.content[label["start_offset"]:
+                               label["end_offset"]] == label["selected_text"]
 
             qas.append({
-                "question": label["question"],
-                "id": label["id"],
-                "question_id": label["question_id"],
+                "question":
+                label["question"],
+                "id":
+                label["id"],
+                "question_id":
+                label["question_id"],
                 "answers": [{
                     "text": label["selected_text"],
                     "answer_start": label["start_offset"],
                     "labeller_id": label["labeler_id"],
                 }],
-                "is_impossible": False,
+                "is_impossible":
+                False,
             })
 
         squad_format_label = {

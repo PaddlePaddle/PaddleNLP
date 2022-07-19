@@ -83,13 +83,11 @@ if __name__ == "__main__":
         required=True,
         default=None,
         help="Directory of storing ElectraForTotalPreTraining model")
-    parser.add_argument(
-        "--generator_output_file",
-        default='generator_for_ft.pdparams',
-        help="Electra generator model for fine-tuning")
-    parser.add_argument(
-        "--discriminator_output_file",
-        default='discriminator_for_ft.pdparams',
-        help="Electra discriminator model for fine-tuning")
+    parser.add_argument("--generator_output_file",
+                        default='generator_for_ft.pdparams',
+                        help="Electra generator model for fine-tuning")
+    parser.add_argument("--discriminator_output_file",
+                        default='discriminator_for_ft.pdparams',
+                        help="Electra discriminator model for fine-tuning")
     args, unparsed = parser.parse_known_args()
     main(args)

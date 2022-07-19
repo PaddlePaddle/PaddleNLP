@@ -22,10 +22,12 @@ import paddle
 
 
 def create_input_specs():
-    src_word = paddle.static.InputSpec(
-        name="src_word", shape=[None, None], dtype="int64")
-    trg_word = paddle.static.InputSpec(
-        name="trg_word", shape=[None, None], dtype="int64")
+    src_word = paddle.static.InputSpec(name="src_word",
+                                       shape=[None, None],
+                                       dtype="int64")
+    trg_word = paddle.static.InputSpec(name="trg_word",
+                                       shape=[None, None],
+                                       dtype="int64")
     return [src_word, trg_word]
 
 
