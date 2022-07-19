@@ -176,14 +176,24 @@ class SpmConverter(Converter):
     def postprocessor(self):
         return None
 
+    def replacement(self):
+        return "▁"
+
+    def add_prefix_space(self):
+        return True
+
+    def set_model(self, tokenizer):
+        pass
+
     def converted(self) -> Tokenizer:
         tokenizer = self.tokenizer(self.proto)
 
+        self.set_model(tokenizer)
         # Tokenizer assemble
         tokenizer.normalizer = self.normalizer(self.proto)
 
-        replacement = "▁"
-        add_prefix_space = True
+        replacement = self.replacement()
+        add_prefix_space = self.add_prefix_space()
         tokenizer.pretokenizer = self.pretokenizer(replacement,
                                                    add_prefix_space)
         # tokenizer.decoder = decoders.MetaSpace(replacement=replacement, add_prefix_space=add_prefix_space)
@@ -196,19 +206,18 @@ class SpmConverter(Converter):
 
 class ErnieMConverter(SpmConverter):
 
+    def set_model(self, tokenizer):
+        SPLICE_UNDERLINE = self.replacement()
+        tokenizer.model.set_filter_token(SPLICE_UNDERLINE)
+        chinese_chars = r"\x{4e00}-\x{9fff}"
+        punc_chars = r",;:.?!~，；：。？！《》【】"
+        digits = r"0-9"
+        tokenizer.model.set_split_rule(
+            fr"[{chinese_chars}]|[{punc_chars}]|[{digits}]+|[^{chinese_chars}{punc_chars}{digits}]+"
+        )
+
     def normalizer(self, proto):
-        list_normalizers = [
-            normalizers.ReplaceNormalizer("“", '"'),
-            normalizers.ReplaceNormalizer("”", '"'),
-            normalizers.ReplaceNormalizer("’", '"'),
-            normalizers.ReplaceNormalizer("—", '"'),
-            # clean text for white space and control character, like bert normalizer,
-            normalizers.ReplaceNormalizer("[\\s\\p{Zs}]+", ' '),
-            normalizers.ReplaceNormalizer(
-                # \p{Cn} is not supported in re2
-                "[\\p{Cf}\\p{Cc}\\p{Co}\\p{Cs}]+",
-                ''),
-        ]
+        list_normalizers = []
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
         list_normalizers.append(
             normalizers.PrecompiledNormalizer(precompiled_charsmap))
@@ -221,13 +230,11 @@ class ErnieMConverter(SpmConverter):
         word_score_dict = {}
         for piece in proto.pieces:
             word_score_dict[piece.piece] = piece.score
-
         vocab_list = [None] * len(self.original_tokenizer.vocab)
-        for _token, _id in self.original_tokenizer.vocab.token_to_idx.items():
+        original_vocab = self.original_tokenizer.vocab.token_to_idx
+        for _token, _id in original_vocab.items():
             if _token in word_score_dict:
-                score = word_score_dict[_token] if check_number_comma(
-                    _token) else word_score_dict[_token] - 100
-                vocab_list[_id] = (_token, score)
+                vocab_list[_id] = (_token, word_score_dict[_token])
             else:
                 vocab_list[_id] = (_token, 0.0)
         return vocab_list

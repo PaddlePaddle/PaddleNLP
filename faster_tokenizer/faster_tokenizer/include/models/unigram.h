@@ -22,6 +22,7 @@ limitations under the License. */
 
 #include "darts.h"
 #include "nlohmann/json.hpp"
+#include "re2/re2.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -40,6 +41,8 @@ struct Unigram : public Model {
   virtual std::vector<std::string> Save(
       const std::string& folder,
       const std::string& filename_prefix) const override;
+  void SetFilterToken(const std::string& filter_token);
+  void SetSplitRule(const std::string& split_rule);
 
 private:
   float GetVocabScore(uint32_t id) const;
@@ -63,6 +66,11 @@ private:
   bool fuse_unk_;
   bool is_optimized_;
   int trie_results_size_;
+
+  std::string filter_token_;
+  // For special rule of token spliting after tokenization
+  // It's useful for some cases, such as ernie-m tokenizer
+  std::unique_ptr<re2::RE2> split_rule_;
 
   friend void to_json(nlohmann::json& j, const Unigram& model);
   friend void from_json(const nlohmann::json& j, Unigram& model);
