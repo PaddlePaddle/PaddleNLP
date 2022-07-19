@@ -69,7 +69,11 @@ class RobertaEmbeddings(nn.Layer):
         self.padding_idx = pad_token_id
         self.cls_token_id = cls_token_id
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                past_key_values_length=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
@@ -79,6 +83,8 @@ class RobertaEmbeddings(nn.Layer):
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
                 position_ids = seq_length - ones
+            if past_key_values_length is not None:
+                position_ids += past_key_values_length
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
@@ -342,6 +348,8 @@ class RobertaModel(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                past_key_values=None,
+                use_cache=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -376,29 +384,31 @@ class RobertaModel(RobertaPretrainedModel):
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
-                Whether or not to output hidden states for all hidden layers.
+                Whether to return the hidden states of all layers.
                 Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a `ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`) by default.
-            Returns (`encoder_outputs`, `pooled_output`) if output_hidden_states is `True`.
-
-            With the fields:
-
-            - `sequence_output` (Tensor):
-                Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
-
-            - `pooled_output` (Tensor):
-                The output of first token (`[CLS]`) in sequence.
-                We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and its shape is [batch_size, hidden_size].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+            An instance of `BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            `BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -414,23 +424,37 @@ class RobertaModel(RobertaPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        past_key_values_length = None
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
                     self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            past_key_values_length=past_key_values_length)
 
+        self.encoder._use_cache = use_cache  # To be consistent with HF
         encoder_outputs = self.encoder(
             embedding_output,
             src_mask=attention_mask,
+            cache=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -972,6 +996,8 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
+                past_key_values=None,
+                use_cache=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -985,24 +1011,25 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
+            past_key_values (Tensor, optional):
+                See :class:`RobertaModel`.
+            use_cache (Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            output_attentions (bool, optional):
+                See :class:`RobertaModel`.
             output_hidden_states (bool, optional):
                 See :class:`RobertaModel`.
+            return_dict (bool, optional):
+                See :class:`RobertaModel`.
+            
 
 
         Returns:
-            Tensor or tuple: Returns tensor `prediction_scores` by default.
-            Returns tuple (`prediction_scores`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `prediction_scores` (Tensor):
-                The scores of masked token prediction.
-                Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of `MaskedLMOutput` if `return_dict=True`. Otherwise it
+            returns a tuple of tensors corresponding to ordered and not None
+            (depending on the input arguments) fields of `MaskedLMOutput`.
 
         Example:
             .. code-block::
@@ -1025,6 +1052,8 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                                attention_mask=attention_mask,
                                token_type_ids=token_type_ids,
                                position_ids=position_ids,
+                               past_key_values=past_key_values,
+                               use_cache=use_cache,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)
@@ -1040,6 +1069,7 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
         return MaskedLMOutput(
             logits=prediction_scores,
+            past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
