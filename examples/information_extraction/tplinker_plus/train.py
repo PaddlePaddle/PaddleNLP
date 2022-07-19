@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 
 from evaluate import evaluate
 from criterion import Criterion
-from utils import create_dataloader, reader, set_seed
+from utils import create_dataloader, reader, set_seed, get_re_label_dict
 from model import TPLinkerPlus
 
 
@@ -38,29 +38,8 @@ def do_train():
         paddle.distributed.init_parallel_env()
     set_seed(args.seed)
 
-    rel2id = {}
-    id2rel = {}
-    with open("data/all_50_schemas", "r", encoding="utf-8") as f:
-        for l in f:
-            l = json.loads(l)
-            if l["predicate"] not in rel2id:
-                id2rel[len(rel2id)] = l["predicate"]
-                rel2id[l["predicate"]] = len(rel2id)
-    link_types = [
-        "SH2OH",  # subject head to object head
-        "OH2SH",  # object head to subject head
-        "ST2OT",  # subject tail to object tail
-        "OT2ST",  # object tail to subject tail
-    ]
-    tags = []
-    for lk in link_types:
-        for rel in rel2id.keys():
-            tags.append("=".join([rel, lk]))
-    tags.append("DEFAULT=EH2ET")
-    tag2id = {t: idx for idx, t in enumerate(tags)}
-    id2tag = {idx: t for t, idx in tag2id.items()}
-
-    re_maps = {"rel2id": rel2id, "id2tag": id2tag, "id2rel": id2rel}
+    label_dicts = get_re_label_dict(args.schema_path)
+    rel2id = label_dicts["rel2id"]
 
     train_ds = load_dataset(reader, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
@@ -143,7 +122,8 @@ def do_train():
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
                 paddle.save(model.state_dict(), save_param_path)
 
-                precision, recall, f1 = evaluate(model, dev_dataloader, re_maps)
+                precision, recall, f1 = evaluate(model, dev_dataloader,
+                                                 label_dicts)
                 logger.info(
                     "Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
                     (precision, recall, f1))
@@ -172,7 +152,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--train_path", default="./data/train_data.json", type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default="./data/dev_data.json", type=str, help="The path of dev set.")
-    parser.add_argument("--rel2id_path", default="./data/rel2id.json", type=str, help="The file path of the mappings of relations.")
+    parser.add_argument("--schema_path", default="./data/all_50_schemas", type=str, help="The file path of the schema for extraction.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum input sequence length. "
         "Sequences longer than this will be split automatically.")

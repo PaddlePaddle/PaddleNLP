@@ -19,15 +19,13 @@ import json
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
-from utils import Preprocessor
-
 
 def clean_text(text):
     text = re.sub(u"\u3000", " ", text)
     return text
 
 
-def do_convert(input_file, target_file, label_map, preprocessor):
+def do_convert(input_file, target_file, label_map):
     with open(input_file, 'r', encoding='utf-8') as f:
         id = 0
         outputs = []
@@ -70,12 +68,6 @@ def do_convert(input_file, target_file, label_map, preprocessor):
             outputs.append(output)
             id += 1
 
-    # # Add char span
-    # outputs, _ = preprocessor.add_char_span(outputs, False)
-
-    # # Add token span
-    # outputs = preprocessor.add_tok_span(outputs)
-
     with open(target_file, 'w', encoding='utf-8') as f:
         for output in outputs:
             f.write(json.dumps(output, ensure_ascii=False) + "\n")
@@ -99,11 +91,7 @@ if __name__ == "__main__":
                                                    add_special_tokens=False)[
                                                        "offset_mapping"]
 
-    preprocessor = Preprocessor(
-        tokenize_func=tokenize,
-        get_tok2char_span_map_func=get_tok2char_span_map)
-
     for fi, ft in zip(input_file_list, target_file_list):
         input_file_path = os.path.join(data_home, fi)
         target_file_path = os.path.join(data_home, ft)
-        do_convert(input_file_path, target_file_path, label_map, preprocessor)
+        do_convert(input_file_path, target_file_path, label_map)

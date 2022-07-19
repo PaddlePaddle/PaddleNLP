@@ -23,7 +23,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, AutoModel
 from paddlenlp.utils.log import logger
 
-from utils import postprocess, create_dataloader, reader
+from utils import postprocess, create_dataloader, reader, get_re_label_dict
 from model import TPLinkerPlus
 
 
@@ -53,29 +53,7 @@ def evaluate(model, data_loader, maps):
 
 
 def do_eval():
-    rel2id = {}
-    id2rel = {}
-    with open("data/all_50_schemas", "r", encoding="utf-8") as f:
-        for l in f:
-            l = json.loads(l)
-            if l["predicate"] not in rel2id:
-                id2rel[len(rel2id)] = l["predicate"]
-                rel2id[l["predicate"]] = len(rel2id)
-    link_types = [
-        "SH2OH",  # subject head to object head
-        "OH2SH",  # object head to subject head
-        "ST2OT",  # subject tail to object tail
-        "OT2ST",  # object tail to subject tail
-    ]
-    tags = []
-    for lk in link_types:
-        for rel in rel2id.keys():
-            tags.append("=".join([rel, lk]))
-    tags.append("DEFAULT=EH2ET")
-    tag2id = {t: idx for idx, t in enumerate(tags)}
-    id2tag = {idx: t for t, idx in tag2id.items()}
-
-    re_maps = {"rel2id": rel2id, "id2tag": id2tag, "id2rel": id2rel}
+    label_dicts = get_re_label_dict(args.schema_path)
 
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
     encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
@@ -93,7 +71,7 @@ def do_eval():
                                         is_train=False,
                                         rel2id=rel2id)
 
-    precision, recall, f1 = evaluate(model, test_dataloader, re_maps)
+    precision, recall, f1 = evaluate(model, test_dataloader, label_dicts)
     logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
                 (precision, recall, f1))
 
@@ -104,6 +82,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
+    parser.add_argument("--schema_path", default="./data/all_50_schemas", type=str, help="The file path of the schema for extraction.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
 

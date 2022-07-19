@@ -346,3 +346,33 @@ def get_spots_fr_shaking_tag(shaking_idx2matrix_idx, shaking_outputs):
         spot = (pos1, pos2, tag_idx)
         spots.append(spot)
     return spots
+
+
+def get_re_label_dict(schema_file_path):
+    """
+    'rel2id', 'id2tag', 'id2rel'
+    """
+    rel2id = {}
+    id2rel = {}
+    with open(schema_file_path, "r", encoding="utf-8") as f:
+        for l in f:
+            l = json.loads(l)
+            if l["predicate"] not in rel2id:
+                id2rel[len(rel2id)] = l["predicate"]
+                rel2id[l["predicate"]] = len(rel2id)
+    link_types = [
+        "SH2OH",  # subject head to object head
+        "OH2SH",  # object head to subject head
+        "ST2OT",  # subject tail to object tail
+        "OT2ST",  # object tail to subject tail
+    ]
+    tags = []
+    for lk in link_types:
+        for rel in rel2id.keys():
+            tags.append("=".join([rel, lk]))
+    tags.append("DEFAULT=EH2ET")
+    tag2id = {t: idx for idx, t in enumerate(tags)}
+    id2tag = {idx: t for t, idx in tag2id.items()}
+
+    label_dicts = {"rel2id": rel2id, "id2tag": id2tag, "id2rel": id2rel}
+    return label_dicts
