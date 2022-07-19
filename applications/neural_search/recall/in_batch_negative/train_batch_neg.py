@@ -86,7 +86,7 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt',
                     help="evaluate_result")
-parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
+parser.add_argument('--evaluate', action='store_true',
                     help='whether evaluate while training')
 args = parser.parse_args()
 # yapf: enable
@@ -294,7 +294,7 @@ def do_train():
                                                    'model_state.pdparams')
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
-        if args.evaluate:
+        if args.evaluate and rank == 0:
             print("evaluating")
             recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
                                 recall_result_file, text_list, id2corpus)
