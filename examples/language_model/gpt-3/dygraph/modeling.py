@@ -374,12 +374,15 @@ class TransformerDecoderLayer(nn.Layer):
                  normalize_before=True,
                  weight_attr=None,
                  bias_attr=None,
-                 num_partitions=1):
+                 num_partitions=1,
+                 fuse=False):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
 
         super(TransformerDecoderLayer, self).__init__()
+
+        self.fuse = fuse
         attn_dropout = dropout if attn_dropout is None else attn_dropout
         act_dropout = dropout if act_dropout is None else act_dropout
         self.normalize_before = normalize_before
@@ -387,32 +390,65 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        self.self_attn = MultiHeadAttention(d_model,
-                                            nhead,
-                                            dropout=attn_dropout,
-                                            weight_attr=weight_attrs[0],
-                                            bias_attr=bias_attrs[0],
-                                            num_partitions=num_partitions)
+        if self.fuse:
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_nranks = hcg.get_model_parallel_world_size()
+            mp_group = hcg.get_model_parallel_group()
+            ring_id = mp_group.id if mp_nranks > 1 else -1
+            self.self_attn = incubate.nn.FusedMultiHeadAttention(
+                d_model,
+                nhead,
+                dropout_rate=dropout,
+                attn_dropout_rate=attn_dropout,
+                normalize_before=normalize_before,
+                qkv_weight_attr=weight_attrs[0],
+                qkv_bias_attr=bias_attrs[0],
+                linear_weight_attr=weight_attrs[0],
+                linear_bias_attr=bias_attrs[0],
+                epsilon=1e-5,
+                nranks=mp_nranks,
+                ring_id=ring_id)
+            self.ffn = incubate.nn.FusedFeedForward(
+                d_model,
+                dim_feedforward,
+                dropout_rate=act_dropout,
+                epsilon=1e-5,
+                activation=activation,
+                normalize_before=normalize_before,
+                act_dropout_rate=0.0,
+                linear1_weight_attr=weight_attrs[2],
+                linear1_bias_attr=bias_attrs[2],
+                linear2_weight_attr=weight_attrs[2],
+                linear2_bias_attr=bias_attrs[2],
+                nranks=mp_nranks,
+                ring_id=ring_id)
+        else:
+            self.self_attn = MultiHeadAttention(d_model,
+                                                nhead,
+                                                dropout=attn_dropout,
+                                                weight_attr=weight_attrs[0],
+                                                bias_attr=bias_attrs[0],
+                                                num_partitions=num_partitions)
 
-        self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
-            d_model,
-            dim_feedforward,
-            weight_attr=weight_attrs[2],
-            gather_output=False,
-            has_bias=True)
+            self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
+                d_model,
+                dim_feedforward,
+                weight_attr=weight_attrs[2],
+                gather_output=False,
+                has_bias=True)
 
-        self.linear2 = fleet.meta_parallel.RowParallelLinear(
-            dim_feedforward,
-            d_model,
-            weight_attr=weight_attrs[2],
-            input_is_parallel=True,
-            has_bias=True)
+            self.linear2 = fleet.meta_parallel.RowParallelLinear(
+                dim_feedforward,
+                d_model,
+                weight_attr=weight_attrs[2],
+                input_is_parallel=True,
+                has_bias=True)
 
-        self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
-        self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
-        self.activation = getattr(F, activation)
+            self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
+            self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
+            self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+            self.activation = getattr(F, activation)
 
     def forward(self,
                 tgt,
@@ -420,6 +456,17 @@ class TransformerDecoderLayer(nn.Layer):
                 tgt_mask=None,
                 use_cache=False,
                 cache=None):
+        if self.fuse:
+            if use_cache:
+                attn_output, cache_kv_out = self.self_attn(tgt,
+                                                           attn_mask=tgt_mask,
+                                                           cache=cache.kv)
+            else:
+                attn_output = self.self_attn(tgt, attn_mask=tgt_mask)
+
+            enc_out = self.ffn(attn_output)
+            return (enc_out, cache_kv_out) if use_cache else enc_out
+
         residual = tgt
 
         if self.normalize_before:
@@ -721,13 +768,16 @@ class GPTModel(GPTPretrainedModel):
                  bos_token_id=0,
                  eol_token_id=3,
                  num_partitions=1,
-                 use_recompute=False):
+                 use_recompute=False,
+                 fuse=False):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+
+        self.fuse = fuse
 
         self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
                                         hidden_dropout_prob,
@@ -749,7 +799,8 @@ class GPTModel(GPTPretrainedModel):
                         initializer=nn.initializer.Normal(
                             mean=0.0, std=self.initializer_range)),
                     bias_attr=None,
-                    num_partitions=num_partitions))
+                    num_partitions=num_partitions,
+                    fuse=self.fuse))
 
         self.decoder = TransformerDecoder(decoder_layers,
                                           num_hidden_layers,
@@ -1072,7 +1123,8 @@ class GPTForPretrainingPipe(PipelineLayer):
                  eol_token_id=3,
                  num_partitions=1,
                  topology=None,
-                 use_recompute=False):
+                 use_recompute=False,
+                 fuse=False):
 
         # forward desc
         self.descs = []
@@ -1102,7 +1154,8 @@ class GPTForPretrainingPipe(PipelineLayer):
                               initializer=nn.initializer.Normal(
                                   mean=0.0, std=initializer_range)),
                           bias_attr=None,
-                          num_partitions=num_partitions))
+                          num_partitions=num_partitions,
+                          fuse=fuse))
 
         self.descs.append(LayerDesc(nn.LayerNorm, normalized_shape=hidden_size))
 
