@@ -30,9 +30,9 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.6
+- python >= 3.7.0
 - paddlenlp >= 2.2.1
-- paddlepaddle-gpu >=2.2
+- paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
@@ -74,7 +74,7 @@ python examples/question-answering/dense_qa_example.py --device cpu
 整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI。接下来我们依次搭建这 3 个服务并串联构成可视化的问答系统
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/start) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
 ```bash
 ./bin/elasticsearch
@@ -88,21 +88,34 @@ curl http://localhost:9200/_aliases?pretty=true
 #### 3.4.2 文档数据写入 ANN 索引库
 ```
 # 以百科城市数据为例建立 ANN 索引库
-python utils/offline_ann.py
+python utils/offline_ann.py --index_name baike_cities \
+                            --doc_dir data/baike
 ```
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
+wget --no-check-certificate https://dl.xpdfreader.com/xpdf-tools-linux-4.04.tar.gz && tar -xvf xpdf-tools-linux-4.04.tar.gz && cp xpdf-tools-linux-4.04/bin64/pdftotext /usr/local/bin
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
+或者直接运行脚本：
+
+```bash
+sh scripts/run_server.sh
+```
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_question_answering.py --server.port 8502
+```
+或者直接运行脚本：
+
+```bash
+sh scripts/run_client.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。
@@ -115,6 +128,7 @@ python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 ```bash
 export LANG=zh_CN.UTF-8
 ```
+
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
