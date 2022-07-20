@@ -120,7 +120,6 @@ class ModelTesterMixin:
             model_vocab_size = config["vocab_size"]
             # Retrieve the embeddings and clone theme
             model_embed = model.resize_token_embeddings(model_vocab_size)
-            print(model_embed)
             cloned_embeddings = model_embed.weight.clone()
 
             # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
