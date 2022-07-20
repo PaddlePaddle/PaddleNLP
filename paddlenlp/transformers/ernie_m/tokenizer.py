@@ -15,6 +15,7 @@
 import os
 
 import sentencepiece as spm
+import unicodedata
 
 from .. import PretrainedTokenizer
 
@@ -145,6 +146,48 @@ class ErnieMTokenizer(PretrainedTokenizer):
             pad_to_max_seq_len, truncation_strategy, return_position_ids,
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)
+
+    def get_offset_mapping(self, text):
+        pieces = self._tokenize(text)
+        _text_trans = ''.join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
+
+        def _get_orig_offset(token, offset, idx):
+            if token == SPIECE_UNDERLINE:
+                return '', offset
+            orig_token = token
+            if token.startswith(SPIECE_UNDERLINE):
+                orig_token = token[1:]
+            while offset < len(text) and self.is_whitespace(text[offset]):
+                offset += 1
+            if text.startswith(orig_token, offset):
+                return orig_token, offset
+            end = offset + sum(
+                [len(_) for _ in pieces[lst_match_idx + 1:idx + 3]])
+            new_offset = text.find(orig_token, offset, end)
+            new_offset_trans = _text_trans.find(orig_token, offset, end)
+            if new_offset > -1 or new_offset_trans > -1:
+                if new_offset < 0 or (new_offset > -1
+                                      and new_offset_trans < new_offset):
+                    new_offset = new_offset_trans
+                return text[new_offset:new_offset + len(orig_token)], new_offset
+            # if not found, get orig_token by next piece
+            if idx < len(pieces) - 1:
+                next_token = pieces[idx + 1]
+                _, next_offset = _get_orig_offset(next_token, offset, idx + 1)
+                orig_token = text[offset:next_offset].strip()
+                return orig_token, offset
+            return text[offset:].strip(), offset
+
+        offset = 0
+        lst_match_idx = -1
+        offsets = []
+        for i, token in enumerate(pieces):
+            orig_token, offset = _get_orig_offset(token, offset, i)
+            if orig_token:
+                lst_match_idx = i
+            offsets += [(offset, offset + len(orig_token))]
+            offset += len(orig_token)
+        return offsets
 
     @property
     def vocab_size(self):
@@ -325,4 +368,16 @@ class ErnieMTokenizer(PretrainedTokenizer):
         """
         if char in u",;:.?!~，；：。？！《》【】":
             return True
+        return False
+
+    def is_whitespace(self, char):
+        """
+        is whitespace
+        """
+        if char == " " or char == "\t" or char == "\n" or char == "\r":
+            return True
+        if len(char) == 1:
+            cat = unicodedata.category(char)
+            if cat == "Zs":
+                return True
         return False

@@ -154,6 +154,7 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
 
   for (auto&& str : encode_result) {
     if (str == filter_token_) {
+      offset += filter_token_.length();
       continue;
     }
     if (split_rule_ != nullptr) {
@@ -166,6 +167,7 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
         start = curr_start + res_len;
         std::string result_str(result.data(), res_len);
         if (result_str == filter_token_) {
+          offset += filter_token_.length();
           continue;
         }
         UpdateTokens(result_str);
