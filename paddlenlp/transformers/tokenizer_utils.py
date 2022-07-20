@@ -1327,9 +1327,13 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                 if token in self.basic_tokenizer.never_split:
                     split_tokens.append(token)
                 else:
-                    split_tokens += self.wordpiece_tokenizer.tokenize(token)
+                    for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                        split_tokens.append(
+                            sub_token if sub_token != self.unk_token else token)
         else:
-            split_tokens = self.wordpiece_tokenizer.tokenize(text)
+            for sub_token in self.wordpiece_tokenizer.tokenize(text):
+                split_tokens.append(
+                    sub_token if sub_token != self.unk_token else text)
 
         normalized_text, char_mapping = '', []
 
@@ -1354,7 +1358,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         text, token_mapping, offset = normalized_text, [], 0
 
         for token in split_tokens:
-
             if token[:2] == '##':
                 token = token[2:]
             if token in self.all_special_tokens:
