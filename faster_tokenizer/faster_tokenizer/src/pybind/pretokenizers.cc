@@ -33,13 +33,13 @@ public:
   }
 };
 
-class PyWhitespace : public pretokenizers::Whitespace {
+class PyWhitespacePreTokenizer : public pretokenizers::WhitespacePreTokenizer {
 public:
-  using Whitespace::Whitespace;
+  using WhitespacePreTokenizer::WhitespacePreTokenizer;
   virtual void operator()(
       pretokenizers::PreTokenizedString* pretokenized) const override {
     PYBIND11_OVERLOAD_NAME(
-        void, Whitespace, "__call__", operator(), pretokenized);
+        void, WhitespacePreTokenizer, "__call__", operator(), pretokenized);
   }
 };
 
@@ -100,10 +100,10 @@ void BindPreTokenizers(pybind11::module* m) {
                                                           "PreTokenizer")
       .def(py::init<>())
       .def("__call__", &pretokenizers::PreTokenizer::operator());
-  py::class_<pretokenizers::Whitespace, PyWhitespace>(sub_module,
-                                                      "WhitespacePreTokenizer")
+  py::class_<pretokenizers::WhitespacePreTokenizer, PyWhitespacePreTokenizer>(
+      sub_module, "WhitespacePreTokenizer")
       .def(py::init<>())
-      .def("__call__", &pretokenizers::Whitespace::operator());
+      .def("__call__", &pretokenizers::WhitespacePreTokenizer::operator());
   py::class_<pretokenizers::BertPreTokenizer, PyBertPreTokenizer>(
       sub_module, "BertPreTokenizer")
       .def(py::init<>())

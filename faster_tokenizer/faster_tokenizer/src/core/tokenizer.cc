@@ -711,7 +711,8 @@ template void Tokenizer::SetNormalizer(const normalizers::StripNormalizer&);
 // Instantiate pretokenizers
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
-template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::WhitespacePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::MetaSpacePreTokenizer&);
 

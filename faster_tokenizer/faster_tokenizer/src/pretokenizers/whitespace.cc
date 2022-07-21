@@ -21,7 +21,8 @@ namespace faster_tokenizer {
 namespace pretokenizers {
 static re2::RE2 pattern("[\\s\\p{Zs}]+");
 
-void Whitespace::operator()(PreTokenizedString* pretokenized) const {
+void WhitespacePreTokenizer::operator()(
+    PreTokenizedString* pretokenized) const {
   pretokenized->Split([&](int idx,
                           normalizers::NormalizedString* normalized,
                           std::vector<StringSplit>* string_splits) {

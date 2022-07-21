@@ -20,7 +20,7 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct Whitespace : public PreTokenizer {
+struct WhitespacePreTokenizer : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
 };
 

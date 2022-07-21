@@ -141,8 +141,9 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
         py_obj.cast<const pretokenizers::BertPreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (pybind11::type::of(py_obj).is(
-                 py::type::of<pretokenizers::Whitespace>())) {
-    const auto& pretokenizer = py_obj.cast<const pretokenizers::Whitespace&>();
+                 py::type::of<pretokenizers::WhitespacePreTokenizer>())) {
+    const auto& pretokenizer =
+        py_obj.cast<const pretokenizers::WhitespacePreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (pybind11::type::of(py_obj).is(
                  py::type::of<pretokenizers::MetaSpacePreTokenizer>())) {
