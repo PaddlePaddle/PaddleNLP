@@ -221,8 +221,6 @@ class ErnieMConverter(SpmConverter):
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
         list_normalizers.append(
             normalizers.PrecompiledNormalizer(precompiled_charsmap))
-        list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
-        list_normalizers.append(normalizers.ReplaceNormalizer("\\s$", ""))
         return normalizers.SequenceNormalizer(list_normalizers)
 
     def vocab(self, proto):
@@ -242,6 +240,13 @@ class ErnieMConverter(SpmConverter):
     def unk_id(self, proto):
         return self.original_tokenizer.convert_tokens_to_ids(
             str(self.original_tokenizer.unk_token))
+
+    def pretokenizer(self, replacement, add_prefix_space):
+        return pretokenizers.SequencePreTokenizer([
+            pretokenizers.WhitespacePreTokenizer(),
+            pretokenizers.MetaSpacePreTokenizer(
+                replacement=replacement, add_prefix_space=add_prefix_space)
+        ])
 
     def postprocessor(self):
         '''

@@ -63,6 +63,16 @@ public:
   }
 };
 
+class PySequencePreTokenizer : public pretokenizers::SequencePreTokenizer {
+public:
+  using SequencePreTokenizer::SequencePreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, SequencePreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
 void BindPreTokenizers(pybind11::module* m) {
   auto sub_module =
       m->def_submodule("pretokenizers", "The pretokenizers module");
@@ -114,6 +124,46 @@ void BindPreTokenizers(pybind11::module* m) {
            py::arg("replacement") = "_",
            py::arg("add_prefix_space") = true)
       .def("__call__", &pretokenizers::MetaSpacePreTokenizer::operator());
+  py::class_<pretokenizers::SequencePreTokenizer, PySequencePreTokenizer>(
+      sub_module, "SequencePreTokenizer")
+      .def(py::init([](const py::list& py_list) {
+             pretokenizers::PreTokenizer* pretokenizer_ptr;
+             std::vector<pretokenizers::PreTokenizer*> pretokenizers;
+             for (py::handle py_pretokenizer : py_list) {
+               if (pybind11::type::of(py_pretokenizer)
+                       .is(py::type::of<pretokenizers::BertPreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer.cast<pretokenizers::BertPreTokenizer*>();
+               } else if (pybind11::type::of(py_pretokenizer)
+                              .is(py::type::of<
+                                  pretokenizers::MetaSpacePreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer
+                         .cast<pretokenizers::MetaSpacePreTokenizer*>();
+               } else if (pybind11::type::of(py_pretokenizer)
+                              .is(py::type::of<
+                                  pretokenizers::SequencePreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer
+                         .cast<pretokenizers::SequencePreTokenizer*>();
+               } else if (pybind11::type::of(py_pretokenizer)
+                              .is(py::type::of<
+                                  pretokenizers::WhitespacePreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer
+                         .cast<pretokenizers::WhitespacePreTokenizer*>();
+               } else {
+                 throw py::value_error(
+                     "Type of normalizers should be one of `BertPreTokenizer`,"
+                     " `MetaSpacePreTokenizer`, `SequencePreTokenizer`,"
+                     " `WhitespacePreTokenizer`");
+               }
+               pretokenizers.push_back(pretokenizer_ptr);
+             }
+             return pretokenizers::SequencePreTokenizer(pretokenizers);
+           }),
+           py::arg("pretokenizers"))
+      .def("__call__", &pretokenizers::SequencePreTokenizer::operator());
 }
 
 }  // namespace pybind

@@ -34,6 +34,13 @@ void WhitespacePreTokenizer::operator()(
   });
 }
 
+void to_json(nlohmann::json& j,
+             const WhitespacePreTokenizer& whitespace_pretokenizer) {
+  j = {
+      {"type", "WhitespacePreTokenizer"},
+  };
+}
+
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp

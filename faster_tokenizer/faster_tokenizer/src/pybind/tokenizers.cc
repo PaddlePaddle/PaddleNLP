@@ -150,6 +150,11 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
     const auto& pretokenizer =
         py_obj.cast<const pretokenizers::MetaSpacePreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<pretokenizers::SequencePreTokenizer>())) {
+    const auto& pretokenizer =
+        py_obj.cast<const pretokenizers::SequencePreTokenizer&>();
+    self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePreTokenizer();
   } else {
