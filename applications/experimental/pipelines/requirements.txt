@@ -13,3 +13,5 @@ python-docx
 nltk
 pdfplumber
 faiss-cpu>=1.7.2
+opencv-python
+opencv-contrib-python-headless

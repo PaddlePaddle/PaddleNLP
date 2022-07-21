@@ -50,8 +50,8 @@ public:
   NormalizedString& operator=(NormalizedString&& other);
   const std::string& GetStr() const;
   const std::string& GetOrignalStr() const;
-  uint GetLen() const;
-  uint GetOriginalLen() const;
+  uint32_t GetLen() const;
+  uint32_t GetOriginalLen() const;
   core::Offset GetOrginalOffset() const;
   bool IsEmpty() const;
   bool IsOriginalEmpty() const;
@@ -78,7 +78,7 @@ public:
              bool origin_range) const;
 
   void UpdateNormalized(const OffsetMapping& new_normalized,
-                        uint initial_offset);
+                        uint32_t initial_offset);
   template <typename PatternType>
   void Split(const PatternType&
                  pattern, /* re2::RE2 or std::function<bool(char32_t)> */
@@ -183,10 +183,10 @@ private:
   // In order to keep track of the offset mapping from
   // original_ to normalized_
   std::vector<core::Range> alignments_;
-  uint original_shift_;
+  uint32_t original_shift_;
 
   void UpdateNormalizedRange(const OffsetMapping& new_normalized,
-                             uint initial_offset,
+                             uint32_t initial_offset,
                              const core::Range& range,
                              bool origin_range = true);
   void RunNormalization(const std::string& mode);

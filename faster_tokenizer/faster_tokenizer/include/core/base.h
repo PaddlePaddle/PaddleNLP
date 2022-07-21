@@ -26,10 +26,10 @@ limitations under the License. */
 
 namespace std {
 template <>
-struct hash<std::pair<uint, uint>> {
-  size_t operator()(const std::pair<uint, uint>& x) const {
-    size_t h1 = hash<uint>()(x.first);
-    size_t h2 = hash<uint>()(x.second);
+struct hash<std::pair<uint32_t, uint32_t>> {
+  size_t operator()(const std::pair<uint32_t, uint32_t>& x) const {
+    size_t h1 = hash<uint32_t>()(x.first);
+    size_t h2 = hash<uint32_t>()(x.second);
     return h1 ^ (h2 << 1);
   }
 };
@@ -83,11 +83,11 @@ struct TruncMethod {
 struct PadMethod {
   PadStrategy strategy_;
   Direction direction_;
-  uint pad_id_;
-  uint pad_token_type_id_;
+  uint32_t pad_id_;
+  uint32_t pad_token_type_id_;
   std::string pad_token_;
-  uint pad_len_;
-  uint pad_to_multiple_of_;
+  uint32_t pad_len_;
+  uint32_t pad_to_multiple_of_;
 
   PadMethod()
       : strategy_(BATCH_LONGEST),
@@ -138,14 +138,14 @@ inline void from_json(const nlohmann::json& j, PadMethod& pad_method) {
   j["pad_to_multiple_of"].get_to(pad_method.pad_to_multiple_of_);
 }
 
-using Offset = std::pair<uint, uint>;
-using Range = std::pair<uint, uint>;
-using Vocab = std::unordered_map<std::string, uint>;
+using Offset = std::pair<uint32_t, uint32_t>;
+using Range = std::pair<uint32_t, uint32_t>;
+using Vocab = std::unordered_map<std::string, uint32_t>;
 using VocabList = std::vector<std::pair<std::string, float>>;
-using VocabReversed = std::unordered_map<uint, std::string>;
-using SortedVocabReversed = std::map<uint, std::string>;
-using Pair = std::pair<uint, uint>;
-using MergeMap = std::unordered_map<Pair, std::pair<uint, uint>>;
+using VocabReversed = std::unordered_map<uint32_t, std::string>;
+using SortedVocabReversed = std::map<uint32_t, std::string>;
+using Pair = std::pair<uint32_t, uint32_t>;
+using MergeMap = std::unordered_map<Pair, std::pair<uint32_t, uint32_t>>;
 using Merges = std::vector<std::pair<std::string, std::string>>;
 
 inline void to_json(nlohmann::json& j,
@@ -157,11 +157,11 @@ inline void to_json(nlohmann::json& j,
 }
 
 struct Token {
-  uint id_;
+  uint32_t id_;
   std::string value_;
   Offset offset_;
   Token() = default;
-  Token(uint id, const std::string& value, const Offset& offset)
+  Token(uint32_t id, const std::string& value, const Offset& offset)
       : id_(id), value_(value), offset_(offset) {}
 };
 
