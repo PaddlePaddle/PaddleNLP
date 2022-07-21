@@ -281,9 +281,10 @@ def create_pretrained_dataset(args,
             print('> compiling dataset index builder ...')
             from data_tools.dataset_utils import compile_helper
             compile_helper()
-            print('>>> done with dataset index builder. Compilation time: {:.3f} '
-                  'seconds'.format(time.time() - start_time),
-                  flush=True)
+            print(
+                '>>> done with dataset index builder. Compilation time: {:.3f} '
+                'seconds'.format(time.time() - start_time),
+                flush=True)
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
