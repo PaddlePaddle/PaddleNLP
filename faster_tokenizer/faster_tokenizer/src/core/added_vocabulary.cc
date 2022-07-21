@@ -135,7 +135,7 @@ core::Vocab& AddedVocabulary::GetMutableVocab() { return vocab_; }
 
 bool AddedVocabulary::TokenToId(const std::string& token,
                                 const models::Model& model,
-                                uint* id) const {
+                                uint32_t* id) const {
   if (vocab_.find(token) != vocab_.end()) {
     *id = vocab_.at(token);
     return true;
@@ -143,7 +143,7 @@ bool AddedVocabulary::TokenToId(const std::string& token,
   return model.TokenToId(token, id);
 }
 
-bool AddedVocabulary::IdToToken(uint id,
+bool AddedVocabulary::IdToToken(uint32_t id,
                                 const models::Model& model,
                                 std::string* token) const {
   if (vocab_reversed_.find(id) != vocab_reversed_.end()) {
@@ -180,11 +180,11 @@ size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
       ignored_tokens_num += 1;
       continue;
     }
-    uint id;
+    uint32_t id;
     if (TokenToId(token.GetContent(), model, &id)) {
       ignored_tokens_num += 1;
     } else {
-      uint new_id = model.GetVocabSize() + GetLen();
+      uint32_t new_id = model.GetVocabSize() + GetLen();
       vocab_[token.GetContent()] = new_id;
       if (special_tokens_set_.count(token.GetContent()) == 0) {
         added_tokens_.push_back(token);
@@ -198,11 +198,11 @@ size_t AddedVocabulary::AddTokens(const std::vector<AddedToken>& tokens,
 }
 void AddedVocabulary::RefreshAddedTokens(
     const models::Model& model, const normalizers::Normalizer* normalizers) {
-  using TokenAndId = std::pair<AddedToken, uint>;
+  using TokenAndId = std::pair<AddedToken, uint32_t>;
   std::vector<TokenAndId> normalized, non_normalized;
   for (const auto& tokens : {special_tokens_, added_tokens_}) {
     for (const auto& token : tokens) {
-      uint id;
+      uint32_t id;
       if (TokenToId(token.GetContent(), model, &id)) {
         if (token.GetUseNormalized()) {
           normalized.push_back({token, id});
@@ -286,7 +286,7 @@ bool AddedVocabulary::FindMatch(const std::string& sequence,
     VLOG(6) << "result_str: " << result_str << ", " << pattern.first->pattern();
     size_t curr_start = result_str.data() - sequence.data();
     size_t curr_end = curr_start + result_str.length();
-    uint id = pattern.second.at(result_str.ToString());
+    uint32_t id = pattern.second.at(result_str.ToString());
     AddedToken added_tokens = vocab_reversed_.at(id);
     VLOG(6) << "start = " << start << ", end = " << end
             << ", curr_start = " << curr_start << ", curr_end = " << curr_end;
@@ -338,7 +338,8 @@ bool AddedVocabulary::SplitWithIndices(
     if (is_not_unk) {
       tokens.emplace_back(core::Token{id, slice.GetStr(), {0, slice.GetLen()}});
     }
-    split_results->push_back({slice, tokens});
+    // use push_back({slice, tokens}) will raise error in windows platform.
+    split_results->emplace_back(slice, tokens);
   }
   return status;
 }
@@ -367,7 +368,7 @@ void AddedVocabulary::ExtractAndNormalize(
       });
 }
 
-const std::unordered_map<uint, AddedToken>&
+const std::unordered_map<uint32_t, AddedToken>&
 AddedVocabulary::GetAddedTokenVocabReversed() const {
   return vocab_reversed_;
 }

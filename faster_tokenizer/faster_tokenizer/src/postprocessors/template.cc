@@ -36,7 +36,7 @@ void ParseIdFromString(const std::string& template_id_string,
       seq = TemplateSequence{SequenceType::SEQ_B, 0};
     } else {
       std::string::size_type sz;
-      uint type_id = std::stoul(rest, &sz);
+      uint32_t type_id = std::stoul(rest, &sz);
       if (sz = rest.length()) {
         seq = TemplateSequence{SequenceType::SEQ_A, type_id};
       } else {
@@ -52,7 +52,7 @@ void ParseIdFromString(const std::string& template_id_string,
   }
 }
 
-void SetTypeId(uint type_id, TemplatePiece* template_piece) {
+void SetTypeId(uint32_t type_id, TemplatePiece* template_piece) {
   if (boost::get<TemplateSequence>(template_piece) != nullptr) {
     boost::get<TemplateSequence>(*template_piece).second = type_id;
   } else {
@@ -72,7 +72,7 @@ void GetTemplatePieceFromString(const std::string& template_string,
     ParseIdFromString(template_id_string, template_piece);
 
     std::string::size_type sz;
-    uint type_id = std::stoul(template_type_id_string, &sz);
+    uint32_t type_id = std::stoul(template_type_id_string, &sz);
     if (sz == template_type_id_string.length()) {
       SetTypeId(type_id, template_piece);
     } else {
@@ -266,21 +266,21 @@ void TemplatePostProcessor::ApplyTemplate(
       }
     }
   }
-  std::vector<uint> ids;
+  std::vector<uint32_t> ids;
   ids.reserve(new_size);
-  std::vector<uint> type_ids;
+  std::vector<uint32_t> type_ids;
   type_ids.reserve(new_size);
   std::vector<std::string> tokens;
   tokens.reserve(new_size);
-  std::vector<uint> words_idx;
+  std::vector<uint32_t> words_idx;
   words_idx.reserve(new_size);
   std::vector<core::Offset> offsets;
   offsets.reserve(new_size);
-  std::vector<uint> special_tokens_mask;
+  std::vector<uint32_t> special_tokens_mask;
   special_tokens_mask.reserve(new_size);
-  std::vector<uint> attention_mask;
+  std::vector<uint32_t> attention_mask;
   attention_mask.reserve(new_size);
-  std::unordered_map<uint, core::Range> sequence_ranges;
+  std::unordered_map<uint32_t, core::Range> sequence_ranges;
   std::vector<core::Encoding> result_overflowings;
   auto& overflowings = encoding->GetMutableOverflowing();
 
@@ -388,7 +388,7 @@ void TemplatePostProcessor::ApplyTemplate(
       auto& special_token = boost::get<TemplateSpecialToken>(piece);
       if (add_special_tokens) {
         const std::string& id = special_token.first;
-        uint type_id = special_token.second;
+        uint32_t type_id = special_token.second;
         auto& tok = special_tokens_map_.tokens_map_.at(
             id);  // We already checked existance above
         auto size = tok.ids_.size();

@@ -31,8 +31,8 @@ struct Unigram : public Model {
   Unigram();
   Unigram(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
   Unigram(const Unigram& other);
-  virtual bool TokenToId(const std::string& token, uint* id) const override;
-  virtual bool IdToToken(uint id, std::string* token) const override;
+  virtual bool TokenToId(const std::string& token, uint32_t* id) const override;
+  virtual bool IdToToken(uint32_t id, std::string* token) const override;
   virtual core::Vocab GetVocab() const override;
   virtual size_t GetVocabSize() const override;
   virtual std::vector<core::Token> Tokenize(
@@ -42,7 +42,7 @@ struct Unigram : public Model {
       const std::string& filename_prefix) const override;
 
 private:
-  float GetVocabScore(uint id) const;
+  float GetVocabScore(uint32_t id) const;
   void Init(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
   void PopulateNodes(utils::Lattice* lattice) const;
   void Encode(const std::string& normalized,

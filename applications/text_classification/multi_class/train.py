@@ -47,7 +47,7 @@ parser.add_argument("--dataset_dir",
                     default=None,
                     type=str,
                     help="Local dataset directory should include"
-                    "train.tsv, dev.tsv and label.tsv")
+                    "train.txt, dev.txt and label.txt")
 parser.add_argument("--task_name",
                     default="KUAKE-QIC",
                     type=str,
@@ -150,7 +150,7 @@ def train():
     # load and preprocess dataset
     if args.dataset_dir is not None:
         label_list = {}
-        with open(os.path.join(args.dataset_dir, 'label.tsv'),
+        with open(os.path.join(args.dataset_dir, 'label.txt'),
                   'r',
                   encoding='utf-8') as f:
             for i, line in enumerate(f):
@@ -158,11 +158,11 @@ def train():
                 label_list[l] = i
         train_ds = load_dataset(read_local_dataset,
                                 path=os.path.join(args.dataset_dir,
-                                                  'train.tsv'),
+                                                  'train.txt'),
                                 label_list=label_list,
                                 lazy=False)
         dev_ds = load_dataset(read_local_dataset,
-                              path=os.path.join(args.dataset_dir, 'dev.tsv'),
+                              path=os.path.join(args.dataset_dir, 'dev.txt'),
                               label_list=label_list,
                               lazy=False)
     else:
@@ -269,12 +269,13 @@ def train():
 
         # save models
         if acc > best_acc:
+            logger.info("Current best accuracy: %.5f" % (acc))
             early_stop_count = 0
             best_acc = acc
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
 
-    logger.info("Best accuracy: %.5f" % (best_acc))
+    logger.info("Final best accuracy: %.5f" % (best_acc))
     logger.info("Save best accuracy text classification model in %s" %
                 (args.save_dir))
 
