@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Lint as: python3
-"""SE-ABSA16: SemEval-2016 Task 5: Aspect Based Sentiment Analysis."""
+"""ChnSentiCorp: Chinese Corpus for sentence-level sentiment classification."""
 
 import csv
 import os
@@ -28,83 +28,66 @@ logger = datasets.logging.get_logger(__name__)
 
 
 _CITATION = """\
-@inproceedings{pontiki2016semeval,
-  title={Semeval-2016 task 5: Aspect based sentiment analysis},
-  author={Pontiki, Maria and Galanis, Dimitrios and Papageorgiou, Haris and Androutsopoulos, Ion and Manandhar, Suresh and Al-Smadi, Mohammad and Al-Ayyoub, Mahmoud and Zhao, Yanyan and Qin, Bing and De Clercq, Orph{\'e}e and others},
-  booktitle={International workshop on semantic evaluation},
-  pages={19--30},
-  year={2016}
+@article{tan2008empirical,
+  title={An empirical study of sentiment analysis for chinese documents},
+  author={Tan, Songbo and Zhang, Jin},
+  journal={Expert Systems with applications},
+  volume={34},
+  number={4},
+  pages={2622--2629},
+  year={2008},
+  publisher={Elsevier}
 }
 """
 
 _DESCRIPTION = """\
-SE-ABSA16, a dataset for aspect based sentiment analysis, which aims to perform fine-grained sentiment classification for aspect in text. The dataset contains both positive and negative categories. It covers the data of mobile phone and camera.
-More information refer to https://www.luge.ai/#/luge/dataDetail?id=18.
+ChnSentiCorp: A classic sentence-level sentiment classification dataset, which includes hotel, laptop and data-related online review data, including positive and negative categories.
+More information refer to https://www.luge.ai/#/luge/dataDetail?id=25.
 """
 
-_SEABSA16_URLs = {
-    # pylint: disable=line-too-long
-    "came":
-    "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_CAME.zip",
-    "phns":
-    "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_PHNS.zip",
-    # pylint: enable=line-too-long
-}
+_URL = "https://bj.bcebos.com/paddlenlp/datasets/ChnSentiCorp.zip"
 
-class SEABSA16Config(datasets.BuilderConfig):
-    """BuilderConfig for SEABSA16."""
 
-    def __init__(self, data_url=None, data_dir=None, **kwargs):
-        """BuilderConfig for SEABSA16.
+class ChnSentiCorpConfig(datasets.BuilderConfig):
+    """BuilderConfig for ChnSentiCorp."""
+
+    def __init__(self, **kwargs):
+        """BuilderConfig for ChnSentiCorp.
 
         Args:
-          data_url: `string`, url to download the zip file.
-          data_dir: `string`, the path to the folder containing the tsv files in the downloaded zip.
           **kwargs: keyword arguments forwarded to super.
         """
-        super(SEABSA16Config, self).__init__(**kwargs)
-        self.data_url = data_url
-        self.data_dir = data_dir
+        super(ChnSentiCorpConfig, self).__init__(**kwargs)
 
 
-class SEABSA16(datasets.GeneratorBasedBuilder):
-    """SE-ABSA16: SemEval-2016 Task 5: Aspect Based Sentiment Analysis."""
+class ChnSentiCorp(datasets.GeneratorBasedBuilder):
+    """COTE: Chinese Opinion Target Extraction."""
 
     BUILDER_CONFIGS = [
-        SEABSA16Config(
-            name="came",
-            data_url=_SEABSA16_URLs["came"],
-            data_dir="SE-ABSA16_CAME",
+        ChnSentiCorpConfig(
+            name="chnsenticorp",
             version = datasets.Version("1.0.0", ""),
-            description="SE-ABSA16-CAME data about camera.",
-        ),
-        SEABSA16Config(
-            name="phns",
-            data_url=_SEABSA16_URLs["phns"],
-            data_dir="SE-ABSA16_PHNS",
-            version = datasets.Version("1.0.0", ""),
-            description="SE-ABSA16-PHNS data about phone."
-        ),
+            description="COTE-BD crawled on baidu.",
+        )
     ]
 
     def _info(self):
         features = {
             "id": datasets.Value("int32"),
-            "text_a": datasets.Value("string"),
-            "text_b": datasets.Value("string"),
+            "text": datasets.Value("string"),
             "label": datasets.Value("int32")
         }
 
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(features),
-            homepage="https://www.luge.ai/#/luge/dataDetail?id=18",
+            homepage="https://www.luge.ai/#/luge/dataDetail?id=25",
             citation=_CITATION
         )
 
     def _split_generators(self, dl_manager):
-        downloaded_dir = dl_manager.download_and_extract(self.config.data_url)  
-        data_dir = os.path.join(downloaded_dir, self.config.data_dir)
+        downloaded_dir = dl_manager.download_and_extract(_URL)  
+        data_dir = os.path.join(downloaded_dir, "ChnSentiCorp")
 
         train_split = datasets.SplitGenerator(
             name=datasets.Split.TRAIN,
@@ -113,6 +96,15 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
                 "split": "train"
             }
         )
+
+        dev_split = datasets.SplitGenerator(
+            name=datasets.Split.VALIDATION,
+            gen_kwargs={
+                "filepath": os.path.join(data_dir, "dev.tsv"),
+                "split": "dev"
+            }
+        )
+
         test_split = datasets.SplitGenerator(
             name=datasets.Split.TEST,
             gen_kwargs={
@@ -121,7 +113,7 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             }
         )
         
-        return [train_split, test_split]
+        return [train_split, dev_split, test_split]
             
 
     def _generate_examples(self, filepath, split):
@@ -134,10 +126,9 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             for idx, row in enumerate(reader):
                 example = {}
                 example["id"] = idx
-                example["text_a"] = row["text_a"]
-                example["text_b"] = row["text_b"]
+                example["text"] = row["text_a"]
 
-                if split == "train":
+                if split != "test":
                     example["label"] = int(row["label"])
                 else:
                     example["label"] = -1

@@ -61,7 +61,6 @@ class COTEConfig(datasets.BuilderConfig):
         """BuilderConfig for COTE.
 
         Args:
-          name:  `string`, dataset name.
           data_url: `string`, url to download the zip file.
           data_dir: `string`, the path to the folder containing the tsv files in the downloaded zip.
           **kwargs: keyword arguments forwarded to super.

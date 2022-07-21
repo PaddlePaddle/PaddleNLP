@@ -2,10 +2,13 @@ import paddlenlp
 from datasets import load_dataset
 
 
-data_set = load_dataset("cote", "mfw")
-# print(type(train_set))
-print(data_set)
+train_set, dev_set, test_set = load_dataset("chnsenticorp", split=["train", "validation", "test"])
 
-for idx, example in enumerate(data_set["train"]):
+print(len(train_set))
+print(len(dev_set))
+print(len(test_set))
+
+for idx, example in enumerate(test_set):
     if idx < 10:
         print(example)
+
