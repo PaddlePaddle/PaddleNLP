@@ -63,6 +63,14 @@ usage = r"""
             '''
             [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990024058203417}]}]
             '''
+
+            # English Model
+            schema = ['person', 'entity']
+            ie = Taskflow('information_extraction', schema=schema, model='uie-base-en')
+            ie('In 1997, Steve was excited to become the CEO of Apple.')
+            '''
+            [{'person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.9995343005557267}], 'organization': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9985144862957185}]}]
+            '''
          """
 
 
@@ -238,7 +246,29 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        }
+        },
+        "uie-base-en": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.0/model_state.pdparams",
+                "d12e03c2bfe2824c876883b4b836d79d"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
+                "2ca9fe0eea8ff9418725d1a24fcf5c36"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
+                "64800d5d8528ce344256daf115d4965e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
     }
 
     def __init__(self, task, model, schema, **kwargs):

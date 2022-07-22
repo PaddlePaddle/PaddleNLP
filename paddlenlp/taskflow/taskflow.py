@@ -257,6 +257,11 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-medical-base"
             },
+            "uie-base-en": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-base-en"
+            },
         },
         "default": {
             "model": "uie-base"

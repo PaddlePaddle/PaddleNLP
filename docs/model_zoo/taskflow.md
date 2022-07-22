@@ -511,9 +511,7 @@ from paddlenlp import Taskflow
 
 开放域信息抽取是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
 
-#### 支持多场景信息抽取任务
-
-- 命名实体识别
+#### 实体抽取
 
   命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
 
@@ -523,7 +521,7 @@ from paddlenlp import Taskflow
   ['时间', '选手', '赛事名称']
   ```
 
-  预测：
+  调用示例：
 
   ```python
   >>> from pprint import pprint
@@ -554,7 +552,7 @@ from paddlenlp import Taskflow
 
   在上例中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
@@ -578,7 +576,7 @@ from paddlenlp import Taskflow
                 'text': 'M0级'}]}]
   ```
 
-- 关系抽取
+#### 关系抽取
 
   关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
 
@@ -594,7 +592,7 @@ from paddlenlp import Taskflow
   }
   ```
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
@@ -630,7 +628,7 @@ from paddlenlp import Taskflow
               'text': '2022语言与智能技术竞赛'}]}]
   ```
 
-- 事件抽取
+#### 事件抽取
 
   事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词(Trigger)和事件论元(Argument)，组合为相应的事件结构化信息。
 
@@ -647,9 +645,9 @@ from paddlenlp import Taskflow
   }
   ```
 
-  触发词的格式统一为`触发词`或`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+  触发词的格式统一为`触发词`或``XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']} # Define the schema for event extraction
@@ -658,7 +656,7 @@ from paddlenlp import Taskflow
   [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
   ```
 
-- 评论观点抽取
+#### 评论观点抽取
 
   评论观点抽取，是指抽取文本中包含的评价维度、观点词。
 
@@ -673,7 +671,7 @@ from paddlenlp import Taskflow
   }
   ```
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = {'评价维度': ['观点词', '情感倾向[正向，负向]']} # Define the schema for opinion extraction
@@ -701,7 +699,7 @@ from paddlenlp import Taskflow
               'text': '店面'}]}]
   ```
 
-- 情感倾向分类
+#### 情感分类
 
   句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
 
@@ -709,7 +707,7 @@ from paddlenlp import Taskflow
   '情感倾向[正向，负向]'
   ```
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
@@ -718,7 +716,7 @@ from paddlenlp import Taskflow
   [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
   ```
 
-- 跨任务抽取
+#### 跨任务抽取
 
   例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
 
@@ -734,7 +732,7 @@ from paddlenlp import Taskflow
   ]
   ```
 
-  预测：
+  调用示例：
 
   ```python
   >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
@@ -762,10 +760,9 @@ from paddlenlp import Taskflow
             'text': 'B公司'}]}]
   ```
 
+#### 模型选择
 
-#### 多模型选择，满足精度、速度要求
-
-- 模型选择
+- 多模型选择，满足精度、速度要求
 
   | 模型 |  结构  |
   | :---: | :--------: |
@@ -775,8 +772,9 @@ from paddlenlp import Taskflow
   | `uie-mini`| 6-layers, 384-hidden, 12-heads |
   | `uie-micro`| 4-layers, 384-hidden, 12-heads |
   | `uie-nano`| 4-layers, 312-hidden, 12-heads |
+  | `uie-base-en` | 12-layers, 768-hidden, 12-heads |
 
-- 使用`UIE-Nano`进行预测
+- `UIE-Nano`调用示例
 
   ```python
   >>> from paddlenlp import Taskflow
@@ -807,8 +805,8 @@ from paddlenlp import Taskflow
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`。
-* `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`, `uie-medical-base`, `uie-base-en`。
+* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖(主要是**确保安装onnxruntime-gpu**)。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
