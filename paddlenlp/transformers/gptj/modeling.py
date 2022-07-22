@@ -136,7 +136,7 @@ class GPTJAttention(Layer):
         key = paddle.cast(key, "float32")
         attn_weights = paddle.matmul(query, key, transpose_y=True)
 
-        mask_value = paddle.to_tensor(-1e4, dtype=attn_weights.dtype)
+        mask_value = paddle.to_tensor(-1e9, dtype=attn_weights.dtype)
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
         attn_weights = paddle.where(causal_mask, attn_weights, mask_value)
         attn_weights = attn_weights / self.scale_attn
