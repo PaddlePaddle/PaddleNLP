@@ -2,10 +2,6 @@
 
 本示例展示了中文医疗预训练模型 ERNIE-Health（[Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/abs/2110.07244)）如何 Fine-tune 完成中文医疗语言理解任务。
 
-## 模型介绍
-
-ERNIE-Health 模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。 而 Fine-tune 过程只用到了判别器模块，由 12 层 Transformer 网络组成。
-
 ## 数据集介绍
 
 本项目使用了中文医学语言理解测评（[Chinese Biomedical Language Understanding Evaluation，CBLUE](https://github.com/CBLUEbenchmark/CBLUE)）1.0 版本数据集，这是国内首个面向中文医疗文本处理的多任务榜单，涵盖了医学文本信息抽取（实体识别、关系抽取）、医学术语归一化、医学文本分类、医学句子关系判定和医学问答共5大类任务8个子任务。其数据来源分布广泛，包括医学教材、电子病历、临床试验公示以及互联网用户真实查询等。该榜单一经推出便受到了学界和业界的广泛关注，已逐渐发展成为检验AI系统中文医疗信息处理能力的“金标准”。
@@ -20,6 +16,10 @@ ERNIE-Health 模型的整体结构与 ELECTRA 相似，包括生成器和判别�
 * KUAKE-QQR：医疗搜索查询词-查询词相关性
 
 更多信息可参考CBLUE的[github](https://github.com/CBLUEbenchmark/CBLUE/blob/main/README_ZH.md)。其中对于临床术语标准化任务（CHIP-CDN），我们按照 ERNIE-Health 中的方法通过检索将原多分类任务转换为了二分类任务，即给定一诊断原词和一诊断标准词，要求判定后者是否是前者对应的诊断标准词。本项目提供了检索处理后的 CHIP-CDN 数据集（简写`CHIP-CDN-2C`），且构建了基于该数据集的example代码。
+
+## 模型介绍
+
+ERNIE-Health 模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。 而 Fine-tune 过程只用到了判别器模块，由 12 层 Transformer 网络组成。
 
 ## 快速开始
 
