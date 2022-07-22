@@ -1,1 +1,3 @@
 onnxruntime-gpu
+onnx
+onnxconverter-common

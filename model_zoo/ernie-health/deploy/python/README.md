@@ -1,128 +1,217 @@
-# ERNIE-Health Python部署指南
-本文介绍ERNIE-Health Python端的部署，包括部署环境的准备，CBLUE数据集任务微调模型部署的使用示例。
-- [ERNIE-Health Python部署指南](#ERNIE-HealthPython部署指南)
-  - [1. 环境准备](#1-环境准备)
-    - [1.1 CPU端](#11-CPU端)
-    - [1.2 GPU端](#12-GPU端)
-  - [2. 分类模型推理](#2-分类模型推理)
-    - [2.1 模型获取](#21-模型获取)
-    - [2.2 CPU端推理样例](#22-CPU端推理样例)
-    - [2.3 GPU端推理样例](#23-GPU端推理样例)
-  - [3. 分类模型推理](#3-分类模型推理)
-    - [3.1 模型获取](#31-模型获取)
-    - [3.2 CPU端推理样例](#32-CPU端推理样例)
-    - [3.3 GPU端推理样例](#33-GPU端推理样例)
-## 1. 环境准备
-ERNIE-Health的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
-### 1.1 CPU端
-CPU端的部署请使用如下命令安装所需依赖
-```
-pip install -r requirements_cpu.txt
-```
-### 1.2 GPU端
-为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖
-```
-pip install -r requirements_gpu.txt
-```
-如需使用半精度（FP16）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。同时需额外安装TensorRT和Paddle Inference。  
-更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
-1. TensorRT安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux端简要步骤如下：  
-    (1)下载TensorRT8.0版本,文件名TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)  
-    (2)解压得到TensorRT-XXX文件夹  
-    (3)通过export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH将lib路径加入到LD_LIBRARY_PATH中  
-    (4)使用pip install安装TensorRT-XXX/python中对应的tensorrt安装包
-2. Paddle Inference的安装请参考：[Paddle Inference的安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux端简要步骤如下：  
-    (1)根据CUDA环境和Python版本下载对应的Paddle Inference预测库，注意须下载支持TensorRT的预测包，如linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[Paddle Inference下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)  
-    (2)使用pip install安装下载好的Paddle Inference安装包
+# 基于ONNXRuntime推理部署指南
 
+本示例以[CBLUE数据集微调](../../cblue/README.md)得到的ERNIE-Health模型为例，分别提供了文本分类任务、实体识别任务和关系抽取任务的部署代码，自定义数据集可参考实现。
+在推理部署前需将微调后的动态图模型转换导出为静态图，详细步骤见[静态图模型导出](../../cblue/README.md)。
 
-## 2. 模型推理
-### 2.1 模型获取
-用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)。微调完毕后，模型存储在`./checkpoint/model_best/model_state.pdparams`路径，请执行命令将动态图模型转换为静态图模型，完整脚本可参考[静态图模型导出](./../../cblue/export_model.py)。
+**目录**
+   * [环境安装](#环境安装)
+   * [GPU部署推理样例](#gpu部署推理样例)
+   * [CPU部署推理样例](#cpu部署推理样例)
+   * [性能与精度测试](#性能与精度测试)
+       * [GPU精度与性能](#gpu精度与性能)
+       * [CPU精度与性能](#cpu精度与性能)
+
+## 环境安装
+
+ONNX模型转换和推理部署依赖于Paddle2ONNX和ONNXRuntime。其中Paddle2ONNX支持将Paddle静态图模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)。
+
+#### GPU端
+请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
+```
+python -m pip install -r requirements_gpu.tx
+```
+\* 如需使用半精度（FP16）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。 更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
+#### CPU端
+请使用如下命令安装所需依赖:
+```
+python -m pip install -r requirements_cpu.txt
+```
+## GPU部署推理样例
+
+请使用如下命令进行GPU上的部署，可用`use_fp16`开启**半精度部署推理加速**，可用`device_id`**指定GPU卡号**。
+
+- 文本分类任务
 
 ```
-cd ../../cblue
-python export_model.py --train_dataset KUAKE-QIC --params_path=./checkpoint/model_best/model_state.pdparams --output_path=./KUAKE-QIC/model_best
+python infer_classification.py --device gpu --device_id 0 --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
 ```
 
-### 2.2 CPU端推理样例
-在CPU端，请使用如下命令进行部署
-```
-python infer_cpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/inference
-```
-输出打印如下:
-```
-Input data: 心肌缺血如何治疗与调养呢？
-医疗搜索检索词意图分类:
-Label: 治疗方案   Confidence: 0.99720025
------------------------------
-Input data: 什么叫痔核脱出？什么叫外痔？
-医疗搜索检索词意图分类:
-Label: 疾病表述   Confidence: 0.9849097
------------------------------
-```
-infer_cpu.py脚本中的参数说明：
-| 参数 |参数说明 |
-|----------|--------------|
-|--task_name | 配置任务名称，可选 QIC, QTR, QQR, CTC, STS, CDN, CMeEE, CMeIE |
-|--model_name_or_path | 模型的路径或者名字，默认为ernie-health-chinese|
-|--model_path | 用于推理的Paddle模型的路径|
-|--max_seq_length |最大序列长度，默认为128|
-|--use_quantize | 是否使用动态量化进行加速，默认关闭 |
-|--num_threads | 配置cpu的线程数，默认为cpu的最大线程数 |
+- 实体识别任务
 
-**Note**：在支持avx512_vnni指令集或Intel® DL Boost的CPU设备上，可开启use_quantize开关对FP32模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。  
-CPU端，开启动态量化的命令如下：
 ```
-python infer_cpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/inference --use_quantize
-```
-INT8的输出打印和FP32的输出打印一致。
-
-### 2.3 GPU端推理样例
-在GPU端，请使用如下命令进行部署
-```
-python infer_gpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/inference
-```
-输出打印如下:
-```
-Input data: 心肌缺血如何治疗与调养呢？
-医疗搜索检索词意图分类:
-Label: 治疗方案   Confidence: 0.99720025
------------------------------
-Input data: 什么叫痔核脱出？什么叫外痔？
-医疗搜索检索词意图分类:
-Label: 疾病表述   Confidence: 0.9849097
------------------------------
-```
-如果需要FP16进行加速，可以开启use_fp16开关，具体命令为
-```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
-python infer_gpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/inference --use_fp16 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
-python infer_gpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/inference --use_fp16 --shape_info_file dynamic_shape_info.txt
+python infer_ner.py --device gpu --device_id 0 --dataset CMeEE --model_path_prefix ../../cblue/export/inference
 ```
 
-如果需要进行INT8量化加速，还需要使用量化脚本对训练好的FP32模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)。  
+- 关系抽取任务
 
-量化模型的部署命令为：  
 ```
-# 第一步，打开set_dynamic_shape开关，自动配置动态shape，在当前目录下生成dynamic_shape_info.txt文件
-python infer_gpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/int8 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的dynamic_shape_info.txt文件，开启预测
-python infer_gpu.py --task_name QIC --model_path ./KUAKE-QIC/model_best/int8 --shape_info_file dynamic_shape_info.txt
+python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_prefix ../../cblue/export/inference
 ```
 
-FP16和INT8推理的运行结果和FP32的运行结果一致。  
-infer_gpu.py脚本中的参数说明：
-| 参数 |参数说明 |
-|----------|--------------|
-|--task_name | 配置任务名称，可选 QIC, QTR, QQR, CTC, STS, CDN, CMeEE, CMeIE |
-|--model_name_or_path | 模型的路径或者名字，默认为ernie-health-chinese|
-|--model_path | 用于推理的Paddle模型的路径|
-|--batch_size |最大可测的batch size，默认为32|
-|--max_seq_length |最大序列长度，默认为128|
-|--shape_info_file | 指定dynamic shape info的存储文件名，默认为shape_info.txt |
-|--set_dynamic_shape | 配置是否自动配置TensorRT的dynamic shape，开启use_fp16推理时需要先开启此选项进行dynamic shape配置，生成shape_info.txt后再关闭，默认关闭 |
-|--use_fp16 | 是否使用FP16进行加速，默认关闭 |
+可支持配置的参数：
 
------------------------
+* `model_path_prefix`：必须，待推理模型路径前缀。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-health-chinese"。
+* `dataset`：CBLUE中的训练数据集。
+   * `文本分类任务`：包括KUAKE-QIC, KUAKE-QQR, KUAKE-QTR, CHIP-CTC, CHIP-STS, CHIP-CDN-2C；默认为KUAKE-QIC。
+   * `实体抽取任务`：默认为CMeEE。
+   * `关系抽取任务`：默认为CMeIE。
+* `max_seq_length`：模型使用的最大序列长度，最大不能超过512；`关系抽取任务`默认为300，其余默认为128。
+* `use_fp16`：选择是否开启FP16进行加速，仅在`devive=gpu`时生效；默认关闭。
+* `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
+* `device`: 选用什么设备进行训练，可选cpu、gpu；默认为gpu。
+* `device_id`: 选择GPU卡号；默认为0。
+* `perf`：是否进行模型性能和精度评估；默认为False。
+* `num_perf_sample`：选择开发集中前`num_perf_sample`条数据用于模型性能和精度评估。
+* `data_file`：本地待预测数据文件；默认为None。
+
+#### 本地数据集加载
+如需使用本地数据集，请指定本地待预测数据文件 `data_file`，每行一条样例，单文本输入每句一行，双文本输入以`\t`分隔符隔开。例如
+
+**ctc-data.txt**
+```
+在过去的6个月曾服用偏头痛预防性药物或长期服用镇痛药物者，以及有酒精依赖或药物滥用习惯者；
+患有严重的冠心病、脑卒中，以及传染性疾病、精神疾病者；
+活动性乙肝（包括大三阳或小三阳）或血清学指标（HBsAg或/和HBeAg或/和HBcAb）阳性者，丙肝、肺结核、巨细胞病毒、严重真菌感染或HIV感染；
+...
+```
+
+**sts-data.txt**
+```
+糖尿病能吃减肥药吗？能治愈吗？\t糖尿病为什么不能吃减肥药？
+为什么慢性乙肝会急性发作\t引起隐匿性慢性乙肝的原因是什么
+标准血压是多少高血压指？低血压又指？\t半月前检查血压100／130，正常吗？
+...
+```
+
+## CPU部署推理样例
+
+请使用如下命令进行CPU上的部署，可用`use_quantize`开启**INT8动态量化加速**，可用`num_threads`**调整预测线程数量**。
+
+- 文本分类任务
+
+```
+python infer_classification.py --device cpu --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
+```
+
+- 实体识别任务
+
+```
+python infer_ner.py --device cpu --dataset CMeEE --model_path_prefix ../../cblue/export/inference
+```
+
+- 关系抽取任务
+
+```
+python infer_spo.py --device cpu --dataset CMeIE --model_path_prefix ../../cblue/export/inference
+```
+
+可支持配置的参数：
+
+* `model_path_prefix`：必须，待推理模型路径前缀。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-health-chinese"。
+* `dataset`：CBLUE中的训练数据集。
+   * `文本分类任务`：包括KUAKE-QIC, KUAKE-QQR, KUAKE-QTR, CHIP-CTC, CHIP-STS, CHIP-CDN-2C；默认为KUAKE-QIC。
+   * `实体抽取任务`：默认为CMeEE。
+   * `关系抽取任务`：默认为CMeIE。
+* `max_seq_length`：模型使用的最大序列长度，最大不能超过512；`关系抽取任务`默认为300，其余默认为128。
+* `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
+* `use_quantize`：选择是否开启INT8动态量化进行加速，仅在`device=cpu`时生效；默认关闭。
+* `device`: 选用什么设备进行训练，可选cpu、gpu；默认为gpu。
+* `num_threads`：cpu线程数，在`device=gpu`时影响较小；默认为cpu的物理核心数量。
+* `perf`：是否进行模型性能和精度评估；默认为False。
+* `num_perf_sample`：选择开发集中前`num_perf_sample`条数据用于模型性能和精度评估。
+* `data_file`：本地待预测数据文件，格式见[GPU部署推理样例](#本地数据集加载)中的介绍；默认为None。
+
+## 性能与精度测试
+
+可以使用如下命令开启评估模型的性能和精度，评估用的数据集为CBLUE中相应的开发集：
+
+- 文本分类任务
+
+```
+python infer_classification.py --perf --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
+```
+
+- 实体识别任务
+
+```
+python infer_ner.py --perf --model_path_prefix ../../cblue/export/inference
+```
+
+- 关系抽取任务
+
+```
+python infer_spo.py --perf --model_path_prefix ../../cblue/export/inference
+```
+
+
+测试配置如下：
+
+1. 数据集
+
+    本示例使用CBLUE数据集中的开发集用于ERNIE-Health微调模型部署推理的性能与精度测试，包括
+
+  - 医疗搜索检索词意图分类（KUAKE-QIC）任务
+  - 医疗搜索查询词-页面标题相关性（KUAKE-QTR）任务
+  - 医疗搜索查询词-查询词相关性（KUAKE-QQR）任务
+  - 临床试验筛选标准短文本分类(CHIP-CTC)任务
+  - 平安医疗科技疾病问答迁移学习（CHIP-STS）任务
+  - 临床术语标准化匹配（CHIP-CDN-2C）任务
+  - 中文医学命名实体识别（CMeEE）任务
+  - 中文医学文本实体关系抽取（CMeIE）任务
+
+2. 物理机环境
+
+    系统: CentOS Linux release 7.7.1908 (Core)
+
+    GPU: Tesla V100-SXM2-32GB
+
+    CPU: Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz
+
+    CUDA: 11.2
+
+    cuDNN: 8.1.0
+
+    Driver Version: 460.27.04
+
+    内存: 630 GB
+
+3. PaddlePaddle 版本：2.3.0
+
+4. PaddleNLP 版本：2.3.4
+
+5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 200（CHIP-CDN-2C 和 CMeIE 数据集为 20），部署运行时间 total_time，计算 latency = total_time / total_samples
+
+
+### GPU精度与性能
+
+| 数据集       | 最大文本长度 | 精度评估指标 | FP32 指标值 | FP16 指标值 | FP32 latency(ms) | FP16 latency(ms) |
+| ----------  | ---------- | ---------- | ---------- | ---------- | ---------------- | ---------------- |
+| KUAKE-QIC   | 128        | Accuracy   | 0.8046     | 0.8046     | 1.92             | 0.46             |
+| KUAKE-QTR   | 64         | Accuracy   | 0.6886     | 0.6876 (-) | 0.92             | 0.23             |
+| KUAKE-QQR   | 64         | Accuracy   | 0.7755     | 0.7755     | 0.61             | 0.16             |
+| CHIP-CTC    | 160        | Macro F1   | 0.8445     | 0.8446 (+) | 2.34             | 0.60             |
+| CHIP-STS    | 96         | Macro F1   | 0.8892     | 0.8892     | 1.39             | 0.35             |
+| CHIP-CDN-2C | 256        | Macro F1   | 0.8921     | 0.8920 (-) | 1.58             | 0.48             |
+| CMeEE       | 128        | Micro F1   | 0.6469     | 0.6468 (-) | 1.90             | 0.48             |
+| CMeIE       | 300        | Micro F1   | 0.5903     | 0.5902 (-) | 50.32            | 41.50            |
+
+经过FP16转化加速比达到 1.2 ~ 4 倍左右，精度变化在 1e-4 ~ 1e-3 内。
+
+### CPU精度与性能
+
+测试环境及说明如上，测试 CPU 性能时，线程数设置为40。
+
+| 数据集       | 最大文本长度 | 精度评估指标 | FP32 指标值 | INT8 指标值 | FP32 latency(ms) | INT8 latency(ms) |
+| ----------  | ---------- | ---------- | ---------- | ---------- | ---------------- | ---------------- |
+| KUAKE-QIC   | 128        | Accuracy   | 0.8046     | 0.7136 (-) | 37.72            | 20.50            |
+| KUAKE-QTR   | 64         | Accuracy   | 0.6886     | 0.5685 (-) | 18.40            | 9.59             |
+| KUAKE-QQR   | 64         | Accuracy   | 0.7755     | 0.6579 (-) | 10.34            | 5.62             |
+| CHIP-CTC    | 160        | Macro F1   | 0.8445     | 0.6137 (-) | 47.43            | 24.48            |
+| CHIP-STS    | 96         | Macro F1   | 0.8892     | 0.8209 (-) | 27.67            | 14.97            |
+| CHIP-CDN-2C | 256        | Micro F1   | 0.8921     | 0.7788 (-) | 26.86            | 15.00            |
+| CMeEE       | 128        | Micro F1   | 0.6469     | 0.2143 (-) | 37.59            | 19.58            |
+| CMeIE       | 300        | Micro F1   | 0.5902     | 0.0015 (-) | 213.04           | 160.05           |
+
+与FP16相比，INT8在线量化精度下降较大，加速比在 1.3 ~ 1.9 倍左右。
