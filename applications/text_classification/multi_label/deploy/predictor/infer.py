@@ -28,7 +28,7 @@ parser.add_argument("--model_path_prefix",
                     required=True,
                     help="The path prefix of inference model to be used.")
 parser.add_argument("--model_name_or_path",
-                    default="ernie-3.0-base-zh",
+                    default="ernie-3.0-medium-zh",
                     type=str,
                     help="The directory or name of model.")
 parser.add_argument("--dataset",

@@ -59,9 +59,9 @@ parser.add_argument("--max_seq_length",
                     "after tokenization. Sequences longer than this "
                     "will be truncated, sequences shorter will be padded.")
 parser.add_argument('--model_name',
-                    default="ernie-3.0-base-zh",
+                    default="ernie-3.0-medium-zh",
                     help="Select model to train, defaults "
-                    "to ernie-3.0-base-zh.")
+                    "to ernie-3.0-medium-zh.")
 parser.add_argument('--device',
                     choices=['cpu', 'gpu', 'xpu', 'npu'],
                     default="gpu",
@@ -244,7 +244,6 @@ def train():
 
             probs = F.sigmoid(logits)
             metric.update(probs, labels)
-            micro_f1_score, macro_f1_score = metric.accumulate()
 
             loss.backward()
             optimizer.step()
@@ -254,6 +253,7 @@ def train():
 
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
+                micro_f1_score, macro_f1_score = metric.accumulate()
                 logger.info(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, micro_f1_score,

@@ -30,7 +30,7 @@ python infer.py --model_path_prefix ../../export/float32
 可支持配置的参数：
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
-* `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-medium-zh"。
 * `dataset`：训练数据集;默认为cail2018_small数据集。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `use_fp16`：选择是否开启FP16进行加速；默认为False。
@@ -65,7 +65,7 @@ python infer.py --device cpu --model_path_prefix ../../export/float32
 可支持配置的参数：
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
-* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-base-zh"。
+* `model_name_or_path`：选择预训练模型；默认为"ernie-2.0-base-en"，中文数据集推荐使用"ernie-3.0-medium-zh"。
 * `dataset`：训练数据集;默认为cail2018_small数据集。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
 * `use_quantize`：选择是否开启INT8动态量化进行加速；默认为False。

@@ -118,8 +118,8 @@ I0628 09:12:30.776288 74305 naive_executor.cc:102] ---  skip [feed], feed -> tok
 I0628 09:12:30.779004 74305 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0628 09:12:30.787542 74305 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
 [2022-06-28 09:12:32,879] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
-[2022-06-28 09:12:32,880] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-base-zh'.
-[2022-06-28 09:12:32,880] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-base-zh/ernie_3.0_base_zh_vocab.txt
+[2022-06-28 09:12:32,880] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
+[2022-06-28 09:12:32,880] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
 
 ```

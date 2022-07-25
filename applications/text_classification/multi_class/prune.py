@@ -76,19 +76,17 @@ class ModelArguments:
             "help":
             "The output directory where the model checkpoints are written."
         })
+    width_mult: str = field(
+        default='2/3',
+        metadata={
+            "help": "The reserved ratio for q, k, v, and ffn weight widths."
+        })
 
 
 def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    f = open("prune_config.json")
-    config = json.load(f)
-    for arg in vars(training_args):
-        if arg in config.keys():
-            setattr(training_args, arg, config[arg])
-
     paddle.set_device(training_args.device)
 
     # Log model and data config
@@ -144,7 +142,9 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2 / 3))
+    trainer.prune(
+        output_dir,
+        prune_config=DynabertConfig(width_mult=eval(model_args.width_mult)))
 
 
 if __name__ == "__main__":

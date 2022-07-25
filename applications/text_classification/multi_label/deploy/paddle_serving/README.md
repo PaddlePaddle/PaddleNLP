@@ -116,8 +116,8 @@ I0625 16:44:36.571702 40218 naive_executor.cc:102] ---  skip [feed], feed -> tok
 I0625 16:44:36.571728 40218 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0625 16:44:36.574352 40218 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
 [2022-06-25 16:44:37,545] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
-[2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-base-zh'.
-[2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-base-zh/ernie_3.0_base_zh_vocab.txt
+[2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
+[2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
 W0625 16:45:40.312942 40218 gpu_context.cc:278] Please NOTE: device: 3, GPU Compute Capability: 7.0, Driver API Version: 11.2, Runtime API Version: 10.2
 W0625 16:45:40.316538 40218 gpu_context.cc:306] device: 3, cuDNN Version: 8.1.

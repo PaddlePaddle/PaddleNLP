@@ -34,24 +34,19 @@ from paddlenlp.utils.log import logger
 from utils import evaluate, preprocess_function, read_local_dataset
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--device',
+                    default="gpu",
+                    help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--dataset_dir",
+                    required=True,
+                    type=str,
+                    help="Local dataset directory should include"
+                    "train.txt, dev.txt and label.txt")
 parser.add_argument("--save_dir",
                     default="./checkpoint",
                     type=str,
                     help="The output directory where the model "
                     "checkpoints will be written.")
-parser.add_argument("--dataset",
-                    default="cblue",
-                    type=str,
-                    help="Dataset for text classfication.")
-parser.add_argument("--dataset_dir",
-                    default=None,
-                    type=str,
-                    help="Local dataset directory should include"
-                    "train.txt, dev.txt and label.txt")
-parser.add_argument("--task_name",
-                    default="KUAKE-QIC",
-                    type=str,
-                    help="Task name for text classfication dataset.")
 parser.add_argument("--max_seq_length",
                     default=128,
                     type=int,
@@ -59,48 +54,44 @@ parser.add_argument("--max_seq_length",
                     "after tokenization. Sequences longer than this "
                     "will be truncated, sequences shorter will be padded.")
 parser.add_argument('--model_name',
-                    default="ernie-3.0-base-zh",
+                    default="ernie-3.0-medium-zh",
                     help="Select model to train, defaults "
-                    "to ernie-3.0-base-zh.")
-parser.add_argument('--device',
-                    choices=['cpu', 'gpu', 'xpu', 'npu'],
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
+                    "to ernie-3.0-medium-zh.")
 parser.add_argument("--batch_size",
                     default=32,
                     type=int,
                     help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate",
-                    default=6e-5,
+                    default=3e-5,
                     type=float,
                     help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay",
-                    default=0.01,
-                    type=float,
-                    help="Weight decay if we apply some.")
+parser.add_argument("--epochs",
+                    default=10,
+                    type=int,
+                    help="Total number of training epochs to perform.")
 parser.add_argument('--early_stop',
                     action='store_true',
                     help='Epoch before early stop.')
 parser.add_argument('--early_stop_nums',
                     type=int,
-                    default=4,
+                    default=3,
                     help='Number of epoch before early stop.')
-parser.add_argument("--epochs",
-                    default=100,
-                    type=int,
-                    help="Total number of training epochs to perform.")
-parser.add_argument('--warmup',
-                    action='store_true',
-                    help="whether use warmup strategy")
-parser.add_argument('--warmup_proportion',
-                    default=0.1,
-                    type=float,
-                    help="Linear warmup proportion of learning "
-                    "rate over the training process.")
 parser.add_argument("--logging_steps",
                     default=5,
                     type=int,
                     help="The interval steps to logging.")
+parser.add_argument("--weight_decay",
+                    default=0.01,
+                    type=float,
+                    help="Weight decay if we apply some.")
+parser.add_argument('--warmup',
+                    action='store_true',
+                    help="whether use warmup strategy")
+parser.add_argument('--warmup_proportion',
+                    default=0.0,
+                    type=float,
+                    help="Linear warmup proportion of learning "
+                    "rate over the training process.")
 parser.add_argument("--init_from_ckpt",
                     type=str,
                     default=None,
@@ -109,7 +100,14 @@ parser.add_argument("--seed",
                     type=int,
                     default=3,
                     help="random seed for initialization")
-
+parser.add_argument("--dataset",
+                    default="cblue",
+                    type=str,
+                    help="Dataset for text classfication.")
+parser.add_argument("--task_name",
+                    default="KUAKE-QIC",
+                    type=str,
+                    help="Task name for text classfication dataset.")
 args = parser.parse_args()
 
 
@@ -244,7 +242,6 @@ def train():
             probs = F.softmax(logits, axis=1)
             correct = metric.compute(probs, labels)
             metric.update(correct)
-            acc = metric.accumulate()
 
             loss.backward()
             optimizer.step()
@@ -254,26 +251,26 @@ def train():
 
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
+                acc = metric.accumulate()
                 logger.info(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, acc: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc, 10 /
+                    % (global_step, epoch, step, loss, acc, args.logging_steps /
                        (time.time() - tic_train)))
                 tic_train = time.time()
 
         early_stop_count += 1
         acc = evaluate(model, criterion, metric, dev_data_loader)
-
         save_best_path = args.save_dir
         if not os.path.exists(save_best_path):
             os.makedirs(save_best_path)
 
         # save models
         if acc > best_acc:
-            logger.info("Current best accuracy: %.5f" % (acc))
             early_stop_count = 0
             best_acc = acc
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
+        logger.info("Current best accuracy: %.5f" % (best_acc))
 
     logger.info("Final best accuracy: %.5f" % (best_acc))
     logger.info("Save best accuracy text classification model in %s" %

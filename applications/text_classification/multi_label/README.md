@@ -95,7 +95,7 @@ python -m paddle.distributed.launch --gpus "0" train.py --epochs 100 --early_sto
 * `dataset_dir`：本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `task_name`：训练数据集;默认为"charges"。
 * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+* `model_name`：选择预训练模型；默认为"ernie-3.0-medium-zh"。
 * `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu。如使用gpu训练，择使用参数gpus指定GPU卡号。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：Fine-tune的最大学习率；默认为3e-5。
@@ -121,7 +121,7 @@ checkpoint/
 
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
-* 如需训练中文文本分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
+* 如需训练中文文本分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-medium-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
 ### 从本地文件创建数据集
 
