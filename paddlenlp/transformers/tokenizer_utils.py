@@ -1320,7 +1320,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if text is None:
             return None
         split_tokens = []
-        if self.do_basic_tokenize:
+        if hasattr(self, "basic_tokenizer"):
             for token in self.basic_tokenizer.tokenize(
                     text, never_split=self.all_special_tokens):
                 # If the token is part of the never_split set
