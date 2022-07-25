@@ -576,6 +576,30 @@ from paddlenlp import Taskflow
                 'text': 'M0级'}]}]
   ```
 
+  例如抽取的目标实体类型是"person"和"organization"，schema构造如下：
+
+  ```text
+  ['person', 'organization']
+  ```
+
+  英文模型调用示例：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+  >>> schema = ['Person', 'Organization']
+  >>> ie_en = Taskflow('information_extraction', schema=schema, model='uie-base-en')
+  >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
+  [{'Organization': [{'end': 53,
+                      'probability': 0.9985840259877357,
+                      'start': 48,
+                      'text': 'Apple'}],
+    'Person': [{'end': 14,
+                'probability': 0.999631971804547,
+                'start': 9,
+                'text': 'Steve'}]}]
+  ```
+
 #### 关系抽取
 
   关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
@@ -628,6 +652,37 @@ from paddlenlp import Taskflow
               'text': '2022语言与智能技术竞赛'}]}]
   ```
 
+  例如以"person"作为抽取主体，抽取关系类型为"Company"和"Position", schema构造如下：
+
+  ```text
+  {
+    'Person': [
+      'Company',
+      'Position'
+    ]
+  }
+  ```
+
+  英文模型调用示例：
+
+  ```python
+  >>> schema = [{'Person': ['Company', 'Position']}]
+  >>> ie_en.set_schema(schema)
+  >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+  [{'Person': [{'end': 14,
+                'probability': 0.999631971804547,
+                'relations': {'Company': [{'end': 53,
+                                          'probability': 0.9960158209451642,
+                                          'start': 48,
+                                          'text': 'Apple'}],
+                              'Position': [{'end': 44,
+                                            'probability': 0.8871063806420736,
+                                            'start': 41,
+                                            'text': 'CEO'}]},
+                'start': 9,
+                'text': 'Steve'}]}]
+  ```
+
 #### 事件抽取
 
   事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词(Trigger)和事件论元(Argument)，组合为相应的事件结构化信息。
@@ -655,6 +710,8 @@ from paddlenlp import Taskflow
   >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
   [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
   ```
+
+  **英文模型暂不支持事件抽取**
 
 #### 评论观点抽取
 
@@ -699,6 +756,35 @@ from paddlenlp import Taskflow
               'text': '店面'}]}]
   ```
 
+  英文模型schema构造如下：
+
+  ```text
+  {
+    'Aspect': [
+      'Opinion',
+      'Sentiment classification [negative, positive]'
+    ]
+  }
+  ```
+
+  英文模型调用示例：
+
+  ```python
+  >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+  >>> ie_en.set_schema(schema)
+  >>> ie_en("overall i 'm happy with my toy.")
+  [{'Comment object': [{'end': 30,
+                        'probability': 0.9774399346859042,
+                        'relations': {'Opinion': [{'end': 18,
+                                                  'probability': 0.6168918705033555,
+                                                  'start': 13,
+                                                  'text': 'happy'}],
+                                      'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
+                                                                                        'text': 'positive'}]},
+                        'start': 24,
+                        'text': 'my toy'}]}]
+  ```
+
 #### 情感分类
 
   句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
@@ -714,6 +800,21 @@ from paddlenlp import Taskflow
   >>> ie.set_schema(schema) # Reset schema
   >>> ie('这个产品用起来真的很流畅，我非常喜欢')
   [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
+  ```
+
+  英文模型schema构造如下：
+
+  ```text
+  '情感倾向[正向，负向]'
+  ```
+
+  英文模型调用示例：
+
+  ```python
+  >>> schema = [{'Person': ['Company', 'Position']}]
+  >>> ie_en.set_schema(schema)
+  >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
+  [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
   ```
 
 #### 跨任务抽取
@@ -764,17 +865,17 @@ from paddlenlp import Taskflow
 
 - 多模型选择，满足精度、速度要求
 
-  | 模型 |  结构  |
-  | :---: | :--------: |
-  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
-  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
-  | `uie-medium`| 6-layers, 768-hidden, 12-heads |
-  | `uie-mini`| 6-layers, 384-hidden, 12-heads |
-  | `uie-micro`| 4-layers, 384-hidden, 12-heads |
-  | `uie-nano`| 4-layers, 312-hidden, 12-heads |
-  | `uie-base-en` | 12-layers, 768-hidden, 12-heads |
+  | 模型 |  结构  | 语言 |
+  | :---: | :--------: | :--------: |
+  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-base-en` | 12-layers, 768-hidden, 12-heads | 英文 |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-medium`| 6-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
+  | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
+  | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
 
-- `UIE-Nano`调用示例
+- `uie-nano`调用示例
 
   ```python
   >>> from paddlenlp import Taskflow

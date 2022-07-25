@@ -323,7 +323,7 @@ TASKS = {
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag"
 ]
 
 
