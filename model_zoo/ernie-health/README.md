@@ -35,7 +35,7 @@ ERNIE-Health模型以超越人类医学专家水平的成绩登顶中文医疗�
 ## 环境依赖
 
 - paddlepaddle >= 2.2.0
-- paddlenlp >= 2.3.1
+- paddlenlp >= 2.3.4
 
 ## 模型预训练
 
@@ -181,15 +181,9 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-health-chinese')
 
 ## 部署
 
-我们为ERNIE-Health提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
+我们为ERNIE-Health提供了Python端部署方案，请根据实际情况进行选择。
 
-#### Python 部署
-
-Python部署请参考：[Python部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/deploy/python)
-
-#### 服务化部署
-
-服务化部署请参考：[服务化部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/deploy/serving)
+详细部署流程请参考：[基于ONNXRuntime推理部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/deploy/predictor/)
 
 
 ## Reference

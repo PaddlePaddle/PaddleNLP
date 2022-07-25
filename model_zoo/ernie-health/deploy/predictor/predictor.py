@@ -33,7 +33,6 @@ class InferBackend(object):
                  device="cpu",
                  device_id=0,
                  use_fp16=False,
-                 use_quantize=False,
                  num_threads=10):
 
         if not isinstance(device, six.string_types):
@@ -73,10 +72,6 @@ class InferBackend(object):
                     onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
-            if use_quantize:
-                logger.warning(
-                    ">>> [InferBackend] Ignore use_quantize as it only " +
-                    "takes effect when deploying on cpu...")
         else:
             logger.info(">>> [InferBackend] Use CPU to inference ...")
             providers = ['CPUExecutionProvider']
@@ -84,15 +79,9 @@ class InferBackend(object):
                 logger.warning(
                     ">>> [InferBackend] Ignore use_fp16 as it only " +
                     "takes effect when deploying on gpu...")
-            if use_quantize:
-                dynamic_quantize_model = os.path.join(infer_model_dir,
-                                                      "int8_model.onnx")
-                from onnxruntime.quantization import quantize_dynamic
-                quantize_dynamic(float_onnx_file, dynamic_quantize_model)
-                onnx_model = dynamic_quantize_model
 
         sess_options = ort.SessionOptions()
-        #sess_options.intra_op_num_threads = num_threads
+        sess_options.intra_op_num_threads = num_threads
         self.predictor = ort.InferenceSession(onnx_model,
                                               sess_options=sess_options,
                                               providers=providers,
@@ -138,8 +127,7 @@ class EHealthPredictor(object):
         self._batch_size = args.batch_size
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               args.device, args.device_id,
-                                              args.use_fp16, args.use_quantize,
-                                              args.num_threads)
+                                              args.use_fp16, args.num_threads)
 
     def predict(self, input_data: list):
         encoded_inputs = self.preprocess(input_data)
@@ -191,9 +179,6 @@ class EHealthPredictor(object):
     def printer(self, result, input_data):
         raise NotImplementedError
 
-    def evaluate(self, encoded_inputs, labels):
-        raise NotImplementedError
-
 
 class CLSPredictor(EHealthPredictor):
 
@@ -237,39 +222,6 @@ class CLSPredictor(EHealthPredictor):
             logger.info("labels: {}, confidence: {}".format(
                 self.label_list[label[i]], confidence[i]))
             logger.info("-----------------------------")
-
-    def get_text_and_label(self, dataset):
-        text = []
-        labels = []
-        for example in dataset:
-            if "text_b" in example:
-                text.append([example["text_a"], example["text_b"]])
-            else:
-                text.append(example["text_a"])
-            labels.append(example["label"])
-        return text, labels
-
-    def evaluate(self, encoded_inputs, labels, metric="acc"):
-        nums = len(encoded_inputs["input_ids"])
-        start_time = time.time()
-        infer_result = self.infer_batch(encoded_inputs)
-        total_time = time.time() - start_time
-        logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" %
-                    (nums, total_time, 1000 * total_time / nums))
-        if metric == "acc":
-            max_value = np.max(infer_result, axis=1, keepdims=True)
-            exp_data = np.exp(infer_result - max_value)
-            probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
-            preds = probs.argmax(axis=-1)
-            acc = np.mean(np.equal(preds, labels))
-            logger.info("acc: %.2f%%" % (acc * 100))
-        elif metric == "macro" or metric == "micro":
-            preds = np.argmax(infer_result, axis=-1)[0]
-            f1 = f1_score(labels, preds, average=metric)
-            logger.info("f1: %.4f" % f1)
-        else:
-            raise ValueError(
-                f"Support metric `acc` and `f1` but received {metric}.")
 
 
 class NERPredictor(EHealthPredictor):
@@ -358,39 +310,6 @@ class NERPredictor(EHealthPredictor):
                     item["type"], item["start_id"], item["end_id"]))
             logger.info("-----------------------------")
 
-    def get_text_and_label(self, dataset):
-        text = [example["text"] for example in dataset]
-        labels = [[example["labels"][0] for example in dataset],
-                  [example["labels"][1] for example in dataset]]
-        return text, labels
-
-    def evaluate(self, encoded_inputs, labels):
-        nums = len(encoded_inputs["input_ids"])
-        start_time = time.time()
-        infer_result = self.infer_batch(encoded_inputs)
-        total_time = time.time() - start_time
-        logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" %
-                    (nums, total_time, 1000 * total_time / nums))
-        lengths = encoded_inputs["attention_mask"].sum(axis=1).astype("int64")
-        preds = [x.argmax(axis=2) for x in infer_result]
-
-        preds_chunk = set()
-        label_chunk = set()
-        for idx, (pred, label) in enumerate(zip(preds, labels)):
-            for i, case in enumerate(pred):
-                case = [self.label_list[idx][x] for x in case[:lengths[i]]]
-                preds_chunk |= set(self._extract_chunk(case))
-            for i, case in enumerate(label):
-                case = [self.label_list[idx][x] for x in case[:lengths[i]]]
-                label_chunk |= set(self._extract_chunk(case))
-        num_infer = len(preds_chunk)
-        num_label = len(label_chunk)
-        num_correct = len(preds_chunk & label_chunk)
-        precision = num_correct / (num_infer + 1e-6)
-        recall = num_correct / (num_label + 1e-6)
-        f1 = 2 * precision * recall / (precision + recall + 1e-6)
-        logger.info("f1: %.4f" % f1)
-
 
 class SPOPredictor(EHealthPredictor):
     """ The predictor for the CMeIE dataset. """
@@ -472,39 +391,3 @@ class SPOPredictor(EHealthPredictor):
                     input_data[i][s[0]:s[1] + 1], self.label_list[p],
                     input_data[i][o[0]:o[1] + 1]))
             logger.info("-----------------------------")
-
-    def get_text_and_label(self, dataset):
-        text = [example["text"] for example in dataset]
-        labels = [[example["ent_label"] for example in dataset],
-                  [example["spo_label"] for example in dataset]]
-        return text, labels
-
-    def _f1_score(self, preds, labels):
-        correct = 0
-        infer = 1e-10
-        label = 1e-10
-        for pred, gold in zip(preds, labels):
-            infer += len(set(pred))
-            label += len(set(gold))
-            correct += len(set(pred) & set(gold))
-        precision = correct / infer
-        recall = correct / label
-        f1 = 2 * precision * recall / (precision + recall) if (
-            precision + recall) > 0 else 0
-        return f1
-
-    def evaluate(self, encoded_inputs, labels):
-        nums = len(encoded_inputs["input_ids"])
-        start_time = time.time()
-        infer_result = self.infer_batch(encoded_inputs)
-        total_time = time.time() - start_time
-        logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" %
-                    (nums, total_time, 1000 * total_time / nums))
-        lengths = encoded_inputs["attention_mask"].sum(axis=-1)
-        preds_dict = self.postprocess(infer_result, lengths)
-        ent_pred_list, spo_pred_list = preds_dict["entity"], preds_dict["spo"]
-        ent_labels, spo_labels = labels
-
-        logger.info("entity f1: %.4f" %
-                    self._f1_score(ent_pred_list, ent_labels))
-        logger.info("spo f1: %.4f" % self._f1_score(spo_pred_list, spo_labels))

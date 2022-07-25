@@ -61,8 +61,6 @@ python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_pref
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
 * `device`: 选用什么设备进行训练，可选cpu、gpu；默认为gpu。
 * `device_id`: 选择GPU卡号；默认为0。
-* `perf`：是否进行模型性能和精度评估；默认为False。
-* `num_perf_sample`：选择开发集中前`num_perf_sample`条数据用于模型性能和精度评估。
 * `data_file`：本地待预测数据文件；默认为None。
 
 #### 本地数据集加载
@@ -86,7 +84,7 @@ python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_pref
 
 ## CPU部署推理样例
 
-请使用如下命令进行CPU上的部署，可用`use_quantize`开启**INT8动态量化加速**，可用`num_threads`**调整预测线程数量**。
+请使用如下命令进行CPU上的部署，可用`num_threads`**调整预测线程数量**。
 
 - 文本分类任务
 
@@ -116,41 +114,19 @@ python infer_spo.py --device cpu --dataset CMeIE --model_path_prefix ../../cblue
    * `关系抽取任务`：默认为CMeIE。
 * `max_seq_length`：模型使用的最大序列长度，最大不能超过512；`关系抽取任务`默认为300，其余默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
-* `use_quantize`：选择是否开启INT8动态量化进行加速，仅在`device=cpu`时生效；默认关闭。
 * `device`: 选用什么设备进行训练，可选cpu、gpu；默认为gpu。
 * `num_threads`：cpu线程数，在`device=gpu`时影响较小；默认为cpu的物理核心数量。
-* `perf`：是否进行模型性能和精度评估；默认为False。
-* `num_perf_sample`：选择开发集中前`num_perf_sample`条数据用于模型性能和精度评估。
 * `data_file`：本地待预测数据文件，格式见[GPU部署推理样例](#本地数据集加载)中的介绍；默认为None。
 
 ## 性能与精度测试
 
-可以使用如下命令开启评估模型的性能和精度，评估用的数据集为CBLUE中相应的开发集：
-
-- 文本分类任务
-
-```
-python infer_classification.py --perf --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
-```
-
-- 实体识别任务
-
-```
-python infer_ner.py --perf --model_path_prefix ../../cblue/export/inference
-```
-
-- 关系抽取任务
-
-```
-python infer_spo.py --perf --model_path_prefix ../../cblue/export/inference
-```
-
+本节提供了在CBLUE数据集上预测的性能和精度数据，以供参考。
 
 测试配置如下：
 
 1. 数据集
 
-    本示例使用CBLUE数据集中的开发集用于ERNIE-Health微调模型部署推理的性能与精度测试，包括
+    使用CBLUE数据集中的开发集用于ERNIE-Health微调模型部署推理的性能与精度测试，包括
 
   - 医疗搜索检索词意图分类（KUAKE-QIC）任务
   - 医疗搜索查询词-页面标题相关性（KUAKE-QTR）任务
@@ -203,15 +179,13 @@ python infer_spo.py --perf --model_path_prefix ../../cblue/export/inference
 
 测试环境及说明如上，测试 CPU 性能时，线程数设置为40。
 
-| 数据集       | 最大文本长度 | 精度评估指标 | FP32 指标值 | INT8 指标值 | FP32 latency(ms) | INT8 latency(ms) |
-| ----------  | ---------- | ---------- | ---------- | ---------- | ---------------- | ---------------- |
-| KUAKE-QIC   | 128        | Accuracy   | 0.8046     | 0.7136 (-) | 37.72            | 20.50            |
-| KUAKE-QTR   | 64         | Accuracy   | 0.6886     | 0.5685 (-) | 18.40            | 9.59             |
-| KUAKE-QQR   | 64         | Accuracy   | 0.7755     | 0.6579 (-) | 10.34            | 5.62             |
-| CHIP-CTC    | 160        | Macro F1   | 0.8445     | 0.6137 (-) | 47.43            | 24.48            |
-| CHIP-STS    | 96         | Macro F1   | 0.8892     | 0.8209 (-) | 27.67            | 14.97            |
-| CHIP-CDN-2C | 256        | Micro F1   | 0.8921     | 0.7788 (-) | 26.86            | 15.00            |
-| CMeEE       | 128        | Micro F1   | 0.6469     | 0.2143 (-) | 37.59            | 19.58            |
-| CMeIE       | 300        | Micro F1   | 0.5902     | 0.0015 (-) | 213.04           | 160.05           |
-
-与FP16相比，INT8在线量化精度下降较大，加速比在 1.3 ~ 1.9 倍左右。
+| 数据集      | 最大文本长度 | 精度评估指标 | FP32 指标值 | FP32 latency(ms) |
+| ----------  | ------------ | ------------ | ---------- | ---------------- |
+| KUAKE-QIC   | 128          | Accuracy     | 0.8046     | 37.72            |
+| KUAKE-QTR   | 64           | Accuracy     | 0.6886     | 18.40            |
+| KUAKE-QQR   | 64           | Accuracy     | 0.7755     | 10.34            |
+| CHIP-CTC    | 160          | Macro F1     | 0.8445     | 47.43            |
+| CHIP-STS    | 96           | Macro F1     | 0.8892     | 27.67            |
+| CHIP-CDN-2C | 256          | Micro F1     | 0.8921     | 26.86            |
+| CMeEE       | 128          | Micro F1     | 0.6469     | 37.59            |
+| CMeIE       | 300          | Micro F1     | 0.5902     | 213.04           |

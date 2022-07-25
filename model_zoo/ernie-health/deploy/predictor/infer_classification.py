@@ -30,13 +30,10 @@ parser.add_argument("--dataset", default="KUAKE-QIC", type=str, help="Dataset fo
 parser.add_argument("--data_file", default=None, type=str, help="The data to predict with one sample per line.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
 parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
-parser.add_argument("--use_quantize", action='store_true', help="Whether to use quantization for acceleration, only takes effect when deploying on cpu.")
 parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for predicting.")
 parser.add_argument("--num_threads", default=psutil.cpu_count(logical=False), type=int, help="num_threads for cpu.")
 parser.add_argument("--device", choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--device_id", default=0, help="Select which gpu device to train model.")
-parser.add_argument("--perf", action="store_true", help="Whether to calculate the performance and evaluate on the test dataset.")
-parser.add_argument("--num_perf_sample", default=None, type=int, help="Use the first K dev samples for evaluation.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -96,12 +93,3 @@ if __name__ == "__main__":
 
     predictor = CLSPredictor(args, label_list)
     predictor.predict(input_data)
-
-    if args.perf:
-        test_ds = load_dataset("cblue", args.dataset.upper(), splits=["dev"])
-        if args.num_perf_sample is not None:
-            test_ds = test_ds[:args.num_perf_sample]
-        input_data, labels = predictor.get_text_and_label(test_ds)
-        encoded_inputs = predictor.preprocess(input_data)
-
-        predictor.evaluate(encoded_inputs, labels, METRIC[args.dataset])
