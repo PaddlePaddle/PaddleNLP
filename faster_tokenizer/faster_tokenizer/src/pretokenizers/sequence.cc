@@ -54,10 +54,42 @@ void SequencePreTokenizer::operator()(PreTokenizedString* pretokenized) const {
 }
 
 void to_json(nlohmann::json& j,
-             const SequencePreTokenizer& sequence_pretokenizer) {}
+             const SequencePreTokenizer& sequence_pretokenizer) {
+  nlohmann::json jlist;
+  for (auto& ptr : sequence_pretokenizer.pretokenzer_ptrs_) {
+    nlohmann::json jitem;
+    if (typeid(*ptr) == typeid(SequencePreTokenizer)) {
+      jitem = *dynamic_cast<SequencePreTokenizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(BertPreTokenizer)) {
+      jitem = *dynamic_cast<BertPreTokenizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(MetaSpacePreTokenizer)) {
+      jitem = *dynamic_cast<MetaSpacePreTokenizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(WhitespacePreTokenizer)) {
+      jitem = *dynamic_cast<WhitespacePreTokenizer*>(ptr.get());
+    }
+    jlist.push_back(jitem);
+  }
+  j = {{"type", "SequencePreTokenizer"}, {"pretokenizers", jlist}};
+}
 
 void from_json(const nlohmann::json& j,
-               SequencePreTokenizer& sequence_pretokenizer) {}
+               SequencePreTokenizer& sequence_pretokenizer) {
+#define TRY_APPEND_PRETOKENIZER(PRETOKENIZER_TYPE)           \
+  if (pretokenizer_type == #PRETOKENIZER_TYPE) {             \
+    PRETOKENIZER_TYPE pretokenizer;                          \
+    pretokenizer_json.get_to(pretokenizer);                  \
+    sequence_pretokenizer.AppendPreTokenizer(&pretokenizer); \
+  }
+  for (auto& pretokenizer_json : j.at("pretokenizers")) {
+    std::string pretokenizer_type;
+    pretokenizer_json.at("type").get_to(pretokenizer_type);
+    TRY_APPEND_PRETOKENIZER(SequencePreTokenizer);
+    TRY_APPEND_PRETOKENIZER(WhitespacePreTokenizer);
+    TRY_APPEND_PRETOKENIZER(MetaSpacePreTokenizer);
+    TRY_APPEND_PRETOKENIZER(BertPreTokenizer);
+  }
+#undef TRY_APPEND_PRETOKENIZER
+}
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
