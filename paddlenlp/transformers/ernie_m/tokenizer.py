@@ -180,14 +180,22 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
         offset = 0
         lst_match_idx = -1
-        offsets = []
+        offsets, orig_tokens = [], []
         for i, token in enumerate(pieces):
             orig_token, offset = _get_orig_offset(token, offset, i)
             if orig_token:
                 lst_match_idx = i
-            offsets += [(offset, offset + len(orig_token))]
+            orig_tokens.append(orig_token)
+            offsets.append(offset)
             offset += len(orig_token)
-        return offsets
+        for i in range(len(offsets) - 2, -1, -1):
+            if offsets[i] == offsets[i + 1]:
+                orig_tokens[i] = orig_tokens[i + 1]
+
+        offset_mapping = []
+        for orig_token, offset in zip(orig_tokens, offsets):
+            offset_mapping += [(offset, offset + len(orig_token))]
+        return offset_mapping
 
     @property
     def vocab_size(self):
