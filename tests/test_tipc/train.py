@@ -87,24 +87,8 @@ def do_train(args):
 
         batch_id = 0
         batch_start = time.time()
-
-        global_step = 0
-
         for input_data in train_loader:
             train_reader_cost = time.time() - batch_start
-            global_step += 1
-            #if global_step == 100:
-            #paddle.fluid.core.nvprof_start()
-            #paddle.fluid.core.nvprof_enable_record_event()
-            #paddle.fluid.core.nvprof_nvtx_push(str(global_step))
-            if global_step == 110:
-                #paddle.fluid.core.nvprof_nvtx_pop()
-                #paddle.fluid.core.nvprof_stop()
-                import sys
-                sys.exit()
-            #if global_step > 100 and global_step < 110:
-            #    paddle.fluid.core.nvprof_nvtx_pop()
-            #    paddle.fluid.core.nvprof_nvtx_push(str(global_step))
 
             if args.use_amp:
                 with paddle.amp.auto_cast(
@@ -152,12 +136,6 @@ def do_train(args):
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
 
-                train_batch_cost = time.time() - batch_start
-                reader_cost_avg.record(train_reader_cost)
-                batch_cost_avg.record(train_batch_cost)
-                batch_ips_avg.record(train_batch_cost, sample_per_cards)
-                batch_start = time.time()
-
                 benchmark_model.logger(
                     args,
                     step_id=step_id,
@@ -172,12 +150,12 @@ def do_train(args):
                 reader_cost_avg.reset()
                 batch_cost_avg.reset()
                 batch_ips_avg.reset()
-            else:
-                train_batch_cost = time.time() - batch_start
-                reader_cost_avg.record(train_reader_cost)
-                batch_cost_avg.record(train_batch_cost)
-                batch_ips_avg.record(train_batch_cost, sample_per_cards)
-                batch_start = time.time()
+
+            train_batch_cost = time.time() - batch_start
+            reader_cost_avg.record(train_reader_cost)
+            batch_cost_avg.record(train_batch_cost)
+            batch_ips_avg.record(train_batch_cost, sample_per_cards)
+            batch_start = time.time()
 
             batch_id += 1
             step_id += 1
