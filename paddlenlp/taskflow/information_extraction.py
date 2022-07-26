@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import numpy as np
 import paddle
 from ..datasets import load_dataset
@@ -62,6 +63,28 @@ usage = r"""
             ie('这个产品用起来真的很流畅，我非常喜欢')
             '''
             [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990024058203417}]}]
+            '''
+
+            # English Model
+            schema = [{'Person': ['Company', 'Position']}]
+            ie_en = Taskflow('information_extraction', schema=schema, model='uie-base-en')
+            ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+            '''
+            [{'Person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.999631971804547, 'relations': {'Company': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9960158209451642}], 'Position': [{'text': 'CEO', 'start': 41, 'end': 44, 'probability': 0.8871063806420736}]}}]}]
+            '''
+
+            schema = ['Sentiment classification [negative, positive]']
+            ie_en.set_schema(schema)
+            ie_en('I am sorry but this is the worst film I have ever seen in my life.')
+            '''
+            [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
+            '''
+
+            schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+            ie_en.set_schema(schema)
+            ie_en("overall i 'm happy with my toy.")
+            '''
+            
             '''
          """
 
@@ -238,7 +261,29 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        }
+        },
+        "uie-base-en": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.0/model_state.pdparams",
+                "d12e03c2bfe2824c876883b4b836d79d"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
+                "2ca9fe0eea8ff9418725d1a24fcf5c36"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
+                "64800d5d8528ce344256daf115d4965e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
     }
 
     def __init__(self, task, model, schema, **kwargs):
@@ -250,6 +295,9 @@ class UIETask(Task):
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
+        self._is_en = False if model not in [
+            "uie-base-en",
+        ] else True
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
@@ -514,9 +562,21 @@ class UIETask(Task):
                         input_map[cnt] = []
                     else:
                         for p in pre:
+                            if self._is_en:
+                                if re.search(r'\[.*?\]$', node.name):
+                                    prompt_prefix = node.name[:node.name.find(
+                                        "[", 1)].strip()
+                                    cls_options = re.search(
+                                        r'\[.*?\]$', node.name).group()
+                                    # Sentiment classification of xxx [positive, negative]
+                                    prompt = prompt_prefix + p + " " + cls_options
+                                else:
+                                    prompt = node.name + p
+                            else:
+                                prompt = p + node.name
                             examples.append({
                                 "text": one_data,
-                                "prompt": dbc2sbc(p + node.name)
+                                "prompt": dbc2sbc(prompt)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
                         idx += len(pre)
@@ -571,7 +631,11 @@ class UIETask(Task):
             for k, v in input_map.items():
                 for idx in v:
                     for i in range(len(result_list[idx])):
-                        prefix[k].append(result_list[idx][i]["text"] + "的")
+                        if self._is_en:
+                            prefix[k].append(" of " +
+                                             result_list[idx][i]["text"])
+                        else:
+                            prefix[k].append(result_list[idx][i]["text"] + "的")
 
             for child in node.children:
                 child.prefix = prefix
