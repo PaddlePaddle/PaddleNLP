@@ -34,7 +34,7 @@ NUM_CLASSES = {
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--train_dataset', required=True, type=str, help='The name of dataset used for training.')
-parser.add_argument('--params_path', type=str, required=True, default='./checkpoint/model_state.pdparams', help='The path to model parameters to be loaded.')
+parser.add_argument('--params_path', type=str, required=True, default='./checkpoint/', help='The path to model parameters to be loaded.')
 parser.add_argument('--output_path', type=str, default='./export', help='The path of model parameter in static graph to be saved.')
 args = parser.parse_args()
 # yapf: enable
