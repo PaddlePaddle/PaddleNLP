@@ -257,6 +257,11 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-medical-base"
             },
+            "uie-base-en": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-base-en"
+            },
         },
         "default": {
             "model": "uie-base"
@@ -318,7 +323,7 @@ TASKS = {
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag"
 ]
 
 
