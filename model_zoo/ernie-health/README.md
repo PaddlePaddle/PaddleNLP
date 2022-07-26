@@ -1,34 +1,53 @@
-# ERNIE-Health: Building Chinese Biomedical Language Models via Multi-Level Text Discrimination
+# ERNIE-Health 中文医疗预训练模型
+
+医疗领域存在大量的专业知识和医学术语，人类经过长时间的学习才能成为一名优秀的医生。那机器如何才能“读懂”医疗文献呢？尤其是面对电子病历、生物医疗文献中存在的大量非结构化、非标准化文本，计算机是无法直接使用、处理的。这就需要自然语言处理（Natural Language Processing，NLP）技术大展身手了。
 
 ## 模型介绍
 
-中文医疗预训练模型[ERNIE-Health](https://arxiv.org/pdf/2110.07244.pdf) 在模型结构上与 [ELECTRA](https://openreview.net/pdf?id=r1xMH1BtvB) 相似，包括生成器和判别器两部分，各自包含1个 [ERNIE](https://arxiv.org/pdf/1904.09223.pdf) 模型。生成器的训练任务为Masked Language Model(MLM)，主要作用是给判别器提供训练语料。判别器的训练任务为多任务学习，也是论文的主要改进点：
+本项目针对中文医疗语言理解任务，开源了中文医疗预训练模型 [ERNIE-Health](https://arxiv.org/pdf/2110.07244.pdf)（模型名称`ernie-health-chinese`）。
 
-#### 字级别任务
-
-- 判断各个位置上的字是否被替换（Replaced Token Detection，RTD）
-- 从候选字中选取被替换位置的原始字（Multi-Token Selection，MTS）
-
-#### 句子级别任务
-
-- 判断对比序列预测（Contrastive Sequence Prediction，CSP），即给定某个句子，通过替换其中个别字构造两个句子作为正例，替换其他句子中的字作为负例来进行分类。
-
-预训练结束后将不再使用生成器，只对判别器进行fine-tuning用于下游的医疗文本处理任务。
+ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型打造, 通过医疗知识增强技术进一步学习海量的医疗数据, 精准地掌握了专业的医学知识。ERNIE-Health 利用医疗实体掩码策略对专业术语等实体级知识学习, 学会了海量的医疗实体知识。同时，通过医疗问答匹配任务学习病患病状描述与医生专业治疗方案的对应关系，获得了医疗实体知识之间的内在联系。ERNIE-Health 共学习了 60 多万的医疗专业术语和 4000 多万的医疗专业问答数据，大幅提升了对医疗专业知识的理解和建模能力。此外，ERNIE-Health 还探索了多级语义判别预训练任务，提升了模型对医疗知识的学习效率。该模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。
 
 ![Overview_of_EHealth](https://user-images.githubusercontent.com/25607475/163949632-8b34e23c-d0cd-49df-8d88-8549a253d221.png)
 
-图片来源：来自[ERNIE-Health论文](https://arxiv.org/pdf/2110.07244.pdf)
+更多技术细节可参考论文
+- [Building Chinese Biomedical Language Models via Multi-Level Text Discrimination, ACL 2022](https://arxiv.org/pdf/2110.07244.pdf)
 
-ERNIE-Health模型在中文医疗自然语言处理榜单 CBLUE 上取得了冠军，平均得分达到 77.822。
+## 模型效果
 
-本项目是 ERNIE-Health 的开源实现，支持自定义数据上的中文医疗预训练模型训练。
+ERNIE-Health模型以超越人类医学专家水平的成绩登顶中文医疗信息处理权威榜单 [CBLUE](https://github.com/CBLUEbenchmark/CBLUE) 冠军, 验证了 ERNIE 在医疗行业应用的重要价值。
 
+![CBLUERank](https://user-images.githubusercontent.com/25607475/160394225-04f75498-ce1a-4665-85f7-d495815eed51.png)
+
+相应的开源模型参数 ``ernie-health-chinese`` 在 CBLUE **验证集** 上的评测指标如下表所示：
+
+| Task      |  metric  | results | results (fp16) |
+| --------- | :------: | :-----: | :------------: |
+| CHIP-STS  | Macro-F1 | 0.88749 |    0.88555     |
+| CHIP-CTC  | Macro-F1 | 0.84136 |    0.83514     |
+| CHIP-CDN  |    F1    | 0.76979 |    0.76489     |
+| KUAKE-QQR | Accuracy | 0.83865 |    0.84053     |
+| KUAKE-QTR | Accuracy | 0.69722 |    0.69722     |
+| KUAKE-QIC | Accuracy | 0.81483 |    0.82046     |
+| CMeEE     | Micro-F1 | 0.66120 |    0.66026     |
+| CMeIE     | Micro-F1 | 0.61385 |    0.60076     |
 
 ## 环境依赖
 
 - paddlepaddle >= 2.2.0
+- paddlenlp >= 2.3.4
 
-## 数据准备
+## 模型预训练
+
+PaddleNLP中提供了ERNIE-Health训练好的模型参数。``ernie-health-chinese``版本为160G医疗文本数据上的训练结果，数据包括脱敏医患对话语料、医疗健康科普文章、脱敏医院电子医疗病例档案以及医学和临床病理学教材。本节提供了预训练的整体流程，可用于自定义数据的学习。
+
+#### 注意: 预训练资源要求
+
+- 推荐使用至少4张16G以上显存的GPU进行预训练。
+- 数据量应尽可能接近ERNIE-Health论文中训练数据的量级，以获得好的预训练模型效果。
+- 若资源有限，可以直接使用开源的ERNIE-Health模型进行微调，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/cblue)。
+
+#### 数据准备
 
 - 数据编码：UTF-8
 - 数据格式：预训练文本数据放在同个目录下，每个文件中每行一句中文文本。
@@ -45,15 +64,6 @@ python preprocess.py --input_path ./raw_data/ --output_file ./data/samples --tok
 - ``logging_steps`` 表示日志打印间隔，每处理``logging_steps``个句子打印一次日志。
 - ``num_worker`` 表示使用的进程数，增加进程数可加速预处理。
 
-## 模型预训练
-
-PaddleNLP中提供了ERNIE-Health训练好的模型参数。该版本为160G医疗文本数据上的训练结果，数据包括脱敏医患对话语料、医疗健康科普文章、脱敏医院电子医疗病例档案以及医学和临床病理学教材。
-
-#### 注意⚠️  : 预训练资源要求
-
-- 推荐使用至少4张16G以上显存的GPU进行预训练。
-- 数据量应尽可能接近ERNIE-Health论文中训练数据的量级，以获得好的预训练模型效果。
-- 若资源有限，可以直接使用开源的ERNIE-Health模型进行Fine-tuning，具体实现可参考 [CBLUE样例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/cblue)。
 
 #### 单机单卡
 
@@ -143,13 +153,38 @@ python -u -m paddle.distributed.launch \
 ```
 大部分参数含义如上文所述，这里简要介绍一些新参数:
 
-- dataset, 同上文task_name，此处为小写字母。表示 Fine-tuning 的分类任务，当前支持 afamc、tnews、iflytek、ocnli、cmnli、csl、cluewsc2020。
-- per_device_train_batch_size 同上文batch_size。训练时，每次迭代每张卡上的样本数目。
-- per_device_eval_batch_size 同上文batch_size。评估时，每次迭代每张卡上的样本数目。
-- warmup_ratio 与warmup_steps类似，warmup步数占总步数的比例。
--fp16 与`use_amp`相同，表示使用混合精度
--fp16_opt_level 混合精度的策略。注：O2训练eHealth存在部分问题，暂时请勿使用。
-- save_total_limit 保存的ckpt数量的最大限制
+- ``per_device_train_batch_size`` 同上文batch_size。训练时，每次迭代每张卡上的样本数目。
+- ``per_device_eval_batch_size`` 同上文batch_size。评估时，每次迭代每张卡上的样本数目。
+- ``warmup_ratio`` 与warmup_steps类似，warmup步数占总步数的比例。
+- ``fp16`` 与`use_amp`相同，表示使用混合精度
+- ``fp16_opt_level`` 混合精度的策略。注：O2训练eHealth存在部分问题，暂时请勿使用。
+- ``save_total_limit`` 保存的ckpt数量的最大限制
+
+## 微调
+
+模型预训练结束后，可以对判别器进行微调以完成下游医疗任务。不同任务的模型加载方式如下：
+
+```
+from paddlenlp.transformers import *
+
+tokenizer = AutoTokenizer.from_pretrained('ernie-health-chinese')
+
+# 分类任务
+model = AutoModelForSequenceClassification.from_pretrained('ernie-health-chinese')
+# 序列标注任务
+model = AutoModelForTokenClassification.from_pretrained('ernie-health-chinese')
+# 阅读理解任务
+model = AutoModelForQuestionAnswering.from_pretrained('ernie-health-chinese')
+```
+
+本项目提供了在 CBLUE 数据集上的微调脚本，包括分类、实体识别和关系抽取三类任务，详细信息可参考 ``cblue``[目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/cblue)。
+
+## 部署
+
+我们为ERNIE-Health提供了Python端部署方案，请根据实际情况进行选择。
+
+详细部署流程请参考：[基于ONNXRuntime推理部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/deploy/predictor/)
+
 
 ## Reference
 
