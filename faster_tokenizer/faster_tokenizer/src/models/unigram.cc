@@ -153,10 +153,12 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
   };
 
   for (auto&& str : encode_result) {
-    if (str == filter_token_) {
-      offset += filter_token_.length();
+    // Avoid to append the filtered_token_ to encoded_result
+    if (str == filtered_token_) {
+      offset += filtered_token_.length();
       continue;
     }
+    // Split the tokenized tokens following some regex rule
     if (split_rule_ != nullptr) {
       re2::StringPiece result;
       int start = 0;
@@ -166,8 +168,8 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
         int res_len = result.length();
         start = curr_start + res_len;
         std::string result_str(result.data(), res_len);
-        if (result_str == filter_token_) {
-          offset += filter_token_.length();
+        if (result_str == filtered_token_) {
+          offset += filtered_token_.length();
           continue;
         }
         UpdateTokens(result_str);
@@ -398,8 +400,8 @@ void Unigram::EncodeUnoptimized(const std::string& normalized,
   }
 }
 
-void Unigram::SetFilterToken(const std::string& filter_token) {
-  filter_token_ = filter_token;
+void Unigram::SetFilterToken(const std::string& filtered_token) {
+  filtered_token_ = filtered_token;
 }
 
 void Unigram::SetSplitRule(const std::string& split_rule) {
@@ -414,7 +416,7 @@ void to_json(nlohmann::json& j, const Unigram& model) {
   j = {{"type", "Unigram"},
        {"unk_id", model.unk_id_},
        {"vocab", model.vocab_},
-       {"filter_token", model.filter_token_},
+       {"filter_token", model.filtered_token_},
        {"split_rule", split_rule}};
 }
 

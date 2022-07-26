@@ -41,7 +41,9 @@ struct Unigram : public Model {
   virtual std::vector<std::string> Save(
       const std::string& folder,
       const std::string& filename_prefix) const override;
-  void SetFilterToken(const std::string& filter_token);
+  // Set the filter token for unigram.
+  void SetFilterToken(const std::string& filtered_token);
+  // Set the special spliting rule for unigram.
   void SetSplitRule(const std::string& split_rule);
 
 private:
@@ -66,10 +68,13 @@ private:
   bool fuse_unk_;
   bool is_optimized_;
   int trie_results_size_;
-
-  std::string filter_token_;
-  // For special rule of token spliting after tokenization
-  // It's useful for some cases, such as ernie-m tokenizer
+  // Some tokenizer, such as ernie-m, may avoid to append some special
+  // token to final result, the unigram model doesn't filter any tokens
+  // by default.
+  std::string filtered_token_;
+  // For special rule of token spliting after tokenization,
+  // the unigram model has no spliting rule by default.
+  // It's useful for some cases, such as ernie-m tokenizer.
   std::unique_ptr<re2::RE2> split_rule_;
 
   friend void to_json(nlohmann::json& j, const Unigram& model);
