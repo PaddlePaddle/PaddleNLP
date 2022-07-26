@@ -136,6 +136,12 @@ def do_train(args):
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
 
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
+                batch_start = time.time()
+
                 benchmark_model.logger(
                     args,
                     step_id=step_id,
@@ -150,12 +156,12 @@ def do_train(args):
                 reader_cost_avg.reset()
                 batch_cost_avg.reset()
                 batch_ips_avg.reset()
-
-            train_batch_cost = time.time() - batch_start
-            reader_cost_avg.record(train_reader_cost)
-            batch_cost_avg.record(train_batch_cost)
-            batch_ips_avg.record(train_batch_cost, sample_per_cards)
-            batch_start = time.time()
+            else:
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
+                batch_start = time.time()
 
             batch_id += 1
             step_id += 1
