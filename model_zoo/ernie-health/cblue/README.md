@@ -1,18 +1,6 @@
 # 使用医疗领域预训练模型Fine-tune完成中文医疗语言理解任务
 
-医疗领域存在大量的专业知识和医学术语，人类经过长时间的学习才能成为一名优秀的医生。那机器如何才能“读懂”医疗文献呢？尤其是面对电子病历、生物医疗文献中存在的大量非结构化、非标准化文本，计算机是无法直接使用、处理的。这就需要自然语言处理（Natural Language Processing，NLP）技术大展身手了。
-
-近年来，预训练语言模型（Pre-trained Language Model，PLM）逐渐成为自然语言处理的主流方法。这类模型利用大规模的未标注语料进行训练，得到的模型在下游NLP任务上的效果有着明显提升，在通用领域和特定领域均有广泛应用。在医疗领域，早期的做法是在预先训练好的通用语言模型上进行 Fine-tune。后来的研究发现直接使用医疗相关语料学习到的预训练语言模型在医疗文本任务上的效果更好，采用的模型结构也从早期的BERT演变为更新的 RoBERTa、ALBERT和ELECTRA。
-
-本示例展示了中文医疗预训练模型 ERNIE-Health（[Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/abs/2110.07244)）如何 Fine-tune完成中文医疗语言理解任务。
-
-## 模型介绍
-
-本项目针对中文医疗语言理解任务，开源了中文医疗预训练模型 ERNIE-Health（模型名称`ernie-health-chinese`）。ERNIE-Health模型依托于百度知识增强语义理解框架 ERNIE，以超越人类医学专家水平的成绩登顶中文医疗信息处理权威榜单 CBLUE 冠军, 验证了 ERNIE 在医疗行业应用的重要价值。
-
-![CBLUERank](https://user-images.githubusercontent.com/25607475/160394225-04f75498-ce1a-4665-85f7-d495815eed51.png)
-
-ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型打造, 通过医疗知识增强技术进一步学习海量的医疗数据, 精准地掌握了专业的医学知识。ERNIE-Health 利用医疗实体掩码策略对专业术语等实体级知识学习, 学会了海量的医疗实体知识。同时，通过医疗问答匹配任务学习病患病状描述与医生专业治疗方案的对应关系，获得了医疗实体知识之间的内在联系。ERNIE-Health 共学习了 60 多万的医疗专业术语和 4000 多万的医疗专业问答数据，大幅提升了对医疗专业知识的理解和建模能力。此外，ERNIE-Health 还探索了多级语义判别预训练任务，提升了模型对医疗知识的学习效率。该模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。 而 Fine-tune 过程只用到了判别器模块，由 12 层 Transformer 网络组成。
+本示例展示了中文医疗预训练模型 ERNIE-Health（[Building Chinese Biomedical Language Models via Multi-Level Text Discrimination](https://arxiv.org/abs/2110.07244)）如何 Fine-tune 完成中文医疗语言理解任务。
 
 ## 数据集介绍
 
@@ -28,6 +16,10 @@ ERNIE-Health 依托百度文心 ERNIE 先进的知识增强预训练语言模型
 * KUAKE-QQR：医疗搜索查询词-查询词相关性
 
 更多信息可参考CBLUE的[github](https://github.com/CBLUEbenchmark/CBLUE/blob/main/README_ZH.md)。其中对于临床术语标准化任务（CHIP-CDN），我们按照 ERNIE-Health 中的方法通过检索将原多分类任务转换为了二分类任务，即给定一诊断原词和一诊断标准词，要求判定后者是否是前者对应的诊断标准词。本项目提供了检索处理后的 CHIP-CDN 数据集（简写`CHIP-CDN-2C`），且构建了基于该数据集的example代码。
+
+## 模型介绍
+
+ERNIE-Health 模型的整体结构与 ELECTRA 相似，包括生成器和判别器两部分。 而 Fine-tune 过程只用到了判别器模块，由 12 层 Transformer 网络组成。
 
 ## 快速开始
 
@@ -52,7 +44,7 @@ pip install xlrd==1.2.0
 
 ### 模型训练
 
-我们按照任务类别划分，同时提供了8个任务的样例代码。可以运行下边的命令，在训练集上进行训练，并在开发集上进行验证。
+我们按照任务类别划分，同时提供了8个任务的样例代码。可以运行下边的命令，在训练集上进行训练，并在**验证集**上进行验证。
 
 **训练参数设置（Training setup）及结果**
 
@@ -80,19 +72,11 @@ pip install xlrd==1.2.0
 * `save_steps`: 保存checkpoints的间隔steps数，默认100。
 * `logging_steps`: 日志打印的间隔steps数，默认10。
 * `warmup_proption`：可选，学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.1。
-* `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
+* `init_from_ckpt`：可选，模型参数路径，恢复模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
 * `use_amp`: 是否使用混合精度训练，默认为False。
 
-**NOTE:**
-* 如需恢复模型训练，则可以设置`init_from_ckpt`， 如`init_from_ckpt=checkpoints/model_100/model_state.pdparams`。
-* 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
-  运行方式：
-
-```shell
-python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./export
-```
 
 #### 医疗文本分类任务
 
@@ -118,6 +102,17 @@ $ python train_ner.py --batch_size 32 --max_seq_length 128 --learning_rate 6e-5 
 $ export CUDA_VISIBLE_DEVICES=0
 $ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 --epochs 100
 ```
+
+### 静态图模型导出
+
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，用于部署推理等，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
+
+运行方式：
+
+```shell
+python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./export
+```
+
 
 [1] CBLUE: A Chinese Biomedical Language Understanding Evaluation Benchmark [pdf](https://arxiv.org/abs/2106.08087) [git](https://github.com/CBLUEbenchmark/CBLUE) [web](https://tianchi.aliyun.com/specials/promotion/2021chinesemedicalnlpleaderboardchallenge)
 
