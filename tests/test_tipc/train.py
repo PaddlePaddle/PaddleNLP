@@ -182,6 +182,13 @@ def do_train(args):
             batch_id += 1
             step_id += 1
 
+        if args.lr_scheduler is not None and args.scheduler_update_by_epoch:
+            lr.step()
+
+        train_epoch_cost = time.time() - epoch_start
+        logger.info("train epoch: %d, epoch_cost: %.5f s" %
+                    (pass_id, train_epoch_cost))
+
 
 def do_hapi(args):
     device = paddle.set_device(args.device)
