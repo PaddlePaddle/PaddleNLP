@@ -366,7 +366,6 @@ class ErnieTokenizer(PretrainedTokenizer):
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
-
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
