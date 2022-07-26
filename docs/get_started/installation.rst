@@ -31,7 +31,7 @@ Anaconda是一个开源的Python发行版本，其包含了conda、Python等180�
 :::::::::
 运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。
 
-.. image:: /imgs/anaconda_windows.png 
+.. image:: ../imgs/anaconda_windows.png
 
 第三步 使用
 :::::::::
