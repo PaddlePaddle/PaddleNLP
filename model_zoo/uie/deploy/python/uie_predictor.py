@@ -88,8 +88,7 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
-                                                        use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._batch_size = args.batch_size
@@ -166,6 +165,7 @@ class UIEPredictor(object):
                                          return_tensors='np',
                                          return_offsets_mapping=True)
         offset_maps = encoded_inputs["offset_mapping"]
+        input_ids = encoded_inputs["input_ids"]
 
         start_probs = []
         end_probs = []
@@ -193,7 +193,6 @@ class UIEPredictor(object):
                                                  limit=self._position_prob,
                                                  return_prob=True)
 
-        input_ids = input_dict['input_ids']
         sentence_ids = []
         probs = []
         for start_ids, end_ids, ids, offset_map in zip(start_ids_list,
