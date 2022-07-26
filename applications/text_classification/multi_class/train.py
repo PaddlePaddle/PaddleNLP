@@ -81,17 +81,16 @@ parser.add_argument("--logging_steps",
                     type=int,
                     help="The interval steps to logging.")
 parser.add_argument("--weight_decay",
-                    default=0.01,
+                    default=0.0,
                     type=float,
                     help="Weight decay if we apply some.")
 parser.add_argument('--warmup',
                     action='store_true',
                     help="whether use warmup strategy")
-parser.add_argument('--warmup_proportion',
-                    default=0.0,
-                    type=float,
-                    help="Linear warmup proportion of learning "
-                    "rate over the training process.")
+parser.add_argument("--warmup_steps",
+                    default=0,
+                    type=int,
+                    help="Linear warmup steps over the training process.")
 parser.add_argument("--init_from_ckpt",
                     type=str,
                     default=None,
@@ -100,14 +99,6 @@ parser.add_argument("--seed",
                     type=int,
                     default=3,
                     help="random seed for initialization")
-parser.add_argument("--dataset",
-                    default="cblue",
-                    type=str,
-                    help="Dataset for text classfication.")
-parser.add_argument("--task_name",
-                    default="KUAKE-QIC",
-                    type=str,
-                    help="Task name for text classfication dataset.")
 args = parser.parse_args()
 
 
@@ -146,28 +137,22 @@ def train():
         paddle.distributed.init_parallel_env()
 
     # load and preprocess dataset
-    if args.dataset_dir is not None:
-        label_list = {}
-        with open(os.path.join(args.dataset_dir, 'label.txt'),
-                  'r',
-                  encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                l = line.strip()
-                label_list[l] = i
-        train_ds = load_dataset(read_local_dataset,
-                                path=os.path.join(args.dataset_dir,
-                                                  'train.txt'),
-                                label_list=label_list,
-                                lazy=False)
-        dev_ds = load_dataset(read_local_dataset,
-                              path=os.path.join(args.dataset_dir, 'dev.txt'),
-                              label_list=label_list,
-                              lazy=False)
-    else:
-        train_ds, dev_ds = load_dataset(args.dataset,
-                                        name=args.task_name,
-                                        splits=["train", "dev"])
-        label_list = train_ds.label_list
+
+    label_list = {}
+    with open(os.path.join(args.dataset_dir, 'label.txt'),
+              'r',
+              encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(args.dataset_dir, 'train.txt'),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(args.dataset_dir, 'dev.txt'),
+                          label_list=label_list,
+                          lazy=False)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     trans_func = functools.partial(preprocess_function,
@@ -204,7 +189,7 @@ def train():
 
     num_training_steps = len(train_data_loader) * args.epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+                                         args.warmup_steps)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.

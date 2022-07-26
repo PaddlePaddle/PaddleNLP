@@ -190,7 +190,7 @@ python doccano.py \
 python doccano.py \
     --doccano_file doccano.jsonl \
     --save_dir ./data \
-    --splits 0.8 0.1 0.1 \
+    --splits 0.8 0.2 \
     --task_type "hierarchical" \
     --separator "##"
 ```
@@ -199,7 +199,7 @@ python doccano.py \
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.2]表示按照``8:2``的比例将数据划分为训练集、验证集。
 - ``task_type``: 可选，选择任务类型,有多分类，多标签，层次分类三种类型的任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
@@ -216,8 +216,8 @@ data/
 ```
 
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集。
-- 如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt则为dev数据集无标签数据。
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分成train/dev 数据集，也可以划分为 train/dev/test 数据集。
+- 脚本会自动生成data.txt，如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt为无标签数据。**如果有未标注数据，则用未标注数据文件替换data.txt**
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 ## References

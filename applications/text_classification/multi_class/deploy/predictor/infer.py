@@ -55,7 +55,6 @@ parser.add_argument("--num_threads",
                     help="num_threads for cpu, only takes effect"
                     " when deploying on cpu.")
 parser.add_argument('--device',
-                    choices=['cpu', 'gpu'],
                     default="gpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--device_id',
@@ -74,18 +73,10 @@ parser.add_argument("--dataset_dir",
                     "if evaluate the performance).")
 parser.add_argument("--perf_dataset",
                     choices=['dev', 'test'],
-                    default='test',
+                    default='dev',
                     type=str,
                     help="evaluate the performance on"
                     "dev dataset or test dataset")
-parser.add_argument("--dataset",
-                    default="cblue",
-                    type=str,
-                    help="Dataset for text classfication.")
-parser.add_argument("--task_name",
-                    default="KUAKE-QIC",
-                    type=str,
-                    help="Task name for text classfication dataset.")
 args = parser.parse_args()
 
 
@@ -109,17 +100,12 @@ def predict(data, label_list):
     predictor = Predictor(args, label_list)
     if args.perf:
 
-        if args.dataset_dir is not None:
-            eval_dir = os.path.join(args.dataset_dir,
-                                    "{}.txt".format(args.perf_dataset))
-            eval_ds = load_dataset(read_local_dataset,
-                                   path=eval_dir,
-                                   label_list=label_list,
-                                   lazy=False)
-        else:
-            eval_ds = load_dataset(args.dataset,
-                                   name=args.task_name,
-                                   splits=[args.perf_dataset])
+        eval_dir = os.path.join(args.dataset_dir,
+                                "{}.txt".format(args.perf_dataset))
+        eval_ds = load_dataset(read_local_dataset,
+                               path=eval_dir,
+                               label_list=label_list,
+                               lazy=False)
 
         texts, labels = predictor.get_text_and_label(eval_ds)
 

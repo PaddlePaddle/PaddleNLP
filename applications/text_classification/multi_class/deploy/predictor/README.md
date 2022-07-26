@@ -1,12 +1,11 @@
-# 基于ONNXRuntime推理部署指南
+# 离线推理部署指南
 
 **目录**
    * [环境准备](#环境准备)
    * [基于GPU部署推理样例](#基于GPU部署推理样例)
    * [基于CPU部署推理样例](#基于CPU部署推理样例)
    * [性能与精度测试](#性能与精度测试)
-       * [GPU精度与性能](#GPU精度与性能)
-       * [CPU精度与性能](#CPU精度与性能)
+
 ## 环境准备
 
 模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle静态图模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)。如何使用[静态图导出脚本](../../export_model.py)将训练后的模型转为静态图模型详见[模型静态图导出指南](../../README.md)，模型使用裁剪API进行裁剪之后会自动生成静态图模型。
@@ -46,7 +45,7 @@ python infer.py \
 * `device_id`: 选择GPU卡号；默认为0。
 * `perf`：选择进行模型性能和精度评估；默认为False。
 * `dataset_dir`：本地数据集地址，需包含data.txt, label.txt, test.txt/dev.txt(可选，如果启动模型性能和精度评估)；默认为None。
-* `perf_dataset`：评估数据集，可选'dev'、'test'，选择在开发集或测试集评估模型；默认为"test"。
+* `perf_dataset`：评估数据集，可选'dev'、'test'，选择在开发集或测试集评估模型；默认为"dev"。
 
 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。可以使用如下命令开启ONNXRuntime的FP16进行推理加速：
 
@@ -103,7 +102,7 @@ python infer.py \
 * `device`: 选用什么设备进行训练，可选cpu、gpu。
 * `perf`：选择进行模型性能和精度评估；默认为False。
 * `dataset_dir`：本地数据集地址，需包含data.txt, label.txt, dev.txt/test.txt(可选，如果启动模型性能和精度评估)；默认为None。
-* `perf_dataset`：评估数据集，选择在开发集或测试集评估模型；默认为"test"。
+* `perf_dataset`：评估数据集，选择在开发集或测试集评估模型；默认为"dev"。
 
 可以使用如下命令开启ONNXRuntime的INT8动态量化进行推理加速：
 

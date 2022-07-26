@@ -26,19 +26,19 @@
 ```text
 multi_class/
 ├── deploy # 部署
-│   └── predictor # 导出ONNX模型并基于ONNXRuntime部署
-│   │   ├── infer.py # ONNXRuntime推理部署示例
-│   │   ├── predictor.py
-│   │   └── README.md # 使用说明
-│   ├── paddle_serving # 基于Paddle Serving 部署
-│   │   ├──config.yml # 分类任务启动服务端的配置文件
-│   │   ├──rpc_client.py # 分类任务发送pipeline预测请求的脚本
-│   │   ├──service.py # 分类任务启动服务端的脚本
-│   │   └── README.md # 使用说明
-│   └── triton_serving # 基于Triton server部署
-│       ├── README.md # 使用说明
-│       ├── seqcls_grpc_client.py # 客户端测试代码
-│       └── models # 部署模型
+│   └── predictor # 离线部署
+│   │   ├── infer.py # 测试脚本
+│   │   ├── predictor.py 离线部署脚本
+│   │   └── README.md # 离线部署使用说明
+│   ├── paddle_serving # PaddleServing在线服务化部署
+│   │   ├──config.yml # 服务端的配置文件
+│   │   ├──rpc_client.py # 客户端预测脚本
+│   │   ├──service.py # 服务端的脚本
+│   │   └── README.md # 在线服务化部署使用说明
+│   └── triton_serving # Triton在线服务化部署
+│       ├── README.md # Triton部署使用说明
+│       ├── seqcls_grpc_client.py # 客户端预测脚本
+│       └── models
 │           ├── seqcls
 │           │   └── config.pbtxt
 │           ├── seqcls_model
@@ -53,14 +53,12 @@ multi_class/
 │               └── config.pbtxt
 ├── train.py # 训练评估脚本
 ├── predict.py # 预测脚本
-├── export_model.py # 动态图参数导出静态图参数脚本
+├── export_model.py # 静态图模型导出脚本
 ├── utils.py # 工具函数脚本
 ├── metric.py # metric脚本
 ├── prune.py # 裁剪脚本
-├── prune_trainer.py # 裁剪trainer脚本
-├── prune_config.py # 裁剪训练参数配置
-├── requirements.txt # 环境依赖
-└── README.md # 使用说明
+├── prune_trainer.py # 裁剪API脚本
+└── README.md # 多分类使用说明
 ```
 
 ## 准备环境
@@ -97,7 +95,7 @@ data/
 ```
 **训练、开发、测试数据集**
 
-train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替；通常建议训练集、开发集、测试集的比例为8:1:1或6:2:2；只有训练集和开发集的情况时建议训练集：开发集比例为8:2或7:3。
+train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替；通常建议训练集、开发集、测试集的比例为8:1:1或6:2:2；只有训练集和开发集的情况时建议训练集：开发集比例为8:2或7:3。**注意文本中不能包含tab符**
 - train.txt/dev.txt/test.txt 文件格式：
 ```text
 <文本1>'\t'<文本1标签>
@@ -193,7 +191,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 
 可支持配置的参数：
 
-* `device`: 选用什么设备进行训练，选择cpu、gpu、xpu、npu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
+* `device`: 选用什么设备进行训练，选择cpu、gpu、xpu、npu。如使用gpu训练，可使用参数--gpus指定GPU卡号；默认为"gpu"。
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
@@ -204,9 +202,9 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `early_stop`：选择是否使用早停法(EarlyStopping)，模型在开发集经过一定epoch后精度表现不再上升，训练终止；默认为False。
 * `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
 * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
-* `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.01。
+* `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.0。
 * `warmup`：是否使用学习率warmup策略，使用时应设置适当的训练轮次（epochs）；默认为False。
-* `warmup_proportion`：学习率warmup策略的比例数，如果设为0.1，则学习率会在前10%steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0.0。
+* `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
 
@@ -251,7 +249,7 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 
 4. PaddleNLP 版本：2.3.1
 
-5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 200，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
+5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 32，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
 
 6. 精度评价指标：Accuracy
 
@@ -264,7 +262,7 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 |"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|78.57|0.22|
 ## 模型预测
 
-训练结束后，输入待预测数据(data/data.txt)和类别标签对照列表(data/label.txt)，使用训练好的模型进行。
+训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
 
 在CPU环境下进行预测，预测结果将保存在`output_file`：
 ```shell
@@ -295,7 +293,7 @@ python predict.py \
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 
-## 模型静态图导出
+## 静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
@@ -340,7 +338,7 @@ python prune.py \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --learning_rate 3e-5 \
-    --num_train_epochs 5 \
+    --num_train_epochs 10 \
     --logging_steps 5 \
     --save_steps 50 \
     --seed 3 \
@@ -359,7 +357,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --learning_rate 3e-5 \
-    --num_train_epochs 5 \
+    --num_train_epochs 10 \
     --logging_steps 5 \
     --save_steps 50 \
     --seed 3 \
@@ -391,7 +389,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
   * `width_mult`：裁剪宽度保留的比例，表示对 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 '2/3'。
 
-以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
+以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
 
@@ -418,7 +416,7 @@ prune/
 
 
 ### 裁剪效果
-本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪,将模型转为ONNX模型，并基于ONNXRuntime引擎GPU部署，测试配置如下：
+本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在KUAKE-QIC任务的表现，测试配置如下：
 
 1. 数据集：CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务开发集
 

@@ -36,13 +36,12 @@ parser.add_argument("--save_dir",
                     type=str,
                     help="The path of data that you wanna save.")
 parser.add_argument("--splits",
-                    default=[0.8, 0.1, 0.1],
+                    default=[0.8, 0.2],
                     type=float,
                     nargs="*",
                     help="The ratio of samples in datasets. "
-                    "[0.8, 0.1, 0.1] means 80% samples "
-                    "used for training, 10% for evaluation"
-                    "and 10% for test.")
+                    "[0.8, 0.2] means 80% samples "
+                    "used for training, 20% for evaluation.")
 parser.add_argument("--task_type",
                     choices=['multi_class', 'multi_label', 'hierarchical'],
                     default="multi_label",

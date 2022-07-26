@@ -40,14 +40,6 @@ class DataArguments:
     the command line.
     """
 
-    dataset: str = field(
-        default="cblue",
-        metadata={"help": "Dataset for multi label classfication."})
-
-    task_name: str = field(
-        default="KUAKE-QIC",
-        metadata={"help": "Task name for multi label classfication dataset."})
-
     dataset_dir: str = field(
         default=None,
         metadata={
@@ -92,29 +84,23 @@ def main():
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    if data_args.dataset_dir is not None:
-        label_list = {}
-        with open(os.path.join(data_args.dataset_dir, 'label.txt'),
-                  'r',
-                  encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                l = line.strip()
-                label_list[l] = i
-        train_ds = load_dataset(read_local_dataset,
-                                path=os.path.join(data_args.dataset_dir,
-                                                  'train.txt'),
-                                label_list=label_list,
-                                lazy=False)
-        dev_ds = load_dataset(read_local_dataset,
-                              path=os.path.join(data_args.dataset_dir,
-                                                'dev.txt'),
-                              label_list=label_list,
-                              lazy=False)
-    else:
-        train_ds, dev_ds = load_dataset(data_args.dataset,
-                                        name=data_args.task_name,
-                                        splits=["train", "dev"])
-        label_list = train_ds.label_list
+
+    label_list = {}
+    with open(os.path.join(data_args.dataset_dir, 'label.txt'),
+              'r',
+              encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(data_args.dataset_dir,
+                                              'train.txt'),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(data_args.dataset_dir, 'dev.txt'),
+                          label_list=label_list,
+                          lazy=False)
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.params_dir)

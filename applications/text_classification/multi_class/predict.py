@@ -25,7 +25,6 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--device',
-                    choices=['cpu', 'gpu', 'xpu', 'npu'],
                     default="gpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--dataset_dir",
@@ -113,12 +112,15 @@ if __name__ == "__main__":
     label_dir = os.path.join(args.dataset_dir, "label.txt")
     label_list = []
     data = []
-    with open(label_dir, 'r', encoding='utf-8') as f:
-        for line in f:
-            label_list.append(line.strip())
-    f.close()
     with open(data_dir, 'r', encoding='utf-8') as f:
-        for line in f:
+        lines = f.readlines()
+        for i, line in enumerate(lines):
             data.append(line.strip())
+    f.close()
+
+    with open(label_dir, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        for i, line in enumerate(lines):
+            label_list.append(line.strip())
     f.close()
     predict(data, label_list)

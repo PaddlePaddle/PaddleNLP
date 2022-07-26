@@ -31,7 +31,7 @@ class Op(Op):
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = [
-            "linear_113.tmp_1",
+            "linear_75.tmp_1",
         ]
 
     def preprocess(self, input_dicts, data_id, log_id):
