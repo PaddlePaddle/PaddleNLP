@@ -515,7 +515,7 @@ from paddlenlp import Taskflow
 
   命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
 
-  - 抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
+  - 例如抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
 
     ```text
     ['时间', '选手', '赛事名称']
@@ -544,7 +544,7 @@ from paddlenlp import Taskflow
               'text': '谷爱凌'}]}]
     ```
 
-  - 抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
+  - 例如抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
 
     ```text
     ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
@@ -576,7 +576,7 @@ from paddlenlp import Taskflow
                   'text': 'M0级'}]}]
     ```
 
-  - 抽取的目标实体类型是"person"和"organization"，schema构造如下：
+  - 例如抽取的目标实体类型是"person"和"organization"，schema构造如下：
 
     ```text
     ['person', 'organization']
@@ -717,7 +717,7 @@ from paddlenlp import Taskflow
 
   评论观点抽取，是指抽取文本中包含的评价维度、观点词。
 
-  - 抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
+  - 例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
 
     ```text
     {
