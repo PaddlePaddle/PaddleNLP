@@ -97,16 +97,15 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
 ```
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
-wget --no-check-certificate https://dl.xpdfreader.com/xpdf-tools-linux-4.04.tar.gz && tar -xvf xpdf-tools-linux-4.04.tar.gz && cp xpdf-tools-linux-4.04/bin64/pdftotext /usr/local/bin
 # 指定语义检索系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-或者直接运行脚本：
+Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_server.sh
+sh scripts/run_search_server.sh
 ```
 
 #### 3.4.4 启动 WebUI
@@ -116,10 +115,10 @@ export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 ```
-或者直接运行脚本：
+Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_client.sh
+sh scripts/run_search_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。

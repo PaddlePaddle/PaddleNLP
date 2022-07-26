@@ -92,18 +92,39 @@ curl http://localhost:9200/_aliases?pretty=true
 python utils/offline_ann.py --index_name baike_cities \
                             --doc_dir data/baike
 ```
+运行成功后会输出如下的日志：
+```
+INFO - pipelines.utils.logger -  Logged parameters:
+ {'processor': 'TextSimilarityProcessor', 'tokenizer': 'NoneType', 'max_seq_len': '0', 'dev_split': '0.1'}
+INFO - pipelines.document_stores.elasticsearch -  Updating embeddings for all 1318 docs ...
+Updating embeddings: 10000 Docs [00:16, 617.76 Docs/s]
+```
+使用如下的命令可以查看是否插入成功：
+```
+curl -XGET http://localhost:9200/baike_cities/_count
+```
+
+运行结束后会有如下的输出：
+```
+{"count":1318,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0}}
+```
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
-wget --no-check-certificate https://dl.xpdfreader.com/xpdf-tools-linux-4.04.tar.gz && tar -xvf xpdf-tools-linux-4.04.tar.gz && cp xpdf-tools-linux-4.04/bin64/pdftotext /usr/local/bin
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-或者直接运行脚本：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh scripts/run_server.sh
+sh scripts/run_qa_server.sh
+```
+启动后可以使用curl命令验证是否成功运行：
+
+```
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "北京市有多少个行政区？","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 ```
 
 #### 3.4.4 启动 WebUI
@@ -113,10 +134,10 @@ export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 ```
-或者直接运行脚本：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh scripts/run_client.sh
+sh scripts/run_qa_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。
