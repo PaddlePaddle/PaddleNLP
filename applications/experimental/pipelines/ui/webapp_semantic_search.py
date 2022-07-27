@@ -28,7 +28,7 @@ from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
-                                        "燃气热水器哪个牌子好?")
+                                        "哪种钻石牌子最好?")
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
 
 # Sliders

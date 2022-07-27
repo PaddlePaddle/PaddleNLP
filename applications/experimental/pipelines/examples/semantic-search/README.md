@@ -59,7 +59,7 @@ python ./rest_api/setup.py install
 python ./ui/setup.py install
 ```
 ### 3.2 数据说明
-语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本。
+语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 3.3 一键体验语义检索系统
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
@@ -78,7 +78,7 @@ python examples/semantic-search/semantic_search_example.py --device cpu
 整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的语义检索系统。
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
 ```bash
 ./bin/elasticsearch
@@ -93,7 +93,7 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_robust_processed
+                            --doc_dir data/dureader_dev
 ```
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
@@ -138,10 +138,17 @@ elasticsearch 需要在非root环境下运行，可以做如下的操作：
 
 ```
 adduser est
-chown est:est -R ${HOME}/elasticsearch-8.1.2/
-cd ${HOME}/elasticsearch-8.1.2/
+chown est:est -R ${HOME}/elasticsearch-8.3.2/
+cd ${HOME}/elasticsearch-8.3.2/
 su est
 ./bin/elasticsearch
+```
+
+#### Mac OS上安装elasticsearch出现错误 `flood stage disk watermark [95%] exceeded on.... all indices on this node will be marked read-only`
+
+elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
+```
+cluster.routing.allocation.disk.threshold_enabled: false
 ```
 
 ## Reference
