@@ -105,22 +105,11 @@ class ErnieMTokenizer(PretrainedTokenizer):
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
-        self.SP_CHAR_MAPPING = {
-            u'℃': u'C',
-            u'①': u'1',
-            u'②': u'2',
-            u'③': u'3',
-            u'④': u'4',
-            u'⑤': u'5',
-            u'⑥': u'6',
-            u'⑦': u'7',
-            u'⑧': u'8',
-            u'⑨': u'9',
-            u'　': u' ',
-        }
+        self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):
             if ch in [ord(u'～')]:
+                self.SP_CHAR_MAPPING[chr(ch)] = chr(ch)
                 continue
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
 
@@ -148,54 +137,31 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return_overflowing_tokens, return_special_tokens_mask)
 
     def get_offset_mapping(self, text):
-        pieces = self._tokenize(text)
-        _text_trans = ''.join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
+        split_tokens = self._tokenize(text)
+        normalized_text, char_mapping = '', []
 
-        def _get_orig_offset(token, offset, idx):
-            if token == SPIECE_UNDERLINE:
-                return '', offset
-            orig_token = token
-            if token.startswith(SPIECE_UNDERLINE):
-                orig_token = token[1:]
-            while offset < len(text) and self.is_whitespace(text[offset]):
-                offset += 1
-            if text.startswith(orig_token, offset):
-                return orig_token, offset
-            end = offset + sum(
-                [len(_) for _ in pieces[lst_match_idx + 1:idx + 3]])
-            new_offset = text.find(orig_token, offset, end)
-            new_offset_trans = _text_trans.find(orig_token, offset, end)
-            if new_offset > -1 or new_offset_trans > -1:
-                if new_offset < 0 or (new_offset > -1
-                                      and new_offset_trans < new_offset):
-                    new_offset = new_offset_trans
-                return text[new_offset:new_offset + len(orig_token)], new_offset
-            # if not found, get orig_token by next piece
-            if idx < len(pieces) - 1:
-                next_token = pieces[idx + 1]
-                _, next_offset = _get_orig_offset(next_token, offset, idx + 1)
-                orig_token = text[offset:next_offset].strip()
-                return orig_token, offset
-            return text[offset:].strip(), offset
+        for i, ch in enumerate(text):
 
-        offset = 0
-        lst_match_idx = -1
-        offsets, orig_tokens = [], []
-        for i, token in enumerate(pieces):
-            orig_token, offset = _get_orig_offset(token, offset, i)
-            if orig_token:
-                lst_match_idx = i
-            orig_tokens.append(orig_token)
-            offsets.append(offset)
-            offset += len(orig_token)
-        for i in range(len(offsets) - 2, -1, -1):
-            if offsets[i] == offsets[i + 1]:
-                orig_tokens[i] = orig_tokens[i + 1]
+            if ch in self.SP_CHAR_MAPPING:
+                ch = self.SP_CHAR_MAPPING.get(ch)
+            else:
+                ch = unicodedata.normalize('NFKC', ch)
+            if self.is_whitespace(ch):
+                continue
+            normalized_text += ch
+            char_mapping.extend([i] * len(ch))
 
-        offset_mapping = []
-        for orig_token, offset in zip(orig_tokens, offsets):
-            offset_mapping += [(offset, offset + len(orig_token))]
-        return offset_mapping
+        text, token_mapping, offset = normalized_text, [], 0
+        for token in split_tokens:
+            if token[:1] == '▁':
+                token = token[1:]
+            start = text[offset:].index(token) + offset
+            end = start + len(token)
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
+            offset = end
+        return token_mapping
 
     @property
     def vocab_size(self):
