@@ -21,14 +21,14 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
+from paddlenlp.data import Stack, Dict, Pad
+from datasets import load_dataset
 from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=400, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_len", default=400, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=6, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=3e-6, type=float, help="The initial learning rate for Adam.")
@@ -48,11 +48,7 @@ def set_seed(seed):
     paddle.seed(seed)
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    is_test=False,
-                    dataset_name="chnsenticorp"):
+def convert_example_to_feature(example, tokenizer, max_seq_len=512, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -81,25 +77,23 @@ def convert_example(example,
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-        dataset_name((obj:`str`, defaults to "chnsenticorp"): The dataset name, "chnsenticorp" or "sst-2".
-
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    encoded_inputs = tokenizer(text=example["text"],
-                               text_pair=example["text_pair"],
-                               max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=example["text_a"],
+                               text_pair=example["text_b"],
+                               max_seq_len=max_seq_len)
 
     input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
     token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
 
     if not is_test:
         label = np.array([example["label"]], dtype="int64")
-        return input_ids, token_type_ids, label
+        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "label":label}
     else:
-        return input_ids, token_type_ids
+        return {"input_ids":input_ids, "token_type_ids":token_type_ids}
 
 
 def create_dataloader(dataset,
@@ -133,20 +127,24 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds = load_dataset("seabsa16", "phns", splits=["train"])
+    train_ds, = load_dataset("seabsa16", "phns", split=["train"])
 
     model = SkepForSequenceClassification.from_pretrained(
-        'skep_ernie_1.0_large_ch', num_classes=len(train_ds.label_list))
+        'skep_ernie_1.0_large_ch', num_classes=2)
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
-    trans_func = partial(convert_example,
+    trans_func = partial(convert_example_to_feature,
                          tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(dtype="int64")  # labels
-    ): [data for data in fn(samples)]
+                         max_seq_len=args.max_seq_len)
+
+    batchify_fn = lambda samples, fn=Dict({
+            "input_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_id), # input_ids
+            "token_type_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
+            "label":
+            Stack(dtype="int64") # labels
+        }): fn(samples)
 
     train_data_loader = create_dataloader(train_ds,
                                           mode='train',
