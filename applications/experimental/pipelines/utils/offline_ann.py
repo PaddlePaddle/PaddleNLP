@@ -30,7 +30,9 @@ def offline_ann(index_name, doc_dir):
                                                 index=index_name)
 
     # 将每篇文档按照段落进行切分
-    dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
+    dicts = convert_files_to_dicts(dir_path=doc_dir,
+                                   split_paragraphs=True,
+                                   encoding='utf-8')
 
     print(dicts[:3])
 
