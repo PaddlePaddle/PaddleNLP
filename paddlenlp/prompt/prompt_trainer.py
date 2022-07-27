@@ -1,6 +1,8 @@
-import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from sklearn.metrics import f1_score
+from functools import partial
+import os
+import copy
 import numpy as np
 import collections
 import paddle
@@ -19,7 +21,7 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 
 from .template import Template
 from .verbalizer import Verbalizer
-from .prompt_utils import InputFeatures, signature
+from .prompt_utils import InputFeatures, InputExample, signature
 from .prompt_tokenizer import MLMTokenizerWrapper
 from .prompt_args import PromptTuningArguments
 
@@ -39,6 +41,7 @@ class PromptTrainer(Trainer):
                  tokenizer: PretrainedTokenizer,
                  criterion: Union[nn.Layer],
                  args: PromptTuningArguments = None,
+                 convert_fn: Callable = None,
                  data_collator: Optional[DataCollator] = None,
                  train_dataset: Optional[MapDataset] = None,
                  eval_dataset: Optional[MapDataset] = None,
@@ -48,7 +51,6 @@ class PromptTrainer(Trainer):
                  optimizers: Tuple[paddle.optimizer.Optimizer,
                                    paddle.optimizer.lr.LRScheduler] = (None,
                                                                        None)):
-
         if args is None:
             output_dir = "tmp_trainer"
             logger.info(
@@ -83,6 +85,12 @@ class PromptTrainer(Trainer):
                 max_seq_length, tokenizer)
         else:
             raise ValueError("Unsupported pretrained model {}")
+
+        if convert_fn is None:
+            self.convert_fn = partial(self._default_label_mapping,
+                                      self.verbalizer.labels_to_ids)
+        else:
+            self.convert_fn = partial(convert_fn, self.verbalizer.labels_to_ids)
 
         self.train_dataset = self._map_dataset(self.train_dataset)
         self.eval_dataset = self._map_dataset(self.eval_dataset)
@@ -135,10 +143,16 @@ class PromptTrainer(Trainer):
                 type(dataset)))
         return dataset.map(self._convert_example)
 
+    def _default_label_mapping(self, labels_to_ids, example):
+        if isinstance(example, InputExample):
+            wrapped = copy.deepcopy(example)
+            wrapped.labels = labels_to_ids[wrapped.labels]
+            return wrapped
+        else:
+            raise TypeError('InputExample')
+
     def _convert_example(self, example):
-        if self.verbalizer is not None and hasattr(self.verbalizer,
-                                                   'wrap_one_example'):
-            example = self.verbalizer.wrap_one_example(example)
+        example = self.convert_fn(example)
         example = self.template.wrap_one_example(example)
         encoded_inputs = InputFeatures(
             **self.tokenizer_wrapper.tokenize_one_example(example),

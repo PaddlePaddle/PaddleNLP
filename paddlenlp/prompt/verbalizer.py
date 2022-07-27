@@ -278,21 +278,12 @@ class ManualVerbalizer(Verbalizer):
         label_logits = self.aggregate(word_logits, self.word_ids_mask)
         return label_logits
 
-    def wrap_one_example(self, example):
-        """ Process labels in InputExample According to the predefined verbalizer. """
-        if isinstance(example, InputExample):
-            wrapped = copy.deepcopy(example)
-            wrapped.labels = self.labels_to_ids[example.labels]
-            return wrapped
-        else:
-            raise TypeError('InputExample')
-
     @classmethod
-    def from_file(cls, tokenizer, label_file):
+    def from_file(cls, tokenizer, label_file, delimiter="=="):
         with open(label_file, "r", encoding="utf-8") as fp:
             label_words = defaultdict(list)
             for line in fp:
-                data = line.strip().split("==")
+                data = line.strip().split(delimiter)
                 word = data[1] if len(data) > 1 else data[0]
                 label_words[data[0]].append(word)
         return cls(tokenizer,
@@ -301,6 +292,10 @@ class ManualVerbalizer(Verbalizer):
 
 
 class Identity(nn.Layer):
+    """
+    Identity layer to replace the last linear layer in MLM model, which
+    outputs the input `sequence_output` directly.
+    """
 
     def __init__(self):
         super().__init__()
@@ -405,15 +400,6 @@ class SoftVerbalizer(Verbalizer):
             mask_ids = inputs["mask_ids"]
             logits = logits[mask_ids == 1]
         return self.head(logits)
-
-    def wrap_one_example(self, example):
-        """ Process labels in InputExample According to the predefined verbalizer. """
-        if isinstance(example, InputExample):
-            wrapped = copy.deepcopy(example)
-            wrapped.labels = self.labels_to_ids[example.labels]
-            return wrapped
-        else:
-            raise TypeError('InputExample')
 
     @classmethod
     def from_file(cls, tokenizer, model, label_file):
