@@ -59,7 +59,10 @@ def predict(model, data_loader, id2label):
     return results
 
 
-def convert_example_to_feature(example, tokenizer, max_seq_len=512, is_test=False):
+def convert_example_to_feature(example,
+                               tokenizer,
+                               max_seq_len=512,
+                               is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -102,9 +105,13 @@ def convert_example_to_feature(example, tokenizer, max_seq_len=512, is_test=Fals
 
     if not is_test:
         label = np.array([example["label"]], dtype="int64")
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "label":label}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "label": label
+        }
     else:
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids}
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids}
 
 
 def create_dataloader(dataset,
@@ -146,11 +153,11 @@ if __name__ == "__main__":
                          is_test=True)
 
     batchify_fn = lambda samples, fn=Dict({
-            "input_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_id), # input_ids
-            "token_type_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id) # token_type_ids
-        }): fn(samples)
+        "input_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        "token_type_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id)  # token_type_ids
+    }): fn(samples)
 
     test_data_loader = create_dataloader(test_ds,
                                          mode='test',

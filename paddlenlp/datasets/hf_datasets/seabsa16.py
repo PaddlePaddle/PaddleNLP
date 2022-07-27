@@ -23,9 +23,7 @@ import numpy as np
 
 import datasets
 
-
 logger = datasets.logging.get_logger(__name__)
-
 
 _CITATION = """\
 @inproceedings{pontiki2016semeval,
@@ -44,12 +42,11 @@ More information refer to https://www.luge.ai/#/luge/dataDetail?id=18.
 
 _SEABSA16_URLs = {
     # pylint: disable=line-too-long
-    "came":
-    "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_CAME.zip",
-    "phns":
-    "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_PHNS.zip",
+    "came": "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_CAME.zip",
+    "phns": "https://paddlenlp.bj.bcebos.com/datasets/SE-ABSA16_PHNS.zip",
     # pylint: enable=line-too-long
 }
+
 
 class SEABSA16Config(datasets.BuilderConfig):
     """BuilderConfig for SEABSA16."""
@@ -75,16 +72,14 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             name="came",
             data_url=_SEABSA16_URLs["came"],
             data_dir="SE-ABSA16_CAME",
-            version = datasets.Version("1.0.0", ""),
+            version=datasets.Version("1.0.0", ""),
             description="SE-ABSA16-CAME data about camera.",
         ),
-        SEABSA16Config(
-            name="phns",
-            data_url=_SEABSA16_URLs["phns"],
-            data_dir="SE-ABSA16_PHNS",
-            version = datasets.Version("1.0.0", ""),
-            description="SE-ABSA16-PHNS data about phone."
-        ),
+        SEABSA16Config(name="phns",
+                       data_url=_SEABSA16_URLs["phns"],
+                       data_dir="SE-ABSA16_PHNS",
+                       version=datasets.Version("1.0.0", ""),
+                       description="SE-ABSA16-PHNS data about phone."),
     ]
 
     def _info(self):
@@ -99,30 +94,30 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             description=_DESCRIPTION,
             features=datasets.Features(features),
             homepage="https://www.luge.ai/#/luge/dataDetail?id=18",
-            citation=_CITATION
-        )
+            citation=_CITATION)
 
     def _split_generators(self, dl_manager):
-        downloaded_dir = dl_manager.download_and_extract(self.config.data_url)  
+        downloaded_dir = dl_manager.download_and_extract(self.config.data_url)
         data_dir = os.path.join(downloaded_dir, self.config.data_dir)
 
-        train_split = datasets.SplitGenerator(
-            name=datasets.Split.TRAIN,
-            gen_kwargs={
-                "filepath": os.path.join(data_dir, "train.tsv"),
-                "split": "train"
-            }
-        )
-        test_split = datasets.SplitGenerator(
-            name=datasets.Split.TEST,
-            gen_kwargs={
-                "filepath": os.path.join(data_dir, "test.tsv"),
-                "split": "test"
-            }
-        )
-        
+        train_split = datasets.SplitGenerator(name=datasets.Split.TRAIN,
+                                              gen_kwargs={
+                                                  "filepath":
+                                                  os.path.join(
+                                                      data_dir, "train.tsv"),
+                                                  "split":
+                                                  "train"
+                                              })
+        test_split = datasets.SplitGenerator(name=datasets.Split.TEST,
+                                             gen_kwargs={
+                                                 "filepath":
+                                                 os.path.join(
+                                                     data_dir, "test.tsv"),
+                                                 "split":
+                                                 "test"
+                                             })
+
         return [train_split, test_split]
-            
 
     def _generate_examples(self, filepath, split):
         """This function returns the examples in the raw (text) form."""
@@ -130,7 +125,7 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
 
         with open(filepath, encoding="utf8") as f:
             reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
-            
+
             for idx, row in enumerate(reader):
                 example = {}
                 example["id"] = idx

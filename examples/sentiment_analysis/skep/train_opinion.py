@@ -98,7 +98,11 @@ def convert_example_to_feature(example,
     seq_len = tokenized_input['seq_len']
 
     if is_test:
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "seq_len": seq_len
+        }
     else:
         # processing label
         start_idx = text.find(label)
@@ -108,10 +112,16 @@ def convert_example_to_feature(example,
             for idx in range(start_idx + 1, start_idx + len(label)):
                 encoded_label[idx] = label2id["I"]
         encoded_label = encoded_label[:(max_seq_len - 2)]
-        encoded_label = np.array([label2id["O"]] + encoded_label + [label2id["O"]],
+        encoded_label = np.array([label2id["O"]] + encoded_label +
+                                 [label2id["O"]],
                                  dtype="int64")
 
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len, "label":encoded_label}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "seq_len": seq_len,
+            "label": encoded_label
+        }
 
 
 def create_dataloader(dataset,
@@ -144,15 +154,16 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds, = load_dataset("cote", "dp", split=['train',])
+    train_ds, = load_dataset("cote", "dp", split=[
+        'train',
+    ])
     label_list = ["B", "I", "O"]
     # The COTE_DP dataset labels with "BIO" schema.
     label2id = {label: idx for idx, label in enumerate(label_list)}
 
     set_seed(args.seed)
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
-    model = SkepCrfForTokenClassification(skep,
-                                          num_classes=len(label_list))
+    model = SkepCrfForTokenClassification(skep, num_classes=len(label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     trans_func = partial(convert_example_to_feature,
@@ -161,15 +172,14 @@ if __name__ == "__main__":
                          label2id=label2id,
                          is_test=False)
 
-    batchify_fn = lambda samples, fn=Dict({
-            "input_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids
-            "token_type_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
-            "seq_len":
-            Stack(dtype='int64'),  # sequence lens
-            "label":
-            Pad(axis=0, pad_val=label2id["O"]), # labels
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id
+                             ),  # input ids
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id
+                                  ),  # token_type_ids
+            "seq_len": Stack(dtype='int64'),  # sequence lens
+            "label": Pad(axis=0, pad_val=label2id["O"]),  # labels
         }): fn(samples)
 
     train_data_loader = create_dataloader(train_ds,

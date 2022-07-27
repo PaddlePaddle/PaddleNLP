@@ -23,9 +23,7 @@ import numpy as np
 
 import datasets
 
-
 logger = datasets.logging.get_logger(__name__)
-
 
 _CITATION = """\
 @article{tan2008empirical,
@@ -66,7 +64,7 @@ class ChnSentiCorp(datasets.GeneratorBasedBuilder):
     BUILDER_CONFIGS = [
         ChnSentiCorpConfig(
             name="chnsenticorp",
-            version = datasets.Version("1.0.0", ""),
+            version=datasets.Version("1.0.0", ""),
             description="COTE-BD crawled on baidu.",
         )
     ]
@@ -82,39 +80,40 @@ class ChnSentiCorp(datasets.GeneratorBasedBuilder):
             description=_DESCRIPTION,
             features=datasets.Features(features),
             homepage="https://www.luge.ai/#/luge/dataDetail?id=25",
-            citation=_CITATION
-        )
+            citation=_CITATION)
 
     def _split_generators(self, dl_manager):
-        downloaded_dir = dl_manager.download_and_extract(_URL)  
+        downloaded_dir = dl_manager.download_and_extract(_URL)
         data_dir = os.path.join(downloaded_dir, "ChnSentiCorp")
 
-        train_split = datasets.SplitGenerator(
-            name=datasets.Split.TRAIN,
-            gen_kwargs={
-                "filepath": os.path.join(data_dir, "train.tsv"),
-                "split": "train"
-            }
-        )
+        train_split = datasets.SplitGenerator(name=datasets.Split.TRAIN,
+                                              gen_kwargs={
+                                                  "filepath":
+                                                  os.path.join(
+                                                      data_dir, "train.tsv"),
+                                                  "split":
+                                                  "train"
+                                              })
 
-        dev_split = datasets.SplitGenerator(
-            name=datasets.Split.VALIDATION,
-            gen_kwargs={
-                "filepath": os.path.join(data_dir, "dev.tsv"),
-                "split": "dev"
-            }
-        )
+        dev_split = datasets.SplitGenerator(name=datasets.Split.VALIDATION,
+                                            gen_kwargs={
+                                                "filepath":
+                                                os.path.join(
+                                                    data_dir, "dev.tsv"),
+                                                "split":
+                                                "dev"
+                                            })
 
-        test_split = datasets.SplitGenerator(
-            name=datasets.Split.TEST,
-            gen_kwargs={
-                "filepath": os.path.join(data_dir, "test.tsv"),
-                "split": "test"
-            }
-        )
-        
+        test_split = datasets.SplitGenerator(name=datasets.Split.TEST,
+                                             gen_kwargs={
+                                                 "filepath":
+                                                 os.path.join(
+                                                     data_dir, "test.tsv"),
+                                                 "split":
+                                                 "test"
+                                             })
+
         return [train_split, dev_split, test_split]
-            
 
     def _generate_examples(self, filepath, split):
         """This function returns the examples in the raw (text) form."""
@@ -122,7 +121,7 @@ class ChnSentiCorp(datasets.GeneratorBasedBuilder):
 
         with open(filepath, encoding="utf8") as f:
             reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
-            
+
             for idx, row in enumerate(reader):
                 example = {}
                 example["id"] = idx

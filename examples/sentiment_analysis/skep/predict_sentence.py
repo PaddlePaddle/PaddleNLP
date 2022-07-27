@@ -36,10 +36,10 @@ args = parser.parse_args()
 
 
 def convert_example_to_feature(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_len=512,
-                    is_test=False):
+                               tokenizer,
+                               label_list,
+                               max_seq_len=512,
+                               is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
