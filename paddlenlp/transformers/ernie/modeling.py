@@ -16,19 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    ModelOutput,
-)
 
 __all__ = [
     'ErnieModel', 'ErniePretrainedModel', 'ErnieForSequenceClassification',
@@ -79,25 +67,32 @@ class ErnieEmbeddings(nn.Layer):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                task_type_ids=None):
+                task_type_ids=None,
+                inputs_embeds=None):
+        if input_ids is not None:
+            input_shape = input_ids.shape
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = inputs_embeds.shape[:-1]
+            input_embeddings = inputs_embeds
+
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             #seq_length = input_ids.shape[1]
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
             position_ids.stop_gradient = True
         if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
-        input_embedings = self.word_embeddings(input_ids)
+            token_type_ids = paddle.zeros(input_shape, dtype="int64")
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = input_embeddings + position_embeddings + token_type_embeddings
         if self.use_task_id:
             if task_type_ids is None:
-                task_type_ids = paddle.ones_like(input_ids,
-                                                 dtype="int64") * self.task_id
+                task_type_ids = paddle.ones(input_shape,
+                                            dtype="int64") * self.task_id
             task_type_embeddings = self.task_type_embeddings(task_type_ids)
             embeddings = embeddings + task_type_embeddings
         embeddings = self.layer_norm(embeddings)
@@ -595,9 +590,7 @@ class ErnieModel(ErniePretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 task_type_ids=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -632,6 +625,9 @@ class ErnieModel(ErniePretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
 
         Returns:
             tuple: Returns tuple (``sequence_output``, ``pooled_output``).
@@ -661,6 +657,18 @@ class ErnieModel(ErniePretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time"
+            )
+        elif input_ids is not None:
+            input_shape = input_ids.shape
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.shape[:-1]
+        else:
+            raise ValueError(
+                "You have to specify either input_ids or inputs_embeds")
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
@@ -676,29 +684,13 @@ class ErnieModel(ErniePretrainedModel):
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,
                                            token_type_ids=token_type_ids,
-                                           task_type_ids=task_type_ids)
+                                           task_type_ids=task_type_ids,
+                                           inputs_embeds=inputs_embeds)
 
-        encoder_outputs = self.encoder(
-            embedding_output,
-            src_mask=attention_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
-        if isinstance(encoder_outputs, type(embedding_output)):
-            sequence_output = encoder_outputs
-            pooled_output = self.pooler(sequence_output)
-            return (sequence_output, pooled_output)
-        else:
-            sequence_output = encoder_outputs[0]
-            pooled_output = self.pooler(sequence_output)
-            if not return_dict:
-                return (sequence_output, pooled_output) + encoder_outputs[1:]
-            return BaseModelOutputWithPoolingAndCrossAttentions(
-                last_hidden_state=sequence_output,
-                pooler_output=pooled_output,
-                past_key_values=encoder_outputs.past_key_values,
-                hidden_states=encoder_outputs.hidden_states,
-                attentions=encoder_outputs.attentions)
+        encoder_outputs = self.encoder(embedding_output, attention_mask)
+        sequence_output = encoder_outputs
+        pooled_output = self.pooler(sequence_output)
+        return sequence_output, pooled_output
 
 
 class ErnieForSequenceClassification(ErniePretrainedModel):
@@ -732,9 +724,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -744,6 +734,8 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
 
         Returns:
@@ -764,29 +756,15 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.ernie(input_ids,
-                             token_type_ids=token_type_ids,
-                             position_ids=position_ids,
-                             attention_mask=attention_mask,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
-        pooled_output = outputs[1]
+        _, pooled_output = self.ernie(input_ids,
+                                      token_type_ids=token_type_ids,
+                                      position_ids=position_ids,
+                                      attention_mask=attention_mask,
+                                      inputs_embeds=inputs_embeds)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-
-        loss = None
-        if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
-
-        return SequenceClassifierOutput(
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        return logits
 
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):
@@ -811,9 +789,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -823,6 +799,8 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
 
 
@@ -853,32 +831,17 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.ernie(input_ids,
-                             token_type_ids=token_type_ids,
-                             position_ids=position_ids,
-                             attention_mask=attention_mask,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
-
-        sequence_output = outputs[0]
+        sequence_output, _ = self.ernie(input_ids,
+                                        token_type_ids=token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask,
+                                        inputs_embeds=inputs_embeds)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        total_loss = None
-        if not return_dict:
-            output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
-
-        return QuestionAnsweringModelOutput(
-            start_logits=start_logits,
-            end_logits=end_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        return start_logits, end_logits
 
 
 class ErnieForTokenClassification(ErniePretrainedModel):
@@ -912,9 +875,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -924,6 +885,8 @@ class ErnieForTokenClassification(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
 
         Returns:
@@ -943,30 +906,15 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        outputs = self.ernie(input_ids,
-                             token_type_ids=token_type_ids,
-                             position_ids=position_ids,
-                             attention_mask=attention_mask,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
-
-        sequence_output = outputs[0]
+        sequence_output, _ = self.ernie(input_ids,
+                                        token_type_ids=token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask,
+                                        inputs_embeds=inputs_embeds)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-
-        loss = None
-        if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
-
-        return TokenClassifierOutput(
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        return logits
 
 
 class ErnieLMPredictionHead(nn.Layer):
@@ -1037,37 +985,6 @@ class ErniePretrainingHeads(nn.Layer):
         return prediction_scores, seq_relationship_score
 
 
-@dataclass
-class ErnieForPreTrainingOutput(ModelOutput):
-    """
-    Output type of [`ErnieForPreTraining`].
-    Args:
-        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
-            Total loss as the sum of the masked language modeling loss and the next sequence prediction
-            (classification) loss.
-        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
-            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
-        seq_relationship_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
-            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
-            before SoftMax).
-        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
-            shape `(batch_size, sequence_length, hidden_size)`.
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
-            sequence_length)`.
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-            heads.
-    """
-
-    loss: Optional[paddle.Tensor] = None
-    prediction_logits: paddle.Tensor = None
-    seq_relationship_logits: paddle.Tensor = None
-    hidden_states: Optional[Tuple[paddle.Tensor]] = None
-    attentions: Optional[Tuple[paddle.Tensor]] = None
-
-
 class ErnieForPretraining(ErniePretrainedModel):
     r"""
     Ernie Model with a `masked language modeling` head and a `sentence order prediction` head
@@ -1097,9 +1014,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1109,6 +1024,8 @@ class ErnieForPretraining(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
 
         Returns:
@@ -1131,26 +1048,11 @@ class ErnieForPretraining(ErniePretrainedModel):
                                  token_type_ids=token_type_ids,
                                  position_ids=position_ids,
                                  attention_mask=attention_mask,
-                                 output_attentions=output_attentions,
-                                 output_hidden_states=output_hidden_states,
-                                 return_dict=return_dict)
+                                 inputs_embeds=inputs_embeds)
             sequence_output, pooled_output = outputs[:2]
             prediction_scores, seq_relationship_score = self.cls(
                 sequence_output, pooled_output, masked_positions)
-
-            total_loss = None
-            if not return_dict:
-                output = (prediction_scores,
-                          seq_relationship_score) + outputs[2:]
-                return ((total_loss, ) +
-                        output) if total_loss is not None else output
-
-            return ErnieForPreTrainingOutput(
-                prediction_logits=prediction_scores,
-                seq_relationship_logits=seq_relationship_score,
-                hidden_states=outputs.hidden_states,
-                attentions=outputs.attentions,
-            )
+            return prediction_scores, seq_relationship_score
 
 
 class ErniePretrainingCriterion(paddle.nn.Layer):
@@ -1250,9 +1152,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
 
         Args:
@@ -1263,6 +1163,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
 
         Returns:
@@ -1291,24 +1193,10 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
+                             inputs_embeds=inputs_embeds)
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
-
-        masked_lm_loss = None
-        if not return_dict:
-            output = (prediction_scores, ) + outputs[2:]
-            return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else (
-                        output[0] if len(output) == 1 else output)
-
-        return MaskedLMOutput(
-            logits=prediction_scores,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        return prediction_scores
 
 
 class ErnieForMultipleChoice(ErniePretrainedModel):
@@ -1341,9 +1229,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                inputs_embeds=None):
         r"""
         The ErnieForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1356,6 +1242,8 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+            inputs_embeds(Tensor, optional):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length, hidden_size].
 
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
@@ -1377,28 +1265,19 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        outputs = self.ernie(input_ids,
-                             token_type_ids=token_type_ids,
-                             position_ids=position_ids,
-                             attention_mask=attention_mask,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
-        pooled_output = outputs[1]
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(
+                shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+
+        _, pooled_output = self.ernie(input_ids,
+                                      token_type_ids=token_type_ids,
+                                      position_ids=position_ids,
+                                      attention_mask=attention_mask,
+                                      inputs_embeds=inputs_embeds)
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape(
             shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
-        loss = None
-        if not return_dict:
-            output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
-
-        return MultipleChoiceModelOutput(
-            logits=reshaped_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        return reshaped_logits
