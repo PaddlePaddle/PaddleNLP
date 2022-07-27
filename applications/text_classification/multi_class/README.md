@@ -4,7 +4,7 @@
    * [二分类/多分类任务介绍](#二分类/多分类任务介绍)
    * [代码结构说明](#代码结构说明)
    * [环境准备](#环境准备)
-   * [多分类数据集准备](#多分类数据集准备)
+   * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
@@ -55,7 +55,6 @@ multi_class/
 ├── predict.py # 预测脚本
 ├── export_model.py # 静态图模型导出脚本
 ├── utils.py # 工具函数脚本
-├── metric.py # metric脚本
 ├── prune.py # 裁剪脚本
 ├── prune_trainer.py # 裁剪API脚本
 └── README.md # 多分类使用说明
@@ -80,7 +79,7 @@ python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
 安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 
-## 多分类数据集准备
+## 数据集准备
 训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。
 
 **指定格式本地数据集目录结构**

@@ -4,7 +4,7 @@
    * [多标签任务介绍](#多标签任务介绍)
    * [代码结构说明](#代码结构说明)
    * [环境准备](#环境准备)
-   * [多标签数据集准备](#多标签数据集准备)
+   * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
@@ -92,7 +92,7 @@ python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
 pip install sklearn
 ```
 
-## 多标签数据集准备
+## 数据集准备
 训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。
 
 **指定格式本地数据集目录结构**
@@ -271,7 +271,7 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 
 5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 32，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
 
-6. 精度评价指标：Micro F1分数、Mcro F1分数
+6. 精度评价指标：Micro F1分数、Macro F1分数
 
 |  model_name  | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
@@ -465,7 +465,7 @@ prune/
 
 5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 32，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
 
-6. 精度评价指标：Accuracy
+6. 精度评价指标：Micro F1分数、Macro F1分数
 
 |                            | Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------- |------------- |

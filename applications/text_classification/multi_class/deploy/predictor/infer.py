@@ -88,56 +88,37 @@ def read_local_dataset(path, label_list):
             yield {'text_a': sentence, 'label': label_list_dict[label]}
 
 
-def predict(data, label_list):
-    """
-    Predicts the data labels.
-    Args:
-
-        data (obj:`List`): The processed data whose each element is one sequence.
-        label_map(obj:`List`): The label id (key) to label str (value) map.
- 
-    """
-    predictor = Predictor(args, label_list)
-    if args.perf:
-
-        eval_dir = os.path.join(args.dataset_dir,
-                                "{}.txt".format(args.perf_dataset))
-        eval_ds = load_dataset(read_local_dataset,
-                               path=eval_dir,
-                               label_list=label_list,
-                               lazy=False)
-
-        texts, labels = predictor.get_text_and_label(eval_ds)
-
-        preprocess_result = predictor.preprocess(texts)
-
-        # evaluate
-        predictor.evaluate(preprocess_result, labels)
-
-        # latency
-        predictor.performance(preprocess_result)
-    else:
-        predictor.predict(data)
-
-
 if __name__ == "__main__":
 
-    data_dir = os.path.join(args.dataset_dir, "data.txt")
-    label_dir = os.path.join(args.dataset_dir, "label.txt")
-
-    data = []
     label_list = []
-
-    with open(data_dir, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-        for i, line in enumerate(lines):
-            data.append(line.strip())
-    f.close()
-
+    label_dir = os.path.join(args.dataset_dir, "label.txt")
     with open(label_dir, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         for i, line in enumerate(lines):
             label_list.append(line.strip())
     f.close()
 
-    predict(data, label_list)
+    predictor = Predictor(args, label_list)
+
+    if args.perf:
+        eval_dir = os.path.join(args.dataset_dir,
+                                "{}.txt".format(args.perf_dataset))
+        eval_ds = load_dataset(read_local_dataset,
+                               path=eval_dir,
+                               label_list=label_list,
+                               lazy=False)
+        texts, labels = predictor.get_text_and_label(eval_ds)
+
+        # preprocess & evaluate & latency
+        preprocess_result = predictor.preprocess(texts)
+        predictor.evaluate(preprocess_result, labels)
+        predictor.performance(preprocess_result)
+    else:
+        data = []
+        data_dir = os.path.join(args.dataset_dir, "data.txt")
+        with open(data_dir, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                data.append(line.strip())
+        f.close()
+        predictor.predict(data)

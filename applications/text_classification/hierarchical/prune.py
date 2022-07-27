@@ -40,10 +40,6 @@ class DataArguments:
     the command line.
     """
 
-    dataset: str = field(
-        default="wos",
-        metadata={"help": "Dataset for hierarchical classfication tasks."})
-
     dataset_dir: str = field(
         default=None,
         metadata={
@@ -76,19 +72,17 @@ class ModelArguments:
             "help":
             "The output directory where the model checkpoints are written."
         })
+    width_mult: str = field(
+        default='2/3',
+        metadata={
+            "help": "The reserved ratio for q, k, v, and ffn weight widths."
+        })
 
 
 def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    f = open("prune_config.json")
-    config = json.load(f)
-    for arg in vars(training_args):
-        if arg in config.keys():
-            setattr(training_args, arg, config[arg])
-
     paddle.set_device(training_args.device)
 
     # Log model and data config
@@ -96,22 +90,14 @@ def main():
     training_args.print_config(data_args, "Data")
 
     # load and preprocess dataset
-    if data_args.dataset_dir is not None:
-        train_dir = os.path.join(data_args.dataset_dir, "train.txt")
-        dev_dir = os.path.join(data_args.dataset_dir, "dev.txt")
-        label_dir = os.path.join(data_args.dataset_dir, "label.txt")
-        train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
-        label_list = {}
-        with open(label_dir, 'r', encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                label_list[line.strip()] = i
-    else:
-        train_ds, dev_ds = load_dataset(data_args.dataset,
-                                        splits=["train", "dev"])
-        label_list = {
-            train_ds.label_list[i]: i
-            for i in range(len(train_ds.label_list))
-        }
+    train_dir = os.path.join(data_args.dataset_dir, "train.txt")
+    dev_dir = os.path.join(data_args.dataset_dir, "dev.txt")
+    label_dir = os.path.join(data_args.dataset_dir, "label.txt")
+    train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
+    label_list = {}
+    with open(label_dir, 'r', encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            label_list[line.strip()] = i
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.params_dir)
@@ -140,7 +126,9 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2 / 3))
+    trainer.prune(
+        output_dir,
+        prune_config=DynabertConfig(width_mult=eval(model_args.width_mult)))
 
 
 if __name__ == "__main__":

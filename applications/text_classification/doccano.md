@@ -109,7 +109,8 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/175248039-ce1673f1-9b03-4804-b1cb-29e4b4193f86.png height=300 hspace='15'/>
 </div>
-对于层次分类任务的分类标签我们建议使用标签层次结构中叶结点标签路径作为标签，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
+
+对于层次分类任务的分类标签我们建议使用标签层次结构中**叶结点标签路径作为标签**，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/177095794-0acb9665-3862-4de9-8771-8f424fd4f7b0.png height=300 hspace='15'/>

@@ -58,11 +58,15 @@ python -m paddle_serving_client.convert --help
 ```
 转换成功后的目录如下:
 ```
-serving_server/
-├── float32.pdiparams
-├── float32.pdmodel
-├── serving_server_conf.prototxt
-└── serving_server_conf.stream.prototxt
+paddle_serving/
+├──serving_server
+│  ├── float32.pdiparams
+│  ├── float32.pdmodel
+│  ├── serving_server_conf.prototxt
+│  └── serving_server_conf.stream.prototxt
+└──serving_client
+   ├── serving_client_conf.prototxt
+   └── serving_client_conf.stream.prototxt
 ```
 
 ## 部署模型

@@ -74,8 +74,6 @@ python infer.py \
     --dataset_dir "../../data"
 ```
 
-如需使用本地数据集,请指定本地数据集路径参数 `dataset_dir` ，更多本地数据集使用方式详见[以内置数据集格式读取本地数据集](../../README.md)
-
 ## 基于CPU部署推理样例
 
 请使用如下命令进行部署
@@ -93,8 +91,6 @@ python infer.py \
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
 * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-medium-zh"，中文数据集推荐使用"ernie-3.0-medium-zh"。
-* `dataset`：训练数据集;默认为cblue数据集。
-* `task_name`：训练数据集任务;默认为KUAKE-QIC数据集。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `use_quantize`：选择是否开启INT8动态量化进行加速；默认为False。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
@@ -132,9 +128,6 @@ python infer.py \
     --batch_size 32 \
     --dataset_dir "../../data"
 ```
-
-如需使用本地数据集,请指定本地数据集路径参数 `dataset_dir` ，更多本地数据集使用方式详见[以内置数据集格式读取本地数据集](../../README.md)
-
 ## 性能与精度测试
 
 

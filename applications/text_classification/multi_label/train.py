@@ -139,7 +139,6 @@ def train():
         paddle.distributed.init_parallel_env()
 
     # load and preprocess dataset
-
     label_list = {}
     with open(os.path.join(args.dataset_dir, 'label.txt'),
               'r',
