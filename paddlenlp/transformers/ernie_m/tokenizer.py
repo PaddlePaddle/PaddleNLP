@@ -15,9 +15,9 @@
 import os
 
 import sentencepiece as spm
+import unicodedata
 
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import _is_control, _is_whitespace
 
 __all__ = ['ErnieMTokenizer']
 
@@ -105,6 +105,14 @@ class ErnieMTokenizer(PretrainedTokenizer):
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
+        self.SP_CHAR_MAPPING = {}
+
+        for ch in range(65281, 65375):
+            if ch in [ord(u'～')]:
+                self.SP_CHAR_MAPPING[chr(ch)] = chr(ch)
+                continue
+            self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
+
     def __call__(self,
                  text,
                  text_pair=None,
@@ -128,6 +136,33 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return_token_type_ids, return_attention_mask, return_length,
             return_overflowing_tokens, return_special_tokens_mask)
 
+    def get_offset_mapping(self, text):
+        split_tokens = self._tokenize(text)
+        normalized_text, char_mapping = '', []
+
+        for i, ch in enumerate(text):
+
+            if ch in self.SP_CHAR_MAPPING:
+                ch = self.SP_CHAR_MAPPING.get(ch)
+            else:
+                ch = unicodedata.normalize('NFKC', ch)
+            if self.is_whitespace(ch):
+                continue
+            normalized_text += ch
+            char_mapping.extend([i] * len(ch))
+
+        text, token_mapping, offset = normalized_text, [], 0
+        for token in split_tokens:
+            if token[:1] == '▁':
+                token = token[1:]
+            start = text[offset:].index(token) + offset
+            end = start + len(token)
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
+            offset = end
+        return token_mapping
+
     @property
     def vocab_size(self):
         r"""
@@ -140,46 +175,37 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
-        text = text.replace(u"“", u'"')\
-                .replace(u'”', u'"')\
-                .replace(u'‘', "'")\
-                .replace(u'’', u"'")\
-                .replace(u'—', u'-')
-
-        output = []
-        for char in text:
-            if _is_control(char):
-                continue
-            if _is_whitespace(char):
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
+        return ''.join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
-        text = self.clean_text(text)
-
         if not sample:
             pieces = self.sp_model.EncodeAsPieces(text)
         else:
             pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
         new_pieces = []
         for piece in pieces:
-            if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
-                    SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
-                        0] == SPIECE_UNDERLINE:
-                    if len(cur_pieces[0]) == 1:
-                        cur_pieces = cur_pieces[1:]
-                    else:
-                        cur_pieces[0] = cur_pieces[0][1:]
-                cur_pieces.append(piece[-1])
-                new_pieces.extend(cur_pieces)
-            else:
-                new_pieces.append(piece)
-
+            if piece == SPIECE_UNDERLINE:
+                continue
+            lst_i = 0
+            for i, c in enumerate(piece):
+                if c == SPIECE_UNDERLINE:
+                    continue
+                if self.is_ch_char(c) or self.is_punct(c):
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    new_pieces.append(c)
+                    lst_i = i + 1
+                elif c.isdigit() and i > 0 and not piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+                elif not c.isdigit() and i > 0 and piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+            if len(piece) > lst_i:
+                new_pieces.append(piece[lst_i:])
         return new_pieces
 
     def tokenize(self, text):
@@ -291,3 +317,41 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def is_ch_char(self, char):
+        """
+        is_ch_char
+        """
+        if u'\u4e00' <= char <= u'\u9fff':
+            return True
+        return False
+
+    def is_alpha(self, char):
+        """
+        is_alpha
+        """
+        if 'a' <= char <= 'z':
+            return True
+        if 'A' <= char <= 'Z':
+            return True
+        return False
+
+    def is_punct(self, char):
+        """
+        is_punct
+        """
+        if char in u",;:.?!~，；：。？！《》【】":
+            return True
+        return False
+
+    def is_whitespace(self, char):
+        """
+        is whitespace
+        """
+        if char == " " or char == "\t" or char == "\n" or char == "\r":
+            return True
+        if len(char) == 1:
+            cat = unicodedata.category(char)
+            if cat == "Zs":
+                return True
+        return False
