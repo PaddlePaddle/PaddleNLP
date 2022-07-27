@@ -140,7 +140,6 @@ def do_train(args):
                 reader_cost_avg.record(train_reader_cost)
                 batch_cost_avg.record(train_batch_cost)
                 batch_ips_avg.record(train_batch_cost, sample_per_cards)
-                batch_start = time.time()
 
                 benchmark_model.logger(
                     args,
@@ -161,7 +160,8 @@ def do_train(args):
                 reader_cost_avg.record(train_reader_cost)
                 batch_cost_avg.record(train_batch_cost)
                 batch_ips_avg.record(train_batch_cost, sample_per_cards)
-                batch_start = time.time()
+
+            batch_start = time.time()
 
             batch_id += 1
             step_id += 1
