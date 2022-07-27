@@ -193,6 +193,7 @@ def do_train(args):
 
         model_config['num_partitions'] = args.mp_degree
         model_config['use_recompute'] = args.use_recompute
+        model_config['fuse'] = args.fuse_transformer
         if args.pp_degree == 1:
             model = GPTForPretraining(GPTModel(**model_config))
         else:
@@ -341,6 +342,9 @@ def do_train(args):
                                     "c_softmax_with_cross_entropy",
                                     "elementwise_div"
                                 ],
+                                custom_white_list=[
+                                    "fused_attention", "fused_feedforward"
+                                ],
                                 level='O2'):
                             preds = model(
                                 tokens[start_index:end_index, :],
@@ -376,6 +380,9 @@ def do_train(args):
                             custom_black_list=[
                                 "reduce_sum", "c_softmax_with_cross_entropy",
                                 "elementwise_div"
+                            ],
+                            custom_white_list=[
+                                "fused_attention", "fused_feedforward"
                             ],
                             level='O2'):
                         loss = model.train_batch(
