@@ -38,10 +38,10 @@ args = parser.parse_args()
 
 
 def convert_example_to_feature(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_len=512,
-                    is_test=False):
+                               tokenizer,
+                               label_list,
+                               max_seq_len=512,
+                               is_test=False):
     text = example
     encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_len)
     input_ids = np.array(encoded_inputs['input_ids'], dtype="int64")
