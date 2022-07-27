@@ -39,6 +39,16 @@
 
 * 📬 2021.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
 
+## 社区交流
+
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接。
+  - 10G重磅NLP学习大礼包！
+
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+  </div>
+
 ## 特性
 
 #### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
@@ -311,16 +321,6 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 - 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。
-
-## 社区交流
-
-- 微信扫描二维码并填写问卷之后，加入交流群领取福利
-  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接。
-  - 10G重磅NLP学习大礼包！
-
-  <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
-  </div>
 
 
 ## Citation
