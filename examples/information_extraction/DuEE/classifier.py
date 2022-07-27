@@ -284,7 +284,7 @@ def do_predict():
     label_map = load_dict(args.tag_path)
     id2label = {val: key for key, val in label_map.items()}
 
-    model = ErnieForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
     tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
