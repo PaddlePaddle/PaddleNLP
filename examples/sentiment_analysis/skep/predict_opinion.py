@@ -19,14 +19,14 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
+from paddlenlp.data import Stack, Dict, Pad
+from datasets import load_dataset
 from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -34,7 +34,11 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
+def convert_example_to_feature(example,
+                               tokenizer,
+                               label_map,
+                               max_seq_len=512,
+                               is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -57,45 +61,63 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        label_map(obj:`dict`): The label dict that convert label to label_id.
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
+        is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask. 
+        token_type_ids(obj: `list[int]`): List of sequence pair mask.
+        label(obj:`list[int]`, optional): The input label if not test data.
     """
-    tokens = example["tokens"]
-    encoded_inputs = tokenizer(tokens,
-                               return_length=True,
-                               is_split_into_words=True,
-                               max_seq_len=max_seq_length)
-    input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
-    token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
-    seq_len = np.array(encoded_inputs["seq_len"], dtype="int64")
+    text = example['text_a']
+    label = example['label']
+    tokenized_input = tokenizer(list(text),
+                                return_length=True,
+                                is_split_into_words=True,
+                                max_seq_len=max_seq_len)
 
-    return input_ids, token_type_ids, seq_len
+    input_ids = np.array(tokenized_input['input_ids'], dtype="int64")
+    token_type_ids = np.array(tokenized_input['token_type_ids'], dtype="int64")
+    seq_len = tokenized_input['seq_len']
+
+    if is_test:
+        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len}
+    else:
+        # processing label
+        start_idx = text.find(label)
+        encoded_label = [label_map['O']] * len(text)
+        if start_idx != -1:
+            encoded_label[start_idx] = label_map["B"]
+            for idx in range(start_idx + 1, start_idx + len(label)):
+                encoded_label[idx] = label_map["I"]
+        encoded_label = encoded_label[:(max_seq_len - 2)]
+        encoded_label = np.array([label_map["O"]] + encoded_label + [label_map["O"]], dtype="int64")
+
+        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len, "label":encoded_label}
 
 
 @paddle.no_grad()
-def predict(model, data_loader, label_map):
+def predict(model, data_loader, id2label):
     """
     Given a prediction dataset, it gives the prediction results.
 
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
-        label_map(obj:`dict`): The label id (key) to label str (value) map.
+        id2label(obj:`dict`): The label id (key) to label str (value) map.
     """
     model.eval()
     results = []
     for input_ids, token_type_ids, seq_lens in data_loader:
         preds = model(input_ids, token_type_ids, seq_lens=seq_lens)
-        tags = parse_predict_result(preds.numpy(), seq_lens.numpy(), label_map)
+        tags = parse_predict_result(preds.numpy(), seq_lens.numpy(), id2label)
         results.extend(tags)
     return results
 
 
-def parse_predict_result(predictions, seq_lens, label_map):
+def parse_predict_result(predictions, seq_lens, id2label):
     """
     Parses the prediction results to the label tag.
     """
@@ -103,7 +125,7 @@ def parse_predict_result(predictions, seq_lens, label_map):
     for idx, pred in enumerate(predictions):
         seq_len = seq_lens[idx]
         # drop the "[CLS]" and "[SEP]" token
-        tag = [label_map[i] for i in pred[1:seq_len - 1]]
+        tag = [id2label[i] for i in pred[1:seq_len - 1]]
         pred_tag.append(tag)
     return pred_tag
 
@@ -135,15 +157,15 @@ def create_dataloader(dataset,
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    test_ds = load_dataset("cote", "dp", splits=['test'])
+    test_ds, = load_dataset("cote", "dp", split=['test',])
+    label_list = ["B", "I", "O"]
     # The COTE_DP dataset labels with "BIO" schema.
-    label_map = {0: "B", 1: "I", 2: "O"}
-    # `no_entity_label` represents that the token isn't an entity.
-    no_entity_label_idx = 2
+    label_map = {label: idx for idx, label in enumerate(label_list)}
+    id2label = dict([(v, k) for k, v in label_map.items()])
 
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
     model = SkepCrfForTokenClassification(skep,
-                                          num_classes=len(test_ds.label_list))
+                                          num_classes=len(label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -151,15 +173,20 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    trans_func = partial(convert_example,
+    trans_func = partial(convert_example_to_feature,
                          tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
-        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]
-            ),  # token type ids
-        Stack(dtype='int64'),  # sequence lens
-    ): [data for data in fn(samples)]
+                         label_map=label_map,
+                         max_seq_len=args.max_seq_len,
+                         is_test=True)
+
+    batchify_fn = lambda samples, fn=Dict({
+            "input_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids
+            "token_type_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
+            "seq_len":
+            Stack(dtype='int64')  # sequence lens
+        }): fn(samples)
 
     test_data_loader = create_dataloader(test_ds,
                                          mode='test',
@@ -167,7 +194,7 @@ if __name__ == "__main__":
                                          batchify_fn=batchify_fn,
                                          trans_fn=trans_func)
 
-    results = predict(model, test_data_loader, label_map)
-    for idx, example in enumerate(test_ds.data):
-        print(len(example['tokens']), len(results[idx]))
+    results = predict(model, test_data_loader, id2label)
+    for idx, example in enumerate(test_ds):
+        print(len(example['text_a']), len(results[idx]))
         print('Data: {} \t Label: {}'.format(example, results[idx]))
