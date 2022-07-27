@@ -18,7 +18,7 @@ import paddle
 from paddle.metric import Accuracy
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM, export_model
-from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trainer import PdArgumentParser, get_scheduler
 from paddlenlp.prompt import (AutoTemplate, SoftVerbalizer, MLMTokenizerWrapper,
                               PromptTuningArguments, PromptTrainer,
                               PromptModelForClassification, FewShotSampler)
@@ -103,8 +103,25 @@ def main():
         freeze_dropout=training_args.freeze_dropout)
 
     # Only update the prompt-related parameters to reduce memory cost.
+    if training_args.max_steps > 0:
+        num_training_steps = training_args.max_steps
+    else:
+        _train_batch_size = training_args.per_device_train_batch_size
+        _num_train_epochs = training_args.num_train_epochs
+        num_update_per_epoch = len(train_ds) // _train_batch_size
+        num_update_per_epoch //= training_args.gradient_accumulation_steps
+        num_update_per_epoch = max(num_update_per_epoch, 1)
+        num_training_steps = num_update_per_epoch * _num_train_epochs
+    if training_args.warmup_steps > 0:
+        num_warmup_steps = training_args.warmup_steps
+    else:
+        num_warmup_steps = int(training_args.warmup_ratio * num_training_steps)
+
+    lr_scheduler = get_scheduler(training_args.lr_scheduler_type,
+                                 training_args.ppt_learning_rate,
+                                 num_warmup_steps, num_training_steps)
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=training_args.ppt_learning_rate,
+        learning_rate=lr_scheduler,
         parameters=[{
             'params': prompt_model.verbalizer.non_head_parameters()
         }, {
@@ -129,7 +146,7 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
-                            optimizers=[optimizer, None],
+                            optimizers=[optimizer, lr_scheduler],
                             compute_metrics=compute_metrics)
 
     if training_args.do_train:
