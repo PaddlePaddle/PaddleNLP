@@ -83,7 +83,11 @@ def convert_example_to_feature(example,
     seq_len = tokenized_input['seq_len']
 
     if is_test:
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "seq_len": seq_len
+        }
     else:
         # processing label
         start_idx = text.find(label)
@@ -93,9 +97,16 @@ def convert_example_to_feature(example,
             for idx in range(start_idx + 1, start_idx + len(label)):
                 encoded_label[idx] = label_map["I"]
         encoded_label = encoded_label[:(max_seq_len - 2)]
-        encoded_label = np.array([label_map["O"]] + encoded_label + [label_map["O"]], dtype="int64")
+        encoded_label = np.array([label_map["O"]] + encoded_label +
+                                 [label_map["O"]],
+                                 dtype="int64")
 
-        return {"input_ids":input_ids, "token_type_ids":token_type_ids, "seq_len":seq_len, "label":encoded_label}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "seq_len": seq_len,
+            "label": encoded_label
+        }
 
 
 @paddle.no_grad()
@@ -157,15 +168,16 @@ def create_dataloader(dataset,
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    test_ds, = load_dataset("cote", "dp", split=['test',])
+    test_ds, = load_dataset("cote", "dp", split=[
+        'test',
+    ])
     label_list = ["B", "I", "O"]
     # The COTE_DP dataset labels with "BIO" schema.
     label_map = {label: idx for idx, label in enumerate(label_list)}
     id2label = dict([(v, k) for k, v in label_map.items()])
 
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
-    model = SkepCrfForTokenClassification(skep,
-                                          num_classes=len(label_list))
+    model = SkepCrfForTokenClassification(skep, num_classes=len(label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -180,13 +192,13 @@ if __name__ == "__main__":
                          is_test=True)
 
     batchify_fn = lambda samples, fn=Dict({
-            "input_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids
-            "token_type_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
-            "seq_len":
-            Stack(dtype='int64')  # sequence lens
-        }): fn(samples)
+        "input_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids
+        "token_type_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        "seq_len":
+        Stack(dtype='int64')  # sequence lens
+    }): fn(samples)
 
     test_data_loader = create_dataloader(test_ds,
                                          mode='test',

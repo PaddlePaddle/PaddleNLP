@@ -79,10 +79,10 @@ def evaluate(model, criterion, metric, data_loader):
 
 
 def convert_example_to_feature(example,
-                    tokenizer,
-                    max_seq_len=512,
-                    is_test=False,
-                    dataset_name="chnsenticorp"):
+                               tokenizer,
+                               max_seq_len=512,
+                               is_test=False,
+                               dataset_name="chnsenticorp"):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -134,9 +134,13 @@ def convert_example_to_feature(example,
                 f"Got unkown datatset name {dataset_name}, it must be processed on your own."
             )
 
-        return {"input_ids": input_ids, "token_type_ids":token_type_ids, "label":label}
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "label": label
+        }
     else:
-        return {"input_ids": input_ids, "token_type_ids":token_type_ids}
+        return {"input_ids": input_ids, "token_type_ids": token_type_ids}
 
 
 def create_dataloader(dataset,
@@ -172,7 +176,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
     if args.model_name == "skep_ernie_1.0_large_ch":
         dataset_name = "chnsenticorp"
-        train_ds, dev_ds = load_dataset(dataset_name, split=["train", "validation"])
+        train_ds, dev_ds = load_dataset(dataset_name,
+                                        split=["train", "validation"])
     else:
         dataset_name = "sst2"
         train_ds, dev_ds = load_dataset("glue",
@@ -189,13 +194,13 @@ if __name__ == "__main__":
                          max_seq_len=args.max_seq_len,
                          dataset_name=dataset_name)
     batchify_fn = lambda samples, fn=Dict({
-            "input_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_id), # input_ids
-            "token_type_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
-            "label":
-            Stack(dtype="int64") # labels
-        }): fn(samples)
+        "input_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+        "token_type_ids":
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
+        "label":
+        Stack(dtype="int64")  # labels
+    }): fn(samples)
 
     train_data_loader = create_dataloader(train_ds,
                                           mode='train',
