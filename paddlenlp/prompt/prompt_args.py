@@ -35,6 +35,23 @@ class PromptTuningArguments(TrainingArguments):
         metadata={"help": "The task type of prompt tuning. Support "\
                           "`multi-class`, `multi-label` and `hierachical`."})
 
+    max_seq_length: int = field(
+        default=512, metadata={"help": "The maximum length of all input text."})
+    first_max_length: int = field(
+        default=None,
+        metadata={"help": "The maximum length of the first sentence."})
+    other_max_length: int = field(
+        default=None,
+        metadata={"help": "The maximum length of other sentences."})
+    truncate_mode: str = field(
+        default="tail",
+        metadata={
+            "help":
+            "How to truncate input text, `head`, `tail` or "
+            "`manual`. Truncate input text according to "
+            "`first_max_length` and `other_max_length` in the "
+            "manual mode."
+        })
     cls_threshold: float = field(
         default=0.5,
         metadata={"help": "The threshold to select predicted labels for "\
@@ -82,3 +99,6 @@ class PromptTuningArguments(TrainingArguments):
             logger.warning("Ignore `use_rgl` because `alpha_rgl` = 0. Please "\
                            "set `alpha_rgl` a positive float to use RGL loss.")
             self.use_rgl = False
+
+        if self.freeze_dropout:
+            self.freeze_plm = True

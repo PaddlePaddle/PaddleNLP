@@ -138,7 +138,7 @@ class PromptTrainer(Trainer):
     def _convert_example(self, example):
         if self.verbalizer is not None and hasattr(self.verbalizer,
                                                    'wrap_one_example'):
-            exmaple = self.verbalizer.wrap_one_example(example)
+            example = self.verbalizer.wrap_one_example(example)
         example = self.template.wrap_one_example(example)
         encoded_inputs = InputFeatures(
             **self.tokenizer_wrapper.tokenize_one_example(example),
@@ -293,14 +293,15 @@ class PromptModelForClassification(nn.Layer):
         self.plm = model
         self.template = template
         self.verbalizer = verbalizer
+        self.freeze_plm = freeze_plm
         self.freeze_dropout = freeze_dropout
         if self.verbalizer is not None and hasattr(verbalizer, "process_model"):
             self.plm = self.verbalizer.process_model(self.plm)
-        if freeze_dropout:
-            self.plm.eval()
-        if freeze_plm or freeze_dropout:
+        if self.freeze_plm:
             for param in self.plm.parameters():
                 param.stop_gradient = True
+        if self.freeze_dropout:
+            self.plm.eval()
         self.forward_keys = signature(self.plm.forward)
 
     def forward(self, input_ids=None, attention_mask=None, **kwargs):
@@ -328,6 +329,13 @@ class PromptModelForClassification(nn.Layer):
             return outputs, hidden_states
         else:
             return outputs
+
+    def prompt_parameters(self):
+        """
+        Get the parameters of template and verbalizer.
+        """
+        return [p for p in self.template.parameters()
+                ] + [p for p in self.verbalizer.parameters()]
 
     def prompt_state_dict(self, destination=None):
         """

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from collections import defaultdict
 from typing import List, Dict, Union, Callable, Optional
 import os
 import copy
@@ -61,35 +62,38 @@ class Verbalizer(nn.Layer):
             self._labels = None
 
     @property
-    def label_to_words(self):
-        label_to_words = getattr(self, "_label_to_words", None)
-        if label_to_words is None:
-            raise RuntimeError("`label_to_words not set yet.")
-        return label_to_words
+    def label_words(self):
+        label_words = getattr(self, "_label_words", None)
+        if label_words is None:
+            raise RuntimeError("`label_words not set yet.")
+        return label_words
 
-    @label_to_words.setter
-    def label_to_words(self, label_to_words: Union[List, Dict]):
-        if label_to_words is None:
+    @label_words.setter
+    def label_words(self, label_words: Union[List, Dict]):
+        if label_words is None:
             return None
-        if isinstance(label_to_words, dict):
-            new_labels = sorted(list(label_to_words.keys()))
-            if new_labels != self.labels:
+        if isinstance(label_words, dict):
+            new_labels = sorted(list(label_words.keys()))
+            if self._labels is None:
+                self._labels = new_labels
+            elif new_labels != self.labels:
                 raise ValueError(
-                    f"The given `label_to_words` {new_labels} does not match " +
+                    f"The given `label_words` {new_labels} does not match " +
                     f"predefined labels {self.labels}.")
-            self._label_to_words = {k: label_to_words[k] for k in self.labels}
-        elif isinstance(label_to_words, list):
-            if len(self.labels) != len(label_to_words):
+            self._label_words = [label_words[k] for k in self.labels]
+        elif isinstance(label_words, list):
+            if self._labels is None:
                 raise ValueError(
-                    "The length of given `label_to_words` and predefined " +
+                    "`labels` should be set as the given `label_words` is "
+                    "a list. Make sure that the order is compatible.")
+            if len(self.labels) != len(label_words):
+                raise ValueError(
+                    "The length of given `label_words` and predefined " +
                     "labels do not match.")
-            self._label_to_words = {
-                k: v
-                for k, v in zip(self.labels, label_to_words)
-            }
+            self._label_words = label_words
         else:
-            raise TypeError('Unsupported type {} for label_to_words'.format(
-                type(label_to_words)))
+            raise TypeError('Unsupported type {} for label_words'.format(
+                type(label_words)))
         self.process_label_words()
 
     @property
@@ -106,6 +110,20 @@ class Verbalizer(nn.Layer):
                 'Property ids_to_labels has not been set before used.')
         return {i: k for i, k in enumerate(self.labels)}
 
+    @staticmethod
+    def add_prefix(label_words, prefix):
+        """ Add prefix to get expected token ids. """
+        if isinstance(label_words[0], str):
+            label_words = [[word] for word in label_words]
+
+        new_label_words = []
+        for words_per_label in label_words:
+            new_words_per_label = []
+            for word in words_per_label:
+                new_words_per_label.append(prefix + word)
+            new_label_words.append(new_words_per_label)
+        return new_label_words
+
     @abstractmethod
     def process_label_words(self, ):
         """ A hook to process verbalizer when it is set. """
@@ -114,35 +132,43 @@ class Verbalizer(nn.Layer):
     @abstractmethod
     def project(self, logits, **kwargs):
         """ 
-        Project the logits with shape ```[batch_size, vocab_size]``` into
-        label_word_logits with shape ```[batch_size, num_label_words]```.
+        Project the logits with shape ```[..., vocab_size]``` into
+        label_word_logits with shape ```[..., label_words]```.
         """
         raise NotImplementedError
 
     @staticmethod
-    def aggregate(label_words_logits, atype='mean', ndim=2):
+    def aggregate(embeddings, mask=None, atype='mean', ndim=2):
         """
-        Aggregate embeddings when multiple words are mapped to one label.
-        
+        Aggregate embeddings at the last dimension according to `atype`
+        if its number of dimensions is greater than `ndim`.
+        Used to handle multiple tokens for words and multiple words
+        for labels.
+
         Args:
-            label_words_logits (paddle.Tensor):
-                The logits of words which could be mapped to labels.
+            embeddings (paddle.Tensor):
+                The original embeddings.
             atype (str):
                 The aggregation strategy, including mean and first.
             ndim (str):
                 The aggregated embeddings' number of dimensions.
 
         """
-        if label_words_logits.ndim > ndim:
+        if embeddings.ndim > ndim:
             if atype == 'mean':
-                return label_words_logits.mean(axis=-1)
+                if mask is None:
+                    return embeddings.mean(axis=-1)
+                return (embeddings * mask.unsqueeze(0)).sum(
+                    axis=-1) / (mask.unsqueeze(0).sum(axis=-1) + 1e-10)
             elif atype == 'max':
-                return label_words_logits.max(axis=-1)
+                if mask is None:
+                    return embeddings.max(axis=-1)
+                return (embeddings - 1e4 * (1 - mask.unsqueeze(0))).max(axis=-1)
             elif atype == 'first':
-                return label_words_logits[..., 0, :]
+                return embeddings[..., 0]
             else:
                 raise ValueError('Unsupported aggreate type {}'.format(atype))
-        return label_words_logits
+        return embeddings
 
     def normalize(self, logits):
         """ Normalize the logits of every example. """
@@ -158,22 +184,22 @@ class Verbalizer(nn.Layer):
             raise ValueError(f"{path} is not a valid label file.")
         with open(path, 'w') as fp:
             lines = fp.readlines()
-            label_to_words = {}
+            label_words = {}
             if map_type == 'one-to-one':
                 for line in lines:
                     label, word = lines.strip().split()
-                    label_to_words[label] = word
+                    label_words[label] = word
             elif map_type == 'one-to-many':
                 for line in lines:
                     label, word = lines.strip().split()
-                    if label not in label_to_words:
-                        label_to_words[label] = []
-                    label_to_words[label].append(word)
+                    if label not in label_words:
+                        label_words[label] = []
+                    label_words[label].append(word)
             else:
                 raise ValueError(f"Unsupported mapping type {map_type}.")
 
-            self.labels = sorted(list(label_to_words.keys()))
-            self.label_to_words = label_to_words
+            self.labels = sorted(list(label_words.keys()))
+            self.label_words = label_words
 
 
 class ManualVerbalizer(Verbalizer):
@@ -185,44 +211,105 @@ class ManualVerbalizer(Verbalizer):
             The tokenizer of pretrained models.
         labels (list):
             The sequence of all labels.
-        label_to_words (dict or list):
+        label_words (dict or list):
             The dictionary or corresponding list to map labels to words.
         prefix (str):
             The prefix string of words, used in PLMs like RoBERTa, which is sensitive to the prefix.
     """
 
-    def __init__(self, tokenizer, labels=None, label_to_words=None, prefix=''):
+    def __init__(self, tokenizer, labels=None, label_words=None, prefix=None):
         super().__init__(tokenizer=tokenizer, labels=labels)
         self.prefix = prefix
-        self.label_to_words = label_to_words
+        self.label_words = label_words
 
     def process_label_words(self):
-        word_ids = []
-        for label in self.labels:
-            word_ids.append(
-                self.tokenizer.encode(self.prefix + self._label_to_words[label],
-                                      add_special_tokens=False,
-                                      return_token_type_ids=False)['input_ids'])
-        self.word_ids = paddle.to_tensor(word_ids, dtype='int64').squeeze()
-        self.label_to_words_ids = {k: v for k, v in zip(self.labels, word_ids)}
+        """ Create the label-word-token array and its corresponding mask. """
+        if self.prefix is not None:
+            self._label_words = self.add_prefix(self.label_words, self.prefix)
 
-    def process_outputs(self, logits, inputs=None, **kwargs):
-        if inputs is not None:
-            mask_ids = inputs["mask_ids"]
-            logits = logits[mask_ids == 1]
-        label_words_logits = logits.index_select(index=self.word_ids, axis=-1)
-        return label_words_logits
+        all_ids = []
+        for words_per_label in self.label_words:
+            word_ids = []
+            for word in words_per_label:
+                word_ids.append(
+                    self.tokenizer.encode(
+                        word,
+                        add_special_tokens=False,
+                        return_token_type_ids=False)["input_ids"])
+            all_ids.append(word_ids)
+
+        max_num_words = max([len(words) for words in self.label_words])
+        max_num_tokens = max([
+            max([len(token_ids) for token_ids in word_ids])
+            for word_ids in all_ids
+        ])
+        token_ids_shape = [len(self.labels), max_num_words, max_num_tokens]
+        token_ids = np.zeros(shape=token_ids_shape)
+        token_mask = np.zeros(shape=token_ids_shape)
+        word_mask = np.zeros(shape=[len(self.labels), max_num_words])
+        for label_i, ids_per_label in enumerate(all_ids):
+            word_mask[label_i][:len(ids_per_label)] = 1
+            for word_i, ids_per_word in enumerate(ids_per_label):
+                token_ids[label_i][word_i][:len(ids_per_word)] = ids_per_word
+                token_mask[label_i][word_i][:len(ids_per_word)] = 1
+        self.token_ids = paddle.to_tensor(token_ids,
+                                          dtype="int64",
+                                          stop_gradient=True)
+        self.token_ids_mask = paddle.to_tensor(token_mask,
+                                               dtype="int64",
+                                               stop_gradient=True)
+        self.word_ids_mask = paddle.to_tensor(word_mask,
+                                              dtype="float32",
+                                              stop_gradient=True)
+
+    def project(self, logits):
+        word_shape = [*logits.shape[:-1], *self.token_ids.shape]
+        token_logits = logits.index_select(index=self.token_ids.reshape([-1]),
+                                           axis=-1).reshape(word_shape)
+        word_logits = self.aggregate(token_logits, self.token_ids_mask)
+        return word_logits
+
+    def process_outputs(self, logits, inputs, **kwargs):
+        # TODO: support multiple mask ids per sentence.
+        mask_ids = inputs["mask_ids"]
+        logits = logits[mask_ids == 1]
+
+        word_logits = self.project(logits)
+        label_logits = self.aggregate(word_logits, self.word_ids_mask)
+        return label_logits
 
     def wrap_one_example(self, example):
         """ Process labels in InputExample According to the predefined verbalizer. """
         if isinstance(example, InputExample):
-            example.labels = self.labels_to_ids[example.cls_label]
-            return example
+            wrapped = copy.deepcopy(example)
+            wrapped.labels = self.labels_to_ids[example.labels]
+            return wrapped
         else:
             raise TypeError('InputExample')
 
+    @classmethod
+    def from_file(cls, tokenizer, label_file):
+        with open(label_file, "r", encoding="utf-8") as fp:
+            label_words = defaultdict(list)
+            for line in fp:
+                data = line.strip().split("==")
+                word = data[1] if len(data) > 1 else data[0]
+                label_words[data[0]].append(word)
+        return cls(tokenizer,
+                   labels=set(label_words.keys()),
+                   label_words=dict(label_words))
 
-class SoftVerbalizer(ManualVerbalizer):
+
+class Identity(nn.Layer):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, sequence_output, masked_positions=None):
+        return sequence_output
+
+
+class SoftVerbalizer(Verbalizer):
     """
     Soft Verbalizer to encode labels as embeddings.
 
@@ -233,78 +320,49 @@ class SoftVerbalizer(ManualVerbalizer):
             The pretrained language model.
         labels (list):
             The sequence of all labels.
-        label_to_words (dict or list):
+        label_words (dict or list):
             The dictionary or corresponding list to map labels to words.
         prefix (str):
             The prefix string of words, used in PLMs like RoBERTa, which is sensitive to the prefix.
     """
 
-    def __init__(self,
-                 tokenizer,
-                 model,
-                 labels,
-                 label_to_words=None,
-                 prefix=''):
+    LAST_WEIGHT = ["ErnieForMaskedLM", "BertForMaskedLM"]
+    LAST_LINEAR = ["AlbertForMaskedLM", "RobertaForMaskedLM"]
+
+    def __init__(self, tokenizer, model, labels, label_words=None, prefix=''):
         super().__init__(tokenizer=tokenizer, labels=labels)
         self.labels = labels
         self.prefix = prefix
-        self.label_to_words = label_to_words
+        self.label_words = label_words
 
-        head_name = [n for n, p in model.named_children()][-1]
-        logger.info(f"The head module {head_name} will be retrieved.")
-        self.head = copy.deepcopy(getattr(model, head_name))
-        self.head_name = [head_name]
-        if isinstance(self.head, nn.Linear):
-            init_weight = paddle.index_select(self.head.weight,
-                                              self.word_ids,
-                                              axis=1)
-            self.head = nn.Linear(self.head.weight.shape[0],
-                                  len(self.labels),
-                                  bias_attr=False)
-            self.head.weight.set_value(init_weight)
-        else:
-            find_linear = False
-            child_names = [n for n, p in self.head.named_children()][::-1]
-            for name in child_names:
-                module = getattr(self.head, name)
-                if isinstance(module, nn.Linear):
-                    self.head_name.append(name)
-                    setattr(
-                        self.head, name,
-                        nn.Linear(module.weight.shape[0],
-                                  len(self.labels),
-                                  bias_attr=False))
-                    getattr(self.head, name).weight.set_value(
-                        paddle.index_select(module.weight,
-                                            self.word_ids,
-                                            axis=1))
-                    find_linear = True
-                    break
-            if not find_linear:
-                nested_head_name = [
-                    n for n, p in self.head.named_children()
-                    if 'Head' in p.__class__.__name__
-                ][0]
-                nested_head = getattr(self.head, nested_head_name)
-                self.head_name.append(nested_head_name)
-                nested_child_name = [n for n, p in nested_head.named_children()]
-                for name in nested_child_name[::-1]:
-                    module = getattr(nested_head, name)
-                    if isinstance(module, nn.Linear):
-                        self.head_name.append(name)
-                        init_weight = paddle.index_select(module.weight,
-                                                          self.word_ids,
-                                                          axis=1)
-                        setattr(
-                            nested_head, name,
-                            nn.Linear(module.weight.shape[0],
-                                      len(self.labels),
-                                      bias_attr=False))
-                        getattr(nested_head, name).weight.set_value(init_weight)
-                        find_linear = True
-                        break
-            if not find_linear:
-                raise RuntimeError("Can not retrive Linear layer from PLM.")
+        self._extract_head(model)
+
+    def process_label_words(self):
+        """ Create the label-token array and its corresponding mask. """
+        if self.prefix is not None:
+            self._label_words = self.add_prefix(self.label_words, self.prefix)
+
+        all_ids = []
+        for words_per_label in self.label_words:
+            if len(words_per_label) > 1:
+                logger.warning("Only the first word used for every label.")
+            all_ids.append(
+                self.tokenizer.encode(words_per_label[0],
+                                      add_special_tokens=False,
+                                      return_token_type_ids=False)["input_ids"])
+
+        max_num_tokens = max([len(tokens) for tokens in all_ids])
+        token_ids = np.zeros(shape=[len(self.labels), max_num_tokens])
+        token_mask = np.zeros(shape=[len(self.labels), max_num_tokens])
+        for label_i, ids_per_label in enumerate(all_ids):
+            token_ids[label_i][:len(ids_per_label)] = ids_per_label
+            token_mask[label_i][:len(ids_per_label)] = 1
+        self.token_ids = paddle.to_tensor(token_ids,
+                                          dtype="int64",
+                                          stop_gradient=True)
+        self.token_ids_mask = paddle.to_tensor(token_mask,
+                                               dtype="int64",
+                                               stop_gradient=True)
 
     def head_parameters(self):
         if isinstance(self.head, nn.Linear):
@@ -325,12 +383,103 @@ class SoftVerbalizer(ManualVerbalizer):
             ]
 
     def process_model(self, model):
-        setattr(model, self.head_name[0], nn.Identity())
-        return model
+        model_type = model.__class__.__name__
+        modules = [model]
+        for name in self.head_name[:-1]:
+            modules.append(getattr(modules[-1], name))
+
+        if model_type in self.LAST_WEIGHT:
+            setattr(modules[-1], "decoder_bias",
+                    paddle.zeros(shape=[len(self.labels)]))
+        setattr(modules[-1], self.head_name[-1], Identity())
+        assert len(self.head_name) == len(modules)
+        index = len(modules) - 1
+        while index > 0:
+            setattr(modules[index - 1], self.head_name[index - 2],
+                    modules[index])
+            index -= 1
+        return modules[0]
 
     def process_outputs(self, logits, inputs=None, **kwargs):
         if inputs is not None:
             mask_ids = inputs["mask_ids"]
             logits = logits[mask_ids == 1]
-        label_words_logits = logits.index_select(index=self.word_ids, axis=-1)
         return self.head(logits)
+
+    def wrap_one_example(self, example):
+        """ Process labels in InputExample According to the predefined verbalizer. """
+        if isinstance(example, InputExample):
+            wrapped = copy.deepcopy(example)
+            wrapped.labels = self.labels_to_ids[example.labels]
+            return wrapped
+        else:
+            raise TypeError('InputExample')
+
+    @classmethod
+    def from_file(cls, tokenizer, model, label_file):
+        with open(label_file, "r", encoding="utf-8") as fp:
+            label_words = defaultdict(list)
+            for line in fp:
+                data = line.strip().split("==")
+                word = data[1] if len(data) > 1 else data[0]
+                label_words[data[0]].append(word)
+        return cls(tokenizer,
+                   model,
+                   labels=set(label_words.keys()),
+                   label_words=dict(label_words))
+
+    def _extract_head(self, model):
+        model_type = model.__class__.__name__
+        self.head_name = []
+        if model_type in self.LAST_LINEAR:
+            # LMHead
+            last_name = [n for n, p in model.named_children()][-1]
+            self.head = copy.deepcopy(getattr(model, last_name))
+            self.head_name.append(last_name)
+            head_names = [n for n, p in self.head.named_children()][::-1]
+            for name in head_names:
+                module = getattr(self.head, name)
+                if isinstance(module, nn.Linear):
+                    self.head_name.append(name)
+                    setattr(
+                        self.head, name,
+                        nn.Linear(module.weight.shape[0],
+                                  len(self.labels),
+                                  bias_attr=False))
+                    getattr(self.head, name).weight.set_value(
+                        self._create_init_weight(module.weight))
+                    break
+        elif model_type in self.LAST_WEIGHT:
+            # OnlyMLMHead
+            last_name = [n for n, p in model.named_children()][-1]
+            head = getattr(model, last_name)
+            self.head_name.append(last_name)
+            # LMPredictionHead
+            last_name = [n for n, p in head.named_children()][-1]
+            self.head = copy.deepcopy(getattr(head, last_name))
+            head_names = [n for n, p in self.head.named_children()][::-1]
+            self.head_name.append(last_name)
+            for name in head_names:
+                if name == 'decoder_weight':
+                    module = getattr(self.head, name)
+                    self.head_name.append(name)
+                    setattr(
+                        self.head, name,
+                        nn.Linear(module.weight.shape[0],
+                                  len(self.labels),
+                                  bias_attr=False))
+                    getattr(self.head, name).weight.set_value(
+                        self._create_init_weight(module.weight))
+                    break
+        else:
+            raise NotImplementedError(
+                f"Please open an issue to request for support of {model_type}" +
+                f" or contribute to PaddleNLP.")
+
+    def _create_init_weight(self, module_weight):
+        word_shape = [module_weight.shape[0], *self.token_ids.shape]
+        word_weight = paddle.index_select(module_weight,
+                                          self.token_ids.reshape([-1]),
+                                          axis=1).reshape(word_shape)
+        label_weight = self.aggregate(word_weight, self.token_ids_mask)
+        return label_weight
