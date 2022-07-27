@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from collections import defaultdict
 import os
 import csv
 import json
@@ -39,10 +40,8 @@ class InputExample(object):
     text_b: str = field(
         default=None,
         metadata={'help': 'The other text sequences in each example.'})
-    cls_label: int = field(
-        default=None, metadata={'help': 'The label of classification tasks.'})
-    seq_label: list = field(default=None,
-                            metadata={'help': 'The label of generation tasks.'})
+    labels: int = field(default=None,
+                        metadata={'help': 'The label in each example.'})
     meta: dict = field(
         default=None,
         metadata={
@@ -76,16 +75,14 @@ class InputFeatures(dict):
             The embeddings of soft tokens.
         mask_ids (paddle.Tensor, optional):
             The mask ids where 1 denotes that a token is a mask, 0 denotes it is not a mask.
-        cls_label (list, optional):
-            The label of classification task.
-        seq_label (list, optional):
-            The label of generation task.
+        labels (list, optional):
+            The labels of classification task.
         uid (list, optional):
             The unique id(s) for example(s).
     """
     input_keys = [
         'input_ids', 'attention_mask', 'token_type_ids', 'inputs_embeds', 'uid',
-        'cls_label', 'seq_label', 'labels', 'mask_ids', 'soft_token_ids'
+        'labels', 'mask_ids', 'soft_token_ids'
     ]
     tensorable = [
         'input_ids', 'attention_mask', 'token_type_ids', 'inputs_embeds',
@@ -99,8 +96,6 @@ class InputFeatures(dict):
                  inputs_embeds=None,
                  mask_ids=None,
                  labels=None,
-                 cls_label=None,
-                 seq_label=None,
                  uid=None,
                  soft_token_ids=None):
         self.input_ids = input_ids
@@ -108,8 +103,6 @@ class InputFeatures(dict):
         self.token_type_ids = token_type_ids
         self.inputs_embeds = inputs_embeds
         self.labels = labels
-        self.cls_label = cls_label
-        self.seq_label = seq_label
         self.mask_ids = mask_ids
         self.uid = uid
         self.soft_token_ids = soft_token_ids
@@ -248,10 +241,9 @@ class FewShotSampler(object):
         """
         self.rng = np.random.RandomState(seed)
         indices = np.arange(len(train_dataset))
-        labels = [x.cls_label for x in train_dataset]
-        train_indices = self._sample_per_label(indices, labels,
-                                               self.num_sample_per_label,
-                                               self.num_sample_total)
+        labels = [x.labels for x in train_dataset]
+        train_indices = self._sample(indices, labels, self.num_sample_per_label,
+                                     self.num_sample_total)
         logger.info(f"{len(train_indices)} examples sampled for train dataset.")
         train_ds = MapDataset([train_dataset[i] for i in train_indices],
                               label_list=train_dataset.label_list)
@@ -260,10 +252,10 @@ class FewShotSampler(object):
             return train_ds
 
         indices = np.arange(len(dev_dataset))
-        labels = [x.cls_label for x in dev_dataset]
-        eval_indices = self._sample_per_label(indices, labels,
-                                              self.eval_num_sample_per_label,
-                                              self.eval_num_sample_total)
+        labels = [x.labels for x in dev_dataset]
+        eval_indices = self._sample(indices, labels,
+                                    self.eval_num_sample_per_label,
+                                    self.eval_num_sample_total)
         logger.info(f"{len(train_indices)} examples sampled for train dataset.")
         dev_ds = MapDataset([dev_dataset[i] for i in eval_indices],
                             label_list=dev_dataset.label_list)
@@ -275,7 +267,7 @@ class FewShotSampler(object):
         """
         self.rng = np.random.RandomState(seed)
         total_indices = np.arange(len(dataset))
-        total_labels = [x.cls_label for x in dataset]
+        total_labels = [x.labels for x in dataset]
         train_indices = self._sample(total_indices, total_labels,
                                      self.num_sample_per_label,
                                      self.num_sample_total)
@@ -459,7 +451,7 @@ class DefaultProcessor(DataProcessor):
                 InputExample(uid='%s-%d' % (split, i),
                              text_a=line['sentence'],
                              text_b=None,
-                             cls_label=line['label']))
+                             labels=line['label']))
         return examples
 
 
@@ -478,7 +470,7 @@ class BoolQProcessor(DataProcessor):
                 InputExample(uid='%s-%d' % (split, i),
                              text_a=line['passage'],
                              text_b=line['question'],
-                             cls_label=str(line['label'])))
+                             labels=str(line['label'])))
 
         return examples
 
@@ -498,7 +490,7 @@ class Sst2Processor(DataProcessor):
                 InputExample(uid='%s-%d' % (split, i),
                              text_a=line[0],
                              text_b=None,
-                             cls_label=line[1]))
+                             labels=line[1]))
         return examples
 
 
