@@ -378,22 +378,8 @@ class SoftVerbalizer(Verbalizer):
             ]
 
     def process_model(self, model):
-        model_type = model.__class__.__name__
-        modules = [model]
-        for name in self.head_name[:-1]:
-            modules.append(getattr(modules[-1], name))
-
-        if model_type in self.LAST_WEIGHT:
-            setattr(modules[-1], "decoder_bias",
-                    paddle.zeros(shape=[len(self.labels)]))
-        setattr(modules[-1], self.head_name[-1], Identity())
-        assert len(self.head_name) == len(modules)
-        index = len(modules) - 1
-        while index > 0:
-            setattr(modules[index - 1], self.head_name[index - 2],
-                    modules[index])
-            index -= 1
-        return modules[0]
+        setattr(model, self.head_name, Identity())
+        return model
 
     def process_outputs(self, logits, inputs=None, **kwargs):
         if inputs is not None:
@@ -416,17 +402,15 @@ class SoftVerbalizer(Verbalizer):
 
     def _extract_head(self, model):
         model_type = model.__class__.__name__
-        self.head_name = []
         if model_type in self.LAST_LINEAR:
             # LMHead
             last_name = [n for n, p in model.named_children()][-1]
             self.head = copy.deepcopy(getattr(model, last_name))
-            self.head_name.append(last_name)
+            self.head_name = last_name
             head_names = [n for n, p in self.head.named_children()][::-1]
             for name in head_names:
                 module = getattr(self.head, name)
                 if isinstance(module, nn.Linear):
-                    self.head_name.append(name)
                     setattr(
                         self.head, name,
                         nn.Linear(module.weight.shape[0],
@@ -439,33 +423,41 @@ class SoftVerbalizer(Verbalizer):
             # OnlyMLMHead
             last_name = [n for n, p in model.named_children()][-1]
             head = getattr(model, last_name)
-            self.head_name.append(last_name)
+            self.head_name = last_name
             # LMPredictionHead
             last_name = [n for n, p in head.named_children()][-1]
             self.head = copy.deepcopy(getattr(head, last_name))
-            head_names = [n for n, p in self.head.named_children()][::-1]
-            self.head_name.append(last_name)
-            for name in head_names:
-                if name == 'decoder_weight':
-                    module = getattr(self.head, name)
-                    self.head_name.append(name)
-                    setattr(
-                        self.head, name,
-                        nn.Linear(module.weight.shape[0],
-                                  len(self.labels),
-                                  bias_attr=False))
-                    getattr(self.head, name).weight.set_value(
-                        self._create_init_weight(module.weight))
-                    break
+
+            module = paddle.to_tensor(getattr(self.head, "decoder_weight"))
+            bias = paddle.to_tensor(getattr(self.head, "decoder_bias"))
+            new_head = nn.Linear(len(self.labels),
+                                 module.shape[1],
+                                 bias_attr=False)
+            new_head.weight.set_value(self._create_init_weight(module.T).T)
+            setattr(self.head, "decoder_weight", new_head.weight)
+            getattr(self.head, "decoder_weight").stop_gradient = False
+            setattr(
+                self.head, "decoder_bias",
+                self.head.create_parameter(shape=[len(self.labels)],
+                                           dtype=new_head.weight.dtype,
+                                           is_bias=True))
+            getattr(self.head, "decoder_bias").stop_gradient = False
         else:
             raise NotImplementedError(
                 f"Please open an issue to request for support of {model_type}" +
                 f" or contribute to PaddleNLP.")
 
-    def _create_init_weight(self, module_weight):
-        word_shape = [module_weight.shape[0], *self.token_ids.shape]
-        word_weight = paddle.index_select(module_weight,
-                                          self.token_ids.reshape([-1]),
-                                          axis=1).reshape(word_shape)
-        label_weight = self.aggregate(word_weight, self.token_ids_mask)
-        return label_weight
+    def _create_init_weight(self, weight, is_bias=False):
+        if is_bias:
+            bias = paddle.index_select(weight,
+                                       self.token_ids.reshape([-1]),
+                                       axis=0).reshape(self.token_ids.shape)
+            bias = self.aggregate(bias, self.token_ids_mask)
+            return bias
+        else:
+            word_shape = [weight.shape[0], *self.token_ids.shape]
+            weight = paddle.index_select(weight,
+                                         self.token_ids.reshape([-1]),
+                                         axis=1).reshape(word_shape)
+            weight = self.aggregate(weight, self.token_ids_mask)
+            return weight
