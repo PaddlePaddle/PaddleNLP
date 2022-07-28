@@ -830,7 +830,8 @@ def convert_params(faster_model,
                 module,
             (
                 nn.TransformerEncoder,  # nn.TransformerDecoder,
-                paddlenlp.transformers.gpt.modeling.TransformerDecoder
+                paddlenlp.transformers.gpt.modeling.TransformerDecoder,
+                paddlenlp.transformers.opt.modeling.TransformerDecoder
             )):
             num_layer = len(module.layers)
             for i, layer in enumerate(module.layers):
@@ -1606,18 +1607,19 @@ class InferOptDecoding(nn.Layer):
         if use_fp16_decoding:
             zero_tensor = paddle.zeros(shape=[0], dtype=paddle.float16)
 
-        # TODO: to make it suitable for more opt models
+        # if there is no final layer norm, pass empty tensor to fusion opt op
         final_layer_norm = self.model.opt.decoder.final_layer_norm
         if final_layer_norm is None:
-            final_layer_norm = paddle.nn.LayerNorm(1)
+            self.decoder_ln_weight = paddle.empty(shape=[0])  
+            self.decoder_ln_bias = paddle.empty(shape=[0])
+        else:
+            self.decoder_ln_weight = final_layer_norm.weight  
+            self.decoder_ln_bias = final_layer_norm.bias
 
-        params["decoder_ln_weight"].append((final_layer_norm, "weight"))
-        params["decoder_ln_bias"].append((final_layer_norm, "bias"))
+        self.normalize_before = self.model.decoder.final_layer_norm is not None
 
-        # TODO: check the normalize_before
         for k, v in params.items():
             setattr(self, k, v)
-        self.normalize_before = self.model.decoder.final_layer_norm is not None 
 
     def forward(self,
                 input_ids,
