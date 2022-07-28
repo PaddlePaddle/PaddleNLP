@@ -20,8 +20,12 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct Whitespace : public PreTokenizer {
+struct WhitespacePreTokenizer : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
+  friend void to_json(nlohmann::json& j,
+                      const WhitespacePreTokenizer& whitespace_pretokenizer);
+  friend void from_json(const nlohmann::json& j,
+                        WhitespacePreTokenizer& whitespace_pretokenizer);
 };
 
 }  // namespace pretokenizers

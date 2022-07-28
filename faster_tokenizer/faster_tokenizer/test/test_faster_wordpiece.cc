@@ -28,12 +28,12 @@ TEST(model, faster_wordpiece_token_to_id) {
   models::FasterWordPiece faster_wordpiece_model(vocab);
   // Test tokens in vocab
   for (const auto& item : vocab) {
-    uint id;
+    uint32_t id;
     faster_wordpiece_model.TokenToId(item.first, &id);
     ASSERT_EQ(item.second, id);
   }
   // Test [UNK] token
-  uint faster_wordpiece_id;
+  uint32_t faster_wordpiece_id;
   ASSERT_FALSE(faster_wordpiece_model.TokenToId("dasd", &faster_wordpiece_id));
 }
 

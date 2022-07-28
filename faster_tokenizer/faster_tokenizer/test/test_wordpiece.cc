@@ -52,9 +52,9 @@ TEST(model, wordpiece_model) {
 
   auto wordpiece_model = factory.CreateWordPieceModel();
   auto check_token_id = [&](const std::string& expected_token,
-                            uint expected_id) {
+                            uint32_t expected_id) {
     std::string token;
-    uint id;
+    uint32_t id;
     wordpiece_model.TokenToId(expected_token, &id);
     wordpiece_model.IdToToken(expected_id, &token);
     ASSERT_EQ(id, expected_id);
@@ -66,7 +66,7 @@ TEST(model, wordpiece_model) {
     check_token_id(tokens[i], i);
   }
   // check non-exist token
-  uint id;
+  uint32_t id;
   ASSERT_FALSE(wordpiece_model.TokenToId("xxsada", &id));
   // check non-exist id
   std::string token;
@@ -77,7 +77,7 @@ TEST(model, wordpiece_model) {
   auto chinese_tokens = wordpiece_model.Tokenize("今天天气真好");
   auto check_token = [](const core::Token& token,
                         const std::string& expected_string,
-                        uint id,
+                        uint32_t id,
                         core::Offset offset) {
     ASSERT_EQ(token.value_, expected_string);
     ASSERT_EQ(token.id_, id);

@@ -67,8 +67,8 @@ doccano还支持PostgreSQL、Docker、Docker Compose等安装方式，详情请�
     <img src=https://user-images.githubusercontent.com/63761690/176858888-79b781f9-2ce0-4348-ba14-faac19031867.png height=300 hspace='15'/>
 </div>
 
-doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，文本分类本地数据集定制训练中**统一使用TextLine**这一文件格式，即上传的文件需要为txt或tsv等格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
-上传的文件为txt或tsv等格式，每一行为一条待标注文本，示例:
+doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，文本分类本地数据集定制训练中**统一使用TextLine**这一文件格式，即上传的文件需要为txt等格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
+上传的文件为txt等格式，每一行为一条待标注文本，示例:
 
 ```text
 黑苦荞茶的功效与作用及食用方法
@@ -208,16 +208,16 @@ python doccano.py \
 转化后的doccano标注数据目录结构如下：
 ```text
 data/
-├── train.tsv # 训练数据集文件
-├── dev.tsv # 开发数据集文件
-├── test.tsv # 测试训练集文件（可选，数据划分为 train/dev/test 数据集）
-├── label.tsv # 分类标签文件
-└── data.tsv # 待预测数据文件
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── test.txt # 测试训练集文件（可选，数据划分为 train/dev/test 数据集）
+├── label.txt # 分类标签文件
+└── data.txt # 待预测数据文件
 ```
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集。
-- 如果数据划分为 train/dev/test 数据集，data.tsv则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.tsv则为dev数据集无标签数据。
+- 如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt则为dev数据集无标签数据。
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 ## References

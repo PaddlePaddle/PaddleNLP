@@ -117,7 +117,7 @@ def do_train():
                           lazy=False)
 
     pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = Autokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
