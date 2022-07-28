@@ -149,8 +149,10 @@ class HandshakingKernel(nn.Layer):
         bs, matrix_size, matrix_size, hidden_size = tensor.shape
         mask = paddle.triu(paddle.ones(shape=[matrix_size, matrix_size]))
         mask = paddle.cast(mask, "bool")[None, :, :, None]
+        mask.stop_gradient = True
         mask = paddle.expand(mask,
                              shape=[bs, matrix_size, matrix_size, hidden_size])
+        bs = paddle.shape(tensor)[0]
         return tensor.masked_select(mask).reshape([bs, -1, hidden_size])
 
     def forward(self, seq_hiddens):

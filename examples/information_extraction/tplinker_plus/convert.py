@@ -15,83 +15,152 @@
 import re
 import os
 import json
-
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.utils.log import logger
+import argparse
 
 
-def clean_text(text):
-    text = re.sub(u"\u3000", " ", text)
-    return text
+def search(pattern, sequence):
+    """从sequence中寻找子串pattern
+    如果找到，返回第一个下标；否则返回-1。
+    """
+    n = len(pattern)
+    for i in range(len(sequence)):
+        if sequence[i:i + n] == pattern:
+            return i
+    return -1
 
 
 def do_convert(input_file, target_file, label_map):
     with open(input_file, 'r', encoding='utf-8') as f:
-        id = 0
         outputs = []
         for line in f:
             output = {}
             json_line = json.loads(line)
-            output['id'] = id
-            output['text'] = clean_text(json_line['text'])
+            text = json_line['text']
+            output['text'] = text
             spo_list = json_line['spo_list']
             for spo in spo_list:
-                subject_text = clean_text(spo['subject'])
+                subject_text = spo['subject']
                 if len(subject_text) == 0:
                     continue
-                predicate_text = clean_text(spo['predicate'])
-                subject_type = spo['subject_type']
-                entity = {'text': subject_text, 'type': subject_type}
+                predicate_text = spo['predicate']
+                subj_start_id = search(subject_text, text)
+                entity = {
+                    'text': subject_text,
+                    'type': "DEFAULT",
+                    'start_index': subj_start_id
+                }
                 output.setdefault('entity_list', []).append(entity)
                 for spo_object in spo['object'].keys():
-                    object_text = clean_text(spo['object'][spo_object])
+                    object_text = spo['object'][spo_object]
                     if len(object_text) == 0:
                         continue
-                    object_type = spo['object_type'][spo_object]
-                    entity = {'text': object_text, 'type': object_type}
+                    obj_start_id = search(object_text, text)
+                    entity = {
+                        'text': object_text,
+                        'type': "DEFAULT",
+                        'start_index': obj_start_id
+                    }
                     output.setdefault('entity_list', []).append(entity)
                     if predicate_text in label_map.keys():
-                        # simple relation
+                        # Simple relation
                         relation = {
                             'subject': subject_text,
+                            'predicate': predicate_text,
                             'object': object_text,
-                            'predicate': predicate_text
+                            'subject_start_index': subj_start_id,
+                            'object_start_index': obj_start_id
                         }
                     else:
-                        # complex relation
                         relation = {
                             'subject': subject_text,
+                            'predicate': predicate_text + '_' + spo_object,
                             'object': object_text,
-                            'predicate': predicate_text + '_' + spo_object
+                            'subject_start_index': subj_start_id,
+                            'object_start_index': obj_start_id
                         }
                     output.setdefault('relation_list', []).append(relation)
             outputs.append(output)
-            id += 1
 
     with open(target_file, 'w', encoding='utf-8') as f:
         for output in outputs:
             f.write(json.dumps(output, ensure_ascii=False) + "\n")
-    logger.info("Save %d examples to %s." % (id, target_file))
 
 
 if __name__ == "__main__":
-    data_home = "./data"
-    input_file_list = ["duie_train.json", "duie_dev.json"]
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--data_dir", type=str, default="duie2.0", help="The path of dataset.")
+    parser.add_argument("--dataset_name", choices=['duie2.0', 'duee1.0'], type=str, default="re_data", help="The name of dataset.")
+
+    args = parser.parse_args()
+    # yapf: enable
+
     target_file_list = ["train_data.json", "dev_data.json"]
-    rel2id_path = os.path.join(data_home, 'rel2id.json')
-    with open(rel2id_path, 'r', encoding='utf8') as fp:
-        label_map = json.load(fp)
 
-    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
-                                              use_faster=True)
-    tokenize = tokenizer.tokenize
-    get_tok2char_span_map = lambda text: tokenizer(text,
-                                                   return_token_type_ids=None,
-                                                   return_offsets_mapping=True,
-                                                   add_special_tokens=False)[
-                                                       "offset_mapping"]
+    if args.dataset_name == "duie2.0":
+        input_file_list = ["duie_train.json", "duie_dev.json"]
 
-    for fi, ft in zip(input_file_list, target_file_list):
-        input_file_path = os.path.join(data_home, fi)
-        target_file_path = os.path.join(data_home, ft)
-        do_convert(input_file_path, target_file_path, label_map)
+        ent2id = {"DEFAULT": 0}
+        rel2id = {}
+        schemas = []
+        schema_path = os.path.join(args.data_dir, "duie_schema.json")
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                json_line = json.loads(line)
+                subject_type = json_line['subject_type']
+                obj_dict = json_line['object_type']
+                predicate = json_line['predicate']
+                if len(obj_dict) == 1:
+                    rel2id[predicate] = len(rel2id)
+                    schemas.append({
+                        "object_type": list(obj_dict.keys())[0],
+                        "predicate": predicate,
+                        "subject_type": subject_type
+                    })
+                else:
+                    for t in obj_dict.keys():
+                        predicate_complex = predicate + "_" + t
+                        rel2id[predicate_complex] = len(rel2id)
+                        schemas.append({
+                            "object_type": obj_dict[t],
+                            "predicate": predicate_complex,
+                            "subject_type": subject_type
+                        })
+
+        label_dicts = {"ent2id": ent2id, "rel2id": rel2id, "schemas": schemas}
+
+        with open(os.path.join(args.data_dir, "label_dicts.json"),
+                  "w",
+                  encoding="utf-8") as fp:
+            fp.write(json.dumps(label_dicts, ensure_ascii=False))
+
+        for fi, ft in zip(input_file_list, target_file_list):
+            input_file_path = os.path.join(args.data_dir, fi)
+            target_file_path = os.path.join(args.data_dir, ft)
+            do_convert(input_file_path, target_file_path, rel2id)
+    elif args.dataset_name == "duee1.0":
+        input_file_list = ["duee_train.json", "duee_dev.json"]
+
+        schemas = []
+        schema_path = os.path.join(args.data_dir, "duee_event_schema.json")
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                json_line = json.loads(line)
+                schema = {
+                    "event_type": json_line["event_type"],
+                    "role_list": json_line["role_list"]
+                }
+                schemas.append(schema)
+
+        label_dicts = {"schemas": schemas}
+
+        with open(os.path.join(args.data_dir, "label_dicts.json"),
+                  "w",
+                  encoding="utf-8") as fp:
+            fp.write(json.dumps(label_dicts, ensure_ascii=False))
+
+        for fi, ft in zip(input_file_list, target_file_list):
+            input_file_path = os.path.join(args.data_dir, fi)
+            target_file_path = os.path.join(args.data_dir, ft)
+            os.rename(input_file_path, target_file_path)
