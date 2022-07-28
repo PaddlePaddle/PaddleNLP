@@ -124,28 +124,28 @@ public:
   void SetPadMethod(const PadMethod& pad_method);
   void DisablePadMethod();
   void EnablePadMethod(Direction direction,
-                       uint pad_id,
-                       uint pad_type_id,
+                       uint32_t pad_id,
+                       uint32_t pad_type_id,
                        const std::string& pad_token,
-                       uint* length,
-                       uint* pad_to_multiple_of);
+                       uint32_t* length,
+                       uint32_t* pad_to_multiple_of);
   PadMethod GetPadMethod() const;
 
   Vocab GetVocab(bool with_added_vocabulary = true) const;
   size_t GetVocabSize(bool with_added_vocabulary = true) const;
-  bool TokenToId(const std::string& token, uint* id) const;
-  bool IdToToken(uint id, std::string* token) const;
+  bool TokenToId(const std::string& token, uint32_t* id) const;
+  bool IdToToken(uint32_t id, std::string* token) const;
   size_t AddTokens(const std::vector<AddedToken>& tokens);
   size_t AddSpecialTokens(const std::vector<AddedToken>& tokens);
   bool DoTokenize(pretokenizers::PreTokenizedString* pretokenized,
-                  uint type_id,
-                  const std::vector<uint>& word_idx,
+                  uint32_t type_id,
+                  const std::vector<uint32_t>& word_idx,
                   OffsetType offset_type,
                   Encoding* encoding) const;
   bool DoPreTokenize(pretokenizers::PreTokenizedString* pretokenized) const;
 
   void EncodeSingleString(const InputString& input_string,
-                          uint type_id,
+                          uint32_t type_id,
                           OffsetType offset_type,
                           Encoding* encodings) const;
   void EncodePairStrings(const EncodeInput& encode_input,
@@ -170,12 +170,12 @@ public:
 
   // Encode single text which is already pretokenized.
   void EncodeSingleText(const std::vector<std::string>& pretokenized_texts,
-                        uint type_id,
+                        uint32_t type_id,
                         OffsetType offset_type,
                         Encoding* encodings) const;
   // Encode single raw text
   void EncodeSingleText(const std::string& raw_text,
-                        uint type_id,
+                        uint32_t type_id,
                         OffsetType offset_type,
                         Encoding* encodings) const;
   const AddedVocabulary& GetAddedVocabulary() const;
@@ -190,16 +190,16 @@ public:
   bool GetUsePadding() const;
 
   // Decode: From tokens to a complete string
-  void Decode(const std::vector<uint>& token_ids,
+  void Decode(const std::vector<uint32_t>& token_ids,
               std::string* result,
               bool skip_special_tokens = true) const;
-  void DecodeBatch(const std::vector<std::vector<uint>>& batch_token_ids,
+  void DecodeBatch(const std::vector<std::vector<uint32_t>>& batch_token_ids,
                    std::vector<std::string>* results,
                    bool skip_special_tokens = true) const;
 
 private:
-  Encoding EncodeTextToEncoding(const std::vector<uint>& word_idx,
-                                uint type_id,
+  Encoding EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
+                                uint32_t type_id,
                                 OffsetType offset_type,
                                 const std::string& text) const;
   // All member of Tokenizer

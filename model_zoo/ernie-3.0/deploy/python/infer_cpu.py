@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,9 +49,12 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
-        "--use_quantize",
-        action='store_true',
-        help="Whether to use quantization for acceleration.",
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "int8"],
+        help=
+        "Inference precision, set int8 to use dynamic quantization for acceleration.",
     )
     parser.add_argument(
         "--num_threads",

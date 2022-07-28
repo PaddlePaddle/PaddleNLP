@@ -12,9 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
-
 #include "normalizers/normalizers.h"
+#include <Python.h>
 #include "pybind/normalizers.h"
 
 namespace py = pybind11;
@@ -414,6 +413,16 @@ void BindNormalizers(pybind11::module* m) {
                                  normalizers::PrecompiledNormalizer>())) {
                 normalizer_ptr =
                     py_normalizer.cast<normalizers::PrecompiledNormalizer*>();
+              } else {
+                throw py::value_error(
+                    "Type of normalizers should be one of "
+                    "`LowercaseNormalizer`,"
+                    " `BertNormalizer`, `NFCNormalizer`, `NFKCNormalizer`, "
+                    "`NFDNormalizer`,"
+                    " `NFKDNormalizer`, `NmtNormalizer`, `ReplaceNormalizer`, "
+                    "`SequenceNormalizer`,"
+                    " `StripAccentsNormalizer`, `StripNormalizer`, "
+                    "`PrecompiledNormalizer`");
               }
               normalizers.push_back(normalizer_ptr);
             }

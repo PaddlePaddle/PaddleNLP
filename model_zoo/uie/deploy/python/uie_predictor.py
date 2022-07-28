@@ -80,7 +80,7 @@ class UIEPredictor(object):
         if not isinstance(args.device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                type(args.device))
             exit(0)
         if args.device not in ['cpu', 'gpu']:
             print(
@@ -88,8 +88,7 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
-                                                        use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._batch_size = args.batch_size
@@ -166,16 +165,21 @@ class UIEPredictor(object):
                                          return_tensors='np',
                                          return_offsets_mapping=True)
         offset_maps = encoded_inputs["offset_mapping"]
+        input_ids = encoded_inputs["input_ids"]
 
         start_probs = []
         end_probs = []
         for idx in range(0, len(texts), self._batch_size):
             l, r = idx, idx + self._batch_size
             input_dict = {
-                "input_ids": encoded_inputs['input_ids'][l:r],
-                "token_type_ids": encoded_inputs['token_type_ids'][l:r],
-                "pos_ids": encoded_inputs['position_ids'][l:r],
-                "att_mask": encoded_inputs["attention_mask"][l:r]
+                "input_ids":
+                encoded_inputs['input_ids'][l:r].astype('int64'),
+                "token_type_ids":
+                encoded_inputs['token_type_ids'][l:r].astype('int64'),
+                "pos_ids":
+                encoded_inputs['position_ids'][l:r].astype('int64'),
+                "att_mask":
+                encoded_inputs["attention_mask"][l:r].astype('int64')
             }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()
@@ -189,7 +193,6 @@ class UIEPredictor(object):
                                                  limit=self._position_prob,
                                                  return_prob=True)
 
-        input_ids = input_dict['input_ids']
         sentence_ids = []
         probs = []
         for start_ids, end_ids, ids, offset_map in zip(start_ids_list,
