@@ -1,7 +1,7 @@
 gpu_ids=0
 export CUDA_VISIBLE_DEVICES=${gpu_ids}
 
-log_dir="log_diffcse_ErG3D3"
+log_dir="log_train"
 python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
 	run_diffcse.py \
 	--mode "train" \
@@ -10,9 +10,9 @@ python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
 	--discriminator_name "ernie-3.0-base-zh" \
 	--max_seq_length "128" \
 	--output_emb_size "32" \
-	--train_set_file "../dataset/100w/train_webdata.txt" \
-	--eval_set_file "../dataset/100w/test_v1.txt" \
-	--save_dir "./checkpoints_diffcse_ErG3D3" \
+	--train_set_file "your train_set path" \
+	--eval_set_file "your dev_set path" \
+	--save_dir "./checkpoints" \
 	--log_dir ${log_dir} \
 	--save_steps "50000" \
 	--eval_steps "1000" \

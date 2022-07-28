@@ -29,9 +29,8 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from visualdl import LogWriter
 
 from model import DiffCSE, Encoder
-from utils import set_seed
-from eval_metrics import eval_metrics
-from data import read_text_single, read_text_pair, convert_example, create_dataloader, word_repetition
+from utils import set_seed, eval_metric
+from data import read_text_single, read_text_pair, convert_example, create_dataloader
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -90,13 +89,11 @@ def do_infer(model, tokenizer, data_loader):
 def do_eval(model, tokenizer, data_loader):
     assert isinstance(
         model, Encoder), "please make sure that model is instance of Encoder."
-    total_num = 0
     sims, labels = [], []
     model.eval()
     with paddle.no_grad():
         for batch in data_loader:
             query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask, label = batch
-            total_num += len(label)
             cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 key_input_ids=key_input_ids,
@@ -110,9 +107,9 @@ def do_eval(model, tokenizer, data_loader):
 
     sims = np.concatenate(sims, axis=0)
     labels = np.concatenate(labels, axis=0)
-    eval_res = eval_metrics(labels, sims)
+    score = eval_metric(labels, sims)
     model.train()
-    return eval_res, total_num
+    return score
 
 
 def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
@@ -133,11 +130,7 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
         apply_decay_param_fun=lambda x: x in decay_params)
 
     global_step = 0
-    best_spearman = 0.0
-    best_pre_rec = 0.0
-    best_pre = 0.0
-    best_rec = 0.0
-    best_rec95 = 0.0
+    best_score = 0.
     tic_train = time.time()
     model = paddle.DataParallel(model)
     model.train()
@@ -155,11 +148,14 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
             global_step += 1
             if global_step % (args.eval_steps // 10) == 0 and rank == 0:
                 print(
-                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, rtd_loss: {:.5f}, rtd_acc: {:.5f}, rtd_rep_acc: {:.5f}, rtd_fix_acc: {:.5f}, speed: {:.2f} step/s"
+                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, rtd_loss: {:.5f}, rtd_acc: {:.5f}, rtd_rep_acc: {:.5f}, rtd_fix_acc: {:.5f}, pos_avg: {:.5f}, neg_avg: {:.5f}, speed: {:.2f} step/s"
                     .format(global_step, epoch, step, loss.item(),
                             rtd_loss.item(), model._layers.rtd_acc,
                             model._layers.rtd_rep_acc,
-                            model._layers.rtd_fix_acc, (args.eval_steps // 10) /
+                            model._layers.rtd_fix_acc,
+                            model._layers.encoder.sim.pos_avg,
+                            model._layers.encoder.sim.neg_avg,
+                            (args.eval_steps // 10) /
                             (time.time() - tic_train)))
                 writer.add_scalar(tag="train/loss",
                                   step=global_step,
@@ -180,17 +176,17 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
                 tic_train = time.time()
 
             if global_step % args.eval_steps == 0 and rank == 0:
-                eval_res, total_num = do_eval(model._layers.encoder, tokenizer,
-                                              dev_data_loader)
-                spearman = eval_res["spearman_corr"]
+                score = do_eval(model._layers.encoder, tokenizer,
+                                dev_data_loader)
+                print("Evaluation - score:{:.5f}".format(score))
 
-                if best_spearman < spearman:
+                if best_score < score:
                     print(
-                        "best checkpoint has been updated: from last best_spearman {} --> new spearman {}."
-                        .format(best_spearman, spearman))
-                    best_spearman = spearman
+                        "best checkpoint has been updated: from last best_score {} --> new score {}."
+                        .format(best_score, score))
+                    best_score = score
                     # save best model
-                    save_dir = os.path.join(args.save_dir, "best_spearman")
+                    save_dir = os.path.join(args.save_dir, "best")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
                     save_param_path = os.path.join(save_dir,
@@ -198,116 +194,10 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
                     paddle.save(model._layers.encoder.state_dict(),
                                 save_param_path)
                     tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(step))
 
-                writer.add_scalar(tag="eval/spearman",
+                writer.add_scalar(tag="eval/score",
                                   step=global_step,
-                                  value=spearman)
-
-                pre_rec = eval_res["best_pre_rec_thr"][0]
-                if best_pre_rec < pre_rec:
-                    print(
-                        "best checkpoint has been updated: from last best_pre_rec {} --> new pre_rec {}."
-                        .format(best_pre_rec, pre_rec))
-                    best_pre_rec = pre_rec
-                    # save best model
-                    save_dir = os.path.join(args.save_dir, "best_pre_rec")
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.encoder.state_dict(),
-                                save_param_path)
-                    tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(step))
-
-                writer.add_scalar(tag="eval/pre_rec",
-                                  step=global_step,
-                                  value=pre_rec)
-
-                pre = eval_res["best_pre_rec_thr"][1]
-                if best_pre < pre:
-                    print(
-                        "best checkpoint has been updated: from last best_pre {} --> new pre {}."
-                        .format(best_pre, pre))
-                    best_pre = pre
-                    # save best model
-                    save_dir = os.path.join(args.save_dir, "best_pre")
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.encoder.state_dict(),
-                                save_param_path)
-                    tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(step))
-
-                writer.add_scalar(tag="eval/pre", step=global_step, value=pre)
-
-                rec = eval_res["best_pre_rec_thr"][2]
-                if best_rec < rec:
-                    print(
-                        "best checkpoint has been updated: from last best_rec {} --> new rec {}."
-                        .format(best_rec, rec))
-                    best_rec = rec
-                    # save best model
-                    save_dir = os.path.join(args.save_dir, "best_rec")
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.encoder.state_dict(),
-                                save_param_path)
-                    tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(step))
-
-                writer.add_scalar(tag="eval/rec", step=global_step, value=rec)
-
-                rec95 = eval_res["best_pre_rec_thr_at_K"][1]
-                if best_rec95 < rec95:
-                    print(
-                        "best checkpoint has been updated: from last best_rec95 {} --> new rec95 {}."
-                        .format(best_rec95, rec95))
-                    best_rec95 = rec95
-                    # save best model
-                    save_dir = os.path.join(args.save_dir, "best_rec95")
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.encoder.state_dict(),
-                                save_param_path)
-                    tokenizer.save_pretrained(save_dir)
-                    with open(os.path.join(save_dir, "best_step.txt"),
-                              "w",
-                              encoding="utf-8") as f:
-                        f.write(
-                            str(global_step) + " " + str(epoch) + " " +
-                            str(step))
-
-                writer.add_scalar(tag="eval/rec95",
-                                  step=global_step,
-                                  value=rec95)
+                                  value=score)
                 model.train()
 
             loss.backward()
@@ -448,7 +338,8 @@ if __name__ == "__main__":
                                             batchify_fn=dev_batchify_fn,
                                             trans_fn=trans_func)
 
-        eval_res, total_num = do_eval(model, tokenizer, dev_data_loader)
+        score = do_eval(model, tokenizer, dev_data_loader)
+        print("Evaluation - score:{:.5f}".format(score))
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))

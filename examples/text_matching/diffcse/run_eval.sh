@@ -8,8 +8,8 @@ python -u -m paddle.distributed.launch --gpus ${gpu_ids} --log_dir ${log_dir} \
 	--encoder_name "rocketqa-zh-dureader-query-encoder" \
 	--max_seq_length "128" \
 	--output_emb_size "32" \
-	--eval_set_file "../diffcse/data/test_v1.txt" \
-	--ckpt_dir "./checkpoints_diffcse_ErG3D3/best_spearman" \
-	--batch_size "8" \
+	--eval_set_file "your dev_set path" \
+	--ckpt_dir "./checkpoints/best" \
+	--batch_size "32" \
 	--seed "0" \
 	--device "gpu"

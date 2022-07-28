@@ -16,6 +16,7 @@ import random
 import numpy as np
 
 import paddle
+from scipy import stats
 
 
 def set_seed(seed=0):
@@ -27,3 +28,8 @@ def set_seed(seed=0):
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
+
+
+def eval_metric(labels, preds):
+    spearman_corr = stats.spearmanr(labels, preds).correlation
+    return spearman_corr

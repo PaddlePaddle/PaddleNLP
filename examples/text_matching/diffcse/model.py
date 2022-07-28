@@ -137,7 +137,6 @@ class Encoder(nn.Layer):
         cosine_sim = self.sim(query_cls_embedding,
                               key_cls_embedding,
                               one_vs_one=True)
-        # cosine_sim = paddle.sum(query_cls_embedding * key_cls_embedding, axis=-1)
         return cosine_sim
 
     def forward(self,
