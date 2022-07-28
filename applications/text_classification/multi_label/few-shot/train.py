@@ -14,15 +14,19 @@
 
 from dataclasses import dataclass, field
 import os
+import sys
 import paddle
-from paddle.metric import Accuracy
+import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM, export_model
 from paddlenlp.trainer import PdArgumentParser, get_scheduler
 from paddlenlp.prompt import (AutoTemplate, SoftVerbalizer, MLMTokenizerWrapper,
                               PromptTuningArguments, PromptTrainer,
                               PromptModelForClassification, FewShotSampler)
-from utils import load_local_dataset
+from utils import load_local_dataset, convert_fn
+
+sys.path.append("../")
+from metric import MetricReport
 
 
 @dataclass
@@ -71,15 +75,6 @@ def main():
     model = AutoModelForMaskedLM.from_pretrained(model_args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    # Load the few-shot datasets.
-    train_ds, dev_ds = load_local_dataset(data_path=data_args.data_dir,
-                                          splits=["train", "dev"],
-                                          task_type=training_args.task_type)
-    if data_args.train_sample_per_label is not None:
-        sampler = FewShotSampler(
-            num_sample_per_label=data_args.train_sample_per_label)
-        train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
-
     # Define the template for preprocess and the verbalizer for postprocess.
     template = AutoTemplate.create_from(data_args.prompt,
                                         tokenizer,
@@ -91,8 +86,17 @@ def main():
     verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
     logger.info("Using verbalizer: {}".format(data_args.verbalizer))
 
+    # Load the few-shot datasets.
+    train_ds, dev_ds = load_local_dataset(data_path=data_args.data_dir,
+                                          splits=["train", "dev"],
+                                          label_list=verbalizer.labels_to_ids)
+    if data_args.train_sample_per_label is not None:
+        sampler = FewShotSampler(
+            num_sample_per_label=data_args.train_sample_per_label)
+        train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
+
     # Define the criterion.
-    criterion = paddle.nn.CrossEntropyLoss()
+    criterion = paddle.nn.BCEWithLogitsLoss()
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForClassification(
@@ -125,20 +129,22 @@ def main():
         parameters=[{
             'params': prompt_model.verbalizer.non_head_parameters()
         }, {
-            'params': [p for p in prompt_model.verbalizer.head_parameters()] +
-            [p for p in prompt_model.template.parameters()],
+            'params':
+            prompt_model.verbalizer.head_parameters(),
             'learning_rate':
             training_args.ppt_learning_rate / training_args.learning_rate
         }])
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        metric = Accuracy()
-        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
-                                 paddle.to_tensor(eval_preds.label_ids))
-        metric.update(correct)
-        acc = metric.accumulate()
-        return {'accuracy': acc}
+        metric = MetricReport()
+        preds = F.sigmoid(paddle.to_tensor(eval_preds.predictions))
+        metric.update(preds, paddle.to_tensor(eval_preds.label_ids))
+        micro_f1_score, macro_f1_score = metric.accumulate()
+        return {
+            "micro_f1_score": micro_f1_score,
+            "macro_f1_score": macro_f1_score
+        }
 
     trainer = PromptTrainer(model=prompt_model,
                             tokenizer=tokenizer,
@@ -146,6 +152,7 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
+                            convert_fn=convert_fn,
                             optimizers=[optimizer, lr_scheduler],
                             compute_metrics=compute_metrics)
 
