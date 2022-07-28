@@ -80,13 +80,13 @@ def convert_example(example,
     """
 
     result = []
-    for text in example:
-        encoded_inputs = tokenizer(text=text,
-                                   max_seq_len=max_seq_length,
-                                   pad_to_max_seq_len=pad_to_max_seq_len)
-        input_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-        result += [input_ids, token_type_ids]
+
+    encoded_inputs = tokenizer(text=example,
+                               max_seq_len=max_seq_length,
+                               pad_to_max_seq_len=pad_to_max_seq_len)
+    input_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
+    result += [input_ids, token_type_ids]
     return result
 
 
@@ -168,7 +168,6 @@ class Predictor(object):
         all_embeddings = []
         examples = []
         for idx, text in tqdm(data.items()):
-            print(text)
             input_ids, segment_ids = convert_example(
                 text,
                 tokenizer,
@@ -200,8 +199,8 @@ class Predictor(object):
 def read_text(file_path):
     file = open(file_path)
     id2corpus = {}
-    for idx, data in enumerate(file.readlines()):
-        id2corpus[idx] = data.strip().split('\t')
+    for idx, line in enumerate(file.readlines()):
+        id2corpus[idx] = line.rstrip().replace('##', ',')
     return id2corpus
 
 

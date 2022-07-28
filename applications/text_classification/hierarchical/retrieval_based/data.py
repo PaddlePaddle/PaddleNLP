@@ -46,11 +46,8 @@ def convert_example(example,
                     pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
-
     A BERT sequence has the following format:
-
     - single sequence: ``[CLS] X [SEP]``
-
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
@@ -58,29 +55,19 @@ def convert_example(example,
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
-
     Returns:
         input_ids(obj:`list[int]`): The list of query token ids.
         token_type_ids(obj: `list[int]`): List of query sequence pair mask.
     """
+
     result = []
-
-    encoded_inputs = tokenizer(text=example['text_a'],
-                               text_pair=example['text_b'],
-                               max_seq_len=max_seq_length,
-                               pad_to_max_seq_len=pad_to_max_seq_len,
-                               truncation_strategy="longest_first")
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-    result += [input_ids, token_type_ids]
-
-    encoded_inputs = tokenizer(text=example['label'],
-                               max_seq_len=max_seq_length,
-                               pad_to_max_seq_len=pad_to_max_seq_len,
-                               truncation_strategy="longest_first")
-    input_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-    result += [input_ids, token_type_ids]
+    for key, text in example.items():
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
+        input_ids = encoded_inputs["input_ids"]
+        token_type_ids = encoded_inputs["token_type_ids"]
+        result += [input_ids, token_type_ids]
     return result
 
 
@@ -109,18 +96,9 @@ def convert_corpus_example(example,
     """
     result = []
     for k, v in example.items():
-        text_arr = v.strip().split('\t')
-        if (len(text_arr) == 1):
-            print(text_arr)
-            text_b = ""
-            text_a = text_arr[0]
-        else:
-            text_a, text_b = text_arr[0], text_arr[1]
-        encoded_inputs = tokenizer(text=text_a,
-                                   text_pair=text_b,
+        encoded_inputs = tokenizer(text=v,
                                    max_seq_len=max_seq_length,
-                                   pad_to_max_seq_len=pad_to_max_seq_len,
-                                   truncation_strategy="longest_first")
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -151,7 +129,6 @@ def convert_label_example(example,
         token_type_ids(obj: `list[int]`): List of query sequence pair mask.
     """
     result = []
-    # breakpoint()
     for k, v in example.items():
         encoded_inputs = tokenizer(text=v,
                                    max_seq_len=max_seq_length,
@@ -167,9 +144,7 @@ def read_text_pair(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             data = line.rstrip().split("\t")
-            if len(data) != 3:
-                continue
-            yield {'text_a': data[0], 'text_b': data[1], 'label': data[2]}
+            yield {'sentence': data[0], 'label': ','.join(data[1:])}
 
 
 # ANN - active learning ------------------------------------------------------
@@ -231,7 +206,7 @@ def gen_id2corpus(corpus_file):
     id2corpus = {}
     with open(corpus_file, 'r', encoding='utf-8') as f:
         for idx, line in enumerate(f):
-            id2corpus[idx] = line.rstrip()
+            id2corpus[idx] = line.rstrip().replace('##', ',')
     return id2corpus
 
 
@@ -241,9 +216,7 @@ def gen_text_file(similar_text_pair_file):
     with open(similar_text_pair_file, 'r', encoding='utf-8') as f:
         for idx, line in enumerate(f):
             splited_line = line.rstrip().split("\t")
-            if len(splited_line) != 3:
-                continue
-            text, similar_text = line.rstrip().rsplit("\t", 1)
+            text, similar_text = splited_line[0], ','.join(splited_line[1:])
             text2similar_text[text] = similar_text
             texts.append({"text": text})
     return texts, text2similar_text

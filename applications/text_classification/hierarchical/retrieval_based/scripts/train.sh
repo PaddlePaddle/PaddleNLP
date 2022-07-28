@@ -15,7 +15,7 @@ python -u -m paddle.distributed.launch --gpus "1,2,3,4" \
     --margin 0.2 \
     --recall_result_dir "recall_result_dir" \
     --recall_result_file "recall_result.txt" \
-    --train_set_file ${data_path}/train_data.txt \
-    --corpus_file ${data_path}/corpus.txt   \
-    --similar_text_pair ${data_path}/val_data.txt \
+    --train_set_file ${data_path}/train.txt \
+    --corpus_file ${data_path}/label.txt   \
+    --similar_text_pair ${data_path}/dev.txt \
     --evaluate True

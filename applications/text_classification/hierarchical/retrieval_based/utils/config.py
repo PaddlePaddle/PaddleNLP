@@ -18,7 +18,7 @@ from milvus import MetricType, IndexType
 MILVUS_HOST = '10.21.226.173'
 MILVUS_PORT = 8530
 
-output_emb_size = 256
+output_emb_size = 0
 
 collection_param = {
     'dimension': output_emb_size if output_emb_size > 0 else 768,

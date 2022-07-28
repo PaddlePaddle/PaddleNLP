@@ -45,8 +45,8 @@ def search_in_milvus(text_embedding, corpus_file, query_text):
 if __name__ == "__main__":
     client = PipelineClient()
     client.connect(['127.0.0.1:8080'])
-    corpus_file = "data/corpus.txt"
-    list_data = [{"text_a": "我是一个多情善感的小男孩！我想翻译成英文，谢谢！", "text_b": "我想成英文，谢谢！"}]
+    corpus_file = "data/label.txt"
+    list_data = [{"sentence": "我是一个多情善感的小男孩！我想翻译成英文，谢谢！我想成英文，谢谢！"}]
     feed = {}
     for i, item in enumerate(list_data):
         feed[str(i)] = str(item)

@@ -20,8 +20,8 @@ client = PipelineClient()
 client.connect(['127.0.0.1:8080'])
 
 list_data = [{
-    "text_a": "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5",
-    "text_b": "频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"
+    "sentence":
+    "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"
 }]
 feed = {}
 for i, item in enumerate(list_data):
@@ -32,7 +32,6 @@ start_time = time.time()
 ret = client.predict(feed_dict=feed)
 end_time = time.time()
 print("time to cost :{} seconds".format(end_time - start_time))
-
 result = np.array(eval(ret.value[0]))
 print(ret.key)
 print(result.shape)

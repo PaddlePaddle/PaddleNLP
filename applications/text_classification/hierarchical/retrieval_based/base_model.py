@@ -61,7 +61,6 @@ class SemanticIndexBase(nn.Layer):
                 input_ids, token_type_ids = batch_data
                 text_embeddings = self.get_pooled_embedding(
                     input_ids, token_type_ids=token_type_ids)
-
                 yield text_embeddings
 
     def cosine_sim(self,

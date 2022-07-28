@@ -129,7 +129,8 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
     text2similar = {}
     with open(args.similar_text_pair_file, 'r', encoding='utf-8') as f:
         for line in f:
-            text, similar_text = line.rstrip().rsplit("\t", 1)
+            text_arr = line.rstrip().rsplit("\t")
+            text, similar_text = text_arr[0], ','.join(text_arr[1:])
             text2similar[text] = similar_text
     rs = []
     with open(recall_result_file, 'r', encoding='utf-8') as f:
@@ -138,9 +139,8 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
             if index % args.recall_num == 0 and index != 0:
                 rs.append(relevance_labels)
                 relevance_labels = []
-            text_arr = line.rstrip().rsplit("\t", 2)
+            text_arr = line.rstrip().rsplit("\t")
             text, similar_text, cosine_sim = text_arr
-            # breakpoint()
             if text2similar[text] == similar_text:
                 relevance_labels.append(1)
             else:
@@ -223,7 +223,7 @@ def do_train():
     ): [data for data in fn(samples)]
 
     if (args.evaluate):
-        eval_func = partial(convert_label_example,
+        eval_func = partial(convert_example,
                             tokenizer=tokenizer,
                             max_seq_length=args.max_seq_length)
         id2corpus = gen_id2corpus(args.corpus_file)
@@ -238,11 +238,10 @@ def do_train():
                                                batchify_fn=batchify_fn_dev,
                                                trans_fn=eval_func)
         # convert_corpus_example
-        query_func = partial(convert_corpus_example,
+        query_func = partial(convert_example,
                              tokenizer=tokenizer,
                              max_seq_length=args.max_seq_length)
-        text_list, text2similar_text = gen_text_file(
-            args.similar_text_pair_file)
+        text_list, _ = gen_text_file(args.similar_text_pair_file)
 
         query_ds = MapDataset(text_list)
 

@@ -24,8 +24,7 @@ def convert_example(example,
                     pad_to_max_seq_len=False):
     result = []
     for text in example:
-        encoded_inputs = tokenizer(text=text['text_a'],
-                                   text_pair=text['text_b'],
+        encoded_inputs = tokenizer(text=text['sentence'],
                                    max_seq_len=max_seq_length,
                                    pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
