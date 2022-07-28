@@ -110,7 +110,7 @@ $ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 
 运行方式：
 
 ```shell
-python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_900/model_state.pdparams --output_path=./export
+python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_900/ --output_path=./export
 ```
 
 
