@@ -18,7 +18,7 @@ from functools import partial
 from collections import defaultdict
 
 import numpy as np
-from paddlenlp.utils.log import logger
+from ..utils.log import logger
 
 __all__ = ["TokenizerWrapper", "MLMTokenizerWrapper"]
 
