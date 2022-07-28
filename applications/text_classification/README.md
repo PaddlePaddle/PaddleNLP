@@ -13,17 +13,17 @@
 文本分类任务可以根据标签类型分为多分类（multi class）、多标签（multi label）、层次分类（hierarchical）等三类任务，接下来我们将以下图的新闻文本分类为例介绍三种分类任务的区别。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/177503276-2095a4f3-0e86-4a72-85a7-c72165bf94e1.jpg />
+    <img src=https://user-images.githubusercontent.com/63761690/178486882-bcf797a8-5a07-420c-acbb-837bef5c80b5.jpg />
 </div>
 
-- **多分类**是最常见的文本分类类型，多分类数据集的标签集含有两个或两个以上的类别，所有输入句子/文本有且只有一个标签。在文本多分类任务中，我们需要预测输入句子/文本最可能来自 `n` 个标签类别中的哪一个类别。以上图多分类中新闻文本为例，该新闻分类具有一个标签为 `娱乐`。
+- **多分类**（Multi class）是最常见的文本分类类型，多分类数据集的标签集含有两个或两个以上的类别，所有输入句子/文本有且只有一个标签。在文本多分类任务中，我们需要预测输入句子/文本最可能来自 `n` 个标签类别中的哪一个类别。以上图多分类中新闻文本为例，该新闻分类具有一个标签为 `娱乐`。
 
-- **多标签**数据集的标签集含有两个或两个以上的类别，输入句子/文本具有一个或多个标签。在文本多标签任务中，我们需要预测输入句子/文本可能来自 `n` 个标签类别中的哪几个类别。以上图多标签中新闻文本为例，该新闻分类具有 `相机` 和 `芯片` 两个标签。
+- **多标签**（Multi label）数据集的标签集含有两个或两个以上的类别，输入句子/文本具有一个或多个标签。在文本多标签任务中，我们需要预测输入句子/文本可能来自 `n` 个标签类别中的哪几个类别。以上图多标签中新闻文本为例，该新闻分类具有 `相机` 和 `芯片` 两个标签。
 
-- **层次分类**数据集的标签集具有多级标签且标签之间具有层级结构关系，输入句子/文本具有一个或多个标签。在文本层次分类任务中，我们需要预测输入句子/文本可能来自于不同级标签类别中的某一个或几个类别。以上图层次分类中新闻文本为例（新闻为根节点），该新闻一级分类标签为 `体育`，二级分类标签为 `足球`。并且由于标签间存在层次结构关系，如果具有二级分类标签 `足球`，那么必然存在二级分类标签的父节点 `体育`。
+- **层次分类**（Hierarchical）数据集的标签集具有多级标签且标签之间具有层级结构关系，输入句子/文本具有一个或多个标签。在文本层次分类任务中，我们需要预测输入句子/文本可能来自于不同级标签类别中的某一个或几个类别。以上图层次分类中新闻文本为例（新闻为根节点），该新闻一级分类标签为 `体育`，二级分类标签为 `足球`。并且由于标签间存在层次结构关系，如果具有二级分类标签 `足球`，那么必然存在二级分类标签的父节点 `体育`。
 
-## 基于预训练模型的文本分类任务微调
-我们希望使用已有的标注数据，训练一个文本分类器对待预测的句子或文本进行分类，目前最常用、效果最好的文本分类方法是对预训练语言模型（Pre-trained Language Model, PLM）进行微调得到文本分类器。
+## 基于预训练模型的文本分类任务
+训练一个文本分类器对待预测的句子或文本进行分类，目前最常用、效果最好的文本分类方法是对预训练语言模型（Pre-trained Language Model, PLM）进行微调得到文本分类器。
 
 预训练模型是在超大规模的语料采用无监督（unsupervised）或者弱监督（weak-supervised）的方式训练模型，期望模型能够获得语言相关的知识，比如句法，语法知识等等，预训练模型编码得到[CLS]输出向量被视为输入文本语义表示。然后再利用预训练模型[CLS]输出层后叠加线性层去训练不同的文本分类任务，使得预训练模型”更懂”这个任务。例如，利用预训练好的模型继续训练多分类任务，将会获得比较好的一个分类结果，直观地想，预训练模型已经懂得了语言的知识，在这些知识基础上去学习文本分类任务将会事半功倍。
 
@@ -36,6 +36,8 @@ model_name = "ernie-3.0-base-zh"
 model = AutoModelForSequenceClassification.from_pretrained(model_name, num_classes=num_classes)
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 ```
+在中文领域内 **ERNIE 3.0** 系列的模型在模型效果和模型计算效率都是相对比较突出的，因此在文本分类的预训练模型选择主要是ERNIE 3.0 系列模型为主，下面是 ERNIE 3.0 batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图，具体的测评细节可以见[**ERNIE 3.0 效果和性能测评文档**](../../model_zoo/ernie-3.0)：
+<img width="1030" alt="image" src="https://user-images.githubusercontent.com/16698950/178405140-4b5885ee-dcb8-4d67-8cd6-9aa1fdb98e92.png">
 
 
 ## 文本分类应用全流程介绍
@@ -47,14 +49,16 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 </div>
 
 1. **数据准备**
-
-- 首先我们需要根据数据类型选择对应的文本分类类型（[多分类](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class)、[多标签](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label)、[层次分类](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical)）。
 - 如果没有已标注的数据集，我们推荐doccano数据标注工具，如何使用doccano进行数据标注并转化成指定格式本地数据集详见[文本分类任务doccano使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)。如果已有标注好的本地数据集，我们需要根据不同任务要求将数据集整理为文档要求的格式：[多分类数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#%E4%BB%8E%E6%9C%AC%E5%9C%B0%E6%96%87%E4%BB%B6%E5%88%9B%E5%BB%BA%E6%95%B0%E6%8D%AE%E9%9B%86)、[多标签数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#%E4%BB%8E%E6%9C%AC%E5%9C%B0%E6%96%87%E4%BB%B6%E5%88%9B%E5%BB%BA%E6%95%B0%E6%8D%AE%E9%9B%86)、[层次分类数据集格式要求](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#%E4%BB%A5%E5%86%85%E7%BD%AE%E6%95%B0%E6%8D%AE%E9%9B%86%E6%A0%BC%E5%BC%8F%E8%AF%BB%E5%8F%96%E6%9C%AC%E5%9C%B0%E6%95%B0%E6%8D%AE%E9%9B%86)。
 - 准备好数据集后，我们可以根据现有的数据集规模或训练后模型表现选择是否使用数据增强策略进行数据集扩充。（目前数据增强工具正在开发中，敬请期待）
 
 2. **模型训练**
 
 - 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"ernie-3.0-base-zh"模型，英文任务默认使用"ernie-2.0-base-en"模型，ERNIE 3.0还支持多个轻量级中文模型，详见[ERNIE模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/ERNIE/contents.html)，可以根据任务和设备需求进行选择。
+- 首先我们需要根据场景选择不同的任务目录，具体可以见
+ [多分类任务点击这里](./multi_class)
+ [多标签任务点击这里](./multi_label)
+ [层次分类任务点击这里](./hierarchical)
 
 - 训练结束后，我们可以加载保存的最佳模型进行模型测试，打印模型预测结果。
 

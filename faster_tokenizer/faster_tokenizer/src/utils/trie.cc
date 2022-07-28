@@ -33,13 +33,13 @@ void Trie::CreateTrie(const std::vector<const char*>& keys,
                const_cast<char**>(&keys[0]),
                nullptr,
                const_cast<int*>(&values[0]));
-  const uint* trie_ptr = reinterpret_cast<const uint*>(trie_->array());
-  trie_array_ = std::vector<uint>(trie_ptr, trie_ptr + trie_->size());
+  const uint32_t* trie_ptr = reinterpret_cast<const uint32_t*>(trie_->array());
+  trie_array_ = std::vector<uint32_t>(trie_ptr, trie_ptr + trie_->size());
 }
 
-int Trie::EncodeTokenId(const std::string& token, uint id) const {
+int Trie::EncodeTokenId(const std::string& token, uint32_t id) const {
   bool is_suffix_token = (token.rfind(continuing_subword_prefix_) == 0);
-  uint token_length = token.length();
+  uint32_t token_length = token.length();
   if (is_suffix_token) {
     token_length -= continuing_subword_prefix_.length();
   }
@@ -78,7 +78,7 @@ void Trie::InitTrie(const std::vector<const char*>& keys,
 
 void Trie::AddPuncVocab(
     std::vector<std::string>* punc_vocab,
-    const std::unordered_map<std::string, uint>& vocab) const {
+    const std::unordered_map<std::string, uint32_t>& vocab) const {
   if (with_pretokenization_) {
     for (uint32_t cp = 1; cp <= 0x0010FFFF; ++cp) {
       if (!utils::IsUnicodeChar(cp) || !utils::IsPunctuationOrChineseChar(cp)) {
@@ -95,7 +95,7 @@ void Trie::AddPuncVocab(
   }
 }
 
-void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
+void Trie::SetVocab(const std::unordered_map<std::string, uint32_t>& vocab) {
   std::vector<const char*> keys;
   std::vector<int> values;
   for (auto&& item : vocab) {
@@ -106,7 +106,7 @@ void Trie::SetVocab(const std::unordered_map<std::string, uint>& vocab) {
 }
 
 void Trie::SetVocabList(const std::vector<std::string>& keys) {
-  std::unordered_map<std::string, uint> vocab;
+  std::unordered_map<std::string, uint32_t> vocab;
   for (int i = 0; i < keys.size(); ++i) {
     vocab[keys[i]] = i;
   }
@@ -123,7 +123,7 @@ Trie::Trie(const std::string& continuing_subword_prefix,
       unk_token_(unk_token),
       with_pretokenization_(with_pretokenization) {}
 
-Trie::Trie(const std::unordered_map<std::string, uint>& vocab,
+Trie::Trie(const std::unordered_map<std::string, uint32_t>& vocab,
            const std::string& continuing_subword_prefix,
            const std::string& unk_token,
            bool with_pretokenization)
