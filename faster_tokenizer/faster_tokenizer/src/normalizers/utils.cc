@@ -84,10 +84,66 @@ void LowercaseNormalizer::operator()(NormalizedString* input) const {
 }
 
 void to_json(nlohmann::json& j, const SequenceNormalizer& normalizer) {
-  j = {{"type", "SequenceNormalizer"}};
+  nlohmann::json jlist;
+  for (auto& ptr : normalizer.normalizer_ptrs_) {
+    nlohmann::json jitem;
+    if (typeid(*ptr) == typeid(SequenceNormalizer)) {
+      jitem = *dynamic_cast<SequenceNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(LowercaseNormalizer)) {
+      jitem = *dynamic_cast<LowercaseNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(StripNormalizer)) {
+      jitem = *dynamic_cast<StripNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(StripAccentsNormalizer)) {
+      jitem = *dynamic_cast<StripAccentsNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(NFCNormalizer)) {
+      jitem = *dynamic_cast<NFCNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(NFDNormalizer)) {
+      jitem = *dynamic_cast<NFDNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(NFKCNormalizer)) {
+      jitem = *dynamic_cast<NFKCNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(NFKDNormalizer)) {
+      jitem = *dynamic_cast<NFKDNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(NmtNormalizer)) {
+      jitem = *dynamic_cast<NmtNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(ReplaceNormalizer)) {
+      jitem = *dynamic_cast<ReplaceNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(BertNormalizer)) {
+      jitem = *dynamic_cast<BertNormalizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(PrecompiledNormalizer)) {
+      jitem = *dynamic_cast<PrecompiledNormalizer*>(ptr.get());
+    }
+    jlist.push_back(jitem);
+  }
+  j = {{"type", "SequenceNormalizer"}, {"normalizers", jlist}};
 }
 
-void from_json(const nlohmann::json& j, SequenceNormalizer& normalizer) {}
+void from_json(const nlohmann::json& j,
+               SequenceNormalizer& sequence_normalizer) {
+#define TRY_APPEND_NORMALIZER(NORMALIZER_TYPE)         \
+  if (normalizer_type == #NORMALIZER_TYPE) {           \
+    NORMALIZER_TYPE normalizer;                        \
+    normalizer_json.get_to(normalizer);                \
+    sequence_normalizer.AppendNormalizer(&normalizer); \
+  }
+
+  for (auto& normalizer_json : j.at("normalizers")) {
+    std::string normalizer_type;
+    normalizer_json.at("type").get_to(normalizer_type);
+    TRY_APPEND_NORMALIZER(BertNormalizer);
+    TRY_APPEND_NORMALIZER(PrecompiledNormalizer);
+    TRY_APPEND_NORMALIZER(ReplaceNormalizer);
+    TRY_APPEND_NORMALIZER(StripAccentsNormalizer);
+    TRY_APPEND_NORMALIZER(StripNormalizer);
+    TRY_APPEND_NORMALIZER(NFCNormalizer);
+    TRY_APPEND_NORMALIZER(NFKCNormalizer);
+    TRY_APPEND_NORMALIZER(NFDNormalizer);
+    TRY_APPEND_NORMALIZER(NFKDNormalizer);
+    TRY_APPEND_NORMALIZER(NmtNormalizer);
+    TRY_APPEND_NORMALIZER(LowercaseNormalizer);
+    TRY_APPEND_NORMALIZER(SequenceNormalizer);
+  }
+#undef TRY_APPEND_NORMALIZER
+}
 
 void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer) {
   j = {
