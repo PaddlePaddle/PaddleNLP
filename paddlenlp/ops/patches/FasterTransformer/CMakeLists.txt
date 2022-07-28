@@ -395,7 +395,6 @@ endforeach()
 ################################################################################
 add_executable(gpt sample/cpp/gpt_sample.cc )
 target_link_libraries(gpt PUBLIC -lcublas -lcublasLt -lcudart -lcurand -lnccl -lmpi transformer-static)
-# target_link_libraries(gpt PUBLIC -lcublas -lcublasLt -lcudart -lcurand -lnccl -lmpi decoder decoding)
 
 export(
   EXPORT
