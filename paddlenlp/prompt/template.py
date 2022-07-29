@@ -319,7 +319,7 @@ class SoftTemplate(Template):
 
             if 'soft' in part and part['soft'] is not None:
                 if 'duplicate' in part:
-                    logger.warnings(
+                    logger.warning(
                         'Ignore ``duplicate``. It is '
                         'incompatible with ``soft`` with text values.')
 
