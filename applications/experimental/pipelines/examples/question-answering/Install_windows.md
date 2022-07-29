@@ -52,6 +52,12 @@ xpack.security.enabled: false
 # 以百科城市数据为例建立 ANN 索引库
 python utils/offline_ann.py --index_name baike_cities --doc_dir data/baike
 ```
+
+参数含义说明
+* `index_name`: 索引的名称
+* `doc_dir`: txt文本数据的路径
+* `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
+
 运行成功后会输出如下的日志：
 ```
 INFO - pipelines.utils.logger -  Logged parameters:
@@ -78,6 +84,20 @@ python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。
+
+#### 1.4.5 数据更新
+
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+
+```
+兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。
+
+从海外市场表现看，
+对俄乌冲突的恐慌情绪已显著释放，
+海外权益市场也从单边下跌转入双向波动。
+
+长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
+```
 
 ## FAQ
 
