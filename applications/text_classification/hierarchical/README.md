@@ -108,24 +108,24 @@ data/
 
 **训练、开发、测试数据集**
 
-train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(可选，测试数据集文件)，文件中文本与标签类别名，不同级的标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
+train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(可选，测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用`','`英文逗号分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替；通常建议训练集：开发集比例为8:2或7:3; 建议训练集、开发集、测试集的比例为8:1:1或6:2:2。
 
-训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替；通常建议训练集：开发集比例为8:2或7:3; 建议训练集、开发集、测试集的比例为8:1:1或6:2:2。**注意文本中不能包含tab符`'\t'`，对于第i层数据没有标签的，使用空字符`''`来表示**。
+**注意文本中不能包含tab符`'\t'`**。本项目选择为标签层次结构中的每一个节点生成对应的标签路径，详见[层次分类任务介绍](#层次分类任务介绍)
 
 - train.txt/dev.txt/test.txt 文件格式：
 ```text
-<文本1>'\t'<文本1：一级标签1>','<文本1：一级标签2>'\t'<文本2：二级标签1>','<文本1：二级标签2>','<文本1：二级标签3>
-<文本2>'\t'<文本2：一级标签1>'\t'<文本2：二级标签1>','<文本2：二级标签2>
+<文本1>'\t'<文本1:标签1>','<文本1:标签2>','<文本1:标签3>
+<文本2>'\t'<文本2:标签1>','<文本2:标签2>
 ...
 ```
 
 - train.txt/dev.txt/test.txt 文件样例：
 ```text
-嗓子紧，有点咳咳，吃什么消炎药好，我现在吃阿莫西林胶囊    药物    适用症
-支气管扩张发病率大概是多少    其他    无法确定
-支气管扩张是癌症吗    病症    定义
-支气管扩张引发的疾病有哪些    病症    相关病症
-支气管扩张和哮喘哪个严重    其他    对比
+嗓子紧，有点咳咳，吃什么消炎药好，我现在吃阿莫西林胶囊    药物,药物##适用症
+支气管扩张发病率大概是多少    其他,其他##无法确定
+支气管扩张是癌症吗    病症,病症##定义
+支气管扩张引发的疾病有哪些    病症,病症##相关病症
+支气管扩张和哮喘哪个严重    其他,其他##对比
 ...
 ```
 **分类标签**
@@ -145,12 +145,13 @@ label.txt(层次分类标签文件)记录数据集中所有标签路径集合，
 ```
 - label.txt  文件样例：
 ```text
-治疗方案
-治疗方案##临床意义/检查目的
-治疗方案##化验/体检方案
+药物
+药物##适用症
+病症
+病症##定义
 其他
 其他##无法确定
-其他##设备用法
+其他##对比
 ...
 ```
 **待预测数据**
@@ -184,7 +185,6 @@ mv cmid data
 python train.py \
     --device "cpu" \
     --dataset_dir "data" \
-    --depth 2 \
     --save_dir "./checkpoint" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
@@ -201,7 +201,6 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
     --device "gpu" \
     --dataset_dir "data" \
-    --depth 2 \
     --save_dir "./checkpoint" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
@@ -217,7 +216,6 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 
 * `device`: 选用什么设备进行训练，选择cpu、gpu、xpu、npu。如使用gpu训练，可使用参数--gpus指定GPU卡号；默认为"gpu"。
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
-* `depth`：层次结构最大深度，默认为2。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
 * `model_name`：选择预训练模型；默认为"ernie-3.0-medium-zh"。
@@ -290,26 +288,22 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 ## 模型预测
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
 
-在CPU环境下进行预测，预测结果将保存在`output_file`：
+在CPU环境下进行预测：
 ```shell
 python predict.py \
     --device "cpu" \
     --dataset_dir "data" \
-    --depth 2 \
-    --output_file "output.txt" \
     --params_path "./checkpoint" \
     --max_seq_length 128 \
     --batch_size 32
 ```
 
-在GPU环境下进行预测，预测结果将保存在`output_file`：
+在GPU环境下进行预测：
 
 ```shell
 python predict.py \
     --device "gpu" \
     --dataset_dir "data" \
-    --depth 2 \
-    --output_file "output.txt" \
     --params_path "./checkpoint" \
     --max_seq_length 128 \
     --batch_size 32
@@ -319,7 +313,6 @@ python predict.py \
 
 * `device`: 选用什么设备进行预测，可选cpu、gpu、xpu、npu；默认为gpu。
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含data.txt和label.txt文件;默认为None。
-* `depth`：层次结构最大深度，默认为2。
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -396,8 +389,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3' \
-    --depth 2
+    --width_mult '2/3'
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
@@ -416,7 +408,6 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `DataArguments`
   * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
-  * `depth`：层次分类数据标签最大深度;默认为2。
   * `max_seq_length`：模型使用的最大序列长度，建议与训练过程保持一致, 若出现显存不足，请适当调低这一参数；默认为128。
 
 * `ModelArguments`

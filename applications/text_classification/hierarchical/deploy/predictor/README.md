@@ -23,7 +23,6 @@ python -m pip install onnxruntime
 ```
 python infer.py \
     --device "gpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \
@@ -35,7 +34,6 @@ python infer.py \
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
 * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-medium-zh"。
-* `depth`：层次分类结构最大深度；默认为2。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `use_fp16`：选择是否开启FP16进行加速；默认为False。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -51,7 +49,6 @@ python infer.py \
 python infer.py \
     --use_fp16 \
     --device "gpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \
@@ -66,7 +63,6 @@ python infer.py \
     --perf \
     --perf_dataset 'dev' \
     --device "gpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \
@@ -80,7 +76,6 @@ python infer.py \
 ```
 python infer.py \
     --device "cpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \
@@ -92,7 +87,6 @@ python infer.py \
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
 * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-medium-zh"，中文数据集推荐使用"ernie-3.0-medium-zh"。
-* `depth`：必须,层次分类结构最大深度；默认为2。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `use_quantize`：选择是否开启INT8动态量化进行加速；默认为False。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为200。
@@ -108,7 +102,6 @@ python infer.py \
 python infer.py \
     --use_quantize \
     --device "cpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \
@@ -125,7 +118,6 @@ python infer.py \
     --perf \
     --perf_dataset 'dev' \
     --device "cpu" \
-    --depth 2 \
     --model_path_prefix "../../export/float32" \
     --model_name_or_path "ernie-3.0-medium-zh" \
     --max_seq_length 128 \

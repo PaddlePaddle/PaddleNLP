@@ -33,15 +33,6 @@ parser.add_argument("--dataset_dir",
                     type=str,
                     help="Local dataset directory should"
                     " include data.txt and label.txt")
-parser.add_argument("--depth",
-                    type=int,
-                    required=True,
-                    default=2,
-                    help="The maximum level of hierarchy")
-parser.add_argument("--output_file",
-                    default="output.txt",
-                    type=str,
-                    help="Save prediction result")
 parser.add_argument("--params_path",
                     default="./checkpoint/",
                     type=str,
@@ -98,26 +89,27 @@ def predict(data, label_list):
         token_type_ids = paddle.to_tensor(token_type_ids)
         logits = model(input_ids, token_type_ids)
         probs = F.sigmoid(logits).numpy()
-        confidence = []
         for prob in probs:
             labels = []
             for i, p in enumerate(prob):
                 if p > 0.5:
-                    labels.append(i)
+                    labels.append(label_list[i])
             results.append(labels)
 
-    with open(args.output_file, 'w', encoding='utf-8') as f:
-        for text, result in zip(data, results):
-            hierarchical_labels = {d: [] for d in range(args.depth)}
-            f.write(text)
-            for r in result:
-                for i, l in enumerate(label_list[r].split('##')):
-                    if l not in hierarchical_labels[i]:
-                        hierarchical_labels[i].append(l)
-            for d in range(args.depth):
-                f.write('\t' + ','.join(hierarchical_labels[d]))
-            f.write('\n')
-    logger.info("Prediction results save in {}.".format(args.output_file))
+    for text, labels in zip(data, results):
+        hierarchical_labels = {}
+        logger.info("text: {}".format(text))
+        logger.info("prediction result: {}".format(",".join(labels)))
+        for label in labels:
+            for i, l in enumerate(label.split('##')):
+                if i not in hierarchical_labels:
+                    hierarchical_labels[i] = []
+                if l not in hierarchical_labels[i]:
+                    hierarchical_labels[i].append(l)
+        for d in range(len(hierarchical_labels)):
+            logger.info("level {} : {}".format(d + 1, ','.join(
+                hierarchical_labels[d])))
+        logger.info("--------------------")
     return
 
 

@@ -31,7 +31,7 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 from paddlenlp.utils.log import logger
 
 from metric import MetricReport
-from utils import evaluate, preprocess_function
+from utils import evaluate, preprocess_function, read_local_dataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--device',
@@ -43,11 +43,6 @@ parser.add_argument("--dataset_dir",
                     type=str,
                     help="Local dataset directory should "
                     "include train.txt, dev.txt and label.txt")
-parser.add_argument("--depth",
-                    type=int,
-                    required=True,
-                    default=2,
-                    help="The maximum level of hierarchy")
 parser.add_argument("--save_dir",
                     default="./checkpoint",
                     type=str,
@@ -144,22 +139,27 @@ def train():
         paddle.distributed.init_parallel_env()
 
     # load and preprocess dataset
-    train_dir = os.path.join(args.dataset_dir, "train.txt")
-    dev_dir = os.path.join(args.dataset_dir, "dev.txt")
-    label_dir = os.path.join(args.dataset_dir, "label.txt")
     label_list = {}
-    with open(label_dir, 'r', encoding='utf-8') as f:
+    with open(os.path.join(args.dataset_dir, 'label.txt'),
+              'r',
+              encoding='utf-8') as f:
         for i, line in enumerate(f):
-            label_list[line.strip()] = i
-
-    train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(args.dataset_dir, 'train.txt'),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(args.dataset_dir, 'dev.txt'),
+                          label_list=label_list,
+                          lazy=False)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
                                    max_seq_length=args.max_seq_length,
-                                   label_list=label_list,
-                                   depth=args.depth)
+                                   label_nums=len(label_list))
     train_ds = train_ds.map(trans_func)
     dev_ds = dev_ds.map(trans_func)
 

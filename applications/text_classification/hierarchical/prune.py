@@ -27,7 +27,7 @@ from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassifica
 from paddlenlp.utils.log import logger
 from dataclasses import dataclass, field
 
-from utils import preprocess_function
+from utils import preprocess_function, read_local_dataset
 from prune_trainer import DynabertConfig
 
 
@@ -47,9 +47,6 @@ class DataArguments:
             "The dataset directory should include train.txt,"
             "dev.txt and label.txt files."
         })
-
-    depth: int = field(default=2,
-                       metadata={"help": "The maximum level of hierarchy."})
 
     max_seq_length: int = field(
         default=512,
@@ -90,14 +87,22 @@ def main():
     training_args.print_config(data_args, "Data")
 
     # load and preprocess dataset
-    train_dir = os.path.join(data_args.dataset_dir, "train.txt")
-    dev_dir = os.path.join(data_args.dataset_dir, "dev.txt")
-    label_dir = os.path.join(data_args.dataset_dir, "label.txt")
-    train_ds, dev_ds = load_dataset("wos", data_files=(train_dir, dev_dir))
     label_list = {}
-    with open(label_dir, 'r', encoding='utf-8') as f:
+    with open(os.path.join(data_args.dataset_dir, 'label.txt'),
+              'r',
+              encoding='utf-8') as f:
         for i, line in enumerate(f):
-            label_list[line.strip()] = i
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(data_args.dataset_dir,
+                                              'train.txt'),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(data_args.dataset_dir, 'dev.txt'),
+                          label_list=label_list,
+                          lazy=False)
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.params_dir)
@@ -106,8 +111,7 @@ def main():
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
                                    max_seq_length=data_args.max_seq_length,
-                                   label_list=label_list,
-                                   depth=data_args.depth)
+                                   label_nums=len(label_list))
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
     # Define data collector， criterion

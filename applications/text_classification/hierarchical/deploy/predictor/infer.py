@@ -23,11 +23,6 @@ from paddlenlp.datasets import load_dataset
 from predictor import Predictor
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--depth",
-                    required=True,
-                    type=int,
-                    default=2,
-                    help="The maximum level of hierarchy")
 parser.add_argument("--model_path_prefix",
                     type=str,
                     required=True,
@@ -84,6 +79,16 @@ parser.add_argument("--perf_dataset",
                     "dev dataset or test dataset")
 args = parser.parse_args()
 
+
+def read_local_dataset(path, label_list):
+    label_list_dict = {label_list[i]: i for i in range(len(label_list))}
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            sentence, label = line.strip().split('\t')
+            labels = [label_list_dict[l] for l in label.split(',')]
+            yield {'sentence': sentence, 'label': labels}
+
+
 if __name__ == "__main__":
 
     label_list = []
@@ -99,7 +104,10 @@ if __name__ == "__main__":
     if args.perf:
         eval_dir = os.path.join(args.dataset_dir,
                                 "{}.txt".format(args.perf_dataset))
-        eval_ds = load_dataset("wos", data_files=(eval_dir))
+        eval_ds = load_dataset(read_local_dataset,
+                               path=eval_dir,
+                               label_list=label_list,
+                               lazy=False)
         texts, labels = predictor.get_text_and_label(eval_ds)
 
         # preprocess & evaluate & latency
