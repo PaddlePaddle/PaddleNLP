@@ -15,11 +15,12 @@
 
 import os
 import json
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from shutil import copyfile
 
 from faster_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFasterTokenizer
+from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .tokenizer import ErnieMTokenizer
 from ...utils.log import logger
 
@@ -87,3 +88,49 @@ class ErnieMFasterTokenizer(PretrainedFasterTokenizer):
             copyfile(self.sentencepiece_model_file,
                      out_sentencepiece_model_file)
         return (out_sentencepiece_model_file, )
+
+    def __call__(self,
+                 text: Union[str, List[str], List[List[str]]],
+                 text_pair: Optional[Union[str, List[str],
+                                           List[List[str]]]] = None,
+                 max_length: Optional[int] = None,
+                 stride: int = 0,
+                 is_split_into_words: bool = False,
+                 padding: Union[bool, str, PaddingStrategy] = False,
+                 truncation: Union[bool, str, TruncationStrategy] = False,
+                 return_position_ids: bool = True,
+                 return_token_type_ids: bool = False,
+                 return_attention_mask: bool = True,
+                 return_length: bool = False,
+                 return_overflowing_tokens: bool = False,
+                 return_special_tokens_mask: bool = False,
+                 return_dict: bool = True,
+                 return_offsets_mapping: bool = False,
+                 add_special_tokens: bool = True,
+                 pad_to_multiple_of: Optional[int] = None,
+                 return_tensors: Optional[Union[str, TensorType]] = None,
+                 verbose: bool = True,
+                 **kwargs):
+        return super(ErnieMFasterTokenizer, self).__call__(
+            text=text,
+            text_pair=text_pair,
+            max_length=max_length,
+            stride=stride,
+            is_split_into_words=is_split_into_words,
+            padding=padding,
+            truncation=truncation,
+            return_position_ids=return_position_ids,
+            # Ernie-M model doesn't have token_type embedding.
+            # So set "return_token_type_ids" to False.
+            return_token_type_ids=False,
+            return_attention_mask=return_attention_mask,
+            return_length=return_length,
+            return_overflowing_tokens=return_overflowing_tokens,
+            return_special_tokens_mask=return_special_tokens_mask,
+            return_dict=return_dict,
+            return_offsets_mapping=return_offsets_mapping,
+            add_special_tokens=add_special_tokens,
+            pad_to_multiple_of=pad_to_multiple_of,
+            return_tensors=return_tensors,
+            verbose=verbose,
+            **kwargs)
