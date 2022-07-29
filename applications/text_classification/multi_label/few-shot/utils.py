@@ -34,16 +34,20 @@ def load_local_dataset(data_path, splits, label_list):
             The dictionary that maps labels to indeces.
     """
 
-    def _reader(data_file):
+    def _reader(data_file, label_list):
         with open(data_file, "r", encoding="utf-8") as fp:
             for idx, line in enumerate(fp):
                 data = line.strip().split("\t")
                 if len(data) == 1:
-                    yield InputExample(uid=idx, text_a=data[0])
+                    yield InputExample(text_a=data[0])
                 else:
                     text, label = data
                     label = label.strip().split(",")
-                    yield InputExample(uid=idx, text_a=text, labels=label)
+                    label = [
+                        float(1) if x in label else float(0)
+                        for x in range(len(label_list))
+                    ]
+                    yield InputExample(text_a=text, labels=label)
 
     split_map = {"train": "train.txt", "dev": "dev.txt", "test": "data.txt"}
     datasets = []
