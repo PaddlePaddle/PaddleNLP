@@ -312,7 +312,11 @@ class FewShotSampler(object):
     def _sample_per_label(self, indices, labels, num_per_label):
         label_dict = defaultdict(list)
         for idx, label in zip(indices, labels):
-            label_dict[label].append(idx)
+            if isinstance(label, list):
+                for sublabel in label:
+                    label_dict[sublabel].append(idx)
+            else:
+                label_dict[label].append(idx)
 
         sampled = []
         for label, index in label_dict.items():
