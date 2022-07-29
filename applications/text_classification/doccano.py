@@ -127,28 +127,21 @@ def do_convert():
                     if l not in label_list:
                         label_list.append(l)
             if args.task_type == 'hierarchical':
-                label_dict = {}
+                label_dict = []
                 for label in labels:
-                    for i, l in enumerate(label.split(args.separator)):
-                        if i in label_dict and l not in label_dict[i]:
-                            label_dict[i].append(l)
-                        else:
-                            label_dict[i] = [l]
-                    for i in range(len(label.split(args.separator))):
-                        if args.separator.join(
-                                label.split(
-                                    args.separator)[:i + 1]) not in label_list:
-                            label_list.append(
-                                args.separator.join(
-                                    label.split(args.separator)[:i + 1]))
-                example = ' '.join(text.strip().split('\t'))
-                for i in range(len(label_dict)):
-                    example += '\t' + ','.join(label_dict[i])
-                example += '\n'
+                    level_labels = label.split(args.separator)
+                    for i in range(len(level_labels)):
+                        l = args.separator.join(level_labels[:i + 1])
+                        label_dict.append(l)
+                        if l not in label_list:
+                            label_list.append(l)
+                example = ' '.join(text.strip().split('\t')) + '\t' + ','.join(
+                    label_list) + '\n'
             examples.append(example)
 
     save_path = os.path.join(args.save_dir, 'label.txt')
     with open(save_path, "w", encoding="utf-8") as f:
+        label_list = sorted(label_list)
         for l in label_list:
             f.write(l + '\n')
 

@@ -173,7 +173,7 @@ python doccano.py \
     --task_type "multi_class"
 ```
 
-### 7.1 多标签任务
+### 7.2 多标签任务
 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)进行相应模型训练。
 运行
 ```shell
@@ -184,7 +184,7 @@ python doccano.py \
     --task_type "multi_label"
 ```
 
-### 7.1 多分类任务
+### 7.3 层次分类任务
 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)进行相应模型训练。
 运行
 ```shell
@@ -192,8 +192,7 @@ python doccano.py \
     --doccano_file doccano.jsonl \
     --save_dir ./data \
     --splits 0.8 0.2 \
-    --task_type "hierarchical" \
-    --separator "##"
+    --task_type "hierarchical"
 ```
 
 可配置参数说明：
