@@ -17,4 +17,5 @@ limitations under the License. */
 #include "pretokenizers/bert.h"
 #include "pretokenizers/metaspace.h"
 #include "pretokenizers/pretokenizer.h"
+#include "pretokenizers/sequence.h"
 #include "pretokenizers/whitespace.h"

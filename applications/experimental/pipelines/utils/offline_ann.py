@@ -1,11 +1,25 @@
+import argparse
+
 import paddle
 from pipelines.utils import convert_files_to_dicts
 from pipelines.document_stores import ElasticsearchDocumentStore
 from pipelines.nodes import DensePassageRetriever
 from pipelines.utils import launch_es
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--index_name",
+                    default='baike_cities',
+                    type=str,
+                    help="The index name of the elasticsearch engine")
+parser.add_argument("--doc_dir",
+                    default='data/baike/',
+                    type=str,
+                    help="The doc path of the corpus")
 
-def offline_ann():
+args = parser.parse_args()
+
+
+def offline_ann(index_name, doc_dir):
 
     launch_es()
 
@@ -13,10 +27,7 @@ def offline_ann():
                                                 port="9200",
                                                 username="",
                                                 password="",
-                                                index="baike_cities")
-
-    # 365 个城市百科数据作为 ANN 建库数据
-    doc_dir = "data/baike/"
+                                                index=index_name)
 
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
@@ -43,4 +54,4 @@ def offline_ann():
 
 
 if __name__ == "__main__":
-    offline_ann()
+    offline_ann(args.index_name, args.doc_dir)
