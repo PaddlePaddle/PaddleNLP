@@ -177,13 +177,13 @@ model = AutoModelForTokenClassification.from_pretrained('ernie-health-chinese')
 model = AutoModelForQuestionAnswering.from_pretrained('ernie-health-chinese')
 ```
 
-本项目提供了在 CBLUE 数据集上的微调脚本，包括分类、实体识别和关系抽取三类任务，详细信息可参考 ``cblue``[目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/cblue)。
+本项目提供了在 CBLUE 数据集上的微调脚本，包括分类、实体识别和关系抽取三类任务，详细信息可参考 ``cblue``[目录](./cblue)。
 
 ## 部署
 
-我们为ERNIE-Health提供了Python端部署方案，请根据实际情况进行选择。
+我们为ERNIE-Health微调后的模型提供了Python端部署方案，请根据实际情况进行实现。
 
-详细部署流程请参考：[基于ONNXRuntime推理部署指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/deploy/predictor/)
+详细部署流程请参考：[基于ONNXRuntime推理部署指南](./cblue/deploy/predictor/)
 
 
 ## Reference

@@ -1,7 +1,7 @@
 # 基于ONNXRuntime推理部署指南
 
-本示例以[CBLUE数据集微调](../../cblue/README.md)得到的ERNIE-Health模型为例，分别提供了文本分类任务、实体识别任务和关系抽取任务的部署代码，自定义数据集可参考实现。
-在推理部署前需将微调后的动态图模型转换导出为静态图，详细步骤见[静态图模型导出](../../cblue/README.md)。
+本示例以[CBLUE数据集微调](../../README.md)得到的ERNIE-Health模型为例，分别提供了文本分类任务、实体识别任务和关系抽取任务的部署代码，自定义数据集可参考实现。
+在推理部署前需将微调后的动态图模型转换导出为静态图，详细步骤见[静态图模型导出](../../README.md)。
 
 **目录**
    * [环境安装](#环境安装)
@@ -33,19 +33,19 @@ python -m pip install -r requirements_cpu.txt
 - 文本分类任务
 
 ```
-python infer_classification.py --device gpu --device_id 0 --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
+python infer_classification.py --device gpu --device_id 0 --dataset KUAKE-QIC --model_path_prefix ../../export/inference
 ```
 
 - 实体识别任务
 
 ```
-python infer_ner.py --device gpu --device_id 0 --dataset CMeEE --model_path_prefix ../../cblue/export/inference
+python infer_ner.py --device gpu --device_id 0 --dataset CMeEE --model_path_prefix ../../export/inference
 ```
 
 - 关系抽取任务
 
 ```
-python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_prefix ../../cblue/export/inference
+python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_prefix ../../export/inference
 ```
 
 可支持配置的参数：
@@ -89,19 +89,19 @@ python infer_spo.py --device gpu --device_id 0 --dataset CMeIE --model_path_pref
 - 文本分类任务
 
 ```
-python infer_classification.py --device cpu --dataset KUAKE-QIC --model_path_prefix ../../cblue/export/inference
+python infer_classification.py --device cpu --dataset KUAKE-QIC --model_path_prefix ../../export/inference
 ```
 
 - 实体识别任务
 
 ```
-python infer_ner.py --device cpu --dataset CMeEE --model_path_prefix ../../cblue/export/inference
+python infer_ner.py --device cpu --dataset CMeEE --model_path_prefix ../../export/inference
 ```
 
 - 关系抽取任务
 
 ```
-python infer_spo.py --device cpu --dataset CMeIE --model_path_prefix ../../cblue/export/inference
+python infer_spo.py --device cpu --dataset CMeIE --model_path_prefix ../../export/inference
 ```
 
 可支持配置的参数：

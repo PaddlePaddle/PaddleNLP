@@ -466,7 +466,8 @@ void BindModels(pybind11::module* m) {
                      py_vocab_list.cast<core::VocabList>();
                  size_t unk_id = py_unk_token_id.cast<size_t>();
                  return models::Unigram(vocab_list, {unk_id});
-               } catch (...) {
+               } catch (std::exception& e) {
+                 VLOG(0) << "Init Unigram error:" << e.what();
                  goto error;
                }
              }
@@ -481,6 +482,12 @@ void BindModels(pybind11::module* m) {
       .def("id_to_token", &models::Unigram::IdToToken)
       .def("get_vocab", &models::Unigram::GetVocab)
       .def("get_vocab_size", &models::Unigram::GetVocabSize)
+      .def("set_filter_token",
+           &models::Unigram::SetFilterToken,
+           py::arg("filter_token") = "")
+      .def("set_split_rule",
+           &models::Unigram::SetSplitRule,
+           py::arg("split_rule") = "")
       .def("save",
            [](const models::Unigram& unigram,
               const std::string& folder,

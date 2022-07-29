@@ -138,7 +138,7 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
   size_t offset = 0;
   std::vector<core::Token> tokens;
   tokens.reserve(encode_result.size());
-  for (auto&& str : encode_result) {
+  auto UpdateTokens = [&](const std::string& str) {
     uint32_t id = 0;
     if (token_to_ids_.find(str) != token_to_ids_.end()) {
       id = token_to_ids_.at(str);
@@ -150,6 +150,37 @@ std::vector<core::Token> Unigram::Tokenize(const std::string& sequence) {
     auto len = str.length();
     tokens.emplace_back(id, str, core::Offset{offset, offset + len});
     offset += len;
+  };
+
+  for (auto&& str : encode_result) {
+    // Avoid to append the filtered_token_ to encoded_result
+    if (str == filtered_token_) {
+      offset += filtered_token_.length();
+      continue;
+    }
+    // Split the tokenized tokens following some regex rule
+    if (split_rule_ != nullptr) {
+      re2::StringPiece result;
+      int start = 0;
+      int end = str.length();
+      while (split_rule_->Match(str, start, end, RE2::UNANCHORED, &result, 1)) {
+        int curr_start = result.data() - str.data();
+        int res_len = result.length();
+        start = curr_start + res_len;
+        std::string result_str(result.data(), res_len);
+        if (result_str == filtered_token_) {
+          offset += filtered_token_.length();
+          continue;
+        }
+        UpdateTokens(result_str);
+      }
+      if (start == 0) {
+        // Hasn't been splitted
+        UpdateTokens(str);
+      }
+    } else {
+      UpdateTokens(str);
+    }
   }
   return tokens;
 }
@@ -369,13 +400,35 @@ void Unigram::EncodeUnoptimized(const std::string& normalized,
   }
 }
 
+void Unigram::SetFilterToken(const std::string& filtered_token) {
+  filtered_token_ = filtered_token;
+}
+
+void Unigram::SetSplitRule(const std::string& split_rule) {
+  split_rule_ = utils::make_unique<re2::RE2>(split_rule);
+}
+
 void to_json(nlohmann::json& j, const Unigram& model) {
-  j = {{"type", "Unigram"}, {"unk_id", model.unk_id_}, {"vocab", model.vocab_}};
+  std::string split_rule = "";
+  if (model.split_rule_ != nullptr) {
+    split_rule = model.split_rule_->pattern();
+  }
+  j = {{"type", "Unigram"},
+       {"unk_id", model.unk_id_},
+       {"vocab", model.vocab_},
+       {"filter_token", model.filtered_token_},
+       {"split_rule", split_rule}};
 }
 
 void from_json(const nlohmann::json& j, Unigram& model) {
+  std::string filter_token = j.at("filter_token").get<std::string>();
+  std::string split_rule = j.at("split_rule").get<std::string>();
   model.Init(j.at("vocab").get<core::VocabList>(),
              j.at("unk_id").get<std::vector<size_t>>());
+  if (!split_rule.empty()) {
+    model.SetSplitRule(split_rule);
+  }
+  model.SetFilterToken(filter_token);
 }
 
 }  // namespace model
