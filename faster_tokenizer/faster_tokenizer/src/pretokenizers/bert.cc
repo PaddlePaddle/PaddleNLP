@@ -66,6 +66,7 @@ void to_json(nlohmann::json& j, const BertPreTokenizer& bert_pre_tokenizer) {
   };
 }
 
+void from_json(const nlohmann::json& j, BertPreTokenizer& bert_pre_tokenizer) {}
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer

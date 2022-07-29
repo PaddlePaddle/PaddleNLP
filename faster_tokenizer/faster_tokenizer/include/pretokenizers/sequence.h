@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+#include <memory>
 
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
@@ -21,25 +22,19 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct MetaSpacePreTokenizer : public PreTokenizer {
-  // Replaces white space with U+2581 (LOWER ONE EIGHT BLOCK)
-  MetaSpacePreTokenizer(const std::string& replacement = "\xe2\x96\x81",
-                        bool add_prefix_space = true);
-  MetaSpacePreTokenizer(const MetaSpacePreTokenizer&) = default;
+struct SequencePreTokenizer : public PreTokenizer {
+  SequencePreTokenizer() = default;
+  SequencePreTokenizer(const SequencePreTokenizer&) = default;
+  SequencePreTokenizer(const std::vector<PreTokenizer*>& pretokenizers);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
-  std::string GetReplacement() const;
-  void SetReplacement(const std::string&);
+  void AppendPreTokenizer(PreTokenizer* pretokenizer);
 
 private:
-  void UpdateReplacementChar();
-  std::string replacement_;
-  bool add_prefix_space_;
-  char32_t replacement_char_;
-
+  std::vector<std::shared_ptr<PreTokenizer>> pretokenzer_ptrs_;
   friend void to_json(nlohmann::json& j,
-                      const MetaSpacePreTokenizer& meta_pretokenizer);
+                      const SequencePreTokenizer& sequence_pretokenizer);
   friend void from_json(const nlohmann::json& j,
-                        MetaSpacePreTokenizer& meta_pretokenizer);
+                        SequencePreTokenizer& sequence_pretokenizer);
 };
 
 }  // namespace pretokenizers
