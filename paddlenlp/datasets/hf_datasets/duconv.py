@@ -25,7 +25,7 @@ from datasets.tasks import QuestionAnsweringExtractive
 logger = datasets.logging.get_logger(__name__)
 
 _DESCRIPTION = """\
-Duconv is a chinese convolution \
+Duconv is a chinese conversation \
 dataset, designed to evaluate the dialogue models.
 """
 
