@@ -27,7 +27,6 @@ from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from paddlenlp.transformers.gpt.modeling import MultiHeadAttention, TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
-
 __all__ = [
     'OPTModel',
     'OPTPretrainedModel',
@@ -561,7 +560,7 @@ class OPTForCausalLM(OPTPretrainedModel):
     def prepare_faster_entry(self, kwargs: Dict[str, Any]):
         # import FasterOPT at here to avoid cycling import
         from paddlenlp.ops import FasterOPT
-        
+
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
         # decoding_lib can be passed into FasterOPT
@@ -587,8 +586,9 @@ class OPTForCausalLM(OPTPretrainedModel):
             # not support for min_length yet in the faster version
             raise AttributeError(
                 "'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterOPT(
-            self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
+        self._faster_entry = FasterOPT(self,
+                                       use_fp16_decoding=use_fp16_decoding,
+                                       decoding_lib=decoding_lib).forward
         return self._faster_entry
 
     def prepare_inputs_for_generation(self,

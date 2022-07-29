@@ -204,12 +204,13 @@ def infer_force_decoding(
     return output_ids, parent_ids, sequence_length
 
 
-def infer_opt_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
-                       slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
-                       slf_v_bias, slf_out_weight, slf_out_bias, ffn_ln_weight,
-                       ffn_ln_bias, ffn_inter_weight, ffn_inter_bias,
-                       ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-                       decoder_ln_bias, pos_emb, linear_weight, normalize_before, topk, topp,
+def infer_opt_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
+                       slf_ln_bias, slf_q_weight, slf_q_bias, slf_k_weight,
+                       slf_k_bias, slf_v_weight, slf_v_bias, slf_out_weight,
+                       slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+                       ffn_inter_weight, ffn_inter_bias, ffn_out_weight,
+                       ffn_out_bias, decoder_ln_weight, decoder_ln_bias,
+                       pos_emb, linear_weight, normalize_before, topk, topp,
                        max_out_len, head_num, size_per_head, num_layer, bos_id,
                        eos_id, temperature, use_fp16_decoding):
     helper = LayerHelper('fusion_opt', **locals())
@@ -831,8 +832,7 @@ def convert_params(faster_model,
             (
                 nn.TransformerEncoder,  # nn.TransformerDecoder,
                 paddlenlp.transformers.gpt.modeling.TransformerDecoder,
-                paddlenlp.transformers.opt.modeling.TransformerDecoder
-            )):
+                paddlenlp.transformers.opt.modeling.TransformerDecoder)):
             num_layer = len(module.layers)
             for i, layer in enumerate(module.layers):
                 if not ft_para_conf.is_load(i, num_layer):
@@ -1590,36 +1590,58 @@ class InferOptDecoding(nn.Layer):
 
         if self.model.opt.embeddings.project_in is not None:
             self.word_emb = paddle.matmul(
-                    self.model.opt.embeddings.word_embeddings.weight,
-                    self.model.opt.embeddings.project_in.weight)
+                self.model.opt.embeddings.word_embeddings.weight,
+                self.model.opt.embeddings.project_in.weight)
             # set the linear_weight
             self.linear_weight = paddle.matmul(
-                    self.model.opt.embeddings.word_embeddings.weight,
-                    self.model.opt.decoder.project_out.weight.T)
+                self.model.opt.embeddings.word_embeddings.weight,
+                self.model.opt.decoder.project_out.weight.T)
         else:
             self.word_emb = self.model.opt.embeddings.word_embeddings.weight
             self.linear_weight = self.model.opt.embeddings.word_embeddings.weight
 
         # reset the offset in position embedding
         position_embedding = self.model.opt.embeddings.position_embeddings
-        self.pos_emb = paddle.concat([position_embedding.weight[2:], position_embedding.weight[:2]])
-
-        if use_fp16_decoding:
-            zero_tensor = paddle.zeros(shape=[0], dtype=paddle.float16)
+        self.pos_emb = paddle.concat(
+            [position_embedding.weight[2:], position_embedding.weight[:2]])
 
         # if there is no final layer norm, pass empty tensor to fusion opt op
         final_layer_norm = self.model.opt.decoder.final_layer_norm
         if final_layer_norm is None:
-            self.decoder_ln_weight = paddle.empty(shape=[0])  
+            self.decoder_ln_weight = paddle.empty(shape=[0])
             self.decoder_ln_bias = paddle.empty(shape=[0])
         else:
-            self.decoder_ln_weight = final_layer_norm.weight  
+            self.decoder_ln_weight = final_layer_norm.weight
             self.decoder_ln_bias = final_layer_norm.bias
 
         self.normalize_before = self.model.decoder.final_layer_norm is not None
 
         for k, v in params.items():
             setattr(self, k, v)
+
+        # check the dtype of embedding
+        dtype = paddle.float16 if use_fp16_decoding else paddle.float32
+        if self.word_emb.dtype != dtype:
+            self.word_emb = transfer_param(self.word_emb,
+                                           dtype=dtype,
+                                           is_bias=False,
+                                           restore_data=True)
+            self.linear_weight = transfer_param(self.linear_weight,
+                                                dtype=dtype,
+                                                is_bias=False,
+                                                restore_data=True)
+            self.pos_emb = transfer_param(self.pos_emb,
+                                          dtype=dtype,
+                                          is_bias=False,
+                                          restore_data=True)
+            self.decoder_ln_weight = transfer_param(self.decoder_ln_weight,
+                                                    dtype=dtype,
+                                                    is_bias=False,
+                                                    restore_data=True)
+            self.decoder_ln_bias = transfer_param(self.decoder_ln_bias,
+                                                  dtype=dtype,
+                                                  is_bias=True,
+                                                  restore_data=True)
 
     def forward(self,
                 input_ids,
