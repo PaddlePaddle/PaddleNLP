@@ -17,12 +17,13 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 #include "core/base.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
-struct Model {
+struct FASTERTOKENIZER_DECL Model {
   virtual std::vector<core::Token> Tokenize(const std::string& tokens) = 0;
   virtual bool TokenToId(const std::string& token, uint32_t* id) const = 0;
   virtual bool IdToToken(uint32_t id, std::string* token) const = 0;

@@ -18,12 +18,13 @@ limitations under the License. */
 #include <string>
 #include <vector>
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
-struct SequenceNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL SequenceNormalizer : public Normalizer {
   SequenceNormalizer() = default;
   SequenceNormalizer(const SequenceNormalizer&) = default;
   SequenceNormalizer(const std::vector<Normalizer*>& normalizers);
@@ -37,7 +38,7 @@ private:
                         SequenceNormalizer& normalizer);
 };
 
-struct LowercaseNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL LowercaseNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j,
