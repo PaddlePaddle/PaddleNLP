@@ -5,7 +5,6 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-
 """
  Command line tool to get dense results and validate them
 """
@@ -42,7 +41,9 @@ class DenseRetriever(object):
     """
     Does passage retrieving over the provided index and question encoder
     """
-    def __init__(self, question_encoder: nn.Layer, batch_size: int, tensorizer: BertTensorizer, index: DenseIndexer):
+
+    def __init__(self, question_encoder: nn.Layer, batch_size: int,
+                 tensorizer: BertTensorizer, index: DenseIndexer):
         self.question_encoder = question_encoder
         self.batch_size = batch_size
         self.tensorizer = tensorizer
@@ -58,13 +59,16 @@ class DenseRetriever(object):
         with paddle.no_grad():
             for j, batch_start in enumerate(range(0, n, bsz)):
 
-                batch_token_tensors = [self.tensorizer.text_to_tensor(q) for q in
-                                       questions[batch_start:batch_start + bsz]]
+                batch_token_tensors = [
+                    self.tensorizer.text_to_tensor(q)
+                    for q in questions[batch_start:batch_start + bsz]
+                ]
 
                 q_ids_batch = paddle.stack(batch_token_tensors, axis=0)
                 q_seg_batch = paddle.zeros_like(q_ids_batch)
 
-                out = self.question_encoder.get_question_pooled_embedding(q_ids_batch, q_seg_batch)
+                out = self.question_encoder.get_question_pooled_embedding(
+                    q_ids_batch, q_seg_batch)
 
                 query_vectors.extend(out)
 
@@ -78,8 +82,10 @@ class DenseRetriever(object):
         assert query_tensor.shape[0] == len(questions)
         return query_tensor
 
-
-    def get_top_docs(self, query_vectors: np.array, top_docs: int = 100) -> List[Tuple[List[object], List[float]]]:
+    def get_top_docs(
+            self,
+            query_vectors: np.array,
+            top_docs: int = 100) -> List[Tuple[List[object], List[float]]]:
         """
         Does the retrieval of the best matching passages given the query vectors batch
         :param query_vectors:
@@ -104,27 +110,36 @@ def parse_qa_csv_file(location) -> Iterator[Tuple[str, List[str]]]:
 def validate(passages: Dict[object, Tuple[str, str]], answers: List[List[str]],
              result_ctx_ids: List[Tuple[List[object], List[float]]],
              workers_num: int, match_type: str) -> List[List[bool]]:
-    match_stats = calculate_matches(passages, answers, result_ctx_ids, workers_num, match_type)
+    match_stats = calculate_matches(passages, answers, result_ctx_ids,
+                                    workers_num, match_type)
     top_k_hits = match_stats.top_k_hits
 
     logger.info('Validation results: top k documents hits %s', top_k_hits)
     top_k_hits = [v / len(result_ctx_ids) for v in top_k_hits]
-    logger.info('Validation results: top k documents hits accuracy %s', top_k_hits)
+    logger.info('Validation results: top k documents hits accuracy %s',
+                top_k_hits)
     return match_stats.questions_doc_hits
+
 
 def load_passages(ctx_file: str) -> Dict[object, Tuple[str, str]]:
     docs = {}
     logger.info('Reading data from: %s', ctx_file)
     if ctx_file.endswith(".gz"):
         with gzip.open(ctx_file, 'rt') as tsvfile:
-            reader = csv.reader(tsvfile, delimiter='\t', )
+            reader = csv.reader(
+                tsvfile,
+                delimiter='\t',
+            )
             # file format: doc_id, doc_text, title
             for row in reader:
                 if row[0] != 'id':
                     docs[row[0]] = (row[1], row[2])
     else:
         with open(ctx_file) as tsvfile:
-            reader = csv.reader(tsvfile, delimiter='\t', )
+            reader = csv.reader(
+                tsvfile,
+                delimiter='\t',
+            )
             # file format: doc_id, doc_text, title
             for row in reader:
                 if row[0] != 'id':
@@ -132,10 +147,11 @@ def load_passages(ctx_file: str) -> Dict[object, Tuple[str, str]]:
     return docs
 
 
-def save_results(passages: Dict[object, Tuple[str, str]], questions: List[str], answers: List[List[str]],
-                 top_passages_and_scores: List[Tuple[List[object], List[float]]], per_question_hits: List[List[bool]],
-                 out_file: str
-                 ):
+def save_results(passages: Dict[object, Tuple[str, str]], questions: List[str],
+                 answers: List[List[str]],
+                 top_passages_and_scores: List[Tuple[List[object],
+                                                     List[float]]],
+                 per_question_hits: List[List[bool]], out_file: str):
     # join passages text with the result ids, their questions and assigning has|no answer labels
     merged_data = []
     assert len(per_question_hits) == len(questions) == len(answers)
@@ -148,17 +164,17 @@ def save_results(passages: Dict[object, Tuple[str, str]], questions: List[str], 
         ctxs_num = len(hits)
 
         merged_data.append({
-            'question': q,
-            'answers': q_answers,
-            'ctxs': [
-                {
-                    'id': results_and_scores[0][c],
-                    'title': docs[c][1],
-                    'text': docs[c][0],
-                    'score': scores[c],
-                    'has_answer': hits[c],
-                } for c in range(ctxs_num)
-            ]
+            'question':
+            q,
+            'answers':
+            q_answers,
+            'ctxs': [{
+                'id': results_and_scores[0][c],
+                'title': docs[c][1],
+                'text': docs[c][0],
+                'score': scores[c],
+                'has_answer': hits[c],
+            } for c in range(ctxs_num)]
         })
 
     with open(out_file, "w") as writer:
@@ -166,7 +182,8 @@ def save_results(passages: Dict[object, Tuple[str, str]], questions: List[str], 
     logger.info('Saved results * scores  to %s', out_file)
 
 
-def iterate_encoded_files(vector_files: list) -> Iterator[Tuple[object, np.array]]:
+def iterate_encoded_files(
+        vector_files: list) -> Iterator[Tuple[object, np.array]]:
     for i, file in enumerate(vector_files):
         logger.info('Reading file %s', file)
         with open(file, "rb") as reader:
@@ -182,7 +199,8 @@ def main(args):
     question_model = BertModel.from_pretrained(args.que_model_path)
 
     context_model = BertModel.from_pretrained(args.con_model_path)
-    model = BiEncoder(question_encoder=question_model, context_encoder=context_model)
+    model = BiEncoder(question_encoder=question_model,
+                      context_encoder=context_model)
 
     model.eval()
 
@@ -212,42 +230,80 @@ def main(args):
     retriever.index.index_data(input_paths)
 
     # get top k results
-    top_ids_and_scores = retriever.get_top_docs(questions_tensor.numpy(), args.n_docs)
+    top_ids_and_scores = retriever.get_top_docs(questions_tensor.numpy(),
+                                                args.n_docs)
 
     all_passages = load_passages(args.ctx_file)
 
     if len(all_passages) == 0:
-        raise RuntimeError('No passages data found. Please specify ctx_file param properly.')
+        raise RuntimeError(
+            'No passages data found. Please specify ctx_file param properly.')
 
-    questions_doc_hits = validate(all_passages, question_answers, top_ids_and_scores, args.validation_workers,
+    questions_doc_hits = validate(all_passages, question_answers,
+                                  top_ids_and_scores, args.validation_workers,
                                   args.match)
 
     if args.out_file:
-        save_results(all_passages, questions, question_answers, top_ids_and_scores, questions_doc_hits, args.out_file)
+        save_results(all_passages, questions, question_answers,
+                     top_ids_and_scores, questions_doc_hits, args.out_file)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--qa_file', required=True, type=str, default=None,
-                        help="Question and answers file of the format: question \\t ['answer1','answer2', ...]")
-    parser.add_argument('--ctx_file', required=True, type=str, default=None,
-                        help="All passages file in the tsv format: id \\t passage_text \\t title")
-    parser.add_argument('--encoded_ctx_file', type=str, default=None,
-                        help='Glob path to encoded passages (from generate_dense_embeddings tool)')
-    parser.add_argument('--out_file', type=str, default=None,
+    parser.add_argument(
+        '--qa_file',
+        required=True,
+        type=str,
+        default=None,
+        help=
+        "Question and answers file of the format: question \\t ['answer1','answer2', ...]"
+    )
+    parser.add_argument(
+        '--ctx_file',
+        required=True,
+        type=str,
+        default=None,
+        help="All passages file in the tsv format: id \\t passage_text \\t title"
+    )
+    parser.add_argument(
+        '--encoded_ctx_file',
+        type=str,
+        default=None,
+        help=
+        'Glob path to encoded passages (from generate_dense_embeddings tool)')
+    parser.add_argument('--out_file',
+                        type=str,
+                        default=None,
                         help='output .json file path to write results to ')
-    parser.add_argument('--match', type=str, default='string', choices=['regex', 'string'],
+    parser.add_argument('--match',
+                        type=str,
+                        default='string',
+                        choices=['regex', 'string'],
                         help="Answer matching logic type")
-    parser.add_argument('--n-docs', type=int, default=200, help="Amount of top docs to return")
-    parser.add_argument('--validation_workers', type=int, default=16,
+    parser.add_argument('--n-docs',
+                        type=int,
+                        default=200,
+                        help="Amount of top docs to return")
+    parser.add_argument('--validation_workers',
+                        type=int,
+                        default=16,
                         help="Number of parallel processes to validate results")
-    parser.add_argument('--batch_size', type=int, default=32, help="Batch size for question encoder forward pass")
-    parser.add_argument('--index_buffer', type=int, default=50000,
-                        help="Temporal memory data buffer size (in samples) for indexer")
-    parser.add_argument("--hnsw_index", action='store_true', help='If enabled, use inference time efficient HNSW index')
-    parser.add_argument('--que_model_path',required=True,type=str)
-    parser.add_argument('--con_model_path',required=True,type=str)
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=32,
+                        help="Batch size for question encoder forward pass")
+    parser.add_argument(
+        '--index_buffer',
+        type=int,
+        default=50000,
+        help="Temporal memory data buffer size (in samples) for indexer")
+    parser.add_argument(
+        "--hnsw_index",
+        action='store_true',
+        help='If enabled, use inference time efficient HNSW index')
+    parser.add_argument('--que_model_path', required=True, type=str)
+    parser.add_argument('--con_model_path', required=True, type=str)
 
     #python dense_retriever.py --hnsw_index --out_file test_dense_retriever --encoded_ctx_file newnewnew_0.pkl  --ctx_file data/psgs_w100.tsv --qa_file nq-dev.qa.csv --que_model_path {que_model_path} --con_model_path {con_model_path}
 

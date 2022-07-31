@@ -8,14 +8,14 @@
 ```
 [
   {
-	"question": "....",
-	"answers": ["...", "...", "..."],
-	"positive_ctxs": [{
-		"title": "...",
-		"text": "...."
-	}],
-	"negative_ctxs": ["..."],
-	"hard_negative_ctxs": ["..."]
+    "question": "....",
+    "answers": ["...", "...", "..."],
+    "positive_ctxs": [{
+        "title": "...",
+        "text": "...."
+    }],
+    "negative_ctxs": ["..."],
+    "hard_negative_ctxs": ["..."]
   },
   ...
 ]
@@ -25,17 +25,17 @@
 在[原始仓库](https://github.com/Elvisambition/DPR)
 下使用命令
 ```
-python data/download_data.py --resource data.wikipedia_split.psgs_w100  
-python data/download_data.py --resource data.retriever.nq  
-python data/download_data.py --resource data.retriever.qas.nq  
+python data/download_data.py --resource data.wikipedia_split.psgs_w100
+python data/download_data.py --resource data.retriever.nq
+python data/download_data.py --resource data.retriever.qas.nq
 ```
 ### 单独下载链接
-[data.retriever.nq-train](https://dl.fbaipublicfiles.com/dpr/data/retriever/biencoder-nq-train.json.gz)  
-[data.retriever.nq-dev](https://dl.fbaipublicfiles.com/dpr/data/retriever/biencoder-nq-dev.json.gz)  
-[data.retriever.qas.nq-dev](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-dev.qa.csv)  
-[data.retriever.qas.nq-test](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-test.qa.csv)  
-[data.retriever.qas.nq-train](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-train.qa.csv)  
-[psgs_w100.tsv](https://dl.fbaipublicfiles.com/dpr/wikipedia_split/psgs_w100.tsv.gz)  
+[data.retriever.nq-train](https://dl.fbaipublicfiles.com/dpr/data/retriever/biencoder-nq-train.json.gz)
+[data.retriever.nq-dev](https://dl.fbaipublicfiles.com/dpr/data/retriever/biencoder-nq-dev.json.gz)
+[data.retriever.qas.nq-dev](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-dev.qa.csv)
+[data.retriever.qas.nq-test](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-test.qa.csv)
+[data.retriever.qas.nq-train](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-train.qa.csv)
+[psgs_w100.tsv](https://dl.fbaipublicfiles.com/dpr/wikipedia_split/psgs_w100.tsv.gz)
 
 ## 模型训练
 ### 基于 [Dense Passage Retriever](https://arxiv.org/abs/2004.04906) 策略训练
@@ -71,14 +71,14 @@ python generate_dense_embeddings.py \
    --out_file ${out files location + name PREFX}  \
    --que_model_path {que_model_path} \
    --con_model_path {con_model_path}
-``` 
+```
 
-## 如果只有一台机器，可以直接使用  
+## 如果只有一台机器，可以直接使用
 
 ```
-python generate_dense_embedding \ 
-   --ctx_file {data/psgs_w100.tsv} \ 
-   --out_file {test_generate} \ 
+python generate_dense_embedding \
+   --ctx_file {data/psgs_w100.tsv} \
+   --out_file {test_generate} \
    --que_model_path {que_model_path} \
    --con_model_path {con_model_path}
 ```
@@ -109,5 +109,3 @@ python dense_retriever.py --hnsw_index \
 * `qa_file`： qa_file文件
 * `que_model_path`: question encoder model
 * `con_model_path`: context encoder model
-
-

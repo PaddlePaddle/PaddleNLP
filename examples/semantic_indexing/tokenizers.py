@@ -4,8 +4,6 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-
-
 """
 Most of the tokenizers code here is copied from DrQA codebase to avoid adding extra dependency
 """
@@ -40,7 +38,7 @@ class Tokens(object):
     def slice(self, i=None, j=None):
         """Return a view of the list of tokens from [i, j)."""
         new_tokens = copy.copy(self)
-        new_tokens.data = self.data[i: j]
+        new_tokens.data = self.data[i:j]
         return new_tokens
 
     def untokenize(self):
@@ -103,8 +101,7 @@ class Tokens(object):
             return filter_fn(gram)
 
         words = self.words(uncased)
-        ngrams = [(s, e + 1)
-                  for s in range(len(words))
+        ngrams = [(s, e + 1) for s in range(len(words))
                   for e in range(s, min(s + n, len(words)))
                   if not _skip(words[s:e + 1])]
 
@@ -162,8 +159,7 @@ class SimpleTokenizer(Tokenizer):
         """
         self._regexp = regex.compile(
             '(%s)|(%s)' % (self.ALPHA_NUM, self.NON_WS),
-            flags=regex.IGNORECASE + regex.UNICODE + regex.MULTILINE
-        )
+            flags=regex.IGNORECASE + regex.UNICODE + regex.MULTILINE)
         if len(kwargs.get('annotators', {})) > 0:
             logger.warning('%s only tokenizes! Skipping annotators: %s' %
                            (type(self).__name__, kwargs.get('annotators')))
@@ -187,7 +183,7 @@ class SimpleTokenizer(Tokenizer):
             # Format data
             data.append((
                 token,
-                text[start_ws: end_ws],
+                text[start_ws:end_ws],
                 span,
             ))
         return Tokens(data, self.annotators)
@@ -230,7 +226,7 @@ class SpacyTokenizer(Tokenizer):
 
             data.append((
                 tokens[i].text,
-                text[start_ws: end_ws],
+                text[start_ws:end_ws],
                 (tokens[i].idx, tokens[i].idx + len(tokens[i].text)),
                 tokens[i].tag_,
                 tokens[i].lemma_,

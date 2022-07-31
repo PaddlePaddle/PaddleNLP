@@ -10,22 +10,21 @@ import numpy as np
 
 BiEncoderPassage = collections.namedtuple("BiEncoderPassage", ["text", "title"])
 
-BiENcoderBatch = collections.namedtuple(
-    "BiEncoderInput",
-    [
-        "questions_ids",
-        "question_segments",
-        "context_ids",
-        "ctx_segments",
-        "is_positive",
-        "hard_negatives",
-        "encoder_type",
-    ]
-)
+BiENcoderBatch = collections.namedtuple("BiEncoderInput", [
+    "questions_ids",
+    "question_segments",
+    "context_ids",
+    "ctx_segments",
+    "is_positive",
+    "hard_negatives",
+    "encoder_type",
+])
+
 
 def normalize_question(question: str) -> str:
     question = question.replace("’", "'")
     return question
+
 
 def normalize_passage(ctx_text: str):
     ctx_text = ctx_text.replace("\n", " ").replace("’", "'")
@@ -42,7 +41,9 @@ class BiEncoderSample(object):
     negative_passages: List[BiEncoderPassage]
     hard_negative_passages: List[BiEncoderPassage]
 
+
 class NQdataSetForDPR(Dataset):
+
     def __init__(self, dataPath, query_special_suffix=None):
         super(NQdataSetForDPR, self).__init__()
         self.data = self._read_json_data(dataPath)
@@ -52,7 +53,7 @@ class NQdataSetForDPR(Dataset):
         for i in range(0, self.__len__()):
             self.new_data.append(self.__getitem__(i))
 
-    def _read_json_data(self,dataPath):
+    def _read_json_data(self, dataPath):
         results = []
         with open(dataPath, "r", encoding="utf-8") as f:
             print("Reading file %s" % dataPath)
@@ -60,6 +61,7 @@ class NQdataSetForDPR(Dataset):
             results.extend(data)
             print("Aggregated data size: {}".format(len(results)))
         return results
+
     def __getitem__(self, index):
         json_sample_data = self.data[index]
         r = BiEncoderSample()
@@ -67,7 +69,8 @@ class NQdataSetForDPR(Dataset):
 
         positive_ctxs = json_sample_data["positive_ctxs"]
 
-        negative_ctxs = json_sample_data["negative_ctxs"] if "negative_ctxs" in json_sample_data else []
+        negative_ctxs = json_sample_data[
+            "negative_ctxs"] if "negative_ctxs" in json_sample_data else []
         hard_negative_ctxs = json_sample_data["hard_negative_ctxs"] if "hard_negative_ctxs" in json_sample_data else []
 
         for ctx in positive_ctxs + negative_ctxs + hard_negative_ctxs:
@@ -75,35 +78,37 @@ class NQdataSetForDPR(Dataset):
                 ctx["title"] = None
 
         def create_passage(ctx):
-            return BiEncoderPassage(
-                normalize_passage(ctx["text"]),
-                ctx["title"]
-            )
+            return BiEncoderPassage(normalize_passage(ctx["text"]),
+                                    ctx["title"])
 
         r.positive_passages = [create_passage(ctx) for ctx in positive_ctxs]
         r.negative_passages = [create_passage(ctx) for ctx in negative_ctxs]
-        r.hard_negative_passages = [create_passage(ctx) for ctx in hard_negative_ctxs]
+        r.hard_negative_passages = [
+            create_passage(ctx) for ctx in hard_negative_ctxs
+        ]
 
         return r
 
-    def _porcess_query(self,query):
+    def _porcess_query(self, query):
         query = normalize_question(query)
 
-        if self.query_special_suffix and not query.endswith(self.query_special_suffix):
+        if self.query_special_suffix and not query.endswith(
+                self.query_special_suffix):
             query += self.query_special_suffix
 
         return query
 
-
     def __len__(self):
         return len(self.data)
 
+
 class DataUtil():
+
     def __init__(self):
         self.tensorizer = BertTensorizer()
 
     def create_biencoder_input(self,
-                               samples : List[BiEncoderSample],
+                               samples: List[BiEncoderSample],
                                inserted_title,
                                num_hard_negatives=0,
                                num_other_negatives=0,
@@ -122,7 +127,8 @@ class DataUtil():
 
             if shuffle and shuffle_positives:
                 positive_ctxs = sample.positive_passages
-                positive_ctx = positive_ctxs[np.random.choice(len(positive_ctxs))]
+                positive_ctx = positive_ctxs[np.random.choice(
+                    len(positive_ctxs))]
             else:
                 positive_ctx = sample.positive_passages[0]
 
@@ -147,20 +153,18 @@ class DataUtil():
             current_ctxs_len = len(ctx_tensors)
 
             sample_ctxs_tensors = [
-                self.tensorizer.text_to_tensor(ctx.text,title=ctx.title if (inserted_title and ctx.title) else None)
+                self.tensorizer.text_to_tensor(
+                    ctx.text,
+                    title=ctx.title if (inserted_title and ctx.title) else None)
                 for ctx in all_ctxs
             ]
 
             ctx_tensors.extend(sample_ctxs_tensors)
             positive_ctx_indices.append(current_ctxs_len)
-            hard_neg_ctx_indices.append(
-                i
-                for i in range(
-                    current_ctxs_len + hard_negative_start_idx,
-                    current_ctxs_len + hard_negative_end_idx,
-                )
-            )
-
+            hard_neg_ctx_indices.append(i for i in range(
+                current_ctxs_len + hard_negative_start_idx,
+                current_ctxs_len + hard_negative_end_idx,
+            ))
             """if query_token:
                 if query_token == "[START_END]":
                     query_span = _select_span
@@ -170,8 +174,10 @@ class DataUtil():
 
             question_tensors.append(self.tensorizer.text_to_tensor(question))
 
-        ctxs_tensor = paddle.concat([paddle.reshape(ctx,[1,-1]) for ctx in ctx_tensors],axis=0)
-        questions_tensor = paddle.concat([paddle.reshape(q,[1,-1]) for q in question_tensors],axis=0)
+        ctxs_tensor = paddle.concat(
+            [paddle.reshape(ctx, [1, -1]) for ctx in ctx_tensors], axis=0)
+        questions_tensor = paddle.concat(
+            [paddle.reshape(q, [1, -1]) for q in question_tensors], axis=0)
 
         ctx_segments = paddle.zeros_like(ctxs_tensor)
         question_segments = paddle.zeros_like(questions_tensor)
@@ -188,15 +194,17 @@ class DataUtil():
 
 
 class BertTensorizer():
-    def __init__(self,pad_to_max=True,max_length=256):
+
+    def __init__(self, pad_to_max=True, max_length=256):
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.max_length = max_length
         self.pad_to_max = pad_to_max
 
-    def text_to_tensor(self,
-                       text:str,
-                       title=None,
-                       ):
+    def text_to_tensor(
+        self,
+        text: str,
+        title=None,
+    ):
         text = text.strip()
 
         if title:
@@ -217,7 +225,8 @@ class BertTensorizer():
 
         seq_len = self.max_length
         if self.pad_to_max and len(token_ids) < seq_len:
-            token_ids = token_ids + [self.tokenizer.pad_token_type_id] * (seq_len - len(token_ids))
+            token_ids = token_ids + [self.tokenizer.pad_token_type_id
+                                     ] * (seq_len - len(token_ids))
         if len(token_ids) >= seq_len:
             token_ids = token_ids[0:seq_len]
             token_ids[-1] = 102
