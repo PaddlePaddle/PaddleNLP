@@ -120,9 +120,6 @@ def main(args):
     start_idx = args.shard_id * shard_size
     end_idx = start_idx + shard_size
 
-    #start_idx = 0
-    #end_idx = len(rows)
-
     logger.info(
         'Producing encodings for passages range: %d to %d (out of total %d)',
         start_idx, end_idx, len(rows))
@@ -166,7 +163,5 @@ if __name__ == '__main__':
     parser.add_argument('--que_model_path', type=str)
     parser.add_argument('--con_model_path', type=str)
     args = parser.parse_args()
-
-    #python generate_dense_embedding --ctx_file data/psgs_w100.tsv --out_file test_generate
 
     main(args)

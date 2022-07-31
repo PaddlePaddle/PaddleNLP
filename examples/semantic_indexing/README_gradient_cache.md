@@ -1,4 +1,4 @@
-#语义索引 [DPR](https://arxiv.org/abs/2004.04906) 策略
+# Gradient Cache策略 [DPR](https://arxiv.org/abs/2004.04906) 策略
 ## 数据准备
 我们使用Dense Passage Retrieval的[原始仓库](https://github.com/Elvisambition/DPR)
 中提供的数据集进行训练和评估。可以使用[download_data.py](https://github.com/Elvisambition/DPR/blob/main/dpr/data/download_data.py)

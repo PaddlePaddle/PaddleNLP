@@ -19,7 +19,6 @@ from typing import Tuple, List, Dict
 import regex as re
 
 from tokenizers import SimpleTokenizer
-#
 
 logger = logging.getLogger(__name__)
 

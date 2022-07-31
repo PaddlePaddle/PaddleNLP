@@ -112,6 +112,4 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype='int64')
         labels = paddle.reshape(labels, shape=[-1, 1])
 
-        #loss = F.cross_entropy(input=cosine_sim, label=labels)
-
         return cosine_sim, labels, query_cls_embedding, title_cls_embedding

@@ -95,10 +95,14 @@ def do_train():
                          max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+            ),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # query_# query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+            ),  # query_# title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # tilte_segment
     ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(train_ds,
@@ -146,7 +150,6 @@ def do_train():
         if inputs.shape[0] % chunk_numbers == 0:
             return paddle.split(inputs, chunk_numbers, axis=0)
         else:
-            #return paddle.split(inputs,2,axis=0)
             return paddle.split(inputs, inputs.shape[0], axis=0)
 
     global_step = 0
@@ -183,10 +186,8 @@ def do_train():
 
                         sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state(
                         )
-                        #sub_global_rnd_state = paddle.framework.random.get_random_seed_generator(global_random_generator)
 
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
-                        #all_global_rnd_state.append(sub_global_rnd_state)
 
                         sub_cosine_sim, sub_label, query_embedding, title_embedding = model(
                             query_input_ids=sub_query_input_ids,
@@ -214,17 +215,12 @@ def do_train():
 
                 model_reps.stop_gradient = False
 
-                #Model_Repos = [r.detach() for r in model_reps]
-
-                #Model_Repos.stop_gradient = False
-
                 model_label = paddle.concat(all_labels, axis=0)
 
                 loss = F.cross_entropy(input=model_reps, label=model_label)
 
                 loss.backward()
 
-                #all_grads = [repos.grad for repos in model_reps]
                 all_grads.append(model_reps.grad)
 
             for sub_batch, CUDA_state, grad in zip(sub_batchs,
@@ -234,7 +230,6 @@ def do_train():
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
 
                 paddle.framework.random.set_cuda_rng_state(CUDA_state)
-                #paddle.framework.random.set_random_seed_generator(global_random_generator,global_rnd_state)
 
                 cosine_sim, _ = model(
                     query_input_ids=sub_query_input_ids,
