@@ -27,7 +27,7 @@ from ..transformers import PretrainedTokenizer
 
 from .prompt_utils import InputExample
 
-__all__ = ["Verbalizer", "ManualVerbalizer", "SoftVerbalizer"]
+__all__ = ["Verbalizer", "NonVerbalizer", "ManualVerbalizer", "SoftVerbalizer"]
 
 
 class Verbalizer(nn.Layer):
@@ -35,16 +35,13 @@ class Verbalizer(nn.Layer):
     Base verbalizer class used to process the outputs and labels.
 
     Args:
-        tokenizer (paddlenlp.transformers.PretrainedTokenizer):
-            The tokenizer of pretrained models.
         labels (list):
             The sequence of labels in task.
     
     """
 
-    def __init__(self, tokenizer, labels):
+    def __init__(self, labels):
         super().__init__()
-        self.tokenizer = tokenizer
         self.labels = labels
 
     @property
@@ -202,6 +199,23 @@ class Verbalizer(nn.Layer):
             self.label_words = label_words
 
 
+class NonVerbalizer(Verbalizer):
+
+    def __init__(self, labels):
+        super().__init__(labels=labels)
+
+    def process_label_words(self):
+        pass
+
+    @classmethod
+    def from_file(cls, label_file, delimiter="=="):
+        with open(label_file, "r", encoding="utf-8") as fp:
+            labels = set()
+            for line in fp:
+                labels.add(line.strip().split(delimiter)[0])
+        return cls(labels=list(labels))
+
+
 class ManualVerbalizer(Verbalizer):
     """
     Manual Verbalizer to map labels to words for hard prompt methods.
@@ -218,7 +232,8 @@ class ManualVerbalizer(Verbalizer):
     """
 
     def __init__(self, tokenizer, labels=None, label_words=None, prefix=None):
-        super().__init__(tokenizer=tokenizer, labels=labels)
+        super().__init__(labels=labels)
+        self.tokenizer = tokenizer
         self.prefix = prefix
         self.label_words = label_words
 
@@ -279,7 +294,7 @@ class ManualVerbalizer(Verbalizer):
         return label_logits
 
     @classmethod
-    def from_file(cls, tokenizer, label_file, delimiter="=="):
+    def from_file(cls, tokenizer, label_file, prefix=None, delimiter="=="):
         with open(label_file, "r", encoding="utf-8") as fp:
             label_words = defaultdict(list)
             for line in fp:
@@ -288,7 +303,8 @@ class ManualVerbalizer(Verbalizer):
                 label_words[data[0]].append(word)
         return cls(tokenizer,
                    labels=set(label_words.keys()),
-                   label_words=dict(label_words))
+                   label_words=dict(label_words),
+                   prefix=prefix)
 
 
 class Identity(nn.Layer):
@@ -325,7 +341,8 @@ class SoftVerbalizer(Verbalizer):
     LAST_LINEAR = ["AlbertForMaskedLM", "RobertaForMaskedLM"]
 
     def __init__(self, tokenizer, model, labels, label_words=None, prefix=''):
-        super().__init__(tokenizer=tokenizer, labels=labels)
+        super().__init__(labels=labels)
+        self.tokenizer = tokenizer
         self.labels = labels
         self.prefix = prefix
         self.label_words = label_words
@@ -388,7 +405,7 @@ class SoftVerbalizer(Verbalizer):
         return self.head(logits)
 
     @classmethod
-    def from_file(cls, tokenizer, model, label_file):
+    def from_file(cls, tokenizer, model, label_file, prefix=None):
         with open(label_file, "r", encoding="utf-8") as fp:
             label_words = defaultdict(list)
             for line in fp:
@@ -398,7 +415,8 @@ class SoftVerbalizer(Verbalizer):
         return cls(tokenizer,
                    model,
                    labels=set(label_words.keys()),
-                   label_words=dict(label_words))
+                   label_words=dict(label_words),
+                   prefix=prefix)
 
     def _extract_head(self, model):
         model_type = model.__class__.__name__
