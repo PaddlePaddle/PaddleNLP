@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 import math
 import random
 from typing import Iterable
@@ -73,7 +74,7 @@ class BaseAugment(object):
         self.create_n = create_n
         self.vocab = Vocab.from_json(self._load_file('vocab'))
         self.tokenizer = JiebaTokenizer(self.vocab)
-        self.loop = 3
+        self.loop = 5
 
     @classmethod
     def clean(cls, sequences):
@@ -122,10 +123,13 @@ class BaseAugment(object):
         return aug_n
 
     def _skip_stop_word_tokens(self, seq_tokens):
-        '''Skip stopping word indexes'''
+        '''Skip words. We can rewrite function to skip specify words.'''
         indexes = []
         for i, seq_token in enumerate(seq_tokens):
-            if seq_token not in self.stop_words:
+            if seq_token not in self.stop_words and not seq_token.isdigit(
+            ) and not bool(re.search(
+                    r'\d',
+                    seq_token)) and not seq_token.encode('UTF-8').isalpha():
                 indexes.append(i)
         return indexes
 
