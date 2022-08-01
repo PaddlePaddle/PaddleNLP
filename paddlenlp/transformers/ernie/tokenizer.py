@@ -326,6 +326,46 @@ class ErnieTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        r"""
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]): 
+                List of ids of the first sequence.
+            token_ids_1 (List[int], optinal): 
+                Optional second list of IDs for sequence pairs.
+                Defaults to `None`.
+            already_has_special_tokens (str, optional): 
+                Whether or not the token list is already formatted with special tokens for the model. 
+                Defaults to `False`.
+
+        Returns:
+            List[int]: 
+                The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+            return list(
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0))
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
     def build_offset_mapping_with_special_tokens(self,
                                                  offset_mapping_0,
                                                  offset_mapping_1=None):
