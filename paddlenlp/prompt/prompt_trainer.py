@@ -55,7 +55,6 @@ class PromptTrainer(Trainer):
                  tokenizer: PretrainedTokenizer,
                  criterion: Union[nn.Layer],
                  args: PromptTuningArguments = None,
-                 convert_fn: Callable = None,
                  data_collator: Optional[DataCollator] = None,
                  train_dataset: Optional[MapDataset] = None,
                  eval_dataset: Optional[MapDataset] = None,

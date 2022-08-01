@@ -44,8 +44,7 @@ def load_local_dataset(data_path, splits, label_list):
                     text, label = data
                     label = label.strip().split(",")
                     label = [
-                        float(1) if x in label else float(0)
-                        for x in range(len(label_list))
+                        float(1) if x in label else float(0) for x in label_list
                     ]
                     yield InputExample(text_a=text, labels=label)
 
@@ -59,18 +58,3 @@ def load_local_dataset(data_path, splits, label_list):
                          label_list=label_list,
                          lazy=False))
     return datasets
-
-
-def convert_fn(labels_to_ids, example):
-    """
-    Self-defined function to create one-hot labels.
-    """
-    if isinstance(example, InputExample):
-        wrapped = copy.deepcopy(example)
-        wrapped.labels = [
-            float(1) if x in wrapped.labels else float(0)
-            for x in range(len(labels_to_ids))
-        ]
-        return wrapped
-    else:
-        raise TypeError('InputExample')

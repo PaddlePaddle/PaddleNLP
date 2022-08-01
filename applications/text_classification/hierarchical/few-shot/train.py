@@ -23,7 +23,7 @@ from paddlenlp.trainer import PdArgumentParser, get_scheduler
 from paddlenlp.prompt import (AutoTemplate, SoftVerbalizer, MLMTokenizerWrapper,
                               PromptTuningArguments, PromptTrainer,
                               PromptModelForClassification, FewShotSampler)
-from utils import load_local_dataset, convert_fn
+from utils import load_local_dataset
 
 sys.path.append("../")
 from metric import MetricReport
@@ -152,7 +152,6 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
-                            convert_fn=convert_fn,
                             optimizers=[optimizer, lr_scheduler],
                             compute_metrics=compute_metrics)
 

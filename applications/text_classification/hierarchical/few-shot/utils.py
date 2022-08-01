@@ -20,10 +20,9 @@ from paddlenlp.prompt import InputExample
 
 def load_local_dataset(data_path, splits, label_list):
     """
-    Load dataset for hierarchical classification from files, where
-    there is one example per line. 
-    Text and labels at different levels are seperated by '\t', and 
-    multiple labels in the same level are delimited by ','.
+    Load dataset for hierachical classification from files, where
+    there is one example per line. Text and label are seperated 
+    by '\t', and multiple labels are delimited by ','.
 
     Args:
         data_path (str):
@@ -39,34 +38,15 @@ def load_local_dataset(data_path, splits, label_list):
         with open(data_file, "r", encoding="utf-8") as fp:
             for idx, line in enumerate(fp):
                 data = line.strip().split("\t")
-                depth = len(data) - 1
-                layers = [x.strip().split(",") for x in data[1:]]
-                shape = [len(layer) for layer in layers]
-                offsets = [0] * len(shape)
-                has_next = True
-                labels = []
-                while has_next:
-                    l = ''
-                    for i, off in enumerate(offsets):
-                        if l == '':
-                            l = layers[i][off]
-                        else:
-                            l += '##{}'.format(layers[i][off])
-                        if l not in labels:
-                            labels.append(l)
-                    for i in range(len(shape) - 1, -1, -1):
-                        if offsets[i] + 1 >= shape[i]:
-                            offsets[i] = 0
-                            if i == 0:
-                                has_next = False
-                        else:
-                            offsets[i] += 1
-                            break
-                labels = [
-                    float(1) if x in labels else float(0)
-                    for x in range(len(label_list))
-                ]
-                yield InputExample(text_a=data[0], labels=labels)
+                if len(data) == 1:
+                    yield InputExample(text_a=data[0])
+                else:
+                    text, label = data
+                    label = label.strip().split(",")
+                    label = [
+                        float(1) if x in label else float(0) for x in label_list
+                    ]
+                    yield InputExample(text_a=text, labels=label)
 
     split_map = {"train": "train.txt", "dev": "dev.txt", "test": "data.txt"}
     datasets = []
@@ -78,18 +58,3 @@ def load_local_dataset(data_path, splits, label_list):
                          label_list=label_list,
                          lazy=False))
     return datasets
-
-
-def convert_fn(labels_to_ids, example):
-    """
-    Self-defined function to create one-hot labels.
-    """
-    if isinstance(example, InputExample):
-        wrapped = copy.deepcopy(example)
-        wrapped.labels = [
-            float(1) if x in wrapped.labels else float(0)
-            for x in range(len(labels_to_ids))
-        ]
-        return wrapped
-    else:
-        raise TypeError('InputExample')
