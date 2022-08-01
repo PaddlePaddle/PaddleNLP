@@ -138,6 +138,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return_special_tokens_mask: bool = False,
         return_offsets_mapping: bool = False,
         return_length: bool = False,
+        return_position_ids: bool = False,
         verbose: bool = True,
     ) -> Tuple[Dict[str, Any], List[FasterEncoding]]:
         """
@@ -174,7 +175,8 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 encoding_dict["offset_mapping"].append(e.offsets)
             if return_length:
                 encoding_dict["length"].append(len(e.ids))
-
+            if return_position_ids:
+                encoding_dict["position_ids"].append(list(range(len(e.ids))))
         return encoding_dict, encodings
 
     def convert_tokens_to_ids(
@@ -317,7 +319,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 "direction": self.padding_side,
                 "pad_id": self.pad_token_id,
                 "pad_token": self.pad_token,
-                "pad_token_type_id": self.pad_token_type_id,
+                "pad_type_id": self.pad_token_type_id,
                 "pad_to_multiple_of": pad_to_multiple_of,
             }
             if _padding != target:
@@ -384,6 +386,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
                 return_special_tokens_mask=return_special_tokens_mask,
                 return_offsets_mapping=return_offsets_mapping,
                 return_length=return_length,
+                return_position_ids=return_position_ids,
                 verbose=verbose,
             ) for encoding in encodings
         ]
