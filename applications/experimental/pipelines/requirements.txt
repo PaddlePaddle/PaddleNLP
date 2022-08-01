@@ -15,3 +15,9 @@ pdfplumber
 faiss-cpu>=1.7.2
 opencv-python
 opencv-contrib-python-headless
+python-multipart
+st-annotated-text
+streamlit==1.9.0
+fastapi
+uvicorn
+markdown
