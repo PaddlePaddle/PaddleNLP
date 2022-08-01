@@ -25,6 +25,7 @@ struct MetaSpacePreTokenizer : public PreTokenizer {
   // Replaces white space with U+2581 (LOWER ONE EIGHT BLOCK)
   MetaSpacePreTokenizer(const std::string& replacement = "\xe2\x96\x81",
                         bool add_prefix_space = true);
+  MetaSpacePreTokenizer(const MetaSpacePreTokenizer&) = default;
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   std::string GetReplacement() const;
   void SetReplacement(const std::string&);
