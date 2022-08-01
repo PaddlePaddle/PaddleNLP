@@ -228,17 +228,26 @@ class SoftTemplate(Template):
     """
     registered_input_names = ['soft_token_ids', 'mask_ids', 'shortenable_ids']
 
-    def __init__(self, tokenizer, model, template=None, prompt_encoder=None):
+    def __init__(self,
+                 tokenizer,
+                 model=None,
+                 template=None,
+                 prompt_encoder=None):
         super().__init__(tokenizer=tokenizer)
-        if type(model).__name__.endswith('Model'):
-            self.token_embeddings = model.embeddings.word_embeddings
+        if model is None:
+            self.token_embeddings = None
+            logger.warning("Pretrained model not given. It would lead to error"
+                           " unless it is initialized for deployment.")
         else:
-            for module in model.children():
-                if type(module).__name__.endswith('Model'):
-                    self.token_embeddings = module.embeddings.word_embeddings
-                    break
-        self.token_embeddings.weight.stop_gradient = True
-        self.embedding_size = self.token_embeddings.weight.shape[-1]
+            if type(model).__name__.endswith('Model'):
+                self.token_embeddings = model.embeddings.word_embeddings
+            else:
+                for module in model.children():
+                    if type(module).__name__.endswith('Model'):
+                        self.token_embeddings = module.embeddings.word_embeddings
+                        break
+            self.token_embeddings.weight.stop_gradient = True
+            self.embedding_size = self.token_embeddings.weight.shape[-1]
         self.prompt_encoder = prompt_encoder
         self.template = template
 
@@ -394,7 +403,7 @@ class SoftTemplate(Template):
         """
         Generate parameters for soft tokens.
         """
-        if self.num_soft_token == 0:
+        if self.num_soft_token == 0 or self.token_embeddings is None:
             return None
         self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
                                             self.embedding_size)
