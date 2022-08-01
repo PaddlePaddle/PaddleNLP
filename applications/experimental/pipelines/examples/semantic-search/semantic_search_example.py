@@ -37,7 +37,7 @@ def semantic_search_tutorial():
         )
     else:
         doc_dir = "data/dureader_robust_processed"
-        dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_robust_processed.zip"
+        dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
 
         fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
         dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)

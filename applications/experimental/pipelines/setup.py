@@ -15,11 +15,18 @@ import os
 import setuptools
 import sys
 import pipelines
+import platform
 
 long_description = "PIPELINES: An End to End Natural Language Proceessing Development Kit Based on ERNIE"
 
-with open("requirements.txt") as fin:
-    REQUIRED_PACKAGES = fin.read()
+if platform.system().lower() == 'windows':
+    pass
+elif platform.system().lower() == "darwin":
+    with open("requirements-cpu.txt") as fin:
+        REQUIRED_PACKAGES = fin.read()
+elif platform.system().lower() == 'linux':
+    with open("requirements.txt") as fin:
+        REQUIRED_PACKAGES = fin.read()
 
 setuptools.setup(name="pipelines",
                  version=pipelines.__version__,
