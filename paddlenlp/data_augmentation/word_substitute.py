@@ -230,8 +230,6 @@ class WordSubstitute(BaseAugment):
                                                         aug_tokens)
             if sequence_generate != sequence and sequence_generate not in sentences:
                 sentences.append(sequence_generate)
-                print(seq_tokens[idx], predicted)
-                print(sequence_generate)
         return sentences
 
     def _augment_multi(self, seq_tokens, aug_n, aug_indexes, p):
@@ -274,9 +272,6 @@ class WordSubstitute(BaseAugment):
                                                        aug_tokens)
                     if sentence not in sentences:
                         sentences.append(sentence)
-                        for aug_token in aug_tokens:
-                            print(seq_tokens[int(aug_token[0])], aug_token[1])
-                        print(sentence)
         elif self.type in ['random']:
             t = 0
             while t < self.create_n * self.loop and len(
@@ -296,9 +291,6 @@ class WordSubstitute(BaseAugment):
                                                    aug_tokens)
                 if sentence not in sentences:
                     sentences.append(sentence)
-                    for aug_token in aug_tokens:
-                        print(seq_tokens[int(aug_token[0])], aug_token[1])
-                    print(sentence)
         return sentences
 
     def _augment_single(self, seq_tokens, aug_indexes, p):
@@ -342,7 +334,5 @@ class WordSubstitute(BaseAugment):
             sequence_generate = self._generate_sequence(seq_tokens.copy(),
                                                         [aug_token])
             sentences.append(sequence_generate)
-            print(seq_tokens[int(aug_token[0])], aug_token[1])
-            print(sequence_generate)
 
         return sentences
