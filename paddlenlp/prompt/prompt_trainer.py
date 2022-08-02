@@ -348,36 +348,3 @@ class PromptModelForClassification(nn.Layer):
         """
         return [p for p in self.template.parameters()
                 ] + [p for p in self.verbalizer.parameters()]
-
-    def prompt_state_dict(self, destination=None):
-        """
-        Get all parameters and persistable buffers of prompt-related
-        layers to save storage when freeze_model is True.
-        """
-        if destination is None:
-            destination = collections.OrderedDict()
-        destination["template"] = self.template.state_dict()
-        if self.verbalizer is not None:
-            destination["verbalizer"] = self.verbalizer.state_dict()
-        return destination
-
-    def set_prompt_state_dict(self, state_dict):
-        """
-        Set prompt-related parameters and persistable buffers from 
-        state_dict, a dictionary with keys `template` and `verbalizer`.
-        """
-        self.template.set_state_dict(state_dict["template"])
-        if self.verbalizer is not None:
-            self.verbalizer.set_state_dict(state_dict["verbalizer"])
-
-    def plm_state_dict(self):
-        """
-        Get all parameters and persistable buffers of plm.
-        """
-        return self.plm.state_dict()
-
-    def set_plm_state_dict(self, state_dict):
-        """
-        Set parameters and persistable buffers from state_dict for plm.
-        """
-        self.plm.set_state_dict(state_dict)

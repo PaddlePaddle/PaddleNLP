@@ -71,15 +71,6 @@ def main():
     model = AutoModelForMaskedLM.from_pretrained(model_args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    # Load the few-shot datasets.
-    train_ds, dev_ds = load_local_dataset(data_path=data_args.data_dir,
-                                          splits=["train", "dev"],
-                                          task_type=training_args.task_type)
-    if data_args.train_sample_per_label is not None:
-        sampler = FewShotSampler(
-            num_sample_per_label=data_args.train_sample_per_label)
-        train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
-
     # Define the template for preprocess and the verbalizer for postprocess.
     template = AutoTemplate.create_from(data_args.prompt,
                                         tokenizer,
@@ -90,6 +81,15 @@ def main():
     label_file = os.path.join(data_args.data_dir, "label.txt")
     verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
     logger.info("Using verbalizer: {}".format(data_args.verbalizer))
+
+    # Load the few-shot datasets.
+    train_ds, dev_ds = load_local_dataset(data_path=data_args.data_dir,
+                                          splits=["train", "dev"],
+                                          label_list=verbalizer.labels_to_ids)
+    if data_args.train_sample_per_label is not None:
+        sampler = FewShotSampler(
+            num_sample_per_label=data_args.train_sample_per_label)
+        train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
