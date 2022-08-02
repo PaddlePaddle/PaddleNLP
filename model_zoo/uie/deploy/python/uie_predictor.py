@@ -16,12 +16,10 @@ import six
 import os
 import math
 import numpy as np
-import paddle
 import paddle2onnx
 import onnxruntime as ort
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
-from model import UIE
 
 
 class InferBackend(object):
@@ -82,7 +80,7 @@ class UIEPredictor(object):
         if not isinstance(args.device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                type(args.device))
             exit(0)
         if args.device not in ['cpu', 'gpu']:
             print(
@@ -90,10 +88,10 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
-                                                        use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
+        self._batch_size = args.batch_size
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == 'cpu':
@@ -152,49 +150,49 @@ class UIEPredictor(object):
             "prompt": short_texts_prompts[i]
         } for i in range(len(short_input_texts))]
 
-        input_ids = []
-        token_type_ids = []
-        position_ids = []
-        attention_mask = []
-        offset_maps = []
-        for example in short_inputs:
-            encoded_inputs = self._tokenizer(text=[example["prompt"]],
-                                             text_pair=[example["text"]],
-                                             stride=len(example["prompt"]),
-                                             truncation=True,
-                                             max_seq_len=self._max_seq_len,
-                                             pad_to_max_seq_len=True,
-                                             return_attention_mask=True,
-                                             return_position_ids=True,
-                                             return_dict=False)
-            encoded_inputs = encoded_inputs[0]
+        prompts = []
+        texts = []
+        for s in short_inputs:
+            prompts.append(s['prompt'])
+            texts.append(s['text'])
+        encoded_inputs = self._tokenizer(text=prompts,
+                                         text_pair=texts,
+                                         truncation=True,
+                                         max_seq_len=self._max_seq_len,
+                                         pad_to_max_seq_len=True,
+                                         return_attention_mask=True,
+                                         return_position_ids=True,
+                                         return_tensors='np',
+                                         return_offsets_mapping=True)
+        offset_maps = encoded_inputs["offset_mapping"]
+        input_ids = encoded_inputs["input_ids"]
 
-            input_ids.append(encoded_inputs["input_ids"])
-            token_type_ids.append(encoded_inputs["token_type_ids"])
-            position_ids.append(encoded_inputs["position_ids"])
-            attention_mask.append(encoded_inputs["attention_mask"])
-            offset_maps.append(encoded_inputs["offset_mapping"])
-
-        input_dict = {
-            "input_ids": np.array(input_ids, dtype="int64"),
-            "token_type_ids": np.array(token_type_ids, dtype="int64"),
-            "pos_ids": np.array(position_ids, dtype="int64"),
-            "att_mask": np.array(attention_mask, dtype="int64")
-        }
-        offset_maps = np.array(offset_maps, dtype="int64")
-
-        start_prob, end_prob = self._infer(input_dict)
-        start_prob = start_prob.tolist()
-        end_prob = end_prob.tolist()
-
-        start_ids_list = get_bool_ids_greater_than(start_prob,
+        start_probs = []
+        end_probs = []
+        for idx in range(0, len(texts), self._batch_size):
+            l, r = idx, idx + self._batch_size
+            input_dict = {
+                "input_ids":
+                encoded_inputs['input_ids'][l:r].astype('int64'),
+                "token_type_ids":
+                encoded_inputs['token_type_ids'][l:r].astype('int64'),
+                "pos_ids":
+                encoded_inputs['position_ids'][l:r].astype('int64'),
+                "att_mask":
+                encoded_inputs["attention_mask"][l:r].astype('int64')
+            }
+            start_prob, end_prob = self._infer(input_dict)
+            start_prob = start_prob.tolist()
+            end_prob = end_prob.tolist()
+            start_probs.extend(start_prob)
+            end_probs.extend(end_prob)
+        start_ids_list = get_bool_ids_greater_than(start_probs,
                                                    limit=self._position_prob,
                                                    return_prob=True)
-        end_ids_list = get_bool_ids_greater_than(end_prob,
+        end_ids_list = get_bool_ids_greater_than(end_probs,
                                                  limit=self._position_prob,
                                                  return_prob=True)
 
-        input_ids = input_dict['input_ids']
         sentence_ids = []
         probs = []
         for start_ids, end_ids, ids, offset_map in zip(start_ids_list,

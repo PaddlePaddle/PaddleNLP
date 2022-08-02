@@ -24,7 +24,7 @@ from time import perf_counter
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from paddlenlp.data import Stack, Tuple
 
 from pipelines.data_handler.samples import SampleBasket
@@ -157,11 +157,10 @@ class ErnieReader(BaseReader):
         self.context_window_size = context_window_size
 
         # load_model
-        self.model = ppnlp.transformers.ErnieGramForQuestionAnswering.from_pretrained(
+        self.model = AutoModelForQuestionAnswering.from_pretrained(
             model_name_or_path)
         self.model.eval()
-        tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-            model_name_or_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
         self.processor = SquadProcessor(
             tokenizer=tokenizer,
@@ -548,7 +547,7 @@ class ErnieReader(BaseReader):
         start_end_matrix[invalid_indices[0][:], invalid_indices[1][:],
                          invalid_indices[2][:]] = -999
         start_end_matrix = paddle.to_tensor(start_end_matrix,
-                                            place=paddle.CUDAPlace(0))
+                                            place=self.devices[0])
 
         # Sort the candidate answers by their score. Sorting happens on the flattened matrix.
         # flat_sorted_indices.shape: (batch_size, max_seq_len^2, 1)

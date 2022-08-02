@@ -18,7 +18,6 @@ import numpy as np
 
 import paddle
 from paddle.io import Dataset
-import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
 from utils import kmeans, pad_sequence
 
@@ -122,7 +121,7 @@ def load_vocab(vocab_dir):
 
 def convert_example(example,
                     vocabs,
-                    encoding_model='ernie-1.0',
+                    encoding_model='ernie-3.0-medium-zh',
                     feat=None,
                     mode='train',
                     fix_len=20):

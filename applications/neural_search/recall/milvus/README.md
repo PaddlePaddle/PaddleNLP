@@ -135,9 +135,7 @@ python3 embedding_insert.py
 | ------------ | ------------ |
 |1000万条|12min24s|
 
-另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
-
-![](../../img/mem.png)
+另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://github.com/zilliztech/attu)
 
 
 运行召回脚本：
@@ -204,3 +202,8 @@ python3 inference.py
 1340319 国有控股上市公司资产并购重组风险探讨国有控股上市公司,并购重组,防范对策 0.5515031218528748
 ....
 ```
+## FAQ
+
+#### 抽取文本语义向量后，利用 Milvus 进行 ANN 检索查询到了完全相同的文本，但是计算出的距离为什么不是 0？
+
+使用的是近似索引，详情请参考Milvus官方文档，[索引创建机制](https://milvus.io/cn/docs/v2.0.x/index.md)

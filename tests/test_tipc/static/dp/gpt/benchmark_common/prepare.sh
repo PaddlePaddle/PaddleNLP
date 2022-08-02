@@ -3,6 +3,11 @@ sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 cd -
 
+cd ../examples/language_model/gpt-3/data_tools/
+sed -i "s/python3/python/g" Makefile
+sed -i "s/python-config/python3.7m-config/g" Makefile
+cd -
+
 mkdir -p data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp

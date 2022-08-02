@@ -13,8 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "normalizers/replace.h"
+#include "utils/unique_ptr.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace normalizers {
 
 ReplaceNormalizer::ReplaceNormalizer(const std::string& pattern,
@@ -40,9 +42,10 @@ void to_json(nlohmann::json& j, const ReplaceNormalizer& replace_normalizer) {
 
 void from_json(const nlohmann::json& j, ReplaceNormalizer& replace_normalizer) {
   replace_normalizer.pattern_ =
-      std::unique_ptr<re2::RE2>(new re2::RE2(std::string(j.at("pattern"))));
+      utils::make_unique<re2::RE2>(std::string(j.at("pattern")));
   j.at("content").get_to(replace_normalizer.content_);
 }
 
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

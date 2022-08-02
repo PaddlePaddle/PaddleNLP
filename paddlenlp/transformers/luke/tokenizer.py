@@ -205,6 +205,10 @@ class LukeTokenizer(RobertaBPETokenizer):
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
+
+        # RobertaTokenizer don't maintain the entity_file resource file name,
+        # so we should not set it as a param in super.__init__ function
+        self._entity_file = entity_file
         super(LukeTokenizer, self).__init__(vocab_file,
                                             merges_file,
                                             do_lower_case=do_lower_case,

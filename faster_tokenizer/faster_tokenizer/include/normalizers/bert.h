@@ -18,7 +18,8 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace normalizers {
 struct BertNormalizer : public Normalizer {
   BertNormalizer(bool clean_text = true,
@@ -40,5 +41,6 @@ private:
   friend void from_json(const nlohmann::json& j,
                         BertNormalizer& bert_normalizer);
 };
-}  // normalizers
-}  // tokenizers
+}  // namespace normalizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

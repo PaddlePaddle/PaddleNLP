@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
@@ -79,12 +79,10 @@ if __name__ == "__main__":
     ]
 
     # Load pretrained model
-    pretrained_model = ppnlp.transformers.BertModel.from_pretrained(
-        "bert-base-uncased")
+    pretrained_model = AutoModel.from_pretrained("bert-base-uncased")
 
     # Load bert tokenizer
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'bert-base-uncased')
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
     model = MultiLabelClassifier(pretrained_model, num_labels=len(label_info))
 
