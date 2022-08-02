@@ -17,25 +17,20 @@ from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
 from tqdm import tqdm
-from milvus_recall import RecallByMilvus
+from milvus_util import RecallByMilvus
+from config import embedding_name, collection_name, partition_tag
 
 
 def search_in_milvus(text_embedding):
-    collection_name = 'literature_search'
-    partition_tag = 'partition_2'
-    client = RecallByMilvus()
-    status, results = client.search(collection_name=collection_name,
-                                    vectors=text_embedding.tolist(),
-                                    partition_tag=partition_tag)
-    corpus_file = "milvus/milvus_data.csv"
-    id2corpus = gen_id2corpus(corpus_file)
-
-    for line in results:
-        for item in line:
-            idx = item.id
-            distance = item.distance
-            text = id2corpus[idx]
-            print(idx, text, distance)
+    recall_client = RecallByMilvus()
+    result = recall_client.search(text_embedding.numpy(),
+                                  embedding_name,
+                                  collection_name,
+                                  partition_names=[partition_tag],
+                                  output_fields=['pk', 'text'])
+    for hits in result:
+        for hit in hits:
+            print(f"hit: {hit}, text field: {hit.entity.get('text')}")
 
 
 if __name__ == "__main__":
@@ -47,7 +42,7 @@ if __name__ == "__main__":
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
@@ -59,7 +54,7 @@ if __name__ == "__main__":
             ),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    pretrained_model = AutoModel.from_pretrained("ernie-1.0")
 
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)
@@ -90,7 +85,6 @@ if __name__ == "__main__":
     with paddle.no_grad():
         for batch_data in corpus_data_loader:
             input_ids, token_type_ids = batch_data
-
             text_embeddings = model.get_pooled_embedding(
                 input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)

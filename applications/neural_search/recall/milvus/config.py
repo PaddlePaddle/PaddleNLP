@@ -13,19 +13,34 @@
 # limitations under the License.
 
 import os
-from milvus import MetricType, IndexType
 
-MILVUS_HOST = '10.21.226.173'
+MILVUS_HOST = '10.21.226.175'
 MILVUS_PORT = 8530
 
 collection_param = {
     'dimension': 256,
     'index_file_size': 256,
-    'metric_type': MetricType.L2
 }
-
-index_type = IndexType.IVF_FLAT
-index_param = {'nlist': 1000}
+data_dim = 256
 
 top_k = 100
 search_param = {'nprobe': 20}
+
+index_config = {
+    "index_type": "IVF_FLAT",
+    "metric_type": "L2",
+    "params": {
+        "nlist": 1000
+    },
+}
+
+search_params = {
+    "metric_type": "L2",
+    "params": {
+        "nprobe": top_k
+    },
+}
+
+collection_name = 'literature_search'
+partition_tag = 'partition_2'
+embedding_name = 'embeddings'

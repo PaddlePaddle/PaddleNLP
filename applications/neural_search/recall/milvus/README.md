@@ -32,11 +32,11 @@
 ## 2. 环境依赖和安装说明
 
 **环境依赖**
-* python >= 3.6
+* python >= 3.6.2
 * paddlepaddle >= 2.2
 * paddlenlp >= 2.2
-* milvus >= 1.1.1
-* pymilvus >= 1.1.2
+* milvus >= 2.1.0
+* pymilvus >= 2.1.0
 
 <a name="代码结构"></a>
 
@@ -47,17 +47,15 @@
 ```
 |—— scripts
     |—— feature_extract.sh  提取特征向量的bash脚本
+    |—— search.sh  插入向量和向量检索bash脚本
 ├── base_model.py # 语义索引模型基类
 ├── config.py  # milvus配置文件
 ├── data.py # 数据处理函数
-├── embedding_insert.py # 插入向量
-├── embedding_recall.py # 检索topK相似结果 / ANN
+├── milvus_ann_search.py # 向量插入和检索的脚本
 ├── inference.py # 动态图模型向量抽取脚本
 ├── feature_extract.py # 批量抽取向量脚本
-├── milvus_insert.py # 插入向量工具类
-├── milvus_recall.py # 向量召回工具类
-├── README.md
-└── server_config.yml # milvus的config文件，本项目所用的配置
+├── milvus_util.py # milvus的工具类
+└── README.md
 ```
 <a name="数据准备"></a>
 
@@ -97,13 +95,14 @@
 
 ## 5. 向量检索
 
+### 5.1 基于Milvus的向量检索系统搭建
 
-数据准备结束以后，我们开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
+数据准备结束以后，我们开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，我们使用[Milvus](https://milvus.io/)开源工具进行召回，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/docs/v2.1.x/install_standalone-docker.md)本案例使用的是 Milvus 的2.1版本，建议使用官方的 Docker 安装方式，简单快捷。
 
 Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 embedding 向量，每个样本生成256维度的向量，使用的是32GB的V100的卡进行的提取：
 
 ```
-CUDA_VISIBLE_DEVICES=2 python feature_extract.py \
+CUDA_VISIBLE_DEVICES=0 python feature_extract.py \
         --model_dir=./output \
         --corpus_file "data/milvus_data.csv"
 ```
@@ -127,59 +126,61 @@ MILVUS_PORT = 8530
 然后运行下面的命令把向量插入到Milvus库中：
 
 ```
-python3 embedding_insert.py
+python milvus_ann_search.py --data_path milvus/milvus_data.csv \
+                            --embedding_path corpus_embedding.npy \
+                            --batch_size 100000 \
+                            --index 0 \
+                            --insert
 ```
+参数含义说明
+
+* `data_path`: 数据的路径
+* `embedding_path`: 数据对应向量的路径
+* `index`: 选择检索向量的索引，用于向量检索
+* `insert`: 是否插入向量
+* `search`: 是否检索向量
+* `batch_size`: 表示的是一次性插入的向量的数量
 
 
 |  数据量 |  时间 |
 | ------------ | ------------ |
-|1000万条|12min24s|
+|1000万条|21min12s|
 
-另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
+另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Attu](https://github.com/zilliztech/attu).
 
-![](../../img/mem.png)
+![](../../img/attu.png)
 
 
 运行召回脚本：
 
 ```
-python3 embedding_recall.py
+python milvus_ann_search.py --data_path milvus/milvus_data.csv \
+                            --embedding_path corpus_embedding.npy \
+                            --batch_size 100000 \
+                            --index 18 \
+                            --search
+```
+
+运行以后的结果的输出为：
 
 ```
-运行的结果为，表示的是召回的 id 和与当前的 query 计算的距离：
-
-```
-10000000
-time cost 0.5410025119781494 s
-Status(code=0, message='Search vectors successfully!')
-[
-[
-(id:1, distance:0.0),
-(id:7109733, distance:0.832247257232666),
-(id:6770053, distance:0.8488889932632446),
-(id:2653227, distance:0.9032443761825562),
+hit: (distance: 0.0, id: 18), text field: 吉林铁合金集团资产管理现状分析及对策资产管理;资金控制;应收帐款风险;造价控制;集中化财务控制
+hit: (distance: 0.6585227251052856, id: 99102), text field: 资产结构管理的重点，在于确定一个既能维持企业正常开展经营活动，又能在减少或不增加风险的前提下，给企业带来更多利润的流动资金水平。
+hit: (distance: 0.8119696974754333, id: 34124), text field: 关于电厂企业计划管理中固定资产管理的重要性电厂企业,计划管理,固定资产管理,重要性
+hit: (distance: 0.8282783627510071, id: 70874), text field: 《商业银行资产负债优化管理:数理建模与应用》内容简介：资产负债管理是一种总体风险控制与资源配给方法，是把资产与负债组合视为有机整体，调整资产负债在总量上平衡、结构上对称、质量上优化，以实现利润最大化的方法。
 ...
 ```
+返回的是向量的距离，向量的id，以及对应的文本。
 
-第一次检索的时间大概是18s左右，需要把数据从磁盘加载到内存，后面检索就很快，下面是测试的速度：
-
-|  数据量 |  时间 |
-| ------------ | ------------ |
-|100条|0.15351247787475586|
-
-如果测试的速度过慢，可以修改 Milvus 配置里面的 cache 参数：
+也可以一键执行上述的过程：
 
 ```
-cache:
-  cache_size: 32GB
-  insert_buffer_size: 8GB
-  preload_collection:
-
+sh scripts/search.sh
 ```
-把 cache_size，insert_buffer_size 调的越大，速度越快，调完后重启 Milvus
 
+### 5.2 文本检索
 
-修改代码的模型路径和样本：
+首先修改代码的模型路径和样本：
 
 ```
 params_path='checkpoints/model_40/model_state.pdparams'
