@@ -102,10 +102,11 @@ class BaseAugment(object):
         data = []
         if os.path.exists(fullname):
             with open(fullname, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                for line in lines:
+                for line in f:
                     data.append(line.strip())
             f.close()
+        else:
+            raise ValueError("The {} should exist.".format(fullname))
 
         return data
 

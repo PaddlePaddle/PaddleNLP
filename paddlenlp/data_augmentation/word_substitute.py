@@ -20,8 +20,8 @@ from typing import Iterable
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
 
+from ..transformers import AutoModelForMaskedLM, AutoTokenizer
 from .base_augment import BaseAugment
 
 
@@ -68,8 +68,7 @@ class WordSubstitute(BaseAugment):
                  aug_min=1,
                  aug_max=10,
                  tf_idf=False,
-                 tf_idf_file=None,
-                 model_name="ernie-1.0"):
+                 tf_idf_file=None):
         super().__init__(create_n=create_n,
                          aug_n=aug_n,
                          aug_percent=aug_percent,
@@ -79,7 +78,7 @@ class WordSubstitute(BaseAugment):
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
         self.tf_idf = tf_idf
-        self.model_name = model_name
+        self.model_name = "ernie-1.0"
         if self.tf_idf:
             self._count_idf(tf_idf_file)
 
@@ -117,18 +116,21 @@ class WordSubstitute(BaseAugment):
             self.type = aug_type
 
     def _count_idf(self, tf_idf_file):
-        with open(tf_idf_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+        if os.path.exists(tf_idf_file):
+            with open(tf_idf_file, 'r', encoding='utf-8') as f:
+                self.word_count_dict = {}
+                self.text_tf_idf = []
+                self.num = 0
+                for line in f:
+                    self.num += 1
+                    self.text_tf_idf.append(line.strip())
+                    for word in set(self.tokenizer.cut(line.strip())):
+                        if word not in self.word_count_dict:
+                            self.word_count_dict[word] = 0
+                        self.word_count_dict[word] += 1
             f.close()
-        self.word_count_dict = {}
-        self.text_tf_idf = []
-        self.num = len(lines)
-        for line in lines:
-            self.text_tf_idf.append(line.strip())
-            for word in set(self.tokenizer.cut(line.strip())):
-                if word not in self.word_count_dict:
-                    self.word_count_dict[word] = 0
-                self.word_count_dict[word] += 1
+        else:
+            raise ValueError("The tf_idf_file should exist.")
         return
 
     def _calculate_tfidf(self, sequence, seq_tokens, aug_indexes):
@@ -160,13 +162,13 @@ class WordSubstitute(BaseAugment):
             fullname = self.custom_file_path
         elif source_type in ['delete']:
             fullname = self.delete_file_path
+
         if os.path.exists(fullname):
             with open(fullname, 'r', encoding='utf-8') as f:
                 substitue_dict = json.load(f)
             f.close()
         else:
-            print('{} does not exist'.format(fullname))
-            return {}
+            raise ValueError("The {} should exist.".format(fullname))
 
         return substitue_dict
 

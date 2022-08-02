@@ -44,9 +44,6 @@ WordSubstitute 参数介绍：
 
     tf_idf_file (str，*可选*)：
         用于计算TF-IDF分数的文件。如果tf_idf为True，本地数据增强词表路径不能为None。默认为None。
-
-    model_name (str)：
-        根据上下文生成替换词的模型参数名。默认为"ernie-1.0"
 ```
 
 我们接下来将以下面的例子介绍词级别替换的使用：
@@ -236,9 +233,6 @@ WordInsert 参数介绍：
 
     aug_max (int)：
         数据增强句子中被插入词数量最大值。默认为10。
-
-    model_name (str)：
-        根据上下文生成插入词的模型参数名。默认为"ernie-1.0"
 ```
 
 我们接下来将以下面的例子介绍词级别插入的使用：

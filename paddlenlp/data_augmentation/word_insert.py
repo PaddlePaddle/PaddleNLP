@@ -18,8 +18,8 @@ import os
 from typing import Iterable
 
 import paddle
-from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
 
+from ..transformers import AutoModelForMaskedLM, AutoTokenizer
 from .base_augment import BaseAugment
 
 
@@ -54,8 +54,7 @@ class WordInsert(BaseAugment):
                  aug_n=None,
                  aug_percent=0.02,
                  aug_min=1,
-                 aug_max=10,
-                 model_name="ernie-1.0"):
+                 aug_max=10):
         super().__init__(create_n=create_n,
                          aug_n=aug_n,
                          aug_percent=aug_percent,
@@ -64,7 +63,7 @@ class WordInsert(BaseAugment):
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
-        self.model_name = model_name
+        self.model_name = "ernie-1.0"
         if isinstance(aug_type, str):
             self.type = aug_type
             if aug_type in ['synonym', 'homonym', 'custom']:
@@ -102,6 +101,8 @@ class WordInsert(BaseAugment):
             with open(fullname, 'r', encoding='utf-8') as f:
                 insert_dict = json.load(f)
             f.close()
+        else:
+            raise ValueError("The {} should exist.".format(fullname))
         return insert_dict
 
     def _augment(self, sequence):
