@@ -47,7 +47,7 @@ pip install faster_tokenizer
 
 使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
 
-用已安装的paddle_serving_client将静态图参数模型转换成serving格式。如何使用[静态图导出脚本](export_model.py)将训练后的模型转为静态图模型详见[模型静态图导出](../../README.md)，模型地址--dirname根据实际填写即可。
+用已安装的paddle_serving_client将静态图参数模型转换成serving格式。如何使用[静态图导出脚本](../../export_model.py)将训练后的模型转为静态图模型详见[模型静态图导出](../../README.md)，模型地址--dirname根据实际填写即可。
 
 ```shell
 python -m paddle_serving_client.convert --dirname ../../export --model_filename float32.pdmodel --params_filename float32.pdiparams
