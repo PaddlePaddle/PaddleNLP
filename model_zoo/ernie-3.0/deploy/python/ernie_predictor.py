@@ -15,7 +15,7 @@
 import six
 import os
 import numpy as np
-import paddle
+# import paddle
 from psutil import cpu_count
 from paddlenlp.transformers import AutoTokenizer
 import fastdeploy
@@ -98,10 +98,10 @@ class ErniePredictor(object):
                                       args.model_path + ".pdiparams")
         precision_mode = args.precision_mode.lower()
         use_fp16 = precision_mode == "fp16"
+        # runtime_option.use_paddle_backend()
         if args.device == 'cpu':
             runtime_option.use_cpu()
             runtime_option.set_cpu_thread_num(args.num_threads)
-            # runtime_option.use_paddle_backend()
             if use_fp16:
                 runtime_option.enable_paddle_mkldnn()
         elif args.device == 'gpu':
