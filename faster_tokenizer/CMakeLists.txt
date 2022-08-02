@@ -4,6 +4,7 @@ project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
 option(WITH_TESTING     "Compile PaddleNLP tokenizers with unit testing"        ON)
 option(WITH_PYTHON      "Compile PaddlePaddle with python interpreter"  ON)
+add_definitions(-DFASTERTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -181,13 +182,18 @@ set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_CORE_PATH ${CMAKE_BINARY_DIR}/faster_tokenizer/src/)
 if (WIN32)
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.lib")
+    add_custom_target(copy_shared_library ALL
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+        COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${TOKENIZER_DST_DIR}/libs
+        DEPENDS build_cpp_package_dir core_tokenizers)
 else()
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
+    add_custom_target(copy_shared_library ALL
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+        DEPENDS build_cpp_package_dir core_tokenizers)
 endif()
 
-add_custom_target(copy_shared_library ALL
-    COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
-    DEPENDS build_cpp_package_dir core_tokenizers)
+
 
 add_custom_target(create_commit_id_file ALL
     COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${CPP_PACKAGE_DIR}/commit.log
