@@ -21,7 +21,8 @@ namespace faster_tokenizer {
 namespace pretokenizers {
 static re2::RE2 pattern("[\\s\\p{Zs}]+");
 
-void Whitespace::operator()(PreTokenizedString* pretokenized) const {
+void WhitespacePreTokenizer::operator()(
+    PreTokenizedString* pretokenized) const {
   pretokenized->Split([&](int idx,
                           normalizers::NormalizedString* normalized,
                           std::vector<StringSplit>* string_splits) {
@@ -32,6 +33,16 @@ void Whitespace::operator()(PreTokenizedString* pretokenized) const {
     }
   });
 }
+
+void to_json(nlohmann::json& j,
+             const WhitespacePreTokenizer& whitespace_pretokenizer) {
+  j = {
+      {"type", "WhitespacePreTokenizer"},
+  };
+}
+
+void from_json(const nlohmann::json& j,
+               WhitespacePreTokenizer& whitespace_pretokenizer) {}
 
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer

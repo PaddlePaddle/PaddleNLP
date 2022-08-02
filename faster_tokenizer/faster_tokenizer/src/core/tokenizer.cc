@@ -506,6 +506,14 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(pretokenizers::MetaSpacePreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::MetaSpacePreTokenizer*>(
           tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::WhitespacePreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::WhitespacePreTokenizer*>(
+          tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::SequencePreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::SequencePreTokenizer*>(
+          tokenizer.pretokenizer_.get());
     }
   }
 
@@ -611,7 +619,15 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         tokenizer.SetPreTokenizer(bert_pretokenizer);
       } else if (pretokenizer.at("type") == "MetaSpacePreTokenizer") {
         pretokenizers::MetaSpacePreTokenizer meta_pretokenizer;
+        pretokenizer.get_to(meta_pretokenizer);
         tokenizer.SetPreTokenizer(meta_pretokenizer);
+      } else if (pretokenizer.at("type") == "WhitespacePreTokenizer") {
+        pretokenizers::WhitespacePreTokenizer whitespace_pretokenizer;
+        tokenizer.SetPreTokenizer(whitespace_pretokenizer);
+      } else if (pretokenizer.at("type") == "SequencePreTokenizer") {
+        pretokenizers::SequencePreTokenizer sequence_pretokenizer;
+        pretokenizer.get_to(sequence_pretokenizer);
+        tokenizer.SetPreTokenizer(sequence_pretokenizer);
       }
     }
 
@@ -711,9 +727,12 @@ template void Tokenizer::SetNormalizer(const normalizers::StripNormalizer&);
 // Instantiate pretokenizers
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
-template void Tokenizer::SetPreTokenizer(const pretokenizers::Whitespace&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::WhitespacePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::MetaSpacePreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::SequencePreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
