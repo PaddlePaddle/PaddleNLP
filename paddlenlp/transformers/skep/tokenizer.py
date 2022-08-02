@@ -271,6 +271,11 @@ class SkepTokenizer(PretrainedTokenizer):
             "add_two_sep_token_inter": True,
         },
     }
+    max_model_input_sizes = {
+        "skep_ernie_1.0_large_ch": 512,
+        "skep_ernie_2.0_large_en": 512,
+        "skep_roberta_large_en": 512,
+    }
 
     def __init__(self,
                  vocab_file,
@@ -453,3 +458,97 @@ class SkepTokenizer(PretrainedTokenizer):
 
             if os.path.abspath(source_file) != os.path.abspath(save_path):
                 shutil.copyfile(source_file, save_path)
+
+    def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (list of string) to a single string. Since
+        the usage of WordPiece introducing `##` to concat subwords, also removes
+        `##` when converting.
+
+        Args:
+            tokens (list): A list of string representing tokens to be converted.
+
+        Returns:
+            str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import SkepTokenizer
+                
+                tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
+                tokens = tokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppet', '##eer']
+                '''
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                '''
+                he was a puppeteer
+                '''
+        """
+
+        out_string = " ".join(tokens).replace(" ##", "").strip()
+        return out_string
+
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optinal):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+            return list(
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0))
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A BERT offset_mapping has the following format:
+
+        - single sequence:      ``(0,0) X (0,0)``
+        - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
+
+        Args:
+            offset_mapping_ids_0 (List[tuple]):
+                List of wordpiece offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (List[tuple], optional):
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+
+        Returns:
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]

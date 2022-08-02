@@ -24,6 +24,8 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
     from paddle.text import ViterbiDecoder
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
+
+from paddlenlp.layers.crf import ViterbiDecoder
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -360,6 +362,22 @@ class SkepModel(SkepPretrainedModel):
         pooled_output = self.pooler(sequence_output)
         return sequence_output, pooled_output
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        """get skep input word embedding
+
+        Returns:
+            nn.Embedding: the input word embedding of skep mdoel
+        """
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding) -> nn.Embedding:
+        """set skep input embedding
+
+        Returns:
+            nn.Embedding: the instance of new word embedding
+        """
+        self.embeddings.word_embeddings = embedding
+
 
 class SkepForSequenceClassification(SkepPretrainedModel):
     r"""
@@ -507,7 +525,7 @@ class SkepForTokenClassification(SkepPretrainedModel):
         return logits
 
 
-class SkepCrfForTokenClassification(nn.Layer):
+class SkepCrfForTokenClassification(SkepPretrainedModel):
     r"""
     SKEPCRF Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
@@ -520,7 +538,7 @@ class SkepCrfForTokenClassification(nn.Layer):
 
     """
 
-    def __init__(self, skep, num_classes):
+    def __init__(self, skep: SkepModel, num_classes: int = 2):
         super().__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
@@ -588,6 +606,16 @@ class SkepCrfForTokenClassification(nn.Layer):
         bigru_output, _ = self.gru(
             sequence_output)  #, sequence_length=seq_lens)
         emission = self.fc(bigru_output)
+
+        if seq_lens is None:
+            # compute seq length according to the attention mask
+            if attention_mask is not None:
+                seq_lens = paddle.sum(attention_mask, axis=1)
+            else:
+                input_ids_shape = input_ids.shape
+                seq_lens = paddle.to_tensor([input_ids_shape[1] - 1] *
+                                            input_ids_shape[0],
+                                            dtype=paddle.int64)
 
         if labels is not None:
             loss = self.crf_loss(emission, seq_lens, labels)
