@@ -160,7 +160,7 @@ def main():
     if training_args.do_export:
         input_spec = [
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="float32")  # attention_mask
+            InputSpec(shape=[None, None], dtype="float32")  # soft_token_ids
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         os.makedirs(export_path, exist_ok=True)

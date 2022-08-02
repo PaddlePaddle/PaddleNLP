@@ -18,7 +18,7 @@ import sys
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM, export_model
+from paddlenlp.transformers import ErnieTokenizer, ErnieForMaskedLM, export_model
 from paddlenlp.trainer import PdArgumentParser, get_scheduler
 from paddlenlp.prompt import (AutoTemplate, SoftVerbalizer, MLMTokenizerWrapper,
                               PromptTuningArguments, PromptTrainer,
@@ -72,8 +72,8 @@ def main():
     paddle.set_device(training_args.device)
 
     # Load the pretrained language model.
-    model = AutoModelForMaskedLM.from_pretrained(model_args.model_name_or_path)
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = ErnieForMaskedLM.from_pretrained(model_args.model_name_or_path)
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
     template = AutoTemplate.create_from(data_args.prompt,
@@ -166,7 +166,7 @@ def main():
     if training_args.do_export:
         input_spec = [
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="float32")  # attention_mask
+            InputSpec(shape=[None, None], dtype="float32")  # soft_token_ids
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         os.makedirs(export_path, exist_ok=True)

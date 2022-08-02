@@ -238,9 +238,11 @@ class PromptTrainer(Trainer):
             raise ValueError("Fail to compute loss as there are no labels "\
                              "in {}.".format(inputs))
         labels = inputs["labels"]
+        soft_token_ids = inputs.get("soft_token_ids", None)
 
-        outputs, hidden_states = self.model(**inputs, return_hidden_states=True)
-
+        outputs, hidden_states = self.model(inputs["input_ids"],
+                                            soft_token_ids,
+                                            return_hidden_states=True)
         if self.criterion is not None:
             loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
@@ -315,14 +317,19 @@ class PromptModelForClassification(nn.Layer):
         if self.freeze_dropout:
             self.plm.eval()
         self.forward_keys = signature(self.plm.forward)
+        self._mask_token_id = self.template.tokenizer.mask_token_id
+        self._pad_token_id = self.template.tokenizer.pad_token_id
 
-    def forward(self, input_ids=None, attention_mask=None, **kwargs):
+    def forward(self, input_ids=None, soft_token_ids=None, **kwargs):
+        return_hidden_states = kwargs.pop('return_hidden_states', False)
         if self.freeze_dropout:
             self.plm.eval()
-        return_hidden_states = kwargs.pop('return_hidden_states', False)
+        mask_ids = (input_ids == self._mask_token_id).astype("int64")
+        attention_mask = (input_ids != self._pad_token_id).astype("int64")
         inputs = InputFeatures(input_ids=input_ids,
+                               mask_ids=mask_ids,
                                attention_mask=attention_mask,
-                               **kwargs)
+                               soft_token_ids=soft_token_ids)
         if hasattr(self.template, "process_batch"):
             inputs = self.template.process_batch(inputs)
         model_inputs = {
@@ -333,8 +340,7 @@ class PromptModelForClassification(nn.Layer):
         hidden_states = outputs
         if hasattr(self.template, "post_process_batch"):
             outputs = self.template.post_process_batch(outputs)
-        if self.verbalizer is not None and hasattr(self.verbalizer,
-                                                   "process_outputs"):
+        if self.verbalizer and hasattr(self.verbalizer, "process_outputs"):
             outputs = self.verbalizer.process_outputs(outputs, inputs=inputs)
 
         if return_hidden_states:
