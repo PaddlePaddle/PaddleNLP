@@ -59,7 +59,7 @@ class ChnSentiCorpConfig(datasets.BuilderConfig):
 
 
 class ChnSentiCorp(datasets.GeneratorBasedBuilder):
-    """COTE: Chinese Opinion Target Extraction."""
+    """ChnSentiCorp: Chinese Corpus for sentence-level sentiment classification."""
 
     BUILDER_CONFIGS = [
         ChnSentiCorpConfig(
