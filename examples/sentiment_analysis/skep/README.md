@@ -88,8 +88,8 @@ skep/
 通过以下方式即可实现加载。
 
 ```python
-train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "validation"])
-train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "validation"])
+train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+train_ds, dev_ds = load_dataset("glue", "sst-2", splits=["train", "dev"])
 ```
 
 ### 模型训练

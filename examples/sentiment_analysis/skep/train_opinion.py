@@ -21,15 +21,15 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Dict, Pad
-from datasets import load_dataset
+from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.transformers import SkepCrfForTokenClassification, SkepModel, SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-7, type=float, help="The initial learning rate for Adam.")
@@ -51,8 +51,8 @@ def set_seed(seed):
 
 def convert_example_to_feature(example,
                                tokenizer,
-                               label2id,
                                max_seq_len=512,
+                               no_entity_label="O",
                                is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
@@ -76,9 +76,9 @@ def convert_example_to_feature(example,
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        label2id(obj:`dict`): The label dict that convert label to label_id.
         max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
+        no_entity_label(obj:`str`, defaults to "O"): The label represents that the token isn't an entity. 
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
     Returns:
@@ -86,42 +86,25 @@ def convert_example_to_feature(example,
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`list[int]`, optional): The input label if not test data.
     """
-    text = example['text_a']
-    label = example['label']
-    tokenized_input = tokenizer(list(text),
+    tokens = example['tokens']
+    labels = example['labels']
+    tokenized_input = tokenizer(tokens,
                                 return_length=True,
                                 is_split_into_words=True,
                                 max_seq_len=max_seq_len)
 
     input_ids = np.array(tokenized_input['input_ids'], dtype="int64")
     token_type_ids = np.array(tokenized_input['token_type_ids'], dtype="int64")
-    seq_len = tokenized_input['seq_len']
+    seq_len = np.array(tokenized_input['seq_len'], dtype="int64")
 
     if is_test:
-        return {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "seq_len": seq_len
-        }
+        return input_ids, token_type_ids, seq_len
     else:
-        # processing label
-        start_idx = text.find(label)
-        encoded_label = [label2id['O']] * len(text)
-        if start_idx != -1:
-            encoded_label[start_idx] = label2id["B"]
-            for idx in range(start_idx + 1, start_idx + len(label)):
-                encoded_label[idx] = label2id["I"]
-        encoded_label = encoded_label[:(max_seq_len - 2)]
-        encoded_label = np.array([label2id["O"]] + encoded_label +
-                                 [label2id["O"]],
+        labels = labels[:(max_seq_len - 2)]
+        encoded_label = np.array([no_entity_label] + labels + [no_entity_label],
                                  dtype="int64")
 
-        return {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "seq_len": seq_len,
-            "label": encoded_label
-        }
+        return input_ids, token_type_ids, seq_len, encoded_label
 
 
 def create_dataloader(dataset,
@@ -154,33 +137,30 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    train_ds, = load_dataset("cote", "dp", split=[
-        'train',
-    ])
-    label_list = ["B", "I", "O"]
+    train_ds = load_dataset("cote", "dp", splits=['train'])
     # The COTE_DP dataset labels with "BIO" schema.
-    label2id = {label: idx for idx, label in enumerate(label_list)}
+    label_map = {label: idx for idx, label in enumerate(train_ds.label_list)}
+    # `no_entity_label` represents that the token isn't an entity.
+    no_entity_label_idx = label_map.get("O", 2)
 
     set_seed(args.seed)
     skep = SkepModel.from_pretrained('skep_ernie_1.0_large_ch')
-    model = SkepCrfForTokenClassification(skep, num_classes=len(label_list))
+    model = SkepCrfForTokenClassification(skep,
+                                          num_classes=len(train_ds.label_list))
     tokenizer = SkepTokenizer.from_pretrained('skep_ernie_1.0_large_ch')
 
     trans_func = partial(convert_example_to_feature,
                          tokenizer=tokenizer,
-                         max_seq_len=args.max_seq_len,
-                         label2id=label2id,
+                         max_seq_len=args.max_seq_length,
+                         no_entity_label=no_entity_label_idx,
                          is_test=False)
-
-    batchify_fn = lambda samples, fn=Dict(
-        {
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id
-                             ),  # input ids
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id
-                                  ),  # token_type_ids
-            "seq_len": Stack(dtype='int64'),  # sequence lens
-            "label": Pad(axis=0, pad_val=label2id["O"]),  # labels
-        }): fn(samples)
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),  # input ids
+        Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]
+            ),  # token type ids
+        Stack(dtype='int64'),  # sequence lens
+        Pad(axis=0, pad_val=no_entity_label_idx)  # labels
+    ): [data for data in fn(samples)]
 
     train_data_loader = create_dataloader(train_ds,
                                           mode='train',
@@ -205,7 +185,7 @@ if __name__ == "__main__":
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
-    metric = ChunkEvaluator(label_list=label_list, suffix=True)
+    metric = ChunkEvaluator(label_list=train_ds.label_list, suffix=True)
 
     global_step = 0
     tic_train = time.time()
@@ -214,7 +194,7 @@ if __name__ == "__main__":
             input_ids, token_type_ids, seq_lens, labels = batch
             loss = model(input_ids,
                          token_type_ids,
-                         seq_lens=seq_lens.squeeze(axis=-1),
+                         seq_lens=seq_lens,
                          labels=labels)
             avg_loss = paddle.mean(loss)
             global_step += 1
@@ -231,6 +211,6 @@ if __name__ == "__main__":
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
-                file_name = os.path.join(save_dir, "model_state.pdparams")
+                file_name = os.path.join(save_dir, "model_state.pdparam")
                 # Need better way to get inner model of DataParallel
                 paddle.save(model._layers.state_dict(), file_name)
