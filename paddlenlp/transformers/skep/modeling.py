@@ -25,6 +25,9 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
+# TODO(wj-Mcat): to be removed later
+from paddlenlp.layers.crf import ViterbiDecoder
+
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -534,7 +537,6 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
             An instance of SkepModel.
         num_classes (int):
             The number of classes.
-
     """
 
     def __init__(self, skep: SkepModel, num_classes: int = 2):
@@ -612,7 +614,7 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
                 seq_lens = paddle.sum(attention_mask, axis=1)
             else:
                 input_ids_shape = input_ids.shape
-                seq_lens = paddle.to_tensor([input_ids_shape[1] - 1] *
+                seq_lens = paddle.to_tensor([input_ids_shape[1]] *
                                             input_ids_shape[0],
                                             dtype=paddle.int64)
 
