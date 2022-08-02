@@ -54,6 +54,12 @@ parser.add_argument("--max_seq_length",
                     "after tokenization. Sequences longer than this "
                     "will be truncated, sequences shorter will be padded.")
 parser.add_argument('--model_name',
+                    choices=[
+                        "ernie-3.0-xbase-zh", "ernie-3.0-base-zh",
+                        "ernie-3.0-medium-zh", "ernie-3.0-micro-zh",
+                        "ernie-3.0-mini-zh", "ernie-3.0-nano-zh",
+                        "ernie-2.0-base-en", "ernie-2.0-large-en"
+                    ],
                     default="ernie-3.0-medium-zh",
                     help="Select model to train, defaults "
                     "to ernie-3.0-medium-zh.")
