@@ -39,7 +39,6 @@ if __name__ == "__main__":
     # If you want to use ernie1.0 model, plesace uncomment the following code
     pretrained_model = AutoModel.from_pretrained(
         "rocketqa-zh-dureader-query-encoder")
-
     tokenizer = AutoTokenizer.from_pretrained(
         "rocketqa-zh-dureader-query-encoder")
     model = SemanticIndexBaseStatic(pretrained_model,
@@ -51,7 +50,6 @@ if __name__ == "__main__":
         print("Loaded parameters from %s" % args.params_path)
 
     model.eval()
-
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,

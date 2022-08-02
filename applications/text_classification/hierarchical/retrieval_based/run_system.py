@@ -25,7 +25,6 @@ def search_in_milvus(text_embedding, corpus_file, query_text):
     end_time = time.time()
     print('Search milvus time cost is {} seconds '.format(end_time -
                                                           start_time))
-
     id2corpus = gen_id2corpus(corpus_file)
     list_data = []
     for line in results:
@@ -36,9 +35,7 @@ def search_in_milvus(text_embedding, corpus_file, query_text):
             list_data.append([query_text, text, distance])
     df = pd.DataFrame(list_data, columns=['query_text', 'label', 'distance'])
     df = df.sort_values(by="distance", ascending=True)
-
     for index, row in df.iterrows():
-        # print(row)
         print(row['query_text'], row['label'], row['distance'])
 
 

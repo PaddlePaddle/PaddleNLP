@@ -45,17 +45,11 @@ def build_index(args, data_loader, model):
     # Set number of threads used during batch search/construction
     # By default using all available cores
     index.set_num_threads(16)
-
     logger.info("start build index..........")
-
     all_embeddings = []
-
     for text_embeddings in model.get_semantic_embedding(data_loader):
         all_embeddings.append(text_embeddings.numpy())
-
     all_embeddings = np.concatenate(all_embeddings, axis=0)
     index.add_items(all_embeddings)
-
     logger.info("Total index number:{}".format(index.get_current_count()))
-
     return index

@@ -55,14 +55,12 @@ parser.add_argument("--output_emb_size", default=None,
                     type=int, help="output_embedding_size")
 parser.add_argument("--recall_num", default=10, type=int,
                     help="Recall number for each query from Ann index.")
-
 parser.add_argument("--hnsw_m", default=100, type=int,
                     help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_ef", default=100, type=int,
                     help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
-
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
                     help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
@@ -73,26 +71,22 @@ if __name__ == "__main__":
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
-
+    tokenizer = AutoTokenizer.from_pretrained(
+        'rocketqa-zh-dureader-query-encoder')
     trans_func = partial(convert_corpus_example,
                          tokenizer=tokenizer,
                          max_seq_length=args.max_seq_length)
-
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
             ),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
             ),  # text_segment
     ): [data for data in fn(samples)]
-
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
-
+    pretrained_model = AutoModel.from_pretrained(
+        "rocketqa-zh-dureader-query-encoder")
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
-
     # Load pretrained semantic model
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -101,9 +95,7 @@ if __name__ == "__main__":
     else:
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
-
     id2corpus = gen_id2corpus(args.corpus_file)
-
     # conver_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
@@ -112,35 +104,26 @@ if __name__ == "__main__":
                                            batch_size=args.batch_size,
                                            batchify_fn=batchify_fn,
                                            trans_fn=trans_func)
-
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
-
     final_index = build_index(args, corpus_data_loader, inner_model)
-
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
-
     query_ds = MapDataset(text_list)
     query_data_loader = create_dataloader(query_ds,
                                           mode='predict',
                                           batch_size=args.batch_size,
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
-
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
-
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
-
     recall_result_file = os.path.join(args.recall_result_dir,
                                       args.recall_result_file)
     with open(recall_result_file, 'w', encoding='utf-8') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
             recalled_idx, cosine_sims = final_index.knn_query(
                 batch_query_embedding.numpy(), args.recall_num)
-
             batch_size = len(cosine_sims)
-
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):

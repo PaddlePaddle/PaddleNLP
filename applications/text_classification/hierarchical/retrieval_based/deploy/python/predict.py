@@ -279,11 +279,11 @@ if __name__ == "__main__":
     corpus_list = [{
         "sentence":
         "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '电脑/网络-硬件'
+        'label': '电脑/网络,硬件'
     }, {
         "sentence":
         "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '商业/理财-股票'
+        'label': '商业/理财,股票'
     }]
     res = predictor.predict(corpus_list, tokenizer)
     print(res)

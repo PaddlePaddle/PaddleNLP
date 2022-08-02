@@ -130,7 +130,7 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
     with open(args.similar_text_pair_file, 'r', encoding='utf-8') as f:
         for line in f:
             text_arr = line.rstrip().rsplit("\t")
-            text, similar_text = text_arr[0], ','.join(text_arr[1:])
+            text, similar_text = text_arr[0], text_arr[1].replace('##', ',')
             text2similar[text] = similar_text
     rs = []
     with open(recall_result_file, 'r', encoding='utf-8') as f:
@@ -169,23 +169,17 @@ def do_train():
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-
     set_seed(args.seed)
-
     train_ds = load_dataset(read_text_pair,
                             data_path=args.train_set_file,
                             lazy=False)
-
     pretrained_model = AutoModel.from_pretrained(
         'rocketqa-zh-dureader-query-encoder')
-
     tokenizer = AutoTokenizer.from_pretrained(
         'rocketqa-zh-dureader-query-encoder')
-
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=args.max_seq_length)
-
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
             ),  # query_input
@@ -196,42 +190,34 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
             ),  # tilte_segment
     ): [data for data in fn(samples)]
-
     train_data_loader = create_dataloader(train_ds,
                                           mode='train',
                                           batch_size=args.batch_size,
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
-
     model = SemanticIndexBatchNeg(pretrained_model,
                                   margin=args.margin,
                                   scale=args.scale,
                                   output_emb_size=args.output_emb_size)
-
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
         print("warmup from:{}".format(args.init_from_ckpt))
-
     model = paddle.DataParallel(model)
-
     batchify_fn_dev = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
             ),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
             ),  # text_segment
     ): [data for data in fn(samples)]
-
     if (args.evaluate):
         eval_func = partial(convert_example,
                             tokenizer=tokenizer,
                             max_seq_length=args.max_seq_length)
         id2corpus = gen_id2corpus(args.corpus_file)
-
         # conver_example function's input must be dict
         corpus_list = [{idx: text} for idx, text in id2corpus.items()]
         corpus_ds = MapDataset(corpus_list)
-
         corpus_data_loader = create_dataloader(corpus_ds,
                                                mode='predict',
                                                batch_size=args.batch_size,
@@ -242,26 +228,19 @@ def do_train():
                              tokenizer=tokenizer,
                              max_seq_length=args.max_seq_length)
         text_list, _ = gen_text_file(args.similar_text_pair_file)
-
         query_ds = MapDataset(text_list)
-
         query_data_loader = create_dataloader(query_ds,
                                               mode='predict',
                                               batch_size=args.batch_size,
                                               batchify_fn=batchify_fn_dev,
                                               trans_fn=query_func)
-
         if not os.path.exists(args.recall_result_dir):
             os.mkdir(args.recall_result_dir)
-
         recall_result_file = os.path.join(args.recall_result_dir,
                                           args.recall_result_file)
-
     num_training_steps = len(train_data_loader) * args.epochs
-
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
-
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
@@ -274,19 +253,16 @@ def do_train():
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
         grad_clip=nn.ClipGradByNorm(clip_norm=1.0))
-
     global_step = 0
     best_recall = 0.0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
-
             loss = model(query_input_ids=query_input_ids,
                          title_input_ids=title_input_ids,
                          query_token_type_ids=query_token_type_ids,
                          title_token_type_ids=title_token_type_ids)
-
             global_step += 1
             if global_step % args.log_steps == 0 and rank == 0:
                 print(
@@ -314,7 +290,6 @@ def do_train():
                                 recall_result_file, text_list, id2corpus)
             if recall_5 > best_recall:
                 best_recall = recall_5
-
                 save_dir = os.path.join(args.save_dir, "model_best")
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)

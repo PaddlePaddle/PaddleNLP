@@ -42,7 +42,6 @@ class ErnieOp(Op):
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
-
         (_, input_dict), = input_dicts.items()
         print("input dict", input_dict)
         batch_size = len(input_dict.keys())

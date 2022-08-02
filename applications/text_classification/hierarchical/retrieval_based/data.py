@@ -144,7 +144,7 @@ def read_text_pair(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         for line in f:
             data = line.rstrip().split("\t")
-            yield {'sentence': data[0], 'label': ','.join(data[1:])}
+            yield {'sentence': data[0], 'label': data[1].replace('##', ',')}
 
 
 # ANN - active learning ------------------------------------------------------

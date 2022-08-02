@@ -60,23 +60,17 @@ def predict(model, data_loader):
         results(obj:`List`): cosine similarity of text pairs.
     """
     cosine_sims = []
-
     model.eval()
-
     with paddle.no_grad():
         for batch_data in data_loader:
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
-
             batch_cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
                 query_token_type_ids=query_token_type_ids,
                 title_token_type_ids=title_token_type_ids).numpy()
-
             cosine_sims.append(batch_cosine_sim)
-
         cosine_sims = np.concatenate(cosine_sims, axis=0)
-
         return cosine_sims
 
 
@@ -85,35 +79,28 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(
         "rocketqa-zh-dureader-query-encoder")
-
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=args.max_seq_length,
                          pad_to_max_seq_len=args.pad_to_max_seq_len)
-
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
-
     valid_ds = load_dataset(read_text_pair,
                             data_path=args.text_pair_file,
                             lazy=False)
-
     valid_data_loader = create_dataloader(valid_ds,
                                           mode='predict',
                                           batch_size=args.batch_size,
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
-
     pretrained_model = AutoModel.from_pretrained(
         "rocketqa-zh-dureader-query-encoder")
-
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)
-
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
@@ -121,9 +108,7 @@ if __name__ == "__main__":
     else:
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
-
     cosin_sim = predict(model, valid_data_loader)
-
     for idx, cosine in enumerate(cosin_sim):
         print('{}'.format(cosine))
         if (idx > 5):

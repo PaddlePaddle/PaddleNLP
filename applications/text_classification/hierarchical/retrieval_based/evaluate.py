@@ -62,7 +62,6 @@ if __name__ == "__main__":
             text2similar[text] = similar_text
 
     rs = []
-
     with open(args.recall_result_file, 'r', encoding='utf-8') as f:
         relevance_labels = []
         for index, line in enumerate(f):
