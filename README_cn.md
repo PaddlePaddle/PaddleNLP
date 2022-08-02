@@ -30,6 +30,7 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
+* 📝 2022.8.1 **PaddleNLP v2.3.5**发布！[**CodeGen**](./examples/code_generation/codegen) 对话式程序生成大模型发布，可Taskflow一键调用；通用信息抽取技术英文模型[**UIE en**](./model_zoo/uie)正式发布，支持英文各项信息抽取工作； [**RGL**](./examples/few_shot/RGL) RGL根据batch内的标签一致性建模了关系图，通过节点分类来充分利用有监督信息，提升微调效果；RGL是百度自研的 Prompt-based tuning 小样本学习算法，论文被 Findings of NAACL 2022 接收，欢迎大家使用！
 * 🍭 2022.6.29 **PaddleNLP v2.3.4**发布！[**ERNIE Tiny**](./model_zoo/ernie-3.0) 全系列中文预训练小模型发布，快速提升预训练模型部署效率，通用信息抽取技术[**UIE Tiny**](./model_zoo/uie) 系列模型全新升级，支持速度更快效果更好的UIE小模型。
 * 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
   * 💎 发布通用信息抽取技术[**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**一键抽取**与全流程**小样本**高效定制开发。
