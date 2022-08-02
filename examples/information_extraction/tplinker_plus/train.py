@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 
 from evaluate import evaluate
 from criterion import Criterion
-from utils import reader, set_seed, get_label_dict, create_dataloader
+from utils import reader, set_seed, get_label_dict, create_dataloader, criteria_map
 from model import TPLinkerPlus
 
 
@@ -38,8 +38,8 @@ def do_train():
         paddle.distributed.init_parallel_env()
     set_seed(args.seed)
 
-    label_dicts = get_label_dict(args.task_type, args.label_dicts_path)
-    num_tags = len(label_dicts["id2tag"])
+    label_dict = get_label_dict(args.task_type, args.label_dict_path)
+    num_tags = len(label_dict["id2tag"])
 
     train_ds = load_dataset(reader, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
@@ -50,16 +50,16 @@ def do_train():
                                          tokenizer,
                                          max_seq_len=args.max_seq_len,
                                          batch_size=args.batch_size,
-                                         is_train=True,
-                                         label_dicts=label_dicts,
+                                         label_dict=label_dict,
+                                         mode="train",
                                          task_type=args.task_type)
 
     dev_dataloader = create_dataloader(dev_ds,
                                        tokenizer,
                                        max_seq_len=args.max_seq_len,
                                        batch_size=args.batch_size,
-                                       is_train=False,
-                                       label_dicts=label_dicts,
+                                       label_dict=label_dict,
+                                       mode="dev",
                                        task_type=args.task_type)
 
     encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
@@ -98,7 +98,6 @@ def do_train():
             input_ids, attention_masks, labels = batch
             logits = model(input_ids, attention_masks)
             loss = criterion(logits, labels)
-
             loss.backward()
             lr_scheduler.step()
             optimizer.step()
@@ -124,13 +123,11 @@ def do_train():
 
                 eval_result = evaluate(model,
                                        dev_dataloader,
-                                       label_dicts,
+                                       label_dict,
                                        task_type=args.task_type)
                 logger.info("Evaluation precision: " + str(eval_result))
 
-                f1 = eval_result[
-                    'relation_f1'] if "relation_f1" in eval_result.keys(
-                    ) else eval_result['argument_f1']
+                f1 = eval_result[criteria_map[args.task_type]]
                 if f1 > best_f1:
                     logger.info(
                         f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
@@ -157,9 +154,9 @@ if __name__ == "__main__":
     parser.add_argument("--dev_path", default="./duie/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum input sequence length.")
-    parser.add_argument("--label_dicts_path", default="./duie/label_dicts.json", type=str, help="The file path of the schema for extraction.")
-    parser.add_argument("--weight_decay", default=0.1, type=float, help="Weight decay rate for L2 regularizer.")
-    parser.add_argument("--warmup_proportion", default=0.05, type=float, help="Linear warmup proption over the training process.")
+    parser.add_argument("--label_dict_path", default="./duie/label_dict.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
+    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
     parser.add_argument("--num_epochs", default=20, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="relation_extraction", type=str, help="Select the training task type.")

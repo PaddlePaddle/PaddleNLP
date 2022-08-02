@@ -28,6 +28,13 @@ from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase,
 
 ignore_list = ["offset_mapping", "text"]
 
+criteria_map = {
+    "entity_extraction": "entity_f1",
+    "opinion_extraction": "relation_f1",  # SPO
+    "relation_extraction": "relation_f1",  # ASO
+    "event_extraction": "argument_f1"
+}
+
 
 def set_seed(seed):
     paddle.seed(seed)
@@ -82,42 +89,49 @@ def get_spots_fr_shaking_tag(shaking_idx2matrix_idx, shaking_outputs):
     return spots
 
 
-def get_label_dict(task_type="relation_extraction", label_dicts_path=None):
-    if task_type in ["opinion_extraction", "relation_extraction"]:
-        with open(label_dicts_path, 'r', encoding='utf-8') as fp:
-            label_dicts = json.load(fp)
+def get_label_dict(task_type="relation_extraction", label_dict_path=None):
+    if task_type in [
+            "relation_extraction", "opinion_extraction", "entity_extraction"
+    ]:
+        with open(label_dict_path, 'r', encoding='utf-8') as fp:
+            label_dict = json.load(fp)
 
-        ent2id = label_dicts['ent2id']
-        rel2id = label_dicts['rel2id']
+        entity2id = label_dict['entity2id']
+        if task_type == "relation_extraction":
+            relation2id = label_dict['relation2id']
+        elif task_type == "opinion_extraction":
+            relation2id = label_dict['sentiment2id']
 
-        id2rel = {idx: t for t, idx in rel2id.items()}
-        link_types = [
-            "SH2OH",  # subject head to object head
-            "OH2SH",  # object head to subject head
-            "ST2OT",  # subject tail to object tail
-            "OT2ST",  # object tail to subject tail
-        ]
         tags = []
-        for lk in link_types:
-            for rel in rel2id.keys():
-                tags.append("=".join([rel, lk]))
+        if task_type != "entity_extraction":
+            id2rel = {idx: t for t, idx in relation2id.items()}
+            label_dict['id2rel'] = id2rel
+            link_types = [
+                "SH2OH",  # subject head to object head
+                "OH2SH",  # object head to subject head
+                "ST2OT",  # subject tail to object tail
+                "OT2ST",  # object tail to subject tail
+            ]
 
-        for ent in ent2id.keys():
+            for lk in link_types:
+                for rel in relation2id.keys():
+                    tags.append("=".join([rel, lk]))
+
+        for ent in entity2id.keys():
             tags.append("=".join([ent, "EH2ET"]))
 
         tag2id = {t: idx for idx, t in enumerate(tags)}
         id2tag = {idx: t for t, idx in tag2id.items()}
 
-        label_dicts['id2rel'] = id2rel
-        label_dicts['id2tag'] = id2tag
-        label_dicts['tag2id'] = tag2id
+        label_dict['id2tag'] = id2tag
+        label_dict['tag2id'] = tag2id
     elif task_type == "event_extraction":
         tag2id = {}
         id2tag = {}
-        with open(label_dicts_path, "r", encoding="utf-8") as fp:
-            label_dicts = json.load(fp)
+        with open(label_dict_path, "r", encoding="utf-8") as fp:
+            label_dict = json.load(fp)
 
-        schemas = label_dicts['schemas']
+        schemas = label_dict['schema_list']
         for schema in schemas:
             t = schema["event_type"]
             for r in ["触发词"] + [s["role"] for s in schema["role_list"]]:
@@ -127,8 +141,9 @@ def get_label_dict(task_type="relation_extraction", label_dicts_path=None):
         tag2id["SH2OH"] = len(tag2id)
         id2tag[len(tag2id)] = "ST2OT"
         tag2id["ST2OT"] = len(tag2id)
-        label_dicts = {"tag2id": tag2id, "id2tag": id2tag}
-    return label_dicts
+        label_dict["tag2id"] = tag2id
+        label_dict["id2tag"] = id2tag
+    return label_dict
 
 
 @dataclass
@@ -136,7 +151,7 @@ class DataCollator:
     tokenizer: PretrainedTokenizerBase
     padding: Union[bool, str, PaddingStrategy] = True
     max_length: Optional[int] = None
-    label_dicts: Optional[dict] = None
+    label_dict: Optional[dict] = None
     task_type: Optional[str] = None
 
     def __call__(
@@ -166,7 +181,7 @@ class DataCollator:
         for k in batch.keys():
             batch[k] = paddle.to_tensor(batch[k])
 
-        num_tags = len(self.label_dicts['tag2id'])
+        num_tags = len(self.label_dict['tag2id'])
         bs = batch["input_ids"].shape[0]
         seqlen = batch["input_ids"].shape[1]
         mask = paddle.triu(paddle.ones(shape=[seqlen, seqlen]), diagonal=0)
@@ -190,8 +205,16 @@ class DataCollator:
                 # tail_labels
                 for t1, t2 in lb["tail_labels"]:
                     batch_shaking_tag[i, t1, t2, -1] = 1
-        elif self.task_type in ["opinion_extraction", "relation_extraction"]:
-            num_rels = len(self.label_dicts['rel2id'])
+        elif self.task_type in [
+                "opinion_extraction", "relation_extraction", "entity_extraction"
+        ]:
+            if self.task_type == "relation_extraction":
+                num_rels = len(self.label_dict["relation2id"])
+            elif self.task_type == "opinion_extraction":
+                num_rels = len(self.label_dict["sentiment2id"])
+            else:
+                num_rels = 0
+
             for i, lb in enumerate(labels):
                 for sh, st, p, oh, ot in lb["rel_labels"]:
                     # SH2OH
@@ -218,8 +241,8 @@ def create_dataloader(dataset,
                       tokenizer,
                       max_seq_len=128,
                       batch_size=1,
-                      is_train=True,
-                      label_dicts=None,
+                      label_dict=None,
+                      mode="train",
                       task_type="relation_extraction"):
 
     def tokenize_and_align_train_labels(example):
@@ -238,7 +261,7 @@ def create_dataloader(dataset,
             for e in example['event_list']:
                 events.append([])
                 for t, r, a, i in e:
-                    label = label_dicts['tag2id'][(t, r)]
+                    label = label_dict['tag2id'][(t, r)]
                     _start, _end = i, i + len(a) - 1
                     start = map_offset(_start, offset_mapping)
                     end = map_offset(_end, offset_mapping)
@@ -260,7 +283,7 @@ def create_dataloader(dataset,
                             tail_labels.append([min(t1, t2), max(t1, t2)])
             argu_labels = list(argu_labels.values())
 
-            return {
+            outputs = {
                 "input_ids": tokenized_inputs["input_ids"],
                 "attention_mask": tokenized_inputs["attention_mask"],
                 "labels": {
@@ -272,35 +295,50 @@ def create_dataloader(dataset,
                     tail_labels if len(tail_labels) > 0 else [[0, 0]]
                 }
             }
-        elif task_type in ["opinion_extraction", "relation_extraction"]:
+        elif task_type in [
+                "relation_extraction", "opinion_extraction", "entity_extraction"
+        ]:
+
             ent_labels = []
-            rel_labels = []
             for e in example["entity_list"]:
                 _start, _end = e['start_index'], e['start_index'] + len(
                     e['text']) - 1
                 start = map_offset(_start, offset_mapping)
                 end = map_offset(_end, offset_mapping)
-                label = label_dicts['ent2id'][e['type']]
+                label = label_dict['entity2id'][e['type']]
                 ent_labels.append([label, start, end])
 
-            for r in example["relation_list"]:
-                _sh, _oh = r['subject_start_index'], r['object_start_index']
-                _st, _ot = _sh + len(r['subject']) - 1, _oh + len(
-                    r['object']) - 1
-                sh = map_offset(_sh, offset_mapping)
-                st = map_offset(_st, offset_mapping)
-                oh = map_offset(_oh, offset_mapping)
-                ot = map_offset(_ot, offset_mapping)
-                p = label_dicts['rel2id'][r['predicate']]
-                rel_labels.append([sh, st, p, oh, ot])
-            return {
+            outputs = {
                 "input_ids": tokenized_inputs["input_ids"],
                 "attention_mask": tokenized_inputs["attention_mask"],
                 "labels": {
                     "ent_labels": ent_labels,
-                    "rel_labels": rel_labels
+                    "rel_labels": []
                 }
             }
+
+            if task_type == "relation_extraction":
+                _triplet_name, _rel_name = "spo_list", "relation2id"
+                _e1_name, _e2_name, _p_name = "subject", "object", "predicate"
+                _e1_id_name, _e2_id_name = "subject_start_index", "object_start_index"
+            elif task_type == "opinion_extraction":
+                _triplet_name, _rel_name = "aso_list", "sentiment2id"
+                _e1_name, _e2_name, _p_name = "aspect", "opinion", "sentiment"
+                _e1_id_name, _e2_id_name = "aspect_start_index", "opinion_start_index"
+
+                rel_labels = []
+                for r in example[_triplet_name]:
+                    _sh, _oh = r[_e1_id_name], r[_e2_id_name]
+                    _st, _ot = _sh + len(r[_e1_name]) - 1, _oh + len(
+                        r[_e2_name]) - 1
+                    sh = map_offset(_sh, offset_mapping)
+                    st = map_offset(_st, offset_mapping)
+                    oh = map_offset(_oh, offset_mapping)
+                    ot = map_offset(_ot, offset_mapping)
+                    p = label_dict[_rel_name][r[_p_name]]
+                    rel_labels.append([sh, st, p, oh, ot])
+                outputs['labels']['rel_labels'] = rel_labels
+        return outputs
 
     def tokenize(example):
         tokenized_inputs = tokenizer(
@@ -315,20 +353,20 @@ def create_dataloader(dataset,
         tokenized_inputs['text'] = example['text']
         return tokenized_inputs
 
-    if task_type == "event_extraction":
+    if task_type == "event_extraction" and not mode == "infer":
         dataset.map(process_ee)
 
-    if is_train:
+    if mode == "train":
         dataset = dataset.map(tokenize_and_align_train_labels)
     else:
         dataset_copy = copy.deepcopy(dataset)
         dataset = dataset.map(tokenize)
 
     data_collator = DataCollator(tokenizer,
-                                 label_dicts=label_dicts,
+                                 label_dict=label_dict,
                                  task_type=task_type)
 
-    shuffle = True if is_train else False
+    shuffle = True if mode == "train" else False
     batch_sampler = paddle.io.BatchSampler(dataset=dataset,
                                            batch_size=batch_size,
                                            shuffle=shuffle)
@@ -337,7 +375,7 @@ def create_dataloader(dataset,
                                       collate_fn=data_collator,
                                       num_workers=0,
                                       return_list=True)
-    if not is_train:
+    if mode != "train":
         dataloader.dataset.raw_data = dataset_copy
     return dataloader
 
@@ -390,11 +428,29 @@ def clique_search(argus, links):
         return [list(sorted(argus))]
 
 
+def extract_events(pred_events, text):
+    event_list = DedupList()
+    for event in pred_events:
+        final_event = {'event_type': event[0][0], 'arguments': DedupList()}
+        for argu in event:
+            if argu[1] != u'触发词':
+                final_event['arguments'].append({
+                    'role': argu[1],
+                    'argument': argu[2]
+                })
+        event_list = [
+            event for event in event_list if not isin(event, final_event)
+        ]
+        if not any([isin(final_event, event) for event in event_list]):
+            event_list.append(final_event)
+    return event_list
+
+
 def postprocess(batch_outputs,
                 offset_mappings,
                 texts,
                 seqlen,
-                label_dicts,
+                label_dict,
                 task_type="relation_extraction"):
     if task_type == "event_extraction":
         batch_results = []
@@ -410,7 +466,7 @@ def postprocess(batch_outputs,
             # Token length
             actual_len = len(offset_mapping) - 2
             for sp in matrix_spots:
-                tag = label_dicts["id2tag"][sp[2]]
+                tag = label_dict["id2tag"][sp[2]]
                 if sp[0] > sp[1] or sp[1] > actual_len:
                     continue
                 if tag == "SH2OH":
@@ -447,7 +503,9 @@ def postprocess(batch_outputs,
 
             batch_results.append(events)
         return batch_results
-    elif task_type in ["opinion_extraction", "relation_extraction"]:
+    elif task_type in [
+            "opinion_extraction", "relation_extraction", "entity_extraction"
+    ]:
         batch_ent_results = []
         batch_rel_results = []
         for shaking_outputs, offset_mapping, text in zip(
@@ -456,14 +514,12 @@ def postprocess(batch_outputs,
                                       for end_ind in list(range(seqlen))[ind:]]
             matrix_spots = get_spots_fr_shaking_tag(shaking_idx2matrix_idx,
                                                     shaking_outputs)
-
             head_ind2entities = {}
             ent_list = []
-            rel_list = []
             # Token length
             actual_len = len(offset_mapping) - 2
             for sp in matrix_spots:
-                tag = label_dicts["id2tag"][sp[2]]
+                tag = label_dict["id2tag"][sp[2]]
                 ent_type, link_type = tag.split("=")
                 # For an entity, the start position can not be larger than the end pos.
                 if link_type != "EH2ET" or sp[0] > sp[1] or sp[1] > actual_len:
@@ -478,75 +534,89 @@ def postprocess(batch_outputs,
                     "start_index": start
                 }
                 ent_list.append(ent)
-
                 # Take ent_head_pos as the key to entity list
                 head_ind2entities.setdefault(start, []).append(ent)
 
             batch_ent_results.append(ent_list)
 
-            tail_link_memory_set = set()
-            for sp in matrix_spots:
-                tag = label_dicts["id2tag"][sp[2]]
-                _, link_type = tag.split("=")
+            if task_type != "entity_extraction":
+                rel_list = []
+                tail_link_memory_set = set()
+                for sp in matrix_spots:
+                    tag = label_dict["id2tag"][sp[2]]
+                    _, link_type = tag.split("=")
 
-                rel_id = 0
-                if link_type == "ST2OT" and sp[0] <= actual_len and sp[
-                        1] <= actual_len:
-                    subj_tail = offset_mapping[sp[0]][1] - 1
-                    obj_tail = offset_mapping[sp[1]][1] - 1
-                    tail_link_memory = (rel_id, subj_tail, obj_tail)
-                    tail_link_memory_set.add(tail_link_memory)
-                elif link_type == "OT2ST" and sp[0] <= actual_len and sp[
-                        1] <= actual_len:
-                    subj_tail = offset_mapping[sp[1]][1] - 1
-                    obj_tail = offset_mapping[sp[0]][1] - 1
-                    tail_link_memory = (rel_id, subj_tail, obj_tail)
-                    tail_link_memory_set.add(tail_link_memory)
-
-            # Head link
-            for sp in matrix_spots:
-                tag = label_dicts["id2tag"][sp[2]]
-                rel_label, link_type = tag.split("=")
-
-                if link_type == "SH2OH" and sp[0] <= actual_len and sp[
-                        1] <= actual_len:
-                    _subj_head, _obj_head = sp[0], sp[1]
-                elif link_type == "OH2SH" and sp[0] <= actual_len and sp[
-                        1] <= actual_len:
-                    _subj_head, _obj_head = sp[1], sp[0]
-                else:
-                    continue
-
-                subj_head_key = offset_mapping[_subj_head][0]
-                obj_head_key = offset_mapping[_obj_head][0]
-
-                if (subj_head_key not in head_ind2entities
-                        or obj_head_key not in head_ind2entities):
-                    # No entity start with subj_head_key and obj_head_key
-                    continue
-
-                # All entities start with this subject head
-                subj_list = head_ind2entities[subj_head_key]
-                # All entities start with this object head
-                obj_list = head_ind2entities[obj_head_key]
-
-                # Go over all subj-obj pair to check whether the tail link exists
-                for subj in subj_list:
-                    for obj in obj_list:
-                        subj_tail = subj["start_index"] + len(subj["text"]) - 1
-                        obj_tail = obj["start_index"] + len(obj["text"]) - 1
+                    rel_id = 0
+                    if link_type == "ST2OT" and sp[0] <= actual_len and sp[
+                            1] <= actual_len:
+                        subj_tail = offset_mapping[sp[0]][1] - 1
+                        obj_tail = offset_mapping[sp[1]][1] - 1
                         tail_link_memory = (rel_id, subj_tail, obj_tail)
+                        tail_link_memory_set.add(tail_link_memory)
+                    elif link_type == "OT2ST" and sp[0] <= actual_len and sp[
+                            1] <= actual_len:
+                        subj_tail = offset_mapping[sp[1]][1] - 1
+                        obj_tail = offset_mapping[sp[0]][1] - 1
+                        tail_link_memory = (rel_id, subj_tail, obj_tail)
+                        tail_link_memory_set.add(tail_link_memory)
 
-                        if tail_link_memory not in tail_link_memory_set:
-                            continue
+                # Head link
+                for sp in matrix_spots:
+                    tag = label_dict["id2tag"][sp[2]]
+                    rel_label, link_type = tag.split("=")
 
-                        rel = {
-                            "subject": subj["text"],
-                            "predicate": rel_label,
-                            "object": obj["text"],
-                            "subject_start_index": subj["start_index"],
-                            "object_start_index": obj["start_index"]
-                        }
-                        rel_list.append(rel)
-            batch_rel_results.append(rel_list)
-        return batch_ent_results, batch_rel_results
+                    if link_type == "SH2OH" and sp[0] <= actual_len and sp[
+                            1] <= actual_len:
+                        _subj_head, _obj_head = sp[0], sp[1]
+                    elif link_type == "OH2SH" and sp[0] <= actual_len and sp[
+                            1] <= actual_len:
+                        _subj_head, _obj_head = sp[1], sp[0]
+                    else:
+                        continue
+
+                    subj_head_key = offset_mapping[_subj_head][0]
+                    obj_head_key = offset_mapping[_obj_head][0]
+
+                    if (subj_head_key not in head_ind2entities
+                            or obj_head_key not in head_ind2entities):
+                        # No entity start with subj_head_key and obj_head_key
+                        continue
+
+                    # All entities start with this subject head
+                    subj_list = head_ind2entities[subj_head_key]
+                    # All entities start with this object head
+                    obj_list = head_ind2entities[obj_head_key]
+
+                    # Go over all subj-obj pair to check whether the tail link exists
+                    for subj in subj_list:
+                        for obj in obj_list:
+                            subj_tail = subj["start_index"] + len(
+                                subj["text"]) - 1
+                            obj_tail = obj["start_index"] + len(obj["text"]) - 1
+                            tail_link_memory = (rel_id, subj_tail, obj_tail)
+
+                            if tail_link_memory not in tail_link_memory_set:
+                                continue
+
+                            if task_type == "relation_extraction":
+                                rel = {
+                                    "subject": subj["text"],
+                                    "predicate": rel_label,
+                                    "object": obj["text"],
+                                    "subject_start_index": subj["start_index"],
+                                    "object_start_index": obj["start_index"]
+                                }
+                            else:
+                                rel = {
+                                    "aspect": subj["text"],
+                                    "sentiment": rel_label,
+                                    "opinion": obj["text"],
+                                    "aspect_start_index": subj["start_index"],
+                                    "opinion_start_index": obj["start_index"]
+                                }
+                            rel_list.append(rel)
+                batch_rel_results.append(rel_list)
+        if task_type == "entity_extraction":
+            return batch_ent_results
+        else:
+            return (batch_ent_results, batch_rel_results)

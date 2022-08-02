@@ -10,9 +10,11 @@
   - [3.3 事件抽取数据示例](#事件抽取数据示例)
   - [3.4 评论观点抽取数据示例](#评论观点抽取数据示例)
 - [4.模型训练](#模型训练)
-  - [4.1 关系抽取](#关系抽取)
-  - [4.2 事件抽取](#事件抽取)
-  - [4.3 评论观点抽取](#评论观点抽取)
+  - [4.1 实体抽取](#实体抽取)
+  - [4.2 关系抽取](#关系抽取)
+  - [4.3 事件抽取](#事件抽取)
+  - [4.4 评论观点抽取](#评论观点抽取)
+  - [4.5 更多配置说明](#更多配置说明)
 - [5.模型部署](#模型部署)
 
 <a name="模型简介"></a>
@@ -32,6 +34,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 ├── train.py # 训练脚本
 ├── convert.py # 数据转换脚本
 ├── evaluate.py # 评估脚本
+├── metric.py # 指标计算
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── utils.py # 工具函数脚本
 ├── criterion.py # 损失函数
@@ -45,7 +48,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 ## 3. 数据格式
 
-本章节展示了不同抽取任务数据格式示例，如果是自己的数据根据任务类型转成对应格式即可。
+本章节展示了不同抽取任务数据格式示例，如果是自己的数据根据任务类型转成对应格式即可用于模型训练及评估。
 
 <a name="实体抽取数据示例"></a>
 
@@ -84,16 +87,16 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
     "entity_list": [
         {
             "text": "离开", // 实体词
-            "type": "歌曲", // 实体类别
+            "type": "DEFAULT", // 实体类别，设置为`DEFAULT`时表示不关注实体类别
             "start_index": 1 // 实体词起始位置索引
         },
         {
             "text": "张宇",
-            "type": "人物",
+            "type": "DEFAULT",
             "start_index": 6
         }
     ], // 实体列表
-    "relation_list": [
+    "spo_list": [
         {
             "subject": "离开", // 主体
             "predicate": "作曲", // 谓语
@@ -147,41 +150,126 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 ```text
 {
-    "text": "只是里边的设施太少了", // 文本
+    "text": "位置不错，环境也还可以，早餐不行，", // 文本
     "entity_list": [
         {
-            "text": "设施", // 实体词
-            "type": "评价维度", // 实体类别
-            "start_index": 5 // 实体词起始位置索引
+            "text": "早餐", // 评价维度
+            "type": "评价维度",
+            "start_index": 12 // 评价维度起始位置索引
         },
         {
-            "text": "少",
+            "text": "位置",
+            "type": "评价维度",
+            "start_index": 0
+        },
+        {
+            "text": "环境",
+            "type": "评价维度",
+            "start_index": 5
+        },
+        {
+            "text": "不行", // 观点词
+            "type": "观点词",
+            "start_index": 14 // 观点词起始位置索引
+        },
+        {
+            "text": "不错",
+            "type": "观点词",
+            "start_index": 2
+        },
+        {
+            "text": "还可以",
             "type": "观点词",
             "start_index": 8
         }
-    ], // 实体列表
-    "relation_list": [
+    ], // 评价维度及观点词列表
+    "aso_list": [
         {
-            "subject": "设施", // 主体
-            "predicate": "观点词", // 谓语
-            "object": "少", // 客体
-            "subject_start_index": 5, // 主体起始位置索引
-            "object_start_index": 8 // 客体起始位置索引
+            "aspect": "早餐", // 评价维度
+            "sentiment": "negative", // 评价维度级情感倾向
+            "opinion": "不行", // 观点词
+            "aspect_start_index": 12, // 评价维度起始位置索引
+            "opinion_start_index": 14 // 观点词起始位置索引
+        },
+        {
+            "aspect": "位置",
+            "sentiment": "positive",
+            "opinion": "不错",
+            "aspect_start_index": 0,
+            "opinion_start_index": 2
+        },
+        {
+            "aspect": "环境",
+            "sentiment": "positive",
+            "opinion": "还可以",
+            "aspect_start_index": 5,
+            "opinion_start_index": 8
         }
-    ] // 关系列表
+    ] // (Aspect, Sentiment, Opinion) 三元组列表
 }
 ```
-
 
 <a name="模型训练"></a>
 
 ## 4 模型训练
 
-本章节提供了不同信息抽取任务的训练示例。
+本章节提供了不同类型抽取任务的训练示例。
+
+<a name="实体抽取"></a>
+
+#### 4.1 实体抽取
+
+- 数据下载
+
+    下载[CLUENER细粒度命名实体识别数据集](https://www.cluebenchmarks.com/introduce.html)，解压后存放于ner_data/目录下
+
+    ```text
+    .ner_data
+    ├── train.json
+    └── dev.json
+    ```
+
+- 格式转换
+
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
+
+    ```shell
+    python convert.py --data_dir ./ner_data --dataset_name CLUENER
+    ```
+
+- 启动训练
+
+    ```shell
+    python train.py \
+        --task_type entity_extraction \
+        --train_path ./ner_data/train_data.json \
+        --dev_path ./ner_data/dev_data.json \
+        --label_dict_path ./ner_data/label_dict.json \
+        --save_dir ./checkpoint \
+        --learning_rate 3e-5 \
+        --batch_size 16 \
+        --max_seq_len 128 \
+        --num_epochs 50 \
+        --seed 1000 \
+        --logging_steps 10 \
+        --valid_steps 100 \
+        --device gpu
+    ```
+
+- 模型评估
+
+    ```shell
+    python evaluate.py \
+        --task_type entity_extraction \
+        --model_path ./checkpoint/model_best \
+        --test_path ./ner_data/dev_data.json \
+        --batch_size 8
+    ```
+
 
 <a name="关系抽取"></a>
 
-#### 4.1 关系抽取
+#### 4.2 关系抽取
 
 - 数据下载
 
@@ -196,20 +284,20 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 格式转换
 
-    使用`convert_duie.py`转换为训练需要的数据格式并生成标签文件`label_dicts.json`。
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
 
     ```shell
-    python convert.py --data_dir ./re_data --dataset_name duie2.0
+    python convert.py --data_dir ./re_data --dataset_name DuIE2.0
     ```
 
-- 启动训练：
+- 启动训练
 
     ```shell
     python train.py \
         --task_type relation_extraction \
-        --train_path ./duie_data/train_data.json \
-        --dev_path ./duie_data/dev_data.json \
-        --label_dicts_path ./duee_data/label_dicts.json \
+        --train_path ./re_data/train_data.json \
+        --dev_path ./re_data/dev_data.json \
+        --label_dict_path ./re_data/label_dict.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
@@ -221,48 +309,19 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --device gpu
     ```
 
-    可配置参数说明：
-
-    - `train_path`: 训练集文件路径。
-    - `dev_path`: 验证集文件路径。
-    - `label_dicts_path`: 标签文件路径。
-    - `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
-    - `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为16。
-    - `learning_rate`: 学习率，默认为3e-5。
-    - `save_dir`: 模型存储路径，默认为`./checkpoint`。
-    - `max_seq_len`：最大序列长度，若出现显存不足，请适当调低这一参数；默认为128。
-    - `num_epochs`: 训练轮数，默认为20。
-    - `seed`: 随机种子，默认为1000.
-    - `logging_steps`: 日志打印的间隔steps数，默认10。
-    - `valid_steps`: evaluate的间隔steps数，默认100。
-    - `device`: 选用什么设备进行训练，可选cpu或gpu。
-    - `init_from_ckpt`: 模型参数路径，热启动模型训练；默认为None。
-    - `warmup_proportion`：学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.05。
-    - `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.1。
-
-
-- 模型评估：
+- 模型评估
 
     ```shell
     python evaluate.py \
         --task_type relation_extraction \
         --model_path ./checkpoint/model_best \
-        --test_path ./data/dev_data.json \
+        --test_path ./re_data/dev_data.json \
         --batch_size 8
     ```
 
-    可配置参数说明：
-
-    - `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
-    - `label_dicts_path`: 标签文件地址。
-    - `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`。
-    - `test_path`: 进行评估的测试集文件。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-    - `max_seq_len`: 文本最大长度，输入超过最大长度时会进行截断处理，默认为128。
-
 <a name="事件抽取"></a>
 
-#### 4.2 事件抽取
+#### 4.3 事件抽取
 
 - 数据下载
 
@@ -277,25 +336,25 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 格式转换
 
-    使用`convert_duee.py`转换为训练需要的数据格式并生成标签文件`label_dicts.json`。
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
 
     ```shell
-    python convert.py --data_dir ./ee_data --dataset_name duee1.0
+    python convert.py --data_dir ./ee_data --dataset_name DuEE1.0
     ```
 
-- 启动训练：
+- 启动训练
 
     ```shell
     python train.py \
         --task_type event_extraction \
-        --train_path ./duee_data/train_data.json \
-        --dev_path ./duee_data/dev_data.json \
-        --label_dicts_path ./duee_data/label_dicts.json \
+        --train_path ./ee_data/train_data.json \
+        --dev_path ./ee_data/dev_data.json \
+        --label_dict_path ./ee_data/label_dict.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
         --max_seq_len 128 \
-        --num_epochs 20 \
+        --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
         --valid_steps 100 \
@@ -304,58 +363,109 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 <a name="评论观点抽取"></a>
 
-#### 4.3 评论观点抽取
+#### 4.4 评论观点抽取
 
 - 数据下载
 
-    下载demo数据[观点抽取示例数据集]()，解压存放于oe_data/目录下
+    下载demo数据[观点抽取示例数据集]()，解压存放于ote_data/目录下（数据集已默认转好格式）
 
     ```text
-    .oe_data
+    .ote_data
     ├── dev_data.json
-    ├── label_dicts.json
+    ├── label_dict.json
     └── train_data.json
     ```
 
-- 启动训练：
+- 启动训练
 
     ```shell
     python train.py \
         --task_type opinion_extraction \
-        --train_path ./opinion_data/train_data.json \
-        --dev_path ./opinion_data/dev_data.json \
-        --label_dicts_path ./duee_data/label_dicts.json \
+        --train_path ./ote_data/train_data.json \
+        --dev_path ./ote_data/dev_data.json \
+        --label_dict_path ./ote_data/label_dict.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
         --max_seq_len 128 \
-        --num_epochs 100 \
+        --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
         --valid_steps 100 \
         --device gpu
     ```
 
+<a name="更多配置说明"></a>
+
+#### 4.5 更多配置说明
+
+- `train.py`脚本配置说明：
+
+    * `train_path`: 训练集文件路径。
+    * `dev_path`: 验证集文件路径。
+    * `label_dict_path`: 标签文件路径。
+    * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
+    * `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为16。
+    * `learning_rate`: 学习率，默认为3e-5。
+    * `save_dir`: 模型存储路径，默认为`./checkpoint`。
+    * `max_seq_len`：最大序列长度，若出现显存不足，请适当调低这一参数；默认为128。
+    * `num_epochs`: 训练轮数，默认为20。
+    * `seed`: 随机种子，默认为1000.
+    * `logging_steps`: 日志打印的间隔steps数，默认10。
+    * `valid_steps`: evaluate的间隔steps数，默认100。
+    * `device`: 选用什么设备进行训练，可选cpu或gpu。
+    * `init_from_ckpt`: 模型参数路径，热启动模型训练；默认为None。
+    * `warmup_proportion`：学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.05。
+    * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.1。
+
+- `evaluate.py`脚本配置说明：
+
+    * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
+    * `label_dict_path`: 标签文件地址。
+    * `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`。
+    * `test_path`: 进行评估的测试集文件。
+    * `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+    * `max_seq_len`: 文本最大长度，输入超过最大长度时会进行截断处理，默认为128。
+
 <a name="模型部署"></a>
 
-## 模型部署
+## 5. 模型部署
 
 - 模型导出
 
     ```shell
-    python export_model.py --model_path ./checkpoint/model_best --output_path ./export
+    python export_model.py \
+        --model_path ./checkpoint/model_best \
+        --output_path ./export \
+        --task_type entity_extraction \
+        --label_dict_path ./ner_data/label_dict.json
     ```
 
     可配置参数说明：
 
-    - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
-    - `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+    * `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
+    * `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+    * `label_dict_path`: 标签文件路径。
+    * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
+
 
 - 推理
 
     ```shell
-    python deploy/python/predict.py --model_path_prefix export/inference
+    python deploy/python/predict.py \
+        --model_path_prefix ./export/inference \
+        --task_type entity_extraction \
+        --label_dict_path ./ner_data/label_dict.json
     ```
+
+    可配置参数说明：
+
+    * `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    * `label_dict_path`: 标签文件路径。
+    * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
+    * `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+    * `max_seq_len`: 文本最大长度，输入超过最大长度时会进行截断处理，默认为128。
+    * `device`: 选择执行预测的设备，可选cpu或gpu。
 
 # References
 
