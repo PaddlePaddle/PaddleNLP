@@ -127,6 +127,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             bos_token='<bod>',
             eos_token='<eod>',
             eol_token='\u2583',
+            pad_token='<pad>',
             **kwargs  # The token of newline.
     ):
         self._model_file = model_file

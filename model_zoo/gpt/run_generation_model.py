@@ -70,7 +70,7 @@ def parse_args():
                         help='The minimum sequence length of generation.')
     parser.add_argument('--max_dec_len',
                         type=int,
-                        default=16,
+                        default=20,
                         help='The maximum sequence length of generation.')
     parser.add_argument('--num_return_sequences',
                         type=int,
@@ -108,6 +108,29 @@ def adjust_length_to_model(length, max_sequence_length):
     return length
 
 
+def left_padding(inputs, pad_id, padding="longest"):
+    assert "input_ids" in inputs, "input_ids should be in inputs!"
+    max_length = 0
+    for ids in inputs["input_ids"]:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(name, max_length, to_pad_id):
+        values = inputs[name]
+        res = []
+        for index, value in enumerate(values):
+            res.append(extend_max_lenth(value, max_length, to_pad_id))
+        inputs[name] = res
+
+    extend_filed("input_ids", max_length, pad_id)
+    if "attention_mask" in inputs:
+        extend_filed("attention_mask", max_length, 0)
+
+    return inputs
+
+
 def main(args, input_text):
     paddle.set_device(args.device)
     if args.seed:
@@ -125,7 +148,7 @@ def main(args, input_text):
     model = model_class.from_pretrained(args.model_name_or_path,
                                         max_length=args.max_dec_len,
                                         decode_strategy=args.decode_strategy,
-                                        eos_id=tokenizer.eol_token_id,
+                                        eos_id=tokenizer.pad_token_id,
                                         temperature=args.temperature,
                                         top_k=args.top_k,
                                         top_p=args.top_p)
@@ -133,23 +156,29 @@ def main(args, input_text):
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len, 1024)
 
-    input_ids = tokenizer.encode(input_text)['input_ids']
+    inputs = tokenizer(input_text,
+                       return_attention_mask=True,
+                       return_position_ids=True)
+    inputs = left_padding(inputs, tokenizer.bos_token_id)
+    input_ids = inputs['input_ids']
     if len(input_ids) == 0:
         input_ids = None
     else:
         # [1, seq_len]
-        input_ids = paddle.to_tensor(input_ids, dtype='int64').unsqueeze(0)
+        input_ids = paddle.to_tensor(input_ids, dtype='int64')
+        if len(input_ids.shape) <= 1:
+            input_ids = input_ids.unsqueeze(0)
+        attn_mask = paddle.to_tensor(inputs["attention_mask"])
 
-    ids = model(input_ids=input_ids)
+    ids = model(input_ids=input_ids)  # , attention_mask=attn_mask)
 
     generated_sequences = []
     for i, generated_ids in enumerate(ids):
         print("*" * 10 + " GENERATED SEQUENCE {} ".format(i) + "*" * 10)
         generated_ids = generated_ids.numpy().tolist()
-        # Decode text
+        print([tokenizer.convert_ids_to_tokens(x) for x in generated_ids])
         text = tokenizer.convert_ids_to_string(generated_ids)
-        # Add the prompt at the beginning of the sequence.
-        sequence = input_text + text
+        sequence = input_text[i] + text
         generated_sequences.append(sequence)
         print(sequence)
 
@@ -158,5 +187,8 @@ def main(args, input_text):
 
 if __name__ == "__main__":
     args = parse_args()
-    input_text = '花间一壶酒，独酌无相亲。举杯邀明月，'
+    input_text = [
+        '默写古诗：明月几时有？把酒问青天。不知天上宫阙，', '默写古诗：花间一壶酒，独酌无相亲。举杯邀明月，',
+        '问题：中国的首都是哪里？答案：北京。问题：苹果的CEO是谁？答案：'
+    ]
     main(args, input_text)

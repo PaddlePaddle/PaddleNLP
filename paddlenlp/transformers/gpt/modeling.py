@@ -207,6 +207,7 @@ class MultiHeadAttention(nn.Layer):
                                 alpha=self.head_dim**-0.5)
 
         if attn_mask is not None:
+            #print("product", product.shape, "attn_mask", attn_mask.shape)
             product = product + attn_mask
 
         weights = F.softmax(product)
@@ -1337,7 +1338,7 @@ class GPTForGeneration(GPTPretrainedModel):
                  gpt,
                  max_length=20,
                  min_length=0,
-                 decoding_strategy='sampling',
+                 decode_strategy='sampling',
                  temperature=1.0,
                  top_k=0,
                  top_p=1.0,
@@ -1351,17 +1352,16 @@ class GPTForGeneration(GPTPretrainedModel):
 
         self.min_dec_len = min_length
         self.max_dec_len = max_length
-        self.decoding_strategy = decoding_strategy
+        self.decoding_strategy = decode_strategy
         self.temperature = temperature
         self.topk = top_k
         self.topp = top_p
-        self._init_gen_cache = False
-        self.generation_caches = None
 
-    def _init_generation_caches(self, src_ids):
-        return self.generation_caches
-
-    def parallel_matmul(self, lm_output, logit_weights, parallel_output, topo):
+    def parallel_matmul(self,
+                        lm_output,
+                        logit_weights,
+                        parallel_output,
+                        topo=None):
         if topo is not None and topo.mp_info.size > 1:
             hybrid_groups = fleet.get_hybrid_communicate_group()
             model_parallel_group = hybrid_groups.get_model_parallel_group()
@@ -1390,7 +1390,7 @@ class GPTForGeneration(GPTPretrainedModel):
             "float32")
         old_probs = probs
         probs = probs * ge_cond / paddle.sum(topk_probs, axis=-1, keepdim=True)
-        sampling_ids = layers.sampling_id(probs, dtype="int")
+        sampling_ids = paddle.fluid.layers.sampling_id(probs)
         probs = old_probs
         return probs, sampling_ids
 
@@ -1398,16 +1398,14 @@ class GPTForGeneration(GPTPretrainedModel):
         sorted_probs, sorted_idx = layers.argsort(probs, descending=True)
         cum_sorted_probs = layers.cumsum(sorted_probs, axis=1, exclusive=True)
         lt_cond = paddle.cast(
-            paddle.less_than(
-                cum_sorted_probs,
-                layers.fill_constant_batch_size_like(cum_sorted_probs,
-                                                     cum_sorted_probs.shape,
-                                                     cum_sorted_probs.dtype,
-                                                     self.topp)), "float32")
+            cum_sorted_probs < paddle.full_like(cum_sorted_probs,
+                                                fill_value=self.topp),
+            "float32")
+
         old_probs = probs
         candidate_probs = sorted_probs * lt_cond
         probs = candidate_probs / paddle.sum(
-            candidate_probs, axis=-1, keep_dim=True)
+            candidate_probs, axis=-1, keepdim=True)
         sampling_ids = layers.sampling_id(probs, dtype="int")
         sampling_ids = paddle.index_sample(sorted_idx,
                                            paddle.unsqueeze(sampling_ids, [1]))
@@ -1451,76 +1449,59 @@ class GPTForGeneration(GPTPretrainedModel):
             inputs (dict): include src_ids.
                 pos_ids, input_mask and max_dec_len are optional.
         """
-        # ######### forward context #########
-        # input_ids = inputs['src_ids']
-        # position_ids = inputs['pos_ids'] if 'pos_ids' in inputs else None
-        # attention_mask = inputs['input_mask'] if 'input_mask' in inputs else None
-
         causal_mask = paddle.tensor.triu(paddle.ones(
             (paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4,
                                          diagonal=1)
         if attention_mask is not None:
+            # mask ids for padding
             tgt_pos = paddle.sum(attention_mask, axis=-1,
                                  keepdim=True).astype('int64')
             if len(attention_mask.shape) == 2:
                 attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
-            encode_mask = attention_mask + causal_mask
+            attn_mask = (1 - attention_mask) * -1e4
+            encode_mask = causal_mask.unsqueeze(axis=[0, 1]) + attn_mask
         else:
-            encode_mask = causal_mask
+            encode_mask = paddle.unsqueeze(causal_mask, axis=[0, 1])
 
-        # if cached_kvs are assigned to next step in _prepare_qkv of MultiHeadAttention,
-        # need to init the global caches here
-        gen_caches = self._init_generation_caches(input_ids)
-
-        logits, cached_kvs = self.model(
-            input_ids,
-            position_ids,
-            None,  # encode_mask,
-            use_cache=True,
-            cache=None)
+        logits, cached_kvs = self.model(input_ids,
+                                        position_ids,
+                                        encode_mask,
+                                        use_cache=True,
+                                        cache=None)
 
         next_id = paddle.argmax(logits[:, -1, :], axis=-1).reshape([-1, 1])
-        ####################################
 
         if max_dec_len is None:
-            max_len = layers.fill_constant([1],
-                                           dtype=int_type,
-                                           value=self.max_dec_len,
-                                           force_cpu=True)
+            max_len = paddle.to_tensor(self.max_dec_len,
+                                       dtype=int_type,
+                                       place=paddle.CPUPlace())
         else:
             max_len = paddle.to_tensor(max_dec_len)
 
-        min_len = layers.fill_constant(shape=[1],
-                                       dtype=int_type,
-                                       value=self.min_dec_len,
-                                       force_cpu=True)
-        step_idx = layers.fill_constant(shape=[1],
-                                        value=0,
-                                        dtype='int64',
-                                        force_cpu=True)
+        min_len = paddle.to_tensor(self.min_dec_len,
+                                   dtype=int_type,
+                                   place=paddle.CPUPlace())
+        step_idx = paddle.to_tensor(0, dtype=int_type, place=paddle.CPUPlace())
 
-        placehold_ids = layers.fill_constant_batch_size_like(
-            input=input_ids, value=0, shape=[-1, 1], dtype=next_id.dtype)
-        ids = layers.array_write(next_id, step_idx)
+        placehold_ids = paddle.full_like(input_ids,
+                                         fill_value=0,
+                                         dtype=next_id.dtype)
+        ids = paddle.tensor.array_write(next_id, step_idx)
 
         if max_dec_len is not None:
             max_len = paddle.tensor.creation._memcpy(max_len,
                                                      place=paddle.CPUPlace())
-        # cond_int = paddle.full([1], 0, dtype=int_type, name="cond_int")
         cond = paddle.less_than(step_idx, max_len)
 
         if attention_mask is not None:
-            append_mask = layers.fill_constant_batch_size_like(
-                input=next_id,
-                value=1,
-                shape=[-1, 1, 1, 1],
-                dtype=attention_mask.dtype)
+            append_mask = paddle.full_like(x=next_id,
+                                           fill_value=1,
+                                           dtype=attention_mask.dtype)
+            append_mask = append_mask.reshape([-1, 1, 1, 1])
 
-        # while_op = layers.While(cond, is_test=True)
-        # with while_op.block():
-        while cond and (paddle.less_than(step_idx, max_len)):
-            pre_ids = layers.array_read(array=ids, i=step_idx)
-            if attention_mask:
+        while cond:
+            pre_ids = paddle.tensor.array_read(array=ids, i=step_idx)
+            if attention_mask is not None:
                 decode_mask = paddle.concat([attention_mask, append_mask],
                                             axis=-1)
                 tgt_pos = tgt_pos + step_idx
@@ -1529,15 +1510,14 @@ class GPTForGeneration(GPTPretrainedModel):
                 att_mask = None
                 tgt_pos = None
 
-            layers.increment(x=step_idx, value=1.0, in_place=True)
-            layers.array_write(placehold_ids, i=step_idx, array=ids)
+            step_idx.add_(paddle.ones([1], dtype=int_type))
+            paddle.tensor.array_write(placehold_ids, i=step_idx, array=ids)
 
-            logits, decode_cached_kvs = self.model(
-                pre_ids,
-                tgt_pos,
-                None,  #att_mask,
-                use_cache=True,
-                cache=cached_kvs)
+            logits, decode_cached_kvs = self.model(pre_ids,
+                                                   tgt_pos,
+                                                   att_mask,
+                                                   use_cache=True,
+                                                   cache=cached_kvs)
 
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)
@@ -1552,20 +1532,14 @@ class GPTForGeneration(GPTPretrainedModel):
                 raise ValueError(self.decoding_strategy)
 
             selected_ids = paddle.unsqueeze(sampling_ids, -1)
-            layers.array_write(selected_ids, i=step_idx, array=ids)
+            paddle.tensor.array_write(selected_ids, i=step_idx, array=ids)
 
-            length_cond = paddle.less_than(x=step_idx,
-                                           y=max_len,
-                                           name="length_cond")
-            finish_cond = paddle.logical_not(paddle.is_empty(x=selected_ids),
-                                             name="finish_cond")
-            paddle.logical_and(x=length_cond,
-                               y=finish_cond,
-                               out=cond,
-                               name="logical_and_cond")
+            print(step_idx.item(), max_len.item())
+            cond = paddle.to_tensor((step_idx < max_len)
+                                    and not paddle.is_empty(x=selected_ids),
+                                    dtype='bool')
 
-            paddle.assign(layers.cast(cond, dtype='bool'), cond)
-            if attention_mask:
+            if attention_mask is not None:
                 paddle.assign(decode_mask, attention_mask)
             for i in range(len(decode_cached_kvs)):
                 paddle.assign(decode_cached_kvs[i].k, cached_kvs[i].k)
