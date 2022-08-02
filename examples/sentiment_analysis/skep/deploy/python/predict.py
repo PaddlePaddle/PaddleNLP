@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
 parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
 
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -37,13 +37,13 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example_to_feature(example,
-                               tokenizer,
-                               label_list,
-                               max_seq_len=512,
-                               is_test=False):
+def convert_example(example,
+                    tokenizer,
+                    label_list,
+                    max_seq_length=512,
+                    is_test=False):
     text = example
-    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_len)
+    encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
     input_ids = np.array(encoded_inputs['input_ids'], dtype="int64")
     token_type_ids = np.array(encoded_inputs['token_type_ids'], dtype="int64")
     return input_ids, token_type_ids
@@ -51,8 +51,8 @@ def convert_example_to_feature(example,
 
 class Predictor(object):
 
-    def __init__(self, model_file, params_file, device, max_seq_len):
-        self.max_seq_len = max_seq_len
+    def __init__(self, model_file, params_file, device, max_seq_length):
+        self.max_seq_length = max_seq_length
 
         config = paddle.inference.Config(model_file, params_file)
         if device == "gpu":
@@ -76,7 +76,7 @@ class Predictor(object):
         self.output_handle = self.predictor.get_output_handle(
             self.predictor.get_output_names()[0])
 
-    def predict(self, data, tokenizer, id2label, batch_size=1):
+    def predict(self, data, tokenizer, label_map, batch_size=1):
         """
         Predicts the data labels.
 
@@ -86,7 +86,7 @@ class Predictor(object):
                 A Example object contains `text`(word_ids) and `se_len`(sequence length).
             tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-            id2label(obj:`dict`): The label id (key) to label str (value) map.
+            label_map(obj:`dict`): The label id (key) to label str (value) map.
             batch_size(obj:`int`, defaults to 1): The number of batch.
 
         Returns:
@@ -94,11 +94,11 @@ class Predictor(object):
         """
         examples = []
         for text in data:
-            input_ids, segment_ids = convert_example_to_feature(
+            input_ids, segment_ids = convert_example(
                 text,
                 tokenizer,
-                label_list=id2label.values(),
-                max_seq_len=self.max_seq_len,
+                label_list=label_map.values(),
+                max_seq_length=self.max_seq_length,
                 is_test=True)
             examples.append((input_ids, segment_ids))
 
@@ -123,7 +123,7 @@ class Predictor(object):
             probs = softmax(logits, axis=1)
             idx = np.argmax(probs, axis=1)
             idx = idx.tolist()
-            labels = [id2label[i] for i in idx]
+            labels = [label_map[i] for i in idx]
             results.extend(labels)
         return results
 
@@ -131,7 +131,7 @@ class Predictor(object):
 if __name__ == "__main__":
     # Define predictor to do prediction.
     predictor = Predictor(args.model_file, args.params_file, args.device,
-                          args.max_seq_len)
+                          args.max_seq_length)
 
     tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
@@ -142,11 +142,11 @@ if __name__ == "__main__":
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
         '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
     ]
-    id2label = {0: 'negative', 1: 'positive'}
+    label_map = {0: 'negative', 1: 'positive'}
 
     results = predictor.predict(data,
                                 tokenizer,
-                                id2label,
+                                label_map,
                                 batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

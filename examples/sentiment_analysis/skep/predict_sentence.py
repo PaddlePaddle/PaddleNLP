@@ -25,7 +25,7 @@ from paddlenlp.transformers import SkepForSequenceClassification, SkepTokenizer
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -35,11 +35,11 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example_to_feature(example,
-                               tokenizer,
-                               label_list,
-                               max_seq_len=512,
-                               is_test=False):
+def convert_example(example,
+                    tokenizer,
+                    label_list,
+                    max_seq_length=512,
+                    is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
     by concatenating and adding special tokens. And creates a mask from the two sequences passed 
@@ -70,7 +70,7 @@ def convert_example_to_feature(example,
         input_ids(obj:`list[int]`): The list of token ids.
         token_type_ids(obj: `list[int]`): List of sequence pair mask. 
     """
-    encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_len)
+    encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
     input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
     token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")
 
@@ -78,7 +78,7 @@ def convert_example_to_feature(example,
 
 
 @paddle.no_grad()
-def predict(model, data, tokenizer, id2label, batch_size=1):
+def predict(model, data, tokenizer, label_map, batch_size=1):
     """
     Predicts the data labels.
 
@@ -88,7 +88,7 @@ def predict(model, data, tokenizer, id2label, batch_size=1):
             A Example object contains `text`(word_ids) and `seq_len`(sequence length).
         tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        id2label(obj:`dict`): The label id (key) to label str (value) map.
+        label_map(obj:`dict`): The label id (key) to label str (value) map.
         batch_size(obj:`int`, defaults to 1): The number of batch.
 
     Returns:
@@ -96,11 +96,11 @@ def predict(model, data, tokenizer, id2label, batch_size=1):
     """
     examples = []
     for text in data:
-        input_ids, token_type_ids = convert_example_to_feature(
+        input_ids, token_type_ids = convert_example(
             text,
             tokenizer,
-            label_list=id2label.values(),
-            max_seq_len=args.max_seq_len,
+            label_list=label_map.values(),
+            max_seq_length=args.max_seq_length,
             is_test=True)
         examples.append((input_ids, token_type_ids))
 
@@ -124,7 +124,7 @@ def predict(model, data, tokenizer, id2label, batch_size=1):
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
-        labels = [id2label[i] for i in idx]
+        labels = [label_map[i] for i in idx]
         results.extend(labels)
     return results
 
@@ -139,10 +139,10 @@ if __name__ == "__main__":
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
         '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
     ]
-    id2label = {0: 'negative', 1: 'positive'}
+    label_map = {0: 'negative', 1: 'positive'}
 
     model = SkepForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(id2label))
+        args.model_name, num_classes=len(label_map))
     tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     results = predict(model,
                       data,
                       tokenizer,
-                      id2label,
+                      label_map,
                       batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))
