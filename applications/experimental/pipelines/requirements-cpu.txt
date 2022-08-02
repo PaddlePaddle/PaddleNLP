@@ -1,4 +1,4 @@
-paddlepaddle-gpu
+paddlepaddle
 paddlenlp
 paddleocr
 requests
@@ -21,4 +21,3 @@ streamlit==1.9.0
 fastapi
 uvicorn
 markdown
-numba
