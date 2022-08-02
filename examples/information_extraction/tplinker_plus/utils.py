@@ -30,8 +30,8 @@ ignore_list = ["offset_mapping", "text"]
 
 criteria_map = {
     "entity_extraction": "entity_f1",
-    "opinion_extraction": "relation_f1",  # SPO
-    "relation_extraction": "relation_f1",  # ASO
+    "opinion_extraction": "relation_f1",  # ASO
+    "relation_extraction": "relation_f1",  # SPO
     "event_extraction": "argument_f1"
 }
 
@@ -318,25 +318,30 @@ def create_dataloader(dataset,
             }
 
             if task_type == "relation_extraction":
-                _triplet_name, _rel_name = "spo_list", "relation2id"
-                _e1_name, _e2_name, _p_name = "subject", "object", "predicate"
-                _e1_id_name, _e2_id_name = "subject_start_index", "object_start_index"
-            elif task_type == "opinion_extraction":
-                _triplet_name, _rel_name = "aso_list", "sentiment2id"
-                _e1_name, _e2_name, _p_name = "aspect", "opinion", "sentiment"
-                _e1_id_name, _e2_id_name = "aspect_start_index", "opinion_start_index"
-
                 rel_labels = []
-                for r in example[_triplet_name]:
-                    _sh, _oh = r[_e1_id_name], r[_e2_id_name]
-                    _st, _ot = _sh + len(r[_e1_name]) - 1, _oh + len(
-                        r[_e2_name]) - 1
+                for r in example["spo_list"]:
+                    _sh, _oh = r["subject_start_index"], r["object_start_index"]
+                    _st, _ot = _sh + len(r["subject"]) - 1, _oh + len(
+                        r["object"]) - 1
                     sh = map_offset(_sh, offset_mapping)
                     st = map_offset(_st, offset_mapping)
                     oh = map_offset(_oh, offset_mapping)
                     ot = map_offset(_ot, offset_mapping)
-                    p = label_dict[_rel_name][r[_p_name]]
+                    p = label_dict["relation2id"][r["predicate"]]
                     rel_labels.append([sh, st, p, oh, ot])
+                outputs['labels']['rel_labels'] = rel_labels
+            elif task_type == "opinion_extraction":
+                rel_labels = []
+                for r in example["aso_list"]:
+                    _ah, _oh = r["aspect_start_index"], r["opinion_start_index"]
+                    _at, _ot = _sh + len(r["aspect"]) - 1, _oh + len(
+                        r["opinion"]) - 1
+                    ah = map_offset(_ah, offset_mapping)
+                    at = map_offset(_at, offset_mapping)
+                    oh = map_offset(_oh, offset_mapping)
+                    ot = map_offset(_ot, offset_mapping)
+                    s = label_dict["sentiment2id"][r["sentiment"]]
+                    rel_labels.append([ah, at, s, oh, ot])
                 outputs['labels']['rel_labels'] = rel_labels
         return outputs
 

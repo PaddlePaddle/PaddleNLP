@@ -252,7 +252,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
-        --valid_steps 100 \
+        --valid_steps 500 \
         --device gpu
     ```
 
@@ -305,7 +305,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --num_epochs 20 \
         --seed 1000 \
         --logging_steps 10 \
-        --valid_steps 100 \
+        --valid_steps 1000 \
         --device gpu
     ```
 
@@ -357,7 +357,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
-        --valid_steps 100 \
+        --valid_steps 500 \
         --device gpu
     ```
 
@@ -391,7 +391,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
-        --valid_steps 100 \
+        --valid_steps 500 \
         --device gpu
     ```
 

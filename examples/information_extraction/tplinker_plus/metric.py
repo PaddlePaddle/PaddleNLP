@@ -33,7 +33,7 @@ def get_eval(all_preds, raw_data, task_type):
             "entity_precision": ent_precision,
             "entity_recall": ent_recall,
         }
-    elif task_type in ["relation_extracition", "opinion_extraction"]:
+    elif task_type in ["relation_extraction", "opinion_extraction"]:
         all_ent_preds, all_rel_preds = all_preds
         ex, ey, ez = 1e-10, 1e-10, 1e-10
         rx, ry, rz = 1e-10, 1e-10, 1e-10
