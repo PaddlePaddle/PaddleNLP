@@ -1363,7 +1363,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if token in self.all_special_tokens:
                 token = token.lower() if hasattr(
                     self, "do_lower_case") and self.do_lower_case else token
-            start = text[offset:].index(token) + offset
+            # The greek letter "sigma" has 2 forms of lowercase, σ and ς respectively.
+            # When used as a final letter of a word, the final form (ς) is used. Otherwise, the form (σ) is used.
+            # https://latin.stackexchange.com/questions/6168/how-and-when-did-we-get-two-forms-of-sigma
+            if "σ" in token or "ς" in token:
+                start = text[offset:].replace("ς", "σ").index(
+                    token.replace("ς", "σ")) + offset
+            else:
+                start = text[offset:].index(token) + offset
 
             end = start + len(token)
 
