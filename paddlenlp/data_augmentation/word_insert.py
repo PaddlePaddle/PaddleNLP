@@ -118,6 +118,7 @@ class WordInsert(BaseAugment):
         else:
             return self._augment_multi(seq_tokens, aug_n, aug_indexes)
 
+    @paddle.no_grad()
     def _augment_mlm(self, sequence):
         seq_tokens = self.tokenizer.cut(sequence)
         aug_indexes = self._skip_stop_word_tokens(seq_tokens)

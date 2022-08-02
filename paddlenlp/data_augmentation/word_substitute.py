@@ -199,6 +199,7 @@ class WordSubstitute(BaseAugment):
         else:
             return self._augment_multi(seq_tokens, aug_n, aug_indexes, p)
 
+    @paddle.no_grad()
     def _augment_mlm(self, sequence, seq_tokens, aug_indexes, p):
         t = 0
         sentences = []
@@ -215,6 +216,7 @@ class WordSubstitute(BaseAugment):
                 i for i, idx in enumerate(tokenized['input_ids'])
                 if idx == self.mlm_tokenizer.mask_token_id
             ]
+
             output = self.mlm_model(
                 paddle.to_tensor([tokenized['input_ids']]),
                 paddle.to_tensor([tokenized['token_type_ids']]))
