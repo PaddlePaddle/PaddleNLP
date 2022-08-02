@@ -1534,7 +1534,6 @@ class GPTForGeneration(GPTPretrainedModel):
             selected_ids = paddle.unsqueeze(sampling_ids, -1)
             paddle.tensor.array_write(selected_ids, i=step_idx, array=ids)
 
-            print(step_idx.item(), max_len.item())
             cond = paddle.to_tensor((step_idx < max_len)
                                     and not paddle.is_empty(x=selected_ids),
                                     dtype='bool')
