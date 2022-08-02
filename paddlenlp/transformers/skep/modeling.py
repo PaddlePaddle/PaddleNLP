@@ -25,7 +25,6 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
-from paddlenlp.layers.crf import ViterbiDecoder
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
