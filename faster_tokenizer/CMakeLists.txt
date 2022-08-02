@@ -150,7 +150,8 @@ else(WITH_PYTHON)
 
 set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer_cpp)
 add_custom_target(build_cpp_package_dir ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include)
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include
+    DEPENDS core_tokenizers)
 
 # copy headers
 add_custom_target(copy_headers ALL
