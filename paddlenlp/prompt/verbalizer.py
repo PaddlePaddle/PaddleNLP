@@ -286,8 +286,9 @@ class ManualVerbalizer(Verbalizer):
 
     def process_outputs(self, logits, inputs, **kwargs):
         # TODO: support multiple mask ids per sentence.
-        mask_ids = inputs["mask_ids"]
-        logits = logits[mask_ids == 1]
+        mask_ids = inputs["mask_ids"].unsqueeze(2)
+        logits = paddle.where(mask_ids == 1, logits, paddle.zeros_like(logits))
+        logits = logits.sum(axis=1) / mask_ids.sum(axis=1)
 
         word_logits = self.project(logits)
         label_logits = self.aggregate(word_logits, self.word_ids_mask)
@@ -399,9 +400,9 @@ class SoftVerbalizer(Verbalizer):
         return model
 
     def process_outputs(self, logits, inputs=None, **kwargs):
-        if inputs is not None:
-            mask_ids = inputs["mask_ids"]
-            logits = logits[mask_ids == 1]
+        mask_ids = inputs["mask_ids"].unsqueeze(2)
+        logits = paddle.where(mask_ids == 1, logits, paddle.zeros_like(logits))
+        logits = logits.sum(axis=1) / mask_ids.sum(axis=1)
         return self.head(logits)
 
     @classmethod

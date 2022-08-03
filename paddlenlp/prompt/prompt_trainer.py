@@ -241,6 +241,7 @@ class PromptTrainer(Trainer):
         soft_token_ids = inputs.get("soft_token_ids", None)
 
         outputs, hidden_states = self.model(inputs["input_ids"],
+                                            inputs["mask_ids"],
                                             soft_token_ids,
                                             return_hidden_states=True)
         if self.criterion is not None:
@@ -320,11 +321,14 @@ class PromptModelForClassification(nn.Layer):
         self._mask_token_id = self.template.tokenizer.mask_token_id
         self._pad_token_id = self.template.tokenizer.pad_token_id
 
-    def forward(self, input_ids=None, soft_token_ids=None, **kwargs):
+    def forward(self,
+                input_ids=None,
+                mask_ids=None,
+                soft_token_ids=None,
+                **kwargs):
         return_hidden_states = kwargs.pop('return_hidden_states', False)
         if self.freeze_dropout:
             self.plm.eval()
-        mask_ids = (input_ids == self._mask_token_id).astype("int64")
         attention_mask = (input_ids != self._pad_token_id).astype("int64")
         inputs = InputFeatures(input_ids=input_ids,
                                mask_ids=mask_ids,
