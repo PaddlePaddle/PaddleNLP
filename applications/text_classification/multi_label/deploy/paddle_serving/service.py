@@ -26,12 +26,12 @@ class Op(Op):
 
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
                                                        use_faster=True)
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = [
-            "linear_147.tmp_1",
+            "linear_75.tmp_1",
         ]
 
     def preprocess(self, input_dicts, data_id, log_id):
