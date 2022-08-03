@@ -36,7 +36,7 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 - 更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 
 ### 安装FasterTokenizer文本处理加速库（可选）
-如果部署环境是Linux，推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
 pip install faster_tokenizer
 ```
@@ -58,11 +58,15 @@ python -m paddle_serving_client.convert --help
 
 转换成功后的目录如下:
 ```
-serving_server/
-├── float32.pdiparams
-├── float32.pdmodel
-├── serving_server_conf.prototxt
-└── serving_server_conf.stream.prototxt
+paddle_serving/
+├──serving_server
+│  ├── float32.pdiparams
+│  ├── float32.pdmodel
+│  ├── serving_server_conf.prototxt
+│  └── serving_server_conf.stream.prototxt
+└──serving_client
+   ├── serving_client_conf.prototxt
+   └── serving_client_conf.stream.prototxt
 ```
 
 ## 部署模型
@@ -94,7 +98,7 @@ rpc_port: 9998   =>   rpc_port: 9998
 device_type: 1    =>   device_type: 0
 
 #Fetch结果列表，以serving_client/serving_client_conf.prototxt中fetch_var的alias_name为准
-fetch_list: ["linear_113.tmp_1"]    =>   fetch_list: ["linear_147.tmp_1"]
+fetch_list: ["linear_147.tmp_1"]    =>   fetch_list: ["linear_75.tmp_1"]
 
 #开启MKLDNN加速
 #use_mkldnn: True    =>   use_mkldnn: True
@@ -116,8 +120,8 @@ I0625 16:44:36.571702 40218 naive_executor.cc:102] ---  skip [feed], feed -> tok
 I0625 16:44:36.571728 40218 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0625 16:44:36.574352 40218 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
 [2022-06-25 16:44:37,545] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
-[2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-base-zh'.
-[2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-base-zh/ernie_3.0_base_zh_vocab.txt
+[2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
+[2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
 W0625 16:45:40.312942 40218 gpu_context.cc:278] Please NOTE: device: 3, GPU Compute Capability: 7.0, Driver API Version: 11.2, Runtime API Version: 10.2
 W0625 16:45:40.316538 40218 gpu_context.cc:306] device: 3, cuDNN Version: 8.1.
@@ -130,13 +134,15 @@ python rpc_client.py
 ```
 输出打印如下:
 ```
-data:  经审理查明，2012年4月5日19时许，被告人王某在杭州市下城区朝晖路农贸市场门口贩卖盗版光碟、淫秽光碟时被民警当场抓获，并当场查获其贩卖的各类光碟5515张，其中5280张某属非法出版物、235张某属淫秽物品。上述事实，被告人王某在庭审中亦无异议，且有经庭审举证、质证的扣押物品清单、赃物照片、公安行政处罚决定书、抓获经过及户籍证明等书证；证人胡某、徐某的证言；出版物鉴定书、淫秽物品审查鉴定书及检查笔录等证据证实，足以认定。
-label:  32,158,187
+data:  五松新村房屋是被告婚前购买的；
+label:  10
 --------------------
-data:  榆林市榆阳区人民检察院指控：2015年11月22日2时许，被告人王某某在自己经营的榆阳区长城福源招待所内，介绍并容留杨某向刘某某、白某向乔某某提供性服务各一次。
-label:  26,27
+data:  被告于2016年3月将车牌号为皖B×××××出售了2.7万元，被告通过原告偿还了齐荷花人民币2.6万元，原、被告尚欠齐荷花2万元。
+label:  2,9
 --------------------
-data:  静乐县人民检察院指控，2014年8月30日15时许，静乐县苏坊村村民张某某因占地问题去苏坊村半切沟静静铁路第五标施工地点阻拦施工时，遭被告人王某某阻止，张某某打电话叫来儿子李某某，李某某看到张某某躺在地上，打了王某某一耳光。于是王某某指使工人殴打李某某，致李某某受伤。经忻州市公安司法鉴定中心鉴定，李某某的损伤评定为轻伤一级。李某某被打伤后，被告人王某某为逃避法律追究，找到任某某，指使任某某作实施××的伪证，并承诺每月给1万元。同时王某某指使工人王某甲、韩某某去丰润派出所作由任某某打伤李某某的伪证，导致任某某被静乐县公安局以涉嫌××罪刑事拘留。公诉机关认为，被告人王某某的行为触犯了《中华人民共和国刑法》××、《中华人民共和国刑法》××××之规定，应以××罪和××罪追究其刑事责任，数罪并罚。
-label:  0,61
+data:  2、判令被告返还借婚姻索取的现金33万元，婚前个人存款10万元；
+label:  10
 --------------------
+data:  一、判决原告于某某与被告杨某某离婚；
+label:  8,11
 ```

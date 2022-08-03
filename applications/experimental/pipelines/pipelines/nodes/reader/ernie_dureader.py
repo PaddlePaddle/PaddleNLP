@@ -547,7 +547,7 @@ class ErnieReader(BaseReader):
         start_end_matrix[invalid_indices[0][:], invalid_indices[1][:],
                          invalid_indices[2][:]] = -999
         start_end_matrix = paddle.to_tensor(start_end_matrix,
-                                            place=paddle.CUDAPlace(0))
+                                            place=self.devices[0])
 
         # Sort the candidate answers by their score. Sorting happens on the flattened matrix.
         # flat_sorted_indices.shape: (batch_size, max_seq_len^2, 1)
