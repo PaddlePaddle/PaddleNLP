@@ -35,6 +35,7 @@ from . import experimental
 from .taskflow import Taskflow
 from . import trainer
 from . import prompt
+from . import data_augmentation
 import paddle
 
 paddle.disable_signal_handler()
