@@ -26,12 +26,12 @@ from utils import postprocess, get_label_dict, create_dataloader, extract_events
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="relation_extraction", type=str, help="Select the training task type.")
-parser.add_argument("--label_dict_path", default="./duie/label_dict.json", type=str, help="The file path of the labels dictionary.")
-parser.add_argument("--model_path_prefix", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
+parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
+parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+parser.add_argument("--model_path_prefix", type=str, required=True, default='./export/inference', help="The path to model info in static graph.")
 parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     # Relation extraction sample
     # input_list = ["歌曲《墨写你的美》是由歌手冷漠演唱的一首歌曲", "常山公主是晋文帝司马昭的女儿，母不详，从小双目失明"]
 
-    # Entity extraction sample
+    # Event extraction sample
     # input_list = ['8月31日，第四届两岸关系天府论坛在四川眉山市举行', '国际金价短期回调 后市银价有望出现较大涨幅']
 
     # Opinion extraction sample
@@ -126,8 +126,6 @@ if __name__ == "__main__":
                                          label_dict=label_dict,
                                          mode="infer",
                                          task_type=args.task_type)
-
-    all_preds = predictor.predict(infer_dataloader)
 
     if args.task_type == "entity_extraction":
         for ent, text in zip(all_preds, input_list):

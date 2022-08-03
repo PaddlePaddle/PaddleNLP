@@ -25,8 +25,8 @@ from utils import get_label_dict
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str, required=True, default='./checkpoint/model_best', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
-parser.add_argument("--label_dict_path", default="./duie/label_dict.json", type=str, help="The file path of the labels dictionary.")
-parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="relation_extraction", type=str, help="Select the training task type.")
+parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
 args = parser.parse_args()
 # yapf: enable
 

@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_dir", type=str, default="duie2.0", help="The path of dataset.")
+    parser.add_argument("--data_dir", type=str, default="ner_data", help="The path of dataset.")
     parser.add_argument("--dataset_name", choices=['DuIE2.0', 'DuEE1.0', "CMeEE", "CLUENER"], type=str, default="CLUENER", help="The name of dataset.")
 
     args = parser.parse_args()
@@ -140,35 +140,23 @@ if __name__ == "__main__":
         # The entity type is default to `DEFAULT` if only the SPO Triplet is extracted
         entity2id = {"DEFAULT": 0}
         relation2id = {}
-        schemas = []
         schema_path = os.path.join(args.data_dir, "duie_schema.json")
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            for line in f:
+        with open(schema_path, 'r', encoding='utf-8') as fp:
+            for line in fp:
                 json_line = json.loads(line)
                 subject_type = json_line['subject_type']
                 obj_dict = json_line['object_type']
                 predicate = json_line['predicate']
                 if len(obj_dict) == 1:
                     relation2id[predicate] = len(relation2id)
-                    schemas.append({
-                        "object_type": list(obj_dict.keys())[0],
-                        "predicate": predicate,
-                        "subject_type": subject_type
-                    })
                 else:
                     for t in obj_dict.keys():
                         predicate_complex = predicate + "_" + t
                         relation2id[predicate_complex] = len(relation2id)
-                        schemas.append({
-                            "object_type": obj_dict[t],
-                            "predicate": predicate_complex,
-                            "subject_type": subject_type
-                        })
 
         label_dict = {
             "entity2id": entity2id,
             "relation2id": relation2id,
-            "schema_list": schemas
         }
 
         with open(os.path.join(args.data_dir, "label_dict.json"),
@@ -186,7 +174,7 @@ if __name__ == "__main__":
 
         schemas = []
         schema_path = os.path.join(args.data_dir, "duee_event_schema.json")
-        with open(schema_path, 'r', encoding='utf-8') as f:
+        with open(schema_path, 'r', encoding='utf-8') as fp:
             for line in f:
                 json_line = json.loads(line)
                 schema = {

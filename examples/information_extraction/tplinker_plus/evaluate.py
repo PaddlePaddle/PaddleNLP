@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--label_dict_path", default="./duie/label_dict.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="relation_extraction", type=str, help="Select the training task type.")
