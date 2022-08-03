@@ -15,9 +15,14 @@ import random
 import sys
 import json
 import os
+import math
 from typing import Iterable
 
-from ..base_augment import BaseAugment
+import numpy as np
+import paddle
+
+from ..transformers import AutoModelForMaskedLM, AutoTokenizer
+from .base_augment import BaseAugment
 
 
 class WordSubstitute(BaseAugment):
@@ -47,6 +52,10 @@ class WordSubstitute(BaseAugment):
             Maximum number of augmented words in sequences.
         tf_idf (bool):
             Use tf-idf to select the most unimportant word for substitution.
+        tf_idf (str):
+            File for calculating TF-IDF score.
+        model_name (str):
+            Model parameter name for MLM prediction task.
     """
 
     def __init__(self,
@@ -58,7 +67,8 @@ class WordSubstitute(BaseAugment):
                  aug_percent=0.02,
                  aug_min=1,
                  aug_max=10,
-                 tf_idf=False):
+                 tf_idf=False,
+                 tf_idf_file=None):
         super().__init__(create_n=create_n,
                          aug_n=aug_n,
                          aug_percent=aug_percent,
@@ -68,13 +78,29 @@ class WordSubstitute(BaseAugment):
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
         self.tf_idf = tf_idf
+        self.model_name = "ernie-1.0"
+        if self.tf_idf:
+            self._count_idf(tf_idf_file)
 
         if isinstance(aug_type, str):
             self.type = aug_type
             if aug_type in ['synonym', 'homonym', 'custom']:
                 self.dict = self._load_substitue_dict(aug_type)
+            elif aug_type in ['mlm']:
+                self.mlm_model = AutoModelForMaskedLM.from_pretrained(
+                    self.model_name)
+                self.mlm_tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name)
         elif isinstance(aug_type, Iterable):
-            self.type = 'combination'
+            if len(aug_type) == 1:
+                self.type = aug_type[0]
+            else:
+                self.type = 'combination'
+            if self.type in ['mlm']:
+                self.mlm_model = AutoModelForMaskedLM.from_pretrained(
+                    self.model_name)
+                self.mlm_tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name)
             self.dict = {}
             # Merge dictionaries from different sources
             for t in aug_type:
@@ -89,6 +115,45 @@ class WordSubstitute(BaseAugment):
         else:
             self.type = aug_type
 
+    def _count_idf(self, tf_idf_file):
+        if os.path.exists(tf_idf_file):
+            with open(tf_idf_file, 'r', encoding='utf-8') as f:
+                self.word_count_dict = {}
+                self.text_tf_idf = []
+                self.num = 0
+                for line in f:
+                    self.num += 1
+                    self.text_tf_idf.append(line.strip())
+                    for word in set(self.tokenizer.cut(line.strip())):
+                        if word not in self.word_count_dict:
+                            self.word_count_dict[word] = 0
+                        self.word_count_dict[word] += 1
+            f.close()
+        else:
+            raise ValueError("The tf_idf_file should exist.")
+        return
+
+    def _calculate_tfidf(self, sequence, seq_tokens, aug_indexes):
+        if sequence not in self.text_tf_idf:
+            self.num += 1
+            self.text_tf_idf.append(sequence)
+            for word in set(seq_tokens):
+                if word not in self.word_count_dict:
+                    self.word_count_dict[word] = 0
+                self.word_count_dict[word] += 1
+        sequence_count = {}
+        for index in aug_indexes:
+            if seq_tokens[index] in sequence_count:
+                sequence_count[seq_tokens[index]] += 1
+            else:
+                sequence_count[seq_tokens[index]] = 1
+        tfidf = []
+        for index in aug_indexes:
+            tf = sequence_count[seq_tokens[index]] / len(aug_indexes)
+            idf = math.log(self.num / self.word_count_dict[seq_tokens[index]])
+            tfidf.append(tf * idf)
+        return np.array(tfidf)
+
     def _load_substitue_dict(self, source_type):
         '''Load substitution dictionary'''
         if source_type in ['synonym', 'homonym']:
@@ -97,13 +162,13 @@ class WordSubstitute(BaseAugment):
             fullname = self.custom_file_path
         elif source_type in ['delete']:
             fullname = self.delete_file_path
+
         if os.path.exists(fullname):
             with open(fullname, 'r', encoding='utf-8') as f:
                 substitue_dict = json.load(f)
             f.close()
         else:
-            print('{} does not exist'.format(fullname))
-            return {}
+            raise ValueError("The {} should exist.".format(fullname))
 
         return substitue_dict
 
@@ -111,46 +176,95 @@ class WordSubstitute(BaseAugment):
         '''Genearte the sequences according to the mapping list'''
         for aug_token in aug_tokens:
             idx, token = aug_token
-            output_seq_tokens[idx] = token
+            output_seq_tokens[int(idx)] = token
         return ''.join(output_seq_tokens)
 
     def _augment(self, sequence):
-        if self.type == 'mlm':
-            self.aug_n = 1
-            return self._augment_mlm(sequence)
-
         seq_tokens = self.tokenizer.cut(sequence)
         aug_indexes = self._skip_stop_word_tokens(seq_tokens)
         aug_n = self._get_aug_n(len(seq_tokens), len(aug_indexes))
+
+        if self.tf_idf:
+            tfidf = self._calculate_tfidf(sequence, seq_tokens, aug_indexes)
+            p = (max(tfidf) + 0.01 - tfidf) / sum(max(tfidf) + 0.01 - tfidf)
+        else:
+            p = None
+
         if aug_n == 0:
             return []
+        elif self.type == 'mlm':
+            return self._augment_mlm(sequence, seq_tokens, aug_indexes, p)
         elif aug_n == 1:
-            return self._augment_single(seq_tokens, aug_indexes)
+            return self._augment_single(seq_tokens, aug_indexes, p)
         else:
-            return self._augment_multi(seq_tokens, aug_n, aug_indexes)
+            return self._augment_multi(seq_tokens, aug_n, aug_indexes, p)
 
-    def _augment_mlm(self, sequence):
-        # Todo: generate word based on mlm task
-        raise NotImplementedError
-
-    def _augment_multi(self, seq_tokens, aug_n, aug_indexes):
+    @paddle.no_grad()
+    def _augment_mlm(self, sequence, seq_tokens, aug_indexes, p):
+        t = 0
         sentences = []
+        while t < self.create_n * self.loop and len(sentences) < self.create_n:
+            skip = False
+            t += 1
+            idx = np.random.choice(aug_indexes, replace=False, p=p)
 
+            aug_tokens = [[idx, "[MASK]" * len(seq_tokens[idx])]]
+            sequence_mask = self._generate_sequence(seq_tokens.copy(),
+                                                    aug_tokens)
+            tokenized = self.mlm_tokenizer(sequence_mask)
+            masked_positions = [
+                i for i, idx in enumerate(tokenized['input_ids'])
+                if idx == self.mlm_tokenizer.mask_token_id
+            ]
+
+            output = self.mlm_model(
+                paddle.to_tensor([tokenized['input_ids']]),
+                paddle.to_tensor([tokenized['token_type_ids']]))
+            predicted = ''.join(
+                self.mlm_tokenizer.convert_ids_to_tokens(
+                    paddle.argmax(output[0][masked_positions], axis=-1)))
+            for ppp in predicted:
+                if ppp in self.stop_words:
+                    skip = True
+                    break
+            if skip:
+                continue
+            aug_tokens = [[idx, predicted]]
+            sequence_generate = self._generate_sequence(seq_tokens.copy(),
+                                                        aug_tokens)
+            if sequence_generate != sequence and sequence_generate not in sentences:
+                sentences.append(sequence_generate)
+        return sentences
+
+    def _augment_multi(self, seq_tokens, aug_n, aug_indexes, p):
+        sentences = []
         aug_n = min(aug_n, len(aug_indexes))
         if self.type in ['synonym', 'homonym', 'combination', 'custom']:
             candidate_tokens = []
-            for aug_index in aug_indexes:
+            pp = []
+            for i, aug_index in enumerate(aug_indexes):
                 if seq_tokens[aug_index] in self.dict:
                     candidate_tokens.append(
                         [aug_index, self.dict[seq_tokens[aug_index]]])
+                    if self.tf_idf:
+                        pp.append(p[i])
+            pp = np.array(pp)
+            pp /= sum(pp)
             aug_n = min(aug_n, len(candidate_tokens))
             if aug_n != 0:
                 t = 0
                 while t < self.create_n * self.loop and len(
                         sentences) < self.create_n:
                     t += 1
-                    idxes = random.sample(list(range(len(candidate_tokens))),
-                                          aug_n)
+                    if self.tf_idf:
+                        idxes = np.random.choice(list(
+                            range(len(candidate_tokens))),
+                                                 size=aug_n,
+                                                 replace=False,
+                                                 p=pp)
+                    else:
+                        idxes = random.sample(
+                            list(range(len(candidate_tokens))), aug_n)
                     aug_tokens = []
                     for idx in idxes:
                         aug_index, aug_dict = candidate_tokens[idx]
@@ -168,8 +282,11 @@ class WordSubstitute(BaseAugment):
                     sentences) < self.create_n:
                 t += 1
                 aug_tokens = []
-                aug_indexes = random.sample(aug_indexes, aug_n)
-                for aug_index in aug_indexes:
+                aug_choice_indexes = np.random.choice(aug_indexes,
+                                                      size=aug_n,
+                                                      replace=False,
+                                                      p=p)
+                for aug_index in aug_choice_indexes:
                     token = self.vocab.to_tokens(
                         random.randint(0,
                                        len(self.vocab) - 2))
@@ -180,30 +297,46 @@ class WordSubstitute(BaseAugment):
                     sentences.append(sentence)
         return sentences
 
-    def _augment_single(self, seq_tokens, aug_indexes):
-
+    def _augment_single(self, seq_tokens, aug_indexes, p):
         sentences = []
         aug_tokens = []
         if self.type in ['synonym', 'homonym', 'combination', 'custom']:
             candidate_tokens = []
-            for aug_index in aug_indexes:
+            pp = []
+            for i, aug_index in enumerate(aug_indexes):
                 if seq_tokens[aug_index] in self.dict:
                     for token in self.dict[seq_tokens[aug_index]]:
                         candidate_tokens.append([aug_index, token])
+                        if self.tf_idf:
+                            pp.append(p[i] /
+                                      len(self.dict[seq_tokens[aug_index]]))
             create_n = min(self.create_n, len(candidate_tokens))
-            aug_tokens = random.sample(candidate_tokens, create_n)
+            pp = np.array(pp)
+            pp /= sum(pp)
+            if self.tf_idf:
+                candidate_indexes = np.random.choice(range(
+                    len(candidate_tokens)),
+                                                     size=create_n,
+                                                     replace=False,
+                                                     p=pp)
+                candidate_tokens = np.array(candidate_tokens)
+                aug_tokens = candidate_tokens[candidate_indexes]
+            else:
+                aug_tokens = random.sample(candidate_tokens, create_n)
         elif self.type in ['random']:
             t = 0
             while t < self.create_n * self.loop and len(
                     aug_tokens) < self.create_n:
                 t += 1
-                aug_index = random.sample(aug_indexes, 1)[0]
+                aug_index = np.random.choice(aug_indexes, replace=False, p=p)
                 token = self.vocab.to_tokens(
                     random.randint(0,
                                    len(self.vocab) - 2))
                 if [aug_index, token] not in aug_tokens:
                     aug_tokens.append([aug_index, token])
         for aug_token in aug_tokens:
-            sentences.append(
-                self._generate_sequence(seq_tokens.copy(), [aug_token]))
+            sequence_generate = self._generate_sequence(seq_tokens.copy(),
+                                                        [aug_token])
+            sentences.append(sequence_generate)
+
         return sentences
