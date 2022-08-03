@@ -5,14 +5,14 @@ import numpy as np
 import paddle
 from paddlenlp.transformers import (
     GPTLMHeadModel,
-    GPTForGeneration,
+    GPTForStaticGeneration,
     GPTTokenizer,
     GPTChineseTokenizer,
 )
 
 MODEL_CLASSES = {
-    "gpt2": (GPTForGeneration, GPTTokenizer),
-    "gpt2-cn": (GPTForGeneration, GPTChineseTokenizer),
+    "gpt2": (GPTForStaticGeneration, GPTTokenizer),
+    "gpt2-cn": (GPTForStaticGeneration, GPTChineseTokenizer),
 }
 
 
@@ -127,6 +127,8 @@ def left_padding(inputs, pad_id, padding="longest"):
     extend_filed("input_ids", max_length, pad_id)
     if "attention_mask" in inputs:
         extend_filed("attention_mask", max_length, 0)
+    if "position_ids" in inputs:
+        extend_filed("position_ids", max_length, 0)
 
     return inputs
 
@@ -169,8 +171,11 @@ def main(args, input_text):
         if len(input_ids.shape) <= 1:
             input_ids = input_ids.unsqueeze(0)
         attn_mask = paddle.to_tensor(inputs["attention_mask"])
+        pos_ids = paddle.to_tensor(inputs["position_ids"])
 
-    ids = model(input_ids=input_ids)  # , attention_mask=attn_mask)
+    ids = model(input_ids=input_ids,
+                attention_mask=attn_mask,
+                position_ids=pos_ids)
 
     generated_sequences = []
     for i, generated_ids in enumerate(ids):

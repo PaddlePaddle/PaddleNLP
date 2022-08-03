@@ -25,16 +25,10 @@ from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'GPTModel',
-    'GPTPretrainedModel',
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
-    'GPTForGreedyGeneration',
-    'GPTLMHeadModel',
-    'GPTForTokenClassification',
-    'GPTForSequenceClassification',
-    'GPTForCausalLM',
-    'GPTForGeneration',
+    'GPTModel', 'GPTPretrainedModel', 'GPTForPretraining',
+    'GPTPretrainingCriterion', 'GPTForGreedyGeneration', 'GPTLMHeadModel',
+    'GPTForTokenClassification', 'GPTForSequenceClassification',
+    'GPTForCausalLM', 'GPTForGeneration', 'GPTForStaticGeneration'
 ]
 
 int_type = "int64"
@@ -126,6 +120,8 @@ class MultiHeadAttention(nn.Layer):
 
         if isinstance(cache, self.Cache):
             # for decoder self-attention in inference
+            print("cache", cache.k.shape, k.shape)
+            print("cache", cache.v.shape, v.shape)
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
         if use_cache is True:
@@ -189,6 +185,7 @@ class MultiHeadAttention(nn.Layer):
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
         """
+        print(query.shape, key.shape, value.shape)
         key = query if key is None else key
         value = query if value is None else value
         # compute q ,k ,v
@@ -1334,6 +1331,314 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
 class GPTForGeneration(GPTPretrainedModel):
 
+    def __init__(self, gpt, **kwargs):
+        super(GPTForGeneration, self).__init__()
+        self.gpt = gpt
+        self.apply(self.init_weights)
+
+    def prepare_inputs_for_generation(self,
+                                      input_ids,
+                                      use_cache=False,
+                                      cache=None,
+                                      **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        position_ids = kwargs.get("position_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        if attention_mask is not None:
+            if len(attention_mask.shape) == 4:
+                attention_mask = attention_mask[:, -1, -1, :]
+            if "int" in paddle.common_ops_import.convert_dtype(
+                    attention_mask.dtype):
+                attention_mask = (1.0 - attention_mask) * -1e4
+        if cache is not None:
+            input_ids = input_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
+        return {
+            "input_ids": input_ids,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "use_cache": use_cache,
+            "cache": cache
+        }
+
+    def model(self,
+              input_ids,
+              position_ids=None,
+              attention_mask=None,
+              masked_positions=None,
+              use_cache=False,
+              cache=None):
+        outputs = self.gpt(input_ids,
+                           position_ids=position_ids,
+                           attention_mask=attention_mask,
+                           use_cache=use_cache,
+                           cache=cache)
+        if use_cache:
+            encoder_outputs, cached_kvs = outputs[:2]
+        else:
+            encoder_outputs = outputs
+
+        logits = paddle.matmul(encoder_outputs,
+                               self.gpt.embeddings.word_embeddings.weight,
+                               transpose_y=True)
+        if use_cache:
+            return logits, cached_kvs
+        else:
+            return logits
+
+    def forward(self,
+                input_ids=None,
+                max_length=20,
+                min_length=0,
+                decode_strategy='greedy_search',
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                repetition_penalty=1.0,
+                num_beams=1,
+                num_beam_groups=1,
+                length_penalty=0.0,
+                early_stopping=False,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                forced_bos_token_id=None,
+                forced_eos_token_id=None,
+                num_return_sequences=1,
+                diversity_rate=0.0,
+                use_cache=True,
+                **model_kwargs):
+        assert (
+            decode_strategy in ["greedy_search", "sampling", "beam_search"]
+        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+            decode_strategy)
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self.gpt, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self.gpt, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self.gpt, 'pad_token_id', None)
+        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
+            self.gpt, 'forced_bos_token_id', None)
+        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
+            self.gpt, 'forced_eos_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self.gpt, 'decoder_start_token_id', None)
+
+        # params check
+        if input_ids is None:
+            # Init `input_ids` with bos_token_id
+            input_ids = self.prepare_input_ids_for_generation(bos_token_id)
+
+        if model_kwargs.get("attention_mask", None) is None:
+            # TODO
+            # Init `attention_mask` depending on `pad_token_id`
+            model_kwargs[
+                "attention_mask"] = self.prepare_attention_mask_for_generation(
+                    input_ids, pad_token_id, eos_token_id)
+        self.is_encoder_decoder = False
+
+        model_kwargs["use_cache"] = use_cache
+        max_length += input_ids.shape[-1]
+        min_length += input_ids.shape[-1]
+
+        logits_processors = self.get_logits_processor(
+            min_length=min_length,
+            max_length=max_length,
+            eos_token_id=eos_token_id,
+            forced_bos_token_id=forced_bos_token_id,
+            forced_eos_token_id=forced_eos_token_id,
+            num_beams=num_beams,
+            num_beam_groups=num_beam_groups,
+            diversity_rate=diversity_rate,
+            repetition_penalty=repetition_penalty)
+
+        if decode_strategy == 'greedy_search':
+            if num_return_sequences > 1:
+                raise ValueError(
+                    "`num_return_sequences` has to be 1, but is {} "
+                    "when doing greedy search.".format(num_return_sequences))
+
+            return self.greedy_search(input_ids, logits_processors, max_length,
+                                      pad_token_id, eos_token_id,
+                                      **model_kwargs)
+
+        elif decode_strategy == 'sampling':
+            if num_return_sequences > 1:
+                input_ids, model_kwargs = self.expand_inputs_for_generation(
+                    input_ids, expand_size=num_return_sequences, **model_kwargs)
+
+            return self.sample(input_ids, logits_processors, max_length,
+                               pad_token_id, eos_token_id, top_k, top_p,
+                               temperature, **model_kwargs)
+        else:
+            raise ValueError(f'Not support {decoding_strategy} strategy yet!')
+
+    def sample(self,
+               input_ids,
+               logits_processors,
+               max_length,
+               pad_token_id,
+               eos_token_id,
+               top_k=None,
+               top_p=None,
+               temperature=None,
+               min_tokens_to_keep=1,
+               **model_kwargs):
+
+        def TopKProcess(probs, top_k, min_tokens_to_keep):
+            top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+            # Remove all tokens with a probability less than the last token of the top-k
+            topk_probs, _ = paddle.topk(probs, k=top_k)
+            probs = paddle.where(probs >= topk_probs[:, -1:], probs,
+                                 paddle.full_like(probs, 0.0))
+            return probs
+
+        def TopPProcess(probs, top_p, min_tokens_to_keep):
+            sorted_probs = paddle.sort(probs, descending=True)
+            sorted_indices = paddle.argsort(probs, descending=True)
+            cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
+
+            # Remove tokens with cumulative probs above the top_p, But keep at
+            # least min_tokens_to_keep tokens
+            sorted_indices_to_remove = cumulative_probs > top_p
+            if min_tokens_to_keep > 1:
+                # Set 'min_tokens_to_keep - 1' because the first token is kept
+                sorted_indices_to_remove[:, :min_tokens_to_keep - 1] = 0
+            # Keep the first token
+            sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove,
+                                                   dtype='int64')
+            sorted_indices_to_remove[:, 1:] = (
+                sorted_indices_to_remove[:, :-1].clone())
+            sorted_indices_to_remove[:, 0] = 0
+
+            # Scatter sorted tensors to original indexing
+            sorted_indices = sorted_indices + paddle.arange(
+                probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+            condition = paddle.scatter(sorted_indices_to_remove.flatten(),
+                                       sorted_indices.flatten(),
+                                       sorted_indices_to_remove.flatten())
+            condition = paddle.cast(condition, 'bool').reshape(probs.shape)
+            probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
+            return probs
+
+        batch_size, cur_len = input_ids.shape
+        origin_len = cur_len
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
+        scores = paddle.full([batch_size, 1],
+                             0.0,
+                             dtype=paddle.get_default_dtype())
+
+        while cur_len < max_length:
+            # prepare model inputs & get model output
+            model_inputs = self.prepare_inputs_for_generation(
+                input_ids, **model_kwargs)
+            outputs = self.model(**model_inputs)
+            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            # [batch_size, vocab_size]
+            logits = logits[:, -1, :]
+
+            # pre-process distribution
+            logits = logits_processors(input_ids, logits)
+
+            # sample
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
+            if temperature is not None and temperature != 1.0:
+                logits = logits / temperature
+            probs = F.softmax(logits)
+            if top_k is not None and top_k != 0:
+                probs = TopKProcess(probs, top_k, min_tokens_to_keep)
+            if top_p is not None and top_p < 1.0:
+                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+            next_tokens = paddle.multinomial(probs)
+
+            next_scores = paddle.index_sample(origin_probs, next_tokens)
+
+            if eos_token_id is not None:
+                next_tokens = paddle.where(
+                    unfinished_flag, next_tokens,
+                    paddle.full_like(next_tokens, pad_token_id))
+
+            scores = self.update_scores_for_generation(scores, next_scores,
+                                                       cur_len - origin_len,
+                                                       unfinished_flag)
+
+            cur_len += 1
+            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
+
+            if eos_token_id is not None:
+                unfinished_flag = paddle.logical_and(
+                    unfinished_flag, next_tokens != eos_token_id)
+
+            # Stop when there is a </s> in all sentences
+            if not paddle.any(unfinished_flag):
+                break
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
+
+        return input_ids[:, origin_len:], scores
+
+    def greedy_search(self, input_ids, logits_processors, max_length,
+                      pad_token_id, eos_token_id, **model_kwargs):
+        batch_size, cur_len = input_ids.shape
+        origin_len = cur_len
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
+        scores = paddle.full([batch_size, 1],
+                             0.0,
+                             dtype=paddle.get_default_dtype())
+
+        while cur_len < max_length:
+            # prepare model inputs & get model output
+            model_inputs = self.prepare_inputs_for_generation(
+                input_ids, **model_kwargs)
+            outputs = self.model(**model_inputs)
+            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            # [batch_size, vocab_size]
+            logits = logits[:, -1, :]
+            # pre-process distribution
+            logits = self.adjust_logits_during_generation(logits)
+            logits = logits_processors(input_ids, logits)
+            # greedy
+            probs = F.softmax(logits)
+            probs = paddle.log(probs)
+            next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
+            next_scores = paddle.index_sample(probs, next_tokens)
+
+            if eos_token_id is not None:
+                next_tokens = paddle.where(
+                    unfinished_flag, next_tokens,
+                    paddle.full_like(next_tokens, pad_token_id))
+
+            scores = self.update_scores_for_generation(scores, next_scores,
+                                                       cur_len - origin_len,
+                                                       unfinished_flag)
+
+            cur_len += 1
+            input_ids = paddle.concat([input_ids, next_tokens], axis=1)
+
+            if eos_token_id is not None:
+                unfinished_flag = paddle.logical_and(
+                    unfinished_flag, next_tokens != eos_token_id)
+
+            # Stop when there is a </s> in all sentences
+            if not paddle.any(unfinished_flag):
+                break
+
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs,
+                model_kwargs,
+                is_encoder_decoder=self.is_encoder_decoder)
+        return input_ids[:, origin_len:], scores
+
+
+class GPTForStaticGeneration(GPTPretrainedModel):
+
     def __init__(self,
                  gpt,
                  max_length=20,
@@ -1344,7 +1649,7 @@ class GPTForGeneration(GPTPretrainedModel):
                  top_p=1.0,
                  eos_id=None,
                  **kwargs):
-        super(GPTForGeneration, self).__init__()
+        super(GPTForStaticGeneration, self).__init__()
         self.gpt = gpt
         self.apply(self.init_weights)
         self.vocab_size = gpt.vocab_size
@@ -1438,6 +1743,86 @@ class GPTForGeneration(GPTPretrainedModel):
             return logits
 
     def forward(self,
+                input_ids=None,
+                max_length=20,
+                min_length=0,
+                decode_strategy='greedy_search',
+                temperature=1.0,
+                top_k=0,
+                top_p=1.0,
+                repetition_penalty=1.0,
+                num_beams=1,
+                num_beam_groups=1,
+                length_penalty=0.0,
+                early_stopping=False,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                decoder_start_token_id=None,
+                forced_bos_token_id=None,
+                forced_eos_token_id=None,
+                num_return_sequences=1,
+                diversity_rate=0.0,
+                use_cache=True,
+                **model_kwargs):
+        assert (
+            decode_strategy in ["greedy_search", "sampling", "beam_search"]
+        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+            decode_strategy)
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self.gpt, 'bos_token_id', None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
+            self.gpt, 'eos_token_id', None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
+            self.gpt, 'pad_token_id', None)
+        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
+            self.gpt, 'forced_bos_token_id', None)
+        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
+            self.gpt, 'forced_eos_token_id', None)
+        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
+            self.gpt, 'decoder_start_token_id', None)
+
+        # params check
+        if input_ids is None:
+            # Init `input_ids` with bos_token_id
+            input_ids = self.prepare_input_ids_for_generation(bos_token_id)
+
+        if model_kwargs.get("attention_mask", None) is None:
+            # TODO
+            # Init `attention_mask` depending on `pad_token_id`
+            model_kwargs[
+                "attention_mask"] = self.prepare_attention_mask_for_generation(
+                    input_ids, pad_token_id, eos_token_id)
+        self.is_encoder_decoder = False
+
+        model_kwargs["use_cache"] = use_cache
+        max_length += input_ids.shape[-1]
+        min_length += input_ids.shape[-1]
+
+        logits_processors = self.get_logits_processor(
+            min_length=min_length,
+            max_length=max_length,
+            eos_token_id=eos_token_id,
+            forced_bos_token_id=forced_bos_token_id,
+            forced_eos_token_id=forced_eos_token_id,
+            num_beams=num_beams,
+            num_beam_groups=num_beam_groups,
+            diversity_rate=diversity_rate,
+            repetition_penalty=repetition_penalty)
+
+        if decode_strategy == 'sampling':
+            if num_return_sequences > 1:
+                input_ids, model_kwargs = self.expand_inputs_for_generation(
+                    input_ids, expand_size=num_return_sequences, **model_kwargs)
+
+            return self.sample(input_ids, logits_processors, max_length,
+                               pad_token_id, eos_token_id, top_k, top_p,
+                               temperature, **model_kwargs)
+        else:
+            raise ValueError(f'Not support {decoding_strategy} strategy yet!')
+
+    def forward(self,
                 input_ids,
                 position_ids=None,
                 attention_mask=None,
@@ -1449,23 +1834,14 @@ class GPTForGeneration(GPTPretrainedModel):
             inputs (dict): include src_ids.
                 pos_ids, input_mask and max_dec_len are optional.
         """
-        causal_mask = paddle.tensor.triu(paddle.ones(
-            (paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4,
-                                         diagonal=1)
         if attention_mask is not None:
-            # mask ids for padding
             tgt_pos = paddle.sum(attention_mask, axis=-1,
                                  keepdim=True).astype('int64')
-            if len(attention_mask.shape) == 2:
-                attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
-            attn_mask = (1 - attention_mask) * -1e4
-            encode_mask = causal_mask.unsqueeze(axis=[0, 1]) + attn_mask
-        else:
-            encode_mask = paddle.unsqueeze(causal_mask, axis=[0, 1])
 
+        print("position_ids", position_ids)
         logits, cached_kvs = self.model(input_ids,
                                         position_ids,
-                                        encode_mask,
+                                        attention_mask,
                                         use_cache=True,
                                         cache=None)
 
@@ -1481,6 +1857,7 @@ class GPTForGeneration(GPTPretrainedModel):
         min_len = paddle.to_tensor(self.min_dec_len,
                                    dtype=int_type,
                                    place=paddle.CPUPlace())
+
         step_idx = paddle.to_tensor(0, dtype=int_type, place=paddle.CPUPlace())
 
         placehold_ids = paddle.full_like(input_ids,
@@ -1488,24 +1865,30 @@ class GPTForGeneration(GPTPretrainedModel):
                                          dtype=next_id.dtype)
         ids = paddle.tensor.array_write(next_id, step_idx)
 
-        if max_dec_len is not None:
-            max_len = paddle.tensor.creation._memcpy(max_len,
-                                                     place=paddle.CPUPlace())
+        # if max_dec_len is not None:
+        #     max_len = paddle.tensor.creation._memcpy(max_len,
+        #                                              place=paddle.CPUPlace())
         cond = paddle.less_than(step_idx, max_len)
+
+        # src_ids = paddle.concat([src_ids, nid], axis=1)
+        # cur_len = 0
+        # while (cur_len < self.max_predict_len):
+        #     src_ids = paddle.concat([src_ids, nid], axis=1)
 
         if attention_mask is not None:
             append_mask = paddle.full_like(x=next_id,
                                            fill_value=1,
                                            dtype=attention_mask.dtype)
-            append_mask = append_mask.reshape([-1, 1, 1, 1])
+            append_mask = append_mask.reshape([-1, 1])
 
         while cond:
             pre_ids = paddle.tensor.array_read(array=ids, i=step_idx)
             if attention_mask is not None:
-                decode_mask = paddle.concat([attention_mask, append_mask],
-                                            axis=-1)
+                print("attention_mask", attention_mask.shape)
+                att_mask = paddle.concat([attention_mask, append_mask], axis=-1)
                 tgt_pos = tgt_pos + step_idx
-                att_mask = (1 - decode_mask) * -1e4
+                # att_mask = decode_mask
+                print("att_mask", att_mask.shape)
             else:
                 att_mask = None
                 tgt_pos = None
@@ -1513,11 +1896,11 @@ class GPTForGeneration(GPTPretrainedModel):
             step_idx.add_(paddle.ones([1], dtype=int_type))
             paddle.tensor.array_write(placehold_ids, i=step_idx, array=ids)
 
-            logits, decode_cached_kvs = self.model(pre_ids,
-                                                   tgt_pos,
-                                                   att_mask,
-                                                   use_cache=True,
-                                                   cache=cached_kvs)
+            logits, cached_kvs = self.model(pre_ids,
+                                            tgt_pos,
+                                            att_mask,
+                                            use_cache=True,
+                                            cache=cached_kvs)
 
             logits = paddle.reshape(logits, shape=(-1, self.vocab_size))
             probs = F.softmax(logits / self.temperature)
@@ -1539,10 +1922,7 @@ class GPTForGeneration(GPTPretrainedModel):
                                     dtype='bool')
 
             if attention_mask is not None:
-                paddle.assign(decode_mask, attention_mask)
-            for i in range(len(decode_cached_kvs)):
-                paddle.assign(decode_cached_kvs[i].k, cached_kvs[i].k)
-                paddle.assign(decode_cached_kvs[i].v, cached_kvs[i].v)
+                attention_mask = att_mask
 
         ids, _ = layers.tensor_array_to_tensor(ids)
         return ids
