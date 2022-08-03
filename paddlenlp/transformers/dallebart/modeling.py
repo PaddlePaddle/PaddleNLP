@@ -35,6 +35,17 @@ __all__ = [
 ]
 
 
+def shift_tokens_right(input_ids, decoder_start_token_id):
+    """
+    Shift input ids one token to the right.
+    """
+    shifted_input_ids = paddle.zeros_like(input_ids)
+    shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
+    shifted_input_ids[:, 0] = decoder_start_token_id
+
+    return shifted_input_ids
+
+
 def _convert_attention_mask(attn_mask, dtype):
     """
     Convert the attention mask to the target dtype we expect.
@@ -762,8 +773,8 @@ class DalleBartModel(DalleBartPretrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import DalleBartModel, DalleBartTokenizer
-                tokenizer = DalleBartTokenizer.from_pretrained('bart-base')
-                model = DalleBartModel.from_pretrained('bart-base')
+                tokenizer = DalleBartTokenizer.from_pretrained('dalle-mini')
+                model = DalleBartModel.from_pretrained('dalle-mini')
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
@@ -771,7 +782,11 @@ class DalleBartModel(DalleBartPretrainedModel):
         if input_ids is None and encoder_output is None:
             raise ValueError(
                 "You have to specify either input_ids or encoder_output")
-
+        if decoder_input_ids is None:
+            assert input_ids is not None, "input_ids should be " \
+                                          "specified when generating decoder_input_ids"
+            decoder_input_ids = shift_tokens_right(input_ids,
+                                                   self.decoder_start_token_id)
         if attention_mask is None:
             assert input_ids is not None, (
                 "input_ids should be "
@@ -883,8 +898,8 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             .. code-block::
                 import paddle
                 from paddlenlp.transformers import DalleBartForConditionalGeneration, DalleBartTokenizer
-                tokenizer = DalleBartTokenizer.from_pretrained('bart-base')
-                model = DalleBartForConditionalGeneration.from_pretrained('bart-base')
+                tokenizer = DalleBartTokenizer.from_pretrained('dalle-mini')
+                model = DalleBartForConditionalGeneration.from_pretrained('dalle-mini')
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
@@ -904,6 +919,10 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             return lm_logits, cache
         else:
             return lm_logits
+
+    def prepare_decoder_input_ids_from_labels(self, labels):
+        return shift_tokens_right(
+            labels, self.dallebart.config['decoder_start_token_id'])
 
     def prepare_inputs_for_generation(self,
                                       decoder_input_ids,
@@ -1454,10 +1473,10 @@ class ResnetBlock(nn.Layer):
     def forward(self, x):
         h = x
         h = self.norm1(h)
-        h *= F.sigmoid(h)
+        h = F.swish(h)
         h = self.conv1(h)
         h = self.norm2(h)
-        h *= F.sigmoid(h)
+        h = F.swish(h)
         h = self.conv2(h)
         if not self.is_middle:
             x = self.nin_shortcut(x)
@@ -1586,7 +1605,7 @@ class Decoder(nn.Layer):
             z = self.up[i](z)
 
         z = self.norm_out(z)
-        z *= F.sigmoid(z)
+        z = F.swish(z)
         z = self.conv_out(z)
         return z
 
@@ -1611,7 +1630,6 @@ class VQGanDetokenizer(nn.Layer):
         z = self.decoder(z)
         # nchw->nhwc
         z = z.transpose(perm=[0, 2, 3, 1])
-        z = paddle.clip(z, 0., 1.) * 255.
         return z
 
 
@@ -1635,7 +1653,8 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                top_p=1.0,
                temperature=1.0,
                condition_scale=1.0,
-               num_return_sequences=1):
+               num_return_sequences=1,
+               **kwargs):
         r"""
         The DalleBartForImageGeneration decode method.
         Args:
@@ -1693,7 +1712,7 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                                       num_return_sequences=num_return_sequences)
                 print(images.shape)
                 # [2, 4, 256, 256, 3]
-                images = images.cpu().numpy().astype("uint8")
+                images = (images.cpu().numpy().clip(0, 1) * 255).astype("uint8")
                 # [2, 256, 4*256, 3]
                 images = images.transpose([0, 2, 1, 3,
                                         4]).reshape(-1, images.shape[-3],
@@ -1703,14 +1722,14 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                     image = Image.fromarray(image)
                     image.save(f"figure_{i}.png")
         """
-        image_tokens = self.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature,
-            condition_scale=condition_scale,
-            num_return_sequences=num_return_sequences)[0]
+        image_tokens = self.generate(input_ids=input_ids,
+                                     attention_mask=attention_mask,
+                                     top_k=top_k,
+                                     top_p=top_p,
+                                     temperature=temperature,
+                                     condition_scale=condition_scale,
+                                     num_return_sequences=num_return_sequences,
+                                     **kwargs)[0]
         images = self.vqgan_detokenizer(image_tokens)
         # images shape [bs, num_return_sequences, 256, 256, 3]
         images = images.reshape([

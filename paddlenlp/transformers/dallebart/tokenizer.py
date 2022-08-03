@@ -417,7 +417,7 @@ class DalleBartTokenizer(GPTTokenizer):
         if self.normalize_text:
             self.text_processor = TextNormalizer(wiki_word_frequency_file)
         super().__init__(vocab_file, merges_file, errors, max_len, pad_token,
-                         eos_token)
+                         eos_token, unk_token)
 
     def _bpe_encode(self, text):
         bpe_tokens = []
