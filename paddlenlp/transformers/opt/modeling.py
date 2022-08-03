@@ -273,7 +273,7 @@ class OPTModel(OPTPretrainedModel):
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
+            are supported. Defaults to `"relu"`.
         hidden_dropout_prob (float, optional):
             The dropout probability for all fully connected layers in the embeddings and decoder.
             Defaults to `0.1`.
@@ -309,7 +309,7 @@ class OPTModel(OPTPretrainedModel):
                  num_hidden_layers: int = 12,
                  num_attention_heads: int = 12,
                  intermediate_size: int = 3072,
-                 hidden_act: str = "gelu",
+                 hidden_act: str = "relu",
                  hidden_dropout_prob: float = 0.1,
                  attention_probs_dropout_prob: float = 0.1,
                  max_position_embeddings: int = 512,
