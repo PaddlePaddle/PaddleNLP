@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from functools import partial
 import argparse
 import os
@@ -41,24 +55,19 @@ if __name__ == "__main__":
     params_path = 'checkpoints/model_40/model_state.pdparams'
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     paddle.set_device(device)
-
     tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
-
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
             ),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
             ),  # text_segment
     ): [data for data in fn(samples)]
-
     pretrained_model = AutoModel.from_pretrained("ernie-1.0")
-
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)
-
     # Load pretrained semantic model
     if params_path and os.path.isfile(params_path):
         state_dict = paddle.load(params_path)
@@ -67,19 +76,15 @@ if __name__ == "__main__":
     else:
         raise ValueError(
             "Please set --params_path with correct pretrained model file")
-
     # conver_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
-
     corpus_data_loader = create_dataloader(corpus_ds,
                                            mode='predict',
                                            batch_size=batch_size,
                                            batchify_fn=batchify_fn,
                                            trans_fn=trans_func)
-
     # Need better way to get inner model of DataParallel
-
     all_embeddings = []
     model.eval()
     with paddle.no_grad():
@@ -88,7 +93,6 @@ if __name__ == "__main__":
             text_embeddings = model.get_pooled_embedding(
                 input_ids, token_type_ids)
             all_embeddings.append(text_embeddings)
-
     text_embedding = all_embeddings[0]
     print(text_embedding.shape)
     print(text_embedding)
