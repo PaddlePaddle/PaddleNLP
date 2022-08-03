@@ -46,14 +46,10 @@ b. 硬件环境：
 
 c. 依赖安装：
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
-# 2) 安装 RestAPI 相关依赖
-python ./rest_api/setup.py install
-# 3) 安装 Streamlit WebUI 相关依赖
-python ./ui/setup.py install
 ```
 ### 3.2 数据说明
 问答知识库数据是我们爬取了百度百科上对国内重点城市的百科介绍文档。我们将所有文档中的非结构化文本数据抽取出来， 按照段落切分后作为问答系统知识库的数据，一共包含 365 个城市的百科介绍文档、切分后共 1318 个段落。
