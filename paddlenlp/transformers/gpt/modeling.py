@@ -25,10 +25,17 @@ from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'GPTModel', 'GPTPretrainedModel', 'GPTForPretraining',
-    'GPTPretrainingCriterion', 'GPTForGreedyGeneration', 'GPTLMHeadModel',
-    'GPTForTokenClassification', 'GPTForSequenceClassification',
-    'GPTForCausalLM', 'GPTForGeneration', 'GPTForStaticGeneration'
+    'GPTModel',
+    'GPTPretrainedModel',
+    'GPTForPretraining',
+    'GPTPretrainingCriterion',
+    'GPTForGreedyGeneration',
+    'GPTLMHeadModel',
+    'GPTForTokenClassification',
+    'GPTForSequenceClassification',
+    'GPTForCausalLM',
+    'GPTForGeneration',
+    'GPTForStaticGeneration',
 ]
 
 int_type = "int64"
@@ -120,8 +127,6 @@ class MultiHeadAttention(nn.Layer):
 
         if isinstance(cache, self.Cache):
             # for decoder self-attention in inference
-            print("cache", cache.k.shape, k.shape)
-            print("cache", cache.v.shape, v.shape)
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
         if use_cache is True:
@@ -185,7 +190,6 @@ class MultiHeadAttention(nn.Layer):
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
         """
-        print(query.shape, key.shape, value.shape)
         key = query if key is None else key
         value = query if value is None else value
         # compute q ,k ,v
@@ -204,7 +208,6 @@ class MultiHeadAttention(nn.Layer):
                                 alpha=self.head_dim**-0.5)
 
         if attn_mask is not None:
-            #print("product", product.shape, "attn_mask", attn_mask.shape)
             product = product + attn_mask
 
         weights = F.softmax(product)
@@ -1838,7 +1841,6 @@ class GPTForStaticGeneration(GPTPretrainedModel):
             tgt_pos = paddle.sum(attention_mask, axis=-1,
                                  keepdim=True).astype('int64')
 
-        print("position_ids", position_ids)
         logits, cached_kvs = self.model(input_ids,
                                         position_ids,
                                         attention_mask,
@@ -1870,11 +1872,6 @@ class GPTForStaticGeneration(GPTPretrainedModel):
         #                                              place=paddle.CPUPlace())
         cond = paddle.less_than(step_idx, max_len)
 
-        # src_ids = paddle.concat([src_ids, nid], axis=1)
-        # cur_len = 0
-        # while (cur_len < self.max_predict_len):
-        #     src_ids = paddle.concat([src_ids, nid], axis=1)
-
         if attention_mask is not None:
             append_mask = paddle.full_like(x=next_id,
                                            fill_value=1,
@@ -1884,11 +1881,8 @@ class GPTForStaticGeneration(GPTPretrainedModel):
         while cond:
             pre_ids = paddle.tensor.array_read(array=ids, i=step_idx)
             if attention_mask is not None:
-                print("attention_mask", attention_mask.shape)
                 att_mask = paddle.concat([attention_mask, append_mask], axis=-1)
                 tgt_pos = tgt_pos + step_idx
-                # att_mask = decode_mask
-                print("att_mask", att_mask.shape)
             else:
                 att_mask = None
                 tgt_pos = None
