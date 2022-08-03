@@ -91,7 +91,7 @@ def _transformer_encoder_fwd(self,
         if output_attentions:
             all_attentions.append(outputs[-1])
         if cache is not None:
-            new_caches.append(outputs[1])
+            new_caches.append(outputs[0])
 
     if self.norm is not None:
         output = self.norm(output)

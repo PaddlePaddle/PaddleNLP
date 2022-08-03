@@ -37,10 +37,14 @@ ExternalProject_Add(
   GIT_TAG               ${RE2_TAG}
   PREFIX                ${RE2_PREFIX_DIR}
   UPDATE_COMMAND        ""
-  CMAKE_ARGS            -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                        -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+  CMAKE_ARGS            -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                        -DCMAKE_CXX_FLAGS_RELEASE=${CMAKE_CXX_FLAGS_RELEASE}
+                        -DCMAKE_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}
+                        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+                        -DCMAKE_C_FLAGS_DEBUG=${CMAKE_C_FLAGS_DEBUG}
+                        -DCMAKE_C_FLAGS_RELEASE=${CMAKE_C_FLAGS_RELEASE}
                         -DCMAKE_INSTALL_PREFIX:PATH=${RE2_INSTALL_DIR}
-                        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+                        -DCMAKE_BUILD_TYPE:STRING=${THIRD_PARTY_BUILD_TYPE}
   BUILD_BYPRODUCTS     ${RE2_LIBRARIES}
 )
 
