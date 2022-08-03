@@ -119,7 +119,7 @@ print(
         return max_len
 ```
 <p align="center">
-<img src="pic/show_1.png"/> <br />
+<img src="https://user-images.githubusercontent.com/24390500/182512164-946d959c-57b1-49e6-b9a5-be47281d1ee2.png"/> <br />
 </p>
 
 - 根据注释/功能描述写代码
