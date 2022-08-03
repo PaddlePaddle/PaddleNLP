@@ -1053,7 +1053,14 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = logits,
+        hidden_states = {
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
+            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+        }
+        if self.training:
+            outputs = logits, hidden_states
+        else:
+            outputs = logits
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -1485,10 +1492,15 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
         loss, pred_relations = self.extractor(sequence_output, entities,
                                               relations)
 
-        return dict(
+        hidden_states = {
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
+            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+        }
+        res = dict(
             loss=loss,
             entities=entities,
             relations=relations,
             pred_relations=pred_relations,
-            hidden_states=outputs[0],
         )
+        res.update(hidden_states)
+        return res
