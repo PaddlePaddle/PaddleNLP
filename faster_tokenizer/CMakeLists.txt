@@ -149,7 +149,7 @@ endif()
 
 else(WITH_PYTHON)
 
-set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer_cpp)
+set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/cpp/faster_tokenizer)
 add_custom_target(build_cpp_package_dir ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include
     DEPENDS core_tokenizers)
@@ -182,6 +182,7 @@ set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_CORE_PATH ${CMAKE_BINARY_DIR}/faster_tokenizer/src/)
 if (WIN32)
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.lib")
+    set(ICU_DLL_DIR ${CMAKE_BINARY_DIR}/third_party/icu/src/extern_icu/icu4c/bin64)
     add_custom_target(copy_shared_library ALL
         COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
         COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${TOKENIZER_DST_DIR}/libs
