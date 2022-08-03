@@ -610,7 +610,7 @@ class LayoutXLMEncoder(nn.Layer):
 
             hidden_save["{}_data".format(i)] = hidden_states
 
-        return hidden_states,
+        return hidden_states, hidden_save
 
 
 class LayoutXLMIntermediate(nn.Layer):
@@ -993,7 +993,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        return sequence_output, pooled_output, encoder_outputs[1]
 
 
 class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
