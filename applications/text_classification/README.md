@@ -54,7 +54,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 2. **模型训练**
 
-- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"ernie-3.0-base-zh"模型，英文任务默认使用"ernie-2.0-base-en"模型，ERNIE 3.0还支持多个轻量级中文模型，详见[ERNIE模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/ERNIE/contents.html)，可以根据任务和设备需求进行选择。
+- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"ernie-3.0-medium-zh"模型，英文任务默认使用"ernie-2.0-base-en"模型，ERNIE 3.0还支持多个轻量级中文模型，详见[ERNIE模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/ERNIE/contents.html)，可以根据任务和设备需求进行选择。
 - 首先我们需要根据场景选择不同的任务目录，具体可以见
  [多分类任务点击这里](./multi_class)
  [多标签任务点击这里](./multi_label)
