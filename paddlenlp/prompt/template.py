@@ -232,12 +232,14 @@ class SoftTemplate(Template):
                  tokenizer,
                  model=None,
                  template=None,
-                 prompt_encoder=None):
+                 prompt_encoder=None,
+                 encoder_hidden_size=None):
         super().__init__(tokenizer=tokenizer)
         if model is None:
             self.token_embeddings = None
-            logger.warning("Pretrained model not given. It would lead to error"
-                           " unless it is initialized for deployment.")
+            logger.warning(
+                "SoftTemplate: The pretrained model is not given. It would "
+                "lead to error unless it is initialized for deployment.")
         else:
             if type(model).__name__.endswith('Model'):
                 self.token_embeddings = model.embeddings.word_embeddings
@@ -248,6 +250,11 @@ class SoftTemplate(Template):
                         break
             self.token_embeddings.weight.stop_gradient = True
             self.embedding_size = self.token_embeddings.weight.shape[-1]
+        self.encoder_hidden_size = encoder_hidden_size
+        if self.encoder_hidden_size is not None and prompt_encoder is None:
+            logger.warning("`prompt_encoder` is not set yet. Use MLP for "
+                           "soft embeddings' projection by default.")
+            prompt_encoder = "mlp"
         self.prompt_encoder = prompt_encoder
         self.template = template
 
@@ -273,8 +280,12 @@ class SoftTemplate(Template):
                 f"Encoder has already set as {self._prompt_encoder}, change " +
                 "`prompt_encoder` will reset parameters.")
 
+        if self.encoder_hidden_size is None:
+            hidden_size = self.embedding_size
+        else:
+            hidden_size = self.encoder_hidden_size
         if prompt_encoder == 'lstm':
-            self.lstm_head = nn.LSTM(input_size=self.embedding_size,
+            self.lstm_head = nn.LSTM(input_size=hidden_size,
                                      hidden_size=self.embedding_size,
                                      num_layers=2,
                                      direction='bidirect',
@@ -284,7 +295,7 @@ class SoftTemplate(Template):
                 nn.ReLU(), nn.Linear(self.embedding_size, self.embedding_size))
         elif prompt_encoder == 'mlp':
             self.mlp_head = nn.Sequential(
-                nn.Linear(self.embedding_size, self.embedding_size), nn.ReLU(),
+                nn.Linear(hidden_size, self.embedding_size), nn.ReLU(),
                 nn.Linear(self.embedding_size, self.embedding_size))
             if hasattr(self, "lstm_head"):
                 delattr(self, "lstm_head")
@@ -405,13 +416,18 @@ class SoftTemplate(Template):
         """
         if self.num_soft_token == 0 or self.token_embeddings is None:
             return None
-        self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
-                                            self.embedding_size)
+        if self.encoder_hidden_size is not None:
+            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
+                                                self.encoder_hidden_size)
+        else:
+            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
+                                                self.embedding_size)
 
-        weight = self.soft_embeddings.weight.clone().detach()
-        for soft_id, word_id in self.soft2word_init.items():
-            weight[soft_id] = self.token_embeddings(paddle.to_tensor(word_id))
-        self.soft_embeddings.weight.set_value(weight)
+            weight = self.soft_embeddings.weight.clone().detach()
+            for soft_id, word_id in self.soft2word_init.items():
+                weight[soft_id] = self.token_embeddings(
+                    paddle.to_tensor(word_id))
+            self.soft_embeddings.weight.set_value(weight)
 
     def process_batch(self, batch):
         word_embeds = self.token_embeddings(batch["input_ids"])
@@ -453,7 +469,12 @@ class AutoTemplate(object):
         return parse_template(inputs, cls.part_start, cls.part_end)
 
     @classmethod
-    def create_from(cls, template, tokenizer, model=None, prompt_encoder=None):
+    def create_from(cls,
+                    template,
+                    tokenizer,
+                    model=None,
+                    prompt_encoder=None,
+                    encoder_hidden_size=None):
         template = cls.parse_inputs(template)
         template_keys = cls._extract_template_keys(template)
         if 'text' not in template_keys:
@@ -471,7 +492,8 @@ class AutoTemplate(object):
             return SoftTemplate(tokenizer=tokenizer,
                                 template=template,
                                 model=model,
-                                prompt_encoder=prompt_encoder)
+                                prompt_encoder=prompt_encoder,
+                                encoder_hidden_size=encoder_hidden_size)
         else:
             return ManualTemplate(tokenizer=tokenizer, template=template)
 

@@ -17,6 +17,7 @@ import os
 import sys
 import paddle
 import paddle.nn.functional as F
+from paddle.static import InputSpec
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieTokenizer, ErnieForMaskedLM, export_model
 from paddlenlp.trainer import PdArgumentParser, get_scheduler
@@ -122,15 +123,17 @@ def main():
         num_warmup_steps = int(training_args.warmup_ratio * num_training_steps)
 
     lr_scheduler = get_scheduler(training_args.lr_scheduler_type,
-                                 training_args.ppt_learning_rate,
-                                 num_warmup_steps, num_training_steps)
+                                 training_args.learning_rate, num_warmup_steps,
+                                 num_training_steps)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=[{
-            'params': prompt_model.verbalizer.non_head_parameters()
-        }, {
             'params':
-            prompt_model.verbalizer.head_parameters(),
+            [p for p in prompt_model.verbalizer.non_head_parameters()] +
+            [p for p in prompt_model.plm.parameters() if not p.stop_gradient]
+        }, {
+            'params': [p for p in prompt_model.verbalizer.head_parameters()] +
+            [p for p in prompt_model.template.parameters()],
             'learning_rate':
             training_args.ppt_learning_rate / training_args.learning_rate
         }])
@@ -166,7 +169,8 @@ def main():
     if training_args.do_export:
         input_spec = [
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="float32")  # soft_token_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # mask_ids
+            InputSpec(shape=[None, None], dtype="int64")  # soft_token_ids
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         os.makedirs(export_path, exist_ok=True)
