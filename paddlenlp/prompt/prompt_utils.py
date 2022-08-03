@@ -312,7 +312,9 @@ class FewShotSampler(object):
     def _sample_per_label(self, indices, labels, num_per_label):
         label_dict = defaultdict(list)
         for idx, label in zip(indices, labels):
+            # One-hot labels for multi-label tasks.
             if isinstance(label, list):
+                label = np.where(np.array(label) > 0)[0]
                 for sublabel in label:
                     label_dict[sublabel].append(idx)
             else:
