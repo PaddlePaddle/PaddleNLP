@@ -414,6 +414,8 @@ class DalleBartTokenizer(GPTTokenizer):
                                                 pad_token=pad_token,
                                                 mask_token=mask_token)
         self.normalize_text = normalize_text
+        # in order to save wiki_word_frequency_file, we need set this attr
+        self._wiki_word_frequency_file = wiki_word_frequency_file
         if self.normalize_text:
             self.text_processor = TextNormalizer(wiki_word_frequency_file)
         super().__init__(vocab_file, merges_file, errors, max_len, pad_token,
