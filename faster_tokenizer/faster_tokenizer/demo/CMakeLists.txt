@@ -36,8 +36,14 @@ add_executable(ernie_faster_tokenizer_demo ernie_faster_tokenizer_demo.cc)
 
 # Include the path of core_tokenizers library
 link_directories("${FASTER_TOKENIZER_LIB}/lib")
+link_directories("${FASTER_TOKENIZER_LIB}/third_party/lib")
 
 ADD_LIBRARY(core_tokenizers SHARED IMPORTED GLOBAL)
-SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.so)
 
+if(WIN32)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/core_tokenizers.dll)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_IMPLIB ${FASTER_TOKENIZER_LIB}/lib/core_tokenizers.lib)
+else(WIN32)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.so)
+endif(WIN32)
 target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers)
