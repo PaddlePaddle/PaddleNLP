@@ -135,9 +135,7 @@ python3 embedding_insert.py
 | ------------ | ------------ |
 |1000万条|12min24s|
 
-另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://zilliz.com/products/em).
-
-![](../../img/mem.png)
+另外，Milvus提供了可视化的管理界面，可以很方便的查看数据，安装地址为[Milvus Enterprise Manager](https://github.com/zilliztech/attu)
 
 
 运行召回脚本：

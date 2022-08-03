@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .word_substitute import *
-from .word_delete import *
-from .word_swap import *
-from .word_insert import *
+import random
+import numpy as np
+
+import paddle
+from scipy import stats
+
+
+def set_seed(seed=0):
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
+
+
+def masked_fill(x, mask, value):
+    y = paddle.full(x.shape, value, x.dtype)
+    return paddle.where(mask, y, x)
+
+
+def eval_metric(labels, preds):
+    spearman_corr = stats.spearmanr(labels, preds).correlation
+    return spearman_corr
