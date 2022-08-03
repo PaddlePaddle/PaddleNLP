@@ -181,10 +181,9 @@ add_custom_target(remove_pybind_headers ALL
 set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_CORE_PATH ${CMAKE_BINARY_DIR}/faster_tokenizer/src)
 if (WIN32)
-    set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.lib")
     set(ICU_DLL_DIR ${CMAKE_BINARY_DIR}/third_party/icu/src/extern_icu/icu4c/bin64)
     add_custom_target(copy_shared_library ALL
-        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.lib ${CPP_PACKAGE_DIR}/lib
         COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${CPP_PACKAGE_DIR}/third_party/lib
         DEPENDS build_cpp_package_dir core_tokenizers)
 else()
