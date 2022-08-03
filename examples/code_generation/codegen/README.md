@@ -70,3 +70,91 @@ print(
 
 ### TaskFlow调用
 参考[TaskFlow文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md)
+
+## 使用案例
+- 解算法题。求解无重复字符的最长子串的长度
+```python
+import re
+import paddle
+from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
+
+# The supported models are shown in the following table
+model_name = 'Salesforce/codegen-2B-mono'
+# Init tokenizer
+tokenizer = CodeGenTokenizer.from_pretrained(model_name)
+# Init model
+model = CodeGenForCausalLM.from_pretrained(model_name)
+
+prompt = "def lengthOfLongestSubstring(self, s: str) -> int:"
+inputs = tokenizer([prompt])
+inputs = {k: paddle.to_tensor(v) for (k, v) in inputs.items()}
+# Generate
+output, score = model.generate(inputs['input_ids'],
+                               max_length=256,
+                               decode_strategy='greedy_search')
+# Decode the result
+print(
+    re.split(
+        "\nclass|\ndef|\n#|\n@|\nprint|\nif",
+        tokenizer.decode(output[0],
+                         skip_special_tokens=True,
+                         spaces_between_special_tokens=False))[0].rstrip())
+```
+结果输出为：
+```python
+        if not s:
+            return 0
+
+        start = 0
+        end = 0
+        max_len = 0
+
+        while end < len(s):
+            if s[end] not in s[start:end]:
+                max_len = max(max_len, end - start + 1)
+                end += 1
+            else:
+                start += 1
+
+        return max_len
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/24390500/182512164-946d959c-57b1-49e6-b9a5-be47281d1ee2.png"/> <br />
+</p>
+
+- 根据注释/功能描述写代码
+
+```python
+import re
+import paddle
+from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
+
+# The supported models are shown in the following table
+model_name = 'Salesforce/codegen-2B-mono'
+# Init tokenizer
+tokenizer = CodeGenTokenizer.from_pretrained(model_name)
+# Init model
+model = CodeGenForCausalLM.from_pretrained(model_name)
+
+prompt = "# this function prints hello world"
+inputs = tokenizer([prompt])
+inputs = {k: paddle.to_tensor(v) for (k, v) in inputs.items()}
+# Generate
+output, score = model.generate(inputs['input_ids'],
+                               max_length=128,
+                               decode_strategy='greedy_search')
+# Decode the result
+print(
+    tokenizer.decode(output[0],
+                     truncate_before_pattern=[r"\n\n^#", "^'''", "\n\n\n"],
+                     skip_special_tokens=True,
+                     spaces_between_special_tokens=False))
+```
+结果输出为：
+```python
+def hello_world():
+    print("Hello World")
+
+hello_world()
+```
+其它更多趣味性的生成欢迎大家体验，同时也欢迎大家来开发代码补全的插件。

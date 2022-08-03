@@ -31,12 +31,13 @@ DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
                                         "衡量酒水的价格的因素有哪些?")
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP",
                                       "酒水的血统，存储的时间等")
-
 # Sliders
 DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
                                             "30"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "3"))
-
+# Labels for the evaluation
+EVAL_LABELS = os.getenv("EVAL_FILE",
+                        str(Path(__file__).parent / "dureader_search.csv"))
 # Whether the file upload should be enabled or not
 DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 
@@ -44,6 +45,13 @@ DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 def set_state_if_absent(key, value):
     if key not in st.session_state:
         st.session_state[key] = value
+
+
+def on_change_text():
+    st.session_state.question = st.session_state.quest
+    st.session_state.answer = None
+    st.session_state.results = None
+    st.session_state.raw_json = None
 
 
 def main():
@@ -65,20 +73,8 @@ def main():
         st.session_state.results = None
         st.session_state.raw_json = None
 
-        # Title
-
+    # Title
     st.write("# PaddleNLP语义检索")
-    #st.markdown(
-    #    """
-    #    基于开源最强 **ERNIE 3.0** 预训练模型和 DuReader 数据集搭建的语义检索系统
-    #
-    #    您可以输入 query 进行语义检索，例如:
-    #    1. 燃气热水器哪些品牌比较好？
-    #    2. 亚马逊河流的介绍
-    #   """,
-    #    unsafe_allow_html=True,
-    #)
-
     # Sidebar
     st.sidebar.header("选项")
     top_k_reader = st.sidebar.slider(
@@ -115,12 +111,20 @@ def main():
         hs_version = f" <small>(v{pipelines_version()})</small>"
     except Exception:
         pass
+    # Load csv into pandas dataframe
+    try:
+        df = pd.read_csv(EVAL_LABELS, sep=";")
+    except Exception:
+        st.error(f"The eval file was not found.")
+        sys.exit(f"The eval file was not found under `{EVAL_LABELS}`.")
 
     # Search bar
     question = st.text_input("",
                              value=st.session_state.question,
+                             key="quest",
+                             on_change=on_change_text,
                              max_chars=100,
-                             on_change=reset_results)
+                             placeholder='请输入您的问题')
     col1, col2 = st.columns(2)
     col1.markdown("<style>.stButton button {width:100%;}</style>",
                   unsafe_allow_html=True)
@@ -149,19 +153,16 @@ def main():
     run_query = (run_pressed or question != st.session_state.question
                  ) and not st.session_state.random_question_requested
 
-    # st.write(question)
     # Check the connection
     with st.spinner("⌛️ &nbsp;&nbsp; pipelines is starting..."):
         if not pipelines_is_ready():
             st.error("🚫 &nbsp;&nbsp; Connection Error. Is pipelines running?")
             run_query = False
             reset_results()
-
     # Get results for query
-    if run_query and question:
+    if (run_query or st.session_state.results is None) and question:
         reset_results()
         st.session_state.question = question
-
         with st.spinner(
                 "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
                 "Do you want to optimize speed or accuracy? \n"):
@@ -194,7 +195,6 @@ def main():
         for count, result in enumerate(st.session_state.results):
             context = result["context"]
             st.write(
-                #markdown(context[:start_idx] + str(annotation(answer, "ANSWER", "#8ef")) + context[end_idx:]),
                 markdown(context),
                 unsafe_allow_html=True,
             )

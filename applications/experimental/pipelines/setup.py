@@ -19,12 +19,10 @@ import platform
 
 long_description = "PIPELINES: An End to End Natural Language Proceessing Development Kit Based on ERNIE"
 
-if platform.system().lower() == 'windows':
-    pass
-elif platform.system().lower() == "darwin":
+if platform.system().lower() == "darwin":  # macos
     with open("requirements-cpu.txt") as fin:
         REQUIRED_PACKAGES = fin.read()
-elif platform.system().lower() == 'linux':
+else:
     with open("requirements.txt") as fin:
         REQUIRED_PACKAGES = fin.read()
 
