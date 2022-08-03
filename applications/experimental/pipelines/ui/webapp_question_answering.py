@@ -28,13 +28,14 @@ from ui.utils import pipelines_is_ready, query, send_feedback, upload_doc, pipel
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
                                         "中国的首都在哪里?")
 DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP", "北京")
-
 # Sliders
 DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
                                             "50"))
 DEFAULT_DOCS_FROM_RANKER = int(os.getenv("DEFAULT_DOCS_FROM_RANKER", "1"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "1"))
-
+# Labels for the evaluation
+EVAL_LABELS = os.getenv("EVAL_FILE",
+                        str(Path(__file__).parent / "baike_qa.csv"))
 # Whether the file upload should be enabled or not
 DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 
@@ -42,6 +43,13 @@ DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 def set_state_if_absent(key, value):
     if key not in st.session_state:
         st.session_state[key] = value
+
+
+def on_change_text():
+    st.session_state.question = st.session_state.quest
+    st.session_state.answer = None
+    st.session_state.results = None
+    st.session_state.raw_json = None
 
 
 def main():
@@ -95,6 +103,13 @@ def main():
         on_change=reset_results,
     )
 
+    # Load csv into pandas dataframe
+    try:
+        df = pd.read_csv(EVAL_LABELS, sep=";")
+    except Exception:
+        st.error(f"The eval file was not found.")
+        sys.exit(f"The eval file was not found under `{EVAL_LABELS}`.")
+
     # File upload block
     if not DISABLE_FILE_UPLOAD:
         st.sidebar.write("## 文件上传:")
@@ -114,8 +129,10 @@ def main():
     # Search bar
     question = st.text_input("",
                              value=st.session_state.question,
+                             key="quest",
+                             on_change=on_change_text,
                              max_chars=100,
-                             on_change=reset_results)
+                             placeholder='请输入您的问题')
     col1, col2 = st.columns(2)
     col1.markdown("<style>.stButton button {width:100%;}</style>",
                   unsafe_allow_html=True)
@@ -153,7 +170,7 @@ def main():
             reset_results()
 
     # Get results for query
-    if run_query and question:
+    if (run_query or st.session_state.results is None) and question:
         reset_results()
         st.session_state.question = question
 
