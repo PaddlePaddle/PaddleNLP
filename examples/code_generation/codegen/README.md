@@ -72,7 +72,7 @@ print(
 参考[TaskFlow文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md)
 
 ## 使用案例
-- 解算法题。求解无重复字符的最长子串
+- 解算法题。求解无重复字符的最长子串的长度
 ```python
 import re
 import paddle
