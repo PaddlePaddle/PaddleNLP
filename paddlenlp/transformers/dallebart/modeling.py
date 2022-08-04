@@ -1646,17 +1646,17 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
         self.vqgan_detokenizer = VQGanDetokenizer(2**14, 256)
 
     @paddle.no_grad()
-    def decode(self,
-               input_ids,
-               attention_mask=None,
-               top_k=0,
-               top_p=1.0,
-               temperature=1.0,
-               condition_scale=1.0,
-               num_return_sequences=1,
-               **kwargs):
+    def generate(self,
+                 input_ids,
+                 attention_mask=None,
+                 top_k=0,
+                 top_p=1.0,
+                 temperature=1.0,
+                 condition_scale=1.0,
+                 num_return_sequences=1,
+                 **kwargs):
         r"""
-        The DalleBartForImageGeneration decode method.
+        The DalleBartForImageGeneration generate method.
         Args:
             input_ids (Tensor):
                 See :class:`DalleBartForConditionalGeneration`.
@@ -1706,7 +1706,7 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                 top_k = 32
                 condition_scale = 16.0
                 num_return_sequences = 4
-                images = model.decode(**tokenized_inputs,
+                images = model.generate(**tokenized_inputs,
                                       top_k=top_k,
                                       condition_scale=condition_scale,
                                       num_return_sequences=num_return_sequences)
@@ -1722,14 +1722,15 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                     image = Image.fromarray(image)
                     image.save(f"figure_{i}.png")
         """
-        image_tokens = self.generate(input_ids=input_ids,
-                                     attention_mask=attention_mask,
-                                     top_k=top_k,
-                                     top_p=top_p,
-                                     temperature=temperature,
-                                     condition_scale=condition_scale,
-                                     num_return_sequences=num_return_sequences,
-                                     **kwargs)[0]
+        image_tokens = super().generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+            condition_scale=condition_scale,
+            num_return_sequences=num_return_sequences,
+            **kwargs)[0]
         images = self.vqgan_detokenizer(image_tokens)
         # images shape [bs, num_return_sequences, 256, 256, 3]
         images = images.reshape([
