@@ -21,9 +21,15 @@ from paddle.static import InputSpec
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieTokenizer, ErnieForMaskedLM, export_model
 from paddlenlp.trainer import PdArgumentParser, get_scheduler
-from paddlenlp.prompt import (AutoTemplate, SoftVerbalizer, MLMTokenizerWrapper,
-                              PromptTuningArguments, PromptTrainer,
-                              PromptModelForClassification, FewShotSampler)
+from paddlenlp.prompt import (
+    AutoTemplate,
+    SoftVerbalizer,
+    MLMTokenizerWrapper,
+    PromptTuningArguments,
+    PromptTrainer,
+    PromptModelForClassification,
+    FewShotSampler,
+)
 from utils import load_local_dataset
 
 sys.path.append("../")
@@ -108,23 +114,11 @@ def main():
         freeze_dropout=training_args.freeze_dropout)
 
     # Only update the prompt-related parameters to reduce memory cost.
-    if training_args.max_steps > 0:
-        num_training_steps = training_args.max_steps
-    else:
-        _train_batch_size = training_args.per_device_train_batch_size
-        _num_train_epochs = training_args.num_train_epochs
-        num_update_per_epoch = len(train_ds) // _train_batch_size
-        num_update_per_epoch //= training_args.gradient_accumulation_steps
-        num_update_per_epoch = max(num_update_per_epoch, 1)
-        num_training_steps = num_update_per_epoch * _num_train_epochs
-    if training_args.warmup_steps > 0:
-        num_warmup_steps = training_args.warmup_steps
-    else:
-        num_warmup_steps = int(training_args.warmup_ratio * num_training_steps)
-
+    training_args = PromptTrainer.init_num_steps(training_args, len(train_ds))
     lr_scheduler = get_scheduler(training_args.lr_scheduler_type,
-                                 training_args.learning_rate, num_warmup_steps,
-                                 num_training_steps)
+                                 training_args.learning_rate,
+                                 training_args.warmup_steps,
+                                 training_args.num_training_steps)
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=[{
