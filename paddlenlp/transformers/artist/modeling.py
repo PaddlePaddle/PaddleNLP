@@ -152,30 +152,7 @@ class ArtistLMHeadModel(GPTLMHeadModel):
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
     def prepare_faster_entry(self, kwargs):
-        from paddlenlp.ops import FasterGPT
-        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        decode_strategy = kwargs.get('decode_strategy')
-        if decode_strategy == "beam_search":
-            raise AttributeError(
-                "'beam_search' is not supported yet in the faster version of GPT"
-            )
-        # Currently, FasterTransformer only support restricted size_per_head.
-        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config[
-            "num_attention_heads"]
-        if size_per_head not in [32, 64, 80, 96, 128]:
-            raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPT"
-                % size_per_head)
-        if kwargs['forced_bos_token_id'] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'forced_bos_token_id != None' is not supported yet in the faster version"
-            )
-        if kwargs['min_length'] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
-
+        # resize lm_head.decoder_weight for faster generation
         image_vocab_size, hidden_size = self.lm_head.decoder_weight.shape
         decoder_weight = paddle.concat([
             self.lm_head.decoder_weight,
@@ -188,9 +165,8 @@ class ArtistLMHeadModel(GPTLMHeadModel):
             shape=[self.gpt.config["vocab_size"], hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=paddle.nn.initializer.Assign(decoder_weight))
-        self._faster_entry = FasterGPT(
-            self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+
+        return super().prepare_faster_entry(kwargs)
 
 
 class ArtistForImageGeneration(ArtistLMHeadModel):
