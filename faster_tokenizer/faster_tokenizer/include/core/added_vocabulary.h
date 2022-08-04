@@ -52,7 +52,7 @@ bool EndWithWord(const std::string& sequence);
 bool StartWithSpace(const std::string& sequence);
 bool EndWithSpace(const std::string& sequence);
 
-class AddedToken {
+class FASTERTOKENIZER_DECL AddedToken {
 public:
   AddedToken();
   AddedToken(const std::string& content,
@@ -84,14 +84,14 @@ private:
   friend struct AddedTokenWithId;
 };
 
-struct AddedTokenWithId {
+struct FASTERTOKENIZER_DECL AddedTokenWithId {
   AddedToken added_token_;
   uint32_t id_;
   friend void to_json(nlohmann::json& j, const AddedTokenWithId& added_token);
   friend void from_json(const nlohmann::json& j, AddedTokenWithId& added_token);
 };
 
-class AddedVocabulary {
+class FASTERTOKENIZER_DECL AddedVocabulary {
 public:
   AddedVocabulary();
   size_t GetLen() const;
