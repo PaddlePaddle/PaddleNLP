@@ -16,12 +16,13 @@ limitations under the License. */
 
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace postprocessors {
 
-struct BertPostProcessor : public PostProcessor {
+struct FASTERTOKENIZER_DECL BertPostProcessor : public PostProcessor {
   BertPostProcessor(const std::pair<std::string, uint32_t>& sep,
                     const std::pair<std::string, uint32_t>& cls);
   BertPostProcessor();

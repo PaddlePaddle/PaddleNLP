@@ -13,7 +13,7 @@
 # limitations under the License.
 import random
 
-from ..base_augment import BaseAugment
+from .base_augment import BaseAugment
 
 
 class WordSwap(BaseAugment):
@@ -77,7 +77,7 @@ class WordSwap(BaseAugment):
             if seq_token not in self.stop_words and not seq_token.isdigit(
             ) and not seq_token.encode('UTF-8').isalpha():
                 if seq_tokens[i + 1] not in self.stop_words and not seq_tokens[
-                        i + 1].isdigit() and not seq_tokens[i + 11].encode(
+                        i + 1].isdigit() and not seq_tokens[i + 1].encode(
                             'UTF-8').isalpha():
                     indexes.append(i)
         return indexes

@@ -13,7 +13,7 @@
 # limitations under the License.
 import random
 
-from ..base_augment import BaseAugment
+from .base_augment import BaseAugment
 
 
 class WordDelete(BaseAugment):

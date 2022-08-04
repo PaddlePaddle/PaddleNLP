@@ -166,7 +166,15 @@ if __name__ == '__main__':
         help=
         "If > 0: set total number of training steps to perform. Override config.max_iterations.",
     )
+    parser.add_argument(
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["cpu", "gpu", "xpu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+
     args = parser.parse_args()
+    paddle.set_device(args.device)
 
     train_processor = Trainer()
     if args.max_steps > 0:
