@@ -121,9 +121,9 @@ python -m paddle.distributed.launch --gpus 1,2 finetune.py \
 ├── t5_model_1000.pdparams
 │   ├── model_config.json
 │   ├── model_state.pdparams
-│   ├── merges.txt
-│   ├── tokenizer_config.json
-│   └── vocab.json
+│   ├── special_tokens_map.json
+│   ├── spiece.model
+│   └── tokenizer_config.json
 └── ...
 ```
 
@@ -161,7 +161,7 @@ python generate.py \
    |---------------------------------|
    | t5-base |
    | t5-large |
-   | t5-base-finetuned-question-generation-ap |
+   | mrm8488/t5-base-finetuned-question-generation-ap |
 
 - `dataset_name` 表示预测的数据集。
 
@@ -193,11 +193,11 @@ python generate.py \
 
 程序运行结束后会将预测生成的摘要保存在`output_path`中。同时终端中会输出评估结果。
 
-采用微调模型t5-base-finetuned-question-generation-ap在验证集上有如下结果：
+采用社区微调模型mrm8488/t5-base-finetuned-question-generation-ap在验证集上有如下结果：
 
 |   model_name_or_path    |     BLEU-1     |     BLEU-2     |    BLEU-3    |    BLEU-4    |
 | :----------------------: | :-------------: | :-------------: |:-------------: |:-------------: |
-|        [t5-base-finetuned-question-generation-ap](https://huggingface.co/mrm8488/t5-base-finetuned-question-generation-ap )      | 50.11 | 35.83 | 27.68 |  22.03 |
+|        [mrm8488/t5-base-finetuned-question-generation-ap](https://huggingface.co/mrm8488/t5-base-finetuned-question-generation-ap )      | 50.11 | 35.83 | 27.68 |  22.03 |
 
 
 
