@@ -19,12 +19,13 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 #include "re2/re2.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
-struct ReplaceNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL ReplaceNormalizer : public Normalizer {
   ReplaceNormalizer() = default;
   ReplaceNormalizer(const std::string& pattern, const std::string& content);
   ReplaceNormalizer(const ReplaceNormalizer& replace_normalizer);
