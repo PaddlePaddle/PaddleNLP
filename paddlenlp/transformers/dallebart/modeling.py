@@ -182,13 +182,13 @@ class DalleBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "dalle-mini":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mini/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
             "dalle-mega-v16":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
             "dalle-mega-v26":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
             "dalle-mega":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
         }
     }
     base_model_prefix = "dallebart"
