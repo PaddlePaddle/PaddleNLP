@@ -16,11 +16,9 @@
 import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
-from paddle.fluid.data_feeder import convert_dtype
+from paddle.common_ops_import import convert_dtype
 from paddle.nn import functional as F
-from paddle.fluid import layers
-from paddle.fluid.dygraph import LayerList
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
     'CanineModel', 'CaninePretrainedModel', 'CanineForQuestionAnswering',
@@ -396,10 +394,9 @@ class CanineMultiHeadAttention(nn.MultiHeadAttention):
             q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
         # scale dot product attention
-        product = layers.matmul(x=q,
+        product = paddle.matmul(x=q * (self.head_dim**-0.5),
                                 y=k,
-                                transpose_y=True,
-                                alpha=self.head_dim**-0.5)
+                                transpose_y=True)
 
         if attn_mask is not None:
             attn_mask = _convert_attention_mask(attn_mask, product.dtype)
@@ -674,7 +671,7 @@ class CanineEncoder(nn.Layer):
                  max_seq_length=2048):
 
         super(CanineEncoder, self).__init__()
-        self.layers = LayerList([
+        self.layers = nn.LayerList([
             CanineEncoderLayer(
                 hidden_size=hidden_size,
                 num_heads=num_heads,
