@@ -17,12 +17,13 @@ limitations under the License. */
 #include <string>
 
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
-struct StripNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL StripNormalizer : public Normalizer {
   StripNormalizer(bool left = true, bool right = true);
   virtual void operator()(NormalizedString* input) const override;
   StripNormalizer(StripNormalizer&&) = default;
@@ -37,7 +38,7 @@ private:
                         StripNormalizer& strip_normalizer);
 };
 
-struct StripAccentsNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL StripAccentsNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j,
                       const StripAccentsNormalizer& strip_normalizer);
