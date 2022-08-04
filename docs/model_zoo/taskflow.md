@@ -1299,7 +1299,8 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
->>> codegen = Taskflow("code_generation")
+# 默认模型为 Salesforce/codegen-350M-mono
+>>> codegen = Taskflow("code_generation", model="Salesforce/codegen-2B-mono")
 # 单条输入
 >>> codegen("def hello_world():")
 ['\n    print("Hello World")']
@@ -1309,6 +1310,7 @@ from paddlenlp import Taskflow
 ```
 
 #### 可配置参数说明
+* `model`：可选模型，默认为Salesforce/codegen-350M-mono，支持的模型参考[CodeGen文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen/README.md)。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_length`：生成代码的最大长度，默认为128。
 * `min_length`：生成代码的最小长度，默认为0。

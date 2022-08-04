@@ -50,7 +50,7 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 
 ### 安装FasterTokenizers文本处理加速库（可选）
 
-如果部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。
 
 在容器内安装 faster_tokenizers
 ```shell

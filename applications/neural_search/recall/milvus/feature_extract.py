@@ -133,8 +133,9 @@ class Predictor(object):
         """
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         all_embeddings = []
