@@ -30,8 +30,8 @@
 
 ## News 📢
 * 📝 2022.8.1 **PaddleNLP v2.3.5** Released！
-  * Release the dialogic code generation model [**CodeGen**](./examples/code_generation/codegen), which can be easily used via [Taskflow](./docs/model_zoo/taskflow.md). 
-  * Release [**UIE en**](./model_zoo/uie), supports for multiple **open-domain** English IE tasks. 
+  * Release the dialogic code generation model [**CodeGen**](./examples/code_generation/codegen), which can be easily used via [Taskflow](./docs/model_zoo/taskflow.md).
+  * Release [**UIE en**](./model_zoo/uie), supports for multiple tasks in **open-domain** information extraction.
   * Release [**RGL**](./examples/few_shot/RGL), an independent research prompt-base tuning approach for few-shot learning, the paper is accepted by NAACL 2022.
 * 🍭 2022.6.29 **PaddleNLP v2.3.4** Released! Whole series of Chinese pretrained models [**ERNIE Tiny**](./model_zoo/ernie-3.0) are released to quickly improve deployment efficiency. We also provides smaller and faster models [**UIE Tiny**](./model_zoo/uie) for universal information extraction.
 * 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
