@@ -19,12 +19,13 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 #include "core/base.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
-class Encoding {
+class FASTERTOKENIZER_DECL Encoding {
 public:
   Encoding() = default;
   Encoding(const std::vector<uint32_t>& ids,
@@ -115,10 +116,11 @@ private:
   std::unordered_map<uint32_t, Range> sequence_ranges_;
 };
 
-bool TruncateEncodings(Encoding* encoding,
-                       Encoding* pair_encoding,
-                       const TruncMethod& method);
-void PadEncodings(std::vector<Encoding>* encoding, const PadMethod& method);
+bool FASTERTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
+                                            Encoding* pair_encoding,
+                                            const TruncMethod& method);
+void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
+                                       const PadMethod& method);
 
 }  // namespace core
 }  // namespace faster_tokenizer
