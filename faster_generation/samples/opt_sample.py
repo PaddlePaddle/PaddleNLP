@@ -15,14 +15,19 @@
 from paddlenlp.transformers import GPTLMHeadModel, GPTChineseTokenizer
 import paddle
 
-model_name = 'facebook/opt-125m'
+model_name = 'facebook/opt-1.3b'
 
 tokenizer = GPTChineseTokenizer.from_pretrained(model_name)
 model = GPTLMHeadModel.from_pretrained(model_name)
 model.eval()
 
-inputs = 'China is a great place to visit.'
-inputs_ids = tokenizer(inputs)["input_ids"]
+inputs = """Question:If x is 2 and y is 5, what is x+y?
+Answer: 7
+Question: if x is 12 and y is 9, what is x+y?
+Answer:21"
+Question: if x is 3 and y is 4, what is x+y?"""
+
+inputs_ids = tokenizer([inputs])["input_ids"]
 inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64').unsqueeze(0)
 
 outputs, _ = model.generate(input_ids=inputs_ids,

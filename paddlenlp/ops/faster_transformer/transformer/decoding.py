@@ -1621,27 +1621,26 @@ class InferOptDecoding(nn.Layer):
 
         # check the dtype of embedding
         dtype = paddle.float16 if use_fp16_decoding else paddle.float32
-        if self.word_emb.dtype != dtype:
-            self.word_emb = transfer_param(self.word_emb,
-                                           dtype=dtype,
-                                           is_bias=False,
-                                           restore_data=True)
-            self.linear_weight = transfer_param(self.linear_weight,
+        self.word_emb = transfer_param(self.word_emb,
+                                       dtype=dtype,
+                                       is_bias=False,
+                                       restore_data=True)
+        self.linear_weight = transfer_param(self.linear_weight,
+                                            dtype=dtype,
+                                            is_bias=False,
+                                            restore_data=True)
+        self.pos_emb = transfer_param(self.pos_emb,
+                                      dtype=dtype,
+                                      is_bias=False,
+                                      restore_data=True)
+        self.decoder_ln_weight = transfer_param(self.decoder_ln_weight,
                                                 dtype=dtype,
                                                 is_bias=False,
                                                 restore_data=True)
-            self.pos_emb = transfer_param(self.pos_emb,
-                                          dtype=dtype,
-                                          is_bias=False,
-                                          restore_data=True)
-            self.decoder_ln_weight = transfer_param(self.decoder_ln_weight,
-                                                    dtype=dtype,
-                                                    is_bias=False,
-                                                    restore_data=True)
-            self.decoder_ln_bias = transfer_param(self.decoder_ln_bias,
-                                                  dtype=dtype,
-                                                  is_bias=True,
-                                                  restore_data=True)
+        self.decoder_ln_bias = transfer_param(self.decoder_ln_bias,
+                                              dtype=dtype,
+                                              is_bias=True,
+                                              restore_data=True)
 
     def forward(self,
                 input_ids,
