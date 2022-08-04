@@ -78,6 +78,11 @@ python examples/semantic-search/semantic_search_example.py --device cpu
 #### 3.4.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
+首先修改`config/elasticsearch.yml`的配置：
+```
+xpack.security.enabled: false
+```
+然后启动：
 ```bash
 ./bin/elasticsearch
 ```

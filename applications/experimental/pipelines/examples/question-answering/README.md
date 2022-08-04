@@ -73,8 +73,14 @@ python examples/question-answering/dense_qa_example.py --device cpu
 整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI。接下来我们依次搭建这 3 个服务并串联构成可视化的问答系统
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
+首先修改`config/elasticsearch.yml`的配置：
+```
+xpack.security.enabled: false
+```
+然后启动：
+
 ```bash
 ./bin/elasticsearch
 ```

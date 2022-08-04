@@ -15,6 +15,7 @@ parser.add_argument("--index_name", default='faiss_index', type=str, help="The a
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
+parser.add_argument("--update_batch_size", default=100, type=int, help="The batch size of document_store to update passage embedding for building ANN index.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -66,7 +67,8 @@ def dense_qa_pipeline():
         )
 
         # update Embedding
-        document_store.update_embeddings(retriever)
+        document_store.update_embeddings(retriever,
+                                         batch_size=args.update_batch_size)
 
         # save index
         document_store.save(args.index_name)
