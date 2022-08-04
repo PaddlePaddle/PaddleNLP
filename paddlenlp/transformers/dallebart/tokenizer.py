@@ -340,28 +340,34 @@ class DalleBartTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mini/vocab.json",
             "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v16/vocab.json",
             "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-vocab.json",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/vocab.json",
+            "dalle-mega":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/vocab.json",
         },
         "merges_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mini/merges.txt",
             "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v16/merges.txt",
             "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-merges.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/merges.txt",
+            "dalle-mega":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/merges.txt",
         },
         "wiki_word_frequency_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mini/enwiki-words-frequency.txt",
             "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v16/enwiki-words-frequency.txt",
             "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
-        }
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
+            "dalle-mega":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
+        },
     }
     pretrained_init_configuration = {
         "dalle-mini": {
@@ -372,7 +378,10 @@ class DalleBartTokenizer(GPTTokenizer):
         },
         "dalle-mega-v26": {
             "normalize_text": True
-        }
+        },
+        "dalle-mega": {
+            "normalize_text": True
+        },
     }
 
     def __init__(self,
