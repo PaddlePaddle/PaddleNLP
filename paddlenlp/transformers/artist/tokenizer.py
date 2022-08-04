@@ -180,7 +180,7 @@ class ArtistTokenizer(BertTokenizer):
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
-        Build model inputs from a sequence (we don't add special tokens!). 
+        Build model inputs from a sequence (we don't add special tokens). 
         
         An Artist sequence has the following format:
 
@@ -190,10 +190,41 @@ class ArtistTokenizer(BertTokenizer):
             token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. Defaults to None.
+                Optional second list of IDs for sequence pairs. 
+                We do'nt use sequence pairs.
+                Defaults to None.
 
         Returns:
             List[int]: List of input_id.
         """
-        if token_ids_1 is None:
-            return token_ids_0
+        return token_ids_0
+
+    def __call__(
+            self,
+            text,
+            text_pair=None,
+            max_length=None,
+            stride=0,
+            is_split_into_words=False,
+            padding=False,
+            truncation=False,
+            return_position_ids=False,
+            return_token_type_ids=False,  # don't return token_type_ids 
+            return_attention_mask=False,
+            return_length=False,
+            return_overflowing_tokens=False,
+            return_special_tokens_mask=False,
+            return_dict=True,
+            return_offsets_mapping=False,
+            add_special_tokens=True,
+            pad_to_multiple_of=None,
+            return_tensors=None,
+            verbose: bool = True,
+            **kwargs):
+        return super().__call__(
+            text, text_pair, max_length, stride, is_split_into_words, padding,
+            truncation, return_position_ids, return_token_type_ids,
+            return_attention_mask, return_length, return_overflowing_tokens,
+            return_special_tokens_mask, return_dict, return_offsets_mapping,
+            add_special_tokens, pad_to_multiple_of, return_tensors, verbose,
+            **kwargs)
