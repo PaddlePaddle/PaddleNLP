@@ -65,13 +65,11 @@ class ModelTesterMixin:
         return inputs_dict
 
     def test_save_load(self):
-        config, input_ids, token_type_ids, input_mask = self.model_tester.prepare_config_and_inputs(
-        )
-        inputs_dict = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": input_mask,
-        }
+        (
+            config,
+            inputs_dict,
+        ) = self.model_tester.prepare_config_and_inputs_for_common()
+
         for model_class in self.all_model_classes:
             if model_class == self.base_model_class:
                 model = model_class(**config)
@@ -101,14 +99,14 @@ class ModelTesterMixin:
 
     def test_resize_tokens_embeddings(self):
         (
-            original_config,
+            config,
             inputs_dict,
         ) = self.model_tester.prepare_config_and_inputs_for_common()
         if not self.test_resize_embeddings:
             return
 
         for model_class in self.all_model_classes:
-            config = copy.deepcopy(original_config)
+            config = copy.deepcopy(config)
             if model_class == self.base_model_class:
                 model = model_class(**config)
             else:
@@ -119,6 +117,7 @@ class ModelTesterMixin:
 
             model_vocab_size = config["vocab_size"]
             # Retrieve the embeddings and clone theme
+
             model_embed = model.resize_token_embeddings(model_vocab_size)
             cloned_embeddings = model_embed.weight.clone()
 
