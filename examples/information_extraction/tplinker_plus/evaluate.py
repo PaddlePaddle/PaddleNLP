@@ -22,7 +22,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, AutoModel
 from paddlenlp.utils.log import logger
 
-from utils import postprocess, create_dataloader, reader, get_label_dict, DedupList
+from utils import postprocess, create_dataloader, reader, get_label_dict
 from metric import get_eval
 from model import TPLinkerPlus
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")
-    parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="relation_extraction", type=str, help="Select the training task type.")
+    parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
 
     args = parser.parse_args()
     # yapf: enable

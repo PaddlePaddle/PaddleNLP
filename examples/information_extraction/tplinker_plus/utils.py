@@ -169,8 +169,9 @@ class DataCollator:
             max_length=self.max_length,
         )
 
+        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
+
         if labels is None:  # for test
-            batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
             if "offset_mapping" in features[0].keys():
                 batch.append(
                     [feature["offset_mapping"] for feature in features])
@@ -178,12 +179,9 @@ class DataCollator:
                 batch.append([feature["text"] for feature in features])
             return batch
 
-        for k in batch.keys():
-            batch[k] = paddle.to_tensor(batch[k])
-
         num_tags = len(self.label_dict['tag2id'])
-        bs = batch["input_ids"].shape[0]
-        seqlen = batch["input_ids"].shape[1]
+        bs = batch[0].shape[0]
+        seqlen = batch[0].shape[1]
         mask = paddle.triu(paddle.ones(shape=[seqlen, seqlen]), diagonal=0)
         mask = paddle.cast(mask, "bool")
 
@@ -231,9 +229,8 @@ class DataCollator:
 
         mask = mask[None, :, :, None]
         mask = paddle.expand(mask, shape=[bs, seqlen, seqlen, num_tags])
-        batch["labels"] = batch_shaking_tag.masked_select(mask).reshape(
-            [bs, -1, num_tags])
-        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
+        batch.append(
+            batch_shaking_tag.masked_select(mask).reshape([bs, -1, num_tags]))
         return batch
 
 
