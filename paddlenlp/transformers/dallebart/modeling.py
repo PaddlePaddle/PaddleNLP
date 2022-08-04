@@ -108,7 +108,30 @@ class DalleBartPretrainedModel(PretrainedModel):
             "use_bias": False,
             "init_std": 0.02
         },
-        "dalle-mega": {
+        "dalle-mega-v16": {
+            "text_vocab_size": 50272,
+            "image_vocab_size": 16415,
+            "bos_token_id": 16384,
+            "pad_token_id": 16384,
+            "eos_token_id": 16384,
+            "max_text_length": 64,
+            "max_image_length": 256,
+            "decoder_start_token_id": 16384,
+            "d_model": 2048,
+            "num_encoder_layers": 24,
+            "num_decoder_layers": 24,
+            "encoder_attention_heads": 32,
+            "decoder_attention_heads": 32,
+            "encoder_ffn_dim": 4096,
+            "decoder_ffn_dim": 4096,
+            "dropout": 0.,
+            "activation_function": "gelu",
+            "attention_dropout": 0.,
+            "activation_dropout": 0.,
+            "use_bias": False,
+            "init_std": 0.02
+        },
+        "dalle-mega-v26": {
             "text_vocab_size": 50272,
             "image_vocab_size": 16415,
             "bos_token_id": 16384,
@@ -136,9 +159,11 @@ class DalleBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mini.pdparams",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mega.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini.pdparams",
+            "dalle-mega-v16":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16.pdparams",
+            "dalle-mega-v26":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26.pdparams",
         }
     }
     base_model_prefix = "dallebart"

@@ -340,28 +340,37 @@ class DalleBartTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mini-vocab.json",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mega-vocab.json",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini-vocab.json",
+            "dalle-mega-v16":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-vocab.json",
+            "dalle-mega-v26":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-vocab.json",
         },
         "merges_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mini-merges.txt",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mega-merges.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini-merges.txt",
+            "dalle-mega-v16":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-merges.txt",
+            "dalle-mega-v26":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-merges.txt",
         },
         "wiki_word_frequency_file": {
             "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mini-enwiki-words-frequency.txt",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dalle/dalle-mega-enwiki-words-frequency.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
+            "dalle-mega-v16":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
+            "dalle-mega-v26":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/enwiki-words-frequency.txt",
         }
     }
     pretrained_init_configuration = {
         "dalle-mini": {
             "normalize_text": True
         },
-        "dalle-mega": {
+        "dalle-mega-v16": {
+            "normalize_text": True
+        },
+        "dalle-mega-v26": {
             "normalize_text": True
         }
     }
