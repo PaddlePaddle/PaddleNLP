@@ -415,8 +415,8 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
     * `valid_steps`: evaluate的间隔steps数，默认100。
     * `device`: 选用什么设备进行训练，可选cpu或gpu。
     * `init_from_ckpt`: 模型参数路径，热启动模型训练；默认为None。
-    * `warmup_proportion`：学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.05。
-    * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.1。
+    * `warmup_proportion`：学习率warmup策略的比例，如果0.1，则学习率会在前10%训练step的过程中从0慢慢增长到learning_rate, 而后再缓慢衰减，默认为0.0。
+    * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.0。
 
 - `evaluate.py`脚本配置说明：
 
