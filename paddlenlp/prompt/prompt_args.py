@@ -68,13 +68,21 @@ class PromptTuningArguments(TrainingArguments):
         default=False,
         metadata={"help": "If True, pretrained parameters won't be updated "\
                           "during tuning and the dropout is disabled."})
+    use_rdrop: bool = field(
+        default=False,
+        metadata={"help": "Use R-Drop regularization strategy."\
+                          "Please refer to the paper for more details: "\
+                          "https://arxiv.org/abs/2106.14448."})
+    alpha_rdrop: float = field(
+        default=5.0,
+        metadata={"help": "The KL-divergence loss weight alpha in R-Drop."})
     use_rgl: bool = field(
         default=False,
         metadata={"help": "Use label consistency to boost tuning performance."\
                           "Please refer to the paper for more details: "\
                           "https://aclanthology.org/2022.findings-naacl.81/."})
     alpha_rgl: float = field(
-        default=0.0,
+        default=0.5,
         metadata={"help": "The weight of label consistency loss in RGL."})
 
     ppt_learning_rate: float = field(
@@ -99,6 +107,11 @@ class PromptTuningArguments(TrainingArguments):
             logger.warning("Ignore `use_rgl` because `alpha_rgl` = 0. Please "\
                            "set `alpha_rgl` a positive float to use RGL loss.")
             self.use_rgl = False
+
+        if self.use_rdrop and self.alpha_rdrop == 0.0:
+            logger.warning("Ignore `use_rdrop` because `alpha_rdrop` = 0. Please "\
+                           "set `alpha_rdrop` a positive float to use R-Drop.")
+            self.use_rdrop = False
 
         if self.freeze_dropout:
             self.freeze_plm = True

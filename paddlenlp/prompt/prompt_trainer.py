@@ -31,6 +31,7 @@ from ..trainer import Trainer, TrainerCallback
 from ..trainer.trainer_utils import EvalPrediction
 
 from ..data import DataCollator
+from ..losses import RDropLoss
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 
 from .template import Template
@@ -101,6 +102,9 @@ class PromptTrainer(Trainer):
 
         self.train_dataset = self._map_dataset(self.train_dataset)
         self.eval_dataset = self._map_dataset(self.eval_dataset)
+
+        if self.args.use_rdrop:
+            self.rdrop_criterion = RDropLoss()
 
     def compute_metrics_multi_class(self, eval_preds):
         metric = Accuracy()
@@ -240,20 +244,32 @@ class PromptTrainer(Trainer):
         labels = inputs["labels"]
         soft_token_ids = inputs.get("soft_token_ids", None)
 
-        outputs, hidden_states = self.model(inputs["input_ids"],
-                                            inputs["mask_ids"],
-                                            soft_token_ids,
-                                            return_hidden_states=True)
+        outputs, hidden_states = model(inputs["input_ids"],
+                                       inputs["mask_ids"],
+                                       soft_token_ids,
+                                       return_hidden_states=True)
         if self.criterion is not None:
             loss = self.criterion(outputs, labels)
+
+            if self.args.use_rdrop:
+                loss = self._compute_rdrop_loss(model, inputs, outputs, loss)
+
+            if self.args.use_rgl:
+                loss += self._compute_rgl_loss(hidden_states, labels)
+
             outputs = (loss, outputs)
 
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
-        if self.args.use_rgl:
-            loss += self._compute_rgl_loss(hidden_states, labels)
-
         return (loss, outputs) if return_outputs else loss
+
+    def _compute_rdrop_loss(self, model, inputs, outputs, loss):
+        re_outputs = model(inputs["input_ids"], inputs["mask_ids"],
+                           inputs.get("soft_token_ids", None))
+        ce_loss = (self.criterion(re_outputs, inputs["labels"]) + loss) * 0.5
+        kl_loss = self.rdrop_criterion(outputs, re_outputs)
+        loss = ce_loss + self.args.alpha_rdrop * kl_loss
+        return loss
 
     def _compute_rgl_loss(self, embeddings, labels, equal_type="raw"):
         """
@@ -274,19 +290,19 @@ class PromptTrainer(Trainer):
             equals = _max_equal
         else:
             raise ValueError("Unsupported equal type {}.".format(equal_type))
-        bce_criterion = nn.CrossEntropyLoss()
-        cos_criterion = nn.CosineSimilarity(axis=0, eps=1e-6)
         batch_size = embeddings.shape[0]
         loss = 0
         for i in range(batch_size):
             for j in range(batch_size):
-                score = cos_criterion(embeddings[i], embeddings[j])
+                score = F.cosine_similarity(embeddings[i],
+                                            embeddings[j],
+                                            axis=0)
                 score = score.unsqueeze(0)
                 logits = paddle.concat([(1 - score) * 50, (1 + score) * 50],
                                        axis=-1)
                 label = paddle.to_tensor([equals(labels[i], labels[j])])
                 logits = logits.reshape([-1, logits.shape[-1]])
-                loss += bce_criterion(logits, label.unsqueeze(0))
+                loss += F.cross_entropy(logits, label.unsqueeze(0))
         loss = loss / (batch_size * (batch_size - 1))
         loss = loss / 100 * self.args.alpha_rgl
 
