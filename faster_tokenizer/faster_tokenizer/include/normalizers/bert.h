@@ -17,11 +17,12 @@ limitations under the License. */
 #include <string>
 #include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
-struct BertNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL BertNormalizer : public Normalizer {
   BertNormalizer(bool clean_text = true,
                  bool handle_chinese_chars = true,
                  bool strip_accents = true,
