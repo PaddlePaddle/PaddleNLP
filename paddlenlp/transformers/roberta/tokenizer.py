@@ -139,7 +139,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                "`tokenizer = RobertaTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
@@ -170,7 +170,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
 
     def _tokenize(self, text):
         """
-        End-to-end tokenization for BERT models.
+        End-to-end tokenization for Roberta models.
 
         Args:
             text (str): The text to be tokenized.
@@ -206,10 +206,10 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         Examples:
             .. code-block::
 
-                from paddlenlp.transformers import BertTokenizer
+                from paddlenlp.transformers import RobertaTokenizer
 
-                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-                tokens = berttokenizer.tokenize('He was a puppeteer')
+                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+                tokens = tokenizer.tokenize('He was a puppeteer')
                 '''
                 ['he', 'was', 'a', 'puppet', '##eer']
                 '''
@@ -245,7 +245,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens.
 
-        A BERT sequence has the following format:
+        A RoBERTa sequence has the following format:
 
         - single sequence:      ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
@@ -271,15 +271,15 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
-        A BERT offset_mapping has the following format:
+        A RoBERTa offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
 
         Args:
-            offset_mapping_ids_0 (List[tuple]):
+            offset_mapping_0 (List[tuple]):
                 List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_ids_1 (List[tuple], optional):
+            offset_mapping_1 (List[tuple], optional):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
@@ -297,7 +297,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
-        A BERT sequence pair mask has the following format:
+        A RoBERTa sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
@@ -332,7 +332,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         Args:
             token_ids_0 (List[int]):
                 A list of `inputs_ids` for the first sequence.
-            token_ids_1 (List[int], optinal):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs. Defaults to None.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
