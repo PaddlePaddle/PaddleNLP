@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .word_substitute import *
-from .word_delete import *
-from .word_swap import *
-from .word_insert import *
+import os
+from milvus import MetricType, IndexType
+
+MILVUS_HOST = '10.21.226.173'
+MILVUS_PORT = 8530
+
+output_emb_size = 0
+
+collection_param = {
+    'dimension': output_emb_size if output_emb_size > 0 else 768,
+    'index_file_size': 256,
+    'metric_type': MetricType.L2
+}
+
+index_type = IndexType.FLAT
+index_param = {'nlist': 1000}
+
+top_k = 20
+search_param = {'nprobe': 20}

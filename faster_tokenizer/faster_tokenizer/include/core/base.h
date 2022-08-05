@@ -23,6 +23,7 @@ limitations under the License. */
 
 #include "glog/logging.h"
 #include "nlohmann/json.hpp"
+#include "utils/utils.h"
 
 namespace std {
 template <>
@@ -39,10 +40,14 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
 
-enum OffsetType { CHAR, BYTE };
-enum Direction { LEFT, RIGHT };
-enum TruncStrategy { LONGEST_FIRST, ONLY_FIRST, ONLY_SECOND };
-enum PadStrategy { BATCH_LONGEST, FIXED_SIZE };
+enum FASTERTOKENIZER_DECL OffsetType { CHAR, BYTE };
+enum FASTERTOKENIZER_DECL Direction { LEFT, RIGHT };
+enum FASTERTOKENIZER_DECL TruncStrategy {
+  LONGEST_FIRST,
+  ONLY_FIRST,
+  ONLY_SECOND
+};
+enum FASTERTOKENIZER_DECL PadStrategy { BATCH_LONGEST, FIXED_SIZE };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(OffsetType,
                              {
@@ -68,7 +73,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(PadStrategy,
                                  {FIXED_SIZE, "FIXED_SIZE"},
                              });
 
-struct TruncMethod {
+struct FASTERTOKENIZER_DECL TruncMethod {
   Direction direction_;
   size_t max_len_;
   TruncStrategy strategy_;
@@ -80,7 +85,7 @@ struct TruncMethod {
         direction_(RIGHT) {}
 };
 
-struct PadMethod {
+struct FASTERTOKENIZER_DECL PadMethod {
   PadStrategy strategy_;
   Direction direction_;
   uint32_t pad_id_;
@@ -156,7 +161,7 @@ inline void to_json(nlohmann::json& j,
   }
 }
 
-struct Token {
+struct FASTERTOKENIZER_DECL Token {
   uint32_t id_;
   std::string value_;
   Offset offset_;
@@ -165,7 +170,7 @@ struct Token {
       : id_(id), value_(value), offset_(offset) {}
 };
 
-struct Merge {
+struct FASTERTOKENIZER_DECL Merge {
   size_t pos_;
   uint32_t rank_;
   uint32_t new_id_;
@@ -184,7 +189,7 @@ struct Merge {
   }
 };
 
-struct Symbol {
+struct FASTERTOKENIZER_DECL Symbol {
   uint32_t ch_;  // symbol id
   int prev_;
   int next_;
@@ -204,7 +209,7 @@ struct Symbol {
   }
 };
 
-struct BPEWord {
+struct FASTERTOKENIZER_DECL BPEWord {
   BPEWord() = default;
   BPEWord(size_t capacity) { Reserve(capacity); }
   void Reserve(size_t capacity) { symbols_.reserve(capacity); }
