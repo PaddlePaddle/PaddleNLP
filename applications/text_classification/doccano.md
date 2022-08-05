@@ -109,7 +109,8 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/175248039-ce1673f1-9b03-4804-b1cb-29e4b4193f86.png height=300 hspace='15'/>
 </div>
-对于层次分类任务的分类标签我们建议使用标签层次结构中叶结点标签路径作为标签，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
+
+对于层次分类任务的分类标签我们建议使用标签层次结构中**叶结点标签路径作为标签**，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/177095794-0acb9665-3862-4de9-8771-8f424fd4f7b0.png height=300 hspace='15'/>
@@ -172,7 +173,7 @@ python doccano.py \
     --task_type "multi_class"
 ```
 
-### 7.1 多标签任务
+### 7.2 多标签任务
 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)进行相应模型训练。
 运行
 ```shell
@@ -183,23 +184,22 @@ python doccano.py \
     --task_type "multi_label"
 ```
 
-### 7.1 多分类任务
+### 7.3 层次分类任务
 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)进行相应模型训练。
 运行
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
     --save_dir ./data \
-    --splits 0.8 0.1 0.1 \
-    --task_type "hierarchical" \
-    --separator "##"
+    --splits 0.8 0.2 \
+    --task_type "hierarchical"
 ```
 
 可配置参数说明：
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.2]表示按照``8:2``的比例将数据划分为训练集、验证集。
 - ``task_type``: 可选，选择任务类型,有多分类，多标签，层次分类三种类型的任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
@@ -216,8 +216,8 @@ data/
 ```
 
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集。
-- 如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt则为dev数据集无标签数据。
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分成train/dev 数据集，也可以划分为 train/dev/test 数据集。
+- 脚本会自动生成data.txt，如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt为无标签数据。**如果有未标注数据，则用未标注数据文件替换data.txt**
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 ## References
