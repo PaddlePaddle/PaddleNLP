@@ -112,26 +112,45 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "hfl/roberta-wwm-ext": 512,
+        "hfl/roberta-wwm-ext-large": 512,
+        "hfl/rbt6": 512,
+        "hfl/rbt4": 512,
+        "hfl/rbt3": 512,
+        "hfl/rbtl3": 512,
+    }
 
     def __init__(self,
                  vocab_file,
                  do_lower_case=True,
+                 do_basic_tokenize=True,
+                 never_split=None,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
+                 tokenize_chinese_chars=True,
+                 strip_accents=None,
                  **kwargs):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = RobertaTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
+                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+        self.do_basic_tokenize = do_basic_tokenize
+        if do_basic_tokenize:
+            self.basic_tokenizer = BasicTokenizer(
+                do_lower_case=do_lower_case,
+                never_split=never_split,
+                tokenize_chinese_chars=tokenize_chinese_chars,
+                strip_accents=strip_accents,
+            )
         self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
                                                       unk_token=unk_token)
 
@@ -146,9 +165,12 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
 
         return len(self.vocab)
 
+    def get_vocab(self):
+        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
+
     def _tokenize(self, text):
         """
-        End-to-end tokenization for RoBERTa models.
+        End-to-end tokenization for BERT models.
 
         Args:
             text (str): The text to be tokenized.
@@ -157,9 +179,16 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             list: A list of string representing converted tokens.
         """
         split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token)
+        if self.do_basic_tokenize:
+            for token in self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens):
+                # If the token is part of the never_split set
+                if token in self.basic_tokenizer.never_split:
+                    split_tokens.append(token)
+                else:
+                    split_tokens += self.wordpiece_tokenizer.tokenize(token)
+        else:
+            split_tokens = self.wordpiece_tokenizer.tokenize(text)
         return split_tokens
 
     def convert_tokens_to_string(self, tokens):
@@ -177,16 +206,19 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         Examples:
             .. code-block::
 
-                from paddlenlp.transformers import RobertaTokenizer
+                from paddlenlp.transformers import BertTokenizer
 
-                tokenizer = RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-                tokens = tokenizer.tokenize('He was a puppeteer')
+                berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                tokens = berttokenizer.tokenize('He was a puppeteer')
+                '''
+                ['he', 'was', 'a', 'puppet', '##eer']
+                '''
                 strings = tokenizer.convert_tokens_to_string(tokens)
                 '''
                 he was a puppeteer
                 '''
-
         """
+
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
@@ -213,17 +245,16 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens.
 
-        A RoBERTa sequence has the following format:
+        A BERT sequence has the following format:
 
-        - single sequence:       ``[CLS] X [SEP]``
+        - single sequence:      ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
 
         Args:
             token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs.
-                Defaults to `None`.
+                Optional second list of IDs for sequence pairs. Defaults to None.
 
         Returns:
             List[int]: List of input_id with the appropriate special tokens.
@@ -240,15 +271,15 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
-        A RoBERTa offset_mapping has the following format:
+        A BERT offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
 
         Args:
-            offset_mapping_0 (List[tuple]):
+            offset_mapping_ids_0 (List[tuple]):
                 List of wordpiece offsets to which the special tokens will be added.
-            offset_mapping_1 (List[tuple], optional):
+            offset_mapping_ids_1 (List[tuple], optional):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
@@ -266,13 +297,13 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
-        A RoBERTa sequence pair mask has the following format:
+        A BERT sequence pair mask has the following format:
         ::
 
             0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
             | first sequence    | second sequence |
 
-        If :obj:`token_ids_1` is :obj:`None`, this method only returns the first portion of the mask (0s).
+        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
 
         Args:
             token_ids_0 (List[int]):
@@ -369,22 +400,43 @@ class RobertaBPETokenizer(GPTTokenizer):
         "merges_file": "merges.txt"
     }  # for save_pretrained
 
-    pretrained_resource_files_map = {}
-    pretrained_init_configuration = {}
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "roberta-base":
+            "https://bj.bcebos.com/paddlenlp/models/community/roberta-base/vocab.json",
+            "roberta-large":
+            "https://bj.bcebos.com/paddlenlp/models/community/roberta-large/vocab.json",
+        },
+        "merges_file": {
+            "roberta-base":
+            "https://bj.bcebos.com/paddlenlp/models/community/roberta-base/merges.txt",
+            "roberta-large":
+            "https://bj.bcebos.com/paddlenlp/models/community/roberta-large/merges.txt",
+        },
+    }
+    pretrained_init_configuration = {
+        "roberta-base": {},
+        "roberta-large": {},
+    }
+    max_model_input_sizes = {
+        "roberta-base": 512,
+        "roberta-large": 512,
+    }
 
     def __init__(self,
                  vocab_file,
                  merges_file,
                  errors='replace',
-                 max_len=None,
-                 special_tokens=None,
                  bos_token="<s>",
                  eos_token="</s>",
-                 cls_token="<s>",
                  sep_token="</s>",
+                 cls_token="<s>",
                  unk_token="<unk>",
                  pad_token="<pad>",
                  mask_token="<mask>",
+                 add_prefix_space=False,
+                 max_len=None,
+                 special_tokens=None,
                  **kwargs):
 
         bos_token = AddedToken(bos_token,
@@ -439,10 +491,15 @@ class RobertaBPETokenizer(GPTTokenizer):
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
+        self.add_prefix_space = add_prefix_space
+
         re = try_import("regex")
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
+
+    def get_vocab(self):
+        return dict(self.encoder, **self.added_tokens_encoder)
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -558,6 +615,16 @@ class RobertaBPETokenizer(GPTTokenizer):
         return len(
             self.build_inputs_with_special_tokens(
                 token_ids_0, token_ids_1 if pair else None))
+
+    def prepare_for_tokenization(self,
+                                 text,
+                                 is_split_into_words=False,
+                                 **kwargs):
+        add_prefix_space = kwargs.pop("add_prefix_space", self.add_prefix_space)
+        if (is_split_into_words or
+                add_prefix_space) and (len(text) > 0 and not text[0].isspace()):
+            text = " " + text
+        return (text, kwargs)
 
 
 class RobertaTokenizer:

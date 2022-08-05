@@ -363,6 +363,7 @@ class GPTTokenizer(PretrainedTokenizer):
             merges_file,
             errors='replace',
             max_len=None,
+            add_prefix_space=False,
             pad_token='<|endoftext|>',
             eos_token='<|endoftext|>',
             unk_token='<|endoftext|>',
@@ -406,6 +407,8 @@ class GPTTokenizer(PretrainedTokenizer):
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
+        self.add_prefix_space = add_prefix_space
+
         re = try_import("regex")
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""

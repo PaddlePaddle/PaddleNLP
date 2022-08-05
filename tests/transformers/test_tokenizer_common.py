@@ -436,9 +436,7 @@ class TokenizerTesterMixin:
                     "cls_token",
                     "mask_token",
                 ]
-
-                vocab = dict(tokenizer.vocab._token_to_idx,
-                             **tokenizer.added_tokens_encoder)
+                vocab = tokenizer.get_vocab()
                 token_id_to_test_setters = next(iter(vocab.values()))
                 token_to_test_setters = tokenizer.convert_ids_to_tokens(
                     token_id_to_test_setters, skip_special_tokens=False)
@@ -486,18 +484,16 @@ class TokenizerTesterMixin:
                 sample_text = " He is very happy, UNwant\u00E9d,running"
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
+                # after_vocab = dict(after_tokenizer.vocab._token_to_idx,
+                #                    **after_tokenizer.added_tokens_encoder)
                 self.assertListEqual(before_tokens["input_ids"],
                                      after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
@@ -518,18 +514,14 @@ class TokenizerTesterMixin:
                     {"additional_special_tokens": additional_special_tokens})
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens["input_ids"],
                                      after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
@@ -562,18 +554,14 @@ class TokenizerTesterMixin:
                     {"additional_special_tokens": additional_special_tokens})
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens, after_tokens)
                 self.assertDictEqual(before_vocab, after_vocab)
                 self.assertIn("bim", after_vocab)
@@ -1861,9 +1849,7 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=False)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                # vocab_dict = tokenizer.get_vocab()
-                vocab_dict = dict(tokenizer.vocab._token_to_idx,
-                                  **tokenizer.added_tokens_encoder)
+                vocab_dict = tokenizer.get_vocab()
                 self.assertIsInstance(vocab_dict, dict)
                 self.assertGreaterEqual(len(tokenizer), len(vocab_dict))
 
@@ -1884,9 +1870,9 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=False)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                # vocab = tokenizer.get_vocab()
-                vocab = dict(tokenizer.vocab._token_to_idx,
-                             **tokenizer.added_tokens_encoder)
+                vocab = tokenizer.get_vocab()
+                # vocab = dict(tokenizer.vocab._token_to_idx,
+                #              **tokenizer.added_tokens_encoder)
                 for word, ind in vocab.items():
                     if word == tokenizer.unk_token:
                         continue
@@ -2626,12 +2612,8 @@ class TokenizerTesterMixin:
                     "an_additional_special_token",
                     tokenizer_without_change_in_init.additional_special_tokens)
 
-                # self.assertIn("an_additional_special_token", tokenizer_without_change_in_init.get_vocab())
-                self.assertIn(
-                    "an_additional_special_token",
-                    dict(
-                        tokenizer_without_change_in_init.vocab._token_to_idx, **
-                        tokenizer_without_change_in_init.added_tokens_encoder))
+                self.assertIn("an_additional_special_token",
+                              tokenizer_without_change_in_init.get_vocab())
                 self.assertEqual(
                     ["an_additional_special_token"],
                     tokenizer_without_change_in_init.convert_ids_to_tokens(
