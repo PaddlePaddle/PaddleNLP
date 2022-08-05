@@ -15,12 +15,17 @@
 
 import os
 import unittest
+from typing import List
 
+import sentencepiece as spm
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizerBase, PretrainedTokenizer
 from paddlenlp.transformers.ernie_m.tokenizer import ErnieMTokenizer
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
-from tests.testing_utils import slow
+from tests.testing_utils import slow, get_tests_dir
 from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+
+SAMPLE_VOCAB = get_tests_dir("fixtures/chinese-speiece.model")
 
 
 class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
@@ -57,13 +62,22 @@ class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
+        self.sentencepiece_model_file = SAMPLE_VOCAB
+
+    def get_tokenizers(self, **kwargs) -> List[PretrainedTokenizerBase]:
+        return [self.get_tokenizer()]
+
+    def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
+        return ErnieMTokenizer(self.vocab_file, self.sentencepiece_model_file)
+
     def get_input_output_texts(self, tokenizer):
         input_text = "UNwant\u00E9d,running"
         output_text = "unwanted, running"
         return input_text, output_text
 
     def test_full_tokenizer(self):
-        tokenizer = self.tokenizer_class(self.vocab_file)
+        tokenizer = self.tokenizer_class(self.vocab_file,
+                                         self.sentencepiece_model_file)
 
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
         self.assertListEqual(tokens,
@@ -72,10 +86,11 @@ class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                              [9, 6, 7, 12, 10, 11])
 
     def test_chinese(self):
-        tokenizer = ErnieMTokenizer()
-
+        for tokenizer_class, pretrained_name, kwargs in self.tokenizers_list:
+            tokenizer = tokenizer_class.from_pretrained(pretrained_name,
+                                                        **kwargs)
         self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "\u535A", "\u63A8", "zz"])
+                             ["▁ah", "\u535A", "\u63A8", "zz"])
 
     def test_wordpiece_tokenizer(self):
         vocab_tokens = [
