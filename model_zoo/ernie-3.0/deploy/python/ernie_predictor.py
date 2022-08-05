@@ -119,14 +119,20 @@ class InferBackend(object):
                 for name in self.predictor.get_output_names()
             ]
         else:
-            import paddle2onnx
+            from paddle2onnx.legacy.command import program2onnx
             import onnxruntime as ort
             import copy
-            onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                model_file=model_path + ".pdmodel",
-                params_file=model_path + ".pdiparams",
-                opset_version=13,
-                enable_onnx_checker=True)
+            onnx_model = "model.onnx"
+            splited_model_path = model_path.split("/")
+            model_pre = splited_model_path[-1]
+            model_dir = model_path[:-1 * len(model_pre)]
+            program2onnx(model_dir=model_dir,
+                         save_file=onnx_model,
+                         model_filename=model_pre + ".pdmodel",
+                         params_filename=model_pre + ".pdiparams",
+                         opset_version=12,
+                         enable_onnx_checker=True,
+                         auto_update_opset=False)
 
             deploy_onnx_model = onnx_model
             providers = ['CUDAExecutionProvider']
