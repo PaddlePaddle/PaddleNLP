@@ -97,10 +97,11 @@ python utils/offline_ann.py --index_name baike_cities \
                             --doc_dir data/baike \
                             --delete_index
 ```
-
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
+* `host`: Elasticsearch的IP地址
+* `port`: Elasticsearch的端口号
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 运行成功后会输出如下的日志：
