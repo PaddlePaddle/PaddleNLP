@@ -27,7 +27,9 @@ from ..transformers import PretrainedTokenizer
 
 from .prompt_utils import InputExample
 
-__all__ = ["Verbalizer", "NonVerbalizer", "ManualVerbalizer", "SoftVerbalizer"]
+__all__ = [
+    "Verbalizer", "MultiMaskVerbalizer", "ManualVerbalizer", "SoftVerbalizer"
+]
 
 
 class Verbalizer(nn.Layer):
@@ -151,7 +153,7 @@ class Verbalizer(nn.Layer):
                 The aggregated embeddings' number of dimensions.
 
         """
-        if embeddings.ndim > ndim:
+        if embeddings.ndim > ndim and atype is not None:
             if atype == 'mean':
                 if mask is None:
                     return embeddings.mean(axis=-1)
@@ -164,7 +166,7 @@ class Verbalizer(nn.Layer):
             elif atype == 'first':
                 return embeddings[..., 0]
             else:
-                raise ValueError('Unsupported aggreate type {}'.format(atype))
+                raise ValueError('Unsupported aggregate type {}'.format(atype))
         return embeddings
 
     def normalize(self, logits):
@@ -172,31 +174,11 @@ class Verbalizer(nn.Layer):
         new_logits = F.softmax(logits.reshape(logits.shape[0], -1), axis=-1)
         return new_logits.reshape(*logits.shape)
 
-    def from_file(self, path, map_type="one-to-one"):
+    def from_file(self, path):
         """
-        Load labels and corresponding words from files, which are formatted as
-        label_name%%
+        Load labels and corresponding words from files.
         """
-        if not os.path.isfile(path):
-            raise ValueError(f"{path} is not a valid label file.")
-        with open(path, 'w') as fp:
-            lines = fp.readlines()
-            label_words = {}
-            if map_type == 'one-to-one':
-                for line in lines:
-                    label, word = lines.strip().split()
-                    label_words[label] = word
-            elif map_type == 'one-to-many':
-                for line in lines:
-                    label, word = lines.strip().split()
-                    if label not in label_words:
-                        label_words[label] = []
-                    label_words[label].append(word)
-            else:
-                raise ValueError(f"Unsupported mapping type {map_type}.")
-
-            self.labels = sorted(list(label_words.keys()))
-            self.label_words = label_words
+        raise NotImplementedError
 
 
 class NonVerbalizer(Verbalizer):
@@ -308,6 +290,32 @@ class ManualVerbalizer(Verbalizer):
                    prefix=prefix)
 
 
+class MultiMaskVerbalizer(ManualVerbalizer):
+
+    def __init__(self, tokenizer, labels=None, label_words=None, prefix=None):
+        super().__init__(tokenizer, labels, label_words, prefix)
+
+    def process_outputs(self, logits, inputs, **kwargs):
+        """
+        Process logits according to mask ids and label words.
+        Args:
+            logits (paddle.Tensor):
+                 The output of ForMaskedLM model with shape
+                 [batch_size, max_seq_length, vocab_size].
+            inputs (InputFeatures):
+                 The input features of model, including mask_ids.
+        """
+        batch_size, seq_len, vocab_size = logits.shape
+        batch_ids, word_ids = paddle.where(inputs["mask_ids"] == 1)
+        mask_ids = paddle.concat([
+            b * seq_len + w
+            for b, w in zip(batch_ids.squeeze(), word_ids.squeeze())
+        ])
+        mask_logits = logits.reshape([-1, vocab_size])[mask_ids]
+        mask_logits = mask_logits.reshape([batch_size, -1, vocab_size])
+        return mask_logits
+
+
 class Identity(nn.Layer):
     """
     Identity layer to replace the last linear layer in MLM model, which
@@ -401,8 +409,7 @@ class SoftVerbalizer(Verbalizer):
 
     def process_outputs(self, logits, inputs=None, **kwargs):
         mask_ids = inputs["mask_ids"].unsqueeze(2)
-        logits = paddle.where(mask_ids == 1, logits, paddle.zeros_like(logits))
-        logits = logits.sum(axis=1) / mask_ids.sum(axis=1)
+        logits = (logits * mask_ids).sum(axis=1) / mask_ids.sum(axis=1)
         return self.head(logits)
 
     @classmethod

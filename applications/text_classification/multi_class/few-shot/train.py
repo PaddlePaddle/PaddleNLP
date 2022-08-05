@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass, field
 import os
+import numpy as np
 import paddle
 from paddle.metric import Accuracy
 from paddle.static import InputSpec
@@ -22,7 +23,7 @@ from paddlenlp.transformers import ErnieTokenizer, ErnieForMaskedLM, export_mode
 from paddlenlp.trainer import PdArgumentParser, get_scheduler
 from paddlenlp.prompt import (
     AutoTemplate,
-    SoftVerbalizer,
+    MultiMaskVerbalizer,
     MLMTokenizerWrapper,
     PromptTuningArguments,
     PromptTrainer,
@@ -90,7 +91,7 @@ def main():
     logger.info("Using template: {}".format(template.template))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
-    verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
+    verbalizer = MultiMaskVerbalizer.from_file(tokenizer, label_file)
     logger.info("Using verbalizer: {}".format(data_args.verbalizer))
 
     # Load the few-shot datasets.
@@ -101,6 +102,12 @@ def main():
         sampler = FewShotSampler(
             num_sample_per_label=data_args.train_sample_per_label)
         train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
+
+    for idx in range(len(train_ds)):
+        train_ds[idx].labels = verbalizer.token_ids.numpy()[
+            train_ds[idx].labels][0]
+    for idx in range(len(dev_ds)):
+        dev_ds[idx].labels = verbalizer.token_ids.numpy()[dev_ds[idx].labels][0]
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -123,10 +130,9 @@ def main():
         learning_rate=lr_scheduler,
         parameters=[{
             'params':
-            [p for p in prompt_model.verbalizer.non_head_parameters()] +
             [p for p in prompt_model.plm.parameters() if not p.stop_gradient]
         }, {
-            'params': [p for p in prompt_model.verbalizer.head_parameters()] +
+            'params': [p for p in prompt_model.verbalizer.parameters()] +
             [p for p in prompt_model.template.parameters()],
             'learning_rate':
             training_args.ppt_learning_rate / training_args.learning_rate
@@ -134,11 +140,9 @@ def main():
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        metric = Accuracy()
-        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
-                                 paddle.to_tensor(eval_preds.label_ids))
-        metric.update(correct)
-        acc = metric.accumulate()
+        preds = [tuple(x) for x in np.argmax(eval_preds.predictions, axis=-1)]
+        labels = [tuple(x) for x in eval_preds.label_ids]
+        acc = np.mean(np.equal(preds, labels))
         return {'accuracy': acc}
 
     trainer = PromptTrainer(model=prompt_model,
