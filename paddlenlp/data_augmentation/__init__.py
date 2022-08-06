@@ -12,4 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_augment import *
+from .word_substitute import *
+from .word_insert import *
+from .word_delete import *
+from .word_swap import *
