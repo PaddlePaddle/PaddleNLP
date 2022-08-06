@@ -28,6 +28,7 @@ Question: if x is 3 and y is 4, what is x+y?
 output text:
 Answer:7
 
+Question: If x is
 ==================================================
 input text:
 a chat between a curious human and Statue of Liberty.

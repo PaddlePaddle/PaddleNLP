@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import argparse
+
+# append project root dir to project to make it run with latest code
 import sys
 
-sys.path.insert(0, "/root/paddle/PaddleNLP-temp/PaddleNLP")
+sys.path.insert(0, "../../")
 
 import time
 from pprint import pprint
@@ -76,10 +78,6 @@ def parse_args():
 
 
 def do_predict(args):
-    print(
-        f"=============================start to predict base on<{args.model_name_or_path}>==============================="
-    )
-
     place = "gpu"
     place = paddle.set_device(place)
 

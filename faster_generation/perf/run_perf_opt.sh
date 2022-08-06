@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES=3
 
-for model_name in facebook/opt-125m facebook/opt-350m facebook/opt-1.3b facebook/opt-2.7b;
+for model_name in facebook/opt-125m facebook/opt-350m;
     do   
         for top_k in 1 4 8 16;
             do

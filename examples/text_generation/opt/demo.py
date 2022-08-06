@@ -1,7 +1,3 @@
-import sys
-
-sys.path.insert(0, "/root/paddle/paddle-nlps/PaddleNLP-opt-op")
-
 from typing import Tuple, List
 from logging import getLogger
 import paddle
