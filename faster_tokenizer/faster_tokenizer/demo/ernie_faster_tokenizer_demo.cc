@@ -15,16 +15,17 @@ limitations under the License. */
 #include "tokenizers/ernie_faster_tokenizer.h"
 #include <iostream>
 #include <vector>
+using namespace paddlenlp;
 
 int main() {
   // 1. Define a ernie faster tokenizer
-  tokenizers::tokenizers_impl::ErnieFasterTokenizer tokenizer(
+  faster_tokenizer::tokenizers_impl::ErnieFasterTokenizer tokenizer(
       "ernie_vocab.txt");
   // 2. Tokenize the input strings
   // case 1: tokenize a single string
   std::cout << "case 1: Tokenize a single string" << std::endl;
-  tokenizers::core::Encoding encoding;
-  tokenizers::core::EncodeInput single_string =
+  faster_tokenizer::core::Encoding encoding;
+  faster_tokenizer::core::EncodeInput single_string =
       "商赢环球股份有限公司关于延期回复上海证券交易所对"
       "公司2017年年度报告的事后审核问询函的公告";
   tokenizer.EncodePairStrings(single_string, &encoding);
@@ -32,7 +33,7 @@ int main() {
 
   // case 2: tokenize a pair of strings
   std::cout << "case 2: Tokenize a pair of strings" << std::endl;
-  tokenizers::core::EncodeInput pair_string =
+  faster_tokenizer::core::EncodeInput pair_string =
       std::pair<std::string, std::string>{"蚂蚁借呗等额还款可以换成先息后本吗",
                                           "借呗有先息到期还本吗"};
   tokenizer.EncodePairStrings(pair_string, &encoding);
@@ -40,8 +41,8 @@ int main() {
 
   // case 3: Tokenize a batch of single strings
   std::cout << "case 3: Tokenize a batch of single strings" << std::endl;
-  std::vector<tokenizers::core::Encoding> encodings;
-  std::vector<tokenizers::core::EncodeInput> strings_list = {
+  std::vector<faster_tokenizer::core::Encoding> encodings;
+  std::vector<faster_tokenizer::core::EncodeInput> strings_list = {
       "通过中介公司买了二手房，首付都付了，现在卖家不想卖了。怎么处理？",
       "凌云研发的国产两轮电动车怎么样，有什么惊喜？",
       "一辆车的寿命到底多长，最多可以开多久？"};
@@ -52,7 +53,7 @@ int main() {
 
   // case 4: Tokenize a batch of pair strings
   std::cout << "case 4: Tokenize a batch of pair strings" << std::endl;
-  std::vector<tokenizers::core::EncodeInput> pair_strings_list = {
+  std::vector<faster_tokenizer::core::EncodeInput> pair_strings_list = {
       {"花呗自动从余额宝扣款，需要我自己设置吗", "支付宝余额会自动还花呗吗"},
       {"这个蚂蚁花呗能恢复正常用不", "我的蚂蚁花呗 怎么用不了"},
       {"在经济的另一次转变中，人们发现在低地农场饲养羔羊更具成本效益，部分原因"

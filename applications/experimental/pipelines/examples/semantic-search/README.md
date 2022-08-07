@@ -30,6 +30,8 @@
 
 ## 3. 快速开始: 快速搭建语义检索系统
 
+以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./Install_windows.md)
+
 ### 3.1 运行环境和安装说明
 
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
@@ -49,17 +51,13 @@ b. 硬件环境：
 
 c. 依赖安装：
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
-# 2) 安装 RestAPI 相关依赖
-python ./rest_api/setup.py install
-# 3) 安装 Streamlit WebUI 相关依赖
-python ./ui/setup.py install
 ```
 ### 3.2 数据说明
-语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本。
+语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 3.3 一键体验语义检索系统
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
@@ -78,7 +76,7 @@ python examples/semantic-search/semantic_search_example.py --device cpu
 整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的语义检索系统。
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
 ```bash
 ./bin/elasticsearch
@@ -93,8 +91,14 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_robust_processed
+                            --doc_dir data/dureader_dev
 ```
+
+参数含义说明
+* `index_name`: 索引的名称
+* `doc_dir`: txt文本数据的路径
+* `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
@@ -123,6 +127,20 @@ sh scripts/run_search_web.sh
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
+#### 3.4.5 数据更新
+
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+
+```
+兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。
+
+从海外市场表现看，
+对俄乌冲突的恐慌情绪已显著释放，
+海外权益市场也从单边下跌转入双向波动。
+
+长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
+```
+
 ## FAQ
 
 #### 语义检索系统可以跑通，但终端输出字符是乱码怎么解决？
@@ -138,10 +156,17 @@ elasticsearch 需要在非root环境下运行，可以做如下的操作：
 
 ```
 adduser est
-chown est:est -R ${HOME}/elasticsearch-8.1.2/
-cd ${HOME}/elasticsearch-8.1.2/
+chown est:est -R ${HOME}/elasticsearch-8.3.2/
+cd ${HOME}/elasticsearch-8.3.2/
 su est
 ./bin/elasticsearch
+```
+
+#### Mac OS上安装elasticsearch出现错误 `flood stage disk watermark [95%] exceeded on.... all indices on this node will be marked read-only`
+
+elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
+```
+cluster.routing.allocation.disk.threshold_enabled: false
 ```
 
 ## Reference
