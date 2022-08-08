@@ -11,7 +11,6 @@ python demo.py
 模型生成使用到的参数释义如下：
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。
 - `max_predict_len` 表示最大生成的句子长度。
-- `repetition_penalty` 表示生成重复token的惩罚参数，详细信息可查看[这篇论文](https://arxiv.org/pdf/1909.05858.pdf)。
 
 ## 生成结果样例
 
@@ -28,7 +27,7 @@ Question: if x is 3 and y is 4, what is x+y?
 output text:
 Answer:7
 
-Question: If x is
+Question: if x is
 ==================================================
 input text:
 a chat between a curious human and Statue of Liberty.
@@ -41,9 +40,7 @@ Statue: New york city.
 Human: how long have you lived there?
 
 output text:
-Statue: Since 1885.
-
-Human
+Statue: I have lived here for a long
 ==================================================
 input text:
 Chinese: 我想回家。
@@ -58,7 +55,7 @@ English: I am hungry.
 Chinese: 我累了。
 
 output text:
-English: I'm tired.
+English: I am tired.
 
 Chinese:
 ==================================================

@@ -1,3 +1,6 @@
+import sys
+
+sys.path.insert(0, '../../../')
 from typing import Tuple, List
 from logging import getLogger
 import paddle
@@ -14,29 +17,21 @@ logger = getLogger(__name__)
 
 class Demo:
 
-    def __init__(self,
-                 model_name_or_path,
-                 max_predict_len=128,
-                 repetition_penalty=1.2):
+    def __init__(self, model_name_or_path, max_predict_len=128):
         self.tokenizer = GPTTokenizer.from_pretrained(model_name_or_path)
         logger.info("Loading the model parameters, please wait...")
         self.model = OPTForCausalLM.from_pretrained(model_name_or_path,
                                                     load_state_as_np=True)
         self.model.eval()
         self.max_predict_len = max_predict_len
-        self.repetition_penalty = repetition_penalty
         logger.info("Model loaded.")
 
     @paddle.no_grad()
-    def generate(self, inputs, repetition_penalty=None):
-        repetition_penalty = repetition_penalty if repetition_penalty is not None else self.repetition_penalty
-
+    def generate(self, inputs):
         ids = self.tokenizer(inputs)["input_ids"]
         input_ids = paddle.to_tensor([ids], dtype="int64")
-        outputs = self.model.generate(
-            input_ids,
-            max_length=self.max_predict_len,
-            repetition_penalty=self.repetition_penalty)[0][0]
+        outputs = self.model.generate(input_ids,
+                                      max_length=self.max_predict_len)[0][0]
         decode_outputs = self.tokenizer.convert_tokens_to_string(
             self.tokenizer.convert_ids_to_tokens(outputs.cpu()))
 
@@ -47,9 +42,7 @@ class Demo:
 
 if __name__ == "__main__":
 
-    demo = Demo(model_name_or_path="facebook/opt-1.3b",
-                max_predict_len=10,
-                repetition_penalty=1.2)
+    demo = Demo(model_name_or_path="facebook/opt-1.3b", max_predict_len=10)
     input_text_list = [
         "Question:If x is 2 and y is 5, what is x+y?\n"
         "Answer: 7\n\n"
