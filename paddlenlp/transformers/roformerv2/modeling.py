@@ -311,6 +311,12 @@ class RoFormerv2PretrainedModel(PretrainedModel):
 
     base_model_prefix = "roformerv2"
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.roformerv2.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.roformerv2.embeddings.word_embeddings = embedding
+
     def init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -521,6 +527,12 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
         outputs = encoder_outputs if output_hidden_states else sequence_output
 
         return outputs
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
 
 
 class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):
