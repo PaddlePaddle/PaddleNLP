@@ -15,132 +15,138 @@
 
 import paddle
 from ..dallebart.modeling import VQGanDetokenizer
-from ..gpt.modeling import GPTLMHeadModel, GPTLMHead, GPTModel as ArtistModel
+from ..gpt.modeling import GPTLMHeadModel, GPTLMHead, GPTModel
 
 __all__ = [
     'ArtistModel',
-    'ArtistLMHeadModel',
     'ArtistForImageGeneration',
-    'ArtistForCausalLM',
+    'ArtistForConditionalGeneration',
 ]
 
+pretrained_init_configuration = {
+    "pai-painter-base-zh": {
+        "vocab_size": 37512,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.0,
+        "attention_probs_dropout_prob": 0.0,
+        "max_position_embeddings": 288,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 16384,  # 0 + 16384
+        "eos_token_id": 10486,  # 102 + 16384
+        "bos_token_id": 10485,  # 101 + 16384
+        "eol_token_id": 10486,  # 102 + 16384
+    },
+    "pai-painter-painting-base-zh": {
+        "vocab_size": 37512,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.0,
+        "attention_probs_dropout_prob": 0.0,
+        "max_position_embeddings": 288,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 16384,  # 0 + 16384
+        "eos_token_id": 10486,  # 102 + 16384
+        "bos_token_id": 10485,  # 101 + 16384
+        "eol_token_id": 10486,  # 102 + 16384
+    },
+    "pai-painter-scenery-base-zh": {
+        "vocab_size": 37512,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.0,
+        "attention_probs_dropout_prob": 0.0,
+        "max_position_embeddings": 288,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 16384,  # 0 + 16384
+        "eos_token_id": 10486,  # 102 + 16384
+        "bos_token_id": 10485,  # 101 + 16384
+        "eol_token_id": 10486,  # 102 + 16384
+    },
+    "pai-painter-commercial-base-zh": {
+        "vocab_size": 37512,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.0,
+        "attention_probs_dropout_prob": 0.0,
+        "max_position_embeddings": 288,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 16384,  # 0 + 16384
+        "eos_token_id": 10486,  # 102 + 16384
+        "bos_token_id": 10485,  # 101 + 16384
+        "eol_token_id": 10486,  # 102 + 16384
+    },
+    "pai-painter-large-zh": {
+        "vocab_size": 37512,
+        "hidden_size": 1024,
+        "num_hidden_layers": 24,
+        "num_attention_heads": 16,
+        "intermediate_size": 4096,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.0,
+        "attention_probs_dropout_prob": 0.0,
+        "max_position_embeddings": 288,
+        "type_vocab_size": 1,
+        "initializer_range": 0.02,
+        "pad_token_id": 16384,  # 0 + 16384
+        "eos_token_id": 10486,  # 102 + 16384
+        "bos_token_id": 10485,  # 101 + 16384
+        "eol_token_id": 10486,  # 102 + 16384
+    },
+}
+pretrained_resource_files_map = {
+    "model_state": {
+        "pai-painter-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
+        "pai-painter-painting-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
+        "pai-painter-scenery-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/model_state.pdparams",
+        "pai-painter-commercial-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/model_state.pdparams",
+        "pai-painter-large-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
+    }
+}
 
-class ArtistLMHeadModel(GPTLMHeadModel):
+
+class ArtistModel(GPTModel):
+    pretrained_init_configuration = pretrained_init_configuration
+    pretrained_resource_files_map = pretrained_resource_files_map
+
+
+class ArtistForConditionalGeneration(GPTLMHeadModel):
     """
     The ArtistT(GPT) Model with a `language modeling` head on top.
 
     Args:
-        gpt (:class:`GPTModel`):
-            An instance of :class:`GPTModel`.
+        gpt (:class:`ArtistModel`):
+            An instance of :class:`ArtistModel`.
 
     """
-    pretrained_init_configuration = {
-        "pai-painter-base-zh": {
-            "vocab_size": 37512,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 288,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 16384,  # 0 + 16384
-            "eos_token_id": 10486,  # 102 + 16384
-            "bos_token_id": 10485,  # 101 + 16384
-            "eol_token_id": 10486,  # 102 + 16384
-        },
-        "pai-painter-painting-base-zh": {
-            "vocab_size": 37512,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 288,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 16384,  # 0 + 16384
-            "eos_token_id": 10486,  # 102 + 16384
-            "bos_token_id": 10485,  # 101 + 16384
-            "eol_token_id": 10486,  # 102 + 16384
-        },
-        "pai-painter-scenery-base-zh": {
-            "vocab_size": 37512,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 288,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 16384,  # 0 + 16384
-            "eos_token_id": 10486,  # 102 + 16384
-            "bos_token_id": 10485,  # 101 + 16384
-            "eol_token_id": 10486,  # 102 + 16384
-        },
-        "pai-painter-commercial-base-zh": {
-            "vocab_size": 37512,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 288,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 16384,  # 0 + 16384
-            "eos_token_id": 10486,  # 102 + 16384
-            "bos_token_id": 10485,  # 101 + 16384
-            "eol_token_id": 10486,  # 102 + 16384
-        },
-        "pai-painter-large-zh": {
-            "vocab_size": 37512,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.0,
-            "attention_probs_dropout_prob": 0.0,
-            "max_position_embeddings": 288,
-            "type_vocab_size": 1,
-            "initializer_range": 0.02,
-            "pad_token_id": 16384,  # 0 + 16384
-            "eos_token_id": 10486,  # 102 + 16384
-            "bos_token_id": 10485,  # 101 + 16384
-            "eol_token_id": 10486,  # 102 + 16384
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "pai-painter-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
-            "pai-painter-painting-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
-            "pai-painter-scenery-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/model_state.pdparams",
-            "pai-painter-commercial-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/model_state.pdparams",
-            "pai-painter-large-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = pretrained_init_configuration
+    pretrained_resource_files_map = pretrained_resource_files_map
 
-    def __init__(self, gpt, image_vocab_size=16384):
+    def __init__(self, gpt):
         super().__init__(gpt)
-        self.image_vocab_size = image_vocab_size
         self.lm_head = GPTLMHead(self.gpt.config["hidden_size"],
-                                 image_vocab_size)
+                                 self.gpt.config["vocab_size"])
         self.apply(self.init_weights)
 
     @staticmethod
@@ -151,37 +157,22 @@ class ArtistLMHeadModel(GPTLMHeadModel):
                                            dtype=paddle.get_default_dtype())
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
-    def prepare_faster_entry(self, kwargs):
-        # resize lm_head.decoder_weight for faster generation
-        image_vocab_size, hidden_size = self.lm_head.decoder_weight.shape
-        decoder_weight = paddle.concat([
-            self.lm_head.decoder_weight,
-            paddle.zeros(
-                (self.gpt.config["vocab_size"] - image_vocab_size, hidden_size),
-                dtype=paddle.get_default_dtype())
-        ],
-                                       axis=0)
-        self.lm_head.decoder_weight = self.create_parameter(
-            shape=[self.gpt.config["vocab_size"], hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=paddle.nn.initializer.Assign(decoder_weight))
 
-        return super().prepare_faster_entry(kwargs)
-
-
-class ArtistForImageGeneration(ArtistLMHeadModel):
+class ArtistForImageGeneration(ArtistForConditionalGeneration):
     r"""
     Artist Model with a `language modeling` head and `VQGanTokenizer` on top.
     Args:
-        gpt (:class:`GPTModel`):
-            An instance of GPTModel.
+        gpt (:class:`ArtistModel`):
+            An instance of ArtistModel.
         image_vocab_size (int, optional):
             The vocabulary size of image.
             Defaults to `16384`. 
     """
+    pretrained_init_configuration = pretrained_init_configuration
+    pretrained_resource_files_map = pretrained_resource_files_map
 
     def __init__(self, gpt, image_vocab_size=16384):
-        super().__init__(gpt, image_vocab_size)
+        super().__init__(gpt)
         self.vqgan_detokenizer = VQGanDetokenizer(image_vocab_size, 256)
 
     @paddle.no_grad()
@@ -199,9 +190,9 @@ class ArtistForImageGeneration(ArtistLMHeadModel):
         The ArtistForImageGeneration generate method.
         Args:
             input_ids (Tensor):
-                See :class:`ArtistLMHeadModel`.
+                See :class:`ArtistForConditionalGeneration`.
             attention_mask (Tensor, optional):
-                See :class:`ArtistLMHeadModel`.
+                See :class:`ArtistForConditionalGeneration`.
             top_k (int, optional): The number of highest probability tokens to 
                 keep for top-k-filtering in the "sampling" strategy. Default to 
                 0, which means no effect.
@@ -226,13 +217,13 @@ class ArtistForImageGeneration(ArtistLMHeadModel):
         Example:
             .. code-block::
                 import paddle
-                from paddlenlp.transformers import ArtistForImageGeneration, ArtistTokenizer
+                from paddlenlp.transformers import AutoModelForImageGeneration, AutoTokenizer
                 from PIL import Image
 
                 # Initialize the model and tokenizer
                 model_name_or_path = 'pai-painter-painting-base-zh'
-                model = ArtistForImageGeneration.from_pretrained(model_name_or_path)
-                tokenizer = ArtistTokenizer.from_pretrained(model_name_or_path)
+                model = AutoModelForImageGeneration.from_pretrained(model_name_or_path)
+                tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
                 model.eval()
 
                 # Prepare the model inputs.
@@ -274,6 +265,7 @@ class ArtistForImageGeneration(ArtistLMHeadModel):
             num_return_sequences=num_return_sequences,
             use_faster=use_faster,
             use_fp16_decoding=use_fp16_decoding,
+            seq_len=paddle.ones((input_ids.shape[0], ), dtype="int32") * 32,
             **kwargs)[0]
         images = self.vqgan_detokenizer(image_tokens)
         # images shape [bs, num_return_sequences, 256, 256, 3]
@@ -282,6 +274,3 @@ class ArtistForImageGeneration(ArtistLMHeadModel):
             images.shape[3]
         ])
         return images
-
-
-ArtistForCausalLM = ArtistLMHeadModel
