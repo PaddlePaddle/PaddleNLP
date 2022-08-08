@@ -25,8 +25,9 @@ from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops import transfer_param
 
 if paddle.__version__ == "0.0.0":
-    from paddle.framework import (core, in_dygraph_mode, _non_static_mode,
-                                  _dygraph_tracer, _in_legacy_dygraph)
+    from paddle.framework import core
+
+from .decoding import run_custom
 
 
 def infer_transformer_decoder(from_tensor,
@@ -66,196 +67,43 @@ def infer_transformer_decoder(from_tensor,
                               size_per_head,
                               memory_hidden_dim,
                               is_fuse_qkv=False):
-    if paddle.__version__ == "0.0.0":
+    inputs_names = [
+        "FromTensor", "MemoryTensor", "MemSeqLen", "SelfLayernormWeight",
+        "SelfLayernormBias", "SelfQueryWeight", "SelfQueryBias",
+        "SelfKeyWeight", "SelfKeyBias", "SelfValueWeight", "SelfValueBias",
+        "SelfOutWeight", "SelfOutBias", "CrossLayernormWeight",
+        "CrossLayernormBias", "CrossQueryWeight", "CrossQueryBias",
+        "CrossKeyWeight", "CrossKeyBias", "CrossValueWeight", "CrossValueBias",
+        "CrossOutWeight", "CrossOutBias", "FFNLayernormWeight",
+        "FFNLayernormBias", "FFNInterWeight", "FFNInterBias", "FFNOutWeight",
+        "FFNOutBias", "OldSelfCacheKey", "OldSelfCacheValue"
+    ]
 
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_var = [
+        from_tensor, memory_tensor, mem_seq_len, self_ln_weight, self_ln_bias,
+        self_q_weight, self_q_bias, self_k_weight, self_k_bias, self_v_weight,
+        self_v_bias, self_out_weight, self_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, old_self_cache_key,
+        old_self_cache_value, old_mem_cache
+    ]
 
-            inputs = [
-                from_tensor, memory_tensor, mem_seq_len, self_ln_weight,
-                self_ln_bias, self_q_weight, self_q_bias, self_k_weight,
-                self_k_bias, self_v_weight, self_v_bias, self_out_weight,
-                self_out_bias, cross_ln_weight, cross_ln_bias, cross_q_weight,
-                cross_q_bias, cross_k_weight, cross_k_bias, cross_v_weight,
-                cross_v_bias, cross_out_weight, cross_out_bias, ffn_ln_weight,
-                ffn_ln_bias, ffn_inter_weight, ffn_inter_bias, ffn_out_weight,
-                ffn_out_bias, old_self_cache_key, old_self_cache_value,
-                old_mem_cache
-            ]
+    attrs_names = [
+        'step', 'n_head', 'size_per_head', 'memory_hidden_dim', 'is_fuse_qkv'
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _rel_len, _alpha, _early_stopping
-            ]
+    attrs_val = [step, n_head, size_per_head, memory_hidden_dim, is_fuse_qkv]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    outputs_names = [
+        'DecoderOutput', 'NewSelfCacheKey', 'NewSelfCacheValue', 'NewMemCache'
+    ]
 
-            decoder_output = core.eager.Tensor()
-            new_self_cache_key = core.eager.Tensor()
-            new_self_cache_value = core.eager.Tensor()
-            new_mem_cache = core.eager.Tensor()
+    outputs_dtype = [memory_tensor.dtype] * len(outputs_names)
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(new_self_cache_key)
-            ctx.add_outputs(new_self_cache_value)
-            ctx.add_outputs(new_mem_cache)
-
-            core.eager._run_custom_op(ctx, "fusion_decoder", True)
-
-        else:
-
-            inputs = {
-                "FromTensor": from_tensor,
-                "MemoryTensor": memory_tensor,
-                "MemSeqLen": mem_seq_len,
-                "SelfLayernormWeight": self_ln_weight,
-                "SelfLayernormBias": self_ln_bias,
-                "SelfQueryWeight": self_q_weight,
-                "SelfQueryBias": self_q_bias,
-                "SelfKeyWeight": self_k_weight,
-                "SelfKeyBias": self_k_bias,
-                "SelfValueWeight": self_v_weight,
-                "SelfValueBias": self_v_bias,
-                "SelfOutWeight": self_out_weight,
-                "SelfOutBias": self_out_bias,
-                "CrossLayernormWeight": cross_ln_weight,
-                "CrossLayernormBias": cross_ln_bias,
-                "CrossQueryWeight": cross_q_weight,
-                "CrossQueryBias": cross_q_bias,
-                "CrossKeyWeight": cross_k_weight,
-                "CrossKeyBias": cross_k_bias,
-                "CrossValueWeight": cross_v_weight,
-                "CrossValueBias": cross_v_bias,
-                "CrossOutWeight": cross_out_weight,
-                "CrossOutBias": cross_out_bias,
-                "FFNLayernormWeight": ffn_ln_weight,
-                "FFNLayernormBias": ffn_ln_bias,
-                "FFNInterWeight": ffn_inter_weight,
-                "FFNInterBias": ffn_inter_bias,
-                "FFNOutWeight": ffn_out_weight,
-                "FFNOutBias": ffn_out_bias,
-                "OldSelfCacheKey": old_self_cache_key,
-                "OldSelfCacheValue": old_self_cache_value,
-                "OldMemCache": old_mem_cache
-            }
-
-            attrs = {
-                'step': step,
-                'n_head': n_head,
-                'size_per_head': size_per_head,
-                'memory_hidden_dim': memory_hidden_dim,
-                'is_fuse_qkv': is_fuse_qkv
-            }
-
-            if _in_legacy_dygraph():
-                decoder_output = core.VarBase()
-                new_self_cache_key = core.VarBase()
-                new_self_cache_value = core.VarBase()
-                new_mem_cache = core.VarBase()
-
-                outputs = {
-                    'DecoderOutput': decoder_output,
-                    'NewSelfCacheKey': new_self_cache_key,
-                    'NewSelfCacheValue': new_self_cache_value,
-                    'NewMemCache': new_mem_cache
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_decoder",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-
-            else:
-                helper = LayerHelper('fusion_decoder', **locals())
-
-                decoder_output = helper.create_variable(
-                    dtype=memory_tensor.dtype)
-                new_self_cache_key = helper.create_variable(
-                    dtype=memory_tensor.dtype)
-                new_self_cache_value = helper.create_variable(
-                    dtype=memory_tensor.dtype)
-                new_mem_cache = helper.create_variable(
-                    dtype=memory_tensor.dtype)
-
-                outputs = {
-                    'DecoderOutput': decoder_output,
-                    'NewSelfCacheKey': new_self_cache_key,
-                    'NewSelfCacheValue': new_self_cache_value,
-                    'NewMemCache': new_mem_cache
-                }
-
-                helper.append_op(type='fusion_decoder',
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-
-    else:
-        helper = LayerHelper('fusion_decoder', **locals())
-
-        inputs = {
-            "FromTensor": from_tensor,
-            "MemoryTensor": memory_tensor,
-            "MemSeqLen": mem_seq_len,
-            "SelfLayernormWeight": self_ln_weight,
-            "SelfLayernormBias": self_ln_bias,
-            "SelfQueryWeight": self_q_weight,
-            "SelfQueryBias": self_q_bias,
-            "SelfKeyWeight": self_k_weight,
-            "SelfKeyBias": self_k_bias,
-            "SelfValueWeight": self_v_weight,
-            "SelfValueBias": self_v_bias,
-            "SelfOutWeight": self_out_weight,
-            "SelfOutBias": self_out_bias,
-            "CrossLayernormWeight": cross_ln_weight,
-            "CrossLayernormBias": cross_ln_bias,
-            "CrossQueryWeight": cross_q_weight,
-            "CrossQueryBias": cross_q_bias,
-            "CrossKeyWeight": cross_k_weight,
-            "CrossKeyBias": cross_k_bias,
-            "CrossValueWeight": cross_v_weight,
-            "CrossValueBias": cross_v_bias,
-            "CrossOutWeight": cross_out_weight,
-            "CrossOutBias": cross_out_bias,
-            "FFNLayernormWeight": ffn_ln_weight,
-            "FFNLayernormBias": ffn_ln_bias,
-            "FFNInterWeight": ffn_inter_weight,
-            "FFNInterBias": ffn_inter_bias,
-            "FFNOutWeight": ffn_out_weight,
-            "FFNOutBias": ffn_out_bias,
-            "OldSelfCacheKey": old_self_cache_key,
-            "OldSelfCacheValue": old_self_cache_value,
-            "OldMemCache": old_mem_cache
-        }
-        attrs = {
-            'step': step,
-            'n_head': n_head,
-            'size_per_head': size_per_head,
-            'memory_hidden_dim': memory_hidden_dim,
-            'is_fuse_qkv': is_fuse_qkv
-        }
-
-        decoder_output = helper.create_variable(dtype=memory_tensor.dtype)
-        new_self_cache_key = helper.create_variable(dtype=memory_tensor.dtype)
-        new_self_cache_value = helper.create_variable(dtype=memory_tensor.dtype)
-        new_mem_cache = helper.create_variable(dtype=memory_tensor.dtype)
-
-        outputs = {
-            'DecoderOutput': decoder_output,
-            'NewSelfCacheKey': new_self_cache_key,
-            'NewSelfCacheValue': new_self_cache_value,
-            'NewMemCache': new_mem_cache
-        }
-
-        helper.append_op(type='fusion_decoder',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache
+    return run_custom("fusion_decoder", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):

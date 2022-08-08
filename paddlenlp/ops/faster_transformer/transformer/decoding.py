@@ -30,8 +30,48 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers.utils import fn_args_to_dict
 
 if paddle.__version__ == "0.0.0":
-    from paddle.framework import (core, in_dygraph_mode, _non_static_mode,
-                                  _dygraph_tracer, _in_legacy_dygraph)
+    from paddle.framework import core
+
+
+def run_custom(op_name,
+               inputs_names,
+               inputs_var,
+               attrs_names,
+               attrs_val,
+               outputs_names,
+               outputs_dtype=None):
+    ret = []
+
+    if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+        ctx = core.CustomOpKernelContext()
+
+        for ins in inputs_var:
+            ctx.add_inputs(ins)
+        for ats in attrs_val:
+            ctx.add_attr(ats)
+
+        for name in outputs_names:
+            ret.append(core.eager.Tensor())
+            ctx.add_outputs(ret[-1])
+
+        core.eager._run_custom_op(ctx, op_name, True)
+    else:
+        inputs = dict(zip(inputs_names, inputs_var))
+        attrs = dict(zip(attrs_names, attrs_val))
+        outputs = {}
+
+        helper = LayerHelper(op_name, **locals())
+
+        for i, name in enumerate(outputs_names):
+            outputs[name] = helper.create_variable(dtype=outputs_dtype[i])
+            ret.append(outputs[name])
+
+        helper.append_op(type=op_name,
+                         inputs=inputs,
+                         outputs=outputs,
+                         attrs=attrs)
+
+    return ret
 
 
 def infer_transformer_decoding(
@@ -47,200 +87,52 @@ def infer_transformer_decoding(
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
         _alpha):
 
-    if paddle.__version__ == "0.0.0":
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_names = [
+        'Input', 'MemSeqLen', 'WordEmbedding', 'SelfLayernormWeight@VECTOR',
+        'SelfLayernormBias@VECTOR', 'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR', 'SelfKeyWeight@VECTOR', 'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR', 'SelfValueBias@VECTOR',
+        'SelfOutWeight@VECTOR', 'SelfOutBias@VECTOR',
+        'CrossLayernormWeight@VECTOR', 'CrossLayernormBias@VECTOR',
+        'CrossQueryWeight@VECTOR', 'CrossQueryBias@VECTOR',
+        'CrossKeyWeight@VECTOR', 'CrossKeyBias@VECTOR',
+        'CrossValueWeight@VECTOR', 'CrossValueBias@VECTOR',
+        'CrossOutWeight@VECTOR', 'CrossOutBias@VECTOR',
+        'FFNLayernormWeight@VECTOR', 'FFNLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR', 'FFNInterBias@VECTOR', 'FFNOutWeight@VECTOR',
+        'FFNOutBias@VECTOR', 'DecoderLayernormWeight', 'DecoderLayernormBias',
+        'EmbWeight', 'EmbBias', 'PositionEncEmb'
+    ]
 
-            inputs = [
-                enc_output, memory_seq_lens, word_emb, slf_ln_weight,
-                slf_ln_bias, slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias,
-                slf_v_weight, slf_v_bias, slf_out_weight, slf_out_bias,
-                cross_ln_weight, cross_ln_bias, cross_q_weight, cross_q_bias,
-                cross_k_weight, cross_k_bias, cross_v_weight, cross_v_bias,
-                cross_out_weight, cross_out_bias, ffn_ln_weight, ffn_ln_bias,
-                ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
-                decoder_ln_weight, decoder_ln_bias, linear_weight, linear_bias,
-                pos_emb
-            ]
+    inputs_var = [
+        enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, linear_weight, linear_bias, pos_emb
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _rel_len, _alpha
-            ]
+    attrs_names = [
+        'decoding_strategy', 'beam_size', 'topk', 'topp', 'n_head',
+        'size_per_head', 'num_layer', 'bos_id', 'eos_id', 'max_len',
+        'beam_search_diversity_rate', 'rel_len', 'alpha'
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha
+    ]
 
-            output_ids = core.eager.Tensor()
-            parent_ids = core.eager.Tensor()
-            sequence_length = core.eager.Tensor()
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength']
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(parent_ids)
-            ctx.add_outputs(sequence_length)
+    outputs_dtype = ["int32"] * len(outputs_names)
 
-            core.eager._run_custom_op(ctx, "fusion_decoding", True)
-        else:
-            inputs = {
-                'Input': enc_output,
-                'MemSeqLen': memory_seq_lens,
-                'WordEmbedding': word_emb,
-                'SelfLayernormWeight@VECTOR': slf_ln_weight,
-                'SelfLayernormBias@VECTOR': slf_ln_bias,
-                'SelfQueryWeight@VECTOR': slf_q_weight,
-                'SelfQueryBias@VECTOR': slf_q_bias,
-                'SelfKeyWeight@VECTOR': slf_k_weight,
-                'SelfKeyBias@VECTOR': slf_k_bias,
-                'SelfValueWeight@VECTOR': slf_v_weight,
-                'SelfValueBias@VECTOR': slf_v_bias,
-                'SelfOutWeight@VECTOR': slf_out_weight,
-                'SelfOutBias@VECTOR': slf_out_bias,
-                'CrossLayernormWeight@VECTOR': cross_ln_weight,
-                'CrossLayernormBias@VECTOR': cross_ln_bias,
-                'CrossQueryWeight@VECTOR': cross_q_weight,
-                'CrossQueryBias@VECTOR': cross_q_bias,
-                'CrossKeyWeight@VECTOR': cross_k_weight,
-                'CrossKeyBias@VECTOR': cross_k_bias,
-                'CrossValueWeight@VECTOR': cross_v_weight,
-                'CrossValueBias@VECTOR': cross_v_bias,
-                'CrossOutWeight@VECTOR': cross_out_weight,
-                'CrossOutBias@VECTOR': cross_out_bias,
-                'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-                'FFNLayernormBias@VECTOR': ffn_ln_bias,
-                'FFNInterWeight@VECTOR': ffn_inter_weight,
-                'FFNInterBias@VECTOR': ffn_inter_bias,
-                'FFNOutWeight@VECTOR': ffn_out_weight,
-                'FFNOutBias@VECTOR': ffn_out_bias,
-                'DecoderLayernormWeight': decoder_ln_weight,
-                'DecoderLayernormBias': decoder_ln_bias,
-                'EmbWeight': linear_weight,
-                'EmbBias': linear_bias,
-                'PositionEncEmb': pos_emb
-            }
-
-            attrs = {
-                'decoding_strategy': _decoding_strategy,
-                'beam_size': _beam_size,
-                'topk': _topk,
-                'topp': _topp,
-                'n_head': _n_head,
-                'size_per_head': _size_per_head,
-                'num_layer': _n_layer,
-                'bos_id': _bos_id,
-                'eos_id': _eos_id,
-                'max_len': _max_out_len,
-                'beam_search_diversity_rate': _diversity_rate,
-                "rel_len": _rel_len,
-                "alpha": _alpha
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-                parent_ids = core.VarBase()
-                sequence_length = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_decoding",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-            else:
-                helper = LayerHelper('fusion_decoding', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                parent_ids = helper.create_variable(dtype="int32")
-                sequence_length = helper.create_variable(dtype="int32")
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                helper.append_op(type="fusion_decoding",
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-    else:
-        helper = LayerHelper('fusion_decoding', **locals())
-
-        inputs = {
-            'Input': enc_output,
-            'MemSeqLen': memory_seq_lens,
-            'WordEmbedding': word_emb,
-            'SelfLayernormWeight@VECTOR': slf_ln_weight,
-            'SelfLayernormBias@VECTOR': slf_ln_bias,
-            'SelfQueryWeight@VECTOR': slf_q_weight,
-            'SelfQueryBias@VECTOR': slf_q_bias,
-            'SelfKeyWeight@VECTOR': slf_k_weight,
-            'SelfKeyBias@VECTOR': slf_k_bias,
-            'SelfValueWeight@VECTOR': slf_v_weight,
-            'SelfValueBias@VECTOR': slf_v_bias,
-            'SelfOutWeight@VECTOR': slf_out_weight,
-            'SelfOutBias@VECTOR': slf_out_bias,
-            'CrossLayernormWeight@VECTOR': cross_ln_weight,
-            'CrossLayernormBias@VECTOR': cross_ln_bias,
-            'CrossQueryWeight@VECTOR': cross_q_weight,
-            'CrossQueryBias@VECTOR': cross_q_bias,
-            'CrossKeyWeight@VECTOR': cross_k_weight,
-            'CrossKeyBias@VECTOR': cross_k_bias,
-            'CrossValueWeight@VECTOR': cross_v_weight,
-            'CrossValueBias@VECTOR': cross_v_bias,
-            'CrossOutWeight@VECTOR': cross_out_weight,
-            'CrossOutBias@VECTOR': cross_out_bias,
-            'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-            'FFNLayernormBias@VECTOR': ffn_ln_bias,
-            'FFNInterWeight@VECTOR': ffn_inter_weight,
-            'FFNInterBias@VECTOR': ffn_inter_bias,
-            'FFNOutWeight@VECTOR': ffn_out_weight,
-            'FFNOutBias@VECTOR': ffn_out_bias,
-            'DecoderLayernormWeight': decoder_ln_weight,
-            'DecoderLayernormBias': decoder_ln_bias,
-            'EmbWeight': linear_weight,
-            'EmbBias': linear_bias,
-            'PositionEncEmb': pos_emb
-        }
-
-        attrs = {
-            'decoding_strategy': _decoding_strategy,
-            'beam_size': _beam_size,
-            'topk': _topk,
-            'topp': _topp,
-            'n_head': _n_head,
-            'size_per_head': _size_per_head,
-            'num_layer': _n_layer,
-            'bos_id': _bos_id,
-            'eos_id': _eos_id,
-            'max_len': _max_out_len,
-            'beam_search_diversity_rate': _diversity_rate,
-            "rel_len": _rel_len,
-            "alpha": _alpha
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        parent_ids = helper.create_variable(dtype="int32")
-        sequence_length = helper.create_variable(dtype="int32")
-
-        outputs = {
-            'OutputIds': output_ids,
-            'ParentIds': parent_ids,
-            'SequenceLength': sequence_length
-        }
-
-        helper.append_op(type="fusion_decoding",
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids, parent_ids, sequence_length
+    return run_custom("fusion_decoding", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def infer_force_decoding(
@@ -256,234 +148,104 @@ def infer_force_decoding(
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
         _alpha):
 
-    if paddle.__version__ == "0.0.0":
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_names = [
+        'Input',
+        'MemSeqLen',
+        'WordEmbedding',
+        'SelfLayernormWeight@VECTOR',
+        'SelfLayernormBias@VECTOR',
+        'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR',
+        'SelfKeyWeight@VECTOR',
+        'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR',
+        'SelfValueBias@VECTOR',
+        'SelfOutWeight@VECTOR',
+        'SelfOutBias@VECTOR',
+        'CrossLayernormWeight@VECTOR',
+        'CrossLayernormBias@VECTOR',
+        'CrossQueryWeight@VECTOR',
+        'CrossQueryBias@VECTOR',
+        'CrossKeyWeight@VECTOR',
+        'CrossKeyBias@VECTOR',
+        'CrossValueWeight@VECTOR',
+        'CrossValueBias@VECTOR',
+        'CrossOutWeight@VECTOR',
+        'CrossOutBias@VECTOR',
+        'FFNLayernormWeight@VECTOR',
+        'FFNLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR',
+        'FFNInterBias@VECTOR',
+        'FFNOutWeight@VECTOR',
+        'FFNOutBias@VECTOR',
+        'DecoderLayernormWeight',
+        'DecoderLayernormBias',
+        'EmbWeight',
+        'EmbBias',
+        'PositionEncEmb',
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        'TrgWord'
+    ]
 
-            inputs = [
-                enc_output,
-                memory_seq_lens,
-                word_emb,
-                slf_ln_weight,
-                slf_ln_bias,
-                slf_q_weight,
-                slf_q_bias,
-                slf_k_weight,
-                slf_k_bias,
-                slf_v_weight,
-                slf_v_bias,
-                slf_out_weight,
-                slf_out_bias,
-                cross_ln_weight,
-                cross_ln_bias,
-                cross_q_weight,
-                cross_q_bias,
-                cross_k_weight,
-                cross_k_bias,
-                cross_v_weight,
-                cross_v_bias,
-                cross_out_weight,
-                cross_out_bias,
-                ffn_ln_weight,
-                ffn_ln_bias,
-                ffn_inter_weight,
-                ffn_inter_bias,
-                ffn_out_weight,
-                ffn_out_bias,
-                decoder_ln_weight,
-                decoder_ln_bias,
-                linear_weight,
-                linear_bias,
-                pos_emb,
-                # The input of custom op must be given.
-                # Dispensable() and Intermediate() are not supported.
-                trg_word
-            ]
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        trg_word
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _rel_len, _alpha
-            ]
+    attrs_names = [
+        'decoding_strategy', 'beam_size', 'topk', 'topp', 'n_head',
+        'size_per_head', 'num_layer', 'bos_id', 'eos_id', 'max_len',
+        'beam_search_diversity_rate', 'rel_len', 'alpha'
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha
+    ]
 
-            output_ids = core.eager.Tensor()
-            parent_ids = core.eager.Tensor()
-            sequence_length = core.eager.Tensor()
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength']
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(parent_ids)
-            ctx.add_outputs(sequence_length)
+    outputs_dtype = ["int32"] * len(outputs_names)
 
-            core.eager._run_custom_op(ctx, "fusion_force_decoding", True)
-        else:
-            inputs = {
-                'Input': enc_output,
-                'MemSeqLen': memory_seq_lens,
-                'WordEmbedding': word_emb,
-                'SelfLayernormWeight@VECTOR': slf_ln_weight,
-                'SelfLayernormBias@VECTOR': slf_ln_bias,
-                'SelfQueryWeight@VECTOR': slf_q_weight,
-                'SelfQueryBias@VECTOR': slf_q_bias,
-                'SelfKeyWeight@VECTOR': slf_k_weight,
-                'SelfKeyBias@VECTOR': slf_k_bias,
-                'SelfValueWeight@VECTOR': slf_v_weight,
-                'SelfValueBias@VECTOR': slf_v_bias,
-                'SelfOutWeight@VECTOR': slf_out_weight,
-                'SelfOutBias@VECTOR': slf_out_bias,
-                'CrossLayernormWeight@VECTOR': cross_ln_weight,
-                'CrossLayernormBias@VECTOR': cross_ln_bias,
-                'CrossQueryWeight@VECTOR': cross_q_weight,
-                'CrossQueryBias@VECTOR': cross_q_bias,
-                'CrossKeyWeight@VECTOR': cross_k_weight,
-                'CrossKeyBias@VECTOR': cross_k_bias,
-                'CrossValueWeight@VECTOR': cross_v_weight,
-                'CrossValueBias@VECTOR': cross_v_bias,
-                'CrossOutWeight@VECTOR': cross_out_weight,
-                'CrossOutBias@VECTOR': cross_out_bias,
-                'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-                'FFNLayernormBias@VECTOR': ffn_ln_bias,
-                'FFNInterWeight@VECTOR': ffn_inter_weight,
-                'FFNInterBias@VECTOR': ffn_inter_bias,
-                'FFNOutWeight@VECTOR': ffn_out_weight,
-                'FFNOutBias@VECTOR': ffn_out_bias,
-                'DecoderLayernormWeight': decoder_ln_weight,
-                'DecoderLayernormBias': decoder_ln_bias,
-                'EmbWeight': linear_weight,
-                'EmbBias': linear_bias,
-                'PositionEncEmb': pos_emb,
-                # The input of custom op must be given.
-                # Dispensable() and Intermediate() are not supported.
-                'TrgWord': trg_word
-            }
-
-            attrs = {
-                'decoding_strategy': _decoding_strategy,
-                'beam_size': _beam_size,
-                'topk': _topk,
-                'topp': _topp,
-                'n_head': _n_head,
-                'size_per_head': _size_per_head,
-                'num_layer': _n_layer,
-                'bos_id': _bos_id,
-                'eos_id': _eos_id,
-                'max_len': _max_out_len,
-                'beam_search_diversity_rate': _diversity_rate,
-                "rel_len": _rel_len,
-                "alpha": _alpha
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-                parent_ids = core.VarBase()
-                sequence_length = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_force_decoding",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-            else:
-                helper = LayerHelper('fusion_force_decoding', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                parent_ids = helper.create_variable(dtype="int32")
-                sequence_length = helper.create_variable(dtype="int32")
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                helper.append_op(type="fusion_force_decoding",
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-    else:
-        helper = LayerHelper('fusion_force_decoding', **locals())
-
-        inputs = {
-            'Input': enc_output,
-            'MemSeqLen': memory_seq_lens,
-            'WordEmbedding': word_emb,
-            'SelfLayernormWeight@VECTOR': slf_ln_weight,
-            'SelfLayernormBias@VECTOR': slf_ln_bias,
-            'SelfQueryWeight@VECTOR': slf_q_weight,
-            'SelfQueryBias@VECTOR': slf_q_bias,
-            'SelfKeyWeight@VECTOR': slf_k_weight,
-            'SelfKeyBias@VECTOR': slf_k_bias,
-            'SelfValueWeight@VECTOR': slf_v_weight,
-            'SelfValueBias@VECTOR': slf_v_bias,
-            'SelfOutWeight@VECTOR': slf_out_weight,
-            'SelfOutBias@VECTOR': slf_out_bias,
-            'CrossLayernormWeight@VECTOR': cross_ln_weight,
-            'CrossLayernormBias@VECTOR': cross_ln_bias,
-            'CrossQueryWeight@VECTOR': cross_q_weight,
-            'CrossQueryBias@VECTOR': cross_q_bias,
-            'CrossKeyWeight@VECTOR': cross_k_weight,
-            'CrossKeyBias@VECTOR': cross_k_bias,
-            'CrossValueWeight@VECTOR': cross_v_weight,
-            'CrossValueBias@VECTOR': cross_v_bias,
-            'CrossOutWeight@VECTOR': cross_out_weight,
-            'CrossOutBias@VECTOR': cross_out_bias,
-            'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-            'FFNLayernormBias@VECTOR': ffn_ln_bias,
-            'FFNInterWeight@VECTOR': ffn_inter_weight,
-            'FFNInterBias@VECTOR': ffn_inter_bias,
-            'FFNOutWeight@VECTOR': ffn_out_weight,
-            'FFNOutBias@VECTOR': ffn_out_bias,
-            'DecoderLayernormWeight': decoder_ln_weight,
-            'DecoderLayernormBias': decoder_ln_bias,
-            'EmbWeight': linear_weight,
-            'EmbBias': linear_bias,
-            'PositionEncEmb': pos_emb,
-            # The input of custom op must be given.
-            # Dispensable() and Intermediate() are not supported.
-            'TrgWord': trg_word
-        }
-
-        attrs = {
-            'decoding_strategy': _decoding_strategy,
-            'beam_size': _beam_size,
-            'topk': _topk,
-            'topp': _topp,
-            'n_head': _n_head,
-            'size_per_head': _size_per_head,
-            'num_layer': _n_layer,
-            'bos_id': _bos_id,
-            'eos_id': _eos_id,
-            'max_len': _max_out_len,
-            'beam_search_diversity_rate': _diversity_rate,
-            "rel_len": _rel_len,
-            "alpha": _alpha
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        parent_ids = helper.create_variable(dtype="int32")
-        sequence_length = helper.create_variable(dtype="int32")
-
-        outputs = {
-            'OutputIds': output_ids,
-            'ParentIds': parent_ids,
-            'SequenceLength': sequence_length
-        }
-
-        helper.append_op(type='fusion_force_decoding',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids, parent_ids, sequence_length
+    return run_custom("fusion_force_decoding", inputs_names, inputs_var,
+                      attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
 def infer_gpt_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
@@ -500,156 +262,44 @@ def infer_gpt_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
     layer_para_size = get_ft_para_conf().layer_para_size
     layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
 
-    if paddle.__version__ == "0.0.0":
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_names = [
+        "Input", "AttentionMask", "StartLength", "WordEmbedding",
+        "SelfLayernormWeight@VECTOR", "SelfLayernormBias@VECTOR",
+        "SelfQueryWeight@VECTOR", "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR", "SelfKeyBias@VECTOR", "SelfValueWeight@VECTOR",
+        "SelfValueBias@VECTOR", "SelfOutWeight@VECTOR", "SelfOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR", "FFNLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR", "FFNInterBias@VECTOR", "FFNOutWeight@VECTOR",
+        "FFNOutBias@VECTOR", "DecoderLayernormWeight", "DecoderLayernormBias",
+        "PositionEncEmb", "EmbWeight"
+    ]
 
-            inputs = [
-                input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
-                slf_ln_bias, slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias,
-                slf_v_weight, slf_v_bias, slf_out_weight, slf_out_bias,
-                ffn_ln_weight, ffn_ln_bias, ffn_inter_weight, ffn_inter_bias,
-                ffn_out_weight, ffn_out_bias, decoder_ln_weight,
-                decoder_ln_bias, pos_emb, linear_weight
-            ]
+    inputs_var = [
+        input, attn_mask, mem_seq_len, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+        ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
+        decoder_ln_weight, decoder_ln_bias, pos_emb, linear_weight
+    ]
 
-            attrs = [
-                topk, topp, max_out_len, head_num, size_per_head, num_layer,
-                bos_id, eos_id, temperature, use_fp16_decoding,
-                tensor_para_size, layer_para_size, layer_para_batch_size
-            ]
+    attrs_names = [
+        "topk", "topp", "max_len", "n_head", "size_per_head", "num_layer",
+        "bos_id", "eos_id", "temperature", "use_fp16", "tensor_para_size",
+        "layer_para_size", "layer_para_batch_size"
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    attrs_val = [
+        topk, topp, max_out_len, head_num, size_per_head, num_layer, bos_id,
+        eos_id, temperature, use_fp16_decoding, tensor_para_size,
+        layer_para_size, layer_para_batch_size
+    ]
 
-            output_ids = core.eager.Tensor()
+    outputs_names = ['OutputIds']
 
-            ctx.add_outputs(output_ids)
+    outputs_dtype = ["int32"]
 
-            core.eager._run_custom_op(ctx, "fusion_gpt", True)
-
-        else:
-            inputs = {
-                "Input": input,
-                "AttentionMask": attn_mask,
-                "StartLength": mem_seq_len,
-                "WordEmbedding": word_emb,
-                "SelfLayernormWeight@VECTOR": slf_ln_weight,
-                "SelfLayernormBias@VECTOR": slf_ln_bias,
-                "SelfQueryWeight@VECTOR": slf_q_weight,
-                "SelfQueryBias@VECTOR": slf_q_bias,
-                "SelfKeyWeight@VECTOR": slf_k_weight,
-                "SelfKeyBias@VECTOR": slf_k_bias,
-                "SelfValueWeight@VECTOR": slf_v_weight,
-                "SelfValueBias@VECTOR": slf_v_bias,
-                "SelfOutWeight@VECTOR": slf_out_weight,
-                "SelfOutBias@VECTOR": slf_out_bias,
-                "FFNLayernormWeight@VECTOR": ffn_ln_weight,
-                "FFNLayernormBias@VECTOR": ffn_ln_bias,
-                "FFNInterWeight@VECTOR": ffn_inter_weight,
-                "FFNInterBias@VECTOR": ffn_inter_bias,
-                "FFNOutWeight@VECTOR": ffn_out_weight,
-                "FFNOutBias@VECTOR": ffn_out_bias,
-                "DecoderLayernormWeight": decoder_ln_weight,
-                "DecoderLayernormBias": decoder_ln_bias,
-                "PositionEncEmb": pos_emb,
-                "EmbWeight": linear_weight
-            }
-
-            attrs = {
-                "topk": topk,
-                "topp": topp,
-                "max_len": max_out_len,
-                "n_head": head_num,
-                "size_per_head": size_per_head,
-                "num_layer": num_layer,
-                "bos_id": bos_id,
-                "eos_id": eos_id,
-                "temperature": temperature,
-                "use_fp16": use_fp16_decoding,
-                "tensor_para_size": tensor_para_size,
-                "layer_para_size": layer_para_size,
-                "layer_para_batch_size": layer_para_batch_size
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_gpt",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-            else:
-                helper = LayerHelper('fusion_gpt', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                outputs = {'OutputIds': output_ids}
-
-                helper.append_op(type='fusion_gpt',
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-    else:
-        helper = LayerHelper('fusion_gpt', **locals())
-
-        inputs = {
-            "Input": input,
-            "AttentionMask": attn_mask,
-            "StartLength": mem_seq_len,
-            "WordEmbedding": word_emb,
-            "SelfLayernormWeight@VECTOR": slf_ln_weight,
-            "SelfLayernormBias@VECTOR": slf_ln_bias,
-            "SelfQueryWeight@VECTOR": slf_q_weight,
-            "SelfQueryBias@VECTOR": slf_q_bias,
-            "SelfKeyWeight@VECTOR": slf_k_weight,
-            "SelfKeyBias@VECTOR": slf_k_bias,
-            "SelfValueWeight@VECTOR": slf_v_weight,
-            "SelfValueBias@VECTOR": slf_v_bias,
-            "SelfOutWeight@VECTOR": slf_out_weight,
-            "SelfOutBias@VECTOR": slf_out_bias,
-            "FFNLayernormWeight@VECTOR": ffn_ln_weight,
-            "FFNLayernormBias@VECTOR": ffn_ln_bias,
-            "FFNInterWeight@VECTOR": ffn_inter_weight,
-            "FFNInterBias@VECTOR": ffn_inter_bias,
-            "FFNOutWeight@VECTOR": ffn_out_weight,
-            "FFNOutBias@VECTOR": ffn_out_bias,
-            "DecoderLayernormWeight": decoder_ln_weight,
-            "DecoderLayernormBias": decoder_ln_bias,
-            "PositionEncEmb": pos_emb,
-            "EmbWeight": linear_weight
-        }
-
-        attrs = {
-            "topk": topk,
-            "topp": topp,
-            "max_len": max_out_len,
-            "n_head": head_num,
-            "size_per_head": size_per_head,
-            "num_layer": num_layer,
-            "bos_id": bos_id,
-            "eos_id": eos_id,
-            "temperature": temperature,
-            "use_fp16": use_fp16_decoding,
-            "tensor_para_size": tensor_para_size,
-            "layer_para_size": layer_para_size,
-            "layer_para_batch_size": layer_para_batch_size
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        outputs = {'OutputIds': output_ids}
-
-        helper.append_op(type='fusion_gpt',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids
+    return run_custom("fusion_gpt", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def infer_unified_decoding(
@@ -670,244 +320,56 @@ def infer_unified_decoding(
     layer_para_size = get_ft_para_conf().layer_para_size
     layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
 
-    if paddle.__version__ == "0.0.0":
+    inputs_names = [
+        "InputIds", "AttnMask", "MemSeqLen", "TypeIds", "DecTypeIds",
+        "LogitsMask", "WordEmbedding", "SelfLayernormWeight@VECTOR",
+        "SelfLayernormBias@VECTOR", "SelfQueryWeight@VECTOR",
+        "SelfQueryBias@VECTOR", "SelfKeyWeight@VECTOR", "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR", "SelfValueBias@VECTOR",
+        "SelfOutWeight@VECTOR", "SelfOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR", "FFNLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR", "FFNInterBias@VECTOR", "FFNOutWeight@VECTOR",
+        "FFNOutBias@VECTOR", "DecoderLayernormWeight", "DecoderLayernormBias",
+        "TransWeight", "TransBias", "LMLayernormWeight", "LMLayernormBias",
+        "EmbWeight", "EmbBias", "PositionEncEmb", "TypeEmb", "RoleIds",
+        "DecRoleIds", "RoleEmbedding", "PositionIds", "DecPositionIds"
+    ]
 
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_var = [
+        input_ids, attn_mask, memory_seq_lens, type_id, decoder_type_id,
+        logits_mask, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
+        slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias,
+        slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
+        ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
+        decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
+        lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb, type_emb,
+        role_id, decoder_role_id, role_emb, position_id, decoder_position_id
+    ]
 
-            inputs = [
-                input_ids, attn_mask, memory_seq_lens, type_id, decoder_type_id,
-                logits_mask, word_emb, slf_ln_weight, slf_ln_bias, slf_q_weight,
-                slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight, slf_v_bias,
-                slf_out_weight, slf_out_bias, ffn_ln_weight, ffn_ln_bias,
-                ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
-                decoder_ln_weight, decoder_ln_bias, trans_weight, trans_bias,
-                lm_ln_weight, lm_ln_bias, linear_weight, linear_bias, pos_emb,
-                type_emb, role_id, decoder_role_id, role_emb, position_id,
-                decoder_position_id
-            ]
+    attrs_names = [
+        "decoding_strategy", "beam_size", "topk", "topp", "n_head",
+        "size_per_head", "num_layer", "bos_id", "eos_id", "max_len",
+        "beam_search_diversity_rate", "unk_id", "mask_id", "temperature",
+        "len_penalty", "normalize_before", "pos_bias", "hidden_act", "rel_len",
+        "early_stopping", "min_length", "tensor_para_size", "layer_para_size",
+        "layer_para_batch_size"
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _unk_id, _mask_id, _temperature, _len_penalty,
-                _normalize_before, _pos_bias, _hidden_act, _rel_len,
-                _early_stopping, _min_length, tensor_para_size, layer_para_size,
-                layer_para_batch_size
-            ]
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk,
+        float(_topp), _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
+        _max_out_len, _diversity_rate, _unk_id, _mask_id, _temperature,
+        _len_penalty, _normalize_before, _pos_bias, _hidden_act, _rel_len,
+        _early_stopping, _min_length, tensor_para_size, layer_para_size,
+        layer_para_batch_size
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength', "OutputScores"]
 
-            output_ids = core.eager.Tensor()
-            parent_ids = core.eager.Tensor()
-            sequence_length = core.eager.Tensor()
-            output_scores = core.eager.Tensor()
+    outputs_dtype = ["int32", "int32", "int32", "float32"]
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(parent_ids)
-            ctx.add_outputs(sequence_length)
-            ctx.add_outputs(output_scores)
-
-            core.eager._run_custom_op(ctx, "fusion_unified_decoding", True)
-
-        else:
-            inputs = {
-                "InputIds": input_ids,
-                "AttnMask": attn_mask,
-                "MemSeqLen": memory_seq_lens,
-                "TypeIds": type_id,
-                "DecTypeIds": decoder_type_id,
-                "LogitsMask": logits_mask,
-                "WordEmbedding": word_emb,
-                "SelfLayernormWeight@VECTOR": slf_ln_weight,
-                "SelfLayernormBias@VECTOR": slf_ln_bias,
-                "SelfQueryWeight@VECTOR": slf_q_weight,
-                "SelfQueryBias@VECTOR": slf_q_bias,
-                "SelfKeyWeight@VECTOR": slf_k_weight,
-                "SelfKeyBias@VECTOR": slf_k_bias,
-                "SelfValueWeight@VECTOR": slf_v_weight,
-                "SelfValueBias@VECTOR": slf_v_bias,
-                "SelfOutWeight@VECTOR": slf_out_weight,
-                "SelfOutBias@VECTOR": slf_out_bias,
-                "FFNLayernormWeight@VECTOR": ffn_ln_weight,
-                "FFNLayernormBias@VECTOR": ffn_ln_bias,
-                "FFNInterWeight@VECTOR": ffn_inter_weight,
-                "FFNInterBias@VECTOR": ffn_inter_bias,
-                "FFNOutWeight@VECTOR": ffn_out_weight,
-                "FFNOutBias@VECTOR": ffn_out_bias,
-                "DecoderLayernormWeight": decoder_ln_weight,
-                "DecoderLayernormBias": decoder_ln_bias,
-                "TransWeight": trans_weight,
-                "TransBias": trans_bias,
-                "LMLayernormWeight": lm_ln_weight,
-                "LMLayernormBias": lm_ln_bias,
-                "EmbWeight": linear_weight,
-                "EmbBias": linear_bias,
-                "PositionEncEmb": pos_emb,
-                "TypeEmb": type_emb,
-                "RoleIds": role_id,
-                "DecRoleIds": decoder_role_id,
-                "RoleEmbedding": role_emb,
-                "PositionIds": position_id,
-                "DecPositionIds": decoder_position_id
-            }
-
-            attrs = {
-                "decoding_strategy": _decoding_strategy,
-                "beam_size": _beam_size,
-                "topk": _topk,
-                "topp": _topp,
-                "n_head": _n_head,
-                "size_per_head": _size_per_head,
-                "num_layer": _n_layer,
-                "bos_id": _bos_id,
-                "eos_id": _eos_id,
-                "max_len": _max_out_len,
-                "beam_search_diversity_rate": _diversity_rate,
-                "unk_id": _unk_id,
-                "mask_id": _mask_id,
-                "temperature": _temperature,
-                "len_penalty": _len_penalty,
-                "normalize_before": _normalize_before,
-                "pos_bias": _pos_bias,
-                "hidden_act": _hidden_act,
-                "rel_len": _rel_len,
-                "early_stopping": _early_stopping,
-                "min_length": _min_length,
-                "tensor_para_size": tensor_para_size,
-                "layer_para_size": layer_para_size,
-                "layer_para_batch_size": layer_para_batch_size
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-                parent_ids = core.VarBase()
-                sequence_length = core.VarBase()
-                output_scores = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length,
-                    "OutputScores": output_scores
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_unified_decoding",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-
-            else:
-                helper = LayerHelper('fusion_unified_decoding', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                parent_ids = helper.create_variable(dtype="int32")
-                sequence_length = helper.create_variable(dtype="int32")
-                output_scores = helper.create_variable(dtype="float32")
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length,
-                    "OutputScores": output_scores
-                }
-
-                helper.append_op(type='fusion_unified_decoding',
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-    else:
-        helper = LayerHelper('fusion_unified_decoding', **locals())
-
-        inputs = {
-            "InputIds": input_ids,
-            "AttnMask": attn_mask,
-            "MemSeqLen": memory_seq_lens,
-            "TypeIds": type_id,
-            "DecTypeIds": decoder_type_id,
-            "LogitsMask": logits_mask,
-            "WordEmbedding": word_emb,
-            "SelfLayernormWeight@VECTOR": slf_ln_weight,
-            "SelfLayernormBias@VECTOR": slf_ln_bias,
-            "SelfQueryWeight@VECTOR": slf_q_weight,
-            "SelfQueryBias@VECTOR": slf_q_bias,
-            "SelfKeyWeight@VECTOR": slf_k_weight,
-            "SelfKeyBias@VECTOR": slf_k_bias,
-            "SelfValueWeight@VECTOR": slf_v_weight,
-            "SelfValueBias@VECTOR": slf_v_bias,
-            "SelfOutWeight@VECTOR": slf_out_weight,
-            "SelfOutBias@VECTOR": slf_out_bias,
-            "FFNLayernormWeight@VECTOR": ffn_ln_weight,
-            "FFNLayernormBias@VECTOR": ffn_ln_bias,
-            "FFNInterWeight@VECTOR": ffn_inter_weight,
-            "FFNInterBias@VECTOR": ffn_inter_bias,
-            "FFNOutWeight@VECTOR": ffn_out_weight,
-            "FFNOutBias@VECTOR": ffn_out_bias,
-            "DecoderLayernormWeight": decoder_ln_weight,
-            "DecoderLayernormBias": decoder_ln_bias,
-            "TransWeight": trans_weight,
-            "TransBias": trans_bias,
-            "LMLayernormWeight": lm_ln_weight,
-            "LMLayernormBias": lm_ln_bias,
-            "EmbWeight": linear_weight,
-            "EmbBias": linear_bias,
-            "PositionEncEmb": pos_emb,
-            "TypeEmb": type_emb,
-            "RoleIds": role_id,
-            "DecRoleIds": decoder_role_id,
-            "RoleEmbedding": role_emb,
-            "PositionIds": position_id,
-            "DecPositionIds": decoder_position_id
-        }
-
-        attrs = {
-            "decoding_strategy": _decoding_strategy,
-            "beam_size": _beam_size,
-            "topk": _topk,
-            "topp": _topp,
-            "n_head": _n_head,
-            "size_per_head": _size_per_head,
-            "num_layer": _n_layer,
-            "bos_id": _bos_id,
-            "eos_id": _eos_id,
-            "max_len": _max_out_len,
-            "beam_search_diversity_rate": _diversity_rate,
-            "unk_id": _unk_id,
-            "mask_id": _mask_id,
-            "temperature": _temperature,
-            "len_penalty": _len_penalty,
-            "normalize_before": _normalize_before,
-            "pos_bias": _pos_bias,
-            "hidden_act": _hidden_act,
-            "rel_len": _rel_len,
-            "early_stopping": _early_stopping,
-            "min_length": _min_length,
-            "tensor_para_size": tensor_para_size,
-            "layer_para_size": layer_para_size,
-            "layer_para_batch_size": layer_para_batch_size
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        parent_ids = helper.create_variable(dtype="int32")
-        sequence_length = helper.create_variable(dtype="int32")
-        output_scores = helper.create_variable(dtype="float32")
-
-        outputs = {
-            'OutputIds': output_ids,
-            'ParentIds': parent_ids,
-            'SequenceLength': sequence_length,
-            "OutputScores": output_scores
-        }
-
-        helper.append_op(type='fusion_unified_decoding',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids, parent_ids, sequence_length, output_scores
+    return run_custom("fusion_unified_decoding", inputs_names, inputs_var,
+                      attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
 def infer_bart_decoding(
@@ -923,204 +385,52 @@ def infer_bart_decoding(
         _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
         _alpha, _early_stopping):
 
-    if paddle.__version__ == "0.0.0":
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
+    inputs_names = [
+        'Input', 'MemSeqLen', 'WordEmbedding', 'SelfLayernormWeight@VECTOR',
+        'SelfLayernormBias@VECTOR', 'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR', 'SelfKeyWeight@VECTOR', 'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR', 'SelfValueBias@VECTOR',
+        'SelfOutWeight@VECTOR', 'SelfOutBias@VECTOR',
+        'CrossLayernormWeight@VECTOR', 'CrossLayernormBias@VECTOR',
+        'CrossQueryWeight@VECTOR', 'CrossQueryBias@VECTOR',
+        'CrossKeyWeight@VECTOR', 'CrossKeyBias@VECTOR',
+        'CrossValueWeight@VECTOR', 'CrossValueBias@VECTOR',
+        'CrossOutWeight@VECTOR', 'CrossOutBias@VECTOR',
+        'FFNLayernormWeight@VECTOR', 'FFNLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR', 'FFNInterBias@VECTOR', 'FFNOutWeight@VECTOR',
+        'FFNOutBias@VECTOR', 'DecoderLayernormWeight', 'DecoderLayernormBias',
+        'EmbWeight', 'EmbBias', 'PositionEncEmb'
+    ]
 
-            inputs = [
-                enc_output, memory_seq_lens, word_emb, slf_ln_weight,
-                slf_ln_bias, slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias,
-                slf_v_weight, slf_v_bias, slf_out_weight, slf_out_bias,
-                cross_ln_weight, cross_ln_bias, cross_q_weight, cross_q_bias,
-                cross_k_weight, cross_k_bias, cross_v_weight, cross_v_bias,
-                cross_out_weight, cross_out_bias, ffn_ln_weight, ffn_ln_bias,
-                ffn_inter_weight, ffn_inter_bias, ffn_out_weight, ffn_out_bias,
-                decoder_ln_weight, decoder_ln_bias, linear_weight, linear_bias,
-                pos_emb
-            ]
+    inputs_var = [
+        enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, linear_weight, linear_bias, pos_emb
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _rel_len, _alpha, _early_stopping
-            ]
+    attrs_names = [
+        'decoding_strategy', 'beam_size', 'topk', 'topp', 'n_head',
+        'size_per_head', 'num_layer', 'bos_id', 'eos_id', 'max_len',
+        'beam_search_diversity_rate', "rel_len", "alpha", "early_stopping"
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _diversity_rate, _rel_len,
+        _alpha, _early_stopping
+    ]
 
-            output_ids = core.eager.Tensor()
-            parent_ids = core.eager.Tensor()
-            sequence_length = core.eager.Tensor()
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength']
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(parent_ids)
-            ctx.add_outputs(sequence_length)
+    outputs_dtype = ["int32"] * len(outputs_names)
 
-            core.eager._run_custom_op(ctx, "fusion_bart_decoding", True)
-
-        else:
-            inputs = {
-                'Input': enc_output,
-                'MemSeqLen': memory_seq_lens,
-                'WordEmbedding': word_emb,
-                'SelfLayernormWeight@VECTOR': slf_ln_weight,
-                'SelfLayernormBias@VECTOR': slf_ln_bias,
-                'SelfQueryWeight@VECTOR': slf_q_weight,
-                'SelfQueryBias@VECTOR': slf_q_bias,
-                'SelfKeyWeight@VECTOR': slf_k_weight,
-                'SelfKeyBias@VECTOR': slf_k_bias,
-                'SelfValueWeight@VECTOR': slf_v_weight,
-                'SelfValueBias@VECTOR': slf_v_bias,
-                'SelfOutWeight@VECTOR': slf_out_weight,
-                'SelfOutBias@VECTOR': slf_out_bias,
-                'CrossLayernormWeight@VECTOR': cross_ln_weight,
-                'CrossLayernormBias@VECTOR': cross_ln_bias,
-                'CrossQueryWeight@VECTOR': cross_q_weight,
-                'CrossQueryBias@VECTOR': cross_q_bias,
-                'CrossKeyWeight@VECTOR': cross_k_weight,
-                'CrossKeyBias@VECTOR': cross_k_bias,
-                'CrossValueWeight@VECTOR': cross_v_weight,
-                'CrossValueBias@VECTOR': cross_v_bias,
-                'CrossOutWeight@VECTOR': cross_out_weight,
-                'CrossOutBias@VECTOR': cross_out_bias,
-                'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-                'FFNLayernormBias@VECTOR': ffn_ln_bias,
-                'FFNInterWeight@VECTOR': ffn_inter_weight,
-                'FFNInterBias@VECTOR': ffn_inter_bias,
-                'FFNOutWeight@VECTOR': ffn_out_weight,
-                'FFNOutBias@VECTOR': ffn_out_bias,
-                'DecoderLayernormWeight': decoder_ln_weight,
-                'DecoderLayernormBias': decoder_ln_bias,
-                'EmbWeight': linear_weight,
-                'EmbBias': linear_bias,
-                'PositionEncEmb': pos_emb
-            }
-
-            attrs = {
-                'decoding_strategy': _decoding_strategy,
-                'beam_size': _beam_size,
-                'topk': _topk,
-                'topp': _topp,
-                'n_head': _n_head,
-                'size_per_head': _size_per_head,
-                'num_layer': _n_layer,
-                'bos_id': _bos_id,
-                'eos_id': _eos_id,
-                'max_len': _max_out_len,
-                'beam_search_diversity_rate': _diversity_rate,
-                "rel_len": _rel_len,
-                "alpha": _alpha,
-                "early_stopping": _early_stopping
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-                parent_ids = core.VarBase()
-                sequence_length = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_bart_decoding",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-            else:
-                helper = LayerHelper('fusion_bart_decoding', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                parent_ids = helper.create_variable(dtype="int32")
-                sequence_length = helper.create_variable(dtype="int32")
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                helper.append_op(type='fusion_bart_decoding',
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-
-    else:
-        helper = LayerHelper('fusion_bart_decoding', **locals())
-
-        inputs = {
-            'Input': enc_output,
-            'MemSeqLen': memory_seq_lens,
-            'WordEmbedding': word_emb,
-            'SelfLayernormWeight@VECTOR': slf_ln_weight,
-            'SelfLayernormBias@VECTOR': slf_ln_bias,
-            'SelfQueryWeight@VECTOR': slf_q_weight,
-            'SelfQueryBias@VECTOR': slf_q_bias,
-            'SelfKeyWeight@VECTOR': slf_k_weight,
-            'SelfKeyBias@VECTOR': slf_k_bias,
-            'SelfValueWeight@VECTOR': slf_v_weight,
-            'SelfValueBias@VECTOR': slf_v_bias,
-            'SelfOutWeight@VECTOR': slf_out_weight,
-            'SelfOutBias@VECTOR': slf_out_bias,
-            'CrossLayernormWeight@VECTOR': cross_ln_weight,
-            'CrossLayernormBias@VECTOR': cross_ln_bias,
-            'CrossQueryWeight@VECTOR': cross_q_weight,
-            'CrossQueryBias@VECTOR': cross_q_bias,
-            'CrossKeyWeight@VECTOR': cross_k_weight,
-            'CrossKeyBias@VECTOR': cross_k_bias,
-            'CrossValueWeight@VECTOR': cross_v_weight,
-            'CrossValueBias@VECTOR': cross_v_bias,
-            'CrossOutWeight@VECTOR': cross_out_weight,
-            'CrossOutBias@VECTOR': cross_out_bias,
-            'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-            'FFNLayernormBias@VECTOR': ffn_ln_bias,
-            'FFNInterWeight@VECTOR': ffn_inter_weight,
-            'FFNInterBias@VECTOR': ffn_inter_bias,
-            'FFNOutWeight@VECTOR': ffn_out_weight,
-            'FFNOutBias@VECTOR': ffn_out_bias,
-            'DecoderLayernormWeight': decoder_ln_weight,
-            'DecoderLayernormBias': decoder_ln_bias,
-            'EmbWeight': linear_weight,
-            'EmbBias': linear_bias,
-            'PositionEncEmb': pos_emb
-        }
-
-        attrs = {
-            'decoding_strategy': _decoding_strategy,
-            'beam_size': _beam_size,
-            'topk': _topk,
-            'topp': _topp,
-            'n_head': _n_head,
-            'size_per_head': _size_per_head,
-            'num_layer': _n_layer,
-            'bos_id': _bos_id,
-            'eos_id': _eos_id,
-            'max_len': _max_out_len,
-            'beam_search_diversity_rate': _diversity_rate,
-            "rel_len": _rel_len,
-            "alpha": _alpha,
-            "early_stopping": _early_stopping
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        parent_ids = helper.create_variable(dtype="int32")
-        sequence_length = helper.create_variable(dtype="int32")
-
-        outputs = {
-            'OutputIds': output_ids,
-            'ParentIds': parent_ids,
-            'SequenceLength': sequence_length
-        }
-
-        helper.append_op(type='fusion_bart_decoding',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids, parent_ids, sequence_length
+    return run_custom("fusion_bart_decoding", inputs_names, inputs_var,
+                      attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
 def infer_mbart_decoding(
@@ -1136,250 +446,110 @@ def infer_mbart_decoding(
         _topp, _n_head, _size_per_head, _n_layer, _bos_id, _eos_id,
         _max_out_len, _diversity_rate, _rel_len, _alpha, _temperature,
         _early_stopping, _hidden_act):
-    if paddle.__version__ == "0.0.0":
-        if in_dygraph_mode():
-            ctx = core.CustomOpKernelContext()
 
-            inputs = [
-                enc_output,
-                memory_seq_lens,
-                word_emb,
-                slf_ln_weight,
-                slf_ln_bias,
-                slf_q_weight,
-                slf_q_bias,
-                slf_k_weight,
-                slf_k_bias,
-                slf_v_weight,
-                slf_v_bias,
-                slf_out_weight,
-                slf_out_bias,
-                cross_ln_weight,
-                cross_ln_bias,
-                cross_q_weight,
-                cross_q_bias,
-                cross_k_weight,
-                cross_k_bias,
-                cross_v_weight,
-                cross_v_bias,
-                cross_out_weight,
-                cross_out_bias,
-                ffn_ln_weight,
-                ffn_ln_bias,
-                ffn_inter_weight,
-                ffn_inter_bias,
-                ffn_out_weight,
-                ffn_out_bias,
-                decoder_ln_weight,
-                decoder_ln_bias,
-                mbart_ln_weight,
-                mbart_ln_bias,
-                linear_weight,
-                linear_bias,
-                pos_emb,
-                # The input of custom op must be given.
-                # Dispensable() and Intermediate() are not supported.
-                trg_word
-            ]
+    inputs_names = [
+        'Input',
+        'MemSeqLen',
+        'WordEmbedding',
+        'SelfLayernormWeight@VECTOR',
+        'SelfLayernormBias@VECTOR',
+        'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR',
+        'SelfKeyWeight@VECTOR',
+        'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR',
+        'SelfValueBias@VECTOR',
+        'SelfOutWeight@VECTOR',
+        'SelfOutBias@VECTOR',
+        'CrossLayernormWeight@VECTOR',
+        'CrossLayernormBias@VECTOR',
+        'CrossQueryWeight@VECTOR',
+        'CrossQueryBias@VECTOR',
+        'CrossKeyWeight@VECTOR',
+        'CrossKeyBias@VECTOR',
+        'CrossValueWeight@VECTOR',
+        'CrossValueBias@VECTOR',
+        'CrossOutWeight@VECTOR',
+        'CrossOutBias@VECTOR',
+        'FFNLayernormWeight@VECTOR',
+        'FFNLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR',
+        'FFNInterBias@VECTOR',
+        'FFNOutWeight@VECTOR',
+        'FFNOutBias@VECTOR',
+        'DecoderLayernormWeight',
+        'DecoderLayernormBias',
+        'MBARTLayernormWeight',
+        'MBARTLayernormBias',
+        'EmbWeight',
+        'EmbBias',
+        'PositionEncEmb',
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        'TrgWord'
+    ]
 
-            attrs = [
-                _decoding_strategy, _beam_size, _topk, _topp, _n_head,
-                _size_per_head, _n_layer, _bos_id, _eos_id, _max_out_len,
-                _diversity_rate, _rel_len, _alpha, _temperature,
-                _early_stopping, _hidden_act
-            ]
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        mbart_ln_weight,
+        mbart_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        trg_word
+    ]
 
-            for ins in inputs:
-                ctx.add_inputs(ins)
-            for ats in attrs:
-                ctx.add_attr(ats)
+    attrs_names = [
+        'decoding_strategy', 'beam_size', 'topk', 'topp', 'n_head',
+        'size_per_head', 'num_layer', 'bos_id', 'eos_id', 'temperature',
+        'max_len', 'beam_search_diversity_rate', "rel_len", "alpha",
+        "early_stopping", "hidden_act"
+    ]
 
-            output_ids = core.eager.Tensor()
-            parent_ids = core.eager.Tensor()
-            sequence_length = core.eager.Tensor()
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _temperature, _max_out_len, _diversity_rate,
+        _rel_len, _alpha, _early_stopping, _hidden_act
+    ]
 
-            ctx.add_outputs(output_ids)
-            ctx.add_outputs(parent_ids)
-            ctx.add_outputs(sequence_length)
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength']
 
-            core.eager._run_custom_op(ctx, "fusion_mbart_decoding", True)
+    outputs_dtype = ["int32"] * len(outputs_names)
 
-        else:
-            inputs = {
-                'Input': enc_output,
-                'MemSeqLen': memory_seq_lens,
-                'WordEmbedding': word_emb,
-                'SelfLayernormWeight@VECTOR': slf_ln_weight,
-                'SelfLayernormBias@VECTOR': slf_ln_bias,
-                'SelfQueryWeight@VECTOR': slf_q_weight,
-                'SelfQueryBias@VECTOR': slf_q_bias,
-                'SelfKeyWeight@VECTOR': slf_k_weight,
-                'SelfKeyBias@VECTOR': slf_k_bias,
-                'SelfValueWeight@VECTOR': slf_v_weight,
-                'SelfValueBias@VECTOR': slf_v_bias,
-                'SelfOutWeight@VECTOR': slf_out_weight,
-                'SelfOutBias@VECTOR': slf_out_bias,
-                'CrossLayernormWeight@VECTOR': cross_ln_weight,
-                'CrossLayernormBias@VECTOR': cross_ln_bias,
-                'CrossQueryWeight@VECTOR': cross_q_weight,
-                'CrossQueryBias@VECTOR': cross_q_bias,
-                'CrossKeyWeight@VECTOR': cross_k_weight,
-                'CrossKeyBias@VECTOR': cross_k_bias,
-                'CrossValueWeight@VECTOR': cross_v_weight,
-                'CrossValueBias@VECTOR': cross_v_bias,
-                'CrossOutWeight@VECTOR': cross_out_weight,
-                'CrossOutBias@VECTOR': cross_out_bias,
-                'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-                'FFNLayernormBias@VECTOR': ffn_ln_bias,
-                'FFNInterWeight@VECTOR': ffn_inter_weight,
-                'FFNInterBias@VECTOR': ffn_inter_bias,
-                'FFNOutWeight@VECTOR': ffn_out_weight,
-                'FFNOutBias@VECTOR': ffn_out_bias,
-                'DecoderLayernormWeight': decoder_ln_weight,
-                'DecoderLayernormBias': decoder_ln_bias,
-                'MBARTLayernormWeight': mbart_ln_weight,
-                'MBARTLayernormBias': mbart_ln_bias,
-                'EmbWeight': linear_weight,
-                'EmbBias': linear_bias,
-                'PositionEncEmb': pos_emb,
-                # The input of custom op must be given.
-                # Dispensable() and Intermediate() are not supported.
-                'TrgWord': trg_word
-            }
-
-            attrs = {
-                'decoding_strategy': _decoding_strategy,
-                'beam_size': _beam_size,
-                'topk': _topk,
-                'topp': _topp,
-                'n_head': _n_head,
-                'size_per_head': _size_per_head,
-                'num_layer': _n_layer,
-                'bos_id': _bos_id,
-                'eos_id': _eos_id,
-                'max_len': _max_out_len,
-                'beam_search_diversity_rate': _diversity_rate,
-                "rel_len": _rel_len,
-                "alpha": _alpha,
-                "temperature": _temperature,
-                "early_stopping": _early_stopping,
-                "hidden_act": _hidden_act
-            }
-
-            if _in_legacy_dygraph():
-                output_ids = core.VarBase()
-                parent_ids = core.VarBase()
-                sequence_length = core.VarBase()
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                _dygraph_tracer().trace_op(type="fusion_mbart_decoding",
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           attrs=attrs)
-
-            else:
-                helper = LayerHelper('fusion_mbart_decoding', **locals())
-
-                output_ids = helper.create_variable(dtype="int32")
-                parent_ids = helper.create_variable(dtype="int32")
-                sequence_length = helper.create_variable(dtype="int32")
-
-                outputs = {
-                    'OutputIds': output_ids,
-                    'ParentIds': parent_ids,
-                    'SequenceLength': sequence_length
-                }
-
-                helper.append_op(type='fusion_mbart_decoding',
-                                 inputs=inputs,
-                                 outputs=outputs,
-                                 attrs=attrs)
-
-    else:
-        helper = LayerHelper('fusion_mbart_decoding', **locals())
-
-        inputs = {
-            'Input': enc_output,
-            'MemSeqLen': memory_seq_lens,
-            'WordEmbedding': word_emb,
-            'SelfLayernormWeight@VECTOR': slf_ln_weight,
-            'SelfLayernormBias@VECTOR': slf_ln_bias,
-            'SelfQueryWeight@VECTOR': slf_q_weight,
-            'SelfQueryBias@VECTOR': slf_q_bias,
-            'SelfKeyWeight@VECTOR': slf_k_weight,
-            'SelfKeyBias@VECTOR': slf_k_bias,
-            'SelfValueWeight@VECTOR': slf_v_weight,
-            'SelfValueBias@VECTOR': slf_v_bias,
-            'SelfOutWeight@VECTOR': slf_out_weight,
-            'SelfOutBias@VECTOR': slf_out_bias,
-            'CrossLayernormWeight@VECTOR': cross_ln_weight,
-            'CrossLayernormBias@VECTOR': cross_ln_bias,
-            'CrossQueryWeight@VECTOR': cross_q_weight,
-            'CrossQueryBias@VECTOR': cross_q_bias,
-            'CrossKeyWeight@VECTOR': cross_k_weight,
-            'CrossKeyBias@VECTOR': cross_k_bias,
-            'CrossValueWeight@VECTOR': cross_v_weight,
-            'CrossValueBias@VECTOR': cross_v_bias,
-            'CrossOutWeight@VECTOR': cross_out_weight,
-            'CrossOutBias@VECTOR': cross_out_bias,
-            'FFNLayernormWeight@VECTOR': ffn_ln_weight,
-            'FFNLayernormBias@VECTOR': ffn_ln_bias,
-            'FFNInterWeight@VECTOR': ffn_inter_weight,
-            'FFNInterBias@VECTOR': ffn_inter_bias,
-            'FFNOutWeight@VECTOR': ffn_out_weight,
-            'FFNOutBias@VECTOR': ffn_out_bias,
-            'DecoderLayernormWeight': decoder_ln_weight,
-            'DecoderLayernormBias': decoder_ln_bias,
-            'MBARTLayernormWeight': mbart_ln_weight,
-            'MBARTLayernormBias': mbart_ln_bias,
-            'EmbWeight': linear_weight,
-            'EmbBias': linear_bias,
-            'PositionEncEmb': pos_emb,
-            # The input of custom op must be given.
-            # Dispensable() and Intermediate() are not supported.
-            'TrgWord': trg_word
-        }
-
-        attrs = {
-            'decoding_strategy': _decoding_strategy,
-            'beam_size': _beam_size,
-            'topk': _topk,
-            'topp': _topp,
-            'n_head': _n_head,
-            'size_per_head': _size_per_head,
-            'num_layer': _n_layer,
-            'bos_id': _bos_id,
-            'eos_id': _eos_id,
-            'max_len': _max_out_len,
-            'beam_search_diversity_rate': _diversity_rate,
-            "rel_len": _rel_len,
-            "alpha": _alpha,
-            "temperature": _temperature,
-            "early_stopping": _early_stopping,
-            "hidden_act": _hidden_act
-        }
-
-        output_ids = helper.create_variable(dtype="int32")
-        parent_ids = helper.create_variable(dtype="int32")
-        sequence_length = helper.create_variable(dtype="int32")
-
-        outputs = {
-            'OutputIds': output_ids,
-            'ParentIds': parent_ids,
-            'SequenceLength': sequence_length
-        }
-
-        helper.append_op(type='fusion_mbart_decoding',
-                         inputs=inputs,
-                         outputs=outputs,
-                         attrs=attrs)
-
-    return output_ids, parent_ids, sequence_length
+    return run_custom("fusion_mbart_decoding", inputs_names, inputs_var,
+                      attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
 def finalize(beam_size,
@@ -2358,12 +1528,16 @@ class InferGptDecoding(nn.Layer):
             batch_size = paddle.shape(input_ids)[0]
             attention_mask = paddle.tril(
                 paddle.ones(
-                    [batch_size, mem_seq_len, mem_seq_len],
+                    [
+                        batch_size,
+                        paddle.max(mem_seq_len),
+                        paddle.max(mem_seq_len)
+                    ],
                     dtype="float16" if self.use_fp16_decoding else "float32"))
         elif self.use_fp16_decoding and attention_mask.dtype == paddle.float32:
             attention_mask = paddle.cast(attention_mask, dtype="float16")
 
-        output_ids = infer_gpt_decoding(
+        output_ids, = infer_gpt_decoding(
             input=[input_ids],
             attn_mask=[attention_mask],
             mem_seq_len=[mem_seq_len],
@@ -2514,13 +1688,13 @@ class InferUnifiedDecoding(nn.Layer):
         if decoding_strategy == "greedy_search":
             decoding_strategy = "topk_sampling"
             topk = 1
-            topp = 0
+            topp = 0.0
         elif decoding_strategy in [
                 "sampling", "topk_sampling", "topp_sampling"
         ]:
             if topp == 1 and topk > 0:
                 decoding_strategy = "topk_sampling"
-                topp = 0
+                topp = 0.0
             elif topp > 0 and topk == 0:
                 decoding_strategy = "topp_sampling"
             else:
