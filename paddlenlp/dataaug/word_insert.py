@@ -22,6 +22,8 @@ import paddle
 from ..transformers import AutoModelForMaskedLM, AutoTokenizer
 from .base_augment import BaseAugment
 
+__all__ = ['WordInsert']
+
 
 class WordInsert(BaseAugment):
     """
