@@ -46,7 +46,7 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 **BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../docs/imgs/bart_perf.png" width="800" height ="400" />
+  <img src="https://user-images.githubusercontent.com/10242208/183384011-0df9a81e-72ac-429e-88da-166d48128b67.png" width="800" height ="400" />
 </p>
 
 **GPT** (gpt2, batch_size=4, max_length=32)
