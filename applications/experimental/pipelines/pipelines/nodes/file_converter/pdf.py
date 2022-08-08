@@ -50,21 +50,6 @@ class PDFToTextConverter(BaseConverter):
         self.set_config(remove_numeric_tables=remove_numeric_tables,
                         valid_languages=valid_languages)
 
-        verify_installation = subprocess.run(["pdftotext -v"], shell=True)
-        if verify_installation.returncode == 127:
-            raise Exception(
-                """pdftotext is not installed. It is part of xpdf or poppler-utils software suite.
-                
-                   Installation on Linux:
-                   wget --no-check-certificate https://dl.xpdfreader.com/xpdf-tools-linux-4.03.tar.gz &&
-                   tar -xvf xpdf-tools-linux-4.03.tar.gz && sudo cp xpdf-tools-linux-4.03/bin64/pdftotext /usr/local/bin
-                   
-                   Installation on MacOS:
-                   brew install xpdf
-                   
-                   You can find more details here: https://www.xpdfreader.com
-                """)
-
         super().__init__(remove_numeric_tables=remove_numeric_tables,
                          valid_languages=valid_languages)
 

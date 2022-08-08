@@ -413,6 +413,16 @@ void BindNormalizers(pybind11::module* m) {
                                  normalizers::PrecompiledNormalizer>())) {
                 normalizer_ptr =
                     py_normalizer.cast<normalizers::PrecompiledNormalizer*>();
+              } else {
+                throw py::value_error(
+                    "Type of normalizers should be one of "
+                    "`LowercaseNormalizer`,"
+                    " `BertNormalizer`, `NFCNormalizer`, `NFKCNormalizer`, "
+                    "`NFDNormalizer`,"
+                    " `NFKDNormalizer`, `NmtNormalizer`, `ReplaceNormalizer`, "
+                    "`SequenceNormalizer`,"
+                    " `StripAccentsNormalizer`, `StripNormalizer`, "
+                    "`PrecompiledNormalizer`");
               }
               normalizers.push_back(normalizer_ptr);
             }
