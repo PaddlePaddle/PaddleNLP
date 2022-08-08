@@ -25,9 +25,6 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
-# TODO(wj-Mcat): to be removed later
-from paddlenlp.layers.crf import ViterbiDecoder
-
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -613,10 +610,9 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
             if attention_mask is not None:
                 seq_lens = paddle.sum(attention_mask, axis=1)
             else:
-                input_ids_shape = input_ids.shape
-                seq_lens = paddle.to_tensor([input_ids_shape[1]] *
-                                            input_ids_shape[0],
-                                            dtype=paddle.int64)
+                input_ids_shape = paddle.shape(input_ids)
+                seq_lens = paddle.ones(
+                    shape=[input_ids_shape[0]]) * input_ids_shape[1]
 
         if labels is not None:
             loss = self.crf_loss(emission, seq_lens, labels)

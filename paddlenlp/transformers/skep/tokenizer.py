@@ -486,8 +486,11 @@ class SkepTokenizer(PretrainedTokenizer):
                 he was a puppeteer
                 '''
         """
+        if self.use_bpe_encoder:
+            out_string = self.bpe_tokenizer.decode(tokens)
+        else:
+            out_string = " ".join(tokens).replace(" ##", "").strip()
 
-        out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
     def get_special_tokens_mask(self,

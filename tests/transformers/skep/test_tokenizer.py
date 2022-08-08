@@ -15,12 +15,22 @@
 
 import os
 import unittest
+import json
 
-from paddlenlp.transformers.skep.tokenizer import SkepTokenizer, BasicTokenizer, WordpieceTokenizer
+from paddlenlp.transformers.skep.tokenizer import SkepTokenizer, BasicTokenizer, WordpieceTokenizer, BpeEncoder
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
 from tests.testing_utils import slow
 from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+
+
+class BPETokenizerTest(unittest.TestCase):
+
+    def setUp(self):
+        self.tokenizer = BpeEncoder()
+
+    def test_simple_encode(self):
+        pass
 
 
 class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
@@ -29,6 +39,8 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
+
+    use_bpe_encoder = False
 
     def setUp(self):
         super().setUp()
@@ -50,10 +62,40 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "low",
             "lowest",
         ]
+        self.vocab_file, self.bpe_json_file, self.bpe_vocab_file = None, None, None
         self.vocab_file = os.path.join(
             self.tmpdirname, SkepTokenizer.resource_files_names["vocab_file"])
+
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
+
+        if self.use_bpe_encoder:
+            self.bpe_json_file = os.path.join(
+                self.tmpdirname,
+                SkepTokenizer.resource_files_names["bpe_json_file"])
+            with open(self.bpe_json_file, 'w', encoding='utf-8') as f:
+                json.dump(
+                    {token: index
+                     for index, token in enumerate(vocab_tokens)},
+                    f,
+                    ensure_ascii=False)
+
+            self.bpe_vocab_file = os.path.join(
+                self.tmpdirname,
+                SkepTokenizer.resource_files_names["bpe_vocab_file"])
+            merges = [
+                "#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r",
+                ""
+            ]
+            with open(self.bpe_vocab_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(merges))
+
+    def get_tokenizer(self, **kwargs):
+        return self.tokenizer_class(vocab_file=self.vocab_file,
+                                    bpe_vocab_file=self.bpe_vocab_file,
+                                    bpe_json_file=self.bpe_json_file,
+                                    use_bpe_encoder=self.use_bpe_encoder,
+                                    **kwargs)
 
     def get_input_output_texts(self, tokenizer):
         input_text = "UNwant\u00E9d,running"

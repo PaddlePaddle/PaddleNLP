@@ -60,8 +60,9 @@ class SkepTestModelConfig:
 
 
 @dataclass
-class SkepTestTrainConfig:
-    """train config under unittest code"""
+class SkepTestConfig(SkepTestModelConfig):
+    """all of Skep Test configuration
+    """
     batch_size: int = 2
     seq_length: int = 7
     is_training: bool = False
@@ -70,15 +71,6 @@ class SkepTestTrainConfig:
 
     # used for sequence classification
     num_classes: int = 3
-
-
-@dataclass
-class SkepTestConfig(SkepTestModelConfig, SkepTestTrainConfig):
-    """all of Skep Test configuration
-    
-    TODO(wj-Mcat): can be intialized with `from_pretrained` style, and it's fixed at current
-    """
-    pass
 
 
 class SkepModelTester:
@@ -177,17 +169,6 @@ class SkepModelTester:
         }
         return config, inputs_dict
 
-    # def _prepare_for_class(self, inputs_dict, model_class):
-    #     inputs_dict = copy.deepcopy(inputs_dict)
-    #     if model_class.__name__.endswith("ForMultipleChoice"):
-    #         inputs_dict = {
-    #             k: v.unsqueeze(1).expand(
-    #                 shape=[-1, self.model_tester.num_choices, -1])
-    #             if isinstance(v, paddle.Tensor) and v.ndim > 1 else v
-    #             for k, v in inputs_dict.items()
-    #         }
-    #     return inputs_dict
-
     def get_config(self) -> dict:
         """get the base model kwargs
 
@@ -236,6 +217,7 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
 
 class SkepModelIntegrationTest(unittest.TestCase):
 
+    @slow
     def test_inference_no_attention(self):
         model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
         model.eval()
@@ -253,6 +235,7 @@ class SkepModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
+    @slow
     def test_inference_with_attention(self):
         model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
         model.eval()
