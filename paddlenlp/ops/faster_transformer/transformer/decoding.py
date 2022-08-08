@@ -29,7 +29,7 @@ from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers.utils import fn_args_to_dict
 
-if paddle.__version__ == "0.0.0":
+if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
     from paddle.framework import core
 
 

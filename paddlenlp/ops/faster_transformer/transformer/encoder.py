@@ -23,7 +23,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
 
-if paddle.__version__ == "0.0.0":
+if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
     from paddle.framework import core
 
 from .decoding import run_custom
