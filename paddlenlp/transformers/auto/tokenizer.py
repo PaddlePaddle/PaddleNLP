@@ -37,6 +37,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ChineseBertTokenizer", "chinesebert"),
     ("ConvBertTokenizer", "convbert"),
     ("CTRLTokenizer", "ctrl"),
+    ("DalleBartTokenizer", "dallebart"),
     ("DistilBertTokenizer", "distilbert"),
     ("ElectraTokenizer", "electra"),
     ("ErnieCtmTokenizer", "ernie_ctm"),
