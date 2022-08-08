@@ -37,9 +37,9 @@ pretrained_init_configuration = {
         "type_vocab_size": 1,  # no use
         "initializer_range": 0.02,
         "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 10486,  # 102 + 16384
-        "bos_token_id": 10485,  # 101 + 16384
-        "eol_token_id": 10486,  # 102 + 16384
+        "eos_token_id": 16486,  # 102 + 16384
+        "bos_token_id": 16485,  # 101 + 16384
+        "eol_token_id": 16486,  # 102 + 16384
     },
     "pai-painter-painting-base-zh": {
         "vocab_size": 37512,
@@ -54,9 +54,9 @@ pretrained_init_configuration = {
         "type_vocab_size": 1,  # no use
         "initializer_range": 0.02,
         "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 10486,  # 102 + 16384
-        "bos_token_id": 10485,  # 101 + 16384
-        "eol_token_id": 10486,  # 102 + 16384
+        "eos_token_id": 16486,  # 102 + 16384
+        "bos_token_id": 16485,  # 101 + 16384
+        "eol_token_id": 16486,  # 102 + 16384
     },
     "pai-painter-scenery-base-zh": {
         "vocab_size": 37512,
@@ -71,9 +71,9 @@ pretrained_init_configuration = {
         "type_vocab_size": 1,  # no use
         "initializer_range": 0.02,
         "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 10486,  # 102 + 16384
-        "bos_token_id": 10485,  # 101 + 16384
-        "eol_token_id": 10486,  # 102 + 16384
+        "eos_token_id": 16486,  # 102 + 16384
+        "bos_token_id": 16485,  # 101 + 16384
+        "eol_token_id": 16486,  # 102 + 16384
     },
     "pai-painter-commercial-base-zh": {
         "vocab_size": 37512,
@@ -88,9 +88,9 @@ pretrained_init_configuration = {
         "type_vocab_size": 1,  # no use
         "initializer_range": 0.02,
         "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 10486,  # 102 + 16384
-        "bos_token_id": 10485,  # 101 + 16384
-        "eol_token_id": 10486,  # 102 + 16384
+        "eos_token_id": 16486,  # 102 + 16384
+        "bos_token_id": 16485,  # 101 + 16384
+        "eol_token_id": 16486,  # 102 + 16384
     },
     "pai-painter-large-zh": {
         "vocab_size": 37512,
@@ -105,9 +105,9 @@ pretrained_init_configuration = {
         "type_vocab_size": 1,
         "initializer_range": 0.02,
         "pad_token_id": 16384,  # 0 + 16384
-        "eos_token_id": 10486,  # 102 + 16384
-        "bos_token_id": 10485,  # 101 + 16384
-        "eol_token_id": 10486,  # 102 + 16384
+        "eos_token_id": 16486,  # 102 + 16384
+        "bos_token_id": 16485,  # 101 + 16384
+        "eol_token_id": 16486,  # 102 + 16384
     },
 }
 pretrained_resource_files_map = {
