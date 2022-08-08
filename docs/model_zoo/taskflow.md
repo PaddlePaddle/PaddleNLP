@@ -1352,7 +1352,7 @@ from paddlenlp import Taskflow
 * `temperature`：解码参数temperature，默认为1.0。
 * `top_k`：解码参数top_k，默认为32。
 * `top_p`：解码参数top_p，默认为1.0。
-* `conditional_scale`：dalle-mini模型使用的参数，可参考[推特](https://twitter.com/RiversHaveWings/status/1478093658716966912>)，默认为10.0。
+* `conditional_scale`：dalle-mini模型使用的参数，可参考[推特](https://twitter.com/RiversHaveWings/status/1478093658716966912)，默认为10.0。
 * `num_return_images`：返回图片的数量，默认为4，即4张图片水平拼接形成一张长图。
 * `use_faster`：是否使用faster_generation，默认为False，目前artist模型支持，而dalle-mini模型不支持。
 * `use_fp16_decoding`：是否使用fp16加速解码过程，默认为False，只有当use_faster为True的时候才有效。
