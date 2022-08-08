@@ -300,7 +300,6 @@ def train():
             (src_ids, src_tids, src_pids, tgt_ids, tgt_tids, tgt_pids, attn_ids,
              mask_src_2_src, mask_tgt_2_srctgt, mask_attn_2_srctgtattn,
              tgt_labels, _) = batch
-            # import pdb; pdb.set_trace()
             if args.label_smooth > 0.:
                 tgt_labels = nn.functional.label_smooth(
                     nn.functional.one_hot(tgt_labels, label_num),
