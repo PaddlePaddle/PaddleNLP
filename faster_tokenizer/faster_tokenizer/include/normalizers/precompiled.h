@@ -18,12 +18,13 @@ limitations under the License. */
 #include "nlohmann/json.hpp"
 #include "normalizers/normalizer.h"
 #include "utils/sentencepiece_normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 
 namespace normalizers {
-struct PrecompiledNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL PrecompiledNormalizer : public Normalizer {
   PrecompiledNormalizer() = default;
   explicit PrecompiledNormalizer(const std::string& precompiled_charsmap);
   PrecompiledNormalizer(const PrecompiledNormalizer& precompiled_normalizer);

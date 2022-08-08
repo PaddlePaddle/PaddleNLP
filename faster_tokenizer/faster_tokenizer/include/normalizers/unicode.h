@@ -16,36 +16,37 @@ limitations under the License. */
 
 #include <string>
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
-struct NFCNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL NFCNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFCNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFCNormalizer& normalizer);
 };
 
-struct NFDNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL NFDNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFDNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFDNormalizer& normalizer);
 };
 
-struct NFKCNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL NFKCNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFKCNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFKCNormalizer& normalizer);
 };
 
-struct NFKDNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL NFKDNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFKDNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFKDNormalizer& normalizer);
 };
 
-struct NmtNormalizer : public Normalizer {
+struct FASTERTOKENIZER_DECL NmtNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NmtNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NmtNormalizer& normalizer);

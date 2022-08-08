@@ -20,12 +20,13 @@
 #include "nlohmann/json.hpp"
 #include "utils/failure.h"
 #include "utils/trie.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
-struct FasterWordPiece : public WordPiece {
+struct FASTERTOKENIZER_DECL FasterWordPiece : public WordPiece {
   FasterWordPiece();
   FasterWordPiece(const core::Vocab& vocab,
                   const std::string& unk_token = "[UNK]",
