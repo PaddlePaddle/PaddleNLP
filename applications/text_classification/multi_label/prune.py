@@ -40,14 +40,6 @@ class DataArguments:
     the command line.
     """
 
-    dataset: str = field(
-        default="cail2018_small",
-        metadata={"help": "Dataset for multi label classfication."})
-
-    task_name: str = field(
-        default="charges",
-        metadata={"help": "Task name for multi label classfication dataset."})
-
     dataset_dir: str = field(
         default=None,
         metadata={
@@ -56,7 +48,7 @@ class DataArguments:
         })
 
     max_seq_length: int = field(
-        default=512,
+        default=128,
         metadata={
             "help":
             "The maximum total input sequence length after tokenization. Sequences longer "
@@ -76,6 +68,11 @@ class ModelArguments:
             "help":
             "The output directory where the model checkpoints are written."
         })
+    width_mult: str = field(
+        default='2/3',
+        metadata={
+            "help": "The reserved ratio for q, k, v, and ffn weight widths."
+        })
 
 
 def main():
@@ -83,40 +80,28 @@ def main():
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    f = open("prune_config.json")
-    config = json.load(f)
-    for arg in vars(training_args):
-        if arg in config.keys():
-            setattr(training_args, arg, config[arg])
-
     paddle.set_device(training_args.device)
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    if data_args.dataset_dir is not None:
-        label_list = {}
-        with open(os.path.join(data_args.dataset_dir, 'label.txt'),
-                  'r',
-                  encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                l = line.strip()
-                label_list[l] = i
-        train_ds = load_dataset(read_local_dataset,
-                                path=os.path.join(data_args.dataset_dir,
-                                                  'train.txt'),
-                                label_list=label_list,
-                                lazy=False)
-        dev_ds = load_dataset(read_local_dataset,
-                              path=os.path.join(data_args.dataset_dir,
-                                                'dev.txt'),
-                              label_list=label_list,
-                              lazy=False)
-    else:
-        train_ds, dev_ds = load_dataset(data_args.dataset,
-                                        name=data_args.task_name,
-                                        splits=["train", "dev"])
-        label_list = train_ds.label_list
+
+    label_list = {}
+    with open(os.path.join(data_args.dataset_dir, 'label.txt'),
+              'r',
+              encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(data_args.dataset_dir,
+                                              'train.txt'),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(data_args.dataset_dir, 'dev.txt'),
+                          label_list=label_list,
+                          lazy=False)
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.params_dir)
@@ -145,7 +130,9 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2 / 3))
+    trainer.prune(
+        output_dir,
+        prune_config=DynabertConfig(width_mult=eval(model_args.width_mult)))
 
 
 if __name__ == "__main__":

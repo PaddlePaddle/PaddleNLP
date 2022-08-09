@@ -34,10 +34,22 @@ include_directories("${FASTER_TOKENIZER_LIB}/include"
                     "${FASTER_TOKENIZER_LIB}/third_party/include")
 add_executable(ernie_faster_tokenizer_demo ernie_faster_tokenizer_demo.cc)
 
-# Include the path of core_tokenizers library
-link_directories("${FASTER_TOKENIZER_LIB}/lib")
-
 ADD_LIBRARY(core_tokenizers SHARED IMPORTED GLOBAL)
-SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.so)
 
+if(WIN32)
+ADD_LIBRARY(icudt SHARED IMPORTED GLOBAL)
+ADD_LIBRARY(icuuc SHARED IMPORTED GLOBAL)
+
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/core_tokenizers.dll)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_IMPLIB ${FASTER_TOKENIZER_LIB}/lib/core_tokenizers.lib)
+
+SET_PROPERTY(TARGET icudt PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/third_party/lib/icudt70.dll)
+SET_PROPERTY(TARGET icudt PROPERTY IMPORTED_IMPLIB ${FASTER_TOKENIZER_LIB}/third_party/lib/icudt.lib)
+SET_PROPERTY(TARGET icuuc PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/third_party/lib/icuuc70.dll)
+SET_PROPERTY(TARGET icuuc PROPERTY IMPORTED_IMPLIB ${FASTER_TOKENIZER_LIB}/third_party/lib/icuuc.lib)
+
+target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers icudt icuuc)
+else(WIN32)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.so)
 target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers)
+endif(WIN32)

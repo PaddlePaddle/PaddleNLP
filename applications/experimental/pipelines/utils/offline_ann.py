@@ -15,6 +15,10 @@ parser.add_argument("--doc_dir",
                     default='data/baike/',
                     type=str,
                     help="The doc path of the corpus")
+parser.add_argument(
+    '--delete_index',
+    action='store_true',
+    help='whether to delete existing index while updating index')
 
 args = parser.parse_args()
 
@@ -28,9 +32,10 @@ def offline_ann(index_name, doc_dir):
                                                 username="",
                                                 password="",
                                                 index=index_name)
-
     # 将每篇文档按照段落进行切分
-    dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
+    dicts = convert_files_to_dicts(dir_path=doc_dir,
+                                   split_paragraphs=True,
+                                   encoding='utf-8')
 
     print(dicts[:3])
 
@@ -53,5 +58,18 @@ def offline_ann(index_name, doc_dir):
     document_store.update_embeddings(retriever)
 
 
+def delete_data(index_name):
+    document_store = ElasticsearchDocumentStore(host="127.0.0.1",
+                                                port="9200",
+                                                username="",
+                                                password="",
+                                                index=index_name)
+
+    document_store.delete_index(index_name)
+    print('Delete an existing elasticsearch index {} Done.'.format(index_name))
+
+
 if __name__ == "__main__":
+    if (args.delete_index):
+        delete_data(args.index_name)
     offline_ann(args.index_name, args.doc_dir)

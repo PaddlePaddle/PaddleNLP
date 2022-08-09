@@ -20,8 +20,13 @@ from paddle.nn import TransformerEncoder, TransformerEncoderLayer
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 
 from paddlenlp.utils.log import logger
-from paddlenlp.ops.ext_utils import load
+from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops.faster_transformer.transformer.decoding import transfer_param
+
+if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+    from paddle.framework import core
+
+from .decoding import run_custom
 
 
 def infer_transformer_encoder(
@@ -61,52 +66,71 @@ def infer_transformer_encoder(
     accepts the weight and bias of TransformerEncoder and some other parameters
     for inference.
     """
-    helper = LayerHelper('fusion_encoder', **locals())
-    inputs = {
-        'Input': input,
-        'SelfAttnMask': attn_mask,
-        'SelfQueryWeight@VECTOR': q_weight,
-        'SelfQueryBias@VECTOR': q_bias,
-        'SelfKeyWeight@VECTOR': k_weight,
-        'SelfKeyBias@VECTOR': k_bias,
-        'SelfValueWeight@VECTOR': v_weight,
-        'SelfValueBias@VECTOR': v_bias,
-        'SelfAttnOutputWeight@VECTOR': attn_out_weight,
-        'SelfAttnOutputBias@VECTOR': attn_out_bias,
-        'SelfAttnOutputLayernormWeight@VECTOR': norm1_weight,
-        'SelfAttnOutputLayernormBias@VECTOR': norm1_bias,
-        'OutputLayernormWeight@VECTOR': norm2_weight,
-        'OutputLayernormBias@VECTOR': norm2_bias,
-        'FFNInterWeight@VECTOR': ffn_inter_weight,
-        'FFNInterBias@VECTOR': ffn_inter_bias,
-        'FFNOutputWeight@VECTOR': ffn_out_weight,
-        'FFNOutputBias@VECTOR': ffn_out_bias,
+    inputs_names = [
+        'Input',
+        'SelfAttnMask',
+        'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR',
+        'SelfKeyWeight@VECTOR',
+        'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR',
+        'SelfValueBias@VECTOR',
+        'SelfAttnOutputWeight@VECTOR',
+        'SelfAttnOutputBias@VECTOR',
+        'SelfAttnOutputLayernormWeight@VECTOR',
+        'SelfAttnOutputLayernormBias@VECTOR',
+        'OutputLayernormWeight@VECTOR',
+        'OutputLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR',
+        'FFNInterBias@VECTOR',
+        'FFNOutputWeight@VECTOR',
+        'FFNOutputBias@VECTOR',
+        # 'SequenceIdOffset',
+        # "TRTSeqLenOffset",
+        # 'AmaxList'
+    ]
+
+    inputs_var = [
+        input,
+        attn_mask,
+        q_weight,
+        q_bias,
+        k_weight,
+        k_bias,
+        v_weight,
+        v_bias,
+        attn_out_weight,
+        attn_out_bias,
+        norm1_weight,
+        norm1_bias,
+        norm2_weight,
+        norm2_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
         # 'SequenceIdOffset': sequence_id_offset,
         # "TRTSeqLenOffset": trt_seqlen_offset,
         # 'AmaxList': amax_list
-    }
-    attrs = {
-        'head_num': n_head,
-        'size_per_head': size_per_head,
-        'use_gelu': use_gelu,
-        "remove_padding": remove_padding,
-        'int8_mode': int8_mode,
-        'num_layer': n_layer,
-        'layer_idx': layer_idx,
-        'allow_gemm_test': allow_gemm_test,
-        'use_trt_kernel': use_trt_kernel,
-        'normalize_before': normalize_before
-    }
+    ]
 
-    encoder_out = helper.create_variable(dtype=input[0].dtype)
+    attrs_names = [
+        'head_num', 'size_per_head', 'use_gelu', "remove_padding", 'int8_mode',
+        'num_layer', 'layer_idx', 'allow_gemm_test', 'use_trt_kernel'
+        'normalize_before'
+    ]
 
-    outputs = {"EncoderOut": encoder_out}
+    attrs_val = [
+        n_head, size_per_head, use_gelu, remove_padding, int8_mode, n_layer,
+        layer_idx, allow_gemm_test, use_trt_kernel, normalize_before
+    ]
 
-    helper.append_op(type='fusion_encoder',
-                     inputs=inputs,
-                     outputs=outputs,
-                     attrs=attrs)
-    return encoder_out
+    outputs_names = ["EncoderOut"]
+
+    outputs_dtype = [input[0].dtype]
+
+    return run_custom("fusion_encoder", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def encoder_layer_forward(self,
@@ -272,7 +296,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             self.ffn_out_weight.append(layer.linear2.weight)
             self.ffn_out_bias.append(layer.linear2.bias)
 
-    output = infer_transformer_encoder(
+    output, = infer_transformer_encoder(
         input=[src],
         attn_mask=[src_mask],
         q_weight=self.q_weight,
@@ -351,7 +375,7 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
             if encoder_lib is not None:
                 if "FasterTransformer" not in LOADED_EXT.keys():
                     ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                        decoding_lib)
+                        encoder_lib)
                     LOADED_EXT["FasterTransformer"] = ops
             else:
                 load("FasterTransformer", verbose=True)
