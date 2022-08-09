@@ -70,6 +70,11 @@ def _transformer_encoder_fwd(self,
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
+    # To get cache from None when use_cache is True, which is compatible with HF
+    # while HF requires decoder. The implementation here uses cache update in the
+    # MultiHeadAttention not so efficiently, and maybe optimize it later.
+    if cache is None and getattr(self, "_use_cache", False):
+        cache = [self.layers[0].gen_cache(src)] * len(self.layers)
     # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
     # to True when cache is not None.
     new_caches = [] if cache is not None and getattr(self, "_use_cache",
