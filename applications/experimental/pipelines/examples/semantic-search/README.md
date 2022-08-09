@@ -78,6 +78,11 @@ python examples/semantic-search/semantic_search_example.py --device cpu
 #### 3.4.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
+首先修改`config/elasticsearch.yml`的配置：
+```
+xpack.security.enabled: false
+```
+然后启动：
 ```bash
 ./bin/elasticsearch
 ```
@@ -97,6 +102,8 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
+* `host`: Elasticsearch的IP地址
+* `port`: Elasticsearch的端口号
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 #### 3.4.3 启动 RestAPI 模型服务
@@ -111,7 +118,12 @@ Linux 用户推荐采用 Shell 脚本来启动服务：：
 ```bash
 sh scripts/run_search_server.sh
 ```
+启动后可以使用curl命令验证是否成功运行：
 
+```
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "亚马逊河流的介绍","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
+
+```
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
@@ -167,6 +179,23 @@ su est
 elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
 ```
 cluster.routing.allocation.disk.threshold_enabled: false
+```
+
+#### nltk_data加载失败的错误 `[nltk_data] Error loading punkt: [Errno 60] Operation timed out`
+
+在命令行里面输入python,然后输入下面的命令进行下载：
+
+```
+import nltk
+nltk.download('punkt')
+```
+如果下载还是很慢，可以手动[下载](https://github.com/nltk/nltk_data/tree/gh-pages/packages/tokenizers)，然后放入本地的`~/nltk_data/tokenizers`进行解压即可。
+
+#### 服务端运行报端口占用的错误 `[Errno 48] error while attempting to bind on address ('0.0.0.0',8891): address already in use`
+
+```
+lsof -i:8891
+kill -9 PID # PID为8891端口的进程
 ```
 
 ## Reference
