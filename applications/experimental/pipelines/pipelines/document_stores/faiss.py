@@ -243,7 +243,7 @@ class FAISSDocumentStore(SQLDocumentStore):
         self,
         documents: Union[List[dict], List[Document]],
         index: Optional[str] = None,
-        batch_size: int = 10000,
+        batch_size: int = 1000,
         duplicate_documents: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> None:
