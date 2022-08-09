@@ -79,6 +79,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BartTokenizer", "bart"),
     ("GAUAlphaTokenizer", "gau_alpha"),
     ("CodeGenTokenizer", "codegen"),
+    ("ArtistTokenizer", "artist"),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([

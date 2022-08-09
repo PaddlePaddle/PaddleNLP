@@ -117,6 +117,8 @@ from .auto.modeling import *
 from .auto.tokenizer import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
+from .artist.modeling import *
+from .artist.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 
