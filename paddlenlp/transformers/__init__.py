@@ -118,6 +118,8 @@ from .codegen.modeling import *
 from .codegen.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .clip.modeling import *
+from .clip.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_faster_tokenizer_available
