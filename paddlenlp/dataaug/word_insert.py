@@ -22,6 +22,8 @@ import paddle
 from ..transformers import AutoModelForMaskedLM, AutoTokenizer
 from .base_augment import BaseAugment
 
+__all__ = ['WordInsert']
+
 
 class WordInsert(BaseAugment):
     """
@@ -106,22 +108,21 @@ class WordInsert(BaseAugment):
         return insert_dict
 
     def _augment(self, sequence):
-        if self.type == 'mlm':
-            return self._augment_mlm(sequence)
         seq_tokens = self.tokenizer.cut(sequence)
         aug_indexes = self._skip_stop_word_tokens(seq_tokens)
         aug_n = self._get_aug_n(len(seq_tokens), len(aug_indexes))
         if aug_n == 0:
             return []
+        elif self.type == 'mlm':
+            return self._augment_mlm(sequence, seq_tokens, aug_indexes)
         elif aug_n == 1:
             return self._augment_single(seq_tokens, aug_indexes)
         else:
             return self._augment_multi(seq_tokens, aug_n, aug_indexes)
 
     @paddle.no_grad()
-    def _augment_mlm(self, sequence):
-        seq_tokens = self.tokenizer.cut(sequence)
-        aug_indexes = self._skip_stop_word_tokens(seq_tokens)
+    def _augment_mlm(self, sequence, seq_tokens, aug_indexes):
+
         t = 0
         sentences = []
         while t < self.create_n * self.loop and len(sentences) < self.create_n:
