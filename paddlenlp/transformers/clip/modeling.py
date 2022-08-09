@@ -252,12 +252,9 @@ class VisualTransformer(nn.Layer):
                  width: int,
                  layers: int,
                  heads: int,
-                 output_dim: int,
                  activation: str,
                  normalize_before: bool = True):
         super().__init__()
-        self.input_resolution = input_resolution
-        self.output_dim = output_dim
         # used patch_size x patch_size, stride patch_size to do linear projection
         self.conv1 = nn.Conv2D(in_channels=3,
                                out_channels=width,
@@ -285,23 +282,20 @@ class VisualTransformer(nn.Layer):
         self.transformer = nn.TransformerEncoder(encoder_layer, layers)
 
         self.ln_post = nn.LayerNorm(width)
-        self.proj = paddle.create_parameter((width, output_dim),
-                                            paddle.get_default_dtype())
 
     def forward(self, x):
         x = self.conv1(x)
         x = x.reshape((x.shape[0], x.shape[1], -1))
         x = x.transpose((0, 2, 1))
         x = paddle.concat([
-            self.class_embedding.unsqueeze([0, 1]).expand(
-                [x.shape[0], 1, x.shape[2]]), x
+            self.class_embedding.unsqueeze([0, 1]).expand([x.shape[0], -1, -1]),
+            x
         ],
                           axis=1)
         x = x + self.positional_embedding
         x = self.ln_pre(x)
         x = self.transformer(x)
         x = self.ln_post(x[:, 0])
-        x = paddle.matmul(x, self.proj)
 
         return x
 
@@ -314,7 +308,6 @@ class TextTransformer(nn.Layer):
                  transformer_heads,
                  transformer_layers,
                  vocab_size,
-                 embed_dim,
                  activation="quick_gelu",
                  normalize_before=True):
         super().__init__()
@@ -335,9 +328,6 @@ class TextTransformer(nn.Layer):
             (context_length, transformer_width), paddle.get_default_dtype())
         self.ln_final = nn.LayerNorm(transformer_width)
 
-        self.text_projection = paddle.create_parameter(
-            (transformer_width, embed_dim), paddle.get_default_dtype())
-
         self.register_buffer("attention_mask",
                              paddle.triu(paddle.ones(
                                  (1, 1, context_length, context_length)) * INF,
@@ -356,9 +346,6 @@ class TextTransformer(nn.Layer):
         x = x.gather_nd(
             paddle.stack([paddle.arange(x.shape[0]),
                           text.argmax(-1)], axis=-1))
-
-        x = paddle.matmul(x, self.text_projection)
-
         return x
 
 
@@ -433,7 +420,6 @@ class CLIPModel(ClipPreTrainedModel):
                                             width=vision_width,
                                             layers=vision_layers,
                                             heads=vision_heads,
-                                            output_dim=embed_dim,
                                             activation=hidden_act,
                                             normalize_before=True)
 
@@ -442,19 +428,24 @@ class CLIPModel(ClipPreTrainedModel):
                                     transformer_heads=transformer_heads,
                                     transformer_layers=transformer_layers,
                                     vocab_size=vocab_size,
-                                    embed_dim=embed_dim,
                                     activation=hidden_act,
                                     normalize_before=True)
+
+        self.visual_projection = paddle.create_parameter(
+            (vision_width, embed_dim), paddle.get_default_dtype())
+        self.text_projection = paddle.create_parameter(
+            (transformer_width, embed_dim), paddle.get_default_dtype())
+
         self.logit_scale = paddle.create_parameter(
             (1, ),
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(logit_scale_init_value))
 
     def encode_image(self, pixel_values):
-        return self.visual(pixel_values)
+        return self.visual_projection(self.visual(pixel_values))
 
     def encode_text(self, input_ids):
-        return self.text(input_ids)
+        return self.text_projection(self.text(input_ids))
 
     def forward(self, input_ids=None, pixel_values=None, **kwargs):
         image_features = self.encode_image(pixel_values)
