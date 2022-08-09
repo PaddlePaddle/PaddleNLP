@@ -368,7 +368,6 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
             if use_fp16:
                 convert_to_fp16(layer)
 
-    encoder_lib = "/paddle/fast_transformer/helper/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
     if not self.training:
         try:
             # Pass decoding lib to prevent re-building encoder.
