@@ -160,6 +160,38 @@ class RoFormerModelTester:
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_choices])
 
+    def create_and_check_for_question_answering(self, config, input_ids,
+                                                token_type_ids, input_mask):
+        model = RoFormerForQuestionAnswering(RoFormerModel(**config))
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+        )
+        self.parent.assertEqual(
+            result[0].shape, [self.config.batch_size, self.config.seq_length])
+        self.parent.assertEqual(
+            result[1].shape, [self.config.batch_size, self.config.seq_length])
+
+    def create_and_check_for_token_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = RoFormerForTokenClassification(RoFormerModel(**config),
+                                               num_classes=self.num_classes)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids)
+        self.parent.assertEqual(result.shape, [
+            self.config.batch_size, self.config.seq_length,
+            self.config.num_classes
+        ])
+
     def create_and_check_for_masked_lm(
         self,
         config,
@@ -172,9 +204,10 @@ class RoFormerModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids)
-        self.parent.assertEqual(
-            result.shape,
-            [self.config.batch_size, self.config.seq_length, self.vocab_size])
+        self.parent.assertEqual(result.shape, [
+            self.config.batch_size, self.config.seq_length,
+            self.config.vocab_size
+        ])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -227,14 +260,28 @@ class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
 
+    def test_for_masked_lm(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
+
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_multiple_choice(
             *config_and_inputs)
 
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_question_answering(
+            *config_and_inputs)
+
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_sequence_classification(
+            *config_and_inputs)
+
+    def test_for_token_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
     # @slow
