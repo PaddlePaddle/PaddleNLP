@@ -112,6 +112,7 @@ from .gau_alpha.tokenizer import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
+from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .codegen.modeling import *
