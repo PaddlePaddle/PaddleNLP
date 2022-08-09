@@ -29,7 +29,6 @@ def layer_init_wrapper(func):
 
     @functools.wraps(func)
     def _impl(self, *args, **kwargs):
-        print(args, kwargs)
         enable_recompute = kwargs.pop("enable_recompute", False)
         func(self, *args, **kwargs)
         if paddle.in_dynamic_mode():
@@ -207,6 +206,9 @@ paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
 paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
     paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
         paddle.nn.TransformerEncoder))
+paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(
+    paddle.nn.TransformerDecoder.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerDecoder))
 
 
 def is_tensor(x):
