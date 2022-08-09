@@ -10,8 +10,8 @@ import paddle.nn.functional as F
 from paddle.optimizer.lr import NoamDecay
 from paddle.optimizer import AdamW
 
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from datasets import load_dataset
 
 from utils import print_args, set_seed, create_data_loader
 
@@ -67,7 +67,7 @@ def train(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds, dev_ds = load_dataset('duconv', splits=('train', 'dev'))
+    train_ds, dev_ds = load_dataset('duconv', split=('train', 'dev'))
     train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
                                                      'train')
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args, 'dev')

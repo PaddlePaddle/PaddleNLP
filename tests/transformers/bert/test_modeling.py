@@ -1,4 +1,5 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,317 +13,318 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
 import unittest
 import paddle
-import copy
 
-from paddlenlp.transformers import BertModel, BertForPretraining, BertPretrainingCriterion, BertForMaskedLM
-from paddlenlp.transformers import BertForQuestionAnswering, BertForSequenceClassification, BertForTokenClassification, BertForMultipleChoice
-
-from common_test import CommonTest
-from util import softmax_with_cross_entropy, slow
-import unittest
+from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
+    BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
+from tests.transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from tests.testing_utils import slow
 
 
-def create_input_data(config, seed=None):
-    '''
-    the generated input data will be same if a specified seed is set 
-    '''
-    if seed is not None:
-        np.random.seed(seed)
+class BertModelTester:
 
-    input_ids = np.random.randint(low=0,
-                                  high=config['vocab_size'],
-                                  size=(config["batch_size"],
-                                        config["seq_len"]))
-    num_to_predict = int(config["seq_len"] * 0.15)
-    masked_lm_positions = np.random.choice(
-        config["seq_len"], (config["batch_size"], num_to_predict),
-        replace=False)
-    masked_lm_positions = np.sort(masked_lm_positions)
-    pred_padding_len = config["seq_len"] - num_to_predict
-    temp_masked_lm_positions = np.full(masked_lm_positions.size,
-                                       0,
-                                       dtype=np.int32)
-    mask_token_num = 0
-    for i, x in enumerate(masked_lm_positions):
-        for j, pos in enumerate(x):
-            temp_masked_lm_positions[
-                mask_token_num] = i * config["seq_len"] + pos
-            mask_token_num += 1
-    masked_lm_positions = temp_masked_lm_positions
-    return input_ids, masked_lm_positions
-
-
-class NpBertPretrainingCriterion(object):
-
-    def __init__(self, vocab_size):
+    def __init__(
+        self,
+        parent,
+        batch_size=13,
+        seq_length=7,
+        is_training=True,
+        use_input_mask=True,
+        use_token_type_ids=True,
+        vocab_size=99,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        intermediate_size=37,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        pad_token_id=0,
+        pool_act="tanh",
+        fuse=False,
+        type_sequence_label_size=2,
+        num_labels=3,
+        num_choices=4,
+        num_classes=3,
+        scope=None,
+    ):
+        self.parent = parent
+        self.batch_size = batch_size
+        self.seq_length = seq_length
+        self.is_training = is_training
+        self.use_input_mask = use_input_mask
+        self.use_token_type_ids = use_token_type_ids
         self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.intermediate_size = intermediate_size
+        self.hidden_act = hidden_act
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.max_position_embeddings = max_position_embeddings
+        self.type_vocab_size = type_vocab_size
+        self.initializer_range = initializer_range
+        self.pad_token_id = pad_token_id
+        self.pool_act = pool_act
+        self.fuse = fuse
+        self.type_sequence_label_size = type_sequence_label_size
+        self.num_classes = num_classes
+        self.num_labels = num_labels
+        self.num_choices = num_choices
+        self.scope = scope
 
-    def __call__(self, prediction_scores, seq_relationship_score,
-                 masked_lm_labels, next_sentence_labels, masked_lm_scale):
-        masked_lm_loss = softmax_with_cross_entropy(prediction_scores,
-                                                    masked_lm_labels,
-                                                    ignore_index=-1)
-        masked_lm_loss = masked_lm_loss / masked_lm_scale
-        next_sentence_loss = softmax_with_cross_entropy(seq_relationship_score,
-                                                        next_sentence_labels)
-        return np.sum(masked_lm_loss) + np.mean(next_sentence_loss)
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.seq_length],
+                               self.vocab_size)
+
+        input_mask = None
+        if self.use_input_mask:
+            input_mask = random_attention_mask(
+                [self.batch_size, self.seq_length])
+
+        token_type_ids = None
+        if self.use_token_type_ids:
+            token_type_ids = ids_tensor([self.batch_size, self.seq_length],
+                                        self.type_vocab_size)
+
+        config = self.get_config()
+        return config, input_ids, token_type_ids, input_mask
+
+    def get_config(self):
+        return {
+            "vocab_size": self.vocab_size,
+            "hidden_size": self.hidden_size,
+            "num_hidden_layers": self.num_hidden_layers,
+            "num_attention_heads": self.num_attention_heads,
+            "intermediate_size": self.intermediate_size,
+            "hidden_act": self.hidden_act,
+            "hidden_dropout_prob": self.hidden_dropout_prob,
+            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
+            "max_position_embeddings": self.max_position_embeddings,
+            "type_vocab_size": self.type_vocab_size,
+            "initializer_range": self.initializer_range,
+            "pad_token_id": self.pad_token_id,
+            "pool_act": self.pool_act,
+            "fuse": self.fuse,
+        }
+
+    def create_and_check_model(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = BertModel(**config)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids)
+        result = model(input_ids, token_type_ids=token_type_ids)
+        result = model(input_ids)
+        self.parent.assertEqual(
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.hidden_size])
+
+    def create_and_check_for_masked_lm(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = BertForMaskedLM(BertModel(**config))
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids)
+        self.parent.assertEqual(
+            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_for_multiple_choice(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = BertForMultipleChoice(BertModel(**config),
+                                      num_choices=self.num_choices)
+        model.eval()
+        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        result = model(
+            multiple_choice_inputs_ids,
+            attention_mask=multiple_choice_input_mask,
+            token_type_ids=multiple_choice_token_type_ids,
+        )
+        self.parent.assertEqual(result.shape,
+                                [self.batch_size, self.num_choices])
+
+    def create_and_check_for_question_answering(self, config, input_ids,
+                                                token_type_ids, input_mask):
+        model = BertForQuestionAnswering(BertModel(**config))
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+        )
+        self.parent.assertEqual(result[0].shape,
+                                [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.seq_length])
+
+    def create_and_check_for_sequence_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = BertForSequenceClassification(BertModel(**config),
+                                              num_classes=self.num_classes)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+        )
+        self.parent.assertEqual(result.shape,
+                                [self.batch_size, self.num_classes])
+
+    def create_and_check_for_token_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = BertForTokenClassification(BertModel(**config),
+                                           num_classes=self.num_classes)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids)
+        self.parent.assertEqual(
+            result.shape, [self.batch_size, self.seq_length, self.num_classes])
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            token_type_ids,
+            input_mask,
+        ) = config_and_inputs
+        inputs_dict = {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": input_mask
+        }
+        return config, inputs_dict
 
 
-class TestBertForSequenceClassification(CommonTest):
+class BertModelTest(ModelTesterMixin, unittest.TestCase):
+    base_model_class = BertModel
 
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BertModel.pretrained_init_configuration['bert-base-uncased'])
-        self.config['num_hidden_layers'] = 2
-        self.config['vocab_size'] = 512
-        self.config['attention_probs_dropout_prob'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['intermediate_size'] = 1024
-        self.config['seq_len'] = 64
-        self.config['batch_size'] = 3
-        self.config['max_position_embeddings'] = 512
-        self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
-
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'], 2)
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForSequenceClassification
+    all_model_classes = (
+        BertModel,
+        BertForMaskedLM,
+        BertForMultipleChoice,
+        BertForPretraining,
+        BertForQuestionAnswering,
+        BertForSequenceClassification,
+        BertForTokenClassification,
+    )
 
     def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
+        self.model_tester = BertModelTester(self)
 
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape, self.expected_shape)
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config['batch_size']
-        del config['seq_len']
+    def test_for_masked_lm(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
 
-        bert = BertModel(**config)
-        model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        self.output = model(input_ids)
-        self.check_testcase()
+    def test_for_multiple_choice(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_multiple_choice(
+            *config_and_inputs)
 
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_question_answering(
+            *config_and_inputs)
 
-class TestBertForTokenClassification(TestBertForSequenceClassification):
+    def test_for_sequence_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_sequence_classification(
+            *config_and_inputs)
 
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForTokenClassification
-
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'],
-                               self.config['seq_len'], 2)
-
-
-class TestBertForPretraining(TestBertForSequenceClassification):
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForPretraining
-
-    def set_output(self):
-        self.expected_seq_shape = (self.masked_lm_positions.shape[0],
-                                   self.config['vocab_size'])
-        self.expected_pooled_shape = (self.config['batch_size'], 2)
-
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config['batch_size']
-        del config['seq_len']
-
-        bert = BertModel(**config)
-        model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        masked_lm_positions = paddle.to_tensor(self.masked_lm_positions,
-                                               dtype="int64")
-        self.output = model(input_ids, masked_positions=masked_lm_positions)
-        self.check_testcase()
-
-    def check_testcase(self):
-        self.check_output_equal(self.output[0].numpy().shape,
-                                self.expected_seq_shape)
-        self.check_output_equal(self.output[1].numpy().shape,
-                                self.expected_pooled_shape)
-
-
-class TestBertForMaskedLM(TestBertForSequenceClassification):
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForMaskedLM
-
-    def set_output(self):
-        self.expected_seq_shape = (self.config['batch_size'],
-                                   self.config['seq_len'],
-                                   self.config['vocab_size'])
-
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config['batch_size']
-        del config['seq_len']
-
-        bert = BertModel(**config)
-        model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-
-        self.output = model(input_ids)
-        self.check_testcase()
-
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape,
-                                self.expected_seq_shape)
-
-
-class TestBertForQuestionAnswering(TestBertForSequenceClassification):
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForQuestionAnswering
-
-    def set_output(self):
-        self.expected_start_logit_shape = (self.config['batch_size'],
-                                           self.config['seq_len'])
-        self.expected_end_logit_shape = (self.config['batch_size'],
-                                         self.config['seq_len'])
-
-    def check_testcase(self):
-        self.check_output_equal(self.output[0].numpy().shape,
-                                self.expected_start_logit_shape)
-        self.check_output_equal(self.output[1].numpy().shape,
-                                self.expected_end_logit_shape)
-
-
-class TestBertForMultipleChoice(TestBertForSequenceClassification):
-
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BertModel.pretrained_init_configuration['bert-base-uncased'])
-        self.config['num_hidden_layers'] = 2
-        self.config['vocab_size'] = 512
-        self.config['attention_probs_dropout_prob'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['intermediate_size'] = 1024
-        self.config['seq_len'] = 64
-        self.config['batch_size'] = 4
-        self.config['num_choices'] = 2
-        self.config['max_position_embeddings'] = 512
-        self.input_ids, _ = create_input_data(self.config)
-        # [bs*num_choice,seq_l] -> [bs,num_choice,seq_l]
-        self.input_ids = np.reshape(self.input_ids, [
-            self.config['batch_size'] // self.config['num_choices'],
-            self.config['num_choices'], -1
-        ])
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BertForMultipleChoice
-
-    def set_output(self):
-        self.expected_logit_shape = (self.config['batch_size'] //
-                                     self.config['num_choices'],
-                                     self.config['num_choices'])
-
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape,
-                                self.expected_logit_shape)
-
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config["num_choices"]
-        del config['batch_size']
-        del config['seq_len']
-
-        bert = BertModel(**config)
-        model = self.TEST_MODEL_CLASS(bert)
-        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        self.output = model(input_ids)
-        self.check_testcase()
-
-
-class TestBertPretrainingCriterion(CommonTest):
-
-    def setUp(self):
-        self.config['vocab_size'] = 1024
-        self.criterion = BertPretrainingCriterion(**self.config)
-        self.np_criterion = NpBertPretrainingCriterion(**self.config)
-
-    def _construct_input_data(self, mask_num, vocab_size, batch_size):
-        prediction_scores = np.random.rand(mask_num, vocab_size).astype(
-            paddle.get_default_dtype())
-        seq_relationship_score = np.random.rand(batch_size, 2).astype(
-            paddle.get_default_dtype())
-        masked_lm_labels = np.random.randint(0, vocab_size, (mask_num, 1))
-        next_sentence_labels = np.random.randint(0, 2, (batch_size, 1))
-        masked_lm_scale = 1.0
-        masked_lm_weights = np.random.randint(0, 2, (mask_num)).astype(
-            paddle.get_default_dtype())
-        return prediction_scores, seq_relationship_score, masked_lm_labels, \
-            next_sentence_labels, masked_lm_scale, masked_lm_weights
-
-    def test_forward(self):
-        np_prediction_score, np_seq_relationship_score, np_masked_lm_labels, \
-            np_next_sentence_labels, masked_lm_scale, np_masked_lm_weights \
-            = self._construct_input_data(20, self.config['vocab_size'], 4)
-
-        prediction_score = paddle.to_tensor(np_prediction_score)
-        seq_relationship_score = paddle.to_tensor(np_seq_relationship_score)
-        masked_lm_labels = paddle.to_tensor(np_masked_lm_labels, dtype="int64")
-        next_sentence_labels = paddle.to_tensor(np_next_sentence_labels,
-                                                dtype="int64")
-        masked_lm_weights = paddle.to_tensor(np_masked_lm_weights)
-
-        np_loss = self.np_criterion(np_prediction_score,
-                                    np_seq_relationship_score,
-                                    np_masked_lm_labels,
-                                    np_next_sentence_labels, masked_lm_scale)
-        loss = self.criterion(prediction_score, seq_relationship_score,
-                              masked_lm_labels, next_sentence_labels,
-                              masked_lm_scale)
-        self.check_output_equal(np_loss, loss.numpy()[0])
-
-
-class TestBertFromPretrain(CommonTest):
+    def test_for_token_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_token_classification(
+            *config_and_inputs)
 
     @slow
-    def test_bert_base_uncased(self):
-        model = BertModel.from_pretrained('bert-base-uncased',
-                                          attention_probs_dropout_prob=0.0,
-                                          hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.config)
-        self.config['seq_len'] = 32
-        self.config['batch_size'] = 3
+    def test_model_from_pretrained(self):
+        for model_name in list(
+                BertPretrainedModel.pretrained_init_configuration)[:1]:
+            model = BertModel.from_pretrained(model_name)
+            self.assertIsNotNone(model)
 
-        input_ids, _ = create_input_data(self.config, 102)
-        input_ids = paddle.to_tensor(input_ids)
-        output = model(input_ids)
 
-        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
-                              self.config['hidden_size'])
-        expected_pooled_shape = (self.config['batch_size'],
-                                 self.config['hidden_size'])
-        self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
-        self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
-        expected_seq_slice = np.array([[0.17383946, 0.09206937, 0.45788339],
-                                       [-0.28287640, 0.06244858, 0.54864359],
-                                       [-0.54589444, 0.04811822, 0.50559914]])
-        # There's output diff about 1e-6 between cpu and gpu
-        self.check_output_equal(output[0].numpy()[0, 0:3, 0:3],
-                                expected_seq_slice,
-                                atol=1e-6)
+class BertModelIntegrationTest(unittest.TestCase):
 
-        expected_pooled_slice = np.array(
-            [[-0.67418981, -0.07148759, 0.85799801],
-             [-0.62072051, -0.08452632, 0.96691507],
-             [-0.74019802, -0.10187808, 0.95353240]])
-        self.check_output_equal(output[1].numpy()[0:3, 0:3],
-                                expected_pooled_slice,
-                                atol=1e-6)
+    @slow
+    def test_inference_no_attention(self):
+        model = BertModel.from_pretrained("bert-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor([[[0.4249, 0.1008, 0.7531],
+                                            [0.3771, 0.1188, 0.7467],
+                                            [0.4152, 0.1098, 0.7108]]])
+        self.assertTrue(
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_attention(self):
+        model = BertModel.from_pretrained("bert-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor([[[0.4249, 0.1008, 0.7531],
+                                            [0.3771, 0.1188, 0.7467],
+                                            [0.4152, 0.1098, 0.7108]]])
+        self.assertTrue(
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":
