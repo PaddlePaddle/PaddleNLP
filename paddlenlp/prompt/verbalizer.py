@@ -17,6 +17,7 @@ from collections import defaultdict
 from typing import List, Dict, Union, Callable, Optional
 import os
 import copy
+import json
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -30,6 +31,8 @@ from .prompt_utils import InputExample
 __all__ = [
     "Verbalizer", "MultiMaskVerbalizer", "ManualVerbalizer", "SoftVerbalizer"
 ]
+
+VERBALIZER_FILE = "verbalizer.json"
 
 
 class Verbalizer(nn.Layer):
@@ -180,6 +183,21 @@ class Verbalizer(nn.Layer):
         """
         raise NotImplementedError
 
+    def save_to(self, path):
+        label_dict = {
+            k: v
+            for k, v in zip(self.labels,
+                            self.token_ids.numpy().tolist())
+        }
+        with open(os.path.join(path, VERBALIZER_FILE), "w") as f:
+            json.dump(label_dict, f)
+
+    @classmethod
+    def load_from(cls, path):
+        with open(os.path.join(path, VERBALIZER_FILE), "r") as f:
+            label_dict = json.load(f)
+            return label_dict
+
 
 class NonVerbalizer(Verbalizer):
 
@@ -307,10 +325,7 @@ class MultiMaskVerbalizer(ManualVerbalizer):
         """
         batch_size, seq_len, vocab_size = logits.shape
         batch_ids, word_ids = paddle.where(inputs["mask_ids"] == 1)
-        mask_ids = paddle.concat([
-            b * seq_len + w
-            for b, w in zip(batch_ids.squeeze(), word_ids.squeeze())
-        ])
+        mask_ids = batch_ids * seq_len + word_ids
         mask_logits = logits.reshape([-1, vocab_size])[mask_ids]
         mask_logits = mask_logits.reshape([batch_size, -1, vocab_size])
         return mask_logits

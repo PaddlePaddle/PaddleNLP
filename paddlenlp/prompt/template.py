@@ -13,12 +13,17 @@
 # limitations under the License.
 
 from abc import abstractmethod
+import os
+import json
+
 import paddle
 import paddle.nn as nn
 from .prompt_utils import InputExample
 from ..utils.log import logger
 
 __all__ = ["Template", "ManualTemplate", "SoftTemplate", "AutoTemplate"]
+
+TEMPLATE_FILE = "template.json"
 
 
 def parse_template(inputs: str, part_start, part_end):
@@ -190,6 +195,10 @@ class Template(nn.Layer):
     def process_batch(self, batch):
         return batch
 
+    def save_to(self, data_dir):
+        with open(os.path.join(data_dir, TEMPLATE_FILE), "w") as f:
+            json.dump(self.template, f)
+
 
 class ManualTemplate(Template):
     """
@@ -331,7 +340,21 @@ class SoftTemplate(Template):
         soft2word_init = {}
         soft_id_reindex = {}
 
-        for part in self.template:
+        if 'add_prefix_space' in self._template[0]:
+            for part in self._template:
+                if 'soft' in part:
+                    soft_token_ids.append(1)
+                    num_soft_token += 1
+                else:
+                    soft_token_ids.append(0)
+            self.soft_token_ids = soft_token_ids
+            self.num_soft_token = num_soft_token
+            if self.num_soft_token == 0:
+                logger.warning('No soft tokens in template. '\
+                    'Use ManualTemplate for better performance.')
+            return None
+
+        for part in self._template:
             if 'soft' not in part and 'soft_id' not in part:
                 soft_token_ids.append(0)
                 inputs.append(part)
@@ -407,7 +430,7 @@ class SoftTemplate(Template):
         self.soft2word_init = soft2word_init
 
         if self.num_soft_token == 0:
-            logger.warnings('No soft tokens in template. '\
+            logger.warning('No soft tokens in template. '\
                 'Use ManualTemplate for better performance.')
 
     def generate_parameters(self):
@@ -475,7 +498,8 @@ class AutoTemplate(object):
                     model=None,
                     prompt_encoder=None,
                     encoder_hidden_size=None):
-        template = cls.parse_inputs(template)
+        if isinstance(template, str):
+            template = cls.parse_inputs(template)
         template_keys = cls._extract_template_keys(template)
         if 'text' not in template_keys:
             text_item = [{
@@ -496,6 +520,18 @@ class AutoTemplate(object):
                                 encoder_hidden_size=encoder_hidden_size)
         else:
             return ManualTemplate(tokenizer=tokenizer, template=template)
+
+    @classmethod
+    def load_from(cls,
+                  data_dir,
+                  tokenizer,
+                  model=None,
+                  prompt_encoder=None,
+                  encoder_hidden_size=None):
+        with open(os.path.join(data_dir, TEMPLATE_FILE), "r") as f:
+            template = json.load(f)
+        return cls.create_from(template, tokenizer, model, prompt_encoder,
+                               encoder_hidden_size)
 
     @classmethod
     def _extract_template_keys(cls, inputs: list):

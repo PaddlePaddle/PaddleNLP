@@ -19,6 +19,7 @@ from collections import defaultdict
 
 import numpy as np
 from ..utils.log import logger
+from .prompt_utils import InputFeatures
 
 __all__ = ["TokenizerWrapper", "MLMTokenizerWrapper"]
 
@@ -279,4 +280,7 @@ class MLMTokenizerWrapper(TokenizerWrapper):
             max_len=self.max_seq_length,
             pad_id_for_inputs=self.tokenizer.pad_token_id)
 
-        return {**encode_inputs}
+        for key in not_to_tokenize:
+            encode_inputs[key] = not_to_tokenize[key]
+
+        return InputFeatures(**encode_inputs)

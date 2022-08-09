@@ -35,7 +35,7 @@ from ..losses import RDropLoss
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 
 from .template import Template
-from .verbalizer import Verbalizer
+from .verbalizer import Verbalizer, SoftVerbalizer
 from .prompt_utils import InputFeatures, InputExample, signature
 from .prompt_tokenizer import MLMTokenizerWrapper
 from .prompt_args import PromptTuningArguments
@@ -156,13 +156,19 @@ class PromptTrainer(Trainer):
 
     def _convert_example(self, example):
         example = self.template.wrap_one_example(example)
-        encoded_inputs = InputFeatures(
-            **self.tokenizer_wrapper.tokenize_one_example(example),
-            **example[1])
+        encoded_inputs = self.tokenizer_wrapper.tokenize_one_example(example)
         return encoded_inputs
 
     def _prepare_input(self, inputs: InputFeatures):
         return inputs
+
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
+        super()._save(output_dir, state_dict)
+        output_dir = output_dir if output_dir is not None else self.args.output_dir
+        if self.template:
+            self.template.save_to(output_dir)
+        if self.verbalizer:
+            self.verbalizer.save_to(output_dir)
 
     def get_eval_dataloader(self, eval_dataset=None):
         """
@@ -193,41 +199,60 @@ class PromptTrainer(Trainer):
         Setup the optimizer for both model and prompt parameters.
         """
         if self.optimizer is None:
+            optim_cls, optim_kwargs = Trainer.get_optimizer_cls_and_kwargs(
+                self.args)
+
+            plm_parameters = []
+            if not self.model.freeze_plm:
+                plm_parameters.extend([
+                    p for p in self.model.plm.parameters()
+                    if not p.stop_gradient
+                ])
+
+            ppt_parameters = []
+            if self.template is not None:
+                ppt_parameters.extend(self.template.parameters())
+            if self.verbalizer is not None:
+                if isinstance(self.verbalizer, SoftVerbalizer):
+                    if not self.model.freeze_plm:
+                        plm_parameters.extend([
+                            p for p in self.verbalizer.non_head_parameters()
+                            if not p.stop_gradient
+                        ])
+                    ppt_parameters.extend(self.verbalizer.head_parameters())
+                else:
+                    ppt_parameters.extend(self.verbalizer.parameters())
+
             decay_parameters = [
-                p.name for n, p in self.model.plm.named_parameters()
+                p.name for n, p in self.model.named_parameters()
                 if not any(nd in n for nd in ["bias", "norm"])
             ]
             apply_decay_param_fun = lambda x: x in decay_parameters
 
-            optim_cls, optim_kwargs = Trainer.get_optimizer_cls_and_kwargs(
-                self.args)
-
-            parameters = [{'params': self.model.plm.parameters()}]
-
-            ppt_parameters = [
-                p for p in self.template.parameters() if not p.stop_gradient
-            ]
-            if self.verbalizer is not None:
-                ppt_parameters.extend([
-                    p for p in self.verbalizer.parameters()
-                    if not p.stop_gradient
-                ])
-            ppt_lr = self.args.ppt_learning_rate / self.args.learning_rate
-            if len(ppt_parameters) > 0:
-                parameters.append({
-                    "params": ppt_parameters,
-                    "learning_rate": ppt_lr,
-                    "weight_decay": self.args.ppt_weight_decay,
-                    "beta1": self.args.ppt_adam_beta1,
-                    "beta2": self.args.ppt_adam_beta2,
-                    "epsilon": self.args.ppt_adam_epsilon
-                })
+            if len(plm_parameters) > 0:
+                ppt_lr = self.args.ppt_learning_rate / self.args.learning_rate
+                lr = self.lr_scheduler if lr_scheduler is None else lr_scheduler
+                if len(ppt_parameters) > 0:
+                    params = [{
+                        "params": plm_parameters
+                    }, {
+                        "params": ppt_parameters,
+                        "learning_rate": ppt_lr,
+                        "weight_decay": self.args.ppt_weight_decay,
+                        "beta1": self.args.ppt_adam_beta1,
+                        "beta2": self.args.ppt_adam_beta2,
+                        "epsilon": self.args.ppt_adam_epsilon
+                    }]
+                else:
+                    params = plm_parameters
+            else:
+                lr = self.args.ppt_learning_rate
+                params = ppt_parameters
 
             self.optimizer = optim_cls(
-                learning_rate=self.lr_scheduler
-                if lr_scheduler is None else lr_scheduler,
+                learning_rate=lr,
                 apply_decay_param_fun=apply_decay_param_fun,
-                parameters=parameters,
+                parameters=params,
                 weight_decay=self.args.weight_decay,
                 grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
                 **optim_kwargs)
