@@ -41,6 +41,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [语义匹配](#语义匹配)          | `Taskflow("semantic_matching")`        | ✅        | ✅        | ✅        |            |            | RocketQA排序模型 |
 
 
 ## QuickStart
@@ -1322,6 +1323,32 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.0。
 * `repetition_penalty`：解码重复惩罚值，默认为1.1。
 * `output_scores`：是否要输出解码得分，请默认为False。
+</div></details>
+
+### 文本语义相似度
+<details><summary>&emsp;基于业界领先的RocketQA中文排序模型的语义相似度计算</summary><div>
+
+#### 单条输入
+
+```python
+>>> from paddlenlp import Taskflow
+>>> semantic_match = Taskflow("semantic_matching", model="rocketqa-zh-dureader-cross-encoder")
+>>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866087343543768}]
+```
+
+#### 批量样本输入，平均速度更快
+
+```python
+>>> from paddlenlp import Taskflow
+>>> semantic_match([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866101313382387}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'scores': 0.7051035761833191}]
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_seq_len`：最大序列长度，默认为384。
+* `task_path`：自定义任务路径，默认为None。
 </div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
