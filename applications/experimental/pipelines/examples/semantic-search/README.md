@@ -60,6 +60,9 @@ python setup.py install
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 3.3 一键体验语义检索系统
+
+#### 3.3.1 快速一键启动
+
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
@@ -70,6 +73,67 @@ python examples/semantic-search/semantic_search_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/semantic-search/semantic_search_example.py --device cpu
 ```
+#### 3.3.2 Docker一键启动
+
+可以使用预编译好的镜像一键启动elastic search和 pipelines的镜像：
+
+```
+docker network create elastic
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+
+# cpu paddlepaddle 2.3.1
+docker pull w5688414/pipeline_cpu_server:1.3
+docker run -d --name pipcpuserver --net host -ti w5688414/pipeline_cpu_server:1.3
+
+# gpu cuda 10.2 cudnn 7 paddlepaddle-gpu 2.3.1
+docker pull w5688414/pipeline_server:1.1
+nvidia-docker run -d --name pipserver --net host -ti w5688414/pipeline_server:1.1
+```
+cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
+
+#### 3.3.3 Docker本地构建镜像启动
+
+另外，我们提供了Dockerfile来构建一个镜像.
+
+```
+cd docker
+# GPU
+docker build --tag=pipeline_server . -f Dockerfile-GPU
+# CPU
+docker build --tag=pipeline_cpu_server . -f Dockerfile
+```
+构建完以后就可以运行：
+
+```
+docker network create elastic
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+# cpu
+docker run -d --name pipcpuserver --net host -it pipeline_cpu_server
+# gpu
+nvidia-docker run -d --name pipserver --net host -it pipeline_server
+```
+
+cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
 ### 3.4 构建 Web 可视化语义检索系统
 
