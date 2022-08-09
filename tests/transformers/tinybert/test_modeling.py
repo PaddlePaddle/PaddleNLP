@@ -16,7 +16,6 @@
 import unittest
 from typing import Optional, Tuple
 from dataclasses import dataclass, fields, Field
-from dataclasses_json import dataclass_json
 
 import paddle
 
