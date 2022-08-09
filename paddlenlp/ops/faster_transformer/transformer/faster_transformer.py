@@ -1341,7 +1341,6 @@ class FasterMBART(MBartPretrainedModel):
             seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
                                              dtype="int32"),
                                  axis=-1,
-                                 keepdim=True,
                                  dtype="int32")
         if self.use_fp16_decoding:
             encoder_output = paddle.cast(encoder_output, "float16")
