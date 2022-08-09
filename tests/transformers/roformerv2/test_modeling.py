@@ -179,9 +179,10 @@ class RoFormerv2ModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids)
-        self.parent.assertEqual(
-            result.shape,
-            [self.config.batch_size, self.config.seq_length, self.vocab_size])
+        self.parent.assertEqual(result.shape, [
+            self.config.batch_size, self.config.seq_length,
+            self.config.vocab_size
+        ])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -215,44 +216,6 @@ class RoFormerv2ModelTester:
             "attention_mask": input_mask
         }
         return config, inputs_dict
-
-    def create_and_check_for_masked_lm(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
-        model = RoFormerv2ForMaskedLM(RoFormerv2Model(**config))
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
-        self.parent.assertEqual(result.shape, [
-            self.config.batch_size, self.config.seq_length,
-            self.config.vocab_size
-        ])
-
-    def create_and_check_for_multiple_choice(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
-        model = RoFormerv2ForMultipleChoice(RoFormerv2Model(**config),
-                                            num_choices=self.num_choices)
-        model.eval()
-        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            token_type_ids=multiple_choice_token_type_ids,
-        )
-        self.parent.assertEqual(
-            result.shape, [self.config.batch_size, self.config.num_choices])
 
     def create_and_check_for_question_answering(self, config, input_ids,
                                                 token_type_ids, input_mask):
@@ -329,7 +292,7 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
-    @slow
+    # @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 RoFormerv2PretrainedModel.pretrained_init_configuration)[:1]:
@@ -339,7 +302,7 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
 
 class RoFormerv2ModelIntegrationTest(unittest.TestCase):
 
-    @slow
+    # @slow
     def test_inference_no_attention(self):
         model = RoFormerv2Model.from_pretrained(
             "roformer_v2_chinese_char_small")
@@ -359,7 +322,7 @@ class RoFormerv2ModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
-    @slow
+    # @slow
     def test_inference_with_attention(self):
         model = RoFormerv2Model.from_pretrained(
             "roformer_v2_chinese_char_small")
