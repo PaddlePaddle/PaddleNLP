@@ -51,14 +51,10 @@ b. 硬件环境：
 
 c. 依赖安装：
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
-# 2) 安装 RestAPI 相关依赖
-python ./rest_api/setup.py install
-# 3) 安装 Streamlit WebUI 相关依赖
-python ./ui/setup.py install
 ```
 ### 3.2 数据说明
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。

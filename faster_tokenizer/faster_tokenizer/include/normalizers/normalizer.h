@@ -19,6 +19,7 @@ limitations under the License. */
 #include <vector>
 #include "core/base.h"
 #include "glog/logging.h"
+#include "utils/utils.h"
 
 namespace re2 {
 class RE2;
@@ -28,7 +29,7 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace normalizers {
 
-enum SplitMode {
+enum FASTERTOKENIZER_DECL SplitMode {
   REMOVED,
   ISOLATED,
   MERGED_WITH_PREVIOUS,
@@ -36,12 +37,12 @@ enum SplitMode {
   CONTIGUOUS
 };
 
-struct OffsetMapping {
+struct FASTERTOKENIZER_DECL OffsetMapping {
   std::u32string u32normalized;
   std::vector<int> changes;  // Same size as normalized
 };
 
-class NormalizedString {
+class FASTERTOKENIZER_DECL NormalizedString {
 public:
   NormalizedString(const std::string& original);
   NormalizedString(NormalizedString&& other);
@@ -201,7 +202,7 @@ private:
                     std::vector<std::pair<core::Range, bool>>* matches) const;
 };
 
-struct Normalizer {
+struct FASTERTOKENIZER_DECL Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 

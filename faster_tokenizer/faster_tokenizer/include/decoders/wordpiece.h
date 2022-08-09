@@ -16,12 +16,13 @@ limitations under the License. */
 
 #include "decoders/decoder.h"
 #include "nlohmann/json.hpp"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace decoders {
 
-struct WordPiece : public Decoder {
+struct FASTERTOKENIZER_DECL WordPiece : public Decoder {
   virtual void operator()(const std::vector<std::string> tokens,
                           std::string* result) const;
 

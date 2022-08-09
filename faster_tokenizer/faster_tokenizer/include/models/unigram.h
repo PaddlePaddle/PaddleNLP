@@ -28,7 +28,7 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
-struct Unigram : public Model {
+struct FASTERTOKENIZER_DECL Unigram : public Model {
   Unigram();
   Unigram(const core::VocabList& vocab, const std::vector<size_t>& unk_id);
   Unigram(const Unigram& other);
