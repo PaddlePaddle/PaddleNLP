@@ -15,6 +15,8 @@ import random
 
 from .base_augment import BaseAugment
 
+__all__ = ['WordDelete']
+
 
 class WordDelete(BaseAugment):
     """
