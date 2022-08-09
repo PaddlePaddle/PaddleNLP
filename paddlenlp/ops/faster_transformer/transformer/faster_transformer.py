@@ -24,7 +24,7 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding,
-                           InferMBartDecoding)
+                           InferMBartDecoding, InferOptDecoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
@@ -32,7 +32,8 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UnifiedTransformerPretrainedModel,
                                     UNIMOPretrainedModel, BartPretrainedModel,
-                                    GPTPretrainedModel, MBartPretrainedModel)
+                                    GPTPretrainedModel, MBartPretrainedModel,
+                                    OPTPretrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -699,6 +700,100 @@ class TransformerGenerator(paddle.nn.Layer):
         else:
             model_dict = paddle.load(path)
             self.transformer.load_dict(model_dict)
+
+
+class FasterOPT(OPTPretrainedModel):
+
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterOPT, self).__init__()
+        self._model = model
+        self.use_fp16_decoding = use_fp16_decoding
+        self.decoding = InferOptDecoding(model=model,
+                                         decoding_lib=decoding_lib,
+                                         use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self,
+                input_ids,
+                seq_len=None,
+                attention_mask=None,
+                top_k=4,
+                top_p=0.0,
+                max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=0,
+                decode_strategy="sample",
+                num_return_sequences=1,
+                **model_kwargs):
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(input_ids != pad_token_id,
+                                             dtype="int32"),
+                                 axis=-1,
+                                 dtype="int32")
+
+            if bos_token_id == pad_token_id and paddle.sum(
+                    paddle.any(input_ids == pad_token_id), dtype="int64") > 0:
+                seq_len = seq_len + 1
+
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
+            seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
+
+        return self.decoding(input_ids,
+                             mem_seq_len=seq_len,
+                             attention_mask=attention_mask,
+                             topk=top_k,
+                             topp=top_p,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             forced_eos_token_id=forced_eos_token_id,
+                             temperature=temperature)
+
+    def export_params(self, state_to_load, place):
+        for item in state_to_load:
+            param_data = np.array(state_to_load[item])
+            if self.use_fp16_decoding:
+                param_data = np.float16(param_data)
+
+            param = self
+            attr_list = item.split(".")
+            attr_list = ["decoding", "model"] + attr_list
+            for attr in attr_list:
+                param = getattr(param, attr)
+            param_name = param.name
+            var = paddle.static.global_scope().find_var(param_name).get_tensor()
+            var.set(param_data, place)
+
+    def save_resources(self, tokenizer, path):
+        vocab_file = os.path.join(path, "vocab.txt")
+        if isinstance(tokenizer, GPTTokenizer):
+            with open(vocab_file, 'w', encoding='utf-8') as f:
+                for token in tokenizer.encoder:
+                    f.write(token + '\n')
+            merges_file = os.path.join(path, "merges.txt")
+            shutil.copyfile(tokenizer._merges_file, merges_file)
+        elif isinstance(tokenizer, GPTChineseTokenizer):
+            tokenizer.save_resources(path)
+
+    generate = forward
 
 
 class FasterGPT(GPTPretrainedModel):
