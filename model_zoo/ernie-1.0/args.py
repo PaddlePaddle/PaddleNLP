@@ -80,6 +80,7 @@ def parse_args(MODEL_CLASSES):
 
     # AMP config
     parser.add_argument("--use_amp", type=str2bool, nargs='?', const=False, help="Enable mixed precision training.")
+    parser.add_argument("--fp16_opt_level", type=str, default="O2", help="Mixed precision training optimization level.")
     parser.add_argument("--enable_addto", type=str2bool, nargs='?', const=True, default=True, help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.")
     parser.add_argument("--scale_loss", type=float, default=32768, help="The value of scale_loss for fp16. This is only used for AMP training.")
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
