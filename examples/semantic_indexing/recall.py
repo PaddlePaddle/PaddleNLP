@@ -28,6 +28,7 @@ import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.utils.log import logger
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from base_model import SemanticIndexBase
 from data import convert_example, create_dataloader

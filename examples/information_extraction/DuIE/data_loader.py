@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 from tqdm import tqdm
 
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 from extract_chinese_and_punct import ChineseAndPunctuationExtractor
@@ -123,7 +123,7 @@ def parse_label(spo_list, label_map, tokens, tokenizer):
 
 def convert_example_to_feature(
         example,
-        tokenizer: ErnieTokenizer,
+        tokenizer: PretrainedTokenizer,
         chineseandpunctuationextractor: ChineseAndPunctuationExtractor,
         label_map,
         max_length: Optional[int] = 512,
@@ -248,7 +248,7 @@ class DuIEDataset(paddle.io.Dataset):
     @classmethod
     def from_file(cls,
                   file_path: Union[str, os.PathLike],
-                  tokenizer: ErnieTokenizer,
+                  tokenizer: PretrainedTokenizer,
                   max_length: Optional[int] = 512,
                   pad_to_max_length: Optional[bool] = None):
         assert os.path.exists(file_path) and os.path.isfile(

@@ -28,11 +28,11 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
-from datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
+from datasets import load_dataset
 
 
 def parse_args():

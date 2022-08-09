@@ -327,8 +327,6 @@ def compute_neuron_head_importance(model,
                     'token_type_ids'], batch['labels']
         else:
             input_ids, segment_ids, labels = batch
-        # print()
-        # import pdb; pdb.set_trace()
         logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
         if "QuestionAnswering" in model.__class__.__name__:
             start_logits, end_logits = logits

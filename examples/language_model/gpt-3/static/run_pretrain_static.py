@@ -288,6 +288,7 @@ def do_train(args):
                     model_config[
                         "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
                     model_config["topo"] = topo
+                    model_config["fuse"] = args.fuse_transformer
 
                     model = guard(f'gpu:{args.pp_degree -1}')(
                         GPTForPretraining)(
