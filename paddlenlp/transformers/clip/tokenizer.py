@@ -87,33 +87,32 @@ class CLIPTokenizer(GPTTokenizer):
             Defaults to `'replace'`.
         max_len (int, optional):
             The maximum value of the input sequence length.
-            Defaults to `None`.
+            Defaults to `77`.
         bos_token (str, optional):
             The beginning of sequence token that was used during pretraining. Can be
             used a sequence classifier token.
-            Defaults to `"<s>"`.
+            Defaults to `"<|startoftext|>"`.
         eos_token (str, optional):
             A special token representing the end of a sequence that was used during pretraining.
-            Defaults to `"</s>"`.
+            Defaults to `"<|endoftext|>"`.
         unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to `"<unk>"`.
+            Defaults to `"<|endoftext|>"`.
         pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
-            Defaults to `"<pad>"`.
+            Defaults to `"<|endoftext|>"`.
 
     Examples:
         .. code-block::
 
-            from paddlenlp.transformers import CLIPTokenizer
+            from paddlenlp.transformers import AutoTokenizer
 
-            tokenizer = CLIPTokenizer.from_pretrained('bart-base')
-            print(tokenizer('He was a puppeteer'))
+            tokenizer = AutoTokenizer.from_pretrained('openai/clip-vit-base-patch32')
+            print(tokenizer('He was a puppeteer', return_token_type_ids=False))
 
             '''
-            {'input_ids': [0, 894, 21, 10, 32986, 9306, 254, 2],
-            'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1]}
+            {'input_ids': [49406, 797, 739, 320, 7116, 38820, 528, 49407]}
             '''
 
     """
@@ -125,20 +124,24 @@ class CLIPTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "openai/clip-vit-base-patch32":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-vocab.json",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/openai/clip-vit-base-patch32/vocab.json",
         },
         "merges_file": {
             "openai/clip-vit-base-patch32":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-merges.txt",
+            "http://bj.bcebos.com/paddlenlp/models/transformers/openai/clip-vit-base-patch32/merges.txt",
         }
     }
-    pretrained_init_configuration = {"openai/clip-vit-base-patch32": {}}
+    pretrained_init_configuration = {
+        "openai/clip-vit-base-patch32": {
+            "max_len": 77
+        }
+    }
 
     def __init__(self,
                  vocab_file,
                  merges_file,
                  errors='replace',
-                 max_len=None,
+                 max_len=77,
                  bos_token="<|startoftext|>",
                  eos_token="<|endoftext|>",
                  unk_token="<|endoftext|>",

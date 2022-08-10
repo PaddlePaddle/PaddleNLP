@@ -20,6 +20,12 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from .. import PretrainedModel, register_base_model
 
+__all__ = [
+    'VisualTransformer',
+    'TextTransformer',
+    'CLIPPreTrainedModel',
+]
+
 
 # set attr
 def quick_gelu(x):
@@ -349,105 +355,335 @@ class TextTransformer(nn.Layer):
         return x
 
 
-class ClipPreTrainedModel(PretrainedModel):
+class CLIPPreTrainedModel(PretrainedModel):
     """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
-    models.
+    An abstract class for pretrained CLIP models. It provides CLIP related
+    `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
+    `pretrained_resource_files_map`, `base_model_prefix` for downloading and
+    loading pretrained models.
+    See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "openai/clip-vit-base-patch32": {
-            "embed_dim": 512,
             # vision
             "image_resolution": 224,
             "vision_layers": 12,
-            "vision_width": 768,
+            "vision_embed_dim": 768,
             "vision_patch_size": 32,
+            "vision_hidden_act": "quick_gelu",
             # text
-            "context_length": 77,
+            "max_text_length": 77,
             "vocab_size": 49408,
-            "transformer_width": 512,
-            "transformer_heads": 8,
-            "transformer_layers": 12,
+            "text_embed_dim": 512,
+            "text_heads": 8,
+            "text_layers": 12,
+            "text_hidden_act": "quick_gelu",
+            # others
+            "projection_dim": 512,
             "initializer_range": 0.02,
-            "hidden_act": "quick_gelu",
             "logit_scale_init_value": 2.6592
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "openai/clip-vit-base-patch32": {}
+            "openai/clip-vit-base-patch32":
+            "http://bj.bcebos.com/paddlenlp/models/transformers/openai/clip-vit-base-patch32/model_state.pdparams"
         }
     }
     base_model_prefix = "clip"
 
+    def _init_weights(self, layer):
+        """Initialize the weights"""
+        initializer_range = self.initializer_range if hasattr(
+            self,
+            "initializer_range") else self.clip.config["initializer_range"]
+        factor = self.initializer_factor if hasattr(
+            self,
+            "initializer_factor") else self.clip.config["initializer_factor"]
+        vision_embed_dim = self.vision_embed_dim if hasattr(
+            self, "vision_embed_dim") else self.clip.config["vision_embed_dim"]
+        text_embed_dim = self.text_embed_dim if hasattr(
+            self, "text_embed_dim") else self.clip.config["text_embed_dim"]
+        vision_layers = self.vision_layers if hasattr(
+            self, "vision_layers") else self.clip.config["vision_layers"]
+        text_layers = self.text_layers if hasattr(
+            self, "text_layers") else self.clip.config["text_layers"]
+
+        if isinstance(layer, VisualTransformer):
+            # vision embedding
+            layer.class_embedding.set_value(
+                paddle.normal(
+                    std=vision_embed_dim**-0.5 * factor,
+                    shape=layer.class_embedding.shape,
+                ))
+            layer.conv1.weight.set_value(
+                paddle.normal(
+                    std=initializer_range * factor,
+                    shape=layer.conv1.weight.shape,
+                ))
+            layer.positional_embedding.set_value(
+                paddle.normal(
+                    std=initializer_range * factor,
+                    shape=layer.positional_embedding.shape,
+                ))
+
+        elif isinstance(layer, TextTransformer):
+            # text embedding
+            layer.token_embedding.weight.set_value(
+                paddle.normal(
+                    mean=0.0,
+                    std=factor * 0.02,
+                    shape=layer.token_embedding.weight.shape,
+                ))
+            layer.positional_embedding.set_value(
+                paddle.normal(
+                    mean=0.0,
+                    std=factor * 0.02,
+                    shape=layer.positional_embedding.shape,
+                ))
+        elif isinstance(layer, CLIPModel):
+            layer.text_projection.set_value(
+                paddle.normal(
+                    std=text_embed_dim**-0.5 * factor,
+                    shape=layer.text_projection.shape,
+                ))
+            layer.visual_projection.set_value(
+                paddle.normal(
+                    std=vision_embed_dim**-0.5 * factor,
+                    shape=layer.visual_projection.shape,
+                ))
+            for name, sub_layer in layer.named_sublayers():
+                num_layers = vision_layers if "visual_model" in name else text_layers
+                if isinstance(sub_layer, nn.TransformerEncoderLayer):
+                    # self_attn
+                    in_proj_std = (sub_layer.self_attn.embed_dim**-0.5) * (
+                        (2 * num_layers)**-0.5) * factor
+                    out_proj_std = (sub_layer.self_attn.embed_dim**
+                                    -0.5) * factor
+                    sub_layer.self_attn.q_proj.weight.set_value(
+                        paddle.normal(
+                            std=in_proj_std,
+                            shape=sub_layer.self_attn.q_proj.weight.shape,
+                        ))
+                    sub_layer.self_attn.k_proj.weight.set_value(
+                        paddle.normal(
+                            std=in_proj_std,
+                            shape=sub_layer.self_attn.k_proj.weight.shape,
+                        ))
+                    sub_layer.self_attn.v_proj.weight.set_value(
+                        paddle.normal(
+                            std=in_proj_std,
+                            shape=sub_layer.self_attn.v_proj.weight.shape,
+                        ))
+                    sub_layer.self_attn.out_proj.weight.set_value(
+                        paddle.normal(
+                            std=out_proj_std,
+                            shape=sub_layer.self_attn.out_proj.weight.shape,
+                        ))
+                    # ffn
+                    in_proj_std = ((sub_layer._config["d_model"]**-0.5) *
+                                   ((2 * num_layers)**-0.5) * factor)
+                    fc_std = (2 * sub_layer._config["d_model"])**-0.5 * factor
+                    sub_layer.linear1.weight.set_value(
+                        paddle.normal(
+                            std=fc_std,
+                            shape=sub_layer.linear1.weight.shape,
+                        ))
+                    sub_layer.linear2.weight.set_value(
+                        paddle.normal(
+                            std=in_proj_std,
+                            shape=sub_layer.linear2.weight.shape,
+                        ))
+        if isinstance(layer, nn.LayerNorm):
+            layer.bias.set_value(paddle.zeros_like(layer.bias))
+            layer.weight.set_value(paddle.ones_like(layer.weight))
+        if isinstance(layer, nn.Linear) and layer.bias is not None:
+            layer.bias.set_value(paddle.zeros_like(layer.bias))
+
 
 @register_base_model
-class CLIPModel(ClipPreTrainedModel):
+class CLIPModel(CLIPPreTrainedModel):
+    r"""
+    The bare CLIP Model outputting logits_per_image and logits_per_text.
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+    Args:
+        image_resolution (int, optional):
+            The size (resolution) of each image.
+            Defaults to `224`.
+        vision_layers (Union[Tuple[int, int, int, int], int], optional):
+            Number of hidden layers in the vision model.
+            Defaults to `12`.
+        vision_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in vision model.
+            Defaults to `768`.
+        vision_patch_size(int, optional):
+            The size (resolution) of each patch.
+            Defaults to `32`.
+        vision_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the vision model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        max_text_length (int, optional):
+            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text 
+            input sequence. Defaults to `64`.
+        vocab_size (int, optional):
+            Vocabulary size of `inputs_ids` in `CLIPModel`. Also is the vocab size of text token embedding matrix.
+            Defaults to `49408`.
+        text_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in text model.
+            Defaults to `768`.
+        text_heads (int, optional):
+            Number of attention heads for each attention layer in the attention.
+            Defaults to `8`.
+        text_layers (int, optional):
+            Number of hidden layers in the text model.
+            Defaults to `12`.
+        text_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the text model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        projection_dim (int, optional):
+            Dimentionality of text and vision projection layers.
+            Defaults to `512`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.
+        logit_scale_init_value (float, optional):
+            The inital value of the *logit_scale* paramter. Default is used as per the original CLIP implementation. 
+            Default to `2.6592`.            
+        
+    """
 
     def __init__(
             self,
-            embed_dim: int = 512,
             # vision
             image_resolution: int = 224,
             vision_layers: Union[Tuple[int, int, int, int], int] = 12,
-            vision_width: int = 768,
+            vision_embed_dim: int = 768,
             vision_patch_size: int = 32,
+            vision_hidden_act: str = "quick_gelu",
             # text
-            context_length: int = 77,
+            max_text_length: int = 77,
             vocab_size: int = 49408,
-            transformer_width: int = 512,
-            transformer_heads: int = 8,
-            transformer_layers: int = 12,
+            text_embed_dim: int = 512,
+            text_heads: int = 8,
+            text_layers: int = 12,
+            text_hidden_act: str = "quick_gelu",
+            # others
+            projection_dim: int = 512,
             initializer_range: float = 0.02,
-            hidden_act: str = "quick_gelu",
+            initializer_factor: float = 1.0,
             logit_scale_init_value: float = 2.6592):
         super().__init__()
+        self.initializer_factor = initializer_factor
         self.initializer_range = initializer_range
         self.logit_scale_init_value = logit_scale_init_value
+        self.vision_embed_dim = vision_embed_dim
+        self.text_embed_dim = text_embed_dim
+        self.vision_layers = vision_layers
+        self.text_layers = text_layers
         if isinstance(vision_layers, (tuple, list)):
-            vision_heads = vision_width * 32 // 64
-            self.visual = ModifiedResNet(layers=vision_layers,
-                                         output_dim=embed_dim,
-                                         heads=vision_heads,
-                                         input_resolution=image_resolution,
-                                         width=vision_width)
+            vision_heads = vision_embed_dim * 32 // 64
+            self.visual_model = ModifiedResNet(
+                layers=vision_layers,
+                output_dim=projection_dim,
+                heads=vision_heads,
+                input_resolution=image_resolution,
+                width=vision_embed_dim)
+            self.visual_projection = None
         else:
-            vision_heads = vision_width // 64
-            self.visual = VisualTransformer(input_resolution=image_resolution,
-                                            patch_size=vision_patch_size,
-                                            width=vision_width,
-                                            layers=vision_layers,
-                                            heads=vision_heads,
-                                            activation=hidden_act,
-                                            normalize_before=True)
+            vision_heads = vision_embed_dim // 64
+            self.visual_model = VisualTransformer(
+                input_resolution=image_resolution,
+                patch_size=vision_patch_size,
+                width=vision_embed_dim,
+                layers=vision_layers,
+                heads=vision_heads,
+                activation=vision_hidden_act,
+                normalize_before=True)
+            self.visual_projection = paddle.create_parameter(
+                (vision_embed_dim, projection_dim), paddle.get_default_dtype())
 
-        self.text = TextTransformer(context_length=context_length,
-                                    transformer_width=transformer_width,
-                                    transformer_heads=transformer_heads,
-                                    transformer_layers=transformer_layers,
-                                    vocab_size=vocab_size,
-                                    activation=hidden_act,
-                                    normalize_before=True)
+        self.text_model = TextTransformer(context_length=max_text_length,
+                                          transformer_width=text_embed_dim,
+                                          transformer_heads=text_heads,
+                                          transformer_layers=text_layers,
+                                          vocab_size=vocab_size,
+                                          activation=text_hidden_act,
+                                          normalize_before=True)
 
-        self.visual_projection = paddle.create_parameter(
-            (vision_width, embed_dim), paddle.get_default_dtype())
         self.text_projection = paddle.create_parameter(
-            (transformer_width, embed_dim), paddle.get_default_dtype())
+            (text_embed_dim, projection_dim), paddle.get_default_dtype())
 
         self.logit_scale = paddle.create_parameter(
             (1, ),
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(logit_scale_init_value))
+        self.apply(self._init_weights)
 
     def encode_image(self, pixel_values):
-        return self.visual_projection(self.visual(pixel_values))
+        if self.visual_projection is not None:
+            return paddle.matmul(self.visual_model(pixel_values),
+                                 self.visual_projection)
+        else:
+            return self.visual_model(pixel_values)
 
     def encode_text(self, input_ids):
-        return self.text_projection(self.text(input_ids))
+        return paddle.matmul(self.text_model(input_ids), self.text_projection)
 
-    def forward(self, input_ids=None, pixel_values=None, **kwargs):
+    def forward(self, input_ids, pixel_values, **kwargs):
+        r'''
+        The CLIPModel forward method, overrides the `__call__()` special method.
+        
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide it.
+                Its data type should be `int64` and it has a shape of [text_batch_size, sequence_length].
+            pixel_values (Tensor):
+                Pixel values. Padding will be ignored by default should you provide it.
+                Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
+                
+        Returns:
+            tuple: Returns tuple (`logits_per_image`, `logits_per_text`).
+
+            With the fields:
+
+            - `logits_per_image` (Tensor):
+                The scaled dot product scores between `image_embeds` and `text_embeds`. This represents the image-text
+                similarity scores.
+                Its data type should be float32 and its shape is [image_batch_size, text_batch_size].
+
+            - `logits_per_text` (Tensor):
+                The scaled dot product scores between `text_embeds` and `image_embeds`. This represents the text-image
+                similarity scores.
+                Its data type should be float32 and its shape is [text_batch_size, image_batch_size].
+            
+        Example:
+            .. code-block::
+            
+                import paddle
+                from paddlenlp.transformers import AutoModel, AutoTokenizer
+                tokenizer = AutoTokenizer.from_pretrained('openai/clip-vit-base-patch32')
+                model = AutoModel.from_pretrained('openai/clip-vit-base-patch32')
+                model.eval()
+                inputs = tokenizer(["a photo of a cat", "a photo of a dog"],
+                                padding=True,
+                                return_tensors="pd",
+                                return_token_type_ids=False)
+                inputs["pixel_values"] = paddle.randn((4, 3, 224, 224))
+                logits_per_image, logits_per_text = model(**inputs)
+                # logits_per_image's shape [4, 2]
+                # logits_per_text's shape [2, 4]
+        '''
         image_features = self.encode_image(pixel_values)
         text_features = self.encode_text(input_ids)
 
