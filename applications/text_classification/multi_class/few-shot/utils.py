@@ -1,10 +1,11 @@
 import os
+import json
 from functools import partial
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import InputExample
 
 
-def load_local_dataset(data_path, splits, label_list):
+def load_local_dataset_qic(data_path, splits, label_list):
     """
     Read datasets from files.
     
@@ -32,6 +33,34 @@ def load_local_dataset(data_path, splits, label_list):
     assert isinstance(splits, list) and len(splits) > 0
 
     split_map = {"train": "train.txt", "dev": "dev.txt", "test": "data.txt"}
+
+    dataset = []
+    for split in splits:
+        data_file = os.path.join(data_path, split_map[split])
+        dataset.append(
+            load_dataset(_reader,
+                         data_file=data_file,
+                         label_list=label_list,
+                         lazy=False))
+    return dataset
+
+
+def load_local_dataset(data_path, splits, label_list):
+
+    def _reader(data_file, label_list):
+        with open(data_file, "r", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                data = json.loads(line.strip())
+                yield InputExample(text_a=data["sentence"],
+                                   labels=label_list[data["label_desc"]])
+
+    assert isinstance(splits, list) and len(splits) > 0
+
+    split_map = {
+        "train": "train_0.json",
+        "dev": "dev_0.json",
+        "test": "test_public.json"
+    }
 
     dataset = []
     for split in splits:

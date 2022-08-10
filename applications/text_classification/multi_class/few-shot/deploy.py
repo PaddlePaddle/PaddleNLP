@@ -23,17 +23,19 @@ import paddle
 import paddle2onnx
 import onnxruntime as ort
 from paddlenlp.utils.log import logger
-from paddlenlp.prompt import AutoTemplate, MLMTokenizerWrapper
-from paddlenlp.prompt import InputExample, InputFeatures
-from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.transformers import normalize_chars, tokenize_special_chars
+from paddlenlp.prompt import (AutoTemplate, MLMTokenizerWrapper, InputExample,
+                              InputFeatures, Verbalizer)
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    normalize_chars,
+    tokenize_special_chars,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
 parser.add_argument("--model_name_or_path", default="ernie-3.0-base-zh", type=str, help="The directory or name of model.")
 parser.add_argument("--data_dir", default=None, type=str, help="The path to the prediction data, including label.txt and data.txt.")
-parser.add_argument("--prompt", default=None, type=str, help="The input prompt for tuning.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
 parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
 parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for predicting.")
@@ -137,14 +139,15 @@ class InferBackend(object):
 class MultiClassPredictor(object):
 
     def __init__(self, args, label_list):
-        self.label_list = label_list
+        self._label_list = label_list
         self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
         self._max_seq_length = args.max_seq_length
         self._batch_size = args.batch_size
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               args.device, args.device_id,
                                               args.use_fp16, args.num_threads)
-        self._template = AutoTemplate.create_from(args.prompt, self._tokenizer)
+        self._template = AutoTemplate.load_from(
+            os.path.dirname(args.model_path_prefix), self._tokenizer)
         self._wrapper = MLMTokenizerWrapper(self._max_seq_length,
                                             self._tokenizer)
 
@@ -192,13 +195,9 @@ class MultiClassPredictor(object):
         return inputs
 
     def postprocess(self, infer_data):
-        infer_data = infer_data[0]
-        max_value = np.max(infer_data, axis=1, keepdims=True)
-        exp_data = np.exp(infer_data - max_value)
-        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+        probs = infer_data[0]
         label = probs.argmax(axis=-1)
-        confidence = probs.max(axis=-1)
-        return {"label": label, "confidence": confidence}
+        return {"label": label}
 
     def printer(self, result, input_data):
         label, confidence = result["label"], result["confidence"]
@@ -213,14 +212,34 @@ if __name__ == "__main__":
     for arg_name, arg_value in vars(args).items():
         logger.info("{:20}: {}".format(arg_name, arg_value))
 
-    label_dir = os.path.join(args.data_dir, "label.txt")
-    with open(label_dir, "r", encoding="utf-8") as f:
-        label_list = [x.strip().split("==")[0] for x in f.readlines()]
-        label_list = sorted(label_list)
+    export_path = os.path.dirname(args.model_path_prefix)
+    label_dict = Verbalizer.load_from(export_path)
+    label_list = sorted(list(label_dict.keys()))
+    label_map = {k: i for i, k in enumerate(label_list)}
 
-    text_dir = os.path.join(args.data_dir, "data.txt")
-    with open(text_dir, "r", encoding="utf-8") as f:
-        text_list = [x.strip() for x in f.readlines()]
+    #text_dir = os.path.join(args.data_dir, "data.txt")
+    #with open(text_dir, "r", encoding="utf-8") as f:
+    #    text_list = [x.strip() for x in f.readlines()]
+
+    case_dir = os.path.join(args.data_dir, "test.txt")
+    with open(case_dir, "r", encoding="utf-8") as f:
+        data = [x.strip().split("\t") for x in f.readlines()]
+        text_list = [x[0] for x in data]
+        labels = [label_dict[x[1]] for x in data]
 
     predictor = MultiClassPredictor(args, label_list)
-    predictor.predict(text_list)
+    #predictor.predict(text_list)
+
+    inputs = predictor.preprocess(text_list)
+    infer_result = predictor.infer_batch(inputs)[0]
+    #max_value = np.max(infer_result, axis=1, keepdims=True)
+    #exp_data = np.exp(infer_result - max_value)
+    #probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+    preds = infer_result.argmax(axis=-1)
+    print(preds.shape)
+    print(np.array(labels).shape)
+    print(np.equal(preds, np.array(labels).squeeze(axis=1)).sum(axis=-1))
+    acc = np.mean(
+        np.equal(preds,
+                 np.array(labels).squeeze(axis=1)).sum(axis=-1) == 2)
+    print("acc: %.2f" % (acc * 100))

@@ -35,12 +35,13 @@ from utils import load_local_dataset
 
 @dataclass
 class DataArguments:
+    prompt: str = field(metadata={"help": "The input prompt for tuning."})
     data_dir: str = field(
+        default=None,
         metadata={
             "help":
             "The dataset dictionary includes train.txt, dev.txt and label.txt files."
         })
-    prompt: str = field(metadata={"help": "The input prompt for tuning."})
     soft_encoder: str = field(
         default=None,
         metadata={
@@ -77,6 +78,13 @@ def main():
 
     paddle.set_device(training_args.device)
 
+    #label_file = "/ssd2/wanghuijuan03/prompt/PaddleNLP/examples/few_shot/p-tuning/label_normalized/tnews.json"
+    #import json
+    #labels = json.load(open(label_file, "r"))
+    #with open(os.path.join(data_args.data_dir, "label.txt"), "w") as fp:
+    #    for k, v in labels.items():
+    #        fp.write(k + "==" + v + "\n")
+
     # Load the pretrained language model.
     model = ErnieForMaskedLM.from_pretrained(model_args.model_name_or_path)
     tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -95,9 +103,10 @@ def main():
     logger.info("Using verbalizer: {}".format(data_args.verbalizer))
 
     # Load the few-shot datasets.
-    train_ds, dev_ds = load_local_dataset(data_path=data_args.data_dir,
-                                          splits=["train", "dev"],
-                                          label_list=verbalizer.labels_to_ids)
+    train_ds, dev_ds, test_ds = load_local_dataset(
+        data_path=data_args.data_dir,
+        splits=["train", "dev", "test"],
+        label_list=verbalizer.labels_to_ids)
     if data_args.train_sample_per_label is not None:
         sampler = FewShotSampler(
             num_sample_per_label=data_args.train_sample_per_label)
@@ -108,6 +117,9 @@ def main():
             train_ds[idx].labels][0]
     for idx in range(len(dev_ds)):
         dev_ds[idx].labels = verbalizer.token_ids.numpy()[dev_ds[idx].labels][0]
+    for idx in range(len(test_ds)):
+        test_ds[idx].labels = verbalizer.token_ids.numpy()[
+            test_ds[idx].labels][0]
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -119,24 +131,6 @@ def main():
         verbalizer,
         freeze_plm=training_args.freeze_plm,
         freeze_dropout=training_args.freeze_dropout)
-
-    # Only update the prompt-related parameters to reduce memory cost.
-    training_args = PromptTrainer.init_num_steps(training_args, len(train_ds))
-    lr_scheduler = get_scheduler(training_args.lr_scheduler_type,
-                                 training_args.learning_rate,
-                                 training_args.warmup_steps,
-                                 training_args.num_training_steps)
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=[{
-            'params':
-            [p for p in prompt_model.plm.parameters() if not p.stop_gradient]
-        }, {
-            'params': [p for p in prompt_model.verbalizer.parameters()] +
-            [p for p in prompt_model.template.parameters()],
-            'learning_rate':
-            training_args.ppt_learning_rate / training_args.learning_rate
-        }])
 
     # Define the metric function.
     def compute_metrics(eval_preds):
@@ -151,7 +145,6 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
-                            optimizers=[optimizer, lr_scheduler],
                             compute_metrics=compute_metrics)
 
     if training_args.do_train:
@@ -162,6 +155,10 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_ds)
+        trainer.log_metrics("test", test_ret.metrics)
+
     if training_args.do_export:
         input_spec = [
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids
@@ -170,8 +167,10 @@ def main():
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         os.makedirs(export_path, exist_ok=True)
-        export_model(prompt_model, input_spec, export_path,
-                     model_args.export_type)
+        template.save_to(export_path)
+        verbalizer.save_to(export_path)
+        #export_model(prompt_model, input_spec, export_path,
+        #             model_args.export_type)
 
 
 if __name__ == '__main__':
