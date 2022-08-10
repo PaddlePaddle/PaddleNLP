@@ -351,6 +351,7 @@ def main():
         model_config[
             "attention_probs_dropout_prob"] = model_args.attention_probs_dropout_prob
         model = model_class(base_class(**model_config))
+        # model_config["enable_recompute"] = args.use_recompute
     else:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
