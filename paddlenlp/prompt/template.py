@@ -340,20 +340,6 @@ class SoftTemplate(Template):
         soft2word_init = {}
         soft_id_reindex = {}
 
-        if 'add_prefix_space' in self._template[0]:
-            for part in self._template:
-                if 'soft' in part:
-                    soft_token_ids.append(1)
-                    num_soft_token += 1
-                else:
-                    soft_token_ids.append(0)
-            self.soft_token_ids = soft_token_ids
-            self.num_soft_token = num_soft_token
-            if self.num_soft_token == 0:
-                logger.warning('No soft tokens in template. '\
-                    'Use ManualTemplate for better performance.')
-            return None
-
         for part in self._template:
             if 'soft' not in part and 'soft_id' not in part:
                 soft_token_ids.append(0)
@@ -421,7 +407,7 @@ class SoftTemplate(Template):
             soft_token_ids.extend(id_list)
             inputs.extend([{
                 'add_prefix_space': part['add_prefix_space'],
-                'soft': ''
+                'soft': self.tokenizer.cls_token
             } for _ in range(len(id_list))])
 
         self._template = inputs

@@ -30,6 +30,8 @@
 
 ## 3. 快速开始: 快速搭建语义检索系统
 
+以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./Install_windows.md)
+
 ### 3.1 运行环境和安装说明
 
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
@@ -49,19 +51,18 @@ b. 硬件环境：
 
 c. 依赖安装：
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
-# 2) 安装 RestAPI 相关依赖
-python ./rest_api/setup.py install
-# 3) 安装 Streamlit WebUI 相关依赖
-python ./ui/setup.py install
 ```
 ### 3.2 数据说明
-语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本。
+语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 3.3 一键体验语义检索系统
+
+#### 3.3.1 快速一键启动
+
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
@@ -72,14 +73,80 @@ python examples/semantic-search/semantic_search_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/semantic-search/semantic_search_example.py --device cpu
 ```
+#### 3.3.2 Docker一键启动
+
+可以使用预编译好的镜像一键启动elastic search和 pipelines的镜像：
+
+```
+docker network create elastic
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+
+# cpu paddlepaddle 2.3.1
+docker pull w5688414/pipeline_cpu_server:1.3
+docker run -d --name pipcpuserver --net host -ti w5688414/pipeline_cpu_server:1.3
+
+# gpu cuda 10.2 cudnn 7 paddlepaddle-gpu 2.3.1
+docker pull w5688414/pipeline_server:1.1
+nvidia-docker run -d --name pipserver --net host -ti w5688414/pipeline_server:1.1
+```
+cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
+
+#### 3.3.3 Docker本地构建镜像启动
+
+另外，我们提供了Dockerfile来构建一个镜像.
+
+```
+cd docker
+# GPU
+docker build --tag=pipeline_server . -f Dockerfile-GPU
+# CPU
+docker build --tag=pipeline_cpu_server . -f Dockerfile
+```
+构建完以后就可以运行：
+
+```
+docker network create elastic
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+# cpu
+docker run -d --name pipcpuserver --net host -it pipeline_cpu_server
+# gpu
+nvidia-docker run -d --name pipserver --net host -it pipeline_server
+```
+
+cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
 ### 3.4 构建 Web 可视化语义检索系统
 
 整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的语义检索系统。
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
+首先修改`config/elasticsearch.yml`的配置：
+```
+xpack.security.enabled: false
+```
+然后启动：
 ```bash
 ./bin/elasticsearch
 ```
@@ -93,8 +160,16 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_robust_processed
+                            --doc_dir data/dureader_dev
 ```
+
+参数含义说明
+* `index_name`: 索引的名称
+* `doc_dir`: txt文本数据的路径
+* `host`: Elasticsearch的IP地址
+* `port`: Elasticsearch的端口号
+* `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
@@ -107,7 +182,12 @@ Linux 用户推荐采用 Shell 脚本来启动服务：：
 ```bash
 sh scripts/run_search_server.sh
 ```
+启动后可以使用curl命令验证是否成功运行：
 
+```
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "亚马逊河流的介绍","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
+
+```
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
@@ -122,6 +202,20 @@ sh scripts/run_search_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
+
+#### 3.4.5 数据更新
+
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+
+```
+兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。
+
+从海外市场表现看，
+对俄乌冲突的恐慌情绪已显著释放，
+海外权益市场也从单边下跌转入双向波动。
+
+长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
+```
 
 ## FAQ
 
@@ -138,10 +232,34 @@ elasticsearch 需要在非root环境下运行，可以做如下的操作：
 
 ```
 adduser est
-chown est:est -R ${HOME}/elasticsearch-8.1.2/
-cd ${HOME}/elasticsearch-8.1.2/
+chown est:est -R ${HOME}/elasticsearch-8.3.2/
+cd ${HOME}/elasticsearch-8.3.2/
 su est
 ./bin/elasticsearch
+```
+
+#### Mac OS上安装elasticsearch出现错误 `flood stage disk watermark [95%] exceeded on.... all indices on this node will be marked read-only`
+
+elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
+```
+cluster.routing.allocation.disk.threshold_enabled: false
+```
+
+#### nltk_data加载失败的错误 `[nltk_data] Error loading punkt: [Errno 60] Operation timed out`
+
+在命令行里面输入python,然后输入下面的命令进行下载：
+
+```
+import nltk
+nltk.download('punkt')
+```
+如果下载还是很慢，可以手动[下载](https://github.com/nltk/nltk_data/tree/gh-pages/packages/tokenizers)，然后放入本地的`~/nltk_data/tokenizers`进行解压即可。
+
+#### 服务端运行报端口占用的错误 `[Errno 48] error while attempting to bind on address ('0.0.0.0',8891): address already in use`
+
+```
+lsof -i:8891
+kill -9 PID # PID为8891端口的进程
 ```
 
 ## Reference
