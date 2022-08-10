@@ -203,11 +203,11 @@ class ArtistTokenizer(BertTokenizer):
             self,
             text,
             text_pair=None,
-            max_length=None,
+            max_length=32,  # default
             stride=0,
             is_split_into_words=False,
-            padding=False,
-            truncation=False,
+            padding="max_length",  # default
+            truncation=True,  # default
             return_position_ids=False,
             return_token_type_ids=False,  # don't return token_type_ids 
             return_attention_mask=False,
