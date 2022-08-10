@@ -19,7 +19,7 @@ import numpy as np
 from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
-from paddle.nn.layer.transformer import _convert_attention_mask
+from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttention
 from paddle.distributed.fleet.utils import recompute
 
 from .utils import adapt_stale_fwd_patch
@@ -125,20 +125,36 @@ def _transformer_encoder_fwd(self,
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
-    new_caches = [] if cache is not None else None
+    # To get cache from None when use_cache is True, which is compatible with HF
+    # while HF requires decoder. The implementation here uses cache update in the
+    # MultiHeadAttention not so efficiently, and maybe optimize it later.
+    if cache is None and getattr(self, "_use_cache", False):
+        cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
+    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
+    # to True when cache is not None.
+    new_caches = [] if cache is not None and getattr(self, "_use_cache",
+                                                     True) else None
     all_attentions = [] if output_attentions else None
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
         if self.enable_recompute:
-            layer_outputs = recompute(mod, output, src_mask,
-                                      None if cache is None else cache[i],
-                                      output_attentions)
+            layer_outputs = recompute(
+                mod,
+                output,
+                src_mask=src_mask,
+                cache=None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]),
+                output_attentions=output_attentions)
         else:
-            layer_outputs = mod(output,
-                                src_mask=src_mask,
-                                cache=None if cache is None else cache[i],
-                                output_attentions=output_attentions)
+            layer_outputs = mod(
+                output,
+                src_mask=src_mask,
+                cache=None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]),
+                output_attentions=output_attentions)
 
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
@@ -151,8 +167,9 @@ def _transformer_encoder_fwd(self,
             all_hidden_states.append(output)
         if output_attentions:
             all_attentions.append(outputs[-1])
-        if cache is not None:
-            new_caches.append(outputs[0])
+        if new_caches is not None:
+            new_caches.append(outputs[0] if isinstance(
+                cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 
     if self.norm is not None:
         output = self.norm(output)
