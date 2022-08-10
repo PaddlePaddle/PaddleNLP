@@ -129,7 +129,7 @@ def _transformer_encoder_fwd(self,
     # while HF requires decoder. The implementation here uses cache update in the
     # MultiHeadAttention not so efficiently, and maybe optimize it later.
     if cache is None and getattr(self, "_use_cache", False):
-        cache = [self.layers[0].gen_cache(src)] * len(self.layers)
+        cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
     # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
     # to True when cache is not None.
     new_caches = [] if cache is not None and getattr(self, "_use_cache",
