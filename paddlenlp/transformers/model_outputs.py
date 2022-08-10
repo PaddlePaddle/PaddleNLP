@@ -20,8 +20,23 @@ from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
 from paddle.nn.layer.transformer import _convert_attention_mask
+from paddle.distributed.fleet.utils import recompute
 
 from .utils import adapt_stale_fwd_patch
+
+
+def layer_init_wrapper(func):
+
+    @functools.wraps(func)
+    def _impl(self, *args, **kwargs):
+        enable_recompute = kwargs.pop("enable_recompute", False)
+        func(self, *args, **kwargs)
+        if paddle.in_dynamic_mode():
+            self.enable_recompute = enable_recompute
+        else:
+            self.enable_recompute = False
+
+    return _impl
 
 
 def _transformer_encoder_layer_fwd(self,
@@ -60,6 +75,46 @@ def _transformer_encoder_layer_fwd(self,
         (src, ) + outputs[::-1])  # hidden_states, cache, attentions
 
 
+def _transformer_decoder_fwd(self,
+                             tgt,
+                             memory,
+                             tgt_mask=None,
+                             memory_mask=None,
+                             cache=None):
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+    memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+    output = tgt
+    new_caches = []
+    for i, mod in enumerate(self.layers):
+        if cache is None:
+            if self.enable_recompute:
+                output = recompute(mod,
+                                   output,
+                                   memory,
+                                   tgt_mask,
+                                   memory_mask,
+                                   cache=None)
+            else:
+                output = mod(output,
+                             memory,
+                             tgt_mask=tgt_mask,
+                             memory_mask=memory_mask,
+                             cache=None)
+        else:
+            output, new_cache = mod(output,
+                                    memory,
+                                    tgt_mask=tgt_mask,
+                                    memory_mask=memory_mask,
+                                    cache=cache[i])
+            new_caches.append(new_cache)
+
+    if self.norm is not None:
+        output = self.norm(output)
+
+    return output if cache is None else (output, new_caches)
+
+
 def _transformer_encoder_fwd(self,
                              src,
                              src_mask=None,
@@ -75,10 +130,16 @@ def _transformer_encoder_fwd(self,
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        layer_outputs = mod(output,
-                            src_mask=src_mask,
-                            cache=None if cache is None else cache[i],
-                            output_attentions=output_attentions)
+        if self.enable_recompute:
+            layer_outputs = recompute(mod, output, src_mask,
+                                      None if cache is None else cache[i],
+                                      output_attentions)
+        else:
+            layer_outputs = mod(output,
+                                src_mask=src_mask,
+                                cache=None if cache is None else cache[i],
+                                output_attentions=output_attentions)
+
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
             outputs = layer_outputs[1:]
@@ -122,6 +183,12 @@ def _transformer_encoder_fwd(self,
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
+paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
+
+_encoder_init = paddle.nn.TransformerEncoder.__init__
+_decoder_init = paddle.nn.TransformerDecoder.__init__
+paddle.nn.TransformerEncoder.__init__ = layer_init_wrapper(_encoder_init)
+paddle.nn.TransformerDecoder.__init__ = layer_init_wrapper(_decoder_init)
 
 
 def _get_wrap_setattr(cls):
@@ -139,6 +206,9 @@ paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
 paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
     paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
         paddle.nn.TransformerEncoder))
+paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(
+    paddle.nn.TransformerDecoder.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerDecoder))
 
 
 def is_tensor(x):

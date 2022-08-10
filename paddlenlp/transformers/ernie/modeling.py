@@ -562,7 +562,8 @@ class ErnieModel(ErniePretrainedModel):
                  pad_token_id=0,
                  task_type_vocab_size=3,
                  task_id=0,
-                 use_task_id=False):
+                 use_task_id=False,
+                 enable_recompute=False):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -585,7 +586,9 @@ class ErnieModel(ErniePretrainedModel):
             act_dropout=0,
             weight_attr=weight_attr,
             normalize_before=False)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer,
+                                             num_hidden_layers,
+                                             enable_recompute=enable_recompute)
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
 

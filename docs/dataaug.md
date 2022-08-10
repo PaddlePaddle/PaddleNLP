@@ -12,7 +12,7 @@ PaddleNLP提供了Data Augmentation数据增强API，可用于训练数据数据
 ## 词级别数据增强策略
 
 ### 词替换
-词替换数据增强策略也即将句子中的词随机替换为其他单词进行数据增强，这里我们将介绍如何使用`paddlenlp.data_augmentation.WordSubstitute`进行词级别替换的数据增强。
+词替换数据增强策略也即将句子中的词随机替换为其他单词进行数据增强，这里我们将介绍如何使用`paddlenlp.dataaug.WordSubstitute`进行词级别替换的数据增强。
 
 ```text
 WordSubstitute 参数介绍：
@@ -49,7 +49,7 @@ WordSubstitute 参数介绍：
 我们接下来将以下面的例子介绍词级别替换的使用：
 
 ``` python
-from paddlenlp.data_augmentation import WordSubstitute
+from paddlenlp.dataaug import WordSubstitute
 s1 = "人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。"
 s2 = "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"
 ```
@@ -207,7 +207,7 @@ print("augmented:", augmented[0])
 可以根据的实际需求，修改数据增强生成句子数 `create_n`和句子中被替换的词数量 `aug_n`。
 
 ### 词插入
-词插入数据增强策略也即将句子中的词随机插入其他单词进行数据增强，这里我们将介绍如何使用`paddlenlp.data_augmentation.WordInsert`进行词级别插入的数据增强。
+词插入数据增强策略也即将句子中的词随机插入其他单词进行数据增强，这里我们将介绍如何使用`paddlenlp.dataaug.WordInsert`进行词级别插入的数据增强。
 
 ```text
 WordInsert 参数介绍：
@@ -238,7 +238,7 @@ WordInsert 参数介绍：
 我们接下来将以下面的例子介绍词级别插入的使用：
 
 ``` python
-from paddlenlp.data_augmentation import WordInsert
+from paddlenlp.dataaug import WordInsert
 s1 = "人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。"
 s2 = "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"
 ```
@@ -376,7 +376,7 @@ print("augmented:", augmented[0])
 
 ### 词删除
 
-词删除数据增强策略也即将句子中的词随机删除进行数据增强，这里我们将介绍如何使用`paddlenlp.data_augmentation.WordDelete`进行词级别删除的数据增强。
+词删除数据增强策略也即将句子中的词随机删除进行数据增强，这里我们将介绍如何使用`paddlenlp.dataaug.WordDelete`进行词级别删除的数据增强。
 
 ```text
 WordDelete 参数介绍：
@@ -400,7 +400,7 @@ WordDelete 参数介绍：
 我们接下来将以下面的例子介绍词级别删除的使用：
 
 ``` python
-from paddlenlp.data_augmentation import WordDelete
+from paddlenlp.dataaug import WordDelete
 s1 = "人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。"
 s2 = "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"
 ```
@@ -455,7 +455,7 @@ for sentence, augmented in zip(sentences, augmenteds):
 
 ### 词交换
 
-词交换数据增强策略也即将句子中的词的位置随机交换进行数据增强，这里我们将介绍如何使用`paddlenlp.data_augmentation.WordSwap`进行词级别交换的数据增强。
+词交换数据增强策略也即将句子中的词的位置随机交换进行数据增强，这里我们将介绍如何使用`paddlenlp.dataaug.WordSwap`进行词级别交换的数据增强。
 
 ```text
 WordSwap 参数介绍：
@@ -479,7 +479,7 @@ WordSwap 参数介绍：
 我们接下来将以下面的例子介绍词级别交换的使用：
 
 ``` python
-from paddlenlp.data_augmentation import WordSwap
+from paddlenlp.dataaug import WordSwap
 s1 = "人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。"
 s2 = "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"
 ```

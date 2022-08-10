@@ -243,7 +243,7 @@ class FAISSDocumentStore(SQLDocumentStore):
         self,
         documents: Union[List[dict], List[Document]],
         index: Optional[str] = None,
-        batch_size: int = 10_000,
+        batch_size: int = 1000,
         duplicate_documents: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> None:
@@ -349,7 +349,7 @@ class FAISSDocumentStore(SQLDocumentStore):
         filters: Optional[Dict[
             str,
             Any]] = None,  # TODO: Adapt type once we allow extended filters in FAISSDocStore
-        batch_size: int = 10_000,
+        batch_size: int = 10000,
     ):
         """
         Updates the embeddings in the the document store using the encoding model specified in the retriever.
@@ -432,7 +432,7 @@ class FAISSDocumentStore(SQLDocumentStore):
             str,
             Any]] = None,  # TODO: Adapt type once we allow extended filters in FAISSDocStore
         return_embedding: Optional[bool] = None,
-        batch_size: int = 10_000,
+        batch_size: int = 10000,
         headers: Optional[Dict[str, str]] = None,
     ) -> List[Document]:
         if headers:
@@ -454,7 +454,7 @@ class FAISSDocumentStore(SQLDocumentStore):
             str,
             Any]] = None,  # TODO: Adapt type once we allow extended filters in FAISSDocStore
         return_embedding: Optional[bool] = None,
-        batch_size: int = 10_000,
+        batch_size: int = 10000,
         headers: Optional[Dict[str, str]] = None,
     ) -> Generator[Document, None, None]:
         """
@@ -493,7 +493,7 @@ class FAISSDocumentStore(SQLDocumentStore):
         self,
         ids: List[str],
         index: Optional[str] = None,
-        batch_size: int = 10_000,
+        batch_size: int = 10000,
         headers: Optional[Dict[str, str]] = None,
     ) -> List[Document]:
         if headers:

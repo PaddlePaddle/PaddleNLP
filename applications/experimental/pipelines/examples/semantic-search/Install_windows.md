@@ -47,12 +47,13 @@ xpack.security.enabled: false
 #### 1.4.2 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir data/dureader_robust_processed
+python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir data/dureader_dev
 ```
-
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
+* `host`: Elasticsearch的IP地址
+* `port`: Elasticsearch的端口号
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 
