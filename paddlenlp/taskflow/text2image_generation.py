@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import paddle
+import numpy as np
 from PIL import Image
 from ..transformers import AutoModelForImageGeneration, AutoTokenizer
 from .task import Task
@@ -24,19 +25,6 @@ usage = r"""
            images[0].save("figure.png")
            
          """
-
-tokenizer_kwargs = {
-    "dallebart": {
-        "max_length": 64,
-        "return_token_typd_ids": False,
-        "return_attention_mask": True
-    },
-    "gpt": {
-        "max_length": 32,
-        "return_token_typd_ids": False,
-        "return_attention_mask": False
-    },
-}
 
 
 class Text2ImageGenerationTask(Task):
@@ -80,12 +68,10 @@ class Text2ImageGenerationTask(Task):
         """
 
         def _parse_batch(batch_examples):
-            tokenizerd_inputs = self._tokenizer(
-                batch_examples,
-                return_tensors="pd",
-                padding="max_length",
-                truncation=True,
-                **tokenizer_kwargs[self._model.base_model_prefix])
+            tokenizerd_inputs = self._tokenizer(batch_examples,
+                                                return_tensors="pd",
+                                                padding="max_length",
+                                                truncation=True)
             if self._model.base_model_prefix == "dallebart":
                 tokenizerd_inputs["condition_scale"] = self._condition_scale
             return tokenizerd_inputs
@@ -125,14 +111,9 @@ class Text2ImageGenerationTask(Task):
                 top_p=self._top_p,
                 num_return_sequences=self._num_return_images,
                 use_faster=self._use_faster,
-                use_fp16_decoding=self._use_fp16_decoding).cpu().numpy()
-            if self._model.base_model_prefix == "dallebart":
-                images = (images.clip(0, 1) * 255).astype("uint8")
-            elif self._model.base_model_prefix == "gpt":
-                images = ((images + 1.0) * 127.5).clip(0, 255).astype("uint8")
-            for image in images:
-                all_images.append(image)
-        inputs['images'] = all_images
+                use_fp16_decoding=self._use_fp16_decoding)
+            all_images.append(images.numpy())
+        inputs['images'] = np.concatenate(all_images, axis=0)
         return inputs
 
     def _postprocess(self, inputs):
@@ -141,11 +122,13 @@ class Text2ImageGenerationTask(Task):
         """
         batch_out = []
         generated_images = inputs['images']
+        # [batch_size, num_return_sequences, 256, 256, 3] -> [batch_size, 256, num_return_sequences*256, 3]
+        generated_images = generated_images.transpose([0, 2, 1, 3, 4]).reshape([
+            -1, generated_images.shape[-3],
+            self._num_return_images * generated_images.shape[-2],
+            generated_images.shape[-1]
+        ])
         for generated_image in generated_images:
-            generated_image = generated_image.transpose([1, 0, 2, 3]).reshape(
-                generated_image.shape[-3],
-                self._num_return_images * generated_image.shape[-2],
-                generated_image.shape[-1])
             batch_out.append(Image.fromarray(generated_image))
 
         return batch_out
