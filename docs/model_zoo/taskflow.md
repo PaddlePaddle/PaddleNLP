@@ -41,6 +41,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 
 
 ## QuickStart
@@ -1322,6 +1323,40 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.0。
 * `repetition_penalty`：解码重复惩罚值，默认为1.1。
 * `output_scores`：是否要输出解码得分，请默认为False。
+</div></details>
+
+### 文图生成
+<details><summary>&emsp; 通过文图生成模型来生成图片 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 pai-painter-painting-base-zh
+>>> text2imagegen = Taskflow("text2image_generation", model="pai-painter-painting-base-zh")
+# 单条输入
+>>> images = text2imagegen("风阁水帘今在眼，且来先看早梅红")
+# [<PIL.Image.Image image mode=RGB size=1024x256>]
+>>> images[0].save("figure.png")
+# 多条输入
+>>> images = text2imagegen(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [<PIL.Image.Image image mode=RGB size=1024x256>,
+#  <PIL.Image.Image image mode=RGB size=1024x256>]
+>>> for i, image in enumerate(images):
+>>>     image.save(f"figure_{i}.png")
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `temperature`：解码参数temperature，默认为1.0。
+* `top_k`：解码参数top_k，默认为32。
+* `top_p`：解码参数top_p，默认为1.0。
+* `conditional_scale`：dalle-mini模型使用的参数，可参考[推特](https://twitter.com/RiversHaveWings/status/1478093658716966912)，默认为10.0。
+* `num_return_images`：返回图片的数量，默认为4，即4张图片水平拼接形成一张长图。
+* `use_faster`：是否使用faster_generation，默认为False，目前支持faster_generation的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh"]`。
+* `use_fp16_decoding`：是否使用fp16加速解码过程，默认为False，只有当use_faster为True的时候才有效。
+
 </div></details>
 
 ## PART Ⅱ &emsp; 定制化训练

@@ -45,6 +45,7 @@ b. 硬件环境：
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 c. 依赖安装：
+首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
@@ -73,8 +74,14 @@ python examples/question-answering/dense_qa_example.py --device cpu
 整个 Web 可视化问答系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI。接下来我们依次搭建这 3 个服务并串联构成可视化的问答系统
 
 #### 3.4.1 启动 ANN 服务
-1. 参考官方文档下载安装 [elasticsearch-8.1.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
+1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
+首先修改`config/elasticsearch.yml`的配置：
+```
+xpack.security.enabled: false
+```
+然后启动：
+
 ```bash
 ./bin/elasticsearch
 ```
@@ -91,10 +98,11 @@ python utils/offline_ann.py --index_name baike_cities \
                             --doc_dir data/baike \
                             --delete_index
 ```
-
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
+* `host`: Elasticsearch的IP地址
+* `port`: Elasticsearch的端口号
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 运行成功后会输出如下的日志：
