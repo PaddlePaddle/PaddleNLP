@@ -259,6 +259,11 @@ class Model(object):
         # Shared the embedding between encoder and decoder
         decoder.embedding.weight = encoder.embedding.weight
 
+        if paddle.distributed.get_world_size() > 1:
+            encoder = paddle.DataParallel(encoder)
+            decoder = paddle.DataParallel(decoder)
+            reduce_state = paddle.DataParallel(reduce_state)
+
         if is_eval:
             encoder.eval()
             decoder.eval()
