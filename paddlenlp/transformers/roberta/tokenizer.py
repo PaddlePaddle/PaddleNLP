@@ -378,12 +378,6 @@ class RobertaBPETokenizer(GPTTokenizer):
         errors (str):
             Paradigm to follow when decoding bytes to UTF-8.
             Defaults to `'replace'`.
-        max_len (int, optional):
-            The maximum value of the input sequence length.
-            Defaults to `None`.
-        special_tokens (list, optional):
-            A list of special tokens not in the vocabulary.
-            Defaults to `None`.
 
     Examples:
         .. code-block::
@@ -435,8 +429,6 @@ class RobertaBPETokenizer(GPTTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  add_prefix_space=False,
-                 max_len=None,
-                 special_tokens=None,
                  **kwargs):
 
         bos_token = AddedToken(bos_token,
@@ -473,7 +465,6 @@ class RobertaBPETokenizer(GPTTokenizer):
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
-        self.max_len = max_len if max_len is not None else int(1e12)
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 

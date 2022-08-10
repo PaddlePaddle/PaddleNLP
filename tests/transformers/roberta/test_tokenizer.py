@@ -27,8 +27,8 @@ from paddlenlp.transformers.bert.tokenizer import (
     WordpieceTokenizer,
 )
 from paddlenlp.transformers.tokenizer_utils import AddedToken
-from tests.testing_utils import slow
-from tests.transformers.test_tokenizer_common import TokenizerTesterMixin
+from ...testing_utils import slow
+from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
 VOCAB_FILES_NAMES = RobertaBPETokenizer.resource_files_names
 
@@ -381,7 +381,7 @@ class RobertaChineseTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     @slow
     def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained("bert-base-uncased")
+        tokenizer = self.tokenizer_class.from_pretrained("hfl/roberta-wwm-ext")
 
         text = tokenizer.encode("sequence builders",
                                 return_token_type_ids=None,
