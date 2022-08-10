@@ -20,8 +20,9 @@ import numpy as np
 import requests
 import json
 
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+
 from paddle_serving_client import HttpClient
-import paddlenlp as ppnlp
 
 
 def convert_example(example,
@@ -53,7 +54,7 @@ print(feed_names)
 print(fetch_names)
 
 # 创建tokenizer
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 max_seq_len = 64
 
 # 数据预处理

@@ -20,11 +20,13 @@
 #include "nlohmann/json.hpp"
 #include "utils/failure.h"
 #include "utils/trie.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
-struct FasterWordPiece : public WordPiece {
+struct FASTERTOKENIZER_DECL FasterWordPiece : public WordPiece {
   FasterWordPiece();
   FasterWordPiece(const core::Vocab& vocab,
                   const std::string& unk_token = "[UNK]",
@@ -33,7 +35,7 @@ struct FasterWordPiece : public WordPiece {
                   bool with_pretokenization = false);
 
   virtual std::vector<core::Token> Tokenize(
-      const std::string& sequence) const override;
+      const std::string& sequence) override;
 
 private:
   void InitFailureAndTrie();
@@ -82,5 +84,6 @@ private:
   bool with_pretokenization_;  // The end-to-end version of FasterWordPiece
 };
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -198,6 +198,11 @@ def parse_args(MODEL_CLASSES):
                         type=int,
                         default=10,
                         help="Evaluate the model use X steps data.")
+    parser.add_argument(
+        "--fuse_transformer",
+        type=str2bool,
+        default=False,
+        help="Whether to use fuse attention and fuse feedforward or not.")
 
     # Config for 4D Parallelism
 

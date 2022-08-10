@@ -20,13 +20,16 @@
 #include <map>
 
 #include "glog/logging.h"
+#include "unicode/uchar.h"
+
 #include "models/faster_wordpiece.h"
 #include "models/wordpiece.h"
 #include "utils/path.h"
 #include "utils/utf8.h"
 #include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -118,7 +121,7 @@ void FasterWordPiece::AppendTokensToOutput(
     int* curr_offset_in_sequence,
     int curr_node_value,
     std::vector<core::Token>* tokens) const {
-  uint id = utils::GetTokenIdFromEncodedValue(curr_node_value);
+  uint32_t id = utils::GetTokenIdFromEncodedValue(curr_node_value);
   std::string value;
   int token_substr_length =
       utils::GetTokenLengthFromEncodedValue(curr_node_value);
@@ -282,6 +285,9 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
                                        &curr_offset_in_sequence,
                                        &all_tokens);
   }
+  if (all_tokens.size() == 0) {
+      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
+  }
   VLOG(6) << "All tokens num from TokenizeWithoutPreTokenize: "
           << all_tokens.size();
   return all_tokens;
@@ -367,13 +373,16 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
                          &original_num_tokens,
                          &all_tokens);
   }
+  if (all_tokens.size() == 0) {
+      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
+  }
   VLOG(6) << "All tokens num from TokenizeWithPreTokenize: "
           << all_tokens.size();
   return all_tokens;
 }
 
 std::vector<core::Token> FasterWordPiece::Tokenize(
-    const std::string& sequence) const {
+    const std::string& sequence) {
   if (!with_pretokenization_) {
     return TokenizeWithoutPreTokenize(sequence);
   }
@@ -400,5 +409,6 @@ void from_json(const nlohmann::json& j, FasterWordPiece& model) {
   model.InitFailureAndTrie();
 }
 
-}  // models
-}  // tokenizers
+}  // namespace models
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

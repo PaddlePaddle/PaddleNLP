@@ -19,7 +19,8 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ErnieMModel', 'ErnieMPretrainedModel', 'ErnieMForSequenceClassification',
-    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering'
+    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering',
+    'ErnieMForMultipleChoice'
 ]
 
 
@@ -266,8 +267,8 @@ class ErnieMModel(ErnieMPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import ErnieMModel, ErnieMTokenizer
 
-                tokenizer = ErnieMModel.from_pretrained('ernie-m-base')
-                model = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                tokenizer = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                model = ErnieMModel.from_pretrained('ernie-m-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}

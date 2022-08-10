@@ -35,12 +35,10 @@ import types
 from utils import get_timers, set_timers
 from types import MethodType
 from paddle import _C_ops
-from paddle.fluid import core
-from paddle.fluid.dygraph import to_variable
+from paddle.fluid.framework import core, in_dygraph_mode
 import paddle.distributed as dist
 from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
 
@@ -179,8 +177,8 @@ def unscale_method(self, optimizer):
             if (param._grad_ivar() is not None) and (
                 param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
         ]
-    temp_found_inf_fp16 = to_variable(np.array([0]).astype(np.bool))
-    temp_found_inf_fp32 = to_variable(np.array([0]).astype(np.bool))
+    temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool))
+    temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool))
 
     if len(param_grads_fp16):
         _C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
@@ -336,6 +334,8 @@ def do_train(args):
     }
 
     fleet.init(is_collective=True, strategy=strategy)
+
+    nranks = paddle.distributed.get_world_size()
 
     # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
@@ -618,9 +618,10 @@ def do_train(args):
                     else:
                         bal_loss = -1
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, bal_loss, speed,
-                           speed * default_global_tokens_num, learning_rate))
+                           speed * default_global_tokens_num, speed *
+                           default_global_tokens_num / nranks, learning_rate))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate", learning_rate,
                                           global_step)

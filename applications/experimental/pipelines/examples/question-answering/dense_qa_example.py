@@ -41,7 +41,9 @@ def dense_qa_pipeline():
         doc_dir = "data/baike"
         city_data = "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
         fetch_archive_from_http(url=city_data, output_dir=doc_dir)
-        dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True)
+        dicts = convert_files_to_dicts(dir_path=doc_dir,
+                                       split_paragraphs=True,
+                                       encoding='utf-8')
 
         if os.path.exists(args.index_name):
             os.remove(args.index_name)

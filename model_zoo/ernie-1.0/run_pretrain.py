@@ -415,8 +415,7 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        clip = paddle.fluid.clip.GradientClipByGlobalNorm(
-            clip_norm=args.grad_clip)
+        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
     decay_param = [
         p.name for n, p in model.named_parameters()
@@ -617,11 +616,10 @@ def do_train(args):
                         }
                         addition_info = ", ".join("%s: %.2f" % (k, v)
                                                   for k, v in amp_info.items())
-                        addition_info = " " + addition_info
                         for k, v in amp_info.items():
                             log_writer.add_scalar("amp/%s" % k, v, global_step)
 
-                    logger.info(common_loginfo + addition_info)
+                    logger.info(", ".join([common_loginfo, addition_info]))
 
                 tic_train = time.time()
 

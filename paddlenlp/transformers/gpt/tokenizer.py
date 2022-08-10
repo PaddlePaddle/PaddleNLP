@@ -529,3 +529,12 @@ class GPTTokenizer(PretrainedTokenizer):
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
                 shutil.copyfile(source_path, save_path)
+
+    def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (string) in a single string.
+        """
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
+        return text

@@ -362,7 +362,11 @@ class TransformerDecoderLayer(nn.Layer):
         self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
         self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
         self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
-        self.activation = getattr(F, activation)
+
+        if activation == 'gelu':
+            self.activation = nn.GELU(approximate=True)
+        else:
+            self.activation = getattr(F, activation)
 
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
         residual = tgt
@@ -382,8 +386,7 @@ class TransformerDecoderLayer(nn.Layer):
         residual = tgt
         if self.normalize_before:
             tgt = self.norm2(tgt)
-        tgt = self.dropout2(
-            self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
+        tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
         tgt = residual + tgt
 
         if not self.normalize_before:
@@ -967,7 +970,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
-        self.max_predict_len = max_predict_len
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype='int32')
         self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
@@ -1166,7 +1169,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         if attention_mask is not None:
             if len(attention_mask.shape) == 4:
                 attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.fluid.data_feeder.convert_dtype(
+            if "int" in paddle.common_ops_import.convert_dtype(
                     attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:

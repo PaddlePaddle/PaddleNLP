@@ -19,11 +19,11 @@ import time
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
 from paddle import inference
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
 sys.path.append('./')
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
     test_ds = load_dataset("chnsenticorp", splits=["test"])
     data = [d["text"] for d in test_ds]
     batches = [

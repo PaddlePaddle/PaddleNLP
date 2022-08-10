@@ -37,6 +37,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ChineseBertTokenizer", "chinesebert"),
     ("ConvBertTokenizer", "convbert"),
     ("CTRLTokenizer", "ctrl"),
+    ("DalleBartTokenizer", "dallebart"),
     ("DistilBertTokenizer", "distilbert"),
     ("ElectraTokenizer", "electra"),
     ("ErnieCtmTokenizer", "ernie_ctm"),
@@ -77,12 +78,15 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BertTokenizer", "bert"),
     ("BartTokenizer", "bart"),
     ("GAUAlphaTokenizer", "gau_alpha"),
+    ("CodeGenTokenizer", "codegen"),
+    ("ArtistTokenizer", "artist"),
 ])
 
-FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFasterTokenizer", "bert"),
-                                              ("ErnieFasterTokenizer", "ernie"),
-                                              ("TinyBertFasterTokenizer",
-                                               "tinybert")])
+FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
+    ("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie"),
+    ("TinyBertFasterTokenizer", "tinybert"),
+    ("ErnieMFasterTokenizer", "ernie_m")
+])
 # For FasterTokenizer
 if is_faster_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
@@ -208,8 +212,8 @@ class AutoTokenizer():
                                 logger.warning(
                                     "Can't find the faster_tokenizer package, "
                                     "please ensure install faster_tokenizer correctly. "
-                                    "You can install faster_tokenizer by `pip install faster_tokenizer`"
-                                    "(Currently only work for linux platform).")
+                                    "You can install faster_tokenizer by `pip install faster_tokenizer`."
+                                )
 
                         logger.info("We are using %s to load '%s'." %
                                     (actual_tokenizer_class,
@@ -283,6 +287,9 @@ class AutoTokenizer():
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                if not init_class:
+                    init_class = init_kwargs.pop("tokenizer_class", None)
+
                 if init_class:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(

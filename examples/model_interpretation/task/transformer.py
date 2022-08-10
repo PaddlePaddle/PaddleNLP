@@ -24,9 +24,9 @@ from paddle.nn.layer.norm import LayerNorm
 from paddle.nn import functional as F
 from paddle import tensor
 from paddle.fluid import layers
-from paddle.fluid.dygraph import Layer, LayerList
-from paddle.fluid.param_attr import ParamAttr
-from paddle.fluid.data_feeder import convert_dtype
+from paddle import ParamAttr
+from paddle.nn import Layer, LayerList
+from paddle.common_ops_import import convert_dtype
 
 __all__ = []
 
@@ -404,11 +404,9 @@ class MultiHeadAttention(Layer):
             q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
         # scale dot product attention
-        # TODO(guosheng): use tensor.matmul, however it doesn't support `alpha`
-        product = layers.matmul(x=q,
+        product = paddle.matmul(x=q * (self.head_dim**-0.5),
                                 y=k,
-                                transpose_y=True,
-                                alpha=self.head_dim**-0.5)
+                                transpose_y=True)
         if attn_mask is not None:
             # Support bool or int mask
             attn_mask = _convert_attention_mask(attn_mask, product.dtype)

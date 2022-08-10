@@ -19,6 +19,8 @@ BATCH_SIZE=$3
 LR=$4
 GRAD_ACCU_STEPS=$5
 
+export FLAGS_cudnn_deterministic=True
+
 if [ -f "${MODEL_PATH}/${TASK_NAME}/${LR}_${BATCH_SIZE}_0.1.log" ]
 then
     # Exits if log exits and best_result is computed.

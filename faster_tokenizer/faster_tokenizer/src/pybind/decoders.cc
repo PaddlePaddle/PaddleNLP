@@ -11,14 +11,15 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-#include <Python.h>
 
 #include "decoders/decoders.h"
+#include <Python.h>
 #include "pybind/decoders.h"
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyDecoder : public decoders::Decoder {
@@ -68,5 +69,6 @@ void BindDecoders(pybind11::module* m) {
            py::arg("tokens"));
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp
