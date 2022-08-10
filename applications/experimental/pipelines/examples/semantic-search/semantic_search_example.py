@@ -36,7 +36,7 @@ def semantic_search_tutorial():
             embed_title=False,
         )
     else:
-        doc_dir = "data/dureader_robust_processed"
+        doc_dir = "data/dureader_dev"
         dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
 
         fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
