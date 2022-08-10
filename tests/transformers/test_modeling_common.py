@@ -164,8 +164,8 @@ class ModelTesterMixin:
             # signature.parameters is an OrderedDict => so arg_names order is deterministic
             arg_names = [*signature.parameters.keys()]
             if not all(
-                    name in arg_names
-                    for name in ["output_attentions", "output_hidden_states"]):
+                    name in arg_names for name in
+                ["output_attentions", "output_hidden_states", "return_dict"]):
                 continue
             inputs_dict["output_attentions"] = True
             inputs_dict["output_hidden_states"] = False
@@ -327,6 +327,13 @@ class ModelTesterMixin:
         )
         inputs_dict["return_dict"] = True
         for model_class in self.all_model_classes:
+            signature = inspect.signature(model_class.forward)
+            # signature.parameters is an OrderedDict => so arg_names order is deterministic
+            arg_names = [*signature.parameters.keys()]
+            if not all(
+                    name in arg_names for name in
+                ["output_attentions", "output_hidden_states", "return_dict"]):
+                continue
             inputs_dict["output_hidden_states"] = True
             check_hidden_states_output(inputs_dict, config, model_class)
             # TODO(guosheng): check that output_hidden_states also work using config
