@@ -69,7 +69,7 @@ def get_pairs(word):
 
 class CLIPTokenizer(GPTTokenizer):
     r"""
-    Construct a BART tokenizer based on byte-level Byte-Pair-Encoding.
+    Construct a CLIP tokenizer based on byte-level Byte-Pair-Encoding.
 
     This tokenizer inherits from :class:`~paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`.
     For more information regarding those methods, please refer to this superclass.
