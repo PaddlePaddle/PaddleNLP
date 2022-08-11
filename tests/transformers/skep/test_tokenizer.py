@@ -16,31 +16,302 @@
 import os
 import unittest
 import json
+from typing import Dict, Any, List, Tuple
+import shutil
+
+from parameterized import parameterized_class
 
 from paddlenlp.transformers.skep.tokenizer import SkepTokenizer, BasicTokenizer, WordpieceTokenizer, BpeEncoder
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
-from tests.testing_utils import slow
+from tests.testing_utils import slow, get_tests_dir
 from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
-class BPETokenizerTest(unittest.TestCase):
+def _class_name_func(cls, num: int, params_dict: Dict[str, Any]):
+    suffix = 'UseBPE' if params_dict['use_bpe_encoder'] else "NotUseBPE"
+    return f"{cls.__name__}{suffix}"
+
+
+def _read_tokens_from_file(file: str) -> List[str]:
+    with open(file, 'r', encoding='utf-8') as f:
+        tokens = [token.strip() for token in f.readlines()]
+    return tokens
+
+
+class SkepBpeEncoderTest(unittest.TestCase):
 
     def setUp(self):
-        self.tokenizer = BpeEncoder()
+        self.vocab_file = get_tests_dir("fixtures/bpe.en/vocab.json")
+        self.merges_file = get_tests_dir("fixtures/bpe.en/merges.txt")
+        self.encoder = BpeEncoder(encoder_json_file=self.vocab_file,
+                                  vocab_bpe_file=self.merges_file)
 
-    def test_simple_encode(self):
-        pass
+    def test_tokenizer(self):
+        text = " lower newer"
+        bpe_tokens = ["\u0120low", "er", "\u0120", "n", "e", "w", "er"]
+        tokens = self.encoder._tokenize(text)
+
+        self.assertListEqual(tokens, bpe_tokens)
+
+        decoded_text = self.encoder.convert_tokens_to_string(tokens)
+        self.assertEqual(text, decoded_text)
+
+    def test_tokenizer_encode_decode(self):
+        text = " lower newer"
+        bpe_tokens = ["\u0120low", "er", "\u0120", "n", "e", "w", "er"]
+        token_ids = self.encoder.encode(text)
+        tokens = [self.encoder.decoder[token_id] for token_id in token_ids]
+
+        self.assertListEqual(tokens, bpe_tokens)
+
+        decoded_text = self.encoder.decode(token_ids)
+        self.assertEqual(text, decoded_text)
+
+    def test_unk_word(self):
+        text = " lower newer a"
+        with self.assertRaises(KeyError):
+            self.encoder.encode(text)
+
+        # can tokenize correct
+        tokens = self.encoder._tokenize(text)
+
+        # recognize the `a` as the <unk-token>
+        token_ids = [
+            self.encoder._convert_token_to_id(token) for token in tokens
+        ]
+
+        decoded_tokens = [
+            self.encoder._convert_id_to_token(token_id)
+            for token_id in token_ids
+        ]
+        self.assertIn(self.encoder.unk_token, decoded_tokens)
 
 
-class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = SkepTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
+    use_bpe_encoder = True
 
+    def setUp(self):
+        super().setUp()
+
+        vocab = [
+            "l",
+            "o",
+            "w",
+            "e",
+            "r",
+            "s",
+            "t",
+            "i",
+            "d",
+            "n",
+            "\u0120",
+            "\u0120l",
+            "\u0120n",
+            "\u0120lo",
+            "\u0120low",
+            "er",
+            "\u0120lowest",
+            "\u0120newer",
+            "\u0120wider",
+            "<|endoftext|>",
+        ]
+        # save vocab file
+        self.vocab_file = os.path.join(self.tmpdirname, 'vocab.txt')
+        with open(self.vocab_file, 'w', encoding='utf-8') as f:
+            # f.write('\n'.join(vocab))
+            f.write('\n'.join(vocab +
+                              ["[PAD]", "[CLS]", "[SEP]", "[UNK]", "[MASK]"]))
+
+        # save bpe related files
+        self.bpe_json_file = os.path.join(self.tmpdirname, 'encoder.json')
+        self.bpe_vocab_file = os.path.join(self.tmpdirname, 'merges.txt')
+        self.special_tokens_map = {"unk_token": "<unk>"}
+        shutil.copyfile(get_tests_dir("fixtures/bpe.en/vocab.json"),
+                        self.bpe_json_file)
+
+        shutil.copyfile(get_tests_dir("fixtures/bpe.en/merges.txt"),
+                        self.bpe_vocab_file)
+
+    def get_tokenizer(self, **kwargs):
+        tokenizer = self.tokenizer_class.from_pretrained(
+            self.tmpdirname,
+            bpe_vocab_file=self.bpe_vocab_file,
+            bpe_json_file=self.bpe_json_file,
+            use_bpe_encoder=self.use_bpe_encoder,
+            **kwargs)
+        return tokenizer
+
+    def get_input_output_texts(self, tokenizer):
+        input_text = " lower"
+        output_text = "\u0120lower"
+        return input_text, output_text
+
+    def get_clean_sequence(self,
+                           tokenizer,
+                           with_prefix_space=False,
+                           max_length=20,
+                           min_length=5) -> Tuple[str, list]:
+        toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False))
+                for i in range(len(tokenizer.bpe_tokenizer.encoder))]
+        toks = list(
+            filter(
+                lambda t: [t[0]] == tokenizer.encode(
+                    t[1], return_token_type_ids=None, add_special_tokens=False)[
+                        'input_ids'], toks))
+        if max_length is not None and len(toks) > max_length:
+            toks = toks[:max_length]
+        if min_length is not None and len(toks) < min_length and len(toks) > 0:
+            while len(toks) < min_length:
+                toks = toks + toks
+        # toks_str = [t[1] for t in toks]
+        toks_ids = [t[0] for t in toks]
+
+        # Ensure consistency
+        output_txt = tokenizer.decode(toks_ids,
+                                      clean_up_tokenization_spaces=False)
+        if " " not in output_txt and len(toks_ids) > 1:
+            output_txt = (tokenizer.decode(
+                [toks_ids[0]], clean_up_tokenization_spaces=False) + " " +
+                          tokenizer.decode(toks_ids[1:],
+                                           clean_up_tokenization_spaces=False))
+        if with_prefix_space:
+            output_txt = " " + output_txt
+        output_ids = tokenizer.encode(output_txt,
+                                      return_token_type_ids=None,
+                                      add_special_tokens=False)['input_ids']
+        return output_txt, output_ids
+
+    def test_full_tokenizer(self):
+        tokenizer = self.get_tokenizer()
+        text = " lower newer"
+        bpe_tokens = ["\u0120low", "er", "\u0120", "n", "e", "w", "er"]
+
+        # test tokenize
+        tokens = tokenizer.tokenize(text)
+        self.assertListEqual(tokens, bpe_tokens)
+
+        # test encode
+        token_ids = tokenizer.encode(text)['input_ids']
+
+        # test decode
+        decode_text = tokenizer.decode(token_ids,
+                                       skip_special_tokens=True,
+                                       spaces_between_special_tokens=False)
+        self.assertEqual(text, decode_text)
+
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
+                             [14, 15, 10, 9, 3, 2, 15])
+
+    def test_internal_consistency(self):
+        tokenizers = self.get_tokenizers()
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                input_text, output_text = self.get_input_output_texts(tokenizer)
+
+                tokens = tokenizer.tokenize(input_text)
+                ids = tokenizer.convert_tokens_to_ids(tokens)
+                tokens_2 = tokenizer.convert_ids_to_tokens(ids)
+
+                ids = tokenizer.convert_tokens_to_ids(tokens)
+                ids_2 = tokenizer.encode(input_text,
+                                         return_token_type_ids=None,
+                                         add_special_tokens=False)['input_ids']
+                self.assertListEqual(ids, ids_2)
+
+                tokens_2 = tokenizer.convert_ids_to_tokens(ids)
+                self.assertNotEqual(len(tokens_2), 0)
+                text_2 = tokenizer.decode(ids)
+                self.assertIsInstance(text_2, str)
+
+    def test_chinese(self):
+        tokenizer = BasicTokenizer()
+
+        self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
+                             ["ah", "\u535A", "\u63A8", "zz"])
+
+    def test_clean_text(self):
+        tokenizer = self.get_tokenizer()
+
+        # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
+        self.assertListEqual(
+            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
+            [['T', 'e', 's', 't'], ['Â', 'Ń'], ['t', 'e', 's', 't']])
+
+    def test_sequence_builders(self):
+        tokenizer = self.tokenizer_class.from_pretrained(
+            "skep_ernie_1.0_large_ch")
+
+        text = tokenizer.encode("sequence builders",
+                                return_token_type_ids=None,
+                                add_special_tokens=False)["input_ids"]
+        text_2 = tokenizer.encode("multi-sequence build",
+                                  return_token_type_ids=None,
+                                  add_special_tokens=False)["input_ids"]
+
+        encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
+        encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
+
+        assert encoded_sentence == [tokenizer.cls_token_id
+                                    ] + text + [tokenizer.sep_token_id]
+        assert encoded_pair == [tokenizer.cls_token_id] + text + [
+            tokenizer.sep_token_id
+        ] + text_2 + [tokenizer.sep_token_id]
+
+    def test_pretokenized_inputs(self):
+        # Test when inputs are pretokenized
+
+        tokenizers = self.get_tokenizers(
+            do_lower_case=False)  # , add_prefix_space=True)
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+
+                if hasattr(
+                        tokenizer,
+                        "add_prefix_space") and not tokenizer.add_prefix_space:
+                    continue
+
+                # Prepare a sequence from our tokenizer vocabulary
+                sequence, ids = self.get_clean_sequence(tokenizer,
+                                                        with_prefix_space=True,
+                                                        max_length=20)
+                # sequence_no_prefix_space = sequence.strip()
+                token_sequence = sequence.split()
+                # Test encode for pretokenized inputs
+                output_sequence = tokenizer.encode(
+                    sequence,
+                    return_token_type_ids=None,
+                    add_special_tokens=False)['input_ids']
+                self.assertEqual(ids, output_sequence)
+
+    def test_pretrained_model_lists(self):
+        self.skipTest("`max_model_input_sizes` not found, so skip this test")
+
+    def test_conversion_reversible(self):
+        self.skipTest("bpe vocab not supported cls_token, bos_token")
+
+    def test_offsets_mapping(self):
+        self.skipTest(
+            "using basic-tokenizer or word-piece tokenzier to do this test, so to skpt"
+        )
+
+    def test_special_tokens_mask_input_pairs(self):
+        self.skipTest("skip for bpe tokenizer")
+
+
+class SkepWordPieceTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+
+    tokenizer_class = SkepTokenizer
+    space_between_special_tokens = True
+    from_pretrained_filter = filter_non_english
+    test_seq2seq = True
     use_bpe_encoder = False
+    from_pretrained_kwargs = {"do_lower_case": False}
 
     def setUp(self):
         super().setUp()
@@ -62,60 +333,9 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "low",
             "lowest",
         ]
-        self.vocab_file, self.bpe_json_file, self.bpe_vocab_file = None, None, None
-        self.vocab_file = os.path.join(
-            self.tmpdirname, SkepTokenizer.resource_files_names["vocab_file"])
-
+        self.vocab_file = os.path.join(self.tmpdirname, "vocab.txt")
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
-            vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
-
-        if self.use_bpe_encoder:
-            self.bpe_json_file = os.path.join(
-                self.tmpdirname,
-                SkepTokenizer.resource_files_names["bpe_json_file"])
-            with open(self.bpe_json_file, 'w', encoding='utf-8') as f:
-                json.dump(
-                    {token: index
-                     for index, token in enumerate(vocab_tokens)},
-                    f,
-                    ensure_ascii=False)
-
-            self.bpe_vocab_file = os.path.join(
-                self.tmpdirname,
-                SkepTokenizer.resource_files_names["bpe_vocab_file"])
-            merges = [
-                "#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r",
-                ""
-            ]
-            with open(self.bpe_vocab_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(merges))
-
-    def get_tokenizer(self, **kwargs):
-        return self.tokenizer_class(vocab_file=self.vocab_file,
-                                    bpe_vocab_file=self.bpe_vocab_file,
-                                    bpe_json_file=self.bpe_json_file,
-                                    use_bpe_encoder=self.use_bpe_encoder,
-                                    **kwargs)
-
-    def get_input_output_texts(self, tokenizer):
-        input_text = "UNwant\u00E9d,running"
-        output_text = "unwanted, running"
-        return input_text, output_text
-
-    def test_full_tokenizer(self):
-        tokenizer = self.tokenizer_class(self.vocab_file)
-
-        tokens = tokenizer.tokenize("UNwant\u00E9d,running")
-        self.assertListEqual(tokens,
-                             ["un", "##want", "##ed", ",", "runn", "##ing"])
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [9, 6, 7, 12, 10, 11])
-
-    def test_chinese(self):
-        tokenizer = BasicTokenizer()
-
-        self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "\u535A", "\u63A8", "zz"])
+            vocab_writer.write("\n".join(vocab_tokens))
 
     def test_basic_tokenizer_lower(self):
         tokenizer = BasicTokenizer(do_lower_case=True)
@@ -189,6 +409,65 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.tokenize("unwantedX running"),
                              ["[UNK]", "runn", "##ing"])
 
+
+class SkepTokenizationZHTest(TokenizerTesterMixin, unittest.TestCase):
+
+    tokenizer_class = SkepTokenizer
+    space_between_special_tokens = False
+    from_pretrained_filter = filter_non_english
+    test_seq2seq = True
+    use_bpe_encoder = False
+
+    def setUp(self):
+        super().setUp()
+        self.vocab_file = os.path.join(self.tmpdirname, 'vocab.txt')
+
+        shutil.copyfile(get_tests_dir("fixtures/vocab.zh.txt"), self.vocab_file)
+
+        self.bpe_vocab_file = None
+        self.bpe_json_file = None
+
+    def get_tokenizer(self, **kwargs):
+        return self.tokenizer_class.from_pretrained(
+            self.tmpdirname,
+            vocab_file=self.vocab_file,
+            bpe_vocab_file=self.bpe_vocab_file,
+            bpe_json_file=self.bpe_json_file,
+            use_bpe_encoder=self.use_bpe_encoder,
+            **kwargs)
+
+    def get_input_output_texts(self, tokenizer):
+        input_text = "飞\u6868深度学习框架"
+        output_text = "飞 桨 深 度 学 习 框 架"
+        return input_text, output_text
+
+    def test_full_tokenizer(self):
+        tokenizer = self.tokenizer_class(self.vocab_file)
+
+        tokens = tokenizer.tokenize("飞\u6868深度学习框架")
+        self.assertListEqual(tokens, list("飞桨深度学习框架"))
+
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
+                             [11, 12, 13, 10, 14, 15, 16, 17])
+
+    def test_chinese(self):
+        tokenizer = BasicTokenizer()
+
+        self.assertListEqual(tokenizer.tokenize("飞\u535A\u63A8桨"),
+                             ["飞", "\u535A", "\u63A8", "桨"])
+
+    def test_basic_tokenizer_no_lower(self):
+        tokenizer = BasicTokenizer(do_lower_case=False)
+        tokens = tokenizer.tokenize(" \t飞!桨  \n 深度学 习  ")
+        self.assertListEqual(tokens, ["飞", "!", "桨", "深", "度", "学", "习"])
+
+    def test_basic_tokenizer_respects_never_split_tokens(self):
+        tokenizer = BasicTokenizer(do_lower_case=False, never_split=["[UNK]"])
+
+        tokens = tokenizer.tokenize(" \t飞!桨  \n 深度学 习  [UNK]")
+        self.assertListEqual(tokens,
+                             ["飞", "!", "桨", "深", "度", "学", "习", "[UNK]"])
+
     def test_offsets_mapping(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
@@ -236,41 +515,15 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     sum(tokens_with_offsets["special_tokens_mask"]),
                     added_tokens)
 
-    def test_is_whitespace(self):
-        self.assertTrue(_is_whitespace(" "))
-        self.assertTrue(_is_whitespace("\t"))
-        self.assertTrue(_is_whitespace("\r"))
-        self.assertTrue(_is_whitespace("\n"))
-        self.assertTrue(_is_whitespace("\u00A0"))
-
-        self.assertFalse(_is_whitespace("A"))
-        self.assertFalse(_is_whitespace("-"))
-
-    def test_is_control(self):
-        self.assertTrue(_is_control("\u0005"))
-
-        self.assertFalse(_is_control("A"))
-        self.assertFalse(_is_control(" "))
-        self.assertFalse(_is_control("\t"))
-        self.assertFalse(_is_control("\r"))
-
-    def test_is_punctuation(self):
-        self.assertTrue(_is_punctuation("-"))
-        self.assertTrue(_is_punctuation("$"))
-        self.assertTrue(_is_punctuation("`"))
-        self.assertTrue(_is_punctuation("."))
-
-        self.assertFalse(_is_punctuation("A"))
-        self.assertFalse(_is_punctuation(" "))
-
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual(
-            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
+            [tokenizer.tokenize(t) for t in ["鲲", "\xad", "鹏"]],
             [["[UNK]"], [], ["[UNK]"]])
 
+    # @slow
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained(
             "skep_ernie_1.0_large_ch")
@@ -291,6 +544,7 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             tokenizer.sep_token_id
         ] + text_2 + [tokenizer.sep_token_id]
 
+    # @slow
     def test_offsets_with_special_characters(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
@@ -299,13 +553,13 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     pretrained_name, **kwargs)
 
                 sentence = f"北京的首都 {tokenizer.mask_token} 是北京"
-                tokens = tokenizer.encode(
-                    sentence,
-                    return_attention_mask=False,
-                    return_token_type_ids=False,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True,
-                )
+                tokens = tokenizer.encode(sentence,
+                                          return_attention_mask=False,
+                                          return_token_type_ids=False,
+                                          return_offsets_mapping=True,
+                                          add_special_tokens=True,
+                                          spaces_between_special_tokens=self.
+                                          space_between_special_tokens)
 
                 expected_results = [
                     ((0, 0), tokenizer.cls_token),
@@ -365,3 +619,6 @@ class SkepTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 ]
                 self.assertListEqual(tokens_without_spe_char_p, expected_tokens)
                 '''
+
+    def test_pretrained_model_lists(self):
+        self.skipTest("`max_model_input_sizes` not found, so skip this test")

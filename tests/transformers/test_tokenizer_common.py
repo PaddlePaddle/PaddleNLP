@@ -755,7 +755,7 @@ class TokenizerTesterMixin:
                 self.assertEqual(all_size_3, all_size_2 + len(new_toks_2))
 
                 tokens = tokenizer.encode(
-                    ">>>>|||<||<<|<< aaaaabbbbbb low cccccccccdddddddd <<<<<|||>|>>>>|> l",
+                    ">>>>|||<||<<|<< aaaaa bbbbbb low cccccccccdddddddd <<<<<|||>|>>>>|> l",
                     return_token_type_ids=None,
                     add_special_tokens=False)['input_ids']
 
@@ -808,6 +808,9 @@ class TokenizerTesterMixin:
                 input_text, output_text = self.get_input_output_texts(tokenizer)
 
                 tokens = tokenizer.tokenize(input_text)
+                ids = tokenizer.convert_tokens_to_ids(tokens)
+                tokens_2 = tokenizer.convert_ids_to_tokens(ids)
+
                 ids = tokenizer.convert_tokens_to_ids(tokens)
                 ids_2 = tokenizer.encode(input_text,
                                          return_token_type_ids=None,
@@ -2542,6 +2545,7 @@ class TokenizerTesterMixin:
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
                     f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+
                 tokenizer = self.tokenizer_class.from_pretrained(
                     pretrained_name, **kwargs)
 
