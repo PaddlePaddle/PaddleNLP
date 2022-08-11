@@ -172,10 +172,8 @@ class SkepModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids)
-        self.parent.assertEqual(result.shape, [
-            self.config.batch_size, self.config.seq_length,
-            self.config.num_classes
-        ])
+        self.parent.assertEqual(
+            result.shape, [self.config.batch_size, self.config.seq_length])
 
     def prepare_config_and_inputs_for_common(self):
         config, input_ids, token_type_ids, input_mask = self.prepare_config_and_inputs(
@@ -202,7 +200,7 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
         SkepModel,
         # TODO(wj-Mcat): to activate this model later
-        # SkepCrfForTokenClassification,
+        SkepCrfForTokenClassification,
         SkepForSequenceClassification,
         SkepForTokenClassification,
     )
@@ -229,10 +227,10 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_for_crf_token_classification(self):
         # TODO(wj-Mcat): to activate this method later
-        self.skipTest(
-            "skip for crf token classification: there are contains something wrong in paddle.text.viterib_decode"
-        )
-        return
+        # self.skipTest(
+        #     "skip for crf token classification: there are contains something wrong in paddle.text.viterib_decode"
+        # )
+        # return
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_crf_token_classification(
             *config_and_inputs)

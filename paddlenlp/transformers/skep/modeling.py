@@ -536,7 +536,7 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
             The number of classes.
     """
 
-    def __init__(self, skep: SkepModel, num_classes: int = 2):
+    def __init__(self, skep: SkepModel, num_classes: int = 3):
         super().__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
@@ -608,11 +608,13 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
         if seq_lens is None:
             # compute seq length according to the attention mask
             if attention_mask is not None:
-                seq_lens = paddle.sum(attention_mask, axis=1)
+                seq_lens = paddle.sum(attention_mask,
+                                      axis=1,
+                                      dtype=paddle.int64)
             else:
                 input_ids_shape = paddle.shape(input_ids)
-                seq_lens = paddle.ones(
-                    shape=[input_ids_shape[0]]) * input_ids_shape[1]
+                seq_lens = paddle.ones(shape=[input_ids_shape[0]],
+                                       dtype=paddle.int64) * input_ids_shape[1]
 
         if labels is not None:
             loss = self.crf_loss(emission, seq_lens, labels)
