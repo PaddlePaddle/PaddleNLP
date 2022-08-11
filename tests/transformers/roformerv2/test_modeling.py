@@ -16,7 +16,6 @@
 import unittest
 from typing import Optional, Tuple
 from dataclasses import dataclass, fields, Field
-from dataclasses_json import dataclass_json
 
 import paddle
 from paddlenlp.transformers import (
@@ -29,23 +28,23 @@ from paddlenlp.transformers import (
     RoFormerv2ForMultipleChoice,
 )
 
-from tests.transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
-from tests.testing_utils import slow
+from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from ...testing_utils import slow
 
 
 @dataclass
 class RoFormerv2ModelTestModelConfig:
     """RoFormerv2Model model config which keep consist with pretrained_init_configuration sub fields
     """
-    vocab_size: int = 12000
-    hidden_size: int = 384
+    vocab_size: int = 200
+    hidden_size: int = 36
     num_hidden_layers: int = 6
     num_attention_heads: int = 6
-    intermediate_size: int = 1536
+    intermediate_size: int = 20
     hidden_act: str = "relu"
     hidden_dropout_prob: float = 0.1
     attention_probs_dropout_prob: float = 0.1
-    max_position_embeddings: int = 512
+    max_position_embeddings: int = 20
     type_vocab_size: int = 2
     pad_token_id: int = 0
     rotary_value: bool = False
