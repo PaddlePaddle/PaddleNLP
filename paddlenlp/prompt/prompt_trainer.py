@@ -13,15 +13,18 @@
 # limitations under the License.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from sklearn.metrics import f1_score
 from functools import partial
 import os
 import copy
-import numpy as np
 import collections
+
+import numpy as np
+from sklearn.metrics import f1_score
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.static import InputSpec
 from paddle.metric import Accuracy
 from datasets import load_metric
 
@@ -32,9 +35,9 @@ from ..trainer.trainer_utils import EvalPrediction
 
 from ..data import DataCollator
 from ..losses import RDropLoss
-from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..transformers import PretrainedTokenizer, export_model
 
-from .template import Template
+from .template import Template, AutoTemplate
 from .verbalizer import Verbalizer, SoftVerbalizer
 from .prompt_utils import InputFeatures, InputExample, signature
 from .prompt_tokenizer import MLMTokenizerWrapper
@@ -92,6 +95,8 @@ class PromptTrainer(Trainer):
                          compute_metrics=compute_metrics,
                          callbacks=callbacks,
                          optimizers=optimizers)
+
+        self.load_state_dict_from_checkpoint(args.resume_from_checkpoint)
 
         max_seq_length = getattr(args, "max_seq_length", 512)
         if self.plm.__class__.__name__.endswith("MaskedLM"):
@@ -169,6 +174,15 @@ class PromptTrainer(Trainer):
             self.template.save_to(output_dir)
         if self.verbalizer:
             self.verbalizer.save_to(output_dir)
+
+    def load_state_dict_from_checkpoint(self, resume_from_checkpoint=None):
+        if resume_from_checkpoint is not None:
+            self.template = AutoTemplate.load_from(
+                resume_from_checkpoint, self.tokenizer, self.plm,
+                getattr(self.template, "_prompt_encoder", None),
+                getattr(self.template, "_encoder_hidden_size", None))
+
+        super().load_state_dict_from_checkpoint(resume_from_checkpoint)
 
     def get_eval_dataloader(self, eval_dataset=None):
         """
@@ -333,6 +347,16 @@ class PromptTrainer(Trainer):
 
         return loss
 
+    def export_model(self, export_path, input_spec=None, export_type="paddle"):
+        os.makedirs(export_path, exist_ok=True)
+        self.template.save_to(export_path)
+        self.verbalizer.save_to(export_path)
+        if input_spec is None and hasattr(self.model, "get_input_spec"):
+            input_spec = self.model.get_input_spec()
+        if input_spec is None:
+            raise ValueError("Please define input_spec to export model.")
+        export_model(self.model, input_spec, export_path, export_type)
+
 
 class PromptModelForClassification(nn.Layer):
     """
@@ -399,3 +423,11 @@ class PromptModelForClassification(nn.Layer):
         """
         return [p for p in self.template.parameters()
                 ] + [p for p in self.verbalizer.parameters()]
+
+    def get_input_spec(self):
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # mask_ids
+            InputSpec(shape=[None, None], dtype="int64")  # soft_token_ids
+        ]
+        return input_spec

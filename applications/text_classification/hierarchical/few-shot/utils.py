@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-import copy
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import InputExample
 
@@ -48,7 +48,7 @@ def load_local_dataset(data_path, splits, label_list):
                     ]
                     yield InputExample(text_a=text, labels=label)
 
-    split_map = {"train": "train.txt", "dev": "dev.txt", "test": "data.txt"}
+    split_map = {"train": "train.txt", "dev": "dev.txt", "test": "test.txt"}
     datasets = []
     for split in splits:
         data_file = os.path.join(data_path, split_map[split])

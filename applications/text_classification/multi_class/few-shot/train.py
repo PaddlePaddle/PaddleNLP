@@ -33,11 +33,10 @@ from utils import load_local_dataset
 # yapf: disable
 @dataclass
 class DataArguments:
-    data_dir: str = field(default=None, metadata={"help": "Path to a dataset which includes train.txt, dev.txt, label.txt and data.txt (optional)."})
+    data_dir: str = field(default="./data/", metadata={"help": "Path to a dataset which includes train.txt, dev.txt, test.txt, label.txt and data.txt (optional)."})
     prompt: str = field(default=None, metadata={"help": "The input prompt for tuning."})
-    soft_encoder: str = field(default=None, metadata={"help": "The encoder type of soft template, `lstm`, `mlp` or None."})
-    encoder_hidden_size: int = field(default=None, metadata={"help": "The dimension of soft embeddings."})
-    verbalizer: str = field(default=None, metadata={"help": "The mapping from labels to words."})
+    soft_encoder: str = field(default="lstm", metadata={"help": "The encoder type of soft template, `lstm`, `mlp` or None."})
+    encoder_hidden_size: int = field(default=200, metadata={"help": "The dimension of soft embeddings."})
 
 
 @dataclass

@@ -184,19 +184,15 @@ class Verbalizer(nn.Layer):
         raise NotImplementedError
 
     def save_to(self, path):
-        label_dict = {
-            k: v
-            for k, v in zip(self.labels,
-                            self.token_ids.numpy().tolist())
-        }
+        label_state = [self.labels, self.token_ids.numpy().tolist()]
         with open(os.path.join(path, VERBALIZER_FILE), "w") as f:
-            json.dump(label_dict, f)
+            json.dump(label_state, f)
 
     @classmethod
     def load_from(cls, path):
         with open(os.path.join(path, VERBALIZER_FILE), "r") as f:
-            label_dict = json.load(f)
-            return label_dict
+            label_state = json.load(f)
+            return label_state
 
 
 class NonVerbalizer(Verbalizer):

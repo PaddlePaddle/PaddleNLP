@@ -15,7 +15,7 @@
 
 ## 小样本学习简介
 
-多分类任务在商品分类、网页分类、新闻分类、医疗文本分类等现实场景中有着广泛应用。现有的主流解决方案是在大规模预训练语言模型进行微调，因为下游任务和预训练任务训练目标不同，想要取得较好的分类效果往往需要大量标注数据，因此学界和业界开始研究如何在小样本学习（Few-shot Learning）场景下取得更好的学习效果。
+[二分类/多分类任务](../README.md#二分类/多分类任务介绍)在商品分类、网页分类、新闻分类、医疗文本分类等现实场景中有着广泛应用。现有的主流解决方案是在大规模预训练语言模型进行微调，因为下游任务和预训练任务训练目标不同，想要取得较好的分类效果往往需要大量标注数据，因此学界和业界开始研究如何在小样本学习（Few-shot Learning）场景下取得更好的学习效果。
 
 **提示学习(Prompt Learning)**
 的主要思想是通过任务转换使得下游任务和预训练任务尽可能相似，充分利用预训练语言模型学习到的特征，从而降低样本需求量。除此之外，我们往往还需要在原有的输入文本上拼接一段“提示”，来引导预训练模型输出期望的结果。
@@ -49,7 +49,7 @@
 
 ### 数据准备
 
-我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano)进行自定义数据标注，然后使用[doccano脚本](../../doccano.py)进行格式转换，具体流程可参考[doccano数据标注指南](../../doccano.md)。对于已有的数据集，需要将数据转换为下述文本分类任务的统一格式。这里我们使用[FewCLUE](https://github.com/CLUEbenchmark/FewCLUE)中的tnews数据集作为示例数据集，可点击[这里](https://paddlenlp.bj.bcebos.com/datasets/few-shot/tnews.tar.gz)下载解压并放入`./data/`文件夹，或者运行以下脚本
+我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano)进行自定义数据标注，然后使用[doccano脚本](../../doccano.py)进行格式转换，具体流程可参考[doccano数据标注指南](../../doccano.md)。对于已有的数据集，需要将数据转换为下述文本分类任务的统一格式。这里我们使用[FewCLUE](https://github.com/CLUEbenchmark/FewCLUE)中的tnews数据集后缀为0的子集作为示例数据集，可点击[这里](https://paddlenlp.bj.bcebos.com/datasets/few-shot/tnews.tar.gz)下载解压并放入`./data/`文件夹，或者运行以下脚本
 
 ```
 wget https://paddlenlp.bj.bcebos.com/datasets/few-shot/tnews.tar.gz
@@ -102,15 +102,13 @@ python train.py \
 --output_dir ./ckpt/ \
 --prompt "这句话说的是" \
 --max_seq_length 128  \
---learning_rate 3e-6 \
---ppt_learning_rate 3e-5 \
+--learning_rate 3e-5 \
+--ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
---max_steps 100 \
+--max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 10 \
---soft_encoder lstm \
---encoder_hidden_size 200 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \
@@ -126,16 +124,14 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --output_dir ./ckpt/ \
 --prompt "这句话说的是" \
 --max_seq_length 128  \
---learning_rate 3e-6 \
---ppt_learning_rate 3e-5 \
+--learning_rate 3e-5 \
+--ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
 --max_steps 100 \
 --eval_steps 10 \
 --logging_steps 10 \
---soft_encoder lstm \
---encoder_hidden_size 200 \
---per_device_eval_batch_size 8 \
+--per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \
 --do_export
@@ -146,8 +142,8 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](数据准备)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `prompt`: 提示模板。定义了如何将文本和提示拼接结合。
-- `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。
-- `encoder_hidden_size`: 提示向量的维度。若为None，则默认为预训练模型字向量维度。
+- `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。默认为`lstm`。
+- `encoder_hidden_size`: 提示向量的维度。若为None，则使用预训练模型字向量维度。默认为200。
 - `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `learning_rate`: 预训练语言模型参数基础学习率大小，将与learning rate scheduler产生的值相乘作为当前学习率。
 - `ppt_learning_rate`: 提示相关参数的基础学习率大小，当预训练参数不固定时，与其共用learning rate scheduler。一般设为`learning_rate`的十倍。
@@ -199,13 +195,13 @@ python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resum
 #### CPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir data/ --batch_size 32 --device cpu
+python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device cpu
 ```
 
 #### GPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir tnews/ --batch_size 32 --device gpu --device_id 0
+python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device gpu --device_id 0
 ```
 
 可配置参数说明：

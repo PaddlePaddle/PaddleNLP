@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-import copy
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import InputExample
 

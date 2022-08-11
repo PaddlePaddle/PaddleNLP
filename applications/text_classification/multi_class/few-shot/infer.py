@@ -14,12 +14,10 @@
 
 import os
 import six
-import time
 import psutil
 import argparse
 import numpy as np
 
-import paddle
 import paddle2onnx
 import onnxruntime as ort
 from paddlenlp.utils.log import logger

@@ -26,7 +26,6 @@ from paddlenlp.prompt import (
     Verbalizer,
     MLMTokenizerWrapper,
     InputExample,
-    InputFeatures,
 )
 from paddlenlp.transformers import AutoTokenizer
 
@@ -135,7 +134,7 @@ class InferBackend(object):
         return result
 
 
-class MultiLabelPredictor(object):
+class HierachicalPredictor(object):
 
     def __init__(self, args, label_list):
         self._label_list = label_list
@@ -183,10 +182,12 @@ class MultiLabelPredictor(object):
     def preprocess(self, input_data: list):
         text = [InputExample(text_a=x) for x in input_data]
         inputs = [self._template.wrap_one_example(x) for x in text]
-        inputs = InputFeatures(
-            input_ids=np.array([x["input_ids"] for x in inputs]),
-            mask_ids=np.array([x["mask_ids"] for x in inputs]),
-            soft_token_ids=np.array([x["soft_token_ids"] for x in inputs]))
+        inputs = [self._wrapper.tokenize_one_example(x) for x in inputs]
+        inputs = {
+            "input_ids": np.array([x["input_ids"] for x in inputs]),
+            "mask_ids": np.array([x["mask_ids"] for x in inputs]),
+            "soft_token_ids": np.array([x["soft_token_ids"] for x in inputs])
+        }
         return inputs
 
     @staticmethod
@@ -200,7 +201,7 @@ class MultiLabelPredictor(object):
         labels = [[] for _ in range(probs.shape[0])]
         for idx, label_id in label_ids:
             labels[idx].append(self._label_list[label_id])
-        return {"label": label}
+        return {"label": labels}
 
     def printer(self, result, input_data):
         label = result["label"]
@@ -221,5 +222,5 @@ if __name__ == "__main__":
     with open(text_dir, "r", encoding="utf-8") as f:
         text_list = [x.strip() for x in f.readlines()]
 
-    predictor = MultiLabelPredictor(args, labels)
+    predictor = HierachicalPredictor(args, labels)
     predictor.predict(text_list)

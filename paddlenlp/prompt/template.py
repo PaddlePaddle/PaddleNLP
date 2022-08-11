@@ -484,15 +484,27 @@ class AutoTemplate(object):
                     model=None,
                     prompt_encoder=None,
                     encoder_hidden_size=None):
+        if template is None:
+            template = "{'soft'}"
         if isinstance(template, str):
             template = cls.parse_inputs(template)
         template_keys = cls._extract_template_keys(template)
         if 'text' not in template_keys:
+            soft_template = []
+            for item in template:
+                if 'hard' in item:
+                    soft_template.append({
+                        'add_prefix_space': '',
+                        'soft': item['hard']
+                    })
+                else:
+                    soft_template.append(item)
             text_item = [{
                 'add_prefix_space': ' ',
                 'text': cls.registered_text_keys[0]
             }]
-            template = text_item + template
+            template = text_item + soft_template
+        template_keys = cls._extract_template_keys(template)
 
         if 'mask' not in template_keys:
             template.append({'add_prefix_space': ' ', 'mask': None})
