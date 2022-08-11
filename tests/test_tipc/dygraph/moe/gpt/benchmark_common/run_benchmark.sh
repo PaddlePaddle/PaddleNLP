@@ -97,31 +97,31 @@ function _train(){
                 --scale_loss 32768 \
                 --gate gshard \
                 --balance_loss_weight 1.0"
-
+    rm -rf mylog
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP_MoE_C1) echo "run run_mode: DP_MoE_C1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     DP_MoE_C8|DP_MoE_C16) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     DP_MoE_C32) echo "run run_mode: DP_MoE_C32"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     Sharding_MoE_C8|Sharding_MoE_C16) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     Sharding_MoE_C32) echo "run run_mode: Sharding_MoE_C32"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
@@ -143,7 +143,12 @@ function _train(){
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        if [[ -f mylog/workerlog.${workerlog_id} ]]
+        then 
+            cp mylog/workerlog.${workerlog_id} ${log_file}
+        else 
+            cp mylog/default.*.${workerlog_id}.log ${log_file}
+        fi
     fi
 }
 
