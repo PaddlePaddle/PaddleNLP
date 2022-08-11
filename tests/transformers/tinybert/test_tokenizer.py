@@ -25,8 +25,8 @@ from paddlenlp.transformers.bert.tokenizer import (
 )
 from paddlenlp.transformers.tinybert.tokenizer import (TinyBertTokenizer)
 
-from tests.testing_utils import slow
-from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ...testing_utils import slow
+from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
 class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
