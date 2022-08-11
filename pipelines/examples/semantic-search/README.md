@@ -50,6 +50,7 @@ b. 硬件环境：
 - Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz
 
 c. 依赖安装：
+首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package

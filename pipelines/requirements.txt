@@ -1,4 +1,3 @@
-paddlepaddle-gpu
 paddlenlp
 paddleocr
 requests
