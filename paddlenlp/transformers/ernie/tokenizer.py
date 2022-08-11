@@ -127,6 +127,16 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "ernie-3.0-nano-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-base-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-medium-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-mini-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-micro-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-nano-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -200,6 +210,21 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-3.0-nano-zh": {
+            "do_lower_case": True
+        },
+        "rocketqa-base-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-medium-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-mini-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-micro-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-nano-cross-encoder": {
             "do_lower_case": True
         },
     }
