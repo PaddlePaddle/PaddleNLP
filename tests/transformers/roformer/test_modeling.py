@@ -16,7 +16,6 @@
 import unittest
 from typing import Optional, Tuple
 from dataclasses import dataclass, fields, Field
-from dataclasses_json import dataclass_json
 
 import paddle
 
@@ -34,16 +33,16 @@ from ...testing_utils import slow
 class RoFormerModelTestModelConfig:
     """RoFormerModel model config which keep consist with pretrained_init_configuration sub fields
     """
-    vocab_size: int = 50000
-    embedding_size: int = 384
-    hidden_size: int = 384
+    vocab_size: int = 200
+    embedding_size: int = 50
+    hidden_size: int = 36
     num_hidden_layers: int = 6
     num_attention_heads: int = 6
-    intermediate_size: int = 1536
+    intermediate_size: int = 16
     hidden_act: str = "gelu"
     hidden_dropout_prob: float = 0.1
     attention_probs_dropout_prob: float = 0.1
-    max_position_embeddings: int = 512
+    max_position_embeddings: int = 20
     type_vocab_size: int = 2
     initializer_range: float = 0.02
     pad_token_id: int = 0
