@@ -236,6 +236,9 @@ class ErnieTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def get_vocab(self):
+        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
+
     def _tokenize(self, text):
         r"""
         End-to-end tokenization for ERNIE models.
