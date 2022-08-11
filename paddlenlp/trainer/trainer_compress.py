@@ -39,7 +39,9 @@ from ..metrics.squad import squad_evaluate, compute_prediction
 from .trainer_base import Trainer
 
 
-def compress(self):
+def compress(self,
+             custom_dynabert_evaluate=None,
+             custom_dynabert_calc_loss=None):
     """
     Supports pruning DynaBERT and post-training quantization. If both are
     needed, pruning DynaBERT would be performed before quantizaton.
@@ -47,6 +49,12 @@ def compress(self):
     args = self.args
     if "dynabert" in args.strategy:
         try_import('paddleslim')
+        self.custom_dynabert_evaluate = custom_dynabert_evaluate
+        self.custom_dynabert_calc_loss = custom_dynabert_calc_loss
+        class_name = self.model.__class__.__name__
+        if "SequenceClassification" not in class_name and "TokenClassification" not in class_name and "QuestionAnswering" not in class_name:
+            assert self.custom_dynabert_evaluate is not None and self.custom_dynabert_calc_loss is not None, \
+                "Custom model using DynaBERT strategy needs to pass in parameters `custom_dynabert_evaluate` and `custom_dynabert_calc_loss`."
         _dynabert(self, self.model, args.output_dir)
         if "ptq" in args.strategy:
             self.args.input_filename_prefix = "pruned_model"
@@ -56,10 +64,10 @@ def compress(self):
                 self.quant(output_dir_width, "ptq")
     elif args.strategy == "ptq":
         # Input model is an inference model
-        if args.infer_model_path is not None:
-            model_dir = os.path.dirname(args.infer_model_path)
+        if args.input_infer_model_path is not None:
+            model_dir = os.path.dirname(args.input_infer_model_path)
             self.args.input_filename_prefix = os.path.basename(
-                args.infer_model_path)
+                args.input_infer_model_path)
             self.quant(model_dir, args.strategy)
         # Input model is load from Trainer API in dygraph.
         else:
@@ -83,17 +91,14 @@ def quant(self, input_dir, strategy):
     Supports Post-Training Quantization now.
     """
     if strategy == "ptq":
-        eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-        _post_training_quantization_grid_search(eval_dataloader,
-                                                self.eval_dataset,
-                                                self.args.device, input_dir,
-                                                self.args)
+        _post_training_quantization_grid_search(self, input_dir)
 
 
 def _dynabert(self, model, output_dir):
     args = self.args
     model = _replace_auto_model_forward(model)
-
+    if args.width_mult_list is None:
+        args.width_mult_list = [0.75]
     # Each batch is a dict.
     train_dataloader = self.get_train_dataloader()
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
@@ -101,14 +106,10 @@ def _dynabert(self, model, output_dir):
     if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
-        ofa_model, teacher_model = _dynabert_init(model,
-                                                  eval_dataloader_with_label,
-                                                  self.criterion,
-                                                  args.width_mult_list)
+        ofa_model, teacher_model = _dynabert_init(self, model,
+                                                  eval_dataloader_with_label)
     else:
-        ofa_model, teacher_model = _dynabert_init(model, eval_dataloader,
-                                                  self.criterion,
-                                                  args.width_mult_list)
+        ofa_model, teacher_model = _dynabert_init(self, model, eval_dataloader)
 
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
@@ -123,11 +124,10 @@ def _dynabert(self, model, output_dir):
 
     ofa_model = _dynabert_training(self, ofa_model, model, teacher_model,
                                    train_dataloader, eval_dataloader,
-                                   args.width_mult_list, self.criterion,
-                                   args.num_train_epochs, args.output_dir)
+                                   args.num_train_epochs)
 
     # Each width_mult best model would be exported.
-    _dynabert_export(ofa_model, args.width_mult_list, args.output_dir)
+    _dynabert_export(self, ofa_model)
 
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model, True), _recover_transformer_func(ofa_model.model, True)
@@ -201,7 +201,7 @@ def _recover_auto_model_forward(self):
     return self
 
 
-def _dynabert_init(model, eval_dataloader, criterion, width_mult_list):
+def _dynabert_init(self, model, eval_dataloader):
     from paddleslim.nas.ofa.convert_super import Convert, supernet
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
 
@@ -244,9 +244,10 @@ def _dynabert_init(model, eval_dataloader, criterion, width_mult_list):
     head_importance, neuron_importance = compute_neuron_head_importance(
         model=ofa_model.model,
         data_loader=eval_dataloader,
-        loss_fct=criterion,
+        loss_fct=self.criterion,
         num_layers=model.base_model.config['num_hidden_layers'],
-        num_heads=model.base_model.config['num_attention_heads'])
+        num_heads=model.base_model.config['num_attention_heads'],
+        custom_dynabert_calc_loss=self.custom_dynabert_calc_loss)
 
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
 
@@ -257,100 +258,99 @@ def _dynabert_init(model, eval_dataloader, criterion, width_mult_list):
 
 
 def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
-                       eval_dataloader, width_mult_list, criterion,
-                       num_train_epochs, output_dir):
-    metric = Accuracy()
-    if "TokenClassification" in model.__class__.__name__:
-        metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
+                       eval_dataloader, num_train_epochs):
+
+    def evaluate(model, data_loader):
+        if self.custom_dynabert_evaluate is not None:
+            return self.custom_dynabert_evaluate(model, data_loader)
+        if isinstance(model, OFA):
+            class_name = model.model.__class__.__name__
+        else:
+            class_name = model.__class__.__name__
+        if "SequenceClassification" in class_name:
+            return evaluate_seq_cls(model, data_loader)
+        elif "QuestionAnswering" in class_name:
+            return evaluate_qa(model, data_loader)
+        elif "TokenClassification" in class_name:
+            return evaluate_token_cls(model, data_loader)
+        else:
+            raise NotImplementedError(
+                "Model to be compressed is an instance of a custom class, " \
+                "so function `evaluate(model, data_loader)` should be " \
+                "implemented, and `model` should support both `paddle.nn.layer` " \
+                "and `paddleslim.nas.ofa.OFA` instances, and it should return " \
+                "a single float for precision value, such as acc.")
 
     @paddle.no_grad()
-    def evaluate(model, criterion, data_loader, width_mult=1.0):
+    def evaluate_qa(model, data_loader):
         model.eval()
         all_start_logits = []
         all_end_logits = []
+        for batch in data_loader:
+            logits = model(batch['input_ids'],
+                           batch['token_type_ids'],
+                           attention_mask=[None, None])
+            if isinstance(model, OFA):
+                start_logits_tensor, end_logits_tensor = logits[0]
+            else:
+                start_logits_tensor, end_logits_tensor = logits
+
+            for idx in range(start_logits_tensor.shape[0]):
+                all_start_logits.append(start_logits_tensor.numpy()[idx])
+                all_end_logits.append(end_logits_tensor.numpy()[idx])
+        n_best_size = 20
+        max_answer_length = 50
+        all_predictions, _, _ = compute_prediction(
+            self.eval_examples, self.eval_dataset,
+            (all_start_logits, all_end_logits), False, n_best_size,
+            max_answer_length)
+        res = squad_evaluate(
+            examples=[raw_data for raw_data in self.eval_examples],
+            preds=all_predictions,
+            is_whitespace_splited=False)
+        logger.info("EM: %f, F1: %f, " % (res['exact'], res['f1']))
+        res = res['exact']
+        model.train()
+        return res
+
+    @paddle.no_grad()
+    def evaluate_seq_cls(model, data_loader):
+        metric = Accuracy()
+        model.eval()
         metric.reset()
         for batch in data_loader:
+            logits = model(batch['input_ids'],
+                           batch['token_type_ids'],
+                           attention_mask=[None, None])
             if isinstance(model, OFA):
-                class_name = model.model.__class__.__name__
-            else:
-                class_name = model.__class__.__name__
+                logits = logits[0]
+            correct = metric.compute(logits, batch['labels'])
+            metric.update(correct)
+        res = metric.accumulate()
+        logger.info("acc: %s, " % res)
+        model.train()
+        return res
 
-            if "QuestionAnswering" in class_name:
-                input_ids, token_type_ids = batch['input_ids'], batch[
-                    'token_type_ids']
-                logits = model(input_ids,
-                               token_type_ids,
-                               attention_mask=[None, None])
-                if width_mult == 100:
-                    start_logits_tensor, end_logits_tensor = logits
-                else:
-                    start_logits_tensor, end_logits_tensor = logits[0]
-                for idx in range(start_logits_tensor.shape[0]):
-                    if len(all_start_logits) % 1000 == 0 and len(
-                            all_start_logits):
-                        logger.info("Processing example: %d" %
-                                    len(all_start_logits))
-                    all_start_logits.append(start_logits_tensor.numpy()[idx])
-                    all_end_logits.append(end_logits_tensor.numpy()[idx])
-
-            else:
-                input_ids, token_type_ids, labels = batch['input_ids'], batch[
-                    'token_type_ids'], batch['labels']
-                logits = model(input_ids,
-                               token_type_ids,
-                               attention_mask=[None, None])
-                if isinstance(logits, tuple):
-                    logits = logits[0]
-                loss = criterion(logits, labels)
-                if "TokenClassification" in class_name:
-                    preds = logits.argmax(axis=2)
-                    num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-                        batch['seq_len'], preds, batch['labels'])
-                    metric.update(num_infer_chunks.numpy(),
-                                  num_label_chunks.numpy(),
-                                  num_correct_chunks.numpy())
-                else:
-                    correct = metric.compute(logits, labels)
-                    metric.update(correct)
-        if "QuestionAnswering" in class_name:
-            n_best_size = 20
-            max_answer_length = 50
-            all_predictions, _, _ = compute_prediction(
-                self.eval_examples, self.eval_dataset,
-                (all_start_logits, all_end_logits), False, n_best_size,
-                max_answer_length)
-            res = squad_evaluate(
-                examples=[raw_data for raw_data in self.eval_examples],
-                preds=all_predictions,
-                is_whitespace_splited=False)
-            if width_mult == 100:
-                logger.info("teacher model, EM: %f, F1: %f" %
-                            (res['exact'], res['f1']))
-            else:
-                logger.info("width_mult: %s, EM: %f, F1: %f, " %
-                            (str(width_mult), res['exact'], res['f1']))
-            res = res['exact']
-        else:
-            res = metric.accumulate()
-            # Teacher model's evaluation
-            if "TokenClassification" in class_name:
-                if width_mult == 100:
-                    logger.info(
-                        "teacher model, eval loss: %f, precision: %f, recall: %f, f1_score: %f"
-                        % (paddle.mean(loss).numpy(), res[0], res[1], res[2]))
-                else:
-                    logger.info(
-                        "width_mult: %s, eval loss: %f, precision: %f, recall: %f, f1_score: %f"
-                        % (str(width_mult), paddle.mean(loss).numpy(), res[0],
-                           res[1], res[2]))
-                res = res[2]
-            else:
-                if width_mult == 100:
-                    logger.info("teacher model, eval loss: %f, acc: %s, " %
-                                (loss.numpy(), res))
-                else:
-                    logger.info("width_mult: %s, eval loss: %f, acc: %s, " %
-                                (str(width_mult), loss.numpy(), res))
+    @paddle.no_grad()
+    def evaluate_token_cls(model, data_loader):
+        metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
+        model.eval()
+        metric.reset()
+        for batch in data_loader:
+            logits = model(batch['input_ids'],
+                           batch['token_type_ids'],
+                           attention_mask=[None, None])
+            if isinstance(model, OFA):
+                logits = logits[0]
+            preds = logits.argmax(axis=2)
+            num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+                batch['seq_len'], preds, batch['labels'])
+            metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                          num_correct_chunks.numpy())
+        res = metric.accumulate()
+        logger.info("precision: %f, recall: %f, f1_score: %f" %
+                    (res[0], res[1], res[2]))
+        res = res[2]
         model.train()
         return res
 
@@ -358,8 +358,14 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
     global_step = 0
     lambda_logit = 1.0
     tic_train = time.time()
-    best_acc = [0.0] * len(width_mult_list)
+    best_acc = [0.0] * len(self.args.width_mult_list)
     acc = 0.0
+
+    logger.info("Teacher's evaluation starts.")
+    tic_eval = time.time()
+    evaluate(teacher_model, eval_dataloader)
+    logger.info("eval done total: %s s" % (time.time() - tic_eval))
+
     logger.info("DynaBERT training starts. This period will cost some time.")
     for epoch in range(num_train_epochs):
         # Step7: Set current epoch and task.
@@ -367,26 +373,21 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         ofa_model.set_task('width')
         for step, batch in enumerate(train_dataloader):
             global_step += 1
-            if "QuestionAnswering" in model.__class__.__name__:
-                input_ids, token_type_ids, start_positions, end_positions = batch[
-                    'input_ids'], batch['token_type_ids'], batch[
-                        'start_positions'], batch['end_positions']
-            else:
-                input_ids, token_type_ids, labels = batch['input_ids'], batch[
-                    'token_type_ids'], batch['labels']
-            for width_mult in width_mult_list:
+            for width_mult in self.args.width_mult_list:
                 # Step8: Broadcast supernet config from width_mult,
                 # and use this config in supernet training.
                 net_config = utils.dynabert_config(ofa_model, width_mult)
                 ofa_model.set_net_config(net_config)
-                logits, teacher_logits = ofa_model(input_ids,
-                                                   token_type_ids,
+                logits, teacher_logits = ofa_model(batch['input_ids'],
+                                                   batch['token_type_ids'],
                                                    attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
-                if "QuestionAnswering" in model.__class__.__name__:
-                    logit_loss = (soft_cross_entropy(logits[0], teacher_logits[0].detach()) \
-                                + \
-                                soft_cross_entropy(logits[1], teacher_logits[1].detach()))/2
+                if isinstance(logits, tuple):
+                    logit_loss = 0
+                    for i in range(len(logits)):
+                        logit_loss += soft_cross_entropy(
+                            logits[i], teacher_logits[i].detach())
+                    logit_loss /= len(logits)
                 else:
                     logit_loss = soft_cross_entropy(logits,
                                                     teacher_logits.detach())
@@ -404,37 +405,33 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                            self.args.logging_steps / (time.time() - tic_train)))
                 tic_train = time.time()
 
-            if "QuestionAnswering" not in model.__class__.__name__ and global_step % self.args.save_steps == 0:
-                tic_eval = time.time()
-
-                evaluate(teacher_model,
-                         criterion,
-                         eval_dataloader,
-                         width_mult=100)
-                logger.info("eval done total : %s s" % (time.time() - tic_eval))
-                for idx, width_mult in enumerate(width_mult_list):
+            if global_step % self.args.save_steps == 0:
+                # tic_eval = time.time()
+                # logger.info("eval done total: %s s" % (time.time() - tic_eval))
+                for idx, width_mult in enumerate(self.args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
-                    acc = evaluate(ofa_model, criterion, eval_dataloader,
-                                   width_mult)
+                    logger.info("width_mult %s:" % width_mult)
+                    acc = evaluate(ofa_model, eval_dataloader)
                     if acc > best_acc[idx]:
                         best_acc[idx] = acc
                         if paddle.distributed.get_rank() == 0:
                             output_dir_width = os.path.join(
-                                output_dir, "width_mult_" + str(width_mult))
+                                self.args.output_dir,
+                                "width_mult_" + str(width_mult))
                             if not os.path.exists(output_dir_width):
                                 os.makedirs(output_dir_width)
                             # need better way to get inner model of DataParallel
                             model_to_save = model._layers if isinstance(
                                 model, paddle.DataParallel) else model
                             model_to_save.save_pretrained(output_dir_width)
-                    logger.info("eval done total : %s s" %
+                    logger.info("eval done total: %s s" %
                                 (time.time() - tic_eval))
             if global_step > self.args.num_training_steps:
                 if best_acc[idx] == 0.0:
                     output_dir_width = os.path.join(
-                        output_dir, "width_mult_" + str(width_mult))
+                        self.args.output_dir, "width_mult_" + str(width_mult))
                     if not os.path.exists(output_dir_width):
                         os.makedirs(output_dir_width)
                     # need better way to get inner model of DataParallel
@@ -445,36 +442,13 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                             (width_mult, best_acc[idx]))
                 return ofa_model
 
-        if "QuestionAnswering" in model.__class__.__name__:
-            tic_eval = time.time()
-            evaluate(teacher_model, criterion, eval_dataloader, width_mult=100)
-            logger.info("eval done total : %s s" % (time.time() - tic_eval))
-            for idx, width_mult in enumerate(width_mult_list):
-                net_config = utils.dynabert_config(ofa_model, width_mult)
-                ofa_model.set_net_config(net_config)
-                tic_eval = time.time()
-                acc = evaluate(ofa_model, criterion, eval_dataloader,
-                               width_mult)
-                if acc > best_acc[idx]:
-                    best_acc[idx] = acc
-                    if paddle.distributed.get_rank() == 0:
-                        output_dir_width = os.path.join(
-                            output_dir, "width_mult_" + str(width_mult))
-                        if not os.path.exists(output_dir_width):
-                            os.makedirs(output_dir_width)
-                        # need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir_width)
-                logger.info("eval done total : %s s" % (time.time() - tic_eval))
-
-    for idx, width_mult in enumerate(width_mult_list):
+    for idx, width_mult in enumerate(self.args.width_mult_list):
         logger.info("Best acc of width_mult %s: %.4f" %
                     (width_mult, best_acc[idx]))
     return ofa_model
 
 
-def _dynabert_export(ofa_model, width_mult_list, output_dir):
+def _dynabert_export(self, ofa_model):
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(
@@ -482,19 +456,12 @@ def _dynabert_export(ofa_model, width_mult_list, output_dir):
 
     ori_num_heads = ofa_model.model.base_model.encoder.layers[
         0].self_attn.num_heads
-    for width_mult in width_mult_list:
-        model_dir = os.path.join(output_dir, "width_mult_" + str(width_mult))
+    for width_mult in self.args.width_mult_list:
+        model_dir = os.path.join(self.args.output_dir,
+                                 "width_mult_" + str(width_mult))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
-        if "QuestionAnswering" in ofa_model.model.__class__.__name__:
-            origin_model = AutoModelForQuestionAnswering.from_pretrained(
-                model_dir)
-        elif "TokenClassification" in ofa_model.model.__class__.__name__:
-            origin_model = AutoModelForTokenClassification.from_pretrained(
-                model_dir)
-        else:
-            origin_model = AutoModelForSequenceClassification.from_pretrained(
-                model_dir)
+        origin_model = self.model.__class__.from_pretrained(model_dir)
         ofa_model.model.set_state_dict(state_dict)
         best_config = utils.dynabert_config(ofa_model, width_mult)
         origin_model_new = ofa_model.export(best_config,
@@ -515,12 +482,20 @@ def _dynabert_export(ofa_model, width_mult_list, output_dir):
         # Recover num_heads of ofa_model.model
         for layer in ofa_model.model.base_model.encoder.layers:
             layer.self_attn.num_heads = ori_num_heads
+    logger.info("Pruned models have been exported.")
 
 
-def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
-                                            device, model_dir, args):
+def _post_training_quantization_grid_search(self, model_dir):
+    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
+    args = self.args
+    if args.batch_num_list is None:
+        args.batch_num_list = [1]
+    if args.batch_size_list is None:
+        args.batch_size_list = [4, 8, 16]
+    if args.algo_list is None:
+        args.algo_list = ['mse', 'KL']
     paddle.enable_static()
-    place = paddle.set_device(device)
+    place = paddle.set_device(args.device)
     exe = paddle.static.Executor(place)
 
     args.output_filename_prefix = "int8"
@@ -529,7 +504,7 @@ def _post_training_quantization_grid_search(eval_dataloader, eval_dataset,
 
         def _batch_generator_func():
             batch_data = [[], []]
-            for data in eval_dataset:
+            for data in self.eval_dataset:
                 batch_data[0].append(data['input_ids'])
                 batch_data[1].append(data['token_type_ids'])
                 if len(batch_data[0]) == batch_size:
