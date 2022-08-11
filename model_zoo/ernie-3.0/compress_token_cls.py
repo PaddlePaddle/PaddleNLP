@@ -14,50 +14,66 @@
 
 import os
 import sys
-import yaml
 from functools import partial
-import distutils.util
-import os.path as osp
-from typing import Optional
 
-import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 
 from datasets import load_dataset
 
-import paddlenlp
 from paddlenlp.data import DataCollatorForTokenClassification
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
-
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForTokenClassification,
-)
+from paddlenlp.trainer import PdArgumentParser, CompressionArguments, Trainer
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
 from paddlenlp.utils.log import logger
 
-from compress_trainer import CompressConfig, PTQConfig
-
 sys.path.append("../ernie-1.0/finetune")
-from token_classification import ner_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from utils import ALL_DATASETS, DataArguments, ModelArguments
+
+
+def tokenize_and_align_labels(example,
+                              tokenizer,
+                              no_entity_id,
+                              max_seq_len=512):
+    if example['tokens'] == []:
+        tokenized_input = {
+            'labels': [],
+            'input_ids': [],
+            'token_type_ids': [],
+            'seq_len': 0,
+            'length': 0,
+        }
+        return tokenized_input
+    tokenized_input = tokenizer(
+        example['tokens'],
+        max_seq_len=max_seq_len,
+        # We use this argument because the texts in our dataset are lists of words (with a label for each word).
+        is_split_into_words=True,
+        return_length=True)
+    label_ids = example['ner_tags']
+    if len(tokenized_input['input_ids']) - 2 < len(label_ids):
+        label_ids = label_ids[:len(tokenized_input['input_ids']) - 2]
+    label_ids = [no_entity_id] + label_ids + [no_entity_id]
+
+    label_ids += [no_entity_id
+                  ] * (len(tokenized_input['input_ids']) - len(label_ids))
+    tokenized_input["labels"] = label_ids
+    return tokenized_input
+
+
+def ner_trans_fn(example, tokenizer, args):
+    return tokenize_and_align_labels(example,
+                                     tokenizer=tokenizer,
+                                     no_entity_id=args.no_entity_id,
+                                     max_seq_len=args.max_seq_length)
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
+    )
 
-    paddle.set_device(training_args.device)
+    paddle.set_device(compression_args.device)
 
     data_args.dataset = data_args.dataset.strip()
     if data_args.dataset not in ALL_DATASETS:
@@ -66,17 +82,17 @@ def main():
     if data_args.dataset in ALL_DATASETS:
         # if you custom you hyper-parameters in yaml config, it will overwrite all args.
         config = ALL_DATASETS[data_args.dataset]
-        for args in (model_args, data_args, training_args):
+        for args in (model_args, data_args, compression_args):
             for arg in vars(args):
                 if arg in config.keys():
                     setattr(args, arg, config[arg])
 
-        training_args.per_device_train_batch_size = config["batch_size"]
-        training_args.per_device_eval_batch_size = config["batch_size"]
+        compression_args.per_device_train_batch_size = config["batch_size"]
+        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
+    compression_args.print_config(model_args, "Model")
+    compression_args.print_config(data_args, "Data")
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -100,7 +116,7 @@ def main():
 
         def __init__(self):
             super(criterion, self).__init__()
-            self.loss_fn = paddle.nn.loss.CrossEntropyLoss(
+            self.loss_fn = nn.CrossEntropyLoss(
                 ignore_index=data_args.ignore_label)
 
         def forward(self, *args, **kwargs):
@@ -124,27 +140,20 @@ def main():
 
     eval_dataset = raw_datasets["test"].map(trans_fn,
                                             remove_columns=column_names)
-
     trainer = Trainer(model=model,
                       criterion=loss_fct,
-                      args=training_args,
+                      args=compression_args,
                       data_collator=data_collator,
                       train_dataset=train_dataset,
                       eval_dataset=eval_dataset,
                       tokenizer=tokenizer)
 
-    output_dir = os.path.join(model_args.model_name_or_path, "compress")
+    if not os.path.exists(compression_args.output_dir):
+        os.makedirs(compression_args.output_dir)
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    compression_args.print_config()
 
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
-
-    trainer.compress(output_dir,
-                     pruning=True,
-                     quantization=True,
-                     compress_config=compress_config)
+    trainer.compress()
 
 
 if __name__ == "__main__":
