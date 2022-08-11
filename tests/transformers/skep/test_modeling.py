@@ -39,14 +39,14 @@ class SkepTestModelConfig:
     attention_probs_dropout_prob: float = 0.1
     hidden_act: str = "relu"
     hidden_dropout_prob: float = 0.1
-    hidden_size: int = 1024
+    hidden_size: int = 48
     initializer_range: float = 0.02
-    intermediate_size: int = 4096
-    max_position_embeddings: int = 512
+    intermediate_size: int = 100
+    max_position_embeddings: int = 20
     num_attention_heads: int = 16
     num_hidden_layers: int = 24
     type_vocab_size: int = 4
-    vocab_size: int = 12800
+    vocab_size: int = 100
     pad_token_id: int = 0
 
     @property
