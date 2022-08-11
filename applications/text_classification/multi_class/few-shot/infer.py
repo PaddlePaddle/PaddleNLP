@@ -23,8 +23,12 @@ import paddle
 import paddle2onnx
 import onnxruntime as ort
 from paddlenlp.utils.log import logger
-from paddlenlp.prompt import (AutoTemplate, MLMTokenizerWrapper, InputExample,
-                              InputFeatures, Verbalizer)
+from paddlenlp.prompt import (
+    AutoTemplate,
+    Verbalizer,
+    MLMTokenizerWrapper,
+    InputExample,
+)
 from paddlenlp.transformers import (
     AutoTokenizer,
     normalize_chars,
@@ -183,28 +187,25 @@ class MultiClassPredictor(object):
 
     def preprocess(self, input_data: list):
         text = [InputExample(text_a=x) for x in input_data]
-        text = [self._template.wrap_one_example(x) for x in text]
-        inputs = [
-            InputFeatures(**self._wrapper.tokenize_one_example(x), **x[1])
-            for x in text
-        ]
-        inputs = InputFeatures(
-            input_ids=np.array([x["input_ids"] for x in inputs]),
-            mask_ids=np.array([x["mask_ids"] for x in inputs]),
-            soft_token_ids=np.array([x["soft_token_ids"] for x in inputs]))
+        inputs = [self._template.wrap_one_example(x) for x in text]
+        inputs = [self._wrapper.tokenize_one_example(x) for x in inputs]
+        inputs = {
+            "input_ids": np.array([x["input_ids"] for x in inputs]),
+            "mask_ids": np.array([x["mask_ids"] for x in inputs]),
+            "soft_token_ids": np.array([x["soft_token_ids"] for x in inputs])
+        }
         return inputs
 
     def postprocess(self, infer_data):
-        probs = infer_data[0]
-        label = probs.argmax(axis=-1)
-        return {"label": label}
+        preds = np.argmax(infer_data[0], axis=-1)
+        labels = [self._label_list[x] for x in preds]
+        return {"label": labels}
 
     def printer(self, result, input_data):
-        label, confidence = result["label"], result["confidence"]
+        label = result["label"]
         for i in range(len(label)):
             logger.info("input data: {}".format(input_data[i]))
-            logger.info("labels: {}, confidence: {}".format(
-                self.label_list[label[i]], confidence[i]))
+            logger.info("labels: {}".format(label[i]))
             logger.info("-----------------------------")
 
 
@@ -213,33 +214,11 @@ if __name__ == "__main__":
         logger.info("{:20}: {}".format(arg_name, arg_value))
 
     export_path = os.path.dirname(args.model_path_prefix)
-    label_dict = Verbalizer.load_from(export_path)
-    label_list = sorted(list(label_dict.keys()))
-    label_map = {k: i for i, k in enumerate(label_list)}
+    labels, _ = Verbalizer.load_from(export_path)
 
-    #text_dir = os.path.join(args.data_dir, "data.txt")
-    #with open(text_dir, "r", encoding="utf-8") as f:
-    #    text_list = [x.strip() for x in f.readlines()]
+    text_dir = os.path.join(args.data_dir, "data.txt")
+    with open(text_dir, "r", encoding="utf-8") as f:
+        text_list = [x.strip() for x in f.readlines()]
 
-    case_dir = os.path.join(args.data_dir, "test.txt")
-    with open(case_dir, "r", encoding="utf-8") as f:
-        data = [x.strip().split("\t") for x in f.readlines()]
-        text_list = [x[0] for x in data]
-        labels = [label_dict[x[1]] for x in data]
-
-    predictor = MultiClassPredictor(args, label_list)
-    #predictor.predict(text_list)
-
-    inputs = predictor.preprocess(text_list)
-    infer_result = predictor.infer_batch(inputs)[0]
-    #max_value = np.max(infer_result, axis=1, keepdims=True)
-    #exp_data = np.exp(infer_result - max_value)
-    #probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
-    preds = infer_result.argmax(axis=-1)
-    print(preds.shape)
-    print(np.array(labels).shape)
-    print(np.equal(preds, np.array(labels).squeeze(axis=1)).sum(axis=-1))
-    acc = np.mean(
-        np.equal(preds,
-                 np.array(labels).squeeze(axis=1)).sum(axis=-1) == 2)
-    print("acc: %.2f" % (acc * 100))
+    predictor = MultiClassPredictor(args, labels)
+    predictor.predict(text_list)

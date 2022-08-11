@@ -14,58 +14,37 @@
 
 from dataclasses import dataclass, field
 import os
-import numpy as np
+
 import paddle
 from paddle.metric import Accuracy
-from paddle.static import InputSpec
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieTokenizer, ErnieForMaskedLM, export_model
-from paddlenlp.trainer import PdArgumentParser, get_scheduler
+from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
+from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.prompt import (
     AutoTemplate,
-    MultiMaskVerbalizer,
-    MLMTokenizerWrapper,
+    SoftVerbalizer,
     PromptTuningArguments,
     PromptTrainer,
     PromptModelForClassification,
-    FewShotSampler,
 )
 from utils import load_local_dataset
 
 
+# yapf: disable
 @dataclass
 class DataArguments:
-    prompt: str = field(metadata={"help": "The input prompt for tuning."})
-    data_dir: str = field(
-        default=None,
-        metadata={
-            "help":
-            "The dataset dictionary includes train.txt, dev.txt and label.txt files."
-        })
-    soft_encoder: str = field(
-        default=None,
-        metadata={
-            "help": "The encoder type of soft template, `lstm`, `mlp` or None."
-        })
-    encoder_hidden_size: int = field(
-        default=None, metadata={"help": "The dimension of soft embeddings."})
-    verbalizer: str = field(
-        default=None, metadata={"help": "The mapping from labels to words."})
-    train_sample_per_label: int = field(
-        default=None,
-        metadata={"help": "Number of examples sampled per label for training."})
+    data_dir: str = field(default=None, metadata={"help": "Path to a dataset which includes train.txt, dev.txt, label.txt and data.txt (optional)."})
+    prompt: str = field(default=None, metadata={"help": "The input prompt for tuning."})
+    soft_encoder: str = field(default=None, metadata={"help": "The encoder type of soft template, `lstm`, `mlp` or None."})
+    encoder_hidden_size: int = field(default=None, metadata={"help": "The dimension of soft embeddings."})
+    verbalizer: str = field(default=None, metadata={"help": "The mapping from labels to words."})
 
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(
-        default="ernie-3.0-base-zh",
-        metadata={
-            "help": "The build-in pretrained model or the path to local model."
-        })
-    export_type: str = field(
-        default='paddle',
-        metadata={"help": "The type to export. Support `paddle` and `onnx`."})
+    model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "Build-in pretrained model name or the path to local model."})
+    export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
+# yapf: enable
 
 
 def main():
@@ -78,16 +57,9 @@ def main():
 
     paddle.set_device(training_args.device)
 
-    #label_file = "/ssd2/wanghuijuan03/prompt/PaddleNLP/examples/few_shot/p-tuning/label_normalized/tnews.json"
-    #import json
-    #labels = json.load(open(label_file, "r"))
-    #with open(os.path.join(data_args.data_dir, "label.txt"), "w") as fp:
-    #    for k, v in labels.items():
-    #        fp.write(k + "==" + v + "\n")
-
     # Load the pretrained language model.
-    model = ErnieForMaskedLM.from_pretrained(model_args.model_name_or_path)
-    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = AutoModelForMaskedLM.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
     template = AutoTemplate.create_from(
@@ -99,7 +71,7 @@ def main():
     logger.info("Using template: {}".format(template.template))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
-    verbalizer = MultiMaskVerbalizer.from_file(tokenizer, label_file)
+    verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
     logger.info("Using verbalizer: {}".format(data_args.verbalizer))
 
     # Load the few-shot datasets.
@@ -107,19 +79,6 @@ def main():
         data_path=data_args.data_dir,
         splits=["train", "dev", "test"],
         label_list=verbalizer.labels_to_ids)
-    if data_args.train_sample_per_label is not None:
-        sampler = FewShotSampler(
-            num_sample_per_label=data_args.train_sample_per_label)
-        train_ds = sampler.sample_datasets(train_ds, seed=training_args.seed)
-
-    for idx in range(len(train_ds)):
-        train_ds[idx].labels = verbalizer.token_ids.numpy()[
-            train_ds[idx].labels][0]
-    for idx in range(len(dev_ds)):
-        dev_ds[idx].labels = verbalizer.token_ids.numpy()[dev_ds[idx].labels][0]
-    for idx in range(len(test_ds)):
-        test_ds[idx].labels = verbalizer.token_ids.numpy()[
-            test_ds[idx].labels][0]
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -134,11 +93,14 @@ def main():
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        preds = [tuple(x) for x in np.argmax(eval_preds.predictions, axis=-1)]
-        labels = [tuple(x) for x in eval_preds.label_ids]
-        acc = np.mean(np.equal(preds, labels))
+        metric = Accuracy()
+        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
+                                 paddle.to_tensor(eval_preds.label_ids))
+        metric.update(correct)
+        acc = metric.accumulate()
         return {'accuracy': acc}
 
+    # Initialize the trainer.
     trainer = PromptTrainer(model=prompt_model,
                             tokenizer=tokenizer,
                             args=training_args,
@@ -147,6 +109,7 @@ def main():
                             eval_dataset=dev_ds,
                             compute_metrics=compute_metrics)
 
+    # Traininig.
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=None)
         metrics = train_result.metrics
@@ -155,22 +118,15 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
+    # Prediction.
     if training_args.do_predict:
         test_ret = trainer.predict(test_ds)
         trainer.log_metrics("test", test_ret.metrics)
 
+    # Export static model.
     if training_args.do_export:
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # mask_ids
-            InputSpec(shape=[None, None], dtype="int64")  # soft_token_ids
-        ]
         export_path = os.path.join(training_args.output_dir, 'export')
-        os.makedirs(export_path, exist_ok=True)
-        template.save_to(export_path)
-        verbalizer.save_to(export_path)
-        #export_model(prompt_model, input_spec, export_path,
-        #             model_args.export_type)
+        trainer.export_model(export_path, export_type=model_args.export_type)
 
 
 if __name__ == '__main__':
