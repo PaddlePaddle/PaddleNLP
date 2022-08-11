@@ -164,7 +164,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 在模型训练时开启`--do_predict`，训练结束后直接进行预测，也可以在训练结束后，通过运行以下命令加载模型参数进行预测：
 ```
-python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --resume_from_checkpoint ./ckpt/
+python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --resume_from_checkpoint ./ckpt/ --max_seq_length 128
 ```
 
 可配置参数说明：
@@ -173,6 +173,7 @@ python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --res
 - `output_dir`: 日志的保存目录。
 - `resume_from_checkpoint`: 训练时模型参数的保存目录，用于加载模型参数。
 - `do_predict`: 是否进行预测。
+- `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 
 ## 部署示例
 

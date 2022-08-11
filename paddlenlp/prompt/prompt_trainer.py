@@ -19,14 +19,11 @@ import copy
 import collections
 
 import numpy as np
-from sklearn.metrics import f1_score
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.static import InputSpec
-from paddle.metric import Accuracy
-from datasets import load_metric
 
 from ..datasets import MapDataset
 from ..utils.log import logger
@@ -79,12 +76,6 @@ class PromptTrainer(Trainer):
         if data_collator is None:
             data_collator = InputFeatures.collate_fn
 
-        if compute_metrics is None:
-            if args.task_type == 'multi-class':
-                compute_metrics = self.compute_metrics_multi_class
-            elif args.task_type in ['multi-label', 'hierachical']:
-                compute_metrics = self.compute_metrics_multi_label
-
         super().__init__(model=model,
                          criterion=criterion,
                          args=args,
@@ -110,22 +101,6 @@ class PromptTrainer(Trainer):
 
         if self.args.use_rdrop:
             self.rdrop_criterion = RDropLoss()
-
-    def compute_metrics_multi_class(self, eval_preds):
-        metric = Accuracy()
-        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
-                                 paddle.to_tensor(eval_preds.label_ids))
-        metric.update(correct)
-        acc = metric.accumulate()
-        return {'accuracy': acc}
-
-    def compute_metrics_multi_label(self, eval_preds):
-        probs = F.sigmoid(eval_preds.predictions)
-        preds = probs > self.args.cls_threshold
-        micro_f1_score = f1_score(y_pred=preds,
-                                  y_true=eval_preds.label_ids,
-                                  average='micro')
-        return micro_f1_score
 
     @property
     def template(self):
@@ -180,7 +155,7 @@ class PromptTrainer(Trainer):
             self.template = AutoTemplate.load_from(
                 resume_from_checkpoint, self.tokenizer, self.plm,
                 getattr(self.template, "_prompt_encoder", None),
-                getattr(self.template, "_encoder_hidden_size", None))
+                getattr(self.template, "encoder_hidden_size", None))
 
         super().load_state_dict_from_checkpoint(resume_from_checkpoint)
 
