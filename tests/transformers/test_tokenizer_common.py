@@ -54,6 +54,10 @@ def filter_non_english(_, pretrained_name: str):
     return not any([lang in pretrained_name for lang in NON_ENGLISH_TAGS])
 
 
+def filter_roberta_detectors(_, pretrained_name: str):
+    return "detector" not in pretrained_name
+
+
 class TokenizerTesterMixin:
 
     tokenizer_class = None
