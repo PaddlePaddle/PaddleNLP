@@ -1729,30 +1729,23 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                 sequences for each sequence in the batch. Default to 1.
         Returns:
             Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
-            Its data type should be float32 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
+            Its data type should be uint8 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
 
         Example:
             .. code-block::
                 import paddle
-                from paddlenlp.transformers import DalleBartForImageGeneration, DalleBartTokenizer
+                from paddlenlp.transformers import AutoModelForImageGeneration, AutoTokenizer
                 from PIL import Image
 
                 # Initialize the model and tokenizer
                 model_name_or_path = 'dalle-mini'
-                model = DalleBartForImageGeneration.from_pretrained(model_name_or_path)
-                tokenizer = DalleBartTokenizer.from_pretrained(model_name_or_path)
+                model = AutoModelForImageGeneration.from_pretrained(model_name_or_path)
+                tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
                 model.eval()
 
                 # Prepare the model inputs.
                 prompts = ["graphite sketch of Elon Musk", "Mohanlal graphite sketch"]
-                tokenized_inputs = tokenizer(
-                    prompts,
-                    return_tensors="pd",
-                    padding="max_length",
-                    truncation=True,
-                    return_attention_mask=True,
-                    max_length=64,
-                )
+                tokenized_inputs = tokenizer(prompts, return_tensors="pd")
                 top_k = 32
                 condition_scale = 16.0
                 num_return_sequences = 4
@@ -1760,14 +1753,12 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                                       top_k=top_k,
                                       condition_scale=condition_scale,
                                       num_return_sequences=num_return_sequences)
-                print(images.shape)
-                # [2, 4, 256, 256, 3]
-                images = (images.cpu().numpy().clip(0, 1) * 255).astype("uint8")
+                print(images.shape) # [2, 4, 256, 256, 3]
                 # [2, 256, 4*256, 3]
-                images = images.transpose([0, 2, 1, 3,
-                                        4]).reshape(-1, images.shape[-3],
+                images = images.numpy().transpose([0, 2, 1, 3,
+                                        4]).reshape([-1, images.shape[-3],
                                                     num_return_sequences * images.shape[-2],
-                                                    images.shape[-1])
+                                                    images.shape[-1]])
                 for i, image in enumerate(images):
                     image = Image.fromarray(image)
                     image.save(f"figure_{i}.png")
@@ -1787,4 +1778,5 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
             -1, num_return_sequences, images.shape[1], images.shape[2],
             images.shape[3]
         ])
+        images = (images.clip(0, 1) * 255).astype("uint8")
         return images

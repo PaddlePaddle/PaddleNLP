@@ -212,7 +212,7 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
                 
         Returns:
             Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
-            Its data type should be float32 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
+            Its data type should be uint8 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
 
         Example:
             .. code-block::
@@ -228,28 +228,18 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
 
                 # Prepare the model inputs.
                 prompts = ["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"]
-                tokenized_inputs = tokenizer(
-                    prompts,
-                    return_tensors="pd",
-                    padding="max_length",
-                    truncation=True,
-                    return_token_type_ids=False,
-                    return_attention_mask=False,
-                    max_length=32,
-                )
+                tokenized_inputs = tokenizer(prompts, return_tensors="pd")
                 top_k = 32
                 num_return_sequences = 4
                 images = model.generate(**tokenized_inputs,
                                       top_k=top_k,
                                       num_return_sequences=num_return_sequences)
-                print(images.shape)
-                # [2, 4, 256, 256, 3]
-                images = ((images.cpu().numpy() + 1.0) * 127.5).clip(0, 255).astype("uint8")
+                print(images.shape) # [2, 4, 256, 256, 3]
                 # [2, 256, 4*256, 3]
-                images = images.transpose([0, 2, 1, 3,
-                                        4]).reshape(-1, images.shape[-3],
+                images = images.numpy().transpose([0, 2, 1, 3,
+                                        4]).reshape([-1, images.shape[-3],
                                                     num_return_sequences * images.shape[-2],
-                                                    images.shape[-1])
+                                                    images.shape[-1]])
                 for i, image in enumerate(images):
                     image = Image.fromarray(image)
                     image.save(f"figure_{i}.png")
@@ -273,4 +263,5 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             -1, num_return_sequences, images.shape[1], images.shape[2],
             images.shape[3]
         ])
+        images = ((images + 1.0) * 127.5).clip(0, 255).astype("uint8")
         return images
