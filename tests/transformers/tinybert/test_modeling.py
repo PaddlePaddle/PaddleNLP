@@ -259,7 +259,9 @@ class TinyBertModelTest(ModelTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
     def test_hidden_states_output(self):
-        self.skipTest("skip: test_hidden_states_output")
+        self.skipTest(
+            "skip: test_hidden_states_output -> there is no supporting argument return_dict"
+        )
 
 
 class TinyBertModelIntegrationTest(unittest.TestCase):
