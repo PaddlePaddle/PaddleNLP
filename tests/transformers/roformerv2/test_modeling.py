@@ -291,7 +291,7 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
-    # @slow
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 RoFormerv2PretrainedModel.pretrained_init_configuration)[:1]:
@@ -301,7 +301,7 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
 
 class RoFormerv2ModelIntegrationTest(unittest.TestCase):
 
-    # @slow
+    @slow
     def test_inference_no_attention(self):
         model = RoFormerv2Model.from_pretrained(
             "roformer_v2_chinese_char_small")
@@ -321,7 +321,7 @@ class RoFormerv2ModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
-    # @slow
+    @slow
     def test_inference_with_attention(self):
         model = RoFormerv2Model.from_pretrained(
             "roformer_v2_chinese_char_small")
