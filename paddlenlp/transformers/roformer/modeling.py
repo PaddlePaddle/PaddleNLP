@@ -451,12 +451,6 @@ class RoFormerPretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
-    def get_input_embeddings(self) -> nn.Embedding:
-        return self.roformer.get_input_embeddings()
-
-    def set_input_embeddings(self, embedding: nn.Embedding):
-        self.roformer.set_input_embeddings(embedding)
-
 
 @register_base_model
 class RoFormerModel(RoFormerPretrainedModel):
