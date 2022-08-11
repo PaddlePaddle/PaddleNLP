@@ -84,7 +84,7 @@ data/
 ...
 ```
 
-对于分类标签集文件，存储了数据集中所有的标签集合，每行为一个标签名。如果需要自定义标签映射，则每行需要包括标签名和相应的映射词，由`==`分隔。例如
+对于分类标签集文件，存储了数据集中所有的标签集合，每行为一个标签名。如果需要自定义标签映射用于分类器初始化，则每行需要包括标签名和相应的映射词，由`==`分隔。例如
 ```
 news_car'=='汽车
 news_culture'=='文化
@@ -106,7 +106,7 @@ python train.py \
 --ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
---max_steps 1000 \
+--max_steps 200 \
 --eval_steps 10 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
@@ -128,7 +128,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
---max_steps 100 \
+--max_steps 200 \
 --eval_steps 10 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \

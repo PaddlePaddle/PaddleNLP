@@ -16,10 +16,9 @@ import os
 import six
 import psutil
 import argparse
+
 import numpy as np
 
-import paddle2onnx
-import onnxruntime as ort
 from paddlenlp.utils.log import logger
 from paddlenlp.prompt import (
     AutoTemplate,
@@ -29,6 +28,8 @@ from paddlenlp.prompt import (
     InputFeatures,
 )
 from paddlenlp.transformers import AutoTokenizer
+import paddle2onnx
+import onnxruntime as ort
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -183,6 +184,7 @@ class MultiLabelPredictor(object):
     def preprocess(self, input_data: list):
         text = [InputExample(text_a=x) for x in input_data]
         inputs = [self._template.wrap_one_example(x) for x in text]
+        inputs = [self._wrapper.tokenize_one_example(x) for x in inputs]
         inputs = InputFeatures(
             input_ids=np.array([x["input_ids"] for x in inputs]),
             mask_ids=np.array([x["mask_ids"] for x in inputs]),
@@ -200,7 +202,7 @@ class MultiLabelPredictor(object):
         labels = [[] for _ in range(probs.shape[0])]
         for idx, label_id in label_ids:
             labels[idx].append(self._label_list[label_id])
-        return {"label": label}
+        return {"label": labels}
 
     def printer(self, result, input_data):
         label = result["label"]

@@ -114,7 +114,7 @@ python train.py \
 --do_train \
 --do_eval \
 --max_steps 1000 \
---eval_steps 10 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -136,7 +136,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --do_train \
 --do_eval \
 --max_steps 1000 \
---eval_steps 10 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \

@@ -16,10 +16,9 @@ import os
 import six
 import psutil
 import argparse
+
 import numpy as np
 
-import paddle2onnx
-import onnxruntime as ort
 from paddlenlp.utils.log import logger
 from paddlenlp.prompt import (
     AutoTemplate,
@@ -32,6 +31,8 @@ from paddlenlp.transformers import (
     normalize_chars,
     tokenize_special_chars,
 )
+import paddle2onnx
+import onnxruntime as ort
 
 # yapf: disable
 parser = argparse.ArgumentParser()

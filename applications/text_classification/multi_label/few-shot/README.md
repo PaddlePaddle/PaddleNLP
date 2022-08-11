@@ -106,7 +106,7 @@ python train.py \
 --do_train \
 --do_eval \
 --max_steps 1000 \
---eval_steps 10 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -128,7 +128,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --do_train \
 --do_eval \
 --max_steps 1000 \
---eval_steps 10 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -195,13 +195,13 @@ python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resum
 #### CPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir data/ --batch_size 32 --device cpu
+python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device cpu
 ```
 
 #### GPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir tnews/ --batch_size 32 --device gpu --device_id 0
+python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device gpu --device_id 0
 ```
 
 可配置参数说明：

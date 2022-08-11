@@ -71,7 +71,6 @@ def main():
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
     verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
-    logger.info("Using verbalizer: {}".format(data_args.verbalizer))
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
