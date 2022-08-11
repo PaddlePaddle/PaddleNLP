@@ -152,4 +152,40 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       const bool min_penalty = false,
                                       const int end_id = -1);
 
+template <typename T>
+void apply_min_length_penalty_kernelLauncher(T* log_probs,
+                                      const T* bias,
+                                      const bool* finished,
+                                      int batch_size,
+                                      int beam_width,
+                                      int vocab_size_padded,
+                                      int vocab_size,
+                                      cudaStream_t stream,
+                                      const bool min_penalty,
+                                      const int end_id);
+
+template <typename T>
+void gptj_start_id_embedding_lookups_kernel_launcher(T* from_tensor,
+                                                         int* output_ids,
+                                                         const T* embedding_table, 
+                                                         const int* word_ids,
+                                                         const int length,
+                                                         const int max_length,
+                                                         const int batch_size,
+                                                         const int hidden_units, 
+                                                         cudaStream_t stream);
+
+template <typename T>
+void gpj_embedding_lookups_kernel_launcher(T* from_tensor,
+                                            const T* embedding_table, 
+                                            const int* word_ids,
+                                            const int local_batch_size,
+                                            const int batch_size,
+                                            const int hidden_units, 
+                                            int step, 
+                                            int ite,
+                                            int max_input_len,
+                                            const int* start_lengths,
+                                            cudaStream_t stream);
+
 }  // namespace fastertransformer
