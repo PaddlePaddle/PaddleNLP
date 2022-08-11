@@ -52,14 +52,19 @@ def reader(data_path):
 def process_ee(example):
     events = []
     for e in example["event_list"]:
-        events.append(
-            [[e["event_type"], "触发词", e["trigger"], e["trigger_start_index"]]])
+        offset1 = len(e["trigger"]) - len(e["trigger"].lstrip())
+        events.append([[
+            e["event_type"], "触发词", e["trigger_start_index"] + offset1,
+            e["trigger_start_index"] + offset1 + len(e["trigger"].strip()) - 1
+        ]])
         for a in e["arguments"]:
+            offset2 = len(a["argument"]) - len(a["argument"].lstrip())
             events[-1].append([
-                e["event_type"], a["role"], a["argument"],
-                a["argument_start_index"]
+                e["event_type"], a["role"], a["argument_start_index"] + offset2,
+                a["argument_start_index"] + offset2 +
+                len(a["argument"].strip()) - 1
             ])
-    return {"text": example['text'], "event_list": events}
+    return {"text": example["text"], "events": events}
 
 
 def map_offset(ori_offset, offset_mapping):
@@ -254,30 +259,35 @@ def create_dataloader(dataset,
         )
         offset_mapping = tokenized_inputs["offset_mapping"]
         if task_type == "event_extraction":
-            events = []
-            for e in example['event_list']:
-                events.append([])
-                for t, r, a, i in e:
-                    label = label_dict['tag2id'][(t, r)]
-                    _start, _end = i, i + len(a) - 1
-                    start = map_offset(_start, offset_mapping)
-                    end = map_offset(_end, offset_mapping)
-                    events[-1].append((label, start, end))
-
             argu_labels = {}
             head_labels = []
             tail_labels = []
-            for e in events:
-                for l, h, t in e:
-                    if l not in argu_labels:
-                        argu_labels[l] = [l]
-                    argu_labels[l].extend([h, t])
+            for event in example["events"]:
+                for i1, (event_type1, rol1, start1, end1) in enumerate(event):
+                    tp1 = label_dict['tag2id'][(event_type1, rol1)]
+                    h1 = map_offset(start1, offset_mapping)
+                    t1 = map_offset(end1, offset_mapping)
 
-                for i1, (_, h1, t1) in enumerate(e):
-                    for i2, (_, h2, t2) in enumerate(e):
+                    if h1 == -1 or t1 == -1:
+                        continue
+                    if tp1 not in argu_labels:
+                        argu_labels[tp1] = [tp1]
+                    argu_labels[tp1].extend([h1, t1])
+
+                    for i2, (_, _, start2, end2) in enumerate(event):
                         if i2 > i1:
-                            head_labels.append([min(h1, h2), max(h1, h2)])
-                            tail_labels.append([min(t1, t2), max(t1, t2)])
+                            h2 = map_offset(start2, offset_mapping)
+                            t2 = map_offset(end2, offset_mapping)
+
+                            if h2 == -1 or t2 == -1:
+                                continue
+                            hl = [min(h1, h2), max(h1, h2)]
+                            tl = [min(t1, t2), max(t1, t2)]
+                            if hl not in head_labels:
+                                head_labels.append(hl)
+                            if tl not in tail_labels:
+                                tail_labels.append(tl)
+
             argu_labels = list(argu_labels.values())
 
             outputs = {
@@ -331,7 +341,7 @@ def create_dataloader(dataset,
                 rel_labels = []
                 for r in example["aso_list"]:
                     _ah, _oh = r["aspect_start_index"], r["opinion_start_index"]
-                    _at, _ot = _sh + len(r["aspect"]) - 1, _oh + len(
+                    _at, _ot = _ah + len(r["aspect"]) - 1, _oh + len(
                         r["opinion"]) - 1
                     ah = map_offset(_ah, offset_mapping)
                     at = map_offset(_at, offset_mapping)
@@ -437,8 +447,10 @@ def extract_events(pred_events, text):
         for argu in event:
             if argu[1] != u'触发词':
                 final_event['arguments'].append({
-                    'role': argu[1],
-                    'argument': argu[2]
+                    'role':
+                    argu[1],
+                    'argument':
+                    text[argu[2]:argu[3] + 1]
                 })
         event_list = [
             event for event in event_list if not isin(event, final_event)
@@ -498,8 +510,7 @@ def postprocess(batch_outputs,
                             offset_mapping[argu[2]][0],
                             offset_mapping[argu[3]][1],
                         )
-                        events[-1].append(
-                            [argu[0], argu[1], text[start:end], start])
+                        events[-1].append([argu[0], argu[1], start, end - 1])
                     if all([argu[1] != "触发词" for argu in event]):
                         events.pop()
 

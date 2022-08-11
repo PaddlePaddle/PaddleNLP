@@ -153,7 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", default="./ner_data/train_data.json", type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default="./ner_data/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum input sequence length.")
+    parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum input sequence length.")
     parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")

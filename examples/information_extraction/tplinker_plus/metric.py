@@ -68,7 +68,7 @@ def get_eval(all_preds, raw_data, task_type):
             for event in pred_events:
                 if any([argu[1] == "触发词" for argu in event]):
                     R.append(list(sorted(event)))
-            for event in data["event_list"]:
+            for event in data["events"]:
                 T.append(list(sorted(event)))
             for event in R:
                 if event in T:
@@ -81,7 +81,7 @@ def get_eval(all_preds, raw_data, task_type):
                 for argu in event:
                     if argu[1] != "触发词":
                         R.append(argu)
-            for event in data["event_list"]:
+            for event in data["events"]:
                 for argu in event:
                     if argu[1] != "触发词":
                         T.append(argu)
@@ -91,10 +91,12 @@ def get_eval(all_preds, raw_data, task_type):
             ay += len(R)
             az += len(T)
 
-        e_f1, e_pr, e_rc = round(2 * ex / (ey + ez),
-                                 5), round(ex / ey, 5), round(ex / ez, 5)
-        a_f1, a_pr, a_rc = round(2 * ax / (ay + az),
-                                 5), round(ax / ay, 5), round(ax / az, 5)
+        e_f1 = round(2 * ex / (ey + ez), 5)
+        e_pr = 0. if ex == 1e-10 and ey == 1e-10 else round(ex / ey, 5)
+        e_rc = round(ex / ez, 5)
+        a_f1 = round(2 * ax / (ay + az), 5)
+        a_pr = 0. if ax == 1e-10 and ay == 1e-10 else round(ax / ay, 5)
+        a_rc = round(ax / az, 5)
 
         return {
             "event_f1": e_f1,

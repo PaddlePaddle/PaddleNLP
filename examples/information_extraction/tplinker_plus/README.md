@@ -301,7 +301,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
-        --max_seq_len 128 \
+        --max_seq_len 256 \
         --num_epochs 20 \
         --seed 1000 \
         --logging_steps 10 \
@@ -353,7 +353,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
-        --max_seq_len 128 \
+        --max_seq_len 256 \
         --num_epochs 50 \
         --seed 1000 \
         --logging_steps 10 \
