@@ -6,6 +6,7 @@
    * [环境准备](#环境准备)
    * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
+       * [训练评估与模型优化](#训练评估与模型优化)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
    * [静态图导出](#静态图导出)
@@ -189,7 +190,8 @@ python train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 
 使用GPU单卡/多卡训练
@@ -205,7 +207,8 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
@@ -220,14 +223,16 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
 * `early_stop`：选择是否使用早停法(EarlyStopping)，模型在开发集经过一定epoch后精度表现不再上升，训练终止；默认为False。
-* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
+* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为10。
 * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
 * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.0。
 * `warmup`：是否使用学习率warmup策略，使用时应设置适当的训练轮次（epochs）；默认为False。
 * `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
-
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
@@ -243,6 +248,55 @@ checkpoint/
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
+### 训练评估与模型优化
+
+训练后的模型我们可以使用[评估脚本](analysis/evaluate.py)对每个类别分别进行评估，并输出预测错误样本（bad case）：
+
+```shell
+python evaluate.py \
+    --device "gpu" \
+    --dataset_dir "../data" \
+    --params_path "../checkpoint" \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --bad_case_path "./bad_case.txt"
+```
+
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+输出打印示例：
+
+```text
+[2022-08-11 03:10:14,058] [    INFO] - -----Evaluate model-------
+[2022-08-11 03:10:14,059] [    INFO] - Train dataset size: 11958
+[2022-08-11 03:10:14,059] [    INFO] - Dev dataset size: 1498
+[2022-08-11 03:10:14,059] [    INFO] - Accuracy in dev dataset: 89.19%
+[2022-08-11 03:10:14,059] [    INFO] - Macro avg in dev dataset: precision: 93.48 | recall: 93.26 | F1 score 93.22
+[2022-08-11 03:10:14,059] [    INFO] - Micro avg in dev dataset: precision: 95.07 | recall: 95.46 | F1 score 95.26
+[2022-08-11 03:10:14,095] [    INFO] - Level 1 Label Performance: Macro F1 score: 96.39 | Micro F1 score: 96.81 | Accuracy: 94.93
+[2022-08-11 03:10:14,255] [    INFO] - Level 2 Label Performance: Macro F1 score: 92.79 | Micro F1 score: 93.90 | Accuracy: 89.72
+[2022-08-11 03:10:14,256] [    INFO] - Class name: 交往
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 471(3.9%) | precision: 99.57 | recall: 98.94 | F1 score 99.25
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 60(4.0%) | precision: 91.94 | recall: 95.00 | F1 score 93.44
+[2022-08-11 03:10:14,256] [    INFO] - ----------------------------
+[2022-08-11 03:10:14,256] [    INFO] - Class name: 交往##会见
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 98(0.8%) | precision: 100.00 | recall: 100.00 | F1 score 100.00
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 12(0.8%) | precision: 92.31 | recall: 100.00 | F1 score 96.00
+...
+```
+
+预测错误的样本保存在bad_case.txt文件中：
+
+```text
+Prediction    Label    Text
+组织关系,组织关系##解雇 组织关系,组织关系##加盟,组织关系##裁员  据猛龙随队记者JoshLewenberg报道，消息人士透露，猛龙已将前锋萨加巴-科纳特裁掉。此前他与猛龙签下了一份Exhibit10合同。在被裁掉后，科纳特下赛季大概率将前往猛龙的发展联盟球队效力。
+组织关系,组织关系##解雇    组织关系,组织关系##裁员    冠军射手被裁掉，欲加入湖人队，但湖人却无意，冠军射手何去何从
+组织关系,组织关系##裁员    组织关系,组织关系##退出,组织关系##裁员    有多名魅族员工表示，从6月份开始，魅族开始了新一轮裁员，重点裁员区域是营销和线下。裁员占比超过30%，剩余员工将不过千余人，魅族的知名工程师，爱讲真话的洪汉生已经从钉钉里退出了，外界传言说他去了OPPO。
+人生,人生##死亡,灾害/意外,灾害/意外##坍/垮塌    灾害/意外,灾害/意外##坍/垮塌    冲刺千亿的美的置业贵阳项目倒塌致8人死亡已责令全面停工
+...
+```
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 ### 训练效果
 
@@ -313,6 +367,8 @@ python predict.py \
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 ## 静态图导出
 

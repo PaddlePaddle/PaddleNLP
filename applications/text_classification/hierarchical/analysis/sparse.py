@@ -234,18 +234,13 @@ def find_sparse_data():
         analysis_result, args.sparse_num)
 
     # Save the sparse data
-    is_true = []
     with open(os.path.join(args.dataset_dir, args.sparse_file), 'w') as f:
         for idx in sparse_indexs:
             data = dev_ds.data[idx]
             f.write(data['text'] + '\t' + str(data['label']) + '\n')
-            is_true.append(1 if str(preds[idx]) ==
-                           str(label_list[data['label']]) else 0)
     f.close()
     logger.info("Sparse data saved in {}".format(
         os.path.join(args.dataset_dir, args.sparse_file)))
-    logger.info("Accuracy in sparse data: {:.2f}%".format(100 * sum(is_true) /
-                                                          len(is_true)))
     logger.info("Average score in sparse data: {:.4f}".format(
         sum(sparse_scores) / len(sparse_scores)))
     return os.path.join(args.dataset_dir, args.sparse_file)

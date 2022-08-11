@@ -29,11 +29,11 @@ parser.add_argument("--aug_strategy",
                     choices=["mix", "substitute", "insert", "delete", "swap"],
                     default='substitute',
                     help="Select data augmentation strategy")
-parser.add_argument(
-    "--aug_type",
-    choices=["synonym", "homonym", "mlm"],
-    default='synonym',
-    help="Select data augmentation type for substitute and insert")
+parser.add_argument("--aug_type",
+                    choices=["synonym", "homonym", "mlm"],
+                    default='synonym',
+                    help="Select data augmentation type"
+                    "for substitute and insert")
 parser.add_argument("--create_n",
                     type=int,
                     default=2,
