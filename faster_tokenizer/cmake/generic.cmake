@@ -41,7 +41,7 @@ function(cc_library TARGET_NAME)
           target_link_libraries(${TARGET_NAME} "-Wl,-undefined,dynamic_lookup")
         endif(WIN32)
       endif()
-      target_link_libraries(${TARGET_NAME} ${cc_library_DEPS})
+      target_link_libraries(${TARGET_NAME} ${cc_library_DEPS} ${PUBLIC_DEPEND_LIBS})
     endif()
     # For C++ 17 filesystem
     # target_link_libraries(${TARGET_NAME} stdc++fs)
