@@ -24,8 +24,8 @@ from parameterized import parameterized_class
 from paddlenlp.transformers.skep.tokenizer import SkepTokenizer, BasicTokenizer, WordpieceTokenizer, BpeEncoder
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
-from tests.testing_utils import slow, get_tests_dir
-from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ...testing_utils import slow, get_tests_dir
+from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
 def _class_name_func(cls, num: int, params_dict: Dict[str, Any]):
@@ -289,9 +289,6 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     add_special_tokens=False)['input_ids']
                 self.assertEqual(ids, output_sequence)
 
-    def test_pretrained_model_lists(self):
-        self.skipTest("`max_model_input_sizes` not found, so skip this test")
-
     def test_conversion_reversible(self):
         self.skipTest("bpe vocab not supported cls_token, bos_token")
 
@@ -300,8 +297,8 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "using basic-tokenizer or word-piece tokenzier to do this test, so to skpt"
         )
 
-    def test_special_tokens_mask_input_pairs(self):
-        self.skipTest("skip for bpe tokenizer")
+    # def test_special_tokens_mask_input_pairs(self):
+    #     self.skipTest("skip for bpe tokenizer")
 
 
 class SkepWordPieceTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
