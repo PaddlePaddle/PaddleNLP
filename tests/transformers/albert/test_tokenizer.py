@@ -342,7 +342,7 @@ class AlbertChineseTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
 
     @slow
     def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained("bert-base-uncased")
+        tokenizer = self.tokenizer_class.from_pretrained("albert-chinese-base")
 
         text = tokenizer.encode("sequence builders",
                                 return_token_type_ids=None,
