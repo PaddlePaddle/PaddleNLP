@@ -80,6 +80,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         }
     }
+    max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
 
     def __init__(self,
                  vocab_file,
@@ -118,6 +119,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
                  text_pair=None,
                  max_seq_len=None,
                  stride=0,
+                 add_special_tokens: bool = False,
                  is_split_into_words=False,
                  pad_to_max_seq_len=False,
                  truncation_strategy="longest_first",
@@ -171,7 +173,15 @@ class ErnieMTokenizer(PretrainedTokenizer):
         Returns:
             int: The size of vocabulary.
         """
-        return len(self.vocab)
+        return self.sp_model.vocab_size()
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
