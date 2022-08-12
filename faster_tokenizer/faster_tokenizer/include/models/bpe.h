@@ -17,12 +17,13 @@ limitations under the License. */
 #include "models/model.h"
 #include "nlohmann/json.hpp"
 #include "utils/cache.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
-struct BPE : public Model {
+struct FASTERTOKENIZER_DECL BPE : public Model {
   BPE();
   BPE(const core::Vocab& vocab,
       const core::Merges& merges,
