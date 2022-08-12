@@ -19,8 +19,6 @@ import json
 from typing import Dict, Any, List, Tuple
 import shutil
 
-from parameterized import parameterized_class
-
 from paddlenlp.transformers.skep.tokenizer import SkepTokenizer, BasicTokenizer, WordpieceTokenizer, BpeEncoder
 from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, _is_punctuation
 
