@@ -13,12 +13,7 @@
 # limitations under the License.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from functools import partial
 import os
-import copy
-import collections
-
-import numpy as np
 
 import paddle
 import paddle.nn as nn
@@ -34,9 +29,9 @@ from ..data import DataCollator
 from ..losses import RDropLoss
 from ..transformers import PretrainedTokenizer, export_model
 
-from .template import Template, AutoTemplate
-from .verbalizer import Verbalizer, SoftVerbalizer
-from .prompt_utils import InputFeatures, InputExample, signature
+from .template import AutoTemplate
+from .verbalizer import SoftVerbalizer
+from .prompt_utils import InputFeatures, signature
 from .prompt_tokenizer import MLMTokenizerWrapper
 from .prompt_args import PromptTuningArguments
 

@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-from typing import Literal
 from dataclasses import dataclass, field
 
 from ..utils.log import logger
 from ..trainer import TrainingArguments
-from ..trainer import SchedulerType
-from ..trainer.trainer_utils import OptimizerNames
 
 __all__ = ["PromptTuningArguments"]
 

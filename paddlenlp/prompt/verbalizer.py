@@ -14,19 +14,18 @@
 
 from abc import abstractmethod
 from collections import defaultdict
-from typing import List, Dict, Union, Callable, Optional
 import os
 import copy
 import json
+
 import numpy as np
+from typing import List, Dict, Union
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.log import logger
-from ..transformers import PretrainedTokenizer
-
-from .prompt_utils import InputExample
 
 __all__ = [
     "Verbalizer", "MultiMaskVerbalizer", "ManualVerbalizer", "SoftVerbalizer"
@@ -193,23 +192,6 @@ class Verbalizer(nn.Layer):
         with open(os.path.join(path, VERBALIZER_FILE), "r") as f:
             label_state = json.load(f)
             return label_state
-
-
-class NonVerbalizer(Verbalizer):
-
-    def __init__(self, labels):
-        super().__init__(labels=labels)
-
-    def process_label_words(self):
-        pass
-
-    @classmethod
-    def from_file(cls, label_file, delimiter="=="):
-        with open(label_file, "r", encoding="utf-8") as fp:
-            labels = set()
-            for line in fp:
-                labels.add(line.strip().split(delimiter)[0])
-        return cls(labels=list(labels))
 
 
 class ManualVerbalizer(Verbalizer):

@@ -18,7 +18,6 @@ from functools import partial
 from collections import defaultdict
 
 import numpy as np
-from ..utils.log import logger
 from .prompt_utils import InputFeatures
 
 __all__ = ["TokenizerWrapper", "MLMTokenizerWrapper"]
