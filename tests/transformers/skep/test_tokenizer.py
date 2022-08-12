@@ -295,8 +295,41 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "using basic-tokenizer or word-piece tokenzier to do this test, so to skpt"
         )
 
-    # def test_special_tokens_mask_input_pairs(self):
-    #     self.skipTest("skip for bpe tokenizer")
+    def test_special_tokens_mask_input_pairs(self):
+        tokenizers = self.get_tokenizers(do_lower_case=False)
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                sequence_0 = " lower"
+                sequence_1 = "newer"
+                encoded_sequence = tokenizer.encode(
+                    sequence_0,
+                    return_token_type_ids=None,
+                    add_special_tokens=False)['input_ids']
+                encoded_sequence += tokenizer.encode(
+                    sequence_1,
+                    return_token_type_ids=None,
+                    add_special_tokens=False)['input_ids']
+                encoded_sequence_dict = tokenizer.encode(
+                    sequence_0,
+                    sequence_1,
+                    add_special_tokens=True,
+                    return_special_tokens_mask=True,
+                    # add_prefix_space=False,
+                )
+                encoded_sequence_w_special = encoded_sequence_dict["input_ids"]
+                special_tokens_mask = encoded_sequence_dict[
+                    "special_tokens_mask"]
+                self.assertEqual(len(special_tokens_mask),
+                                 len(encoded_sequence_w_special))
+
+                filtered_sequence = [
+                    (x if not special_tokens_mask[i] else None)
+                    for i, x in enumerate(encoded_sequence_w_special)
+                ]
+                filtered_sequence = [
+                    x for x in filtered_sequence if x is not None
+                ]
+                self.assertEqual(encoded_sequence, filtered_sequence)
 
 
 class SkepWordPieceTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
@@ -405,13 +438,15 @@ class SkepWordPieceTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                              ["[UNK]", "runn", "##ing"])
 
 
-class SkepTokenizationZHTest(TokenizerTesterMixin, unittest.TestCase):
+class SkepChineseTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = SkepTokenizer
     space_between_special_tokens = False
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
     use_bpe_encoder = False
+
+    only_english_character = False
 
     def setUp(self):
         super().setUp()
@@ -518,7 +553,7 @@ class SkepTokenizationZHTest(TokenizerTesterMixin, unittest.TestCase):
             [tokenizer.tokenize(t) for t in ["鲲", "\xad", "鹏"]],
             [["[UNK]"], [], ["[UNK]"]])
 
-    # @slow
+    @slow
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained(
             "skep_ernie_1.0_large_ch")
@@ -539,7 +574,7 @@ class SkepTokenizationZHTest(TokenizerTesterMixin, unittest.TestCase):
             tokenizer.sep_token_id
         ] + text_2 + [tokenizer.sep_token_id]
 
-    # @slow
+    @slow
     def test_offsets_with_special_characters(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
