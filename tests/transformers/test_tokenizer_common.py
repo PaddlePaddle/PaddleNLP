@@ -438,6 +438,7 @@ class TokenizerTesterMixin:
                     "cls_token",
                     "mask_token",
                 ]
+
                 vocab = tokenizer.get_vocab()
                 token_id_to_test_setters = next(iter(vocab.values()))
                 token_to_test_setters = tokenizer.convert_ids_to_tokens(

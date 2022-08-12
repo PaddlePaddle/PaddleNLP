@@ -498,7 +498,7 @@ class BertTokenizer(PretrainedTokenizer):
         return len(self.vocab)
 
     def get_vocab(self):
-        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         """

@@ -72,13 +72,8 @@ class ModelTesterMixin:
             return model_class(self.base_model_class(**config))
 
     def test_save_load(self):
-        config, input_ids, token_type_ids, input_mask = self.model_tester.prepare_config_and_inputs(
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )
-        inputs_dict = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": input_mask,
-        }
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
