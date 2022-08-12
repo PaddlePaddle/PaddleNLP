@@ -106,7 +106,18 @@ parser.add_argument("--seed",
                     type=int,
                     default=3,
                     help="random seed for initialization")
-
+parser.add_argument("--train_file",
+                    type=str,
+                    default="train.txt",
+                    help="Train dataset file name")
+parser.add_argument("--dev_file",
+                    type=str,
+                    default="dev.txt",
+                    help="Dev dataset file name")
+parser.add_argument("--label_file",
+                    type=str,
+                    default="label.txt",
+                    help="Label file name")
 args = parser.parse_args()
 
 
@@ -146,18 +157,19 @@ def train():
 
     # load and preprocess dataset
     label_list = {}
-    with open(os.path.join(args.dataset_dir, 'label.txt'),
+    with open(os.path.join(args.dataset_dir, args.label_file),
               'r',
               encoding='utf-8') as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
     train_ds = load_dataset(read_local_dataset,
-                            path=os.path.join(args.dataset_dir, 'train.txt'),
+                            path=os.path.join(args.dataset_dir,
+                                              args.train_file),
                             label_list=label_list,
                             lazy=False)
     dev_ds = load_dataset(read_local_dataset,
-                          path=os.path.join(args.dataset_dir, 'dev.txt'),
+                          path=os.path.join(args.dataset_dir, args.dev_file),
                           label_list=label_list,
                           lazy=False)
 

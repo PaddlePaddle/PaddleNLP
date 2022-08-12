@@ -118,18 +118,11 @@ def evaluate():
 
     label_list = {}
     label_map = {}
-    label_map_dict = {}
     with open(label_path, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
             label_map[i] = l
-            for ii, ll in enumerate(l.split('##')):
-                if ii not in label_map_dict:
-                    label_map_dict[ii] = {}
-                if ll not in label_map_dict[ii]:
-                    iii = len(label_map_dict[ii])
-                    label_map_dict[ii][ll] = iii
     train_ds = load_dataset(read_local_dataset,
                             path=train_path,
                             label_list=label_list,
@@ -192,22 +185,6 @@ def evaluate():
     report = classification_report(labels, preds, digits=4, output_dict=True)
     accuracy = accuracy_score(labels, preds)
 
-    labels_dict = {ii: [] for ii in range(len(label_map_dict))}
-    preds_dict = {ii: [] for ii in range(len(label_map_dict))}
-    for i in range(len(preds)):
-        for ii in range(len(label_map_dict)):
-            labels_dict[ii].append([0] * len(label_map_dict[ii]))
-            preds_dict[ii].append([0] * len(label_map_dict[ii]))
-        for l in dev_ds.data[i]["label_n"].split(','):
-            for ii, sub_l in enumerate(l.split('##')):
-                labels_dict[ii][-1][label_map_dict[ii][sub_l]] = 1
-
-        pred_n = [label_map[i] for i, pp in enumerate(preds[i]) if pp]
-
-        for l in pred_n:
-            for ii, sub_l in enumerate(l.split('##')):
-                preds_dict[ii][-1][label_map_dict[ii][sub_l]] = 1
-
     logger.info("-----Evaluate model-------")
     logger.info("Train dataset size: {}".format(len(train_ds)))
     logger.info("Dev dataset size: {}".format(len(dev_ds)))
@@ -222,18 +199,6 @@ def evaluate():
         .format(report['macro avg']['precision'] * 100,
                 report['macro avg']['recall'] * 100,
                 report['macro avg']['f1-score'] * 100))
-    for ii in range(len(label_map_dict)):
-        macro_f1_score = f1_score(labels_dict[ii],
-                                  preds_dict[ii],
-                                  average='macro')
-        micro_f1_score = f1_score(labels_dict[ii],
-                                  preds_dict[ii],
-                                  average='micro')
-        accuracy = accuracy_score(labels_dict[ii], preds_dict[ii])
-        logger.info(
-            "Level {} Label Performance: Macro F1 score: {:.2f} | Micro F1 score: {:.2f} | Accuracy: {:.2f}"
-            .format(ii + 1, macro_f1_score * 100, micro_f1_score * 100,
-                    accuracy * 100))
 
     for i in label_map:
         logger.info("Class name: {}".format(label_map[i]))

@@ -51,6 +51,14 @@ parser.add_argument("--batch_size",
                     default=32,
                     type=int,
                     help="Batch size per GPU/CPU for training.")
+parser.add_argument("--data_file",
+                    type=str,
+                    default="data.txt",
+                    help="Unlabeled data file name")
+parser.add_argument("--label_file",
+                    type=str,
+                    default="label.txt",
+                    help="Label file name")
 args = parser.parse_args()
 
 
@@ -111,8 +119,8 @@ def predict(data, label_list):
 
 if __name__ == "__main__":
 
-    data_dir = os.path.join(args.dataset_dir, "data.txt")
-    label_dir = os.path.join(args.dataset_dir, "label.txt")
+    data_dir = os.path.join(args.dataset_dir, args.data_file)
+    label_dir = os.path.join(args.dataset_dir, args.label_file)
     label_list = []
     data = []
     with open(data_dir, 'r', encoding='utf-8') as f:

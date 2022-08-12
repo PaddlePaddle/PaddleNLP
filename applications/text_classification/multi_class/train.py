@@ -283,4 +283,3 @@ def train():
 
 if __name__ == "__main__":
     train()
-    print(args.train_file)

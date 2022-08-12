@@ -68,7 +68,7 @@ multi_class/
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
-- scikit-learn >= 0.24.2
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
@@ -83,7 +83,7 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 
 **安装sklearn**
 ```shell
-pip install scikit-learn==0.24.2
+pip install scikit-learn==1.0.2
 ```
 
 ## 数据集准备

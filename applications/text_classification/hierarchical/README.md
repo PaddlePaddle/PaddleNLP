@@ -75,7 +75,7 @@ multi_label/
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
-- scikit-learn >= 0.24.2
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
@@ -90,7 +90,7 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 
 **安装sklearn**
 ```shell
-pip install scikit-learn==0.24.2
+pip install scikit-learn==1.0.2
 ```
 
 ## 数据集准备
@@ -122,11 +122,10 @@ train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(�
 
 - train.txt/dev.txt/test.txt 文件样例：
 ```text
-嗓子紧，有点咳咳，吃什么消炎药好，我现在吃阿莫西林胶囊    药物,药物##适用症
-支气管扩张发病率大概是多少    其他,其他##无法确定
-支气管扩张是癌症吗    病症,病症##定义
-支气管扩张引发的疾病有哪些    病症,病症##相关病症
-支气管扩张和哮喘哪个严重    其他,其他##对比
+又要停产裁员6000！通用汽车罢工危机再升级股价大跌市值蒸发近300亿！    组织行为,组织行为##罢工,组织关系,组织关系##裁员
+上海一改建厂房坍塌已救出19人其中5人死亡    人生,人生##死亡,灾害/意外,灾害/意外##坍/垮塌
+车闻：广本召回9万余辆；领动上市，10.98万起；艾力绅混动    产品行为,产品行为##召回
+86岁老翁过马路遭挖掘机碾压身亡警方：正在侦办中    灾害/意外,灾害/意外##车祸,人生,人生##死亡
 ...
 ```
 **分类标签**
@@ -143,13 +142,13 @@ label.txt(层次分类标签文件)记录数据集中所有标签路径集合，
 ```
 - label.txt  文件样例：
 ```text
-药物
-药物##适用症
-病症
-病症##定义
-其他
-其他##无法确定
-其他##对比
+人生
+人生##死亡
+灾害/意外
+灾害/意外##坍/垮塌
+灾害/意外##车祸
+产品行为
+产品行为##召回
 ...
 ```
 **待预测数据**
@@ -163,19 +162,19 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 ```
 - data.txt 文件样例：
 ```text
-请问木竭胶囊能同高血压药、氨糖同时服吗？
-低压100*高压140*头涨，想吃点降压药。谢谢！
-脑穿通畸形易发人群有哪些
+金属卡扣安装不到位，上海乐扣乐扣贸易有限公司将召回捣碎器1162件
+卡车超载致使跨桥侧翻，没那么简单
+消失的“外企光环”，5月份在华裁员900余人，香饽饽变“臭”了
 ...
 ```
 ## 模型训练
-我们以公开数据集CMID为示例，在训练集上进行模型微调，并在开发集上验证。CMID是一个人工标注的医疗意图分类信息数据集，包含4个一级标签和36个二级标签，数据集按8：2划分成训练集和开发集。
+我们以[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集为例，在训练集上进行模型微调，并在开发集上验证。
 
-下载CMID数据集：
+下载数据集：
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/cmid.tar.gz
-tar -zxvf cmid.tar.gz
-mv cmid data
+wget https://paddlenlp.bj.bcebos.com/datasets/baidu_extract_2020.tar.gz
+tar -zxvf baidu_extract_2020.tar.gz
+mv baidu_extract_2020 data
 ```
 
 使用CPU训练
@@ -195,6 +194,7 @@ python train.py \
 ```
 
 使用GPU单卡/多卡训练
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
@@ -210,6 +210,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --logging_steps 5 \
     --train_file "train.txt"
 ```
+
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
@@ -300,9 +301,9 @@ Prediction    Label    Text
 
 ### 训练效果
 
-PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们评测了不同预训练模型在医疗意图分类CMID任务的表现，测试配置如下：
+PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们评测了不同预训练模型在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集的表现，测试配置如下：
 
-1. 数据集：医疗意图分类CMID开发集
+1. 数据集：[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集
 
 2. 物理机环境
 
@@ -330,11 +331,12 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 
 |  model_name  | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
-|"ernie-3.0-base-zh" |12-layer, 768-hidden, 12-heads|63.13|45.92| 4.16 |
-|"ernie-3.0-medium-zh"| 6-layer, 768-hidden, 12-heads|63.51|46.98| 2.12|
-|"ernie-3.0-mini-zh" |6-layer, 384-hidden, 12-heads|61.70|42.30| 0.83|
-|"ernie-3.0-micro-zh" | 4-layer, 384-hidden, 12-heads|61.14|42.97| 0.60|
-|"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|60.15|32.62|0.25|
+|"ernie-3.0-xbase-zh" |20-layer, 1024-hidden, 12-heads|95.12|92.77| 12.51 |
+|"ernie-3.0-base-zh" |12-layer, 768-hidden, 12-heads|95.68|93.39| 4.63 |
+|"ernie-3.0-medium-zh"| 6-layer, 768-hidden, 12-heads|95.26|93.22| 2.42|
+|"ernie-3.0-mini-zh" |6-layer, 384-hidden, 12-heads|94.72|93.03| 0.93|
+|"ernie-3.0-micro-zh" | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.70|
+|"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|93.98|91.25|0.54|
 
 ## 模型预测
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
@@ -494,9 +496,9 @@ prune/
 
 
 ### 裁剪效果
-本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在医疗意图分类CMID的表现，测试配置如下：
+本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集的表现，测试配置如下：
 
-1. 数据集：医疗意图分类CMID开发集
+1. 数据集：[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集
 
 2. 物理机环境
 
@@ -524,10 +526,10 @@ prune/
 
 |                            | Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------- |------------- |
-| ERNIE 3.0 Medium             | 63.13|45.92| 4.16 |
-| ERNIE 3.0 Medium +裁剪(保留比例3/4)    | 62.11|45.04| 0.81   |
-| ERNIE 3.0 Medium +裁剪(保留比例2/3)    | 62.41|45.06 | 0.74  |
-| ERNIE 3.0 Medium +裁剪(保留比例1/2)    | 59.86 | 41.42| 0.61 |
+| ERNIE 3.0 Medium             | 95.27|93.22| 4.16 |
+| ERNIE 3.0 Medium +裁剪(保留比例3/4)    | **95.45**|**93.40**| 0.81   |
+| ERNIE 3.0 Medium +裁剪(保留比例2/3)    | 95.23|93.27 | 0.74  |
+| ERNIE 3.0 Medium +裁剪(保留比例1/2)    | 94.92 | 92.70| 0.61 |
 
 ## 模型部署
 
