@@ -283,7 +283,7 @@ class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
-    # @slow
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 RoFormerPretrainedModel.pretrained_init_configuration)[:1]:
