@@ -22,13 +22,13 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, AutoModel
 from paddlenlp.utils.log import logger
 
-from utils import postprocess, create_dataloader, reader, get_label_dict
+from utils import postprocess, create_dataloader, reader, get_label_maps
 from metric import get_eval
 from model import TPLinkerPlus
 
 
 @paddle.no_grad()
-def evaluate(model, dataloader, label_dict, task_type="relation_extraction"):
+def evaluate(model, dataloader, label_maps, task_type="relation_extraction"):
     model.eval()
     all_preds = ([], []) if task_type in [
         "opinion_extraction", "relation_extraction"
@@ -37,7 +37,7 @@ def evaluate(model, dataloader, label_dict, task_type="relation_extraction"):
         input_ids, attention_masks, offset_mappings, texts = batch
         logits = model(input_ids, attention_masks)
         batch_outputs = postprocess(logits, offset_mappings, texts,
-                                    input_ids.shape[1], label_dict, task_type)
+                                    input_ids.shape[1], label_maps, task_type)
         if isinstance(batch_outputs, tuple):
             all_preds[0].extend(batch_outputs[0])  # Entity output
             all_preds[1].extend(batch_outputs[1])  # Relation output
@@ -49,8 +49,8 @@ def evaluate(model, dataloader, label_dict, task_type="relation_extraction"):
 
 
 def do_eval():
-    label_dict = get_label_dict(args.task_type, args.label_dict_path)
-    num_tags = len(label_dict["id2tag"])
+    label_maps = get_label_maps(args.task_type, args.label_maps_path)
+    num_tags = len(label_maps["id2tag"])
 
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
     encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
@@ -65,13 +65,13 @@ def do_eval():
                                         tokenizer,
                                         max_seq_len=args.max_seq_len,
                                         batch_size=args.batch_size,
-                                        label_dict=label_dict,
+                                        label_maps=label_maps,
                                         mode="test",
                                         task_type=args.task_type)
 
     eval_result = evaluate(model,
                            test_dataloader,
-                           label_dict,
+                           label_maps,
                            task_type=args.task_type)
     logger.info("Evaluation precision: " + str(eval_result))
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")

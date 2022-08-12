@@ -22,12 +22,12 @@ from paddlenlp.transformers import AutoTokenizer
 
 sys.path.append('./')
 
-from utils import postprocess, get_label_dict, create_dataloader, extract_events
+from utils import postprocess, get_label_maps, create_dataloader, extract_events
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
-parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
 parser.add_argument("--model_path_prefix", type=str, required=True, default='./export/inference', help="The path to model info in static graph.")
 parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -45,9 +45,9 @@ def reader(inputs):
 class Predictor(object):
     """Predictor"""
 
-    def __init__(self, model_path_prefix, device, task_type, label_dict):
+    def __init__(self, model_path_prefix, device, task_type, label_maps):
         self.task_type = task_type
-        self.label_dict = label_dict
+        self.label_maps = label_maps
 
         model_file = model_path_prefix + ".pdmodel"
         params_file = model_path_prefix + ".pdiparams"
@@ -83,7 +83,7 @@ class Predictor(object):
             self.predictor.run()
             logits = paddle.to_tensor(self.output_handle.copy_to_cpu())
             batch_outputs = postprocess(logits, offset_mappings, texts,
-                                        input_ids.shape[1], self.label_dict,
+                                        input_ids.shape[1], self.label_maps,
                                         self.task_type)
             if isinstance(batch_outputs, tuple):
                 all_preds[0].extend(batch_outputs[0])  # Entity output
@@ -94,13 +94,13 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
-    label_dict = get_label_dict(args.task_type, args.label_dict_path)
+    label_maps = get_label_maps(args.task_type, args.label_maps_path)
 
     tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-base-zh')
 
     # Define predictor to do prediction.
     predictor = Predictor(args.model_path_prefix, args.device, args.task_type,
-                          label_dict)
+                          label_maps)
 
     # Entity extraction sample
     input_list = [
@@ -123,7 +123,7 @@ if __name__ == "__main__":
                                          tokenizer,
                                          max_seq_len=args.max_seq_len,
                                          batch_size=args.batch_size,
-                                         label_dict=label_dict,
+                                         label_maps=label_maps,
                                          mode="infer",
                                          task_type=args.task_type)
 

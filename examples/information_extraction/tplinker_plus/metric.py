@@ -34,7 +34,19 @@ def get_eval(all_preds, raw_data, task_type):
             "entity_recall": ent_recall,
         }
     elif task_type in ["relation_extraction", "opinion_extraction"]:
-        _, all_rel_preds = all_preds
+        all_ent_preds, all_rel_preds = all_preds
+
+        ex, ey, ez = 1e-10, 1e-10, 1e-10
+        for ent_preds, data in zip(all_ent_preds, raw_data):
+            pred_ent_set = set([tuple(p.values()) for p in ent_preds])
+            gold_ent_set = set([tuple(g.values()) for g in data["entity_list"]])
+            ex += len(pred_ent_set & gold_ent_set)
+            ey += len(pred_ent_set)
+            ez += len(gold_ent_set)
+        ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.
+        ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.
+        ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.
+
         rx, ry, rz = 1e-10, 1e-10, 1e-10
 
         for rel_preds, raw_data in zip(all_rel_preds, raw_data):
@@ -54,6 +66,9 @@ def get_eval(all_preds, raw_data, task_type):
         rel_recall = round(rx / rz, 5) if rz != 1e-10 else 0.
 
         return {
+            "entity_f1": ent_f1,
+            "entity_precision": ent_precision,
+            "entity_recall": ent_recall,
             "relation_f1": rel_f1,
             "relation_precision": rel_precision,
             "relation_recall": rel_recall

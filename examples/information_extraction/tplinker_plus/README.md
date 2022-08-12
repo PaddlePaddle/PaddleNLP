@@ -231,7 +231,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 格式转换
 
-    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_maps.json`。
 
     ```shell
     python convert.py --data_dir ./ner_data --dataset_name CLUENER
@@ -244,7 +244,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --task_type entity_extraction \
         --train_path ./ner_data/train_data.json \
         --dev_path ./ner_data/dev_data.json \
-        --label_dict_path ./ner_data/label_dict.json \
+        --label_maps_path ./ner_data/label_maps.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
@@ -284,7 +284,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 格式转换
 
-    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_maps.json`。
 
     ```shell
     python convert.py --data_dir ./re_data --dataset_name DuIE2.0
@@ -297,7 +297,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --task_type relation_extraction \
         --train_path ./re_data/train_data.json \
         --dev_path ./re_data/dev_data.json \
-        --label_dict_path ./re_data/label_dict.json \
+        --label_maps_path ./re_data/label_maps.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
@@ -336,7 +336,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 格式转换
 
-    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_dict.json`。
+    使用`convert.py`转换为训练需要的数据格式并生成标签文件`label_maps.json`。
 
     ```shell
     python convert.py --data_dir ./ee_data --dataset_name DuEE1.0
@@ -349,7 +349,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --task_type event_extraction \
         --train_path ./ee_data/train_data.json \
         --dev_path ./ee_data/dev_data.json \
-        --label_dict_path ./ee_data/label_dict.json \
+        --label_maps_path ./ee_data/label_maps.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
@@ -367,12 +367,12 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
 - 数据下载
 
-    下载demo数据[观点抽取示例数据集]()，解压存放于ote_data/目录下（数据集已默认转好格式）
+    下载demo数据[观点抽取示例数据集](https://bj.bcebos.com/paddlenlp/data/ote_data.tar.gz)，解压存放于ote_data/目录下（数据集已默认转好格式）
 
     ```text
     .ote_data
     ├── dev_data.json
-    ├── label_dict.json
+    ├── label_maps.json
     └── train_data.json
     ```
 
@@ -383,12 +383,12 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --task_type opinion_extraction \
         --train_path ./ote_data/train_data.json \
         --dev_path ./ote_data/dev_data.json \
-        --label_dict_path ./ote_data/label_dict.json \
+        --label_maps_path ./ote_data/label_maps.json \
         --save_dir ./checkpoint \
         --learning_rate 3e-5 \
         --batch_size 16 \
         --max_seq_len 128 \
-        --num_epochs 50 \
+        --num_epochs 100 \
         --seed 1000 \
         --logging_steps 10 \
         --valid_steps 500 \
@@ -403,7 +403,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 
     * `train_path`: 训练集文件路径。
     * `dev_path`: 验证集文件路径。
-    * `label_dict_path`: 标签文件路径。
+    * `label_maps_path`: 标签文件路径。
     * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
     * `batch_size`: 批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为16。
     * `learning_rate`: 学习率，默认为3e-5。
@@ -421,7 +421,7 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
 - `evaluate.py`脚本配置说明：
 
     * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
-    * `label_dict_path`: 标签文件地址。
+    * `label_maps_path`: 标签文件地址。
     * `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`。
     * `test_path`: 进行评估的测试集文件。
     * `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
@@ -438,14 +438,14 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
         --model_path ./checkpoint/model_best \
         --output_path ./export \
         --task_type entity_extraction \
-        --label_dict_path ./ner_data/label_dict.json
+        --label_maps_path ./ner_data/label_maps.json
     ```
 
     可配置参数说明：
 
     * `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
     * `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
-    * `label_dict_path`: 标签文件路径。
+    * `label_maps_path`: 标签文件路径。
     * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
 
 
@@ -455,13 +455,13 @@ TPLinker提出了一种一阶段联合抽取模型，它能够解决实体、关
     python deploy/python/predict.py \
         --model_path_prefix ./export/inference \
         --task_type entity_extraction \
-        --label_dict_path ./ner_data/label_dict.json
+        --label_maps_path ./ner_data/label_maps.json
     ```
 
     可配置参数说明：
 
     * `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    * `label_dict_path`: 标签文件路径。
+    * `label_maps_path`: 标签文件路径。
     * `task_type`: 选择抽取任务类型，可选有`entity_extraction`, `relation_extraction`, `event_extraction`和`opinion_extraction`。
     * `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
     * `max_seq_len`: 文本最大长度，输入超过最大长度时会进行截断处理，默认为128。

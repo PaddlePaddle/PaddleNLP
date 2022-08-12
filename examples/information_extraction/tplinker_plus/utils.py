@@ -94,23 +94,23 @@ def get_spots_fr_shaking_tag(shaking_idx2matrix_idx, shaking_outputs):
     return spots
 
 
-def get_label_dict(task_type="relation_extraction", label_dict_path=None):
+def get_label_maps(task_type="relation_extraction", label_maps_path=None):
     if task_type in [
             "relation_extraction", "opinion_extraction", "entity_extraction"
     ]:
-        with open(label_dict_path, 'r', encoding='utf-8') as fp:
-            label_dict = json.load(fp)
+        with open(label_maps_path, 'r', encoding='utf-8') as fp:
+            label_maps = json.load(fp)
 
-        entity2id = label_dict['entity2id']
+        entity2id = label_maps['entity2id']
         if task_type == "relation_extraction":
-            relation2id = label_dict['relation2id']
+            relation2id = label_maps['relation2id']
         elif task_type == "opinion_extraction":
-            relation2id = label_dict['sentiment2id']
+            relation2id = label_maps['sentiment2id']
 
         tags = []
         if task_type != "entity_extraction":
             id2rel = {idx: t for t, idx in relation2id.items()}
-            label_dict['id2rel'] = id2rel
+            label_maps['id2rel'] = id2rel
             link_types = [
                 "SH2OH",  # subject head to object head
                 "OH2SH",  # object head to subject head
@@ -128,15 +128,15 @@ def get_label_dict(task_type="relation_extraction", label_dict_path=None):
         tag2id = {t: idx for idx, t in enumerate(tags)}
         id2tag = {idx: t for t, idx in tag2id.items()}
 
-        label_dict['id2tag'] = id2tag
-        label_dict['tag2id'] = tag2id
+        label_maps['id2tag'] = id2tag
+        label_maps['tag2id'] = tag2id
     elif task_type == "event_extraction":
         tag2id = {}
         id2tag = {}
-        with open(label_dict_path, "r", encoding="utf-8") as fp:
-            label_dict = json.load(fp)
+        with open(label_maps_path, "r", encoding="utf-8") as fp:
+            label_maps = json.load(fp)
 
-        schemas = label_dict['schema_list']
+        schemas = label_maps['schema_list']
         for schema in schemas:
             t = schema["event_type"]
             for r in ["触发词"] + [s["role"] for s in schema["role_list"]]:
@@ -146,9 +146,9 @@ def get_label_dict(task_type="relation_extraction", label_dict_path=None):
         tag2id["SH2OH"] = len(tag2id)
         id2tag[len(tag2id)] = "ST2OT"
         tag2id["ST2OT"] = len(tag2id)
-        label_dict["tag2id"] = tag2id
-        label_dict["id2tag"] = id2tag
-    return label_dict
+        label_maps["tag2id"] = tag2id
+        label_maps["id2tag"] = id2tag
+    return label_maps
 
 
 @dataclass
@@ -156,7 +156,7 @@ class DataCollator:
     tokenizer: PretrainedTokenizerBase
     padding: Union[bool, str, PaddingStrategy] = True
     max_length: Optional[int] = None
-    label_dict: Optional[dict] = None
+    label_maps: Optional[dict] = None
     task_type: Optional[str] = None
 
     def __call__(
@@ -184,7 +184,7 @@ class DataCollator:
                 batch.append([feature["text"] for feature in features])
             return batch
 
-        num_tags = len(self.label_dict['tag2id'])
+        num_tags = len(self.label_maps['tag2id'])
         bs = batch[0].shape[0]
         seqlen = batch[0].shape[1]
         mask = paddle.triu(paddle.ones(shape=[seqlen, seqlen]), diagonal=0)
@@ -212,9 +212,9 @@ class DataCollator:
                 "opinion_extraction", "relation_extraction", "entity_extraction"
         ]:
             if self.task_type == "relation_extraction":
-                num_rels = len(self.label_dict["relation2id"])
+                num_rels = len(self.label_maps["relation2id"])
             elif self.task_type == "opinion_extraction":
-                num_rels = len(self.label_dict["sentiment2id"])
+                num_rels = len(self.label_maps["sentiment2id"])
             else:
                 num_rels = 0
 
@@ -243,7 +243,7 @@ def create_dataloader(dataset,
                       tokenizer,
                       max_seq_len=128,
                       batch_size=1,
-                      label_dict=None,
+                      label_maps=None,
                       mode="train",
                       task_type="relation_extraction"):
 
@@ -264,7 +264,7 @@ def create_dataloader(dataset,
             tail_labels = []
             for event in example["events"]:
                 for i1, (event_type1, rol1, start1, end1) in enumerate(event):
-                    tp1 = label_dict['tag2id'][(event_type1, rol1)]
+                    tp1 = label_maps['tag2id'][(event_type1, rol1)]
                     h1 = map_offset(start1, offset_mapping)
                     t1 = map_offset(end1, offset_mapping)
 
@@ -312,7 +312,7 @@ def create_dataloader(dataset,
                     e['text']) - 1
                 start = map_offset(_start, offset_mapping)
                 end = map_offset(_end, offset_mapping)
-                label = label_dict['entity2id'][e['type']]
+                label = label_maps['entity2id'][e['type']]
                 ent_labels.append([label, start, end])
 
             outputs = {
@@ -334,7 +334,7 @@ def create_dataloader(dataset,
                     st = map_offset(_st, offset_mapping)
                     oh = map_offset(_oh, offset_mapping)
                     ot = map_offset(_ot, offset_mapping)
-                    p = label_dict["relation2id"][r["predicate"]]
+                    p = label_maps["relation2id"][r["predicate"]]
                     rel_labels.append([sh, st, p, oh, ot])
                 outputs['labels']['rel_labels'] = rel_labels
             elif task_type == "opinion_extraction":
@@ -347,7 +347,7 @@ def create_dataloader(dataset,
                     at = map_offset(_at, offset_mapping)
                     oh = map_offset(_oh, offset_mapping)
                     ot = map_offset(_ot, offset_mapping)
-                    s = label_dict["sentiment2id"][r["sentiment"]]
+                    s = label_maps["sentiment2id"][r["sentiment"]]
                     rel_labels.append([ah, at, s, oh, ot])
                 outputs['labels']['rel_labels'] = rel_labels
         return outputs
@@ -375,7 +375,7 @@ def create_dataloader(dataset,
         dataset = dataset.map(tokenize)
 
     data_collator = DataCollator(tokenizer,
-                                 label_dict=label_dict,
+                                 label_maps=label_maps,
                                  task_type=task_type)
 
     shuffle = True if mode == "train" else False
@@ -464,7 +464,7 @@ def postprocess(batch_outputs,
                 offset_mappings,
                 texts,
                 seqlen,
-                label_dict,
+                label_maps,
                 task_type="relation_extraction"):
     if task_type == "event_extraction":
         batch_results = []
@@ -480,7 +480,7 @@ def postprocess(batch_outputs,
             # Token length
             actual_len = len(offset_mapping) - 2
             for sp in matrix_spots:
-                tag = label_dict["id2tag"][sp[2]]
+                tag = label_maps["id2tag"][sp[2]]
                 if sp[0] > sp[1] or sp[1] > actual_len:
                     continue
                 if tag == "SH2OH":
@@ -532,7 +532,7 @@ def postprocess(batch_outputs,
             # Token length
             actual_len = len(offset_mapping) - 2
             for sp in matrix_spots:
-                tag = label_dict["id2tag"][sp[2]]
+                tag = label_maps["id2tag"][sp[2]]
                 ent_type, link_type = tag.split("=")
                 # For an entity, the start position can not be larger than the end pos.
                 if link_type != "EH2ET" or sp[0] > sp[1] or sp[1] > actual_len:
@@ -556,7 +556,7 @@ def postprocess(batch_outputs,
                 rel_list = []
                 tail_link_memory_set = set()
                 for sp in matrix_spots:
-                    tag = label_dict["id2tag"][sp[2]]
+                    tag = label_maps["id2tag"][sp[2]]
                     _, link_type = tag.split("=")
 
                     rel_id = 0
@@ -575,7 +575,7 @@ def postprocess(batch_outputs,
 
                 # Head link
                 for sp in matrix_spots:
-                    tag = label_dict["id2tag"][sp[2]]
+                    tag = label_maps["id2tag"][sp[2]]
                     rel_label, link_type = tag.split("=")
 
                     if link_type == "SH2OH" and sp[0] <= actual_len and sp[

@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 
 from evaluate import evaluate
 from criterion import Criterion
-from utils import reader, set_seed, get_label_dict, create_dataloader, criteria_map
+from utils import reader, set_seed, get_label_maps, create_dataloader, criteria_map
 from model import TPLinkerPlus
 
 
@@ -38,8 +38,8 @@ def do_train():
         paddle.distributed.init_parallel_env()
     set_seed(args.seed)
 
-    label_dict = get_label_dict(args.task_type, args.label_dict_path)
-    num_tags = len(label_dict["id2tag"])
+    label_maps = get_label_maps(args.task_type, args.label_maps_path)
+    num_tags = len(label_maps["id2tag"])
 
     train_ds = load_dataset(reader, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
@@ -50,7 +50,7 @@ def do_train():
                                          tokenizer,
                                          max_seq_len=args.max_seq_len,
                                          batch_size=args.batch_size,
-                                         label_dict=label_dict,
+                                         label_maps=label_maps,
                                          mode="train",
                                          task_type=args.task_type)
 
@@ -58,7 +58,7 @@ def do_train():
                                        tokenizer,
                                        max_seq_len=args.max_seq_len,
                                        batch_size=args.batch_size,
-                                       label_dict=label_dict,
+                                       label_maps=label_maps,
                                        mode="dev",
                                        task_type=args.task_type)
 
@@ -123,7 +123,7 @@ def do_train():
 
                 eval_result = evaluate(model,
                                        dev_dataloader,
-                                       label_dict,
+                                       label_maps,
                                        task_type=args.task_type)
                 logger.info("Evaluation precision: " + str(eval_result))
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--dev_path", default="./ner_data/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum input sequence length.")
-    parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+    parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
     parser.add_argument("--num_epochs", default=20, type=int, help="Number of epoches for training.")

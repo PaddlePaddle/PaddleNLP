@@ -154,15 +154,15 @@ if __name__ == "__main__":
                         predicate_complex = predicate + "_" + t
                         relation2id[predicate_complex] = len(relation2id)
 
-        label_dict = {
+        label_maps = {
             "entity2id": entity2id,
             "relation2id": relation2id,
         }
 
-        with open(os.path.join(args.data_dir, "label_dict.json"),
+        with open(os.path.join(args.data_dir, "label_maps.json"),
                   "w",
                   encoding="utf-8") as fp:
-            fp.write(json.dumps(label_dict, ensure_ascii=False))
+            fp.write(json.dumps(label_maps, ensure_ascii=False))
 
         for fi, ft in zip(input_file_list, target_file_list):
             input_file_path = os.path.join(args.data_dir, fi)
@@ -183,12 +183,12 @@ if __name__ == "__main__":
                 }
                 schemas.append(schema)
 
-        label_dict = {"schema_list": schemas}
+        label_maps = {"schema_list": schemas}
 
-        with open(os.path.join(args.data_dir, "label_dict.json"),
+        with open(os.path.join(args.data_dir, "label_maps.json"),
                   "w",
                   encoding="utf-8") as fp:
-            fp.write(json.dumps(label_dict, ensure_ascii=False))
+            fp.write(json.dumps(label_maps, ensure_ascii=False))
 
         for fi, ft in zip(input_file_list, target_file_list):
             input_file_path = os.path.join(args.data_dir, fi)
@@ -208,12 +208,12 @@ if __name__ == "__main__":
         }
         input_file_list = ["CMeEE_train.json", "CMeEE_dev.json"]
 
-        label_dict = {"entity2id": entity2id}
+        label_maps = {"entity2id": entity2id}
 
-        with open(os.path.join(args.data_dir, "label_dict.json"),
+        with open(os.path.join(args.data_dir, "label_maps.json"),
                   "w",
                   encoding="utf-8") as fp:
-            fp.write(json.dumps(label_dict, ensure_ascii=False))
+            fp.write(json.dumps(label_maps, ensure_ascii=False))
 
         for fi, ft in zip(input_file_list, target_file_list):
             input_file_path = os.path.join(args.data_dir, fi)
@@ -235,12 +235,12 @@ if __name__ == "__main__":
         }
         input_file_list = ["train.json", "dev.json"]
 
-        label_dict = {"entity2id": entity2id}
+        label_maps = {"entity2id": entity2id}
 
-        with open(os.path.join(args.data_dir, "label_dict.json"),
+        with open(os.path.join(args.data_dir, "label_maps.json"),
                   "w",
                   encoding="utf-8") as fp:
-            fp.write(json.dumps(label_dict, ensure_ascii=False))
+            fp.write(json.dumps(label_maps, ensure_ascii=False))
         for fi, ft in zip(input_file_list, target_file_list):
             input_file_path = os.path.join(args.data_dir, fi)
             target_file_path = os.path.join(args.data_dir, ft)

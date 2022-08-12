@@ -19,20 +19,20 @@ import paddle
 from paddlenlp.transformers import AutoModel
 
 from model import TPLinkerPlus
-from utils import get_label_dict
+from utils import get_label_maps
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str, required=True, default='./checkpoint/model_best', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
-parser.add_argument("--label_dict_path", default="./ner_data/label_dict.json", type=str, help="The file path of the labels dictionary.")
+parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
 parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    label_dict = get_label_dict(args.task_type, args.label_dict_path)
-    num_tags = len(label_dict["id2tag"])
+    label_maps = get_label_maps(args.task_type, args.label_maps_path)
+    num_tags = len(label_maps["id2tag"])
 
     encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
     model = TPLinkerPlus(encoder, num_tags, shaking_type="cln")
