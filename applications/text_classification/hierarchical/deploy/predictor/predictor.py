@@ -129,7 +129,6 @@ class Predictor(object):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
                                                        use_faster=True)
         self.label_list = label_list
-        self.depth = args.depth
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
 
@@ -163,7 +162,7 @@ class Predictor(object):
 
             for i, p in enumerate(prob):
                 if p > threshold:
-                    label.append(i)
+                    label.append(self.label_list[i])
 
             labels.append(label)
 
@@ -197,21 +196,21 @@ class Predictor(object):
                 infer_result = np.append(infer_result, result, axis=0)
         return infer_result
 
-    def printer(self, result, input_data):
-
-        for idx, text in enumerate(input_data):
-            logger.info("input data: {}".format(text))
-
-            hierarchical_labels = {d: [] for d in range(self.depth)}
-
-            for r in result[idx]:
-                for i, l in enumerate(self.label_list[r].split('##')):
+    def printer(self, results, input_data):
+        for text, labels in zip(input_data, results):
+            hierarchical_labels = {}
+            logger.info("text: {}".format(text))
+            logger.info("prediction result: {}".format(",".join(labels)))
+            for label in labels:
+                for i, l in enumerate(label.split('##')):
+                    if i not in hierarchical_labels:
+                        hierarchical_labels[i] = []
                     if l not in hierarchical_labels[i]:
                         hierarchical_labels[i].append(l)
-            for d in range(self.depth):
-                logger.info('level {}: {}'.format(
-                    d + 1, ', '.join(hierarchical_labels[d])))
-            logger.info('----------------------------')
+            for d in range(len(hierarchical_labels)):
+                logger.info("level {} : {}".format(
+                    d + 1, ','.join(hierarchical_labels[d])))
+            logger.info("--------------------")
 
     def predict(self, input_data: list):
         preprocess_result = self.preprocess(input_data)
@@ -248,41 +247,11 @@ class Predictor(object):
         """
         all_texts = []
         all_labels = []
-        label_list = {
-            self.label_list[i]: i
-            for i in range(len(self.label_list))
-        }
-        for i in range(len(ds)):
-            text = ds[i]['sentence']
-
-            labels = []
-            layers = [
-                ds[i]["level {}".format(d + 1)] for d in range(self.depth)
+        for ii in range(len(ds)):
+            all_texts.append(ds[ii]['sentence'])
+            labels = [
+                float(1) if i in ds[ii]["label"] else float(0)
+                for i in range(len(self.label_list))
             ]
-            shape = [len(layer) for layer in layers]
-            offsets = [0] * len(shape)
-            has_next = True
-            while has_next:
-                l = ''
-                for i, off in enumerate(offsets):
-                    if l == '':
-                        l = layers[i][off]
-                    else:
-                        l += '##{}'.format(layers[i][off])
-                    if l in label_list and label_list[l] not in labels:
-                        labels.append(label_list[l])
-                for i in range(len(shape) - 1, -1, -1):
-                    if offsets[i] + 1 >= shape[i]:
-                        offsets[i] = 0
-                        if i == 0:
-                            has_next = False
-                    else:
-                        offsets[i] += 1
-                        break
-            label = [
-                float(1) if ii in labels else float(0)
-                for ii in range(len(label_list))
-            ]
-            all_texts.append(text)
-            all_labels.append(label)
+            all_labels.append(labels)
         return all_texts, all_labels

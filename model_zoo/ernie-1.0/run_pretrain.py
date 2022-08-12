@@ -27,6 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
@@ -327,6 +328,7 @@ def do_train(args):
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+        model_config["enable_recompute"] = args.use_recompute
         model = model_class(base_class(**model_config))
     else:
         model = model_class.from_pretrained(
@@ -462,33 +464,39 @@ def do_train(args):
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
 
-            with paddle.amp.auto_cast(args.use_amp,
-                                      custom_black_list=[
-                                          "reduce_sum",
-                                          "c_softmax_with_cross_entropy",
-                                          "elementwise_div"
-                                      ],
-                                      level='O2'):
+            with model.no_sync():
+                with paddle.amp.auto_cast(args.use_amp,
+                                          custom_black_list=[
+                                              "reduce_sum",
+                                              "c_softmax_with_cross_entropy",
+                                              "elementwise_div"
+                                          ],
+                                          level='O2'):
 
-                # Create the model for the ernie pretrain
-                prediction_scores, seq_relationship_score = model(
-                    input_ids=input_ids,
-                    token_type_ids=segment_ids,
-                    position_ids=None,
-                    attention_mask=input_mask,
-                    masked_positions=masked_lm_positions)
+                    # Create the model for the ernie pretrain
+                    prediction_scores, seq_relationship_score = model(
+                        input_ids=input_ids,
+                        token_type_ids=segment_ids,
+                        position_ids=None,
+                        attention_mask=input_mask,
+                        masked_positions=masked_lm_positions)
 
-                lm_loss, sop_loss = criterion(prediction_scores,
-                                              seq_relationship_score,
-                                              masked_lm_labels,
-                                              next_sentence_labels)
-                loss = lm_loss + sop_loss
+                    lm_loss, sop_loss = criterion(prediction_scores,
+                                                  seq_relationship_score,
+                                                  masked_lm_labels,
+                                                  next_sentence_labels)
+                    loss = lm_loss + sop_loss
+
+                if args.use_amp:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+
+            fused_allreduce_gradients(list(model.parameters()), None)
 
             if args.use_amp:
-                scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
             else:
-                loss.backward()
                 optimizer.step()
 
             optimizer.clear_grad()
