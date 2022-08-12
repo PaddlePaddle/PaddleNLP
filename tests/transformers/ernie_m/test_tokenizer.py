@@ -16,6 +16,7 @@
 import os
 import unittest
 from typing import List
+import shutil
 
 import sentencepiece as spm
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizerBase, PretrainedTokenizer
@@ -25,7 +26,7 @@ from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, 
 from tests.testing_utils import slow, get_tests_dir
 from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
-SAMPLE_VOCAB = get_tests_dir("fixtures/chinese-speiece.model")
+SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece_bpe.model")
 
 
 class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
@@ -62,13 +63,14 @@ class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
-        self.sentencepiece_model_file = SAMPLE_VOCAB
-
-    def get_tokenizers(self, **kwargs) -> List[PretrainedTokenizerBase]:
-        return [self.get_tokenizer()]
+        shutil.copyfile(
+            SAMPLE_VOCAB,
+            os.path.join(
+                self.tmpdirname, ErnieMTokenizer.
+                resource_files_names["sentencepiece_model_file"]))
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
-        return ErnieMTokenizer(self.vocab_file, self.sentencepiece_model_file)
+        return ErnieMTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
         input_text = "UNwant\u00E9d,running"
@@ -76,8 +78,7 @@ class ErnieMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return input_text, output_text
 
     def test_full_tokenizer(self):
-        tokenizer = self.tokenizer_class(self.vocab_file,
-                                         self.sentencepiece_model_file)
+        tokenizer = self.get_tokenizer()
 
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
         self.assertListEqual(tokens,

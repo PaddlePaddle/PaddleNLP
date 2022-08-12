@@ -208,17 +208,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
                 new_pieces.append(piece[lst_i:])
         return new_pieces
 
-    def tokenize(self, text):
-        r"""
-        Converts a string to a list of tokens.
-        
-        Args:
-            text (str): The text to be tokenized.
-        Returns:
-            List(str): A list of string representing converted tokens.
-        """
-        return self._tokenize(text)
-
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
         out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
