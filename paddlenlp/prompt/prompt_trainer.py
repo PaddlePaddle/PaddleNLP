@@ -32,7 +32,6 @@ from ..transformers import PretrainedTokenizer, export_model
 from .template import AutoTemplate
 from .verbalizer import SoftVerbalizer
 from .prompt_utils import InputFeatures, signature
-from .prompt_tokenizer import MLMTokenizerWrapper
 from .prompt_args import PromptTuningArguments
 
 __all__ = ["PromptTrainer", "PromptModelForClassification"]
@@ -84,13 +83,6 @@ class PromptTrainer(Trainer):
 
         self.load_state_dict_from_checkpoint(args.resume_from_checkpoint)
 
-        max_seq_length = getattr(args, "max_seq_length", 512)
-        if self.plm.__class__.__name__.endswith("MaskedLM"):
-            self.tokenizer_wrapper = MLMTokenizerWrapper(
-                max_seq_length, tokenizer)
-        else:
-            raise ValueError("Unsupported pretrained model {}")
-
         self.train_dataset = self._map_dataset(self.train_dataset)
         self.eval_dataset = self._map_dataset(self.eval_dataset)
 
@@ -130,8 +122,7 @@ class PromptTrainer(Trainer):
         return dataset.map(self._convert_example)
 
     def _convert_example(self, example):
-        example = self.template.wrap_one_example(example)
-        encoded_inputs = self.tokenizer_wrapper.tokenize_one_example(example)
+        encoded_inputs = self.template.wrap_one_example(example)
         return encoded_inputs
 
     def _prepare_input(self, inputs: InputFeatures):
@@ -148,7 +139,8 @@ class PromptTrainer(Trainer):
     def load_state_dict_from_checkpoint(self, resume_from_checkpoint=None):
         if resume_from_checkpoint is not None:
             self.template = AutoTemplate.load_from(
-                resume_from_checkpoint, self.tokenizer, self.plm,
+                resume_from_checkpoint, self.tokenizer,
+                self.args.max_seq_length, self.plm,
                 getattr(self.template, "_prompt_encoder", None),
                 getattr(self.template, "encoder_hidden_size", None))
 

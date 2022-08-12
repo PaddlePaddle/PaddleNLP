@@ -18,7 +18,8 @@ import json
 
 import paddle
 import paddle.nn as nn
-from .prompt_utils import InputExample
+from .prompt_utils import InputExample, InputFeatures
+from .prompt_tokenizer import MLMPromptTokenizer
 from ..utils.log import logger
 
 __all__ = ["Template", "ManualTemplate", "SoftTemplate", "AutoTemplate"]
@@ -90,9 +91,10 @@ class Template(nn.Layer):
     registered_input_names = ['mask_ids', 'shortenable_ids']
     registered_text_keys = ['text_a', 'text_b']
 
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, max_seq_length):
         super().__init__()
         self.tokenizer = tokenizer
+        self.wrapped_tokenizer = MLMPromptTokenizer(tokenizer, max_seq_length)
         self.part_start = '{'
         self.part_end = '}'
 
@@ -188,7 +190,11 @@ class Template(nn.Layer):
                 key: getattr(example, key)
                 for key in non_empty_keys
             }
-            return [wrapped_parts_to_tokenize, wrapped_parts_not_to_tokenize]
+            wrapped_parts_to_tokenize = self.wrapped_tokenizer(
+                wrapped_parts_to_tokenize)
+
+            return InputFeatures(**wrapped_parts_to_tokenize,
+                                 **wrapped_parts_not_to_tokenize)
         else:
             raise TypeError('InputExample')
 
@@ -213,8 +219,8 @@ class ManualTemplate(Template):
             list of dictionary/set parsed by `parse_template` method.
     """
 
-    def __init__(self, tokenizer, template=None):
-        super().__init__(tokenizer=tokenizer)
+    def __init__(self, tokenizer, max_seq_length, template=None):
+        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
         self.template = template
 
     def _post_init_template(self):
@@ -239,11 +245,12 @@ class SoftTemplate(Template):
 
     def __init__(self,
                  tokenizer,
+                 max_seq_length,
                  model=None,
                  template=None,
                  prompt_encoder=None,
                  encoder_hidden_size=None):
-        super().__init__(tokenizer=tokenizer)
+        super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
         if model is None:
             self.token_embeddings = None
             logger.warning(
@@ -481,6 +488,7 @@ class AutoTemplate(object):
     def create_from(cls,
                     template,
                     tokenizer,
+                    max_seq_length,
                     model=None,
                     prompt_encoder=None,
                     encoder_hidden_size=None):
@@ -513,23 +521,27 @@ class AutoTemplate(object):
         if 'soft' in template_keys:
             return SoftTemplate(tokenizer=tokenizer,
                                 template=template,
+                                max_seq_length=max_seq_length,
                                 model=model,
                                 prompt_encoder=prompt_encoder,
                                 encoder_hidden_size=encoder_hidden_size)
         else:
-            return ManualTemplate(tokenizer=tokenizer, template=template)
+            return ManualTemplate(tokenizer=tokenizer,
+                                  max_seq_length=max_seq_length,
+                                  template=template)
 
     @classmethod
     def load_from(cls,
                   data_dir,
                   tokenizer,
+                  max_seq_length,
                   model=None,
                   prompt_encoder=None,
                   encoder_hidden_size=None):
         with open(os.path.join(data_dir, TEMPLATE_FILE), "r") as f:
             template = json.load(f)
-        return cls.create_from(template, tokenizer, model, prompt_encoder,
-                               encoder_hidden_size)
+        return cls.create_from(template, tokenizer, max_seq_length, model,
+                               prompt_encoder, encoder_hidden_size)
 
     @classmethod
     def _extract_template_keys(cls, inputs: list):

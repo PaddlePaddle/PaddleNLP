@@ -20,266 +20,119 @@ from collections import defaultdict
 import numpy as np
 from .prompt_utils import InputFeatures
 
-__all__ = ["TokenizerWrapper", "MLMTokenizerWrapper"]
+__all__ = ["MLMPromptTokenizer"]
 
 
-class TokenizerWrapper:
-    """
-    Process examples encoded by template, such as truncating and padding.
+class MLMPromptTokenizer(object):
 
-    Args:
-        max_seq_length (int):
-            The maximum length of input data (prompt and text).
-        tokenizer (paddlenlp.transformers.PreTrainedTokenizer):
-            The tokenizer of pretrained model.
-        truncate_method (str):
-            How to truncate input data. 
-            Choices: ``tail``, ``head``, ``manual``.
-        create_token_type_ids (bool):
-            Whether to create token_type_ids for inputs.
-        seq_length_list (list, optional):
-            The list of maximum length for every part in input data.  
-    """
+    def __init__(self, tokenizer, max_seq_length, **kwargs):
+        self._tokenizer = tokenizer
+        self._max_seq_len = max_seq_length
+        self._num_special_tokens = self._tokenizer.num_special_tokens_to_add()
+        self._special_map = {
+            "<cls>": "cls_token",
+            "<sep>": "sep_token",
+            "<pad>": "pad_token",
+            "<unk>": "unk_token",
+            "<mask>": "mask_token"
+        }
+        self.mask_token_id = self._tokenizer.mask_token_id
+        self.pad_token_id = self._tokenizer.pad_token_id
+        self.soft_token_id = self._tokenizer.unk_token_id
 
-    def __init__(self,
-                 max_seq_length,
-                 tokenizer,
-                 truncate_method='tail',
-                 create_token_type_ids=False,
-                 **kwargs):
-        self.max_seq_length = max_seq_length
-        self.tokenizer = tokenizer
-        if truncate_method == 'manual':
-            assert hasattr(kwargs, 'seq_length_list'), 'seq_length_list '\
-                'should be defined for manual truncation.'
-            self.seq_length_list = kwargs['seq_length_list']
-            self.truncate_fn = partial(self.truncate_from_end, etype='tail')
-        elif truncate_method == 'tail' or truncate_method == 'head':
-            self.truncate_fn = partial(self.truncate_from_end,
-                                       etype=truncate_method)
-        else:
-            raise NotImplementedError
+    def __call__(self, input_list):
+        encoded_input = defaultdict(list)
 
-        self.create_token_type_ids = create_token_type_ids
+        for input_dict in input_list:
+            # Format text and special tokens, then convert them to ids.
+            if input_dict["mask_ids"] == 1:
+                text = [self.mask_token_id]
 
-        self.num_truncated_sentences = 0
-        self.total_passed_sentences = 0
+            if input_dict["text"] in self._special_map:
+                special_token = getattr(self._tokenizer,
+                                        self._special_map[input_dict["text"]])
+                input_dict["text"] = special_token
 
-    @property
-    def special_tokens_maps(self):
-        if not hasattr(self, "_special_tokens_map"):
-            self._special_tokens_map = {
-                '<cls>': getattr(self.tokenizer, 'cls_token', ''),
-                '<sep>': getattr(self.tokenizer, 'sep_token', ''),
-                '<pad>': getattr(self.tokenizer, 'pad_token', ''),
-                '<mask>': getattr(self.tokenizer, 'mask_token', ''),
-                '<unk>': getattr(self.tokenizer, 'unk_token', '')
-            }
-        return self._special_tokens_map
+            soft_ids = input_dict.get("soft_token_ids", None)
+            if soft_ids is not None and soft_ids == 1:
+                text = [self.soft_token_id]
+            else:
+                text = self._tokenizer.encode(
+                    input_dict["text"],
+                    add_special_tokens=False,
+                    return_token_type_ids=False)["input_ids"]
+            encoded_input["input_ids"].append(text)
 
-    @property
-    def truncate_rate(self):
-        if self.total_passed_sentences == 0:
-            return None
-        else:
-            return self.num_truncated_sentences / self.total_passed_sentences
+            # Extend other features as the same length of input ids.
+            for key in input_dict:
+                if key != "text":
+                    encoded_input[key].append([input_dict[key]] * len(text))
+
+        max_seq_len = self._max_seq_len - self._num_special_tokens
+        encoded_input = self.truncate(encoded_input, max_seq_len)
+        encoded_input.pop("shortenable_ids")
+        encoded_input = self.join(encoded_input)
+
+        encoded_input = self.add_special_tokens(encoded_input)
+        encoded_input = self.pad(encoded_input, self._max_seq_len,
+                                 self.pad_token_id)
+        return encoded_input
+
+    def add_special_tokens(self, input_dict):
+        for key in input_dict:
+            new_inputs = self._tokenizer.build_inputs_with_special_tokens(
+                input_dict[key])
+            if key != "input_ids":
+                special_mask = np.array(
+                    self._tokenizer.get_special_tokens_mask(input_dict[key]))
+                new_inputs = np.array(new_inputs)
+                new_inputs[special_mask == 1] = 0
+                new_inputs = new_inputs.tolist()
+            input_dict[key] = new_inputs
+        return input_dict
 
     @staticmethod
-    def truncate_by_manual(input_dict, max_len_list=[]):
-        """
-        Truncate input data by manually defined maximum sequence length.
-
-        Args:
-            input_dict (dict):
-                The dictionary of an input example.
-            max_len_list (list):
-                The maximum length of every part in example.
-                ``-1`` denotes that there is no limit on length.
-        """
-        truncated_dict = defaultdict(list)
-        shortenable_ids = input_dict['shortenable_ids']
-        truncated_dict['shortenable_ids'] = shortenable_ids
-        for attr_name, attr_values in input_dict.items():
-            text_idx = 0
-            for i, value in enumerate(attr_values):
-                if shortenable_ids[i][0] == 0:
-                    continue
-                if text_idx >= len(max_len_list):
-                    break
-                if len(value) > 0:
-                    max_len = max_len_list[text_idx]
-                    if max_len < 0:
-                        attr_values[i] = value
+    def truncate(input_dict, max_seq_len):
+        total_tokens = sum([len(text) for text in input_dict["input_ids"]])
+        trunc_length = total_tokens - max_seq_len
+        if trunc_length > 0:
+            truncated_dict = defaultdict(list)
+            trunc_mask = input_dict["shortenable_ids"]
+            for key in input_dict:
+                content = input_dict[key]
+                count = trunc_length
+                for idx, text in enumerate(content[::-1]):
+                    index = -idx - 1
+                    if len(text) == 0 or trunc_mask[index][0] == 0:
+                        continue
+                    if count < len(text):
+                        content[index] = text[:-count]
                     else:
-                        attr_values[i] = value[:max_len]
-                text_idx += 1
-            truncated_dict[attr_name] = attr_values
-        return truncated_dict
+                        content[index] = []
+                    count -= len(text)
+                    if count <= 0:
+                        break
+                truncated_dict[key] = content
+            return truncated_dict
+        else:
+            return input_dict
 
     @staticmethod
-    def truncate_from_end(input_dict, num_tokens_to_truncate=0, etype='tail'):
-        assert etype in ['head', 'tail']
-        step = 1 if etype == 'head' else -1
-        idx_offset = 0 if etype == 'head' else 1
-        truncated_dict = defaultdict(list)
-        shortenable_ids = input_dict['shortenable_ids']
-        for attr_name in input_dict:
-            attr_values = input_dict[attr_name]
-            count = num_tokens_to_truncate
-            for i, value in enumerate(attr_values[::step]):
-                index = int(step * (idx_offset + i))
-                if len(value) == 0 or shortenable_ids[index][0] == 0:
-                    continue
-                if count < len(value):
-                    attr_values[index] = value[:-count]
-                else:
-                    attr_values[index] = []
-                count -= len(value)
-                if count <= 0:
-                    break
-            truncated_dict[attr_name] = attr_values
-
-        return truncated_dict
+    def pad(input_dict, max_seq_len, pad_id, other_pad_id=0):
+        for key, content in input_dict.items():
+            if len(content) > max_seq_len:
+                raise ValueError(
+                    f"Truncated length of {key} is still longer than "
+                    f"{max_seq_len}, please use a shorter prompt.")
+            if key == "input_ids":
+                pad_seq = [pad_id] * (max_seq_len - len(content))
+            else:
+                pad_seq = [other_pad_id] * (max_seq_len - len(content))
+            input_dict[key].extend(pad_seq)
+        return input_dict
 
     @staticmethod
-    def concate_parts(input_dict):
+    def join(input_dict):
         for key in input_dict:
             input_dict[key] = list(itertools.chain(*input_dict[key]))
         return input_dict
-
-    @staticmethod
-    def padding(input_dict,
-                max_len,
-                pad_id_for_inputs=0,
-                pad_id_for_others: int = 0) -> None:
-        for key, value in input_dict.items():
-            if (len(input_dict[key]) > max_len):
-                raise ValueError(
-                    f'''Truncated seq length of '{key}' still greater than 
-                    max length {max_len}. One possible reason is that 
-                    no enough shortenable parts in template. Try adding
-                    {{"shortenable": "True"}} property.
-                ''')
-            if 'input' in key:
-                input_dict[key].extend([pad_id_for_inputs] *
-                                       (max_len - len(value)))
-            else:
-                input_dict[key].extend([pad_id_for_others] *
-                                       (max_len - len(value)))
-        return input_dict
-
-    def truncate(self, inputs):
-        if hasattr(self, 'seq_length_list'):
-            inputs = self.truncate_by_manual(inputs, self.seq_length_list)
-        total_tokens = sum([len(part) for part in inputs['input_ids']])
-        num_specials = self.num_special_tokens_to_add
-        num_tokens_to_truncate = total_tokens - self.max_seq_length + num_specials
-        self.total_passed_sentences += 1
-        if num_tokens_to_truncate > 0:
-            self.num_truncated_sentences += 1
-            inputs = self.truncate_fn(
-                input_dict=inputs,
-                num_tokens_to_truncate=num_tokens_to_truncate)
-        return inputs
-
-    def add_special_tokens(self, encode_inputs):
-        for key in encode_inputs:
-            if key == "input_ids":
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    encode_inputs[
-                        key] = self.tokenizer.build_inputs_with_special_tokens(
-                            encode_inputs[key])
-            else:
-                special_tokens_mask = np.array(
-                    self.tokenizer.get_special_tokens_mask(encode_inputs[key]))
-                with_special_tokens = np.array(
-                    self.tokenizer.build_inputs_with_special_tokens(
-                        encode_inputs[key]))
-                with_special_tokens[special_tokens_mask == 1] = 0
-                encode_inputs[key] = with_special_tokens.tolist()
-        return encode_inputs
-
-
-class MLMTokenizerWrapper(TokenizerWrapper):
-    input_keys = ['input_ids', 'attention_mask', 'token_type_ids']
-
-    @property
-    def mask_token(self):
-        return self.tokenizer.mask_token
-
-    @property
-    def mask_token_id(self):
-        return self.tokenizer.mask_token_id
-
-    @property
-    def soft_token(self):
-        return self.tokenizer.unk_token
-
-    @property
-    def soft_token_id(self):
-        return self.tokenizer.unk_token_id
-
-    @property
-    def num_special_tokens_to_add(self):
-        if not hasattr(self, '_num_specials'):
-            self._num_specials = self.tokenizer.num_special_tokens_to_add()
-        return self._num_specials
-
-    def get_token_type_ids(self, encoded_inputs):
-        token_type_ids = [0] * len(encode_inputs['input_ids'])
-        sep_token = getattr(self.tokenizer, 'sep_token', -1)
-        if sep_token >= 0:
-            sep_index = np.where(
-                [x == sep_token for x in encode_inputs['input_ids']])[0]
-            for i, x in enumerate(sep_index[1:]):
-                pre_x = sep_index[i - 1]
-                sep_index[pre_x + 1:x + 1] = [i + 1] * (x - pre_x)
-        return token_type_ids
-
-    def tokenize_one_example(self, wrapped_example):
-        to_tokenize, not_to_tokenize = wrapped_example
-
-        encode_inputs = defaultdict(list)
-        for part in to_tokenize:
-            if part['mask_ids'] == 1:
-                text = [self.mask_token_id]
-
-            if part['text'] in self.special_tokens_maps.keys():
-                to_replace = self.special_tokens_maps[part['text']]
-                if to_replace is not None:
-                    part['text'] = to_replace
-                else:
-                    raise KeyError(
-                        "This tokenizer doesn't specify {} token.".format(
-                            piece['prompt']))
-
-            if 'soft_token_ids' in part and part['soft_token_ids'] == 1:
-                text = [self.soft_token_id]
-            else:
-                text = self.tokenizer.encode(
-                    part['text'],
-                    add_special_tokens=False,
-                    return_token_type_ids=False)['input_ids']
-
-            text_len = len(text)
-            encode_inputs['input_ids'].append(text)
-            for key in part:
-                if key not in ['text']:
-                    encode_inputs[key].append([part[key]] * text_len)
-        encode_inputs = self.truncate(inputs=encode_inputs)
-        encode_inputs.pop('shortenable_ids')
-        encode_inputs = self.concate_parts(encode_inputs)
-        encode_inputs = self.add_special_tokens(encode_inputs)
-        encode_inputs['attention_mask'] = [1] * len(encode_inputs['input_ids'])
-        if self.create_token_type_ids:
-            encode_inputs['token_type_ids'] = get_token_type_ids(encode_inputs)
-        encode_inputs = self.padding(
-            encode_inputs,
-            max_len=self.max_seq_length,
-            pad_id_for_inputs=self.tokenizer.pad_token_id)
-
-        for key in not_to_tokenize:
-            encode_inputs[key] = not_to_tokenize[key]
-
-        return InputFeatures(**encode_inputs)

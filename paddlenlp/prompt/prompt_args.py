@@ -48,13 +48,6 @@ class PromptTuningArguments(TrainingArguments):
             "`first_max_length` and `other_max_length` in the "
             "manual mode."
         })
-    cls_threshold: float = field(
-        default=0.5,
-        metadata={"help": "The threshold to select predicted labels for "\
-                          "multi-label classification."})
-    cls_top_k: int = field(
-        default=1,
-        metadata={"help": "Select the top k labels as prediction results."})
 
     freeze_plm: bool = field(
         default=False,

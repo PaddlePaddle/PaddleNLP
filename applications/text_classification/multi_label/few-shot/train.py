@@ -67,6 +67,7 @@ def main():
     template = AutoTemplate.create_from(
         data_args.prompt,
         tokenizer,
+        training_args.max_seq_length,
         model=model,
         prompt_encoder=data_args.soft_encoder,
         encoder_hidden_size=data_args.encoder_hidden_size)
