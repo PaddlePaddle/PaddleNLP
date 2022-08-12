@@ -285,6 +285,9 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
                                        &curr_offset_in_sequence,
                                        &all_tokens);
   }
+  if (all_tokens.size() == 0) {
+      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
+  }
   VLOG(6) << "All tokens num from TokenizeWithoutPreTokenize: "
           << all_tokens.size();
   return all_tokens;
@@ -369,6 +372,9 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
                          end_of_word - word_offset_in_sequence,
                          &original_num_tokens,
                          &all_tokens);
+  }
+  if (all_tokens.size() == 0) {
+      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
   }
   VLOG(6) << "All tokens num from TokenizeWithPreTokenize: "
           << all_tokens.size();

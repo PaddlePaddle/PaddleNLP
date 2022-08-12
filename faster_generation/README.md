@@ -1,6 +1,6 @@
 # FasterGeneration
 
-FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功能，其支持GPT、BART、UnifiedTransformer等多种NLP生成类预训练模型，并且支持多种解码策略，可以用于机器翻译、文本续写、文本摘要、对话生成等多种NLG任务的GPU场景预测加速。
+FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功能，其支持GPT、OPT、BART、UnifiedTransformer等多种NLP生成类预训练模型，并且支持多种解码策略，可以用于机器翻译、文本续写、文本摘要、对话生成等多种NLG任务的GPU场景预测加速。
 
 功能底层依托于[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)，该库针对标准的Transformer和GPT模型、beam search和sampling解码策略进行了性能优化。PaddleNLP FasterGeneration在其之上进行了扩展，实现了更多模型和生成策略的优化支持，并将功能入口封装于`model.generate`函数。功能的开启和关闭通过传入`use_faster`参数进行控制（默认为关闭状态）。通过调用generate函数，用户可以简单的使用模型高性能推理功能。下图展示了FasterGeneration的启动流程：
 
@@ -11,7 +11,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 
 ## Featrues
 
-- 全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。
+- 全面支持生成式预训练模型。包括GPT、OPT、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
 - 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
@@ -20,18 +20,17 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration对预训练模型和解码策略的支持情况（GPU）。
 
-| Model Name | GPT2 |BART |mBART | UnifiedTransformer |
-|:---:| :----:| :-----:|:-----:| :------------------: |
-| Model Structure| Decoder |Encoder-Decoder |  Encoder-Decoder | Prefix-LM  |
-|Beam Search           | ❌  | ✅  | ✅  | ✅  |
-|Top-K Sampling        | ✅  | ✅  | ✅  | ✅  |
-|Top-P Sampling        | ✅  | ✅  | ✅  | ✅  |
-|Diverse Sibling Search| ❌  | ✅  | ✅  | ✅  |
-|Forced Decoding       | ❌  | ❌  | ✅  | ❌  |
-|Length Penalty        | ❌  | ✅  | ✅  | ✅  |
-|Temperature           | ✅  | ✅  | ✅  | ✅  |
-|Repetition Penalty    | ✅  | ❌  | ❌  | ❌  |
-
+| Model   Name           | GPT2    | OPT     | BART            | mBART           | UnifiedTransformer |
+|------------------------|---------|---------|-----------------|-----------------|--------------------|
+| Model   Structure      | Decoder | Decoder | Encoder-Decoder | Encoder-Decoder | Prefix-LM          |
+| Beam Search            | ❌       | ❌       | ✅               | ✅               | ✅                  |
+| Top-K Sampling         | ✅       | ✅       | ✅               | ✅               | ✅                  |
+| Top-P Sampling         | ✅       | ✅       | ✅               | ✅               | ✅                  |
+| Diverse Sibling Search | ❌       | ❌       | ✅               | ✅               | ✅                  |
+| Forced Decoding        | ❌       | ❌       | ❌               | ✅               | ❌                  |
+| Length Penalty         | ❌       | ❌       | ✅               | ✅               | ✅                  |
+| Temperature            | ✅       | ✅       | ✅               | ✅               | ✅                  |
+| Repetition Penalty     | ✅       | ✅       | ❌               | ❌               | ❌                  |
 
 ## Performence
 
@@ -47,13 +46,19 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 **BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../docs/imgs/bart_perf.png" width="800" height ="400" />
+  <img src="https://user-images.githubusercontent.com/10242208/183384011-0df9a81e-72ac-429e-88da-166d48128b67.png" width="800" height ="400" />
 </p>
 
 **GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
-  <img src="../docs/imgs/gpt_perf.png" width="800" height ="400" />
+  <img src="https://user-images.githubusercontent.com/10242208/183376427-638a7dd1-94b0-4b45-bd52-7c38f12f090f.png" width="800" height ="400" />
+</p>
+
+**OPT** (opt, batch_size=4, max_length=32)
+
+<p align="left">
+  <img src="https://user-images.githubusercontent.com/10242208/183376428-7e7a0998-803c-4bc3-acf6-971a9471b300.png" width="800" height ="400" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf)

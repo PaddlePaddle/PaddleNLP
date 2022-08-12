@@ -64,16 +64,22 @@ void PrecompiledNormalizer::operator()(NormalizedString* mut_str) const {
 
 void to_json(nlohmann::json& j,
              const PrecompiledNormalizer& precompiled_normalizer) {
-  j = {{"type", "PrecompiledNormalizer"},
-       {"precompiled_charsmap",
-        precompiled_normalizer.sentencepiece_normalizer_
-            ->GetPrecompiledCharsmap()}};
+  const auto& precompiled_str =
+      precompiled_normalizer.sentencepiece_normalizer_
+          ->GetPrecompiledCharsmap();
+  std::vector<uint8_t> bytes(precompiled_str.begin(), precompiled_str.end());
+  j = {{"type", "PrecompiledNormalizer"}, {"precompiled_charsmap", bytes}};
 }
 
 void from_json(const nlohmann::json& j,
                PrecompiledNormalizer& precompiled_normalizer) {
-  precompiled_normalizer.SetPrecompiledCharsMap(
-      j.at("precompiled_charsmap").get<std::string>());
+  std::vector<uint8_t> bytes;
+  j.at("precompiled_charsmap").get_to(bytes);
+  std::ostringstream precompiled_charsmap_oss;
+  for (int i = 0; i < bytes.size(); ++i) {
+    precompiled_charsmap_oss << static_cast<char>(bytes[i]);
+  }
+  precompiled_normalizer.SetPrecompiledCharsMap(precompiled_charsmap_oss.str());
 }
 
 }  // namespace normalizers

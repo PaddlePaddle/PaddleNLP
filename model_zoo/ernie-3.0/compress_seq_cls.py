@@ -14,61 +14,46 @@
 
 import os
 import sys
-import yaml
 from functools import partial
 
 import paddle
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
-
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-)
+from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
+from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.utils.log import logger
 
-from compress_trainer import CompressConfig, PTQConfig
-
 sys.path.append("../ernie-1.0/finetune")
-
 from sequence_classification import seq_trans_fn, clue_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
+    )
 
-    paddle.set_device(training_args.device)
+    paddle.set_device(compression_args.device)
 
     data_args.dataset = data_args.dataset.strip()
 
     if data_args.dataset in ALL_DATASETS:
-        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
+        # If you custom you hyper-parameters in yaml config, it will overwrite all args.
         config = ALL_DATASETS[data_args.dataset]
-        logger.info("Over-writing training config by yaml config!")
-        for args in (model_args, data_args, training_args):
+        logger.info("Over-writing compression config by yaml config!")
+        for args in (model_args, data_args, compression_args):
             for arg in vars(args):
                 if arg in config.keys():
                     setattr(args, arg, config[arg])
 
-        training_args.per_device_train_batch_size = config["batch_size"]
-        training_args.per_device_eval_batch_size = config["batch_size"]
+        compression_args.per_device_train_batch_size = config["batch_size"]
+        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
+    compression_args.print_config(model_args, "Model")
+    compression_args.print_config(data_args, "Data")
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -81,42 +66,37 @@ def main():
         raw_datasets['train'].label_list)
 
     criterion = paddle.nn.CrossEntropyLoss()
-    # Define tokenizer, model, loss function.
+    # Defines tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
 
-    # Define dataset pre-process function
+    # Defines dataset pre-process function
     if "clue" in data_args.dataset:
         trans_fn = partial(clue_trans_fn, tokenizer=tokenizer, args=data_args)
     else:
         trans_fn = partial(seq_trans_fn, tokenizer=tokenizer, args=data_args)
 
-    # Define data collector
+    # Defines data collector
     data_collator = DataCollatorWithPadding(tokenizer)
 
     train_dataset = raw_datasets["train"].map(trans_fn)
     eval_dataset = raw_datasets["dev"].map(trans_fn)
 
-    trainer = Trainer(model=model,
-                      args=training_args,
-                      data_collator=data_collator,
-                      train_dataset=train_dataset,
-                      eval_dataset=eval_dataset,
-                      tokenizer=tokenizer,
-                      criterion=criterion)
+    trainer = Trainer(
+        model=model,
+        args=compression_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
 
-    output_dir = os.path.join(model_args.model_name_or_path, "compress")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    compression_args.print_config()
 
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
+    if not os.path.exists(compression_args.output_dir):
+        os.makedirs(compression_args.output_dir)
 
-    trainer.compress(output_dir,
-                     pruning=True,
-                     quantization=True,
-                     compress_config=compress_config)
+    trainer.compress()
 
 
 if __name__ == "__main__":

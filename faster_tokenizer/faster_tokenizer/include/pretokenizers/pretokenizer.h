@@ -21,12 +21,13 @@ limitations under the License. */
 #include "core/base.h"
 #include "core/encoding.h"
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct StringSplit {
+struct FASTERTOKENIZER_DECL StringSplit {
   normalizers::NormalizedString normalized_;
   std::vector<core::Token> tokens_;
   StringSplit(normalizers::NormalizedString&& normalized)
@@ -50,7 +51,7 @@ struct StringSplit {
   }
 };
 
-class PreTokenizedString {
+class FASTERTOKENIZER_DECL PreTokenizedString {
 public:
   PreTokenizedString() = default;
   PreTokenizedString(const std::string& original);
@@ -83,18 +84,19 @@ private:
   std::vector<StringSplit> splits_;
 };
 
-struct PreTokenizer {
+struct FASTERTOKENIZER_DECL PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const = 0;
 };
 
-struct OffsetConverter {
+struct FASTERTOKENIZER_DECL OffsetConverter {
   OffsetConverter(const std::string&) {}
   virtual bool convert(const core::Offset&, core::Offset*) const {
     return true;
   }
 };
 
-struct BytesToCharOffsetConverter : public OffsetConverter {
+struct FASTERTOKENIZER_DECL BytesToCharOffsetConverter
+    : public OffsetConverter {
   std::vector<size_t> offset_map_;
   BytesToCharOffsetConverter(const std::string&);
   virtual bool convert(const core::Offset&, core::Offset*) const;
