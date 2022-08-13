@@ -67,15 +67,15 @@ def do_train():
                 max_seq_len=args.max_seq_len))
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(dataset=train_ds,
-                                                 batch_size=args.batch_size,
-                                                 shuffle=True)
+                                                            batch_size=args.batch_size,
+                                                            shuffle=True)
     train_data_loader = paddle.io.DataLoader(dataset=train_ds,
                                              batch_sampler=train_batch_sampler,
                                              return_list=True)
 
     dev_batch_sampler = paddle.io.DistributedBatchSampler(dataset=dev_ds,
-                                               batch_size=args.batch_size,
-                                               shuffle=False)
+                                                          batch_size=args.batch_size,
+                                                          shuffle=False)
     dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
                                            batch_sampler=dev_batch_sampler,
                                            return_list=True)
