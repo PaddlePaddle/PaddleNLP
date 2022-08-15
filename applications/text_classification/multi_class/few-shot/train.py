@@ -25,7 +25,7 @@ from paddlenlp.prompt import (
     SoftVerbalizer,
     PromptTuningArguments,
     PromptTrainer,
-    PromptModelForClassification,
+    PromptModelForSequenceClassification,
 )
 from utils import load_local_dataset
 
@@ -83,7 +83,7 @@ def main():
     criterion = paddle.nn.CrossEntropyLoss()
 
     # Initialize the prompt model with the above variables.
-    prompt_model = PromptModelForClassification(
+    prompt_model = PromptModelForSequenceClassification(
         model,
         template,
         verbalizer,

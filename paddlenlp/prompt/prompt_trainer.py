@@ -34,7 +34,7 @@ from .verbalizer import SoftVerbalizer
 from .prompt_utils import InputFeatures, signature
 from .prompt_args import PromptTuningArguments
 
-__all__ = ["PromptTrainer", "PromptModelForClassification"]
+__all__ = ["PromptTrainer", "PromptModelForSequenceClassification"]
 
 PROMPT_NAME = "prompt.pdparams"
 
@@ -320,7 +320,7 @@ class PromptTrainer(Trainer):
         export_model(self.model, input_spec, export_path, export_type)
 
 
-class PromptModelForClassification(nn.Layer):
+class PromptModelForSequenceClassification(nn.Layer):
     """
     PromptModel for classification tasks.
     """

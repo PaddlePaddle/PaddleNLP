@@ -98,6 +98,8 @@ data/
 ...
 ```
 
+**Note**: 这里的标签映射词定义遵循的规则是，不同映射词尽可能长度一致，映射词和提示需要尽可能构成通顺的语句。越接近自然语句，小样本下模型训练效果越好。如果原标签名已经可以构成通顺语句，也可以不构造映射词，每行一个标签即可。
+
 ### 模型训练
 
 **单卡训练**
@@ -107,7 +109,7 @@ export CUDA_VISIBLE_DEVICES=0
 python train.py \
 --data_dir ./data \
 --output_dir ./ckpt/ \
---prompt "这句话描述的事件属于" \
+--prompt "这句话说的是" \
 --max_seq_length 128  \
 --learning_rate 3e-5 \
 --ppt_learning_rate 3e-4 \
@@ -129,7 +131,7 @@ unset CUDA_VISIBLE_DEVICES
 python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --data_dir ./data \
 --output_dir ./ckpt/ \
---prompt "这句话描述的事件属于" \
+--prompt "这句话说的是" \
 --max_seq_length 128  \
 --learning_rate 3e-5 \
 --ppt_learning_rate 3e-4 \

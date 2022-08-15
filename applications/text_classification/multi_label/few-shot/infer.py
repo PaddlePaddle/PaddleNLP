@@ -20,13 +20,7 @@ import argparse
 import numpy as np
 
 from paddlenlp.utils.log import logger
-from paddlenlp.prompt import (
-    AutoTemplate,
-    Verbalizer,
-    MLMTokenizerWrapper,
-    InputExample,
-    InputFeatures,
-)
+from paddlenlp.prompt import AutoTemplate, Verbalizer, InputExample
 from paddlenlp.transformers import AutoTokenizer
 import paddle2onnx
 import onnxruntime as ort
@@ -147,9 +141,8 @@ class MultiLabelPredictor(object):
                                               args.device, args.device_id,
                                               args.use_fp16, args.num_threads)
         self._template = AutoTemplate.load_from(
-            os.path.dirname(args.model_path_prefix), self._tokenizer)
-        self._wrapper = MLMTokenizerWrapper(self._max_seq_length,
-                                            self._tokenizer)
+            os.path.dirname(args.model_path_prefix), self._tokenizer,
+            args.max_seq_length)
 
     def predict(self, input_data: list):
         encoded_inputs = self.preprocess(input_data)
@@ -184,11 +177,11 @@ class MultiLabelPredictor(object):
     def preprocess(self, input_data: list):
         text = [InputExample(text_a=x) for x in input_data]
         inputs = [self._template.wrap_one_example(x) for x in text]
-        inputs = [self._wrapper.tokenize_one_example(x) for x in inputs]
-        inputs = InputFeatures(
-            input_ids=np.array([x["input_ids"] for x in inputs]),
-            mask_ids=np.array([x["mask_ids"] for x in inputs]),
-            soft_token_ids=np.array([x["soft_token_ids"] for x in inputs]))
+        inputs = {
+            "input_ids": np.array([x["input_ids"] for x in inputs]),
+            "mask_ids": np.array([x["mask_ids"] for x in inputs]),
+            "soft_token_ids": np.array([x["soft_token_ids"] for x in inputs])
+        }
         return inputs
 
     @staticmethod
