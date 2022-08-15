@@ -815,9 +815,6 @@ class TokenizerTesterMixin:
 
                 tokens = tokenizer.tokenize(input_text)
                 ids = tokenizer.convert_tokens_to_ids(tokens)
-                tokens_2 = tokenizer.convert_ids_to_tokens(ids)
-
-                ids = tokenizer.convert_tokens_to_ids(tokens)
                 ids_2 = tokenizer.encode(input_text,
                                          return_token_type_ids=None,
                                          add_special_tokens=False)['input_ids']
