@@ -12,15 +12,15 @@ from paddlenlp.transformers import (
 
 MODEL_CLASSES = {
     "gpt2": (GPTLMHeadModel, GPTTokenizer),
-    # "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
-    "gpt2-cn": (GPTForGeneration, GPTChineseTokenizer),
+    "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
+    "gpt2-gen": (GPTForGeneration, GPTChineseTokenizer),
 }
 
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--model_type',
-                        default='gpt2-cn',
+                        default='gpt2-gen',
                         type=str,
                         help="Model type selected in the list: " +
                         ", ".join(MODEL_CLASSES.keys()))
@@ -154,34 +154,46 @@ def main(args, input_text):
     args.max_dec_len = adjust_length_to_model(args.max_dec_len, 512)
     #                                           model.max_position_embeddings)
 
-    print(input_text)
     # input_ids = tokenizer.encode(input_text)['input_ids']
     inputs = tokenizer(input_text)
     inputs = left_padding(inputs, tokenizer.bos_token_id)
     input_ids = inputs['input_ids']
-    print(input_ids)
+
     if len(input_ids) == 0:
         input_ids = None
     else:
         # [1, seq_len]
         input_ids = paddle.to_tensor(input_ids, dtype='int64')  # .unsqueeze(0)
-        print(input_ids.shape)
 
-    ids, scores = model(input_ids=input_ids,
-                        max_length=args.max_dec_len,
-                        min_length=args.min_dec_len,
-                        eos_token_id=tokenizer.eos_token_id,
-                        decode_strategy=args.decode_strategy,
-                        temperature=args.temperature,
-                        top_k=args.top_k,
-                        top_p=args.top_p,
-                        num_beams=args.num_beams,
-                        length_penalty=args.length_penalty,
-                        early_stopping=args.early_stopping,
-                        num_return_sequences=args.num_return_sequences)
+    if args.model_type == "gpt2-gen":
+        ids, scores = model(input_ids=input_ids,
+                            max_length=args.max_dec_len,
+                            min_length=args.min_dec_len,
+                            eos_token_id=tokenizer.eos_token_id,
+                            decode_strategy=args.decode_strategy,
+                            temperature=args.temperature,
+                            top_k=args.top_k,
+                            top_p=args.top_p,
+                            num_beams=args.num_beams,
+                            length_penalty=args.length_penalty,
+                            early_stopping=args.early_stopping,
+                            num_return_sequences=args.num_return_sequences)
+    else:
+        ids, scores = model.generate(
+            input_ids=input_ids,
+            max_length=args.max_dec_len,
+            min_length=args.min_dec_len,
+            eos_token_id=tokenizer.eos_token_id,
+            decode_strategy=args.decode_strategy,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            top_p=args.top_p,
+            num_beams=args.num_beams,
+            length_penalty=args.length_penalty,
+            early_stopping=args.early_stopping,
+            num_return_sequences=args.num_return_sequences)
 
     generated_sequences = []
-    print(ids)
     for i, generated_ids in enumerate(ids):
         print("*" * 10 + " GENERATED SEQUENCE {} ".format(i) + "*" * 10)
         generated_ids = generated_ids.numpy().tolist()
@@ -197,9 +209,6 @@ def main(args, input_text):
 
 if __name__ == "__main__":
     args = parse_args()
-    input_text = ['花间一壶酒，独酌无相亲。举杯邀明月，', '我寄愁心与明月，随风']
-    # input_text = ['我寄愁心与明月，', '花间一壶酒，独酌无相亲。举杯邀明月，']
-    # input_text = ['花间一壶酒，独酌无相亲。举杯', '花间一壶酒，独酌无相亲。举杯邀明月，']
-    # input_text = ['花间一壶酒，独酌无相亲。举杯', '花间一壶酒，独酌无相亲。举杯']
+    # input_text = ['花间一壶酒，独酌无相亲。举杯邀明月，', '我寄愁心与明月，随风']
     input_text = ['床前明月光，疑是地上霜。举头望明月，低头', '白日依山尽，黄河入海流。欲穷千里目，']
     main(args, input_text)
