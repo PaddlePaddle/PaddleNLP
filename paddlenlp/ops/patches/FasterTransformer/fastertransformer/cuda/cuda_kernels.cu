@@ -92,5 +92,4 @@ template void update_logits_v2(half* logits,
                                const int m,
                                const int n,
                                cudaStream_t stream);
-
 }  // namespace fastertransformer

@@ -629,7 +629,6 @@ def infer_gptj_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
                         head_num, size_per_head, num_layer, bos_id, eos_id,
                         temperature, rotary_embedding_dim, repetition_penalty,
                         min_length, use_fp16_decoding):
-    # helper = LayerHelper('fusion_gptj', **locals())
     tensor_para_size = get_ft_para_conf().tensor_para_size
     layer_para_size = get_ft_para_conf().layer_para_size
     layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
