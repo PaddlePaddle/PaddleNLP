@@ -18,6 +18,7 @@ import json
 
 import paddle
 import paddle.nn as nn
+
 from .prompt_utils import InputExample, InputFeatures
 from .prompt_tokenizer import MLMPromptTokenizer
 from ..utils.log import logger

@@ -15,6 +15,7 @@
 from dataclasses import dataclass, field
 import os
 import sys
+
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
@@ -27,6 +28,7 @@ from paddlenlp.prompt import (
     PromptTrainer,
     PromptModelForSequenceClassification,
 )
+
 from utils import load_local_dataset
 
 sys.path.append("../")

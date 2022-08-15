@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
+
 from ..utils.log import logger
 
 __all__ = ["InputExample", "InputFeatures"]

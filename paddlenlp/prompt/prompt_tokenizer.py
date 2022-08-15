@@ -18,6 +18,7 @@ from functools import partial
 from collections import defaultdict
 
 import numpy as np
+
 from .prompt_utils import InputFeatures
 
 __all__ = ["MLMPromptTokenizer"]
