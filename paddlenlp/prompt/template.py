@@ -27,53 +27,52 @@ __all__ = ["Template", "ManualTemplate", "SoftTemplate", "AutoTemplate"]
 TEMPLATE_FILE = "template.json"
 
 
-def parse_template(inputs: str, part_start, part_end):
+def parse_template(inputs: str, part_start="{", part_end="}"):
     """ Parse items from the input template text. """
     parsed = []
-    i = 0
-    while i < len(inputs):
-        p = {
-            'add_prefix_space': ' ' if (i > 0 and inputs[i - 1] == ' ') else ''
-        }
-        while i < len(inputs) and inputs[i] == ' ':
-            p['add_prefix_space'] = ' '
-            i = i + 1
-        if i == len(inputs): break
+    i_start = 0
+    while i_start < len(inputs):
+        space = ' ' if (i_start > 0 and inputs[i_start - 1] == ' ') else ''
+        p = {"add_prefix_space": space}
+        while i_start < len(inputs) and inputs[i_start] == ' ':
+            p["add_prefix_space"] = ' '
+            i_start += 1
+        if i_start == len(inputs): break
 
-        if inputs[i] == part_start:
-            j = i + 1
+        if inputs[i_start] == part_start:
+            i_end = i_start + 1
             count_part = 1
-            while j < len(inputs):
-                if inputs[j] == part_end:
+            while i_end < len(inputs):
+                if inputs[i_end] == part_end:
                     count_part -= 1
                     if count_part == 0: break
-                elif inputs[j] == part_start:
+                elif inputs[i_end] == part_start:
                     count_part += 1
-                j = j + 1
-            if j == len(inputs):
+                i_end += 1
+            if i_end == len(inputs):
                 raise ValueError(
                     '{} at position {} has no corresponding {}'.format(
-                        part_start, i, part_end))
+                        part_start, i_start, part_end))
             try:
-                part = eval('{%s}' % inputs[i + 1:j])
+                part = eval('{%s}' % inputs[i_start + 1:i_end])
                 if isinstance(part, set):
                     part = {k: None for k in part}
                 p.update(part)
             except:
                 import traceback
                 logger.error(traceback.format_exc())
-                logger.error('syntax error in {}'.format('{%s}' %
-                                                         inputs[i + 1:j]))
+                logger.error(
+                    'syntax error in {}'.format(f"{inputs[i_start + 1:i_end]}"))
                 exit()
-            i = j + 1
+            i_start = i_end + 1
         else:
-            j = i + 1
-            while j < len(inputs):
-                if inputs[j] == part_start:
+            i_end = i_start + 1
+            while i_end < len(inputs):
+                if inputs[i_end] == part_start:
                     break
-                j = j + 1
-            p['hard'] = inputs[i:j].rstrip(' ')
-            i = j
+                i_end += 1
+            p['hard'] = inputs[i_start:i_end].rstrip(' ')
+            i_start = i_end
         parsed.append(p)
 
     return parsed
@@ -95,8 +94,6 @@ class Template(nn.Layer):
         super().__init__()
         self.tokenizer = tokenizer
         self.wrapped_tokenizer = MLMPromptTokenizer(tokenizer, max_seq_length)
-        self.part_start = '{'
-        self.part_end = '}'
 
     @property
     def template(self):
@@ -110,15 +107,15 @@ class Template(nn.Layer):
         if template is None:
             return
         self._template = template
-        self._post_init_template()
+        self._process_template()
 
     @abstractmethod
-    def _post_init_template(self):
+    def _process_template(self):
         """ A hook to process template text when it is set. """
         raise NotImplementedError
 
     def parse_inputs(self, inputs):
-        return parse_template(inputs, self.part_start, self.part_end)
+        return parse_template(inputs)
 
     def get_default_mask_ids(self):
         """ List to denote whether an item in template is a mask token. """
@@ -149,14 +146,14 @@ class Template(nn.Layer):
             elif 'sep' in p:
                 inputs[i] = self.tokenizer.sep_token
             else:
-                raise ValueError('can not parse {}'.format(p))
+                raise ValueError('Can not parse {}'.format(p))
 
         return inputs
 
     def wrap_one_example(self, example):
         """ Process InputExample according to the predefined template. """
         if self.template is None:
-            raise ValueError('template has not been initialized.')
+            raise ValueError('The template has not been initialized.')
         if isinstance(example, InputExample):
             text = self.incorporate_template_text(example)
 
@@ -223,7 +220,7 @@ class ManualTemplate(Template):
         super().__init__(tokenizer=tokenizer, max_seq_length=max_seq_length)
         self.template = template
 
-    def _post_init_template(self):
+    def _process_template(self):
         if isinstance(self._template, str):
             self._template = self.parse_inputs(self._template)
 
@@ -274,7 +271,7 @@ class SoftTemplate(Template):
         self.prompt_encoder = prompt_encoder
         self.template = template
 
-    def _post_init_template(self):
+    def _process_template(self):
         if isinstance(self._template, str):
             self._template = self.parse_inputs(self._template)
         self.parse_soft_tokens()
@@ -471,8 +468,6 @@ class AutoTemplate(object):
     given the provided prompt.
     """
     registered_text_keys = ['text_a', 'text_b']
-    part_start = '{'
-    part_end = '}'
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -482,7 +477,7 @@ class AutoTemplate(object):
 
     @classmethod
     def parse_inputs(cls, inputs):
-        return parse_template(inputs, cls.part_start, cls.part_end)
+        return parse_template(inputs)
 
     @classmethod
     def create_from(cls,

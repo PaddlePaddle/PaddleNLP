@@ -199,6 +199,20 @@ python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resum
 
 ### 模型部署
 
+模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle静态图模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)。
+
+如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
+```shell
+pip install paddle2onnx==1.0.0rc3
+python -m pip install onnxruntime-gpu onnx onnxconverter-common
+```
+
+如果基于CPU部署，请使用如下命令安装所需依赖:
+```shell
+pip install paddle2onnx==1.0.0rc3
+python -m pip install onnxruntime
+```
+
 #### CPU端推理样例
 
 ```
@@ -222,3 +236,5 @@ python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_
 - `device_id`: 指定GPU设备ID。
 - `use_fp16`: 是否使用半精度加速推理。仅在GPU设备上有效。
 - `num_threads`: 设置CPU使用的线程数。默认为机器上的物理内核数。
+
+**Note**: 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。
