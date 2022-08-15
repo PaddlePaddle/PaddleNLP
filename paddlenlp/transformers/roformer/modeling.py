@@ -640,14 +640,14 @@ class RoFormerModel(RoFormerPretrainedModel):
                 Whether to return the attentions tensors of all attention layers.
                 Defaults to `False`.
             return_dict (bool, optional):
-                Whether to return a `ModelOutput` object. If `False`, the output
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            An instance of `BaseModelOutputWithPoolingAndCrossAttentions` if
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
             `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
             to ordered and not None (depending on the input arguments) fields of
-            `BaseModelOutputWithPoolingAndCrossAttentions`.
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -679,8 +679,6 @@ class RoFormerModel(RoFormerPretrainedModel):
             embedding_output = self.embeddings_project(embedding_output)
 
         self.encoder._use_cache = use_cache  # To be consistent with HF
-
-        seqlen = embedding_output.shape[1]
 
         encoder_outputs = self.encoder(
             embedding_output,
@@ -732,6 +730,8 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 attention_mask=None,
+                start_positions=None,
+                end_positions=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -745,18 +745,30 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
             output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
                 
         Returns:
-            An instance of `QuestionAnsweringModelOutput` if `return_dict=True`. 
-            Otherwise it returns a tuple of tensors corresponding to ordered and 
-            not None (depending on the input arguments) fields of `QuestionAnsweringModelOutput`.
-            
+            An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput`.
+
         Example:
             .. code-block::
 
@@ -776,19 +788,35 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
-
         sequence_output = outputs[0]
 
         logits = self.classifier(sequence_output)
         start_logits, end_logits = paddle.unstack(x=logits, axis=-1)
 
         total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
             return ((total_loss, ) +
                     output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(
+            loss=total_loss,
             start_logits=start_logits,
             end_logits=end_logits,
             hidden_states=outputs.hidden_states,
@@ -826,6 +854,7 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -839,18 +868,26 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
             output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            An instance of `SequenceClassifierOutput` if `return_dict=True`. 
-            Otherwise it returns a tuple of tensors corresponding to ordered and 
-            not None (depending on the input arguments) fields of `SequenceClassifierOutput`.
-     
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput`.
+
         Example:
             .. code-block::
 
@@ -876,12 +913,25 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
         logits = self.classifier(pooled_output)
 
         loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
         if not return_dict:
             output = (logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
+            loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -918,6 +968,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -931,18 +982,23 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
             output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            An instance of `TokenClassifierOutput` if `return_dict=True`. 
-            Otherwise it returns a tuple of tensors corresponding to ordered and 
-            not None (depending on the input arguments) fields of `TokenClassifierOutput`.
-     
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
         Example:
             .. code-block::
 
@@ -962,19 +1018,24 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
-
         sequence_output = outputs[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
         loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+
         if not return_dict:
             output = (logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
+            loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -1012,6 +1073,7 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                 input_ids=None,
                 token_type_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -1025,17 +1087,24 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                 See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
             output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
                 
         Returns:
-            An instance of `MultipleChoiceModelOutput` if `return_dict=True`. 
-            Otherwise it returns a tuple of tensors corresponding to ordered and 
-            not None (depending on the input arguments) fields of `MultipleChoiceModelOutput`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
 
         Example:
             .. code-block::
@@ -1091,19 +1160,23 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
         pooled_output = outputs[1]
-        pooled_output = self.dropout(pooled_output)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         reshaped_logits = logits.reshape((-1, self.num_choices))
 
         loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(
+            loss=loss,
             logits=reshaped_logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -1136,6 +1209,7 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                 input_ids=None,
                 token_type_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -1149,17 +1223,25 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
+                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
+                loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
             output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
 
         Returns:
-            An instance of `MaskedLMOutput` if `return_dict=True`. Otherwise it
-            returns a tuple of tensors corresponding to ordered and not None
-            (depending on the input arguments) fields of `MaskedLMOutput`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput`.
 
         Example:
             .. code-block::
@@ -1181,11 +1263,18 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
-
         sequence_output = outputs[0]
+
         prediction_scores = self.cls(sequence_output)
 
         masked_lm_loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss(
+            )  # -100 index = padding token
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
+                labels.reshape((-1, )))
+
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
             return ((masked_lm_loss, ) +
@@ -1193,6 +1282,7 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                         output[0] if len(output) == 1 else output)
 
         return MaskedLMOutput(
+            loss=masked_lm_loss,
             logits=prediction_scores,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -1223,8 +1313,9 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
 
     def forward(self,
                 input_ids=None,
-                attention_mask=None,
                 token_type_ids=None,
+                attention_mask=None,
+                labels=None,
                 past_key_values=None,
                 use_cache=None,
                 output_attentions=False,
@@ -1240,23 +1331,29 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel`.
-            past_key_values (Tensor, optional):
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
+                `[-100, 0, ..., vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
+                ignored (masked), the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
+            past_key_values (List(Tensor), optional):
                 See :class:`RoFormerModel`.
             use_cache (Tensor, optional):
                 See :class:`RoFormerModel`.
-            attention_mask (Tensor, optional):
-                See :class:`RoFormerModel`.
-            output_attentions (bool, optional):
-                See :class:`RoFormerModel`.
             output_hidden_states (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
             return_dict (bool, optional):
-                See :class:`RoFormerModel`.
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
             
         Returns:
-            An instance of `CausalLMOutputWithCrossAttentions` if `return_dict=True`. Otherwise it
-            returns a tuple of tensors corresponding to ordered and not None
-            (depending on the input arguments) fields of `CausalLMOutputWithCrossAttentions`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions`.
 
         Example:
             .. code-block::
@@ -1274,8 +1371,8 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
         """
 
         outputs = self.roformer(input_ids,
-                                attention_mask=attention_mask,
                                 token_type_ids=token_type_ids,
+                                attention_mask=attention_mask,
                                 past_key_values=past_key_values,
                                 use_cache=use_cache,
                                 output_attentions=output_attentions,
@@ -1286,12 +1383,21 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
         prediction_scores = self.cls(sequence_output)
 
         lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :]
+            labels = labels[:, 1:]
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            lm_loss = loss_fct(
+                shifted_prediction_scores.reshape(
+                    (-1, prediction_scores.shape[-1])), labels.reshape((-1, )))
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
             return ((lm_loss, ) + output) if lm_loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
             logits=prediction_scores,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
