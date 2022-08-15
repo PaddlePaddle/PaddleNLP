@@ -127,6 +127,26 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "ernie-3.0-nano-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-zh-base-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-zh-base-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-zh-medium-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-zh-medium-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-zh-mini-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-zh-mini-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-zh-micro-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-zh-micro-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-zh-nano-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-zh-nano-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
             "rocketqa-base-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "rocketqa-medium-cross-encoder":
@@ -210,6 +230,36 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-3.0-nano-zh": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-base-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-base-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-medium-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-medium-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-mini-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-mini-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-micro-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-micro-para-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-nano-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqa-zh-nano-para-encoder": {
             "do_lower_case": True
         },
         "rocketqa-base-cross-encoder": {
