@@ -20,7 +20,7 @@ MODEL_CLASSES = {
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--model_type',
-                        default='gpt2-gen',
+                        default='gpt2-cn',
                         type=str,
                         help="Model type selected in the list: " +
                         ", ".join(MODEL_CLASSES.keys()))
