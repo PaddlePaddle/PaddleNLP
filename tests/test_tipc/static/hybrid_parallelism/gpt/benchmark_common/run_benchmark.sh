@@ -148,6 +148,7 @@ function _train(){
     cd ../examples/language_model/gpt-3/static/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
+    [ ${PADDLE_TRAINER_ID} ] && export PADDLE_RANK=${PADDLE_TRAINER_ID}
     timeout 15m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
