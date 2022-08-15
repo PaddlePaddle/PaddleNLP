@@ -497,6 +497,9 @@ class BertTokenizer(PretrainedTokenizer):
 
         return len(self.vocab)
 
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
+
     def _tokenize(self, text):
         """
         End-to-end tokenization for BERT models.
