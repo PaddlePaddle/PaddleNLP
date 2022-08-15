@@ -15,7 +15,7 @@
 
 import json
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict
 import shutil
 
 from paddle.utils import try_import
