@@ -1254,9 +1254,9 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             
         Returns:
-            An instance of `MaskedLMOutput` if `return_dict=True`. Otherwise it
+            An instance of `CausalLMOutputWithCrossAttentions` if `return_dict=True`. Otherwise it
             returns a tuple of tensors corresponding to ordered and not None
-            (depending on the input arguments) fields of `MaskedLMOutput`.
+            (depending on the input arguments) fields of `CausalLMOutputWithCrossAttentions`.
 
         Example:
             .. code-block::
@@ -1291,7 +1291,7 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
             return ((lm_loss, ) + output) if lm_loss is not None else (
                 output[0] if len(output) == 1 else output)
 
-        return CausalLMOutputWithPast(
+        return CausalLMOutputWithCrossAttentions(
             logits=prediction_scores,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
