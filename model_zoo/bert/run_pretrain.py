@@ -150,7 +150,7 @@ def parse_args():
     parser.add_argument("--device",
                         type=str,
                         default="gpu",
-                        choices=["cpu", "gpu", "xpu"],
+                        choices=["cpu", "gpu", "xpu", "npu"],
                         help="Device for selecting for the training.")
     parser.add_argument("--use_amp",
                         type=distutils.util.strtobool,
@@ -501,7 +501,7 @@ def do_train(args):
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:            
+                if global_step >= args.max_steps:
                     del train_data_loader
                     return
                 batch_start = time.time()

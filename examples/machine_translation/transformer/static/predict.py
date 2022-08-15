@@ -101,6 +101,8 @@ def do_predict(args):
     paddle.enable_static()
     if args.device == "gpu":
         place = paddle.set_device("gpu")
+    elif args.device == "npu":
+        place = paddle.set_device("npu")
     else:
         place = paddle.set_device("cpu")
 

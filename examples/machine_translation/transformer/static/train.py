@@ -113,6 +113,9 @@ def do_train(args):
         elif args.device == "xpu":
             places = paddle.static.xpu_places()
             paddle.set_device("xpu")
+        elif args.device == "npu":
+            places = paddle.static.npu_places()
+            paddle.set_device("npu")
         else:
             places = paddle.static.cpu_places()
             paddle.set_device("cpu")

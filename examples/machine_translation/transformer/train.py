@@ -109,6 +109,10 @@ def do_train(args):
     if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
+    elif args.device == "npu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("npu")
     else:
         rank = 0
         trainer_count = 1
