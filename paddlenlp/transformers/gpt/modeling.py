@@ -1529,17 +1529,28 @@ class GPTForGeneration(GPTPretrainedModel):
             return probs
 
         batch_size, cur_len = input_ids.shape
-        origin_len = cur_len
+        origin_len = input_ids.shape[1]
         unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
         scores = paddle.full([batch_size, 1],
                              0.0,
                              dtype=paddle.get_default_dtype())
 
-        while cur_len < max_length:
-            # prepare model inputs & get model output
+        # Pre-while call for inference,
+        # the value in model_kwargs should be tensor before while loop
+        if cur_len < max_length:
             model_inputs = self.prepare_inputs_for_generation(
                 input_ids, **model_kwargs)
             outputs = self.model(**model_inputs)
+            model_kwargs["cache"] = outputs[1]
+
+        while cur_len < max_length:
+            # prepare model inputs & get model output
+            # skip first step for pre-while call
+            if cur_len > origin_len:
+                model_inputs = self.prepare_inputs_for_generation(
+                    input_ids, **model_kwargs)
+                outputs = self.model(**model_inputs)
+
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
@@ -1590,17 +1601,28 @@ class GPTForGeneration(GPTPretrainedModel):
     def greedy_search(self, input_ids, logits_processors, max_length,
                       pad_token_id, eos_token_id, **model_kwargs):
         batch_size, cur_len = input_ids.shape
-        origin_len = cur_len
+        origin_len = input_ids.shape[1]  # cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
         scores = paddle.full([batch_size, 1],
                              0.0,
                              dtype=paddle.get_default_dtype())
 
-        while cur_len < max_length:
-            # prepare model inputs & get model output
+        # Pre-while call for inference,
+        # the value in model_kwargs should be tensor before while loop
+        if cur_len < max_length:
             model_inputs = self.prepare_inputs_for_generation(
                 input_ids, **model_kwargs)
             outputs = self.model(**model_inputs)
+            model_kwargs["cache"] = outputs[1]
+
+        while cur_len < max_length:
+            # prepare model inputs & get model output
+            # skip first step for pre-while call
+            if cur_len > origin_len:
+                model_inputs = self.prepare_inputs_for_generation(
+                    input_ids, **model_kwargs)
+                outputs = self.model(**model_inputs)
+
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
@@ -1637,6 +1659,7 @@ class GPTForGeneration(GPTPretrainedModel):
                 outputs,
                 model_kwargs,
                 is_encoder_decoder=self.is_encoder_decoder)
+
         return input_ids[:, origin_len:], scores
 
 
